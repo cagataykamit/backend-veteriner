@@ -19,6 +19,7 @@
 | **Seeding** | İzin ve temel platform verisi için seed akışları |
 | **Middleware / Swagger / Health** | API sözleşmesi, sürümleme, sağlık kontrolleri, ortak middleware |
 | **Platform admin controller’ları** | Kullanıcı, izin, claim ve outbox gibi **platform** uçları |
+| **Veteriner domain iskeleti** | `Tenant`, `Clinic`, `Client`, `Pet`, `Appointment` agregatları; Application’da Create + GetById + sayfalı liste sorguları (API uçları sonraki adımda) |
 
 ## Ne içermez?
 

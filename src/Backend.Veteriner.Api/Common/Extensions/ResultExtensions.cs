@@ -71,6 +71,11 @@ public static class ResultExtensions
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }
 
+        if (normalized.Contains("tenantinactive"))
+        {
+            return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
         if (normalized.Contains("unauthorized") || normalized.Contains("unauthenticated"))
         {
             return (StatusCodes.Status401Unauthorized, "https://httpstatuses.io/401");

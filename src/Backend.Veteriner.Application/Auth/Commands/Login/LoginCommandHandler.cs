@@ -1,8 +1,11 @@
 using System.Security.Claims;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using MediatR;
 using Microsoft.Extensions.Options;
 
@@ -18,6 +21,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
     private readonly IClientContext _client;
     private readonly IJwtOptionsProvider _jwtOpt;
     private readonly IOperationClaimPermissionRepository _ocpRepo;
+    private readonly IReadRepository<Tenant> _tenants;
     private readonly SessionOptions _sessionOpt;
 
     public LoginCommandHandler(
@@ -29,6 +33,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         IClientContext client,
         IJwtOptionsProvider jwtOpt,
         IOperationClaimPermissionRepository ocpRepo,
+        IReadRepository<Tenant> tenants,
         IOptions<SessionOptions> sessionOpt)
     {
         _users = users;
@@ -39,6 +44,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         _client = client;
         _jwtOpt = jwtOpt;
         _ocpRepo = ocpRepo;
+        _tenants = tenants;
         _sessionOpt = sessionOpt.Value;
     }
 
@@ -58,8 +64,36 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         if (_sessionOpt.SingleSessionPerUser)
             await _refreshRepo.RevokeAllByUserAsync(user.Id, ct);
 
-        var permissionCodes = await _ocpRepo.GetPermissionCodesByUserIdAsync(user.Id, ct);
+        var permissionCodes = await _ocpRepo.GetPermissionCodesByUserIdAsync(user.Id, ct)
+                              ?? Array.Empty<string>();
         var extraClaims = permissionCodes.Select(code => new Claim("permission", code)).ToList();
+
+        if (request.TenantId is { } loginTenantId)
+        {
+            if (loginTenantId == Guid.Empty)
+            {
+                return Result<LoginResultDto>.Failure(
+                    "Validation.TenantId",
+                    "TenantId geçersiz.");
+            }
+
+            var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(loginTenantId), ct);
+            if (tenant is null)
+            {
+                return Result<LoginResultDto>.Failure(
+                    "Tenants.NotFound",
+                    "Kiracı bulunamadı.");
+            }
+
+            if (!tenant.IsActive)
+            {
+                return Result<LoginResultDto>.Failure(
+                    "Tenants.TenantInactive",
+                    "Pasif kiracı için oturum açılamaz.");
+            }
+
+            extraClaims.Add(new Claim(VeterinerClaims.TenantId, loginTenantId.ToString("D")));
+        }
 
         var (access, refreshRaw, accessExp) = _jwt.Create(user, extraClaims);
 

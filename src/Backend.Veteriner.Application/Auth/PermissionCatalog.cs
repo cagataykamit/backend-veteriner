@@ -33,6 +33,44 @@ public static class PermissionCatalog
         public const string Write = "Outbox.Write";
     }
 
+    public static class Tenants
+    {
+        public const string Read = "Tenants.Read";
+        public const string Create = "Tenants.Create";
+    }
+
+    public static class Clinics
+    {
+        public const string Read = "Clinics.Read";
+        public const string Create = "Clinics.Create";
+    }
+
+    public static class Clients
+    {
+        public const string Read = "Clients.Read";
+        public const string Create = "Clients.Create";
+    }
+
+    public static class Pets
+    {
+        public const string Read = "Pets.Read";
+        public const string Create = "Pets.Create";
+    }
+
+    public static class Appointments
+    {
+        public const string Read = "Appointments.Read";
+        public const string Create = "Appointments.Create";
+        public const string Cancel = "Appointments.Cancel";
+        public const string Complete = "Appointments.Complete";
+        public const string Reschedule = "Appointments.Reschedule";
+    }
+
+    public static class Dashboard
+    {
+        public const string Read = "Dashboard.Read";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -57,6 +95,26 @@ public static class PermissionCatalog
 
         new(Outbox.Read, "Outbox kayıtlarını görüntüleme yetkisi", "Outbox"),
         new(Outbox.Write, "Outbox üzerinde yönetim işlemleri yapma yetkisi", "Outbox"),
+
+        new(Tenants.Read, "Kiracıları listeleme ve görüntüleme yetkisi", "Tenants"),
+        new(Tenants.Create, "Kiracı oluşturma yetkisi", "Tenants"),
+
+        new(Clinics.Read, "Klinikleri listeleme ve görüntüleme yetkisi", "Clinics"),
+        new(Clinics.Create, "Klinik oluşturma yetkisi", "Clinics"),
+
+        new(Clients.Read, "Müşterileri listeleme ve görüntüleme yetkisi", "Clients"),
+        new(Clients.Create, "Müşteri oluşturma yetkisi", "Clients"),
+
+        new(Pets.Read, "Hayvan kayıtlarını listeleme ve görüntüleme yetkisi", "Pets"),
+        new(Pets.Create, "Hayvan kaydı oluşturma yetkisi", "Pets"),
+
+        new(Appointments.Read, "Randevuları listeleme ve görüntüleme yetkisi", "Appointments"),
+        new(Appointments.Create, "Randevu oluşturma yetkisi", "Appointments"),
+        new(Appointments.Cancel, "Planlanmış randevuyu iptal etme yetkisi", "Appointments"),
+        new(Appointments.Complete, "Planlanmış randevuyu tamamlama yetkisi", "Appointments"),
+        new(Appointments.Reschedule, "Planlanmış randevuyu yeniden zamanlama yetkisi", "Appointments"),
+
+        new(Dashboard.Read, "Klinik paneli özet dashboard verilerini görüntüleme yetkisi", "Dashboard"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 

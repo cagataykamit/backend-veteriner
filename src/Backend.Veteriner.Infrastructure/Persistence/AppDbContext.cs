@@ -1,5 +1,10 @@
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
+using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +49,12 @@ public class AppDbContext : DbContext
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<Clinic> Clinics => Set<Clinic>();
+    public DbSet<Client> Clients => Set<Client>();
+    public DbSet<Pet> Pets => Set<Pet>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

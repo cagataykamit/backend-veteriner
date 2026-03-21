@@ -65,6 +65,7 @@ public static class WebApplicationExtensions
         app.UseAppRateLimiting();
 
         app.UseAuthentication();
+        app.UseMiddleware<TenantContextMiddleware>();
         app.UseAuthorization();
 
         // 401/403/404/429 gibi exception olmayan durumları da ProblemDetails'e bağla

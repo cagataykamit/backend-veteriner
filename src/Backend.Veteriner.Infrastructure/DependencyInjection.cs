@@ -86,6 +86,7 @@ public static class DependencyInjection
         // ===== HttpContext & App URL & Audit =====
         services.AddHttpContextAccessor();
         services.AddScoped<IClientContext, ClientContext>();
+        services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<IAppUrlProvider, AppUrlProvider>();
         services.AddScoped<IAuditContext, HttpAuditContext>();
         services.AddScoped<IAuditLogWriter, AuditLogWriter>();
