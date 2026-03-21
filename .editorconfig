@@ -1,0 +1,17 @@
+# EditorConfig: https://editorconfig.org
+# Proje kökü - tüm kaynak dosyalar UTF-8 ile tutulur (Türkçe karakter uyumu)
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cs,csproj,json,md}]
+charset = utf-8
+
+[*.cs]
+indent_style = space
+indent_size = 4
