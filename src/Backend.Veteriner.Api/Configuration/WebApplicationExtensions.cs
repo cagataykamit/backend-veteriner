@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
+using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
@@ -160,6 +161,33 @@ public static class WebApplicationExtensions
             {
                 var db = services.GetRequiredService<AppDbContext>();
                 var hasher = services.GetRequiredService<IPasswordHasher>();
+
+                // Geçici tanılama: migration öncesi gerçek bağlantı hedefi (User Secrets / env override doğrulaması).
+                var aspNetCoreEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+                    ?? app.Environment.EnvironmentName;
+                var rawConnectionString = db.Database.GetConnectionString();
+                string? server = null;
+                string? databaseName = null;
+                if (!string.IsNullOrWhiteSpace(rawConnectionString))
+                {
+                    try
+                    {
+                        var csb = new SqlConnectionStringBuilder(rawConnectionString);
+                        server = csb.DataSource;
+                        databaseName = csb.InitialCatalog;
+                    }
+                    catch (Exception parseEx)
+                    {
+                        logger.LogWarning(parseEx, "[Startup DB] Connection string parse edilemedi.");
+                    }
+                }
+
+                logger.LogWarning(
+                    "[Startup DB] Migration öncesi — Environment={Environment} | DatabaseServer={DatabaseServer} | DatabaseName={DatabaseName} | FullConnectionString={FullConnectionString}",
+                    aspNetCoreEnv,
+                    server,
+                    databaseName,
+                    rawConnectionString ?? "(null)");
 
                 await db.Database.MigrateAsync();
 

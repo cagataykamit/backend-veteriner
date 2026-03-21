@@ -12,20 +12,25 @@ namespace Backend.Veteriner.Application.Tests.Clinics.Handlers;
 
 public sealed class CreateClinicCommandHandlerTests
 {
+    private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IRepository<Clinic>> _clinicsWrite = new();
 
     private CreateClinicCommandHandler CreateHandler()
-        => new(_tenantsRead.Object, _clinicsRead.Object, _clinicsWrite.Object);
+        => new(_tenantContext.Object, _tenantsRead.Object, _clinicsRead.Object, _clinicsWrite.Object);
+
+    private static void AlignTenantId(Tenant tenant, Guid id)
+        => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantNotFound()
     {
         var handler = CreateHandler();
         var tenantId = Guid.NewGuid();
-        var cmd = new CreateClinicCommand(tenantId, "Merkez", "İstanbul");
+        var cmd = new CreateClinicCommand("Merkez", "İstanbul");
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Tenant?)null);
 
@@ -41,11 +46,13 @@ public sealed class CreateClinicCommandHandlerTests
     {
         var handler = CreateHandler();
         var tenantId = Guid.NewGuid();
-        var cmd = new CreateClinicCommand(tenantId, "Merkez", "İstanbul");
+        var cmd = new CreateClinicCommand("Merkez", "İstanbul");
 
         var tenant = new Tenant("Pasif A.Ş.");
+        AlignTenantId(tenant, tenantId);
         tenant.Deactivate();
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -61,10 +68,12 @@ public sealed class CreateClinicCommandHandlerTests
     {
         var handler = CreateHandler();
         var tenantId = Guid.NewGuid();
-        var cmd = new CreateClinicCommand(tenantId, "Merkez Şube", "Ankara");
+        var cmd = new CreateClinicCommand("Merkez Şube", "Ankara");
 
         var tenant = new Tenant("Aktif A.Ş.");
+        AlignTenantId(tenant, tenantId);
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -83,10 +92,12 @@ public sealed class CreateClinicCommandHandlerTests
     {
         var handler = CreateHandler();
         var tenantId = Guid.NewGuid();
-        var cmd = new CreateClinicCommand(tenantId, "Merkez", "İstanbul");
+        var cmd = new CreateClinicCommand("Merkez", "İstanbul");
 
         var tenant = new Tenant("Aktif A.Ş.");
+        AlignTenantId(tenant, tenantId);
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 

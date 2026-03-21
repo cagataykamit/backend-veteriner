@@ -21,6 +21,7 @@ public sealed class RefreshCommandHandlerTests
     private readonly Mock<IJwtOptionsProvider> _opt = new();
     private readonly Mock<IOperationClaimPermissionRepository> _ocpRepo = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
+    private readonly Mock<IUserTenantRepository> _userTenants = new();
 
     private RefreshCommandHandler CreateHandler()
     {
@@ -32,20 +33,18 @@ public sealed class RefreshCommandHandlerTests
             _jwt.Object,
             _opt.Object,
             _ocpRepo.Object,
-            _tenants.Object);
+            _tenants.Object,
+            _userTenants.Object);
     }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_RefreshToken_IsEmpty()
     {
-        // Arrange
         var handler = CreateHandler();
         var cmd = new RefreshCommand(string.Empty);
 
-        // Act
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Auth.Unauthorized.InvalidRefreshToken");
         _refreshRepo.Verify(r => r.GetByHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -54,7 +53,6 @@ public sealed class RefreshCommandHandlerTests
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_StoredToken_NotFound()
     {
-        // Arrange
         var handler = CreateHandler();
         var cmd = new RefreshCommand("raw-token");
 
@@ -62,10 +60,8 @@ public sealed class RefreshCommandHandlerTests
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
             .ReturnsAsync((RefreshToken?)null);
 
-        // Act
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Auth.Unauthorized.RefreshTokenNotFound");
     }
@@ -73,24 +69,22 @@ public sealed class RefreshCommandHandlerTests
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TokenIsReused()
     {
-        // Arrange
         var handler = CreateHandler();
         var cmd = new RefreshCommand("raw-token");
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
 
         var user = new User("user@example.com", "hash");
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null);
+        var tid = Guid.NewGuid();
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, tid);
         stored.Revoke("reused");
-        typeof(RefreshToken).GetProperty("User")!.SetValue(stored, user);
+        typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
 
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
 
-        // Act
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Auth.Unauthorized.RefreshTokenReused");
         _refreshRepo.Verify(r => r.RevokeAllByUserAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
@@ -99,62 +93,81 @@ public sealed class RefreshCommandHandlerTests
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TokenIsExpired()
     {
-        // Arrange
         var handler = CreateHandler();
         var cmd = new RefreshCommand("raw-token");
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
 
         var user = new User("user@example.com", "hash");
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(-1), null, null);
-        typeof(RefreshToken).GetProperty("User")!.SetValue(stored, user);
+        var tid = Guid.NewGuid();
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(-1), null, null, tid);
+        typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
 
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
 
-        // Act
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Auth.Unauthorized.RefreshTokenReused");
+        result.Error.Code.Should().Be("Auth.Unauthorized.RefreshTokenExpired");
     }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_UserIsNull()
     {
-        // Arrange
         var handler = CreateHandler();
         var cmd = new RefreshCommand("raw-token");
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
 
-        var stored = new RefreshToken(Guid.NewGuid(), "hash", DateTime.UtcNow.AddDays(1), null, null);
-        // User navigation null bırakılıyor
+        var tid = Guid.NewGuid();
+        var stored = new RefreshToken(Guid.NewGuid(), "hash", DateTime.UtcNow.AddDays(1), null, null, tid);
 
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
 
-        // Act
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Auth.Unauthorized.UserNotFound");
     }
 
     [Fact]
-    public async Task Handle_Should_IssueNewTokens_When_RefreshIsValid()
+    public async Task Handle_Should_ReturnFailure_When_SessionTenantMissing()
     {
-        // Arrange
         var handler = CreateHandler();
         var cmd = new RefreshCommand("raw-token");
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
 
         var user = new User("user@example.com", "hash");
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null);
-        typeof(RefreshToken).GetProperty("User")!.SetValue(stored, user);
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, null);
+        typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
+
+        _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(stored);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Auth.RefreshSessionRequiresReLogin");
+    }
+
+    [Fact]
+    public async Task Handle_Should_IssueNewTokens_When_RefreshIsValid()
+    {
+        var handler = CreateHandler();
+        var cmd = new RefreshCommand("raw-token");
+
+        _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
+
+        var user = new User("user@example.com", "hash");
+        var tid = Guid.NewGuid();
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, tid);
+        typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
+
+        var tenant = new Tenant("Acme");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
@@ -164,18 +177,19 @@ public sealed class RefreshCommandHandlerTests
 
         _opt.SetupGet(o => o.RefreshTokenDays).Returns(7);
 
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
         _jwt.Setup(j => j.Create(user, It.IsAny<IEnumerable<Claim>>()))
             .Returns(("access-new", "raw-new", DateTime.UtcNow.AddMinutes(5)));
 
         _hash.Setup(h => h.ComputeSha256("raw-new")).Returns("hash-new");
 
-        // Act
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        // Assert
         result.IsSuccess.Should().BeTrue();
 
-        // Pattern ile hem IsSuccess hem Value != null akışını netleştir.
         if (result is not { IsSuccess: true, Value: { } value })
             return;
 
@@ -187,21 +201,23 @@ public sealed class RefreshCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_IncludeTenantClaim_When_TenantIdProvided()
+    public async Task Handle_Should_IncludeTenantClaim_FromStoredSession()
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new RefreshCommand("raw-token", tid);
+        var cmd = new RefreshCommand("raw-token");
         var user = new User("user@example.com", "hash");
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null);
-        typeof(RefreshToken).GetProperty("User")!.SetValue(stored, user);
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, tid);
+        typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
         var tenant = new Tenant("Acme");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
+        _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _ocpRepo.Setup(r => r.GetPermissionCodesByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<string>());
         _opt.SetupGet(o => o.RefreshTokenDays).Returns(7);
@@ -219,4 +235,3 @@ public sealed class RefreshCommandHandlerTests
         captured!.Should().Contain(c => c.Type == VeterinerClaims.TenantId && c.Value == tid.ToString("D"));
     }
 }
-

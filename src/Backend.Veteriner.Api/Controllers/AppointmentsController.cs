@@ -19,7 +19,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Backend.Veteriner.Api.Controllers;
 
 /// <summary>
-/// Randevu yönetimi. Kiracı JWT <c>tenant_id</c> veya sorgu <c>tenantId</c>; filtreler sorguda.
+/// Randevu yönetimi. Kiracı JWT <c>tenant_id</c> (veya uyum için sorgu <c>tenantId</c>); iş kurallarında <see cref="ITenantContext"/>.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -47,8 +47,8 @@ public sealed class AppointmentsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateAppointmentCommand cmd, CancellationToken ct)
     {
-        if (this.ValidateBodyTenant(_tenantContext, cmd.TenantId) is { } forbid)
-            return forbid;
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
 
         var result = await _mediator.Send(cmd, ct);
         if (!result.IsSuccess)
@@ -60,8 +60,7 @@ public sealed class AppointmentsController : ControllerBase
             new
             {
                 version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0",
-                id,
-                tenantId = cmd.TenantId
+                id
             },
             id);
     }
@@ -73,9 +72,9 @@ public sealed class AppointmentsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
-        if (!this.TryGetResolvedTenant(_tenantContext, out var tid, out var problem))
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
-        var result = await _mediator.Send(new GetAppointmentByIdQuery(tid, id), ct);
+        var result = await _mediator.Send(new GetAppointmentByIdQuery(id), ct);
         return result.ToActionResult(this);
     }
 
@@ -92,10 +91,10 @@ public sealed class AppointmentsController : ControllerBase
         [FromQuery] DateTime? dateToUtc = null,
         CancellationToken ct = default)
     {
-        if (!this.TryGetResolvedTenant(_tenantContext, out var tid, out var problem))
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var result = await _mediator.Send(
-            new GetAppointmentsListQuery(tid, page, clinicId, petId, status, dateFromUtc, dateToUtc),
+            new GetAppointmentsListQuery(page, clinicId, petId, status, dateFromUtc, dateToUtc),
             ct);
         return result.ToActionResult(this);
     }
@@ -111,10 +110,10 @@ public sealed class AppointmentsController : ControllerBase
         [FromBody] CancelAppointmentBody? body,
         CancellationToken ct)
     {
-        if (!this.TryGetResolvedTenant(_tenantContext, out var tid, out var problem))
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new CancelAppointmentCommand(tid, id, body?.Reason), ct);
+        var result = await _mediator.Send(new CancelAppointmentCommand(id, body?.Reason), ct);
         return result.ToActionResult(this);
     }
 
@@ -125,10 +124,10 @@ public sealed class AppointmentsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Complete([FromRoute] Guid id, CancellationToken ct)
     {
-        if (!this.TryGetResolvedTenant(_tenantContext, out var tid, out var problem))
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new CompleteAppointmentCommand(tid, id), ct);
+        var result = await _mediator.Send(new CompleteAppointmentCommand(id), ct);
         return result.ToActionResult(this);
     }
 
@@ -144,7 +143,7 @@ public sealed class AppointmentsController : ControllerBase
         [FromBody] RescheduleAppointmentBody? body,
         CancellationToken ct)
     {
-        if (!this.TryGetResolvedTenant(_tenantContext, out var tid, out var problem))
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
         if (body is null)
@@ -156,7 +155,7 @@ public sealed class AppointmentsController : ControllerBase
         }
 
         var result = await _mediator.Send(
-            new RescheduleAppointmentCommand(tid, id, body.ScheduledAtUtc),
+            new RescheduleAppointmentCommand(id, body.ScheduledAtUtc),
             ct);
         return result.ToActionResult(this);
     }

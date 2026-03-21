@@ -5,5 +5,5 @@ using MediatR;
 
 namespace Backend.Veteriner.Application.Clients.Queries.GetList;
 
-public sealed record GetClientsListQuery(Guid TenantId, PageRequest PageRequest)
+public sealed record GetClientsListQuery(PageRequest PageRequest)
     : IRequest<Result<PagedResult<ClientListItemDto>>>;

@@ -8,21 +8,31 @@ namespace Backend.Veteriner.Application.Appointments.Commands.Complete;
 
 public sealed class CompleteAppointmentCommandHandler : IRequestHandler<CompleteAppointmentCommand, Result>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Appointment> _appointmentsRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
 
     public CompleteAppointmentCommandHandler(
+        ITenantContext tenantContext,
         IReadRepository<Appointment> appointmentsRead,
         IRepository<Appointment> appointmentsWrite)
     {
+        _tenantContext = tenantContext;
         _appointmentsRead = appointmentsRead;
         _appointmentsWrite = appointmentsWrite;
     }
 
     public async Task<Result> Handle(CompleteAppointmentCommand request, CancellationToken ct)
     {
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
         var appointment = await _appointmentsRead.FirstOrDefaultAsync(
-            new AppointmentByIdSpec(request.TenantId, request.AppointmentId), ct);
+            new AppointmentByIdSpec(tenantId, request.AppointmentId), ct);
 
         if (appointment is null)
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");

@@ -11,13 +11,13 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Backend.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Paylaşılan Backend_Veteriner_IntegrationTests veritabanında OutboxProcessor çakışmasını önlemek için
+/// Paylaşılan VeterinerDb_IntegrationTests veritabanında OutboxProcessor çakışmasını önlemek için
 /// ayrı LocalDB veritabanı ve hızlı döngü/no-op SMTP kullanır.
 /// </summary>
 public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory<global::Program>
 {
     private const string ProcessorTestConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=Backend_Veteriner_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VeterinerDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

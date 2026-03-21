@@ -10,15 +10,18 @@ namespace Backend.Veteriner.Application.Clients.Commands.Create;
 
 public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCommand, Result<Guid>>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Client> _clientsRead;
     private readonly IRepository<Client> _clientsWrite;
 
     public CreateClientCommandHandler(
+        ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clientsRead,
         IRepository<Client> clientsWrite)
     {
+        _tenantContext = tenantContext;
         _tenants = tenants;
         _clientsRead = clientsRead;
         _clientsWrite = clientsWrite;
@@ -26,7 +29,14 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
 
     public async Task<Result<Guid>> Handle(CreateClientCommand request, CancellationToken ct)
     {
-        var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(request.TenantId), ct);
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result<Guid>.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
+        var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
             return Result<Guid>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
 
@@ -39,13 +49,13 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
         var phoneKey = string.IsNullOrWhiteSpace(request.Phone) ? "" : request.Phone.Trim();
 
         var duplicate = await _clientsRead.FirstOrDefaultAsync(
-            new ClientByTenantFullNameAndPhoneSpec(request.TenantId, nameKey, phoneKey), ct);
+            new ClientByTenantFullNameAndPhoneSpec(tenantId, nameKey, phoneKey), ct);
         if (duplicate is not null)
             return Result<Guid>.Failure(
                 "Clients.DuplicateClient",
                 "Bu kiracı altında aynı ad ve telefon bilgisiyle kayıtlı bir müşteri zaten var.");
 
-        var client = new Client(request.TenantId, request.FullName, request.Phone);
+        var client = new Client(tenantId, request.FullName, request.Phone);
         await _clientsWrite.AddAsync(client, ct);
         await _clientsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(client.Id);

@@ -11,17 +11,29 @@ namespace Backend.Veteriner.Application.Clinics.Queries.GetList;
 public sealed class GetClinicsListQueryHandler
     : IRequestHandler<GetClinicsListQuery, Result<PagedResult<ClinicListItemDto>>>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Clinic> _clinics;
 
-    public GetClinicsListQueryHandler(IReadRepository<Clinic> clinics) => _clinics = clinics;
+    public GetClinicsListQueryHandler(ITenantContext tenantContext, IReadRepository<Clinic> clinics)
+    {
+        _tenantContext = tenantContext;
+        _clinics = clinics;
+    }
 
     public async Task<Result<PagedResult<ClinicListItemDto>>> Handle(GetClinicsListQuery request, CancellationToken ct)
     {
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result<PagedResult<ClinicListItemDto>>.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
 
-        var total = await _clinics.CountAsync(new ClinicsByTenantCountSpec(request.TenantId), ct);
-        var rows = await _clinics.ListAsync(new ClinicsByTenantPagedSpec(request.TenantId, page, pageSize), ct);
+        var total = await _clinics.CountAsync(new ClinicsByTenantCountSpec(tenantId), ct);
+        var rows = await _clinics.ListAsync(new ClinicsByTenantPagedSpec(tenantId, page, pageSize), ct);
 
         var items = rows
             .Select(c => new ClinicListItemDto(c.Id, c.TenantId, c.Name, c.City, c.IsActive))

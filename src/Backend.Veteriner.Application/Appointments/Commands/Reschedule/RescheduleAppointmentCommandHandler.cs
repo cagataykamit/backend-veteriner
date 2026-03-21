@@ -9,23 +9,33 @@ namespace Backend.Veteriner.Application.Appointments.Commands.Reschedule;
 
 public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<RescheduleAppointmentCommand, Result>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Appointment> _appointmentsRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
 
     public RescheduleAppointmentCommandHandler(
+        ITenantContext tenantContext,
         IReadRepository<Appointment> appointmentsRead,
         IRepository<Appointment> appointmentsWrite)
     {
+        _tenantContext = tenantContext;
         _appointmentsRead = appointmentsRead;
         _appointmentsWrite = appointmentsWrite;
     }
 
     public async Task<Result> Handle(RescheduleAppointmentCommand request, CancellationToken ct)
     {
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
         var scheduledUtc = NormalizeToUtc(request.ScheduledAtUtc);
 
         var appointment = await _appointmentsRead.FirstOrDefaultAsync(
-            new AppointmentByIdSpec(request.TenantId, request.AppointmentId), ct);
+            new AppointmentByIdSpec(tenantId, request.AppointmentId), ct);
 
         if (appointment is null)
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
@@ -43,7 +53,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
 
         var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
             new AppointmentScheduledSlotAtClinicSpec(
-                request.TenantId,
+                tenantId,
                 appointment.ClinicId,
                 scheduledUtc,
                 appointment.Id),
@@ -57,7 +67,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
 
         var petBusy = await _appointmentsRead.FirstOrDefaultAsync(
             new AppointmentScheduledSlotForPetSpec(
-                request.TenantId,
+                tenantId,
                 appointment.PetId,
                 scheduledUtc,
                 appointment.Id),

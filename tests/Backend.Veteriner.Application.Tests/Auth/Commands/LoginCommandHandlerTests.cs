@@ -26,6 +26,7 @@ public sealed class LoginCommandHandlerTests
     private readonly Mock<IJwtOptionsProvider> _jwtOpt = new();
     private readonly Mock<IOperationClaimPermissionRepository> _ocpRepo = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
+    private readonly Mock<IUserTenantRepository> _userTenants = new();
 
     private LoginCommandHandler CreateHandler(SessionOptions? sessionOptions = null)
     {
@@ -42,23 +43,21 @@ public sealed class LoginCommandHandlerTests
             _jwtOpt.Object,
             _ocpRepo.Object,
             _tenants.Object,
+            _userTenants.Object,
             opt);
     }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_UserNotFound()
     {
-        // Arrange
         var handler = CreateHandler();
         var cmd = new LoginCommand("user@example.com", "password");
 
         _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((User?)null);
 
-        // Act
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Auth.Unauthorized.InvalidCredentials");
         _refreshRepo.Verify(r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -67,7 +66,6 @@ public sealed class LoginCommandHandlerTests
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_PasswordIsInvalid()
     {
-        // Arrange
         var handler = CreateHandler();
         var cmd = new LoginCommand("user@example.com", "wrong");
 
@@ -76,27 +74,34 @@ public sealed class LoginCommandHandlerTests
             .ReturnsAsync(user);
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(false);
 
-        // Act
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Auth.Unauthorized.InvalidCredentials");
         _refreshRepo.Verify(r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task Handle_Should_LoginSuccessfully_When_CredentialsAreValid()
+    public async Task Handle_Should_LoginSuccessfully_When_CredentialsAreValid_SingleTenant()
     {
-        // Arrange
         var sessionOptions = new SessionOptions { SingleSessionPerUser = true };
         var handler = CreateHandler(sessionOptions);
         var cmd = new LoginCommand("user@example.com", "password");
 
         var user = new User("user@example.com", "hash");
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("Acme");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
+
         _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid> { tid });
+        _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
 
         _ocpRepo.Setup(r => r.GetPermissionCodesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<string> { "p1", "p2" });
@@ -108,13 +113,10 @@ public sealed class LoginCommandHandlerTests
 
         _tokenHash.Setup(t => t.ComputeSha256("refresh-token-raw")).Returns("refresh-hash");
 
-        // Act
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        // Assert
         result.IsSuccess.Should().BeTrue();
 
-        // Pattern ile hem IsSuccess hem Value != null akışını netleştir.
         if (result is not { IsSuccess: true, Value: { } value })
             return;
 
@@ -127,17 +129,22 @@ public sealed class LoginCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_IncludeTenantClaim_When_TenantIdProvidedAndActive()
+    public async Task Handle_Should_IncludeTenantClaim_When_TenantIdProvidedAndActive_MultiTenant()
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var cmd = new LoginCommand("user@example.com", "password", tid);
         var user = new User("user@example.com", "hash");
         var tenant = new Tenant("Acme");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
         _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid> { tid, Guid.NewGuid() });
+        _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -166,11 +173,16 @@ public sealed class LoginCommandHandlerTests
         var cmd = new LoginCommand("user@example.com", "password", tid);
         var user = new User("user@example.com", "hash");
         var tenant = new Tenant("Acme");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         tenant.Deactivate();
 
         _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid> { tid });
+        _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -179,5 +191,84 @@ public sealed class LoginCommandHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Tenants.TenantInactive");
     }
-}
 
+    [Fact]
+    public async Task Handle_Should_Fail_When_MultiTenant_NoTenantIdSelected()
+    {
+        var handler = CreateHandler();
+        var cmd = new LoginCommand("user@example.com", "password");
+        var user = new User("user@example.com", "hash");
+
+        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid> { Guid.NewGuid(), Guid.NewGuid() });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Auth.TenantRequired");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_TenantNotInMembership()
+    {
+        var handler = CreateHandler();
+        var requested = Guid.NewGuid();
+        var memberTid = Guid.NewGuid();
+        var cmd = new LoginCommand("user@example.com", "password", requested);
+        var user = new User("user@example.com", "hash");
+
+        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid> { memberTid, Guid.NewGuid() });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Auth.TenantNotMember");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_NoTenantMembership()
+    {
+        var handler = CreateHandler();
+        var cmd = new LoginCommand("user@example.com", "password");
+        var user = new User("user@example.com", "hash");
+
+        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid>());
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Auth.TenantMembershipRequired");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_SingleTenant_TenantMismatch()
+    {
+        var handler = CreateHandler();
+        var onlyTid = Guid.NewGuid();
+        var wrongTid = Guid.NewGuid();
+        var cmd = new LoginCommand("user@example.com", "password", wrongTid);
+        var user = new User("user@example.com", "hash");
+
+        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid> { onlyTid });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Auth.TenantMismatch");
+    }
+}

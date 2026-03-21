@@ -4,7 +4,6 @@ using MediatR;
 namespace Backend.Veteriner.Application.Appointments.Commands.Create;
 
 public sealed record CreateAppointmentCommand(
-    Guid TenantId,
     Guid ClinicId,
     Guid PetId,
     DateTime ScheduledAtUtc,

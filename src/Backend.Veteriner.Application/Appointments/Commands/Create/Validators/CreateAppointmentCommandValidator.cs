@@ -7,7 +7,6 @@ public sealed class CreateAppointmentCommandValidator : AbstractValidator<Create
 {
     public CreateAppointmentCommandValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
         RuleFor(x => x.ClinicId).NotEmpty();
         RuleFor(x => x.PetId).NotEmpty();
         RuleFor(x => x.ScheduledAtUtc)

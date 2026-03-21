@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Users;
 using MediatR;
 using Microsoft.Extensions.Options;
 
@@ -22,6 +23,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
     private readonly IJwtOptionsProvider _jwtOpt;
     private readonly IOperationClaimPermissionRepository _ocpRepo;
     private readonly IReadRepository<Tenant> _tenants;
+    private readonly IUserTenantRepository _userTenants;
     private readonly SessionOptions _sessionOpt;
 
     public LoginCommandHandler(
@@ -34,6 +36,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         IJwtOptionsProvider jwtOpt,
         IOperationClaimPermissionRepository ocpRepo,
         IReadRepository<Tenant> tenants,
+        IUserTenantRepository userTenants,
         IOptions<SessionOptions> sessionOpt)
     {
         _users = users;
@@ -45,13 +48,13 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         _jwtOpt = jwtOpt;
         _ocpRepo = ocpRepo;
         _tenants = tenants;
+        _userTenants = userTenants;
         _sessionOpt = sessionOpt.Value;
     }
 
     public async Task<Result<LoginResultDto>> Handle(LoginCommand request, CancellationToken ct)
     {
-        var user = await _users.FirstOrDefaultAsync(new UserByEmailSpec(request.Email), ct)
-                   ?? null;
+        var user = await _users.FirstOrDefaultAsync(new UserByEmailSpec(request.Email), ct);
 
         if (user is null || !_hasher.Verify(request.Password, user.PasswordHash))
         {
@@ -60,7 +63,6 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
                 "Kullanıcı veya şifre hatalı.");
         }
 
-        // ✅ Opsiyonel politika: kullanıcı başına tek aktif refresh token
         if (_sessionOpt.SingleSessionPerUser)
             await _refreshRepo.RevokeAllByUserAsync(user.Id, ct);
 
@@ -68,32 +70,46 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
                               ?? Array.Empty<string>();
         var extraClaims = permissionCodes.Select(code => new Claim("permission", code)).ToList();
 
-        if (request.TenantId is { } loginTenantId)
+        if (IsPlatformAdmin(user))
+            extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));
+
+        var memberships = await _userTenants.GetTenantIdsByUserIdAsync(user.Id, ct);
+        if (memberships.Count == 0)
         {
-            if (loginTenantId == Guid.Empty)
-            {
-                return Result<LoginResultDto>.Failure(
-                    "Validation.TenantId",
-                    "TenantId geçersiz.");
-            }
-
-            var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(loginTenantId), ct);
-            if (tenant is null)
-            {
-                return Result<LoginResultDto>.Failure(
-                    "Tenants.NotFound",
-                    "Kiracı bulunamadı.");
-            }
-
-            if (!tenant.IsActive)
-            {
-                return Result<LoginResultDto>.Failure(
-                    "Tenants.TenantInactive",
-                    "Pasif kiracı için oturum açılamaz.");
-            }
-
-            extraClaims.Add(new Claim(VeterinerClaims.TenantId, loginTenantId.ToString("D")));
+            return Result<LoginResultDto>.Failure(
+                "Auth.TenantMembershipRequired",
+                "Bu kullanıcı için kiracı üyeliği tanımlı değil.");
         }
+
+        var resolved = ResolveLoginTenant(request.TenantId, memberships);
+        if (!resolved.IsSuccess)
+            return Result<LoginResultDto>.Failure(resolved.Code!, resolved.Message!);
+
+        var tenantId = resolved.TenantId!.Value;
+
+        var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
+        if (tenant is null)
+        {
+            return Result<LoginResultDto>.Failure(
+                "Tenants.NotFound",
+                "Kiracı bulunamadı.");
+        }
+
+        if (!tenant.IsActive)
+        {
+            return Result<LoginResultDto>.Failure(
+                "Tenants.TenantInactive",
+                "Pasif kiracı için oturum açılamaz.");
+        }
+
+        if (!await _userTenants.ExistsAsync(user.Id, tenantId, ct))
+        {
+            return Result<LoginResultDto>.Failure(
+                "Auth.TenantNotMember",
+                "Bu kiracıda üyeliğiniz yok.");
+        }
+
+        extraClaims.Add(new Claim(VeterinerClaims.TenantId, tenantId.ToString("D")));
 
         var (access, refreshRaw, accessExp) = _jwt.Create(user, extraClaims);
 
@@ -104,8 +120,8 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
             refreshHash,
             DateTime.UtcNow.AddDays(_jwtOpt.RefreshTokenDays),
             _client.IpAddress,
-            _client.UserAgent
-        );
+            _client.UserAgent,
+            tenantId);
 
         user.AddRefreshToken(rt);
         await _refreshRepo.AddAsync(rt, ct);
@@ -113,5 +129,37 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
 
         var dto = new LoginResultDto(access, refreshRaw, accessExp);
         return Result<LoginResultDto>.Success(dto);
+    }
+
+    private static bool IsPlatformAdmin(User user)
+        => user.Roles.Any(r => string.Equals(r.Name, "PlatformAdmin", StringComparison.OrdinalIgnoreCase));
+
+    private static (bool IsSuccess, Guid? TenantId, string? Code, string? Message) ResolveLoginTenant(
+        Guid? requested,
+        IReadOnlyList<Guid> memberships)
+    {
+        if (memberships.Count == 1)
+        {
+            var only = memberships[0];
+            if (requested is { } r && r != Guid.Empty && r != only)
+            {
+                return (false, null, "Auth.TenantMismatch",
+                    "Tek kiracılı kullanıcı için farklı TenantId belirtilemez.");
+            }
+
+            return (true, only, null, null);
+        }
+
+        if (requested is null || requested == Guid.Empty)
+        {
+            return (false, null, "Auth.TenantRequired",
+                "Birden fazla kiracıya üyesiniz; girişte TenantId zorunludur.");
+        }
+
+        var req = requested.Value;
+        if (!memberships.Contains(req))
+            return (false, null, "Auth.TenantNotMember", "Bu kiracıda üyeliğiniz yok.");
+
+        return (true, req, null, null);
     }
 }

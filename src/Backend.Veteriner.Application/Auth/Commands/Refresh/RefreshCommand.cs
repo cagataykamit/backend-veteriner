@@ -4,5 +4,9 @@ using MediatR;
 
 namespace Backend.Veteriner.Application.Auth.Commands.Refresh;
 
-public sealed record RefreshCommand(string RefreshToken, Guid? TenantId = null)
+/// <summary>
+/// Access token yenileme. Kiracı yalnızca sunucudaki refresh kaydından alınır; istekte tenant alanı yoktur.
+/// </summary>
+/// <param name="RefreshToken">Ham refresh token (JSON alanı: <c>refreshToken</c>).</param>
+public sealed record RefreshCommand(string RefreshToken)
     : IRequest<Result<LoginResultDto>>;

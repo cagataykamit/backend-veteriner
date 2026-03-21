@@ -4,8 +4,10 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
+using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.IntegrationTests.Infrastructure;
@@ -23,6 +25,7 @@ internal static class TestDataSeeder
         lock (SeedSync)
         {
             SeedAdminUser(db, hasher);
+            EnsureDefaultTenantAndUserTenant(db);
             SeedOutboxPermissionsForAdmin(db);
         }
     }
@@ -46,6 +49,30 @@ internal static class TestDataSeeder
         var hash = hasher.Hash("123456");
         db.Users.Add(new User(email, hash));
         db.SaveChanges();
+    }
+
+    /// <summary>
+    /// Login üyelik gerektirir; entegrasyon DB'sinde varsayılan kiracı ve <see cref="UserTenant"/> yoksa giriş 400 döner.
+    /// </summary>
+    private static void EnsureDefaultTenantAndUserTenant(AppDbContext db)
+    {
+        var admin = db.Users.FirstOrDefault(u => u.Email == "admin@example.com");
+        if (admin is null)
+            return;
+
+        var tenant = db.Tenants.FirstOrDefault(t => t.Name == DataSeeder.DefaultTenantName);
+        if (tenant is null)
+        {
+            db.Tenants.Add(new Tenant(DataSeeder.DefaultTenantName));
+            db.SaveChanges();
+            tenant = db.Tenants.First(t => t.Name == DataSeeder.DefaultTenantName);
+        }
+
+        if (!db.UserTenants.Any(ut => ut.UserId == admin.Id && ut.TenantId == tenant.Id))
+        {
+            db.UserTenants.Add(new UserTenant(admin.Id, tenant.Id));
+            db.SaveChanges();
+        }
     }
 
     // Tasks modülü foundation'dan çıkarıldığı için task permission seeding kaldırıldı.

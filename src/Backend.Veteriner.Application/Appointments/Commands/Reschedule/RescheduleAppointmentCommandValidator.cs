@@ -6,7 +6,6 @@ public sealed class RescheduleAppointmentCommandValidator : AbstractValidator<Re
 {
     public RescheduleAppointmentCommandValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
         RuleFor(x => x.AppointmentId).NotEmpty();
         RuleFor(x => x.ScheduledAtUtc)
             .NotEqual(default(DateTime))

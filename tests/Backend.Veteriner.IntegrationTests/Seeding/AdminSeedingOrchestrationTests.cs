@@ -19,7 +19,7 @@ public sealed class AdminSeedOrchestrationCollection;
 public sealed class AdminSeedingOrchestrationTests
 {
     private const string ConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=Backend_Veteriner_AdminSeedOrchestration;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VeterinerDb_AdminSeedOrchestration;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     private static DbContextOptions<AppDbContext> CreateOptions()
     {

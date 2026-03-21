@@ -4,6 +4,8 @@ public sealed class RefreshToken
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid UserId { get; private set; }
+    /// <summary>Oturumun bağlı olduğu kiracı; refresh ile aynı tenant korunur.</summary>
+    public Guid? TenantId { get; private set; }
     public string TokenHash { get; private set; } = default!;   // raw token değil, SHA-256
 
     public DateTime ExpiresAtUtc { get; private set; }
@@ -23,13 +25,14 @@ public sealed class RefreshToken
 
     private RefreshToken() { }
 
-    public RefreshToken(Guid userId, string tokenHash, DateTime expiresAtUtc, string? ip, string? ua)
+    public RefreshToken(Guid userId, string tokenHash, DateTime expiresAtUtc, string? ip, string? ua, Guid? tenantId = null)
     {
         UserId = userId;
         TokenHash = tokenHash;
         ExpiresAtUtc = expiresAtUtc;
         IpAddress = ip;
         UserAgent = ua;
+        TenantId = tenantId;
     }
 
     public bool IsActive => RevokedAtUtc is null && DateTime.UtcNow < ExpiresAtUtc;

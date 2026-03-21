@@ -4,4 +4,4 @@ using MediatR;
 
 namespace Backend.Veteriner.Application.Appointments.Queries.GetById;
 
-public sealed record GetAppointmentByIdQuery(Guid TenantId, Guid Id) : IRequest<Result<AppointmentDetailDto>>;
+public sealed record GetAppointmentByIdQuery(Guid Id) : IRequest<Result<AppointmentDetailDto>>;

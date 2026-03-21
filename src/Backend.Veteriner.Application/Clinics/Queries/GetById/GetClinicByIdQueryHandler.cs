@@ -9,13 +9,25 @@ namespace Backend.Veteriner.Application.Clinics.Queries.GetById;
 
 public sealed class GetClinicByIdQueryHandler : IRequestHandler<GetClinicByIdQuery, Result<ClinicDetailDto>>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Clinic> _clinics;
 
-    public GetClinicByIdQueryHandler(IReadRepository<Clinic> clinics) => _clinics = clinics;
+    public GetClinicByIdQueryHandler(ITenantContext tenantContext, IReadRepository<Clinic> clinics)
+    {
+        _tenantContext = tenantContext;
+        _clinics = clinics;
+    }
 
     public async Task<Result<ClinicDetailDto>> Handle(GetClinicByIdQuery request, CancellationToken ct)
     {
-        var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(request.TenantId, request.Id), ct);
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result<ClinicDetailDto>.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
+        var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, request.Id), ct);
         if (clinic is null)
             return Result<ClinicDetailDto>.Failure("Clinics.NotFound", "Klinik bulunamadı.");
 

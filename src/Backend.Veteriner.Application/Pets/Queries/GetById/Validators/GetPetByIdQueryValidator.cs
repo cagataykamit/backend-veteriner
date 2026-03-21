@@ -7,7 +7,6 @@ public sealed class GetPetByIdQueryValidator : AbstractValidator<GetPetByIdQuery
 {
     public GetPetByIdQueryValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
         RuleFor(x => x.Id).NotEmpty();
     }
 }

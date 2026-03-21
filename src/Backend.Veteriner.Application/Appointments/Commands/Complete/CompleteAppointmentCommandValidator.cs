@@ -6,7 +6,6 @@ public sealed class CompleteAppointmentCommandValidator : AbstractValidator<Comp
 {
     public CompleteAppointmentCommandValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
         RuleFor(x => x.AppointmentId).NotEmpty();
     }
 }

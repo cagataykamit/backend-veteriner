@@ -7,7 +7,6 @@ public sealed class GetClinicByIdQueryValidator : AbstractValidator<GetClinicByI
 {
     public GetClinicByIdQueryValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
         RuleFor(x => x.Id).NotEmpty();
     }
 }

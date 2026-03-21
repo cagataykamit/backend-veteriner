@@ -25,7 +25,7 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
         // 2) Connection string�i oku (ENV override destekli)
         var cs = config.GetConnectionString("SqlServer")
                  ?? Environment.GetEnvironmentVariable("ConnectionStrings__SqlServer")
-                 ?? "Server=localhost;Database=BackendDb;Trusted_Connection=True;TrustServerCertificate=True;";
+                 ?? "Server=localhost;Database=VeterinerDb;Trusted_Connection=True;TrustServerCertificate=True;";
 
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
         optionsBuilder.UseSqlServer(cs);

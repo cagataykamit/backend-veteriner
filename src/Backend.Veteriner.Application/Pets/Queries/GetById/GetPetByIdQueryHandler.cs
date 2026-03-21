@@ -9,13 +9,25 @@ namespace Backend.Veteriner.Application.Pets.Queries.GetById;
 
 public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Result<PetDetailDto>>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Pet> _pets;
 
-    public GetPetByIdQueryHandler(IReadRepository<Pet> pets) => _pets = pets;
+    public GetPetByIdQueryHandler(ITenantContext tenantContext, IReadRepository<Pet> pets)
+    {
+        _tenantContext = tenantContext;
+        _pets = pets;
+    }
 
     public async Task<Result<PetDetailDto>> Handle(GetPetByIdQuery request, CancellationToken ct)
     {
-        var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(request.TenantId, request.Id), ct);
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result<PetDetailDto>.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
+        var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, request.Id), ct);
         if (pet is null)
             return Result<PetDetailDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı.");
 

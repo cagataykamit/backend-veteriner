@@ -11,17 +11,29 @@ namespace Backend.Veteriner.Application.Clients.Queries.GetList;
 public sealed class GetClientsListQueryHandler
     : IRequestHandler<GetClientsListQuery, Result<PagedResult<ClientListItemDto>>>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Client> _clients;
 
-    public GetClientsListQueryHandler(IReadRepository<Client> clients) => _clients = clients;
+    public GetClientsListQueryHandler(ITenantContext tenantContext, IReadRepository<Client> clients)
+    {
+        _tenantContext = tenantContext;
+        _clients = clients;
+    }
 
     public async Task<Result<PagedResult<ClientListItemDto>>> Handle(GetClientsListQuery request, CancellationToken ct)
     {
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result<PagedResult<ClientListItemDto>>.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
 
-        var total = await _clients.CountAsync(new ClientsByTenantCountSpec(request.TenantId), ct);
-        var rows = await _clients.ListAsync(new ClientsByTenantPagedSpec(request.TenantId, page, pageSize), ct);
+        var total = await _clients.CountAsync(new ClientsByTenantCountSpec(tenantId), ct);
+        var rows = await _clients.ListAsync(new ClientsByTenantPagedSpec(tenantId, page, pageSize), ct);
 
         var items = rows
             .Select(c => new ClientListItemDto(c.Id, c.TenantId, c.FullName, c.Phone))

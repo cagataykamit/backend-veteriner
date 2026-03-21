@@ -54,6 +54,7 @@ public class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<UserTenant> UserTenants => Set<UserTenant>();
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Pet> Pets => Set<Pet>();

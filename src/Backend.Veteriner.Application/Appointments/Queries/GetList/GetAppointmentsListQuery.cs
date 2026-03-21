@@ -7,7 +7,6 @@ using MediatR;
 namespace Backend.Veteriner.Application.Appointments.Queries.GetList;
 
 public sealed record GetAppointmentsListQuery(
-    Guid TenantId,
     PageRequest PageRequest,
     Guid? ClinicId = null,
     Guid? PetId = null,

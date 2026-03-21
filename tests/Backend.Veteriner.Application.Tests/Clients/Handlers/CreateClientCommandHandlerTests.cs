@@ -12,20 +12,40 @@ namespace Backend.Veteriner.Application.Tests.Clients.Handlers;
 
 public sealed class CreateClientCommandHandlerTests
 {
+    private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IReadRepository<Client>> _clientsRead = new();
     private readonly Mock<IRepository<Client>> _clientsWrite = new();
 
     private CreateClientCommandHandler CreateHandler()
-        => new(_tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object);
+        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object);
+
+    private static void AlignTenantId(Tenant tenant, Guid id)
+        => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
+    {
+        var handler = CreateHandler();
+        var cmd = new CreateClientCommand("Ali Veli", null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns((Guid?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Tenants.ContextMissing");
+        _clientsWrite.Verify(r => r.AddAsync(It.IsAny<Client>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantNotFound()
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateClientCommand(tid, "Ali Veli", null);
+        var cmd = new CreateClientCommand("Ali Veli", null);
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Tenant?)null);
 
@@ -41,11 +61,13 @@ public sealed class CreateClientCommandHandlerTests
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateClientCommand(tid, "Ali Veli", "555");
+        var cmd = new CreateClientCommand("Ali Veli", "555");
 
         var tenant = new Tenant("A.Ş.");
+        AlignTenantId(tenant, tid);
         tenant.Deactivate();
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -61,10 +83,12 @@ public sealed class CreateClientCommandHandlerTests
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateClientCommand(tid, "Ayşe Yılmaz", "05321234567");
+        var cmd = new CreateClientCommand("Ayşe Yılmaz", "05321234567");
 
         var tenant = new Tenant("Klinik A.Ş.");
+        AlignTenantId(tenant, tid);
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -83,10 +107,12 @@ public sealed class CreateClientCommandHandlerTests
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateClientCommand(tid, "Mehmet Demir", null);
+        var cmd = new CreateClientCommand("Mehmet Demir", null);
 
         var tenant = new Tenant("Klinik A.Ş.");
+        AlignTenantId(tenant, tid);
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -101,7 +127,8 @@ public sealed class CreateClientCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         captured.Should().NotBeNull();
-        captured!.FullName.Should().Be("Mehmet Demir");
+        captured!.TenantId.Should().Be(tid);
+        captured.FullName.Should().Be("Mehmet Demir");
         captured.Phone.Should().BeNull();
 
         _clientsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);

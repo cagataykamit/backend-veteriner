@@ -59,6 +59,17 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         e.HasIndex(x => x.ReplacedByTokenHash)
             .HasDatabaseName("IX_RefreshTokens_ReplacedByTokenHash");
 
+        e.Property(x => x.TenantId).IsRequired(false);
+        e.HasIndex(x => x.TenantId)
+            .HasDatabaseName("IX_RefreshTokens_TenantId");
+
+        // İlişki
+        e.HasOne<Backend.Veteriner.Domain.Tenants.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // İlişki
         e.HasOne(x => x.User)
             .WithMany(u => u.RefreshTokens)

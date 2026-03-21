@@ -7,7 +7,6 @@ public sealed class CreateClinicCommandValidator : AbstractValidator<CreateClini
 {
     public CreateClinicCommandValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
         RuleFor(x => x.Name).NotEmpty().MinimumLength(2).MaximumLength(300);
         RuleFor(x => x.City).NotEmpty().MinimumLength(2).MaximumLength(200);
     }

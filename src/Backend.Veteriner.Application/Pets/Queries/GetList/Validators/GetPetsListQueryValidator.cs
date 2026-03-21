@@ -7,6 +7,8 @@ public sealed class GetPetsListQueryValidator : AbstractValidator<GetPetsListQue
 {
     public GetPetsListQueryValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
+        RuleFor(x => x.PageRequest).NotNull();
+        RuleFor(x => x.PageRequest.Page).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageRequest.PageSize).InclusiveBetween(1, 200);
     }
 }

@@ -12,6 +12,7 @@ using System.Security.Claims;
 
 namespace Backend.Veteriner.Api.Controllers;
 
+/// <summary>Kimlik doğrulama ve oturum (login/refresh ayrı sözleşme: <c>docs/AUTH_TENANT_CONTRACT.md</c>).</summary>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
@@ -20,7 +21,7 @@ public sealed class AuthController : ControllerBase
     private readonly IMediator _mediator;
     public AuthController(IMediator mediator) => _mediator = mediator;
 
-    // POST /api/v1/auth/login
+    /// <summary>Giriş. Gövde: email, password, isteğe bağlı tenantId (çok kiracıda zorunlu). Swagger şeması <see cref="LoginCommand"/>.</summary>
     [AllowAnonymous]
     [EnableRateLimiting("login")]
     [HttpPost("login")]
@@ -37,7 +38,7 @@ public sealed class AuthController : ControllerBase
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Invalid request",
-                detail: "Ýstek gövdesi boþ veya hatalý JSON."
+                detail: "İstek gövdesi boş veya hatalı JSON."
             );
         }
 
@@ -45,7 +46,7 @@ public sealed class AuthController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    // POST /api/v1/auth/refresh
+    /// <summary>Token yenileme. Gövde: yalnızca refreshToken (kiracı istekte taşınmaz).</summary>
     [AllowAnonymous]
     [EnableRateLimiting("refresh")]
     [HttpPost("refresh")]

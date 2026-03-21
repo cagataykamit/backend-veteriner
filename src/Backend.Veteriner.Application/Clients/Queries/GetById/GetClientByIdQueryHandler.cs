@@ -9,13 +9,25 @@ namespace Backend.Veteriner.Application.Clients.Queries.GetById;
 
 public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQuery, Result<ClientDetailDto>>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Client> _clients;
 
-    public GetClientByIdQueryHandler(IReadRepository<Client> clients) => _clients = clients;
+    public GetClientByIdQueryHandler(ITenantContext tenantContext, IReadRepository<Client> clients)
+    {
+        _tenantContext = tenantContext;
+        _clients = clients;
+    }
 
     public async Task<Result<ClientDetailDto>> Handle(GetClientByIdQuery request, CancellationToken ct)
     {
-        var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(request.TenantId, request.Id), ct);
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result<ClientDetailDto>.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
+        var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, request.Id), ct);
         if (client is null)
             return Result<ClientDetailDto>.Failure("Clients.NotFound", "Müşteri bulunamadı.");
 

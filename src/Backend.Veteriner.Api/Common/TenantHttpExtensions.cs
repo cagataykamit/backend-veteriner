@@ -7,7 +7,8 @@ namespace Backend.Veteriner.Api.Common;
 public static class TenantHttpExtensions
 {
     /// <summary>
-    /// Middleware'in birleştirdiği kiracıyı döndürür; yoksa 400 ProblemDetails.
+    /// Çözümlenmiş kiracıyı döndürür (<see cref="ITenantContext"/> = JWT <c>tenant_id</c> ve/veya sorgu <c>tenantId</c>).
+    /// Tenant-scoped API'lerde handler kaynağı budur; gövdede ayrıca tenant beklenmez.
     /// </summary>
     public static bool TryGetResolvedTenant(
         this ControllerBase controller,
@@ -26,12 +27,13 @@ public static class TenantHttpExtensions
         problem = controller.Problem(
             statusCode: StatusCodes.Status400BadRequest,
             title: "Kiracı eksik",
-            detail: "tenant_id JWT claim (login/refresh isteğinde isteğe bağlı tenantId) veya sorgu tenantId gerekir.");
+            detail: "Kiracı bağlamı yok: geçerli access token içinde tenant_id claim veya (geçiş için) sorgu tenantId gerekir.");
         return false;
     }
 
     /// <summary>
-    /// JWT/sorgu kiracısı varken gövde tenantId ile uyuşmazsa 403.
+    /// JWT/sorgu kiracısı varken gövde <c>tenantId</c> ile uyuşmazsa 403.
+    /// Yeni uçlarda kullanılmıyor; geriye dönük veya özel senaryolar içindir.
     /// </summary>
     public static IActionResult? ValidateBodyTenant(
         this ControllerBase controller,

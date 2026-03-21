@@ -49,7 +49,7 @@ dotnet build Veteriner.sln -c Debug
 ```
 
 API giriş projesi: `src/Backend.Veteriner.Api`  
-Yerel geliştirmede connection string ve JWT anahtarı için **User Secrets** veya ortam değişkenleri kullanın.
+Yerel geliştirmede varsayılan SQL veritabanı adı **`VeterinerDb`** (`appsettings.Development.json` içindeki `ConnectionStrings:DefaultConnection`). İsterseniz **User Secrets** veya ortam değişkenleri ile üzerine yazın; JWT anahtarı için de User Secrets kullanın.
 
 ## Test çalıştırma
 
@@ -58,7 +58,7 @@ dotnet test Veteriner.sln -c Debug
 ```
 
 - **Birim / uygulama testleri:** `tests/Backend.Veteriner.Application.Tests`, `tests/Backend.Veteriner.Domain.Tests`
-- **Entegrasyon testleri:** `tests/Backend.Veteriner.IntegrationTests` (genelde ayrı `appsettings.IntegrationTests.json` ve LocalDB / test veritabanı)
+- **Entegrasyon testleri:** `tests/Backend.Veteriner.IntegrationTests` (`appsettings.IntegrationTests.json` → LocalDB, varsayılan DB adı **`VeterinerDb_IntegrationTests`**)
 
 ## Ürün modülü ekleme (özet)
 

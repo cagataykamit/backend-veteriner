@@ -14,13 +14,32 @@ namespace Backend.Veteriner.Application.Tests.Pets.Handlers;
 
 public sealed class CreatePetCommandHandlerTests
 {
+    private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IReadRepository<Client>> _clientsRead = new();
     private readonly Mock<IReadRepository<Pet>> _petsRead = new();
     private readonly Mock<IRepository<Pet>> _petsWrite = new();
 
     private CreatePetCommandHandler CreateHandler()
-        => new(_tenantsRead.Object, _clientsRead.Object, _petsRead.Object, _petsWrite.Object);
+        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _petsRead.Object, _petsWrite.Object);
+
+    private static void AlignTenantId(Tenant tenant, Guid id)
+        => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
+    {
+        var handler = CreateHandler();
+        var cmd = new CreatePetCommand(Guid.NewGuid(), "Pamuk", "Kedi", null, null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns((Guid?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Tenants.ContextMissing");
+        _petsWrite.Verify(r => r.AddAsync(It.IsAny<Pet>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantNotFound()
@@ -28,8 +47,9 @@ public sealed class CreatePetCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
-        var cmd = new CreatePetCommand(tid, cid, "Pamuk", "Kedi", null, null);
+        var cmd = new CreatePetCommand(cid, "Pamuk", "Kedi", null, null);
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Tenant?)null);
 
@@ -46,11 +66,13 @@ public sealed class CreatePetCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
-        var cmd = new CreatePetCommand(tid, cid, "Pamuk", "Kedi", null, null);
+        var cmd = new CreatePetCommand(cid, "Pamuk", "Kedi", null, null);
 
         var tenant = new Tenant("X");
+        AlignTenantId(tenant, tid);
         tenant.Deactivate();
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -67,10 +89,12 @@ public sealed class CreatePetCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
-        var cmd = new CreatePetCommand(tid, cid, "Pamuk", "Kedi", null, null);
+        var cmd = new CreatePetCommand(cid, "Pamuk", "Kedi", null, null);
 
         var tenant = new Tenant("X");
+        AlignTenantId(tenant, tid);
 
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -91,9 +115,12 @@ public sealed class CreatePetCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var future = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10));
-        var cmd = new CreatePetCommand(tid, cid, "Pamuk", "Kedi", null, future);
+        var cmd = new CreatePetCommand(cid, "Pamuk", "Kedi", null, future);
 
         var tenant = new Tenant("X");
+        AlignTenantId(tenant, tid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -113,9 +140,12 @@ public sealed class CreatePetCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
-        var cmd = new CreatePetCommand(tid, cid, "Pamuk", "Kedi", "Tekir", null);
+        var cmd = new CreatePetCommand(cid, "Pamuk", "Kedi", "Tekir", null);
 
         var tenant = new Tenant("X");
+        AlignTenantId(tenant, tid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -139,9 +169,12 @@ public sealed class CreatePetCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var birth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-2));
-        var cmd = new CreatePetCommand(tid, cid, "Pamuk", "Kedi", "Tekir", birth);
+        var cmd = new CreatePetCommand(cid, "Pamuk", "Kedi", "Tekir", birth);
 
         var tenant = new Tenant("X");
+        AlignTenantId(tenant, tid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
@@ -159,7 +192,8 @@ public sealed class CreatePetCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         captured.Should().NotBeNull();
-        captured!.Name.Should().Be("Pamuk");
+        captured!.TenantId.Should().Be(tid);
+        captured.Name.Should().Be("Pamuk");
         captured.Species.Should().Be("Kedi");
         captured.Breed.Should().Be("Tekir");
         captured.BirthDate.Should().Be(birth);

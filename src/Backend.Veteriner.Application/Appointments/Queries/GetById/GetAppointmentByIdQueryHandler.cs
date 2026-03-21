@@ -10,15 +10,28 @@ namespace Backend.Veteriner.Application.Appointments.Queries.GetById;
 public sealed class GetAppointmentByIdQueryHandler
     : IRequestHandler<GetAppointmentByIdQuery, Result<AppointmentDetailDto>>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Appointment> _appointments;
 
-    public GetAppointmentByIdQueryHandler(IReadRepository<Appointment> appointments)
-        => _appointments = appointments;
+    public GetAppointmentByIdQueryHandler(
+        ITenantContext tenantContext,
+        IReadRepository<Appointment> appointments)
+    {
+        _tenantContext = tenantContext;
+        _appointments = appointments;
+    }
 
     public async Task<Result<AppointmentDetailDto>> Handle(GetAppointmentByIdQuery request, CancellationToken ct)
     {
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result<AppointmentDetailDto>.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
         var a = await _appointments.FirstOrDefaultAsync(
-            new AppointmentByIdSpec(request.TenantId, request.Id), ct);
+            new AppointmentByIdSpec(tenantId, request.Id), ct);
         if (a is null)
             return Result<AppointmentDetailDto>.Failure("Appointments.NotFound", "Randevu bulunamadı.");
 

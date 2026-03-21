@@ -12,17 +12,20 @@ namespace Backend.Veteriner.Application.Pets.Commands.Create;
 
 public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, Result<Guid>>
 {
+    private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _petsRead;
     private readonly IRepository<Pet> _petsWrite;
 
     public CreatePetCommandHandler(
+        ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clients,
         IReadRepository<Pet> petsRead,
         IRepository<Pet> petsWrite)
     {
+        _tenantContext = tenantContext;
         _tenants = tenants;
         _clients = clients;
         _petsRead = petsRead;
@@ -31,7 +34,14 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
 
     public async Task<Result<Guid>> Handle(CreatePetCommand request, CancellationToken ct)
     {
-        var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(request.TenantId), ct);
+        if (_tenantContext.TenantId is not { } tenantId)
+        {
+            return Result<Guid>.Failure(
+                "Tenants.ContextMissing",
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
+        }
+
+        var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
             return Result<Guid>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
 
@@ -41,7 +51,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
                 "Pasif kiracı için hayvan kaydı oluşturulamaz.");
 
         var client = await _clients.FirstOrDefaultAsync(
-            new ClientByIdSpec(request.TenantId, request.ClientId), ct);
+            new ClientByIdSpec(tenantId, request.ClientId), ct);
         if (client is null)
             return Result<Guid>.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");
 
@@ -59,7 +69,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
                 "Bu müşteri için aynı isim ve türde bir hayvan kaydı zaten var.");
 
         var pet = new Pet(
-            request.TenantId,
+            tenantId,
             request.ClientId,
             request.Name,
             request.Species,

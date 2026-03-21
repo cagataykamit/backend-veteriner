@@ -7,7 +7,6 @@ public sealed class CreatePetCommandValidator : AbstractValidator<CreatePetComma
 {
     public CreatePetCommandValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
         RuleFor(x => x.ClientId).NotEmpty();
         RuleFor(x => x.Name).NotEmpty().MinimumLength(1).MaximumLength(200);
         RuleFor(x => x.Species).NotEmpty().MinimumLength(2).MaximumLength(100);

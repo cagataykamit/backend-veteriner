@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<IOperationClaimPermissionRepository, OperationClaimPermissionRepository>();
         services.AddScoped<IOperationClaimReadRepository, OperationClaimReadRepository>();
         services.AddScoped<IUserOperationClaimRepository, UserOperationClaimRepository>();
+        services.AddScoped<IUserTenantRepository, UserTenantRepository>();
         services.AddScoped<IOutbox, EfOutbox>();
 
 

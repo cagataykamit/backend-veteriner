@@ -7,7 +7,10 @@ public sealed class GetAppointmentsListQueryValidator : AbstractValidator<GetApp
 {
     public GetAppointmentsListQueryValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
+        RuleFor(x => x.PageRequest).NotNull();
+        RuleFor(x => x.PageRequest.Page).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageRequest.PageSize).InclusiveBetween(1, 200);
+
         RuleFor(x => x)
             .Must(q =>
                 !q.DateFromUtc.HasValue

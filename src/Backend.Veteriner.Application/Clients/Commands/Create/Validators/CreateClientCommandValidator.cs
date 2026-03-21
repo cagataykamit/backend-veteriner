@@ -7,7 +7,6 @@ public sealed class CreateClientCommandValidator : AbstractValidator<CreateClien
 {
     public CreateClientCommandValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
         RuleFor(x => x.FullName)
             .NotEmpty()
             .MinimumLength(2)

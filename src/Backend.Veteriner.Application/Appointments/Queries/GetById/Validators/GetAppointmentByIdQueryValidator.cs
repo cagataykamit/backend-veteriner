@@ -7,7 +7,6 @@ public sealed class GetAppointmentByIdQueryValidator : AbstractValidator<GetAppo
 {
     public GetAppointmentByIdQueryValidator()
     {
-        RuleFor(x => x.TenantId).NotEmpty();
         RuleFor(x => x.Id).NotEmpty();
     }
 }

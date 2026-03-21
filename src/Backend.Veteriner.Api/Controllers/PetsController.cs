@@ -14,7 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Backend.Veteriner.Api.Controllers;
 
 /// <summary>
-/// Hayvan kayıtları. Kiracı JWT <c>tenant_id</c> veya sorgu <c>tenantId</c>.
+/// Hayvan kayıtları. Kiracı JWT <c>tenant_id</c>; handler’da <see cref="ITenantContext"/>.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -42,8 +42,8 @@ public sealed class PetsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreatePetCommand cmd, CancellationToken ct)
     {
-        if (this.ValidateBodyTenant(_tenantContext, cmd.TenantId) is { } forbid)
-            return forbid;
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
 
         var result = await _mediator.Send(cmd, ct);
         if (!result.IsSuccess)
@@ -55,8 +55,7 @@ public sealed class PetsController : ControllerBase
             new
             {
                 version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0",
-                id,
-                tenantId = cmd.TenantId
+                id
             },
             id);
     }
@@ -68,9 +67,9 @@ public sealed class PetsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
-        if (!this.TryGetResolvedTenant(_tenantContext, out var tid, out var problem))
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
-        var result = await _mediator.Send(new GetPetByIdQuery(tid, id), ct);
+        var result = await _mediator.Send(new GetPetByIdQuery(id), ct);
         return result.ToActionResult(this);
     }
 
@@ -80,9 +79,9 @@ public sealed class PetsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetList([FromQuery] PageRequest page, CancellationToken ct)
     {
-        if (!this.TryGetResolvedTenant(_tenantContext, out var tid, out var problem))
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
-        var result = await _mediator.Send(new GetPetsListQuery(tid, page), ct);
+        var result = await _mediator.Send(new GetPetsListQuery(page), ct);
         return result.ToActionResult(this);
     }
 }
