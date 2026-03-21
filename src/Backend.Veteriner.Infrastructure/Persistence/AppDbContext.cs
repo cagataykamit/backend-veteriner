@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
 using Backend.Veteriner.Domain.Clinics;
@@ -55,6 +56,7 @@ public class AppDbContext : DbContext
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Pet> Pets => Set<Pet>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<Examination> Examinations => Set<Examination>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

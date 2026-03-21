@@ -71,6 +71,12 @@ public static class PermissionCatalog
         public const string Read = "Dashboard.Read";
     }
 
+    public static class Examinations
+    {
+        public const string Read = "Examinations.Read";
+        public const string Create = "Examinations.Create";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -115,6 +121,9 @@ public static class PermissionCatalog
         new(Appointments.Reschedule, "Planlanmış randevuyu yeniden zamanlama yetkisi", "Appointments"),
 
         new(Dashboard.Read, "Klinik paneli özet dashboard verilerini görüntüleme yetkisi", "Dashboard"),
+
+        new(Examinations.Read, "Muayene kayıtlarını listeleme ve görüntüleme yetkisi", "Examinations"),
+        new(Examinations.Create, "Muayene kaydı oluşturma yetkisi", "Examinations"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 

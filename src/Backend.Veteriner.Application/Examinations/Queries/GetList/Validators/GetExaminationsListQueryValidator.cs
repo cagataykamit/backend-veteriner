@@ -1,0 +1,18 @@
+using Backend.Veteriner.Application.Examinations.Queries.GetList;
+using FluentValidation;
+
+namespace Backend.Veteriner.Application.Examinations.Queries.GetList.Validators;
+
+public sealed class GetExaminationsListQueryValidator : AbstractValidator<GetExaminationsListQuery>
+{
+    public GetExaminationsListQueryValidator()
+    {
+        RuleFor(x => x.PageRequest).NotNull();
+        RuleFor(x => x.PageRequest.Page).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageRequest.PageSize).InclusiveBetween(1, 200);
+
+        RuleFor(x => x)
+            .Must(x => !x.DateFromUtc.HasValue || !x.DateToUtc.HasValue || x.DateFromUtc <= x.DateToUtc)
+            .WithMessage("dateFromUtc, dateToUtc'den küçük veya eşit olmalıdır.");
+    }
+}
