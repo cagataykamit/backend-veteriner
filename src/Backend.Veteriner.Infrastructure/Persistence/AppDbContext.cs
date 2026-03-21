@@ -7,6 +7,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
+using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -57,6 +58,7 @@ public class AppDbContext : DbContext
     public DbSet<Pet> Pets => Set<Pet>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Examination> Examinations => Set<Examination>();
+    public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

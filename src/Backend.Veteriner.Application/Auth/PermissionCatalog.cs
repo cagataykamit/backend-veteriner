@@ -77,6 +77,12 @@ public static class PermissionCatalog
         public const string Create = "Examinations.Create";
     }
 
+    public static class Vaccinations
+    {
+        public const string Read = "Vaccinations.Read";
+        public const string Create = "Vaccinations.Create";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -124,6 +130,9 @@ public static class PermissionCatalog
 
         new(Examinations.Read, "Muayene kayıtlarını listeleme ve görüntüleme yetkisi", "Examinations"),
         new(Examinations.Create, "Muayene kaydı oluşturma yetkisi", "Examinations"),
+
+        new(Vaccinations.Read, "Aşı kayıtlarını listeleme ve görüntüleme yetkisi", "Vaccinations"),
+        new(Vaccinations.Create, "Aşı kaydı oluşturma yetkisi", "Vaccinations"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 
