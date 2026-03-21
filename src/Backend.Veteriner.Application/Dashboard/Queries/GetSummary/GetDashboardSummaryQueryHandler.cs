@@ -45,46 +45,32 @@ public sealed class GetDashboardSummaryQueryHandler
         var dayStart = new DateTime(utcNow.Year, utcNow.Month, utcNow.Day, 0, 0, 0, DateTimeKind.Utc);
         var dayEnd = dayStart.AddDays(1);
 
-        var todayScheduledTask = _appointments.CountAsync(
+        // Tek DbContext: paralel Task.WhenAll yerine sıralı await (EF Core concurrency kuralı).
+        var todayScheduled = await _appointments.CountAsync(
             new DashboardTodayScheduledCountSpec(tenantId, dayStart, dayEnd), ct);
-        var upcomingCountTask = _appointments.CountAsync(
+        var upcomingCount = await _appointments.CountAsync(
             new DashboardUpcomingScheduledCountSpec(tenantId, utcNow), ct);
-        var completedTodayTask = _appointments.CountAsync(
+        var completedToday = await _appointments.CountAsync(
             new DashboardTodayCompletedCountSpec(tenantId, dayStart, dayEnd), ct);
-        var cancelledTodayTask = _appointments.CountAsync(
+        var cancelledToday = await _appointments.CountAsync(
             new DashboardTodayCancelledCountSpec(tenantId, dayStart, dayEnd), ct);
-        var clientsTotalTask = _clients.CountAsync(new DashboardClientsTotalCountSpec(tenantId), ct);
-        var petsTotalTask = _pets.CountAsync(new DashboardPetsTotalCountSpec(tenantId), ct);
+        var clientsTotal = await _clients.CountAsync(new DashboardClientsTotalCountSpec(tenantId), ct);
+        var petsTotal = await _pets.CountAsync(new DashboardPetsTotalCountSpec(tenantId), ct);
 
-        var upcomingListTask = _appointments.ListAsync(
+        var upcomingRows = await _appointments.ListAsync(
             new DashboardUpcomingScheduledListSpec(tenantId, utcNow, UpcomingListTake), ct);
-        var recentClientsTask = _clients.ListAsync(
+        var recentClientRows = await _clients.ListAsync(
             new DashboardRecentClientsListSpec(tenantId, RecentListTake), ct);
-        var recentPetsTask = _pets.ListAsync(
+        var recentPetRows = await _pets.ListAsync(
             new DashboardRecentPetsListSpec(tenantId, RecentListTake), ct);
 
-        await Task.WhenAll(
-            todayScheduledTask,
-            upcomingCountTask,
-            completedTodayTask,
-            cancelledTodayTask,
-            clientsTotalTask,
-            petsTotalTask,
-            upcomingListTask,
-            recentClientsTask,
-            recentPetsTask);
-
-        var upcomingRows = await upcomingListTask;
-        var recentClientRows = await recentClientsTask;
-        var recentPetRows = await recentPetsTask;
-
         var dto = new DashboardSummaryDto(
-            TodayAppointmentsCount: await todayScheduledTask,
-            UpcomingAppointmentsCount: await upcomingCountTask,
-            CompletedTodayCount: await completedTodayTask,
-            CancelledTodayCount: await cancelledTodayTask,
-            TotalClientsCount: await clientsTotalTask,
-            TotalPetsCount: await petsTotalTask,
+            TodayAppointmentsCount: todayScheduled,
+            UpcomingAppointmentsCount: upcomingCount,
+            CompletedTodayCount: completedToday,
+            CancelledTodayCount: cancelledToday,
+            TotalClientsCount: clientsTotal,
+            TotalPetsCount: petsTotal,
             UpcomingAppointments: upcomingRows
                 .Select(a => new DashboardAppointmentItemDto(
                     a.Id,
