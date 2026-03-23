@@ -1,6 +1,7 @@
 namespace Backend.Veteriner.Application.Clients.Contracts.Dtos;
 
-public sealed record ClientDetailDto(
+/// <summary>POST /clients yanıt gövdesi; frontend yönlendirme için <see cref="Id"/> her zaman dolu.</summary>
+public sealed record ClientCreatedDto(
     Guid Id,
     Guid TenantId,
     string FullName,

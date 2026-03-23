@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +11,13 @@ namespace Backend.Veteriner.Api.Middleware;
 public static class ExceptionHandlingExtensions
 {
     private const int ClientClosedRequest = 499;
+
+    /// <summary>FluentValidation <see cref="ValidationException"/> için JSON; Türkçe ve alan adları camelCase.</summary>
+    private static readonly JsonSerializerOptions ValidationProblemJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     public static IApplicationBuilder UseGlobalExceptionHandler(this IApplicationBuilder app, IWebHostEnvironment env)
     {
@@ -35,7 +44,7 @@ public static class ExceptionHandlingExtensions
 
                 ctx.Response.ContentType = "application/problem+json";
 
-                // 0) Exception null ise bile s�zle?me bozulmas?n
+                // Exception null ise bile yanıt gövdesi üretilir
                 if (ex is null)
                 {
                     ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
@@ -45,8 +54,8 @@ public static class ExceptionHandlingExtensions
                         title: "Beklenmeyen hata",
                         type: "https://httpstatuses.io/500",
                         detail: env.IsDevelopment()
-                            ? "Exception al?namad? (null)."
-                            : "Beklenmeyen bir hata olu?tu.",
+                            ? "Exception alınamadı (null)."
+                            : "Beklenmeyen bir hata oluştu.",
                         instance: ctx.Request.Path,
                         traceId: traceId,
                         correlationId: correlationId,
@@ -64,7 +73,7 @@ public static class ExceptionHandlingExtensions
 
                     var errors = vex.Errors
                         .Where(e => e is not null)
-                        .GroupBy(e => e.PropertyName)
+                        .GroupBy(e => ToCamelCasePropertyPath(e.PropertyName))
                         .ToDictionary(
                             g => string.IsNullOrWhiteSpace(g.Key) ? "general" : g.Key,
                             g => g.Select(e => e.ErrorMessage).Distinct().ToArray()
@@ -73,9 +82,9 @@ public static class ExceptionHandlingExtensions
                     var vpd = new ValidationProblemDetails(errors)
                     {
                         Status = StatusCodes.Status400BadRequest,
-                        Title = "Do?rulama hatas?",
+                        Title = "Doğrulama hatası",
                         Type = "https://httpstatuses.io/400",
-                        Detail = "Bir veya daha fazla do?rulama hatas? olu?tu.",
+                        Detail = "Gönderilen bilgiler doğrulanamadı. Aşağıdaki alanları kontrol edin.",
                         Instance = ctx.Request.Path
                     };
 
@@ -86,7 +95,7 @@ public static class ExceptionHandlingExtensions
                     if (env.IsDevelopment())
                         vpd.Extensions["stackTrace"] = ex.StackTrace;
 
-                    await ctx.Response.WriteAsJsonAsync(vpd);
+                    await ctx.Response.WriteAsJsonAsync(vpd, ValidationProblemJsonOptions);
                     return;
                 }
 
@@ -95,21 +104,21 @@ public static class ExceptionHandlingExtensions
                 {
                     UnauthorizedAccessException => (
                         StatusCodes.Status401Unauthorized,
-                        "Yetkisiz eri?im",
+                        "Yetkisiz erişim",
                         "https://httpstatuses.io/401",
                         ex.Message
                     ),
 
                     KeyNotFoundException => (
                         StatusCodes.Status404NotFound,
-                        "Bulunamad?",
+                        "Bulunamadı",
                         "https://httpstatuses.io/404",
                         ex.Message
                     ),
 
                     OperationCanceledException => (
                         ClientClosedRequest,
-                        "?stek iptal edildi",
+                        "İstek iptal edildi",
                         "https://httpstatuses.io/499",
                         ex.Message
                     ),
@@ -118,7 +127,7 @@ public static class ExceptionHandlingExtensions
                         StatusCodes.Status500InternalServerError,
                         "Beklenmeyen hata",
                         "https://httpstatuses.io/500",
-                        env.IsDevelopment() ? ex.Message : "Beklenmeyen bir hata olu?tu."
+                        env.IsDevelopment() ? ex.Message : "Beklenmeyen bir hata oluştu."
                     )
                 };
 
@@ -170,5 +179,38 @@ public static class ExceptionHandlingExtensions
             pd.Extensions["stackTrace"] = ex.StackTrace;
 
         return pd;
+    }
+
+    /// <summary>
+    /// FluentValidation <c>PropertyName</c> genelde <c>Phone</c> biçimindedir; JSON <c>errors.phone</c> ile uyum için camelCase yapılır.
+    /// İç içe özelliklerde her segment ayrı dönüştürülür.
+    /// </summary>
+    private static string ToCamelCasePropertyPath(string? propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(propertyName))
+            return "general";
+
+        var segments = propertyName.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length == 0)
+            return "general";
+
+        var sb = new StringBuilder();
+        for (var i = 0; i < segments.Length; i++)
+        {
+            if (i > 0)
+                sb.Append('.');
+            sb.Append(ToCamelCaseSegment(segments[i]));
+        }
+
+        return sb.ToString();
+    }
+
+    private static string ToCamelCaseSegment(string segment)
+    {
+        if (string.IsNullOrEmpty(segment))
+            return segment;
+        if (segment.Length == 1)
+            return segment.ToLowerInvariant();
+        return char.ToLowerInvariant(segment[0]) + segment[1..];
     }
 }

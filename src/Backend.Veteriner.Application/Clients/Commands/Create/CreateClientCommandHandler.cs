@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -8,7 +9,7 @@ using MediatR;
 
 namespace Backend.Veteriner.Application.Clients.Commands.Create;
 
-public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCommand, Result<Guid>>
+public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCommand, Result<ClientCreatedDto>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Tenant> _tenants;
@@ -27,37 +28,46 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
         _clientsWrite = clientsWrite;
     }
 
-    public async Task<Result<Guid>> Handle(CreateClientCommand request, CancellationToken ct)
+    public async Task<Result<ClientCreatedDto>> Handle(CreateClientCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {
-            return Result<Guid>.Failure(
+            return Result<ClientCreatedDto>.Failure(
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
-            return Result<Guid>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
+            return Result<ClientCreatedDto>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
 
         if (!tenant.IsActive)
-            return Result<Guid>.Failure(
+            return Result<ClientCreatedDto>.Failure(
                 "Tenants.TenantInactive",
                 "Pasif kiracı için müşteri oluşturulamaz.");
 
-        var nameKey = request.FullName.Trim().ToLowerInvariant();
-        var phoneKey = string.IsNullOrWhiteSpace(request.Phone) ? "" : request.Phone.Trim();
+        var emailNorm = Client.NormalizeEmailForStorage(request.Email);
+        string? phoneNorm = null;
+        if (!string.IsNullOrWhiteSpace(request.Phone))
+            TurkishMobilePhone.TryNormalize(request.Phone, out phoneNorm);
 
-        var duplicate = await _clientsRead.FirstOrDefaultAsync(
-            new ClientByTenantFullNameAndPhoneSpec(tenantId, nameKey, phoneKey), ct);
-        if (duplicate is not null)
-            return Result<Guid>.Failure(
-                "Clients.DuplicateClient",
-                "Bu kiracı altında aynı ad ve telefon bilgisiyle kayıtlı bir müşteri zaten var.");
+        if (!string.IsNullOrEmpty(emailNorm) && !string.IsNullOrEmpty(phoneNorm))
+        {
+            var duplicate = await _clientsRead.FirstOrDefaultAsync(
+                new ClientByTenantNormalizedEmailAndPhoneSpec(tenantId, emailNorm, phoneNorm), ct);
+            if (duplicate is not null)
+            {
+                return Result<ClientCreatedDto>.Failure(
+                    "Clients.DuplicateClient",
+                    "Bu kiracı altında aynı e-posta ve telefon ile kayıtlı bir müşteri zaten var.");
+            }
+        }
 
-        var client = new Client(tenantId, request.FullName, request.Phone);
+        var client = new Client(tenantId, request.FullName, request.Phone, request.Email);
         await _clientsWrite.AddAsync(client, ct);
         await _clientsWrite.SaveChangesAsync(ct);
-        return Result<Guid>.Success(client.Id);
+
+        var dto = new ClientCreatedDto(client.Id, client.TenantId, client.FullName, client.Email, client.Phone);
+        return Result<ClientCreatedDto>.Success(dto);
     }
 }

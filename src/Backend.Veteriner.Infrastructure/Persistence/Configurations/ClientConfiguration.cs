@@ -19,10 +19,20 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
             .IsRequired()
             .HasMaxLength(300);
 
+        b.Property(x => x.Email)
+            .HasMaxLength(320);
+
         b.Property(x => x.Phone)
+            .HasMaxLength(50);
+
+        b.Property(x => x.PhoneNormalized)
             .HasMaxLength(50);
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.FullName });
+
+        b.HasIndex(x => new { x.TenantId, x.Email, x.PhoneNormalized })
+            .IsUnique()
+            .HasFilter("[Email] IS NOT NULL AND [PhoneNormalized] IS NOT NULL");
     }
 }

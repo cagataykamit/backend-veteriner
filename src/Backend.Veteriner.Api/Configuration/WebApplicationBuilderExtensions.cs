@@ -85,7 +85,7 @@ public static class WebApplicationBuilderExtensions
                         Status = StatusCodes.Status400BadRequest,
                         Title = "Doğrulama hatası",
                         Type = "https://httpstatuses.io/400",
-                        Detail = "Bir veya daha fazla doğrulama hatası oluştu.",
+                        Detail = "Gönderilen bilgiler doğrulanamadı. Aşağıdaki alanları kontrol edin.",
                         Instance = http.Request.Path
                     };
 

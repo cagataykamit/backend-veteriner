@@ -35,7 +35,7 @@ public sealed class ClientsController : ControllerBase
     [HttpPost]
     [Authorize(Policy = PermissionCatalog.Clients.Create)]
     [Consumes("application/json")]
-    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ClientCreatedDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -49,15 +49,15 @@ public sealed class ClientsController : ControllerBase
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
-        var id = result.Value;
+        var dto = result.Value!;
         return CreatedAtAction(
             nameof(GetById),
             new
             {
                 version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0",
-                id
+                id = dto.Id
             },
-            id);
+            dto);
     }
 
     [HttpGet("{id:guid}")]

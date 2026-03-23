@@ -61,7 +61,7 @@ public sealed class CreateClientCommandHandlerTests
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateClientCommand("Ali Veli", "555");
+        var cmd = new CreateClientCommand("Ali Veli", Phone: "05321111111");
 
         var tenant = new Tenant("A.Ş.");
         AlignTenantId(tenant, tid);
@@ -79,11 +79,11 @@ public sealed class CreateClientCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnFailure_When_DuplicateFullNameAndPhone()
+    public async Task Handle_Should_ReturnFailure_When_DuplicateEmailAndPhone()
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateClientCommand("Ayşe Yılmaz", "05321234567");
+        var cmd = new CreateClientCommand("Ayşe Yılmaz", Email: "Ayse@Example.com", Phone: "0532 123 45 67");
 
         var tenant = new Tenant("Klinik A.Ş.");
         AlignTenantId(tenant, tid);
@@ -92,14 +92,37 @@ public sealed class CreateClientCommandHandlerTests
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
-        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantFullNameAndPhoneSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "ayşe yılmaz", "05321234567"));
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedEmailAndPhoneSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Client(tid, "Önceki Kayıt", "05321234567", "ayse@example.com"));
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Clients.DuplicateClient");
         _clientsWrite.Verify(r => r.AddAsync(It.IsAny<Client>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_CreateClient_When_SamePhoneButDifferentEmail()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cmd = new CreateClientCommand("Yeni Kişi", Email: "baska@example.com", Phone: "05321234567");
+
+        var tenant = new Tenant("Klinik A.Ş.");
+        AlignTenantId(tenant, tid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedEmailAndPhoneSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Client?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _clientsWrite.Verify(r => r.AddAsync(It.IsAny<Client>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -116,7 +139,7 @@ public sealed class CreateClientCommandHandlerTests
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
-        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantFullNameAndPhoneSpec>(), It.IsAny<CancellationToken>()))
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedEmailAndPhoneSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Client?)null);
 
         Client? captured = null;
@@ -126,6 +149,9 @@ public sealed class CreateClientCommandHandlerTests
         var result = await handler.Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
+        var created = result.Value!;
+        created.Id.Should().NotBeEmpty();
+        created.FullName.Should().Be("Mehmet Demir");
         captured.Should().NotBeNull();
         captured!.TenantId.Should().Be(tid);
         captured.FullName.Should().Be("Mehmet Demir");

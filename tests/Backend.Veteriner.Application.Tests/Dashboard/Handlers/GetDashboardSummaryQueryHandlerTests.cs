@@ -95,7 +95,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
 
         _clients.Setup(c => c.CountAsync(It.IsAny<DashboardClientsTotalCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(7);
-        var client = new Client(tid, "Ali Veli", "555");
+        var client = new Client(tid, "Ali Veli", "05321111111");
         _clients.Setup(c => c.ListAsync(It.IsAny<DashboardRecentClientsListSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client> { client });
 
