@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Tests;
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Dashboard.Queries.GetSummary;
@@ -101,7 +102,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
 
         _pets.Setup(p => p.CountAsync(It.IsAny<DashboardPetsTotalCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(5);
-        var pet = new Pet(tid, client.Id, "Pamuk", "Kedi");
+        var pet = new Pet(tid, client.Id, "Pamuk", TestSpeciesIds.Cat);
         _pets.Setup(p => p.ListAsync(It.IsAny<DashboardRecentPetsListSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Pet> { pet });
 

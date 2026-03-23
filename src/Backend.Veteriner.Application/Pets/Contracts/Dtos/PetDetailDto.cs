@@ -5,6 +5,7 @@ public sealed record PetDetailDto(
     Guid TenantId,
     Guid ClientId,
     string Name,
-    string Species,
+    Guid SpeciesId,
+    string SpeciesName,
     string? Breed,
     DateOnly? BirthDate);

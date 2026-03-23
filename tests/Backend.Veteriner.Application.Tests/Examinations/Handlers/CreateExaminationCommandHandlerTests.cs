@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -121,7 +122,7 @@ public sealed class CreateExaminationCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
@@ -150,7 +151,7 @@ public sealed class CreateExaminationCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         var wrongClinicAppt = new Appointment(tid, Guid.NewGuid(), pid, DateTime.UtcNow.AddDays(1), null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -180,7 +181,7 @@ public sealed class CreateExaminationCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         Examination? captured = null;
         _examinationsWrite.Setup(r => r.AddAsync(It.IsAny<Examination>(), It.IsAny<CancellationToken>()))
@@ -215,7 +216,7 @@ public sealed class CreateExaminationCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), null));

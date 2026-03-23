@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Pets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -22,16 +23,21 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
             .IsRequired()
             .HasMaxLength(200);
 
-        b.Property(x => x.Species)
-            .IsRequired()
-            .HasMaxLength(100);
+        b.Property(x => x.SpeciesId)
+            .IsRequired();
 
         b.Property(x => x.Breed)
             .HasMaxLength(150);
 
         b.Property(x => x.BirthDate);
 
+        b.HasOne(x => x.Species)
+            .WithMany()
+            .HasForeignKey(x => x.SpeciesId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ClientId });
+        b.HasIndex(x => x.SpeciesId);
     }
 }

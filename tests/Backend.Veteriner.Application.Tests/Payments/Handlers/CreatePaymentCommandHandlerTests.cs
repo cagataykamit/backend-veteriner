@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
@@ -126,7 +127,7 @@ public sealed class CreatePaymentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         SetupTenantClinicClient(tid, cid, clientId);
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         var result = await CreateHandler().Handle(Cmd(cid, clientId, petId), CancellationToken.None);
 
@@ -186,7 +187,7 @@ public sealed class CreatePaymentCommandHandlerTests
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, otherClient, "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, otherClient, "P", TestSpeciesIds.Cat, null, null));
 
         var result = await CreateHandler().Handle(Cmd(cid, clientId, appointmentId: aid), CancellationToken.None);
 
@@ -224,8 +225,8 @@ public sealed class CreatePaymentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         SetupTenantClinicClient(tid, cid, clientId);
         _pets.SetupSequence(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, clientId, "P", "Kedi", null, null))
-            .ReturnsAsync(new Pet(tid, clientId, "Q", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null))
+            .ReturnsAsync(new Pet(tid, clientId, "Q", TestSpeciesIds.Cat, null, null));
         var exam = new Examination(
             tid,
             cid,
@@ -272,7 +273,7 @@ public sealed class CreatePaymentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         SetupTenantClinicClient(tid, cid, clientId);
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, clientId, "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null));
 
         Payment? captured = null;
         _paymentsWrite.Setup(r => r.AddAsync(It.IsAny<Payment>(), It.IsAny<CancellationToken>()))

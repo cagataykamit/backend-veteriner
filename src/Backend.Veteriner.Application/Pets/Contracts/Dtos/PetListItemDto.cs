@@ -5,5 +5,6 @@ public sealed record PetListItemDto(
     Guid TenantId,
     Guid ClientId,
     string Name,
-    string Species,
+    Guid SpeciesId,
+    string SpeciesName,
     string? Breed);

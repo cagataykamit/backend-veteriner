@@ -83,7 +83,11 @@ public sealed class GetDashboardSummaryQueryHandler
                 .Select(c => new DashboardRecentClientDto(c.Id, c.FullName, c.Phone))
                 .ToList(),
             RecentPets: recentPetRows
-                .Select(p => new DashboardRecentPetDto(p.Id, p.ClientId, p.Name, p.Species))
+                .Select(p => new DashboardRecentPetDto(
+                    p.Id,
+                    p.ClientId,
+                    p.Name,
+                    p.Species?.Name ?? ""))
                 .ToList());
 
         return Result<DashboardSummaryDto>.Success(dto);

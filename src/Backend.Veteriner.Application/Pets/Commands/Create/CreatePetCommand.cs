@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Application.Pets.Commands.Create;
 public sealed record CreatePetCommand(
     Guid ClientId,
     string Name,
-    string Species,
+    Guid SpeciesId,
     string? Breed = null,
     DateOnly? BirthDate = null)
     : IRequest<Result<Guid>>;

@@ -36,7 +36,14 @@ public sealed class GetPetsListQueryHandler
         var rows = await _pets.ListAsync(new PetsByTenantPagedSpec(tenantId, page, pageSize), ct);
 
         var items = rows
-            .Select(p => new PetListItemDto(p.Id, p.TenantId, p.ClientId, p.Name, p.Species, p.Breed))
+            .Select(p => new PetListItemDto(
+                p.Id,
+                p.TenantId,
+                p.ClientId,
+                p.Name,
+                p.SpeciesId,
+                p.Species?.Name ?? "",
+                p.Breed))
             .ToList();
 
         return Result<PagedResult<PetListItemDto>>.Success(

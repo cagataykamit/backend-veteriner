@@ -9,6 +9,7 @@ public sealed class DashboardRecentPetsListSpec : Specification<Pet>
     public DashboardRecentPetsListSpec(Guid tenantId, int take)
     {
         Query.Where(p => p.TenantId == tenantId)
+            .Include(p => p.Species!)
             .OrderByDescending(p => p.Id)
             .Take(take);
     }

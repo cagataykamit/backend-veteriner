@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -188,7 +189,7 @@ public sealed class CreateAppointmentCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Appointment(tid, cid, Guid.NewGuid(), when, null));
@@ -218,7 +219,7 @@ public sealed class CreateAppointmentCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
@@ -249,7 +250,7 @@ public sealed class CreateAppointmentCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", "Kedi", null, null));
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);

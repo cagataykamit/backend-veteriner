@@ -31,12 +31,16 @@ public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Re
         if (pet is null)
             return Result<PetDetailDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı.");
 
+        if (pet.Species is null)
+            return Result<PetDetailDto>.Failure("Pets.Inconsistent", "Hayvan tür bilgisi yüklenemedi.");
+
         var dto = new PetDetailDto(
             pet.Id,
             pet.TenantId,
             pet.ClientId,
             pet.Name,
-            pet.Species,
+            pet.SpeciesId,
+            pet.Species.Name,
             pet.Breed,
             pet.BirthDate);
         return Result<PetDetailDto>.Success(dto);
