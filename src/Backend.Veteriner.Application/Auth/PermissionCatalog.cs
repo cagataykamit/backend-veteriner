@@ -57,6 +57,20 @@ public static class PermissionCatalog
         public const string Create = "Pets.Create";
     }
 
+    public static class Species
+    {
+        public const string Read = "Species.Read";
+        public const string Create = "Species.Create";
+        public const string Update = "Species.Update";
+    }
+
+    public static class Breeds
+    {
+        public const string Read = "Breeds.Read";
+        public const string Create = "Breeds.Create";
+        public const string Update = "Breeds.Update";
+    }
+
     public static class Appointments
     {
         public const string Read = "Appointments.Read";
@@ -125,6 +139,14 @@ public static class PermissionCatalog
 
         new(Pets.Read, "Hayvan kayıtlarını listeleme ve görüntüleme yetkisi", "Pets"),
         new(Pets.Create, "Hayvan kaydı oluşturma yetkisi", "Pets"),
+
+        new(Species.Read, "Tür (species) referanslarını listeleme ve görüntüleme yetkisi", "Species"),
+        new(Species.Create, "Tür (species) oluşturma yetkisi", "Species"),
+        new(Species.Update, "Tür (species) güncelleme yetkisi", "Species"),
+
+        new(Breeds.Read, "Irk (breed) referanslarını listeleme ve görüntüleme yetkisi", "Breeds"),
+        new(Breeds.Create, "Irk (breed) oluşturma yetkisi", "Breeds"),
+        new(Breeds.Update, "Irk (breed) güncelleme yetkisi", "Breeds"),
 
         new(Appointments.Read, "Randevuları listeleme ve görüntüleme yetkisi", "Appointments"),
         new(Appointments.Create, "Randevu oluşturma yetkisi", "Appointments"),

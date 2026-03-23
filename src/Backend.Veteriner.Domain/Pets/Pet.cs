@@ -6,6 +6,11 @@ namespace Backend.Veteriner.Domain.Pets;
 /// Kiracı ve müşteriye bağlı evcil hayvan kaydı.
 /// Irk (Breed) bilinmiyorsa opsiyonel bırakılabilir.
 /// </summary>
+/// <remarks>
+/// Geçiş planı (referans veri): <see cref="Species"/> serbest metin yerine zorunlu <c>SpeciesId</c> (FK → global Catalog);
+/// ırk için önce <see cref="Breed"/> metni korunabilir; veri migrasyonu sonrası opsiyonel <c>BreedId</c> eklenebilir.
+/// Şema değişikliği ayrı migration turunda yapılmalıdır.
+/// </remarks>
 public sealed class Pet : AggregateRoot
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
