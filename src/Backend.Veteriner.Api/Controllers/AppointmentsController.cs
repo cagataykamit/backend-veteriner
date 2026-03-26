@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Appointments.Commands.Cancel;
 using Backend.Veteriner.Application.Appointments.Commands.Complete;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
 using Backend.Veteriner.Application.Appointments.Commands.Reschedule;
+using Backend.Veteriner.Application.Appointments.Commands.Update;
 using Backend.Veteriner.Application.Appointments.Contracts;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.Queries.GetById;
@@ -12,6 +13,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -63,6 +65,28 @@ public sealed class AppointmentsController : ControllerBase
                 id
             },
             id);
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = PermissionCatalog.Appointments.Reschedule)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateAppointmentCommand cmd, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        // Route id kaynak-of-truth: body id opsiyonel olabilir.
+        if (cmd.Id != Guid.Empty && id != cmd.Id)
+            return Result.Failure("Appointments.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+
+        cmd = cmd with { Id = id };
+
+        var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
     }
 
     [HttpGet("{id:guid}")]

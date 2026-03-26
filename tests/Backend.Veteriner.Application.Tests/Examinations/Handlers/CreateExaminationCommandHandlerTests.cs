@@ -18,6 +18,7 @@ namespace Backend.Veteriner.Application.Tests.Examinations.Handlers;
 public sealed class CreateExaminationCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
@@ -27,6 +28,7 @@ public sealed class CreateExaminationCommandHandlerTests
     private CreateExaminationCommandHandler CreateHandler()
         => new(
             _tenantContext.Object,
+            _clinicContext.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
@@ -40,6 +42,12 @@ public sealed class CreateExaminationCommandHandlerTests
         Guid? aid,
         DateTime examined)
         => new(cid, pid, aid, examined, "Şikayet", "Bulgu", null, null);
+
+    private static CreateExaminationCommand CmdWithAppointmentOnly(Guid aid, DateTime examined)
+        => new(null, null, aid, examined, "Şikayet", "Bulgu", null, null);
+
+    private static CreateExaminationCommand CmdWithAppointmentAndOverrides(Guid aid, Guid? clinicId, Guid? petId, DateTime examined)
+        => new(clinicId, petId, aid, examined, "Şikayet", "Bulgu", null, null);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
@@ -113,16 +121,10 @@ public sealed class CreateExaminationCommandHandlerTests
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var aid = Guid.NewGuid();
-        var cmd = Cmd(tid, cid, pid, aid, DateTime.UtcNow.AddHours(-1));
+        var cmd = CmdWithAppointmentOnly(aid, DateTime.UtcNow.AddHours(-1));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
-
-        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
-
-        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
@@ -139,19 +141,13 @@ public sealed class CreateExaminationCommandHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
-        var cid = Guid.NewGuid();
-        var pid = Guid.NewGuid();
+        var cid = Guid.NewGuid(); // request clinic
+        var pid = Guid.NewGuid(); // appointment pet
         var aid = Guid.NewGuid();
-        var cmd = Cmd(tid, cid, pid, aid, DateTime.UtcNow.AddHours(-1));
+        var cmd = CmdWithAppointmentAndOverrides(aid, cid, null, DateTime.UtcNow.AddHours(-1));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
-
-        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
-
-        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         var wrongClinicAppt = new Appointment(tid, Guid.NewGuid(), pid, DateTime.UtcNow.AddDays(1), null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -207,19 +203,19 @@ public sealed class CreateExaminationCommandHandlerTests
         var pid = Guid.NewGuid();
         var aid = Guid.NewGuid();
         var examined = DateTime.UtcNow.AddMinutes(-30);
-        var cmd = Cmd(tid, cid, pid, aid, examined);
+        var cmd = CmdWithAppointmentOnly(aid, examined);
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
+
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), null));
 
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
-
-        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), null));
 
         Examination? captured = null;
         _examinationsWrite.Setup(r => r.AddAsync(It.IsAny<Examination>(), It.IsAny<CancellationToken>()))

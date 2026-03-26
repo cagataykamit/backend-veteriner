@@ -16,17 +16,20 @@ public sealed class GetDashboardSummaryQueryHandler
     private const int RecentListTake = 5;
 
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
 
     public GetDashboardSummaryQueryHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Appointment> appointments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _appointments = appointments;
         _clients = clients;
         _pets = pets;
@@ -44,21 +47,22 @@ public sealed class GetDashboardSummaryQueryHandler
         var utcNow = DateTime.UtcNow;
         var dayStart = new DateTime(utcNow.Year, utcNow.Month, utcNow.Day, 0, 0, 0, DateTimeKind.Utc);
         var dayEnd = dayStart.AddDays(1);
+        var clinicId = _clinicContext.ClinicId;
 
         // Tek DbContext: paralel Task.WhenAll yerine sıralı await (EF Core concurrency kuralı).
         var todayScheduled = await _appointments.CountAsync(
-            new DashboardTodayScheduledCountSpec(tenantId, dayStart, dayEnd), ct);
+            new DashboardTodayScheduledCountSpec(tenantId, clinicId, dayStart, dayEnd), ct);
         var upcomingCount = await _appointments.CountAsync(
-            new DashboardUpcomingScheduledCountSpec(tenantId, utcNow), ct);
+            new DashboardUpcomingScheduledCountSpec(tenantId, clinicId, utcNow), ct);
         var completedToday = await _appointments.CountAsync(
-            new DashboardTodayCompletedCountSpec(tenantId, dayStart, dayEnd), ct);
+            new DashboardTodayCompletedCountSpec(tenantId, clinicId, dayStart, dayEnd), ct);
         var cancelledToday = await _appointments.CountAsync(
-            new DashboardTodayCancelledCountSpec(tenantId, dayStart, dayEnd), ct);
+            new DashboardTodayCancelledCountSpec(tenantId, clinicId, dayStart, dayEnd), ct);
         var clientsTotal = await _clients.CountAsync(new DashboardClientsTotalCountSpec(tenantId), ct);
         var petsTotal = await _pets.CountAsync(new DashboardPetsTotalCountSpec(tenantId), ct);
 
         var upcomingRows = await _appointments.ListAsync(
-            new DashboardUpcomingScheduledListSpec(tenantId, utcNow, UpcomingListTake), ct);
+            new DashboardUpcomingScheduledListSpec(tenantId, clinicId, utcNow, UpcomingListTake), ct);
         var recentClientRows = await _clients.ListAsync(
             new DashboardRecentClientsListSpec(tenantId, RecentListTake), ct);
         var recentPetRows = await _pets.ListAsync(

@@ -6,6 +6,8 @@ public sealed class RefreshToken
     public Guid UserId { get; private set; }
     /// <summary>Oturumun bağlı olduğu kiracı; refresh ile aynı tenant korunur.</summary>
     public Guid? TenantId { get; private set; }
+    /// <summary>Oturumun bağlı olduğu aktif klinik (opsiyonel).</summary>
+    public Guid? ClinicId { get; private set; }
     public string TokenHash { get; private set; } = default!;   // raw token değil, SHA-256
 
     public DateTime ExpiresAtUtc { get; private set; }
@@ -25,7 +27,14 @@ public sealed class RefreshToken
 
     private RefreshToken() { }
 
-    public RefreshToken(Guid userId, string tokenHash, DateTime expiresAtUtc, string? ip, string? ua, Guid? tenantId = null)
+    public RefreshToken(
+        Guid userId,
+        string tokenHash,
+        DateTime expiresAtUtc,
+        string? ip,
+        string? ua,
+        Guid? tenantId = null,
+        Guid? clinicId = null)
     {
         UserId = userId;
         TokenHash = tokenHash;
@@ -33,6 +42,7 @@ public sealed class RefreshToken
         IpAddress = ip;
         UserAgent = ua;
         TenantId = tenantId;
+        ClinicId = clinicId;
     }
 
     public bool IsActive => RevokedAtUtc is null && DateTime.UtcNow < ExpiresAtUtc;
@@ -57,5 +67,12 @@ public sealed class RefreshToken
     {
         ReplacedByTokenHash = newTokenHash;
         Revoke("rotated");
+    }
+
+    public void BindClinic(Guid? clinicId)
+    {
+        if (clinicId == Guid.Empty)
+            throw new ArgumentException("ClinicId gecersiz.", nameof(clinicId));
+        ClinicId = clinicId;
     }
 }

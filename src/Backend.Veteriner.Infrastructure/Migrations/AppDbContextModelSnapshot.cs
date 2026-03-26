@@ -520,6 +520,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -567,6 +570,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClinicId")
+                        .HasDatabaseName("IX_RefreshTokens_ClinicId");
 
                     b.HasIndex("ExpiresAtUtc")
                         .HasDatabaseName("IX_RefreshTokens_ExpiresAt");
@@ -897,6 +903,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Users.RefreshToken", b =>
                 {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Backend.Veteriner.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")

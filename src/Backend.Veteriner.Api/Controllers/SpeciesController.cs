@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.SpeciesReference.Commands.Update;
 using Backend.Veteriner.Application.SpeciesReference.Contracts.Dtos;
 using Backend.Veteriner.Application.SpeciesReference.Queries.GetById;
 using Backend.Veteriner.Application.SpeciesReference.Queries.GetList;
+using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -54,8 +55,12 @@ public sealed class SpeciesController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateSpeciesCommand cmd, CancellationToken ct)
     {
-        if (id != cmd.Id)
-            return BadRequest();
+        // Route id kaynak-of-truth: body'de id yoksa route'tan enjekte edilir.
+        // Body'de id gönderildiyse ve route ile uyuşmuyorsa açıklayıcı hata dön.
+        if (cmd.Id != Guid.Empty && id != cmd.Id)
+            return Result.Failure("Species.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+
+        cmd = cmd with { Id = id };
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);

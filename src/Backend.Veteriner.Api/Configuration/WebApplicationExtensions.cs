@@ -67,6 +67,7 @@ public static class WebApplicationExtensions
 
         app.UseAuthentication();
         app.UseMiddleware<TenantContextMiddleware>();
+        app.UseMiddleware<ClinicContextMiddleware>();
         app.UseAuthorization();
 
         // 401/403/404/429 gibi exception olmayan durumları da ProblemDetails'e bağla

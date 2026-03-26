@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Auth.Commands.Login;
 using Backend.Veteriner.Application.Auth.Commands.Refresh;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -22,6 +23,7 @@ public sealed class RefreshCommandHandlerTests
     private readonly Mock<IOperationClaimPermissionRepository> _ocpRepo = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IUserTenantRepository> _userTenants = new();
+    private readonly Mock<IReadRepository<Clinic>> _clinics = new();
 
     private RefreshCommandHandler CreateHandler()
     {
@@ -34,7 +36,8 @@ public sealed class RefreshCommandHandlerTests
             _opt.Object,
             _ocpRepo.Object,
             _tenants.Object,
-            _userTenants.Object);
+            _userTenants.Object,
+            _clinics.Object);
     }
 
     [Fact]

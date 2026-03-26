@@ -11,13 +11,16 @@ public sealed class GetVaccinationByIdQueryHandler
     : IRequestHandler<GetVaccinationByIdQuery, Result<VaccinationDetailDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Vaccination> _vaccinations;
 
     public GetVaccinationByIdQueryHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Vaccination> vaccinations)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _vaccinations = vaccinations;
     }
 
@@ -34,6 +37,8 @@ public sealed class GetVaccinationByIdQueryHandler
             new VaccinationByIdSpec(tenantId, request.Id), ct);
         if (v is null)
             return Result<VaccinationDetailDto>.Failure("Vaccinations.NotFound", "Aşı kaydı bulunamadı.");
+        if (_clinicContext.ClinicId is { } clinicId && v.ClinicId != clinicId)
+            return Result<VaccinationDetailDto>.Failure("Vaccinations.NotFound", "Asi kaydi bulunamadi.");
 
         var dto = new VaccinationDetailDto(
             v.Id,

@@ -2,7 +2,9 @@ using System.Security.Claims;
 using Backend.Veteriner.Application.Auth.Commands.Login;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
@@ -18,6 +20,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
     private readonly IOperationClaimPermissionRepository _ocpRepo;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
+    private readonly IReadRepository<Clinic> _clinics;
 
     public RefreshCommandHandler(
         IRefreshTokenRepository refreshRepo,
@@ -26,7 +29,8 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         IJwtOptionsProvider opt,
         IOperationClaimPermissionRepository ocpRepo,
         IReadRepository<Tenant> tenants,
-        IUserTenantRepository userTenants)
+        IUserTenantRepository userTenants,
+        IReadRepository<Clinic> clinics)
     {
         _refreshRepo = refreshRepo;
         _hash = hash;
@@ -35,6 +39,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         _ocpRepo = ocpRepo;
         _tenants = tenants;
         _userTenants = userTenants;
+        _clinics = clinics;
     }
 
     public async Task<Result<LoginResultDto>> Handle(RefreshCommand request, CancellationToken ct)
@@ -121,6 +126,20 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
 
         extraClaims.Add(new Claim(VeterinerClaims.TenantId, sessionTenantId.ToString("D")));
 
+        // Clinic seçildiyse token'a taşınır; geçersizse yeniden seçim zorunlu.
+        if (stored.ClinicId is { } sessionClinicId)
+        {
+            var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(sessionTenantId, sessionClinicId), ct);
+            if (clinic is null || !clinic.IsActive)
+            {
+                return Result<LoginResultDto>.Failure(
+                    "Auth.ClinicSelectionRequired",
+                    "Aktif klinik bulunamadi; lutfen klinik secimi yapin.");
+            }
+
+            extraClaims.Add(new Claim(VeterinerClaims.ClinicId, sessionClinicId.ToString("D")));
+        }
+
         var (access, newRefreshRaw, accessExp) = _jwt.Create(user, extraClaims);
 
         var newHash = _hash.ComputeSha256(newRefreshRaw);
@@ -132,7 +151,8 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
             DateTime.UtcNow.AddDays(_opt.RefreshTokenDays),
             null,
             null,
-            sessionTenantId);
+            sessionTenantId,
+            stored.ClinicId);
 
         user.AddRefreshToken(newRefresh);
         await _refreshRepo.AddAsync(newRefresh, ct);

@@ -11,13 +11,16 @@ public sealed class GetExaminationByIdQueryHandler
     : IRequestHandler<GetExaminationByIdQuery, Result<ExaminationDetailDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Examination> _examinations;
 
     public GetExaminationByIdQueryHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Examination> examinations)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _examinations = examinations;
     }
 
@@ -34,6 +37,8 @@ public sealed class GetExaminationByIdQueryHandler
             new ExaminationByIdSpec(tenantId, request.Id), ct);
         if (e is null)
             return Result<ExaminationDetailDto>.Failure("Examinations.NotFound", "Muayene kaydı bulunamadı.");
+        if (_clinicContext.ClinicId is { } clinicId && e.ClinicId != clinicId)
+            return Result<ExaminationDetailDto>.Failure("Examinations.NotFound", "Muayene kaydi bulunamadi.");
 
         var dto = new ExaminationDetailDto(
             e.Id,

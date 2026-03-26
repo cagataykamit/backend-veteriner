@@ -6,6 +6,9 @@ public static class VeterinerClaims
     /// <summary>Aktif kiracı kimliği (GUID string). Tek kiracı oturumu varsayımı.</summary>
     public const string TenantId = "tenant_id";
 
+    /// <summary>Aktif klinik kimliği (GUID string). Çok klinikli tenant'ta kullanıcı tarafından seçilir.</summary>
+    public const string ClinicId = "clinic_id";
+
     /// <summary>
     /// Platform genelinde yetki (ör. operasyon ekipleri). Değer genelde <c>true</c>.
     /// Kiracı bypass için middleware’de otomatik kullanılmaz; açık policy + denetim gerekir.

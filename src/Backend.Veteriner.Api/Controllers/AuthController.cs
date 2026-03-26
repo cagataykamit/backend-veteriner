@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Auth.Commands.Login;
 using Backend.Veteriner.Application.Auth.Commands.Logout;
 using Backend.Veteriner.Application.Auth.Commands.LogoutAll;
 using Backend.Veteriner.Application.Auth.Commands.Refresh;
+using Backend.Veteriner.Application.Auth.Commands.SelectClinic;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -65,6 +66,31 @@ public sealed class AuthController : ControllerBase
                 title: "Validation failed",
                 detail: "refreshToken zorunludur."
             );
+        }
+
+        Result<LoginResultDto> result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Aktif klinik seçimi. Body: refreshToken + clinicId. Başarılı olunca clinic_id claim içeren yeni access/refresh döner.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("select-clinic")]
+    [Consumes("application/json")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(LoginResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SelectClinic([FromBody] SelectClinicCommand? cmd, CancellationToken ct)
+    {
+        if (cmd is null || string.IsNullOrWhiteSpace(cmd.RefreshToken) || cmd.ClinicId == Guid.Empty)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Validation failed",
+                detail: "refreshToken ve clinicId zorunludur.");
         }
 
         Result<LoginResultDto> result = await _mediator.Send(cmd, ct);

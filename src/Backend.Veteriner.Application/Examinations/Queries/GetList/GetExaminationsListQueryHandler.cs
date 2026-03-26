@@ -12,13 +12,16 @@ public sealed class GetExaminationsListQueryHandler
     : IRequestHandler<GetExaminationsListQuery, Result<PagedResult<ExaminationListItemDto>>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Examination> _examinations;
 
     public GetExaminationsListQueryHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Examination> examinations)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _examinations = examinations;
     }
 
@@ -35,11 +38,18 @@ public sealed class GetExaminationsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
+        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        {
+            return Result<PagedResult<ExaminationListItemDto>>.Failure(
+                "Examinations.ClinicContextMismatch",
+                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+        }
 
         var total = await _examinations.CountAsync(
             new ExaminationsFilteredCountSpec(
                 tenantId,
-                request.ClinicId,
+                effectiveClinicId,
                 request.PetId,
                 request.AppointmentId,
                 request.DateFromUtc,
@@ -49,7 +59,7 @@ public sealed class GetExaminationsListQueryHandler
         var rows = await _examinations.ListAsync(
             new ExaminationsFilteredPagedSpec(
                 tenantId,
-                request.ClinicId,
+                effectiveClinicId,
                 request.PetId,
                 request.AppointmentId,
                 request.DateFromUtc,

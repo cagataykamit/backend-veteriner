@@ -17,6 +17,7 @@ namespace Backend.Veteriner.Application.Examinations.Commands.Create;
 public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExaminationCommand, Result<Guid>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -25,6 +26,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
 
     public CreateExaminationCommandHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -32,6 +34,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         IRepository<Examination> examinationsWrite)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
@@ -65,19 +68,13 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         if (!window.IsSuccess)
             return Result<Guid>.Failure(window.Error);
 
-        var clinic = await _clinics.FirstOrDefaultAsync(
-            new ClinicByIdSpec(tenantId, request.ClinicId), ct);
-        if (clinic is null)
-            return Result<Guid>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
+        Guid clinicId;
+        Guid petId;
 
-        var pet = await _pets.FirstOrDefaultAsync(
-            new PetByIdSpec(tenantId, request.PetId), ct);
-        if (pet is null)
-            return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
-
+        Appointment? appt = null;
         if (request.AppointmentId is { } aid)
         {
-            var appt = await _appointments.FirstOrDefaultAsync(
+            appt = await _appointments.FirstOrDefaultAsync(
                 new AppointmentByIdSpec(tenantId, aid), ct);
             if (appt is null)
             {
@@ -86,18 +83,52 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
                     "Randevu bulunamadı veya kiracıya ait değil.");
             }
 
-            if (appt.ClinicId != request.ClinicId || appt.PetId != request.PetId)
+            if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+            {
+                return Result<Guid>.Failure(
+                    "Examinations.ClinicContextMismatch",
+                    "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+            }
+
+            clinicId = _clinicContext.ClinicId ?? request.ClinicId ?? appt.ClinicId;
+            petId = request.PetId ?? appt.PetId;
+
+            if (clinicId != appt.ClinicId || petId != appt.PetId)
             {
                 return Result<Guid>.Failure(
                     "Examinations.AppointmentPetClinicMismatch",
                     "Seçilen randevu ile klinik veya hayvan bilgisi uyuşmuyor.");
             }
         }
+        else
+        {
+            var cid = _clinicContext.ClinicId ?? request.ClinicId;
+            if (cid is not { } resolvedCid || resolvedCid == Guid.Empty
+                || request.PetId is not { } pid || pid == Guid.Empty)
+            {
+                return Result<Guid>.Failure(
+                    "Examinations.Validation",
+                    "AppointmentId yoksa ClinicId ve PetId zorunludur.");
+            }
+
+            clinicId = resolvedCid;
+            petId = pid;
+        }
+
+        var clinic = await _clinics.FirstOrDefaultAsync(
+            new ClinicByIdSpec(tenantId, clinicId), ct);
+        if (clinic is null)
+            return Result<Guid>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
+
+        var pet = await _pets.FirstOrDefaultAsync(
+            new PetByIdSpec(tenantId, petId), ct);
+        if (pet is null)
+            return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
         var examination = new Examination(
             tenantId,
-            request.ClinicId,
-            request.PetId,
+            clinicId,
+            petId,
             request.AppointmentId,
             examinedUtc,
             request.VisitReason,

@@ -20,6 +20,7 @@ namespace Backend.Veteriner.Application.Payments.Commands.Create;
 public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentCommand, Result<Guid>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Client> _clients;
@@ -30,6 +31,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
 
     public CreatePaymentCommandHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Client> clients,
@@ -39,6 +41,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         IRepository<Payment> paymentsWrite)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _tenants = tenants;
         _clinics = clinics;
         _clients = clients;
@@ -80,8 +83,17 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         if (!window.IsSuccess)
             return Result<Guid>.Failure(window.Error);
 
+        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        {
+            return Result<Guid>.Failure(
+                "Payments.ClinicContextMismatch",
+                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+        }
+
+        var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
+
         var clinic = await _clinics.FirstOrDefaultAsync(
-            new ClinicByIdSpec(tenantId, request.ClinicId), ct);
+            new ClinicByIdSpec(tenantId, effectiveClinicId), ct);
         if (clinic is null)
             return Result<Guid>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
 
@@ -115,7 +127,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
                     "Randevu bulunamadı veya kiracıya ait değil.");
             }
 
-            if (appt.ClinicId != request.ClinicId)
+            if (appt.ClinicId != effectiveClinicId)
             {
                 return Result<Guid>.Failure(
                     "Payments.AppointmentClinicMismatch",
@@ -149,7 +161,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
                     "Muayene bulunamadı veya kiracıya ait değil.");
             }
 
-            if (exam.ClinicId != request.ClinicId)
+            if (exam.ClinicId != effectiveClinicId)
             {
                 return Result<Guid>.Failure(
                     "Payments.ExaminationClinicMismatch",
@@ -174,7 +186,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
 
         var payment = new Payment(
             tenantId,
-            request.ClinicId,
+            effectiveClinicId,
             request.ClientId,
             request.PetId,
             request.AppointmentId,

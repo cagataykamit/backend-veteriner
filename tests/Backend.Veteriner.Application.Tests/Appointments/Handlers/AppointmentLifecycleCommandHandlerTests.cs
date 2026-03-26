@@ -13,13 +13,14 @@ namespace Backend.Veteriner.Application.Tests.Appointments.Handlers;
 public sealed class AppointmentLifecycleCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Appointment>> _read = new();
     private readonly Mock<IRepository<Appointment>> _write = new();
 
     [Fact]
     public async Task Cancel_Should_Fail_When_ContextMissing()
     {
-        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         _tenantContext.SetupGet(t => t.TenantId).Returns((Guid?)null);
 
         var result = await handler.Handle(new CancelAppointmentCommand(Guid.NewGuid()), CancellationToken.None);
@@ -31,7 +32,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Cancel_Should_Fail_When_NotFound()
     {
-        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var aid = Guid.NewGuid();
 
@@ -49,7 +50,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Cancel_Should_Fail_When_NotScheduled()
     {
-        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
         _ = appt.Complete();
@@ -68,7 +69,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Cancel_Should_Succeed_When_Scheduled()
     {
-        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
 
@@ -87,7 +88,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Complete_Should_Fail_When_NotScheduled()
     {
-        var handler = new CompleteAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new CompleteAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
         _ = appt.Cancel();
@@ -105,7 +106,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Complete_Should_Succeed_When_Scheduled()
     {
-        var handler = new CompleteAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new CompleteAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
 
@@ -123,7 +124,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_ClinicSlotDuplicate()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(3);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
@@ -146,7 +147,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Succeed_When_NoConflict()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(5);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
@@ -171,7 +172,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_NotScheduled()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(3);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
@@ -193,7 +194,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_TooFarInPast()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var past = DateTime.UtcNow.AddDays(-30);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);

@@ -12,10 +12,13 @@ namespace Backend.Veteriner.Application.Tests.Examinations.Handlers;
 public sealed class GetExaminationsListQueryHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
 
     private GetExaminationsListQueryHandler CreateHandler()
-        => new(_tenantContext.Object, _examinations.Object);
+        => new(
+            _tenantContext.Object,
+            _clinicContext.Object, _examinations.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -54,5 +57,23 @@ public sealed class GetExaminationsListQueryHandlerTests
         _examinations.Verify(
             r => r.ListAsync(It.IsAny<ExaminationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_QueryClinic_Differs_From_ActiveClinicContext()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
+        var queryClinicId = Guid.NewGuid();
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+
+        var result = await CreateHandler().Handle(new GetExaminationsListQuery(page, queryClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.ClinicContextMismatch");
+        _examinations.Verify(
+            r => r.CountAsync(It.IsAny<ExaminationsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

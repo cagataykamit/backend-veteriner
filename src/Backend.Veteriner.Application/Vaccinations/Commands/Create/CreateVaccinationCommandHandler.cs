@@ -16,6 +16,7 @@ namespace Backend.Veteriner.Application.Vaccinations.Commands.Create;
 public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVaccinationCommand, Result<Guid>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -24,6 +25,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
 
     public CreateVaccinationCommandHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -31,6 +33,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         IRepository<Vaccination> vaccinationsWrite)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
@@ -83,8 +86,17 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
                 return Result<Guid>.Failure(dw.Error);
         }
 
+        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        {
+            return Result<Guid>.Failure(
+                "Vaccinations.ClinicContextMismatch",
+                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+        }
+
+        var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
+
         var clinic = await _clinics.FirstOrDefaultAsync(
-            new ClinicByIdSpec(tenantId, request.ClinicId), ct);
+            new ClinicByIdSpec(tenantId, effectiveClinicId), ct);
         if (clinic is null)
             return Result<Guid>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
 
@@ -104,7 +116,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
                     "Muayene bulunamadı veya kiracıya ait değil.");
             }
 
-            if (exam.ClinicId != request.ClinicId || exam.PetId != request.PetId)
+            if (exam.ClinicId != effectiveClinicId || exam.PetId != request.PetId)
             {
                 return Result<Guid>.Failure(
                     "Vaccinations.ExaminationPetClinicMismatch",
@@ -115,7 +127,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         var vaccination = new Vaccination(
             tenantId,
             request.PetId,
-            request.ClinicId,
+            effectiveClinicId,
             request.ExaminationId,
             request.VaccineName,
             request.Status,

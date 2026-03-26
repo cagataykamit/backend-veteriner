@@ -11,10 +11,13 @@ namespace Backend.Veteriner.Application.Tests.Payments.Handlers;
 public sealed class GetPaymentByIdQueryHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Payment>> _payments = new();
 
     private GetPaymentByIdQueryHandler CreateHandler()
-        => new(_tenantContext.Object, _payments.Object);
+        => new(
+            _tenantContext.Object,
+            _clinicContext.Object, _payments.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

@@ -12,10 +12,13 @@ namespace Backend.Veteriner.Application.Tests.Payments.Handlers;
 public sealed class GetPaymentsListQueryHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Payment>> _payments = new();
 
     private GetPaymentsListQueryHandler CreateHandler()
-        => new(_tenantContext.Object, _payments.Object);
+        => new(
+            _tenantContext.Object,
+            _clinicContext.Object, _payments.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -53,5 +56,23 @@ public sealed class GetPaymentsListQueryHandlerTests
         _payments.Verify(
             r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_QueryClinic_Differs_From_ActiveClinicContext()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
+        var queryClinicId = Guid.NewGuid();
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+
+        var result = await CreateHandler().Handle(new GetPaymentsListQuery(page, queryClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.ClinicContextMismatch");
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

@@ -14,12 +14,13 @@ namespace Backend.Veteriner.Application.Tests.Dashboard.Handlers;
 public sealed class GetDashboardSummaryQueryHandlerTests
 {
     private readonly Mock<ITenantContext> _tenant = new();
+    private readonly Mock<IClinicContext> _clinic = new();
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
 
     private GetDashboardSummaryQueryHandler CreateHandler()
-        => new(_tenant.Object, _appointments.Object, _clients.Object, _pets.Object);
+        => new(_tenant.Object, _clinic.Object, _appointments.Object, _clients.Object, _pets.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

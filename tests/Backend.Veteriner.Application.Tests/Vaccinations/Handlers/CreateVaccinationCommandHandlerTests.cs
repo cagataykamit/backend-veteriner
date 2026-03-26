@@ -18,6 +18,7 @@ namespace Backend.Veteriner.Application.Tests.Vaccinations.Handlers;
 public sealed class CreateVaccinationCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
@@ -27,6 +28,7 @@ public sealed class CreateVaccinationCommandHandlerTests
     private CreateVaccinationCommandHandler CreateHandler()
         => new(
             _tenantContext.Object,
+            _clinicContext.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,

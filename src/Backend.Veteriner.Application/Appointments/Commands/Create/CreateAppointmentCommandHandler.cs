@@ -16,6 +16,7 @@ namespace Backend.Veteriner.Application.Appointments.Commands.Create;
 public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppointmentCommand, Result<Guid>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -24,6 +25,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
 
     public CreateAppointmentCommandHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -31,6 +33,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         IRepository<Appointment> appointmentsWrite)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
@@ -62,10 +65,16 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         if (!window.IsSuccess)
             return Result<Guid>.Failure(window.Error);
 
-        var clinic = await _clinics.FirstOrDefaultAsync(
-            new ClinicByIdSpec(tenantId, request.ClinicId), ct);
-        if (clinic is null)
-            return Result<Guid>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
+        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+            return Result<Guid>.Failure("Appointments.ClinicContextMismatch", "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+
+        var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
+        var clinicResolve = await ResolveClinicAsync(tenantId, effectiveClinicId, ct);
+        if (!clinicResolve.IsSuccess)
+            return Result<Guid>.Failure(clinicResolve.Error);
+        var clinic = clinicResolve.Value!;
+
+        var clinicId = clinic.Id;
 
         var pet = await _pets.FirstOrDefaultAsync(
             new PetByIdSpec(tenantId, request.PetId), ct);
@@ -73,7 +82,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
             return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
         var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
-            new AppointmentScheduledSlotAtClinicSpec(tenantId, request.ClinicId, scheduledUtc), ct);
+            new AppointmentScheduledSlotAtClinicSpec(tenantId, clinicId, scheduledUtc), ct);
         if (clinicBusy is not null)
             return Result<Guid>.Failure(
                 "Appointments.ClinicSlotDuplicate",
@@ -88,7 +97,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
 
         var appointment = new Appointment(
             tenantId,
-            request.ClinicId,
+            clinicId,
             request.PetId,
             scheduledUtc,
             request.Notes);
@@ -106,5 +115,28 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
             DateTimeKind.Local => value.ToUniversalTime(),
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
+    }
+
+    private async Task<Result<Clinic>> ResolveClinicAsync(Guid tenantId, Guid? requestedClinicId, CancellationToken ct)
+    {
+        if (requestedClinicId is { } clinicId)
+        {
+            var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, clinicId), ct);
+            if (clinic is null)
+                return Result<Clinic>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
+            if (!clinic.IsActive)
+                return Result<Clinic>.Failure("Clinics.Inactive", "Seçilen klinik pasif.");
+            return Result<Clinic>.Success(clinic);
+        }
+
+        var activeClinics = await _clinics.ListAsync(new ActiveClinicsByTenantTakeSpec(tenantId, 2), ct);
+        if (activeClinics.Count == 0)
+            return Result<Clinic>.Failure("Clinics.NotFound", "Randevu için aktif klinik bulunamadı.");
+        if (activeClinics.Count > 1)
+            return Result<Clinic>.Failure(
+                "Clinics.ClinicSelectionRequired",
+                "Birden fazla aktif klinik var; clinicId gönderilmelidir.");
+
+        return Result<Clinic>.Success(activeClinics[0]);
     }
 }

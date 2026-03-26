@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.BreedsReference.Contracts.Dtos;
 using Backend.Veteriner.Application.BreedsReference.Queries.GetById;
 using Backend.Veteriner.Application.BreedsReference.Queries.GetList;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -55,8 +56,12 @@ public sealed class BreedsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBreedCommand cmd, CancellationToken ct)
     {
-        if (id != cmd.Id)
-            return BadRequest();
+        // Frontend çoğu zaman body'de id göndermeyebilir; route id kaynak-of-truth.
+        // Body'de id gönderildiyse ve route ile uyuşmuyorsa açıklayıcı hata dön.
+        if (cmd.Id != Guid.Empty && id != cmd.Id)
+            return Result.Failure("Breeds.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+
+        cmd = cmd with { Id = id };
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);

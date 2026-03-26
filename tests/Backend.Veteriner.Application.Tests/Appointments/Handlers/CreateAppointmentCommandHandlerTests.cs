@@ -18,6 +18,7 @@ namespace Backend.Veteriner.Application.Tests.Appointments.Handlers;
 public sealed class CreateAppointmentCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
@@ -27,6 +28,7 @@ public sealed class CreateAppointmentCommandHandlerTests
     private CreateAppointmentCommandHandler CreateHandler()
         => new(
             _tenantContext.Object,
+            _clinicContext.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
@@ -144,6 +146,64 @@ public sealed class CreateAppointmentCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Clinics.NotFound");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ResolveSingleActiveClinic_When_ClinicIdMissing()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var when = DateTime.UtcNow.AddDays(1);
+        var cmd = new CreateAppointmentCommand(null, pid, when, null);
+        var onlyClinic = new Clinic(tid, "Tek Klinik", "Ankara");
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.ListAsync(It.IsAny<ActiveClinicsByTenantTakeSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic> { onlyClinic });
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+
+        Appointment? captured = null;
+        _appointmentsWrite.Setup(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()))
+            .Callback<Appointment, CancellationToken>((a, _) => captured = a);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured.Should().NotBeNull();
+        captured!.ClinicId.Should().Be(onlyClinic.Id);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ClinicIdMissing_And_MultipleActiveClinics()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var when = DateTime.UtcNow.AddDays(1);
+        var cmd = new CreateAppointmentCommand(null, pid, when, null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.ListAsync(It.IsAny<ActiveClinicsByTenantTakeSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic>
+            {
+                new Clinic(tid, "K1", "İstanbul"),
+                new Clinic(tid, "K2", "Ankara")
+            });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clinics.ClinicSelectionRequired");
     }
 
     [Fact]
@@ -271,5 +331,28 @@ public sealed class CreateAppointmentCommandHandlerTests
         captured.ScheduledAtUtc.Should().Be(when, "UTC normalization ile aynı an");
 
         _appointmentsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_BodyClinic_Differs_From_ActiveClinicContext()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var bodyClinicId = Guid.NewGuid();
+        var activeClinicId = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var when = DateTime.UtcNow.AddDays(1);
+        var cmd = new CreateAppointmentCommand(bodyClinicId, pid, when, null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(activeClinicId);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.ClinicContextMismatch");
+        _appointmentsWrite.Verify(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

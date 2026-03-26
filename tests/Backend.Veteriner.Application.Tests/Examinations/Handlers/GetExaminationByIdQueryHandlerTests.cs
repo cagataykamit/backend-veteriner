@@ -11,10 +11,13 @@ namespace Backend.Veteriner.Application.Tests.Examinations.Handlers;
 public sealed class GetExaminationByIdQueryHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
 
     private GetExaminationByIdQueryHandler CreateHandler()
-        => new(_tenantContext.Object, _examinations.Object);
+        => new(
+            _tenantContext.Object,
+            _clinicContext.Object, _examinations.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

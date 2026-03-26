@@ -61,6 +61,38 @@ public sealed class Examination : AggregateRoot
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
 
+    public Result UpdateDetails(
+        Guid clinicId,
+        Guid petId,
+        Guid? appointmentId,
+        DateTime examinedAtUtc,
+        string visitReason,
+        string findings,
+        string? assessment,
+        string? notes)
+    {
+        if (clinicId == Guid.Empty)
+            return Result.Failure("Examinations.Validation", "ClinicId gecersiz.");
+        if (petId == Guid.Empty)
+            return Result.Failure("Examinations.Validation", "PetId gecersiz.");
+        if (appointmentId == Guid.Empty)
+            return Result.Failure("Examinations.Validation", "AppointmentId gecersiz.");
+        if (string.IsNullOrWhiteSpace(visitReason))
+            return Result.Failure("Examinations.Validation", "VisitReason bos olamaz.");
+        if (string.IsNullOrWhiteSpace(findings))
+            return Result.Failure("Examinations.Validation", "Findings bos olamaz.");
+
+        ClinicId = clinicId;
+        PetId = petId;
+        AppointmentId = appointmentId;
+        ExaminedAtUtc = NormalizeUtc(examinedAtUtc);
+        VisitReason = visitReason.Trim();
+        Findings = findings.Trim();
+        Assessment = string.IsNullOrWhiteSpace(assessment) ? null : assessment.Trim();
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        return Result.Success();
+    }
+
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch
         {

@@ -2,6 +2,8 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeAllMy;
 using Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeMy;
 using Backend.Veteriner.Application.Auth.Queries.Sessions;
+using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
+using Backend.Veteriner.Application.Clinics.Queries.GetMyClinics;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -29,6 +31,17 @@ public sealed class MeController : ControllerBase
     public async Task<IActionResult> GetSessions(CancellationToken ct)
     {
         var result = await _mediator.Send(new ListSessionsQuery(), ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpGet("clinics")]
+    [ProducesResponseType(typeof(IReadOnlyList<ClinicListItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetMyClinics([FromQuery] bool? isActive, CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetMyClinicsQuery(isActive), ct);
         return result.ToActionResult(this);
     }
 

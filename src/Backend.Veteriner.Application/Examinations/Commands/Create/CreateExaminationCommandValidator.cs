@@ -6,8 +6,24 @@ public sealed class CreateExaminationCommandValidator : AbstractValidator<Create
 {
     public CreateExaminationCommandValidator()
     {
-        RuleFor(x => x.ClinicId).NotEmpty();
-        RuleFor(x => x.PetId).NotEmpty();
+        RuleFor(x => x.ClinicId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("ClinicId gecersiz.");
+
+        RuleFor(x => x.PetId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("PetId gecersiz.");
+
+        RuleFor(x => x)
+            .Must(x =>
+                x.AppointmentId is { } aid && aid != Guid.Empty
+                || (x.ClinicId is { } cid && cid != Guid.Empty) && (x.PetId is { } pid && pid != Guid.Empty))
+            .WithMessage("AppointmentId veya ClinicId+PetId zorunludur.");
+
+        RuleFor(x => x.AppointmentId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("AppointmentId gecersiz.");
+
         RuleFor(x => x.ExaminedAtUtc).NotEqual(default(DateTime));
 
         RuleFor(x => x.VisitReason)

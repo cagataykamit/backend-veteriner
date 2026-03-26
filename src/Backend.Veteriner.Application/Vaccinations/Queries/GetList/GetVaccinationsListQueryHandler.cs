@@ -12,13 +12,16 @@ public sealed class GetVaccinationsListQueryHandler
     : IRequestHandler<GetVaccinationsListQuery, Result<PagedResult<VaccinationListItemDto>>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Vaccination> _vaccinations;
 
     public GetVaccinationsListQueryHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Vaccination> vaccinations)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _vaccinations = vaccinations;
     }
 
@@ -35,11 +38,18 @@ public sealed class GetVaccinationsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
+        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        {
+            return Result<PagedResult<VaccinationListItemDto>>.Failure(
+                "Vaccinations.ClinicContextMismatch",
+                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+        }
 
         var total = await _vaccinations.CountAsync(
             new VaccinationsFilteredCountSpec(
                 tenantId,
-                request.ClinicId,
+                effectiveClinicId,
                 request.PetId,
                 request.Status,
                 request.DueFromUtc,
@@ -51,7 +61,7 @@ public sealed class GetVaccinationsListQueryHandler
         var rows = await _vaccinations.ListAsync(
             new VaccinationsFilteredPagedSpec(
                 tenantId,
-                request.ClinicId,
+                effectiveClinicId,
                 request.PetId,
                 request.Status,
                 request.DueFromUtc,

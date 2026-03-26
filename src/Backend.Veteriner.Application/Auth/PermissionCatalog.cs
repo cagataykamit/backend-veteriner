@@ -89,6 +89,7 @@ public static class PermissionCatalog
     {
         public const string Read = "Examinations.Read";
         public const string Create = "Examinations.Create";
+        public const string Update = "Examinations.Update";
     }
 
     public static class Vaccinations
@@ -158,6 +159,7 @@ public static class PermissionCatalog
 
         new(Examinations.Read, "Muayene kayıtlarını listeleme ve görüntüleme yetkisi", "Examinations"),
         new(Examinations.Create, "Muayene kaydı oluşturma yetkisi", "Examinations"),
+        new(Examinations.Update, "Muayene kaydı güncelleme yetkisi", "Examinations"),
 
         new(Vaccinations.Read, "Aşı kayıtlarını listeleme ve görüntüleme yetkisi", "Vaccinations"),
         new(Vaccinations.Create, "Aşı kaydı oluşturma yetkisi", "Vaccinations"),

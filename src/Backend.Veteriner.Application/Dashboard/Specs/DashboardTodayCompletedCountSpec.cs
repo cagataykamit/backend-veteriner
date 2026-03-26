@@ -9,12 +9,14 @@ namespace Backend.Veteriner.Application.Dashboard.Specs;
 /// </summary>
 public sealed class DashboardTodayCompletedCountSpec : Specification<Appointment>
 {
-    public DashboardTodayCompletedCountSpec(Guid tenantId, DateTime dayStartUtc, DateTime dayEndUtc)
+    public DashboardTodayCompletedCountSpec(Guid tenantId, Guid? clinicId, DateTime dayStartUtc, DateTime dayEndUtc)
     {
         Query.Where(a =>
             a.TenantId == tenantId
             && a.Status == AppointmentStatus.Completed
             && a.ScheduledAtUtc >= dayStartUtc
             && a.ScheduledAtUtc < dayEndUtc);
+        if (clinicId.HasValue)
+            Query.Where(a => a.ClinicId == clinicId.Value);
     }
 }

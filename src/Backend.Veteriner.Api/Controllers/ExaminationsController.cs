@@ -4,9 +4,11 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Examinations.Commands.Create;
+using Backend.Veteriner.Application.Examinations.Commands.Update;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Queries.GetById;
 using Backend.Veteriner.Application.Examinations.Queries.GetList;
+using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -39,10 +41,23 @@ public sealed class ExaminationsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Create([FromBody] CreateExaminationCommand cmd, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreateExaminationBody body, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
+
+        var visitReason = body.VisitReason ?? body.Complaint ?? string.Empty;
+        var findings = body.Findings ?? string.Empty;
+
+        var cmd = new CreateExaminationCommand(
+            body.ClinicId,
+            body.PetId,
+            body.AppointmentId,
+            body.ExaminedAtUtc,
+            visitReason,
+            findings,
+            body.Assessment,
+            body.Notes);
 
         var result = await _mediator.Send(cmd, ct);
         if (!result.IsSuccess)
@@ -53,6 +68,40 @@ public sealed class ExaminationsController : ControllerBase
             nameof(GetById),
             new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
             id);
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateExaminationBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        if (body.Id is { } bid && bid != Guid.Empty && bid != id)
+            return Result.Failure("Examinations.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+
+        var visitReason = body.VisitReason ?? body.Complaint ?? string.Empty;
+        var findings = body.Findings ?? string.Empty;
+
+        var cmd = new UpdateExaminationCommand(
+            id,
+            body.ClinicId,
+            body.PetId,
+            body.AppointmentId,
+            body.ExaminedAtUtc,
+            visitReason,
+            findings,
+            body.Assessment,
+            body.Notes);
+
+        var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
     }
 
     [HttpGet("{id:guid}")]

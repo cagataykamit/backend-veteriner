@@ -22,6 +22,7 @@ namespace Backend.Veteriner.Application.Tests.Payments.Handlers;
 public sealed class CreatePaymentCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
@@ -33,6 +34,7 @@ public sealed class CreatePaymentCommandHandlerTests
     private CreatePaymentCommandHandler CreateHandler()
         => new(
             _tenantContext.Object,
+            _clinicContext.Object,
             _tenants.Object,
             _clinics.Object,
             _clients.Object,

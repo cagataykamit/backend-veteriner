@@ -88,6 +88,30 @@ public sealed class Appointment : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>
+    /// Yalnızca <see cref="AppointmentStatus.Scheduled"/> durumunda randevu detaylarını günceller.
+    /// </summary>
+    public Result UpdateDetails(Guid clinicId, Guid petId, DateTime scheduledAtUtc, string? notes)
+    {
+        if (Status != AppointmentStatus.Scheduled)
+        {
+            return Result.Failure(
+                "Appointments.InvalidStatusTransition",
+                "Yalnızca planlanmış randevu güncellenebilir.");
+        }
+
+        if (clinicId == Guid.Empty)
+            return Result.Failure("Appointments.Validation", "ClinicId geçersiz.");
+        if (petId == Guid.Empty)
+            return Result.Failure("Appointments.Validation", "PetId geçersiz.");
+
+        ClinicId = clinicId;
+        PetId = petId;
+        ScheduledAtUtc = NormalizeUtc(scheduledAtUtc);
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        return Result.Success();
+    }
+
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch
         {

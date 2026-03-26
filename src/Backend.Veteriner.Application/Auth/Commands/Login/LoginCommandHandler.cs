@@ -121,7 +121,8 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
             DateTime.UtcNow.AddDays(_jwtOpt.RefreshTokenDays),
             _client.IpAddress,
             _client.UserAgent,
-            tenantId);
+            tenantId,
+            clinicId: null);
 
         user.AddRefreshToken(rt);
         await _refreshRepo.AddAsync(rt, ct);

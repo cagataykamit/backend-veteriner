@@ -11,13 +11,16 @@ public sealed class GetPaymentByIdQueryHandler
     : IRequestHandler<GetPaymentByIdQuery, Result<PaymentDetailDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Payment> _payments;
 
     public GetPaymentByIdQueryHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Payment> payments)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _payments = payments;
     }
 
@@ -34,6 +37,8 @@ public sealed class GetPaymentByIdQueryHandler
             new PaymentByIdSpec(tenantId, request.Id), ct);
         if (p is null)
             return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
+        if (_clinicContext.ClinicId is { } clinicId && p.ClinicId != clinicId)
+            return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Odeme kaydi bulunamadi.");
 
         var dto = new PaymentDetailDto(
             p.Id,

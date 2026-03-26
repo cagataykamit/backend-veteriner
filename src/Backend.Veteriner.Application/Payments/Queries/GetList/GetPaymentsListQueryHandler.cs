@@ -12,13 +12,16 @@ public sealed class GetPaymentsListQueryHandler
     : IRequestHandler<GetPaymentsListQuery, Result<PagedResult<PaymentListItemDto>>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Payment> _payments;
 
     public GetPaymentsListQueryHandler(
         ITenantContext tenantContext,
+        IClinicContext clinicContext,
         IReadRepository<Payment> payments)
     {
         _tenantContext = tenantContext;
+        _clinicContext = clinicContext;
         _payments = payments;
     }
 
@@ -35,11 +38,18 @@ public sealed class GetPaymentsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
+        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        {
+            return Result<PagedResult<PaymentListItemDto>>.Failure(
+                "Payments.ClinicContextMismatch",
+                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+        }
 
         var total = await _payments.CountAsync(
             new PaymentsFilteredCountSpec(
                 tenantId,
-                request.ClinicId,
+                effectiveClinicId,
                 request.ClientId,
                 request.PetId,
                 request.Method,
@@ -50,7 +60,7 @@ public sealed class GetPaymentsListQueryHandler
         var rows = await _payments.ListAsync(
             new PaymentsFilteredPagedSpec(
                 tenantId,
-                request.ClinicId,
+                effectiveClinicId,
                 request.ClientId,
                 request.PetId,
                 request.Method,

@@ -7,11 +7,16 @@ public sealed class CreateAppointmentCommandValidator : AbstractValidator<Create
 {
     public CreateAppointmentCommandValidator()
     {
-        RuleFor(x => x.ClinicId).NotEmpty();
+        RuleFor(x => x.ClinicId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("ClinicId geçersiz.");
+
         RuleFor(x => x.PetId).NotEmpty();
+
         RuleFor(x => x.ScheduledAtUtc)
             .Must(d => d != default)
-            .WithMessage("Randevu zamanÄ± zorunludur.");
+            .WithMessage("Randevu zamaný zorunludur.");
+
         RuleFor(x => x.Notes).MaximumLength(2000);
     }
 }
