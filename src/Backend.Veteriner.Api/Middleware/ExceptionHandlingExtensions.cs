@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using Backend.Veteriner.Application.Common.Constants;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -33,8 +34,9 @@ public static class ExceptionHandlingExtensions
                 var traceId = Activity.Current?.Id ?? ctx.TraceIdentifier;
 
                 var correlationId =
-                    ctx.Items.TryGetValue("CorrelationId", out var v) ? v?.ToString() :
-                    ctx.Request.Headers.TryGetValue("X-Correlation-Id", out var cid) ? cid.ToString() :
+                    ctx.Items.TryGetValue(Correlation.HeaderName, out var v) ? v?.ToString() :
+                    ctx.Items.TryGetValue("CorrelationId", out var legacy) ? legacy?.ToString() :
+                    ctx.Request.Headers.TryGetValue(Correlation.HeaderName, out var cid) ? cid.ToString() :
                     traceId;
 
                 if (ex is not null)
@@ -90,6 +92,7 @@ public static class ExceptionHandlingExtensions
 
                     vpd.Extensions["traceId"] = traceId;
                     vpd.Extensions["correlationId"] = correlationId;
+                    vpd.Extensions["code"] = "Validation.FluentValidation";
                     vpd.Extensions["timestampUtc"] = DateTime.UtcNow;
 
                     if (env.IsDevelopment())
@@ -173,6 +176,14 @@ public static class ExceptionHandlingExtensions
 
         pd.Extensions["traceId"] = traceId;
         pd.Extensions["correlationId"] = correlationId;
+        pd.Extensions["code"] = status switch
+        {
+            StatusCodes.Status401Unauthorized => "Errors.Unauthorized",
+            StatusCodes.Status404NotFound => "Errors.NotFound",
+            StatusCodes.Status500InternalServerError => "Errors.Unhandled",
+            ClientClosedRequest => "Errors.RequestCancelled",
+            _ => "Errors.Unhandled"
+        };
         pd.Extensions["timestampUtc"] = DateTime.UtcNow;
 
         if (env.IsDevelopment() && ex is not null)

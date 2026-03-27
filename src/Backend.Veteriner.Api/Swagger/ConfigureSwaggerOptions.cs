@@ -1,4 +1,8 @@
 using System.Reflection;
+using Backend.Veteriner.Api.Contracts;
+using Backend.Veteriner.Application.Payments.Commands.Create;
+using Backend.Veteriner.Application.Payments.Contracts.Dtos;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
@@ -38,6 +42,8 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
 
         // (Opsiyonel) Swagger’da version parametresi gösterimini toparlamak için
         options.OperationFilter<SwaggerDefaultValues>();
+        options.OperationFilter<AuthContractCleanupOperationFilter>();
+        options.SchemaFilter<PaymentsContractSchemaFilter>();
 
         // (Opsiyonel) XML comments (dosya yoksa sessiz geç)
         TryIncludeXmlComments(options);
@@ -67,6 +73,142 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 Array.Empty<string>()
             }
         });
+    }
+
+    private sealed class PaymentsContractSchemaFilter : ISchemaFilter
+    {
+        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        {
+            if (context.Type == typeof(CreatePaymentCommand))
+            {
+                MarkRequired(schema, "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc");
+                SetNullable(schema, "currency", false);
+                return;
+            }
+
+            if (context.Type == typeof(PaymentDetailDto))
+            {
+                MarkRequired(schema,
+                    "id", "tenantId", "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc");
+                SetNullable(schema, "currency", false);
+                return;
+            }
+
+            if (context.Type == typeof(PaymentListItemDto))
+            {
+                MarkRequired(schema,
+                    "id", "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc");
+                SetNullable(schema, "currency", false);
+            }
+        }
+
+        private static void MarkRequired(OpenApiSchema schema, params string[] names)
+        {
+            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                if (schema.Properties.ContainsKey(name))
+                {
+                    schema.Required.Add(name);
+                }
+            }
+        }
+
+        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
+        {
+            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
+            {
+                return;
+            }
+
+            propertySchema.Nullable = isNullable;
+        }
+    }
+
+    private sealed class AuthContractCleanupOperationFilter : IOperationFilter
+    {
+        public void Apply(OpenApiOperation operation, OperationFilterContext context)
+        {
+            var routeValues = context.ApiDescription.ActionDescriptor.RouteValues;
+            if (!routeValues.TryGetValue("controller", out var controller)
+                || !string.Equals(controller, "Auth", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (!routeValues.TryGetValue("action", out var action))
+            {
+                return;
+            }
+
+            if (string.Equals(action, "Logout", StringComparison.OrdinalIgnoreCase))
+            {
+                var schema = context.SchemaGenerator.GenerateSchema(typeof(AuthLogoutBodyDto), context.SchemaRepository);
+                operation.RequestBody = new OpenApiRequestBody
+                {
+                    Required = false,
+                    Content =
+                    {
+                        ["application/json"] = new OpenApiMediaType { Schema = schema }
+                    }
+                };
+
+                operation.Responses["200"] = new OpenApiResponse
+                {
+                    Description = "OK",
+                    Content =
+                    {
+                        ["application/json"] = new OpenApiMediaType
+                        {
+                            Schema = context.SchemaGenerator.GenerateSchema(typeof(AuthActionResultDto), context.SchemaRepository)
+                        }
+                    }
+                };
+
+                operation.Responses["401"] = new OpenApiResponse
+                {
+                    Description = "Unauthorized",
+                    Content =
+                    {
+                        ["application/json"] = new OpenApiMediaType
+                        {
+                            Schema = context.SchemaGenerator.GenerateSchema(typeof(ProblemDetails), context.SchemaRepository)
+                        }
+                    }
+                };
+
+                return;
+            }
+
+            if (string.Equals(action, "LogoutAll", StringComparison.OrdinalIgnoreCase))
+            {
+                operation.RequestBody = null;
+
+                operation.Responses["200"] = new OpenApiResponse
+                {
+                    Description = "OK",
+                    Content =
+                    {
+                        ["application/json"] = new OpenApiMediaType
+                        {
+                            Schema = context.SchemaGenerator.GenerateSchema(typeof(AuthActionResultDto), context.SchemaRepository)
+                        }
+                    }
+                };
+
+                operation.Responses["401"] = new OpenApiResponse
+                {
+                    Description = "Unauthorized",
+                    Content =
+                    {
+                        ["application/json"] = new OpenApiMediaType
+                        {
+                            Schema = context.SchemaGenerator.GenerateSchema(typeof(ProblemDetails), context.SchemaRepository)
+                        }
+                    }
+                };
+            }
+        }
     }
 
     private static void TryIncludeXmlComments(SwaggerGenOptions options)

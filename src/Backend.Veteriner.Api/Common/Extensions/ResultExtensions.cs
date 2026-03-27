@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Shared;
+using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Veteriner.Api.Common.Extensions;
@@ -28,6 +29,8 @@ public static class ResultExtensions
     private static IActionResult MapFailure(ControllerBase controller, Error error)
     {
         var (statusCode, type) = MapStatusCode(error.Code);
+        var traceId = Activity.Current?.Id ?? controller.HttpContext.TraceIdentifier;
+        var correlationId = ResolveCorrelationId(controller.HttpContext, traceId);
 
         var problem = new ProblemDetails
         {
@@ -36,15 +39,28 @@ public static class ResultExtensions
             Detail = string.IsNullOrWhiteSpace(error.Message)
                 ? "A business rule was violated."
                 : error.Message,
-            Type = type
+            Type = type,
+            Instance = controller.HttpContext.Request.Path
         };
 
         if (!string.IsNullOrWhiteSpace(error.Code))
         {
             problem.Extensions["code"] = error.Code;
         }
+        problem.Extensions["traceId"] = traceId;
+        problem.Extensions["correlationId"] = correlationId;
+        problem.Extensions["timestampUtc"] = DateTime.UtcNow;
 
         return controller.StatusCode(statusCode, problem);
+    }
+
+    private static string ResolveCorrelationId(HttpContext httpContext, string fallback)
+    {
+        return
+            (httpContext.Items.TryGetValue("X-Correlation-ID", out var v) ? v?.ToString() : null)
+            ?? (httpContext.Items.TryGetValue("CorrelationId", out var legacy) ? legacy?.ToString() : null)
+            ?? (httpContext.Request.Headers.TryGetValue("X-Correlation-ID", out var cid) ? cid.ToString() : null)
+            ?? fallback;
     }
 
     private static (int StatusCode, string Type) MapStatusCode(string code)

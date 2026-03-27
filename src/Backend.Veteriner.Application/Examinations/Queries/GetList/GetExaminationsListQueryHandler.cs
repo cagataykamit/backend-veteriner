@@ -1,8 +1,12 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -14,15 +18,21 @@ public sealed class GetExaminationsListQueryHandler
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Examination> _examinations;
+    private readonly IReadRepository<Pet> _pets;
+    private readonly IReadRepository<Client> _clients;
 
     public GetExaminationsListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
-        IReadRepository<Examination> examinations)
+        IReadRepository<Examination> examinations,
+        IReadRepository<Pet> pets,
+        IReadRepository<Client> clients)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _examinations = examinations;
+        _pets = pets;
+        _clients = clients;
     }
 
     public async Task<Result<PagedResult<ExaminationListItemDto>>> Handle(
@@ -68,14 +78,37 @@ public sealed class GetExaminationsListQueryHandler
                 pageSize),
             ct);
 
+        var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
+        var pets = petIds.Length == 0
+            ? []
+            : await _pets.ListAsync(new PetsByTenantIdsSpec(tenantId, petIds), ct);
+        var petById = pets.ToDictionary(x => x.Id);
+
+        var clientIds = pets.Select(x => x.ClientId).Distinct().ToArray();
+        var clients = clientIds.Length == 0
+            ? []
+            : await _clients.ListAsync(new ClientsByTenantIdsSpec(tenantId, clientIds), ct);
+        var clientNameById = clients.ToDictionary(x => x.Id, x => x.FullName);
+
         var items = rows
-            .Select(e => new ExaminationListItemDto(
-                e.Id,
-                e.ClinicId,
-                e.PetId,
-                e.AppointmentId,
-                e.ExaminedAtUtc,
-                e.VisitReason))
+            .Select(e =>
+            {
+                petById.TryGetValue(e.PetId, out var pet);
+                var petName = pet?.Name ?? string.Empty;
+                var clientName = pet is not null && clientNameById.TryGetValue(pet.ClientId, out var cName)
+                    ? cName
+                    : string.Empty;
+
+                return new ExaminationListItemDto(
+                    e.Id,
+                    e.ClinicId,
+                    e.PetId,
+                    petName,
+                    clientName,
+                    e.AppointmentId,
+                    e.ExaminedAtUtc,
+                    e.VisitReason);
+            })
             .ToList();
 
         return Result<PagedResult<ExaminationListItemDto>>.Success(

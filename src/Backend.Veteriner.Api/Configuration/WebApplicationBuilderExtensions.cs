@@ -3,6 +3,7 @@ using Backend.Veteriner.Api.Health;
 using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Api.Swagger;
 using Backend.Veteriner.Application;
+using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Infrastructure;
 using Backend.Veteriner.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -76,8 +77,9 @@ public static class WebApplicationBuilderExtensions
                     var traceId = Activity.Current?.Id ?? http.TraceIdentifier;
 
                     var correlationId =
-                        http.Items.TryGetValue("CorrelationId", out var v) ? v?.ToString() :
-                        http.Request.Headers.TryGetValue("X-Correlation-Id", out var cid) ? cid.ToString() :
+                        http.Items.TryGetValue(Correlation.HeaderName, out var v) ? v?.ToString() :
+                        http.Items.TryGetValue("CorrelationId", out var legacy) ? legacy?.ToString() :
+                        http.Request.Headers.TryGetValue(Correlation.HeaderName, out var cid) ? cid.ToString() :
                         traceId;
 
                     var problem = new ValidationProblemDetails(context.ModelState)
@@ -91,6 +93,7 @@ public static class WebApplicationBuilderExtensions
 
                     problem.Extensions["traceId"] = traceId;
                     problem.Extensions["correlationId"] = correlationId;
+                    problem.Extensions["code"] = "Validation.ModelStateInvalid";
                     problem.Extensions["timestampUtc"] = DateTime.UtcNow;
 
                     return new BadRequestObjectResult(problem)

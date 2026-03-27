@@ -3,7 +3,9 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Examinations.Queries.GetList;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
+using Backend.Veteriner.Domain.Pets;
 using FluentAssertions;
 using Moq;
 
@@ -14,11 +16,16 @@ public sealed class GetExaminationsListQueryHandlerTests
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
+    private readonly Mock<IReadRepository<Pet>> _pets = new();
+    private readonly Mock<IReadRepository<Client>> _clients = new();
 
     private GetExaminationsListQueryHandler CreateHandler()
         => new(
             _tenantContext.Object,
-            _clinicContext.Object, _examinations.Object);
+            _clinicContext.Object,
+            _examinations.Object,
+            _pets.Object,
+            _clients.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

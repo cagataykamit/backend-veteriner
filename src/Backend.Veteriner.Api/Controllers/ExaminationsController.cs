@@ -46,7 +46,7 @@ public sealed class ExaminationsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var visitReason = body.VisitReason ?? body.Complaint ?? string.Empty;
+        var visitReason = body.VisitReason ?? string.Empty;
         var findings = body.Findings ?? string.Empty;
 
         var cmd = new CreateExaminationCommand(
@@ -86,7 +86,7 @@ public sealed class ExaminationsController : ControllerBase
         if (body.Id is { } bid && bid != Guid.Empty && bid != id)
             return Result.Failure("Examinations.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
 
-        var visitReason = body.VisitReason ?? body.Complaint ?? string.Empty;
+        var visitReason = body.VisitReason ?? string.Empty;
         var findings = body.Findings ?? string.Empty;
 
         var cmd = new UpdateExaminationCommand(

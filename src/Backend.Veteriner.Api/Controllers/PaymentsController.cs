@@ -60,6 +60,8 @@ public sealed class PaymentsController : ControllerBase
     [Authorize(Policy = PermissionCatalog.Payments.Read)]
     [ProducesResponseType(typeof(PaymentDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
@@ -74,6 +76,8 @@ public sealed class PaymentsController : ControllerBase
     [Authorize(Policy = PermissionCatalog.Payments.Read)]
     [ProducesResponseType(typeof(PagedResult<PaymentListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetList(
         [FromQuery] PageRequest page,
         [FromQuery] Guid? clinicId = null,

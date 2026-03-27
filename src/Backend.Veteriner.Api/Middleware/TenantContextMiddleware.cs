@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Claims;
+using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Tenancy;
 using Microsoft.AspNetCore.Mvc;
 
@@ -41,6 +42,10 @@ public sealed class TenantContextMiddleware
             return;
 
         var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
+        var correlationId =
+            (context.Items.TryGetValue(Correlation.HeaderName, out var v) ? v?.ToString() : null)
+            ?? (context.Request.Headers.TryGetValue(Correlation.HeaderName, out var cid) ? cid.ToString() : null)
+            ?? traceId;
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         context.Response.ContentType = "application/problem+json";
 
@@ -53,6 +58,8 @@ public sealed class TenantContextMiddleware
             Instance = context.Request.Path
         };
         problem.Extensions["traceId"] = traceId;
+        problem.Extensions["correlationId"] = correlationId;
+        problem.Extensions["code"] = "Context.TenantConflict";
         problem.Extensions["timestampUtc"] = DateTime.UtcNow;
 
         await context.Response.WriteAsJsonAsync(problem);

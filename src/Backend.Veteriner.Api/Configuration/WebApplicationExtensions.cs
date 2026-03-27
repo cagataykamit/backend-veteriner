@@ -90,14 +90,14 @@ public static class WebApplicationExtensions
 
             ctx.Response.ContentType = "application/problem+json";
 
-            var (title, type) = ctx.Response.StatusCode switch
+            var (title, type, detail, code) = ctx.Response.StatusCode switch
             {
-                401 => ("Unauthorized", "https://httpstatuses.io/401"),
-                403 => ("Forbidden", "https://httpstatuses.io/403"),
-                404 => ("Not found", "https://httpstatuses.io/404"),
-                409 => ("Conflict", "https://httpstatuses.io/409"),
-                429 => ("Too many requests", "https://httpstatuses.io/429"),
-                _ => ("Request failed", $"https://httpstatuses.io/{ctx.Response.StatusCode}")
+                401 => ("Unauthorized", "https://httpstatuses.io/401", "Kimlik dogrulamasi gecersiz veya eksik.", "Auth.Unauthorized"),
+                403 => ("Forbidden", "https://httpstatuses.io/403", "Bu islem icin yetkiniz bulunmuyor.", "Auth.Forbidden"),
+                404 => ("Not found", "https://httpstatuses.io/404", "Istenen kaynak bulunamadi.", "Errors.NotFound"),
+                409 => ("Conflict", "https://httpstatuses.io/409", "Istek mevcut durum ile cakisiyor.", "Errors.Conflict"),
+                429 => ("Too many requests", "https://httpstatuses.io/429", "Istek limiti asildi. Lutfen biraz sonra tekrar deneyin.", "RateLimit.Exceeded"),
+                _ => ("Request failed", $"https://httpstatuses.io/{ctx.Response.StatusCode}", "Istek islenemedi.", $"Errors.Http{ctx.Response.StatusCode}")
             };
 
             var pd = new ProblemDetails
@@ -105,11 +105,13 @@ public static class WebApplicationExtensions
                 Status = ctx.Response.StatusCode,
                 Title = title,
                 Type = type,
+                Detail = detail,
                 Instance = ctx.Request.Path
             };
 
             pd.Extensions["traceId"] = traceId;
             pd.Extensions["correlationId"] = correlationId;
+            pd.Extensions["code"] = code;
             pd.Extensions["timestampUtc"] = DateTime.UtcNow;
 
             await ctx.Response.WriteAsJsonAsync(pd);

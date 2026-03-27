@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Backend.Veteriner.Application.Common.Constants;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,24 +26,28 @@ public static class RateLimitingExtensions
 
                 var traceId = context.HttpContext.TraceIdentifier;
                 var correlationId =
-                    context.HttpContext.Request.Headers.TryGetValue("X-Correlation-Id", out var cid) ? cid.ToString() : null;
+                    (context.HttpContext.Items.TryGetValue(Correlation.HeaderName, out var v) ? v?.ToString() : null)
+                    ?? (context.HttpContext.Request.Headers.TryGetValue(Correlation.HeaderName, out var cid) ? cid.ToString() : null)
+                    ?? traceId;
 
                 var retryAfterHeader = context.HttpContext.Response.Headers.RetryAfter.ToString();
                 int? retryAfterSeconds = null;
                 if (int.TryParse(retryAfterHeader, out var sec))
                     retryAfterSeconds = sec;
 
-                var problem = new
+                var problem = new ProblemDetails
                 {
-                    type = "https://httpstatuses.com/429",
-                    title = "Too Many Requests",
-                    status = 429,
-                    errorCode = "rate_limit_exceeded",
-                    detail = "�stek limiti a��ld�. L�tfen biraz sonra tekrar deneyin.",
-                    traceId,
-                    correlationId,
-                    retryAfterSeconds
+                    Type = "https://httpstatuses.io/429",
+                    Title = "Too Many Requests",
+                    Status = StatusCodes.Status429TooManyRequests,
+                    Detail = "Istek limiti asildi. Lutfen biraz sonra tekrar deneyin.",
+                    Instance = context.HttpContext.Request.Path
                 };
+                problem.Extensions["code"] = "RateLimit.Exceeded";
+                problem.Extensions["traceId"] = traceId;
+                problem.Extensions["correlationId"] = correlationId;
+                problem.Extensions["retryAfterSeconds"] = retryAfterSeconds;
+                problem.Extensions["timestampUtc"] = DateTime.UtcNow;
 
                 await context.HttpContext.Response.WriteAsJsonAsync(problem, cancellationToken: token);
             };

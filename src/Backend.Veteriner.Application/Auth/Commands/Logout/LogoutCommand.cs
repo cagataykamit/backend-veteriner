@@ -6,6 +6,6 @@ namespace Backend.Veteriner.Application.Auth.Commands.Logout;
 public sealed record LogoutCommand(string RefreshToken)
     : IRequest<Unit>, IAuditableRequest
 {
-    public string AuditAction => "Session.Logout";
-    public string AuditTarget => $"RefreshToken={RefreshToken}";
+    string IAuditableRequest.AuditAction => "Session.Logout";
+    string IAuditableRequest.AuditTarget => $"RefreshToken={RefreshToken}";
 }
