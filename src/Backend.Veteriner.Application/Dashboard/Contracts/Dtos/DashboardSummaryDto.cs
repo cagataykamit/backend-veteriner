@@ -1,7 +1,8 @@
 namespace Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
 
 /// <summary>
-/// Klinik paneli özeti. Tüm tarihler şimdilik <b>UTC</b> takvim günü / anına göredir; kiracı saat dilimi sonraya bırakıldı.
+/// Klinik paneli özeti. Gunluk kutular ve randevu listesi operasyon saat dilimi gun sinirina gore hesaplanir,
+/// tarih alanlari ise istemci tarafinda donusturulmak uzere UTC olarak doner.
 /// </summary>
 public sealed record DashboardSummaryDto(
     int TodayAppointmentsCount,

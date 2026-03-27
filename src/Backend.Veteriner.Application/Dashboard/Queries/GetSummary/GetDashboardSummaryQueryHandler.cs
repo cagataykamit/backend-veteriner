@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
 using Backend.Veteriner.Application.Dashboard.Specs;
 using Backend.Veteriner.Domain.Appointments;
@@ -45,8 +46,7 @@ public sealed class GetDashboardSummaryQueryHandler
         }
 
         var utcNow = DateTime.UtcNow;
-        var dayStart = new DateTime(utcNow.Year, utcNow.Month, utcNow.Day, 0, 0, 0, DateTimeKind.Utc);
-        var dayEnd = dayStart.AddDays(1);
+        var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(utcNow);
         var clinicId = _clinicContext.ClinicId;
 
         // Tek DbContext: paralel Task.WhenAll yerine sıralı await (EF Core concurrency kuralı).
@@ -61,8 +61,9 @@ public sealed class GetDashboardSummaryQueryHandler
         var clientsTotal = await _clients.CountAsync(new DashboardClientsTotalCountSpec(tenantId), ct);
         var petsTotal = await _pets.CountAsync(new DashboardPetsTotalCountSpec(tenantId), ct);
 
+        // Dashboard listesi "bugun + gelecek" planlanmis randevulari gosterir; gecmis gun kayitlari disarida kalir.
         var upcomingRows = await _appointments.ListAsync(
-            new DashboardUpcomingScheduledListSpec(tenantId, clinicId, utcNow, UpcomingListTake), ct);
+            new DashboardUpcomingScheduledListSpec(tenantId, clinicId, dayStart, UpcomingListTake), ct);
         var recentClientRows = await _clients.ListAsync(
             new DashboardRecentClientsListSpec(tenantId, RecentListTake), ct);
         var recentPetRows = await _pets.ListAsync(
