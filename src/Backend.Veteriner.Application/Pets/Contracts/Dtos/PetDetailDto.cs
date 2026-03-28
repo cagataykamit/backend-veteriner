@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Pets;
+
 namespace Backend.Veteriner.Application.Pets.Contracts.Dtos;
 
 public sealed record PetDetailDto(
@@ -8,4 +10,6 @@ public sealed record PetDetailDto(
     Guid SpeciesId,
     string SpeciesName,
     string? Breed,
-    DateOnly? BirthDate);
+    DateOnly? BirthDate,
+    Guid? BreedId,
+    PetGender? Gender);

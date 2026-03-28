@@ -1,7 +1,11 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetById;
 using Backend.Veteriner.Application.Vaccinations.Specs;
+using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Vaccinations;
 using FluentAssertions;
 using Moq;
@@ -13,11 +17,16 @@ public sealed class GetVaccinationByIdQueryHandlerTests
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Vaccination>> _vaccinations = new();
+    private readonly Mock<IReadRepository<Pet>> _pets = new();
+    private readonly Mock<IReadRepository<Client>> _clients = new();
 
     private GetVaccinationByIdQueryHandler CreateHandler()
         => new(
             _tenantContext.Object,
-            _clinicContext.Object, _vaccinations.Object);
+            _clinicContext.Object,
+            _vaccinations.Object,
+            _pets.Object,
+            _clients.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -52,9 +61,11 @@ public sealed class GetVaccinationByIdQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var petId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
         var entity = new Vaccination(
             tid,
-            Guid.NewGuid(),
+            petId,
             Guid.NewGuid(),
             null,
             "Kuduz",
@@ -65,10 +76,23 @@ public sealed class GetVaccinationByIdQueryHandlerTests
         _vaccinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(entity);
 
+        var pet = new Pet(tid, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
+        typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
+        var client = new Client(tid, "Ali Veli");
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
+
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Pet> { pet });
+        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Client> { client });
+
         var result = await CreateHandler().Handle(new GetVaccinationByIdQuery(entity.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.VaccineName.Should().Be("Kuduz");
         result.Value.Status.Should().Be(VaccinationStatus.Applied);
+        result.Value.PetName.Should().Be("Pamuk");
+        result.Value.ClientName.Should().Be("Ali Veli");
+        result.Value.ClientId.Should().Be(clientId);
     }
 }

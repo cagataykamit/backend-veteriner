@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -8,5 +9,7 @@ public sealed record CreatePetCommand(
     string Name,
     Guid SpeciesId,
     string? Breed = null,
-    DateOnly? BirthDate = null)
+    DateOnly? BirthDate = null,
+    Guid? BreedId = null,
+    PetGender? Gender = null)
     : IRequest<Result<Guid>>;

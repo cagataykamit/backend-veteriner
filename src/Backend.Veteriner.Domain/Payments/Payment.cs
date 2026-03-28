@@ -68,6 +68,44 @@ public sealed class Payment : AggregateRoot
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
 
+    public Result UpdateDetails(
+        Guid clinicId,
+        Guid clientId,
+        Guid? petId,
+        Guid? appointmentId,
+        Guid? examinationId,
+        decimal amount,
+        string currency,
+        PaymentMethod method,
+        DateTime paidAtUtc,
+        string? notes)
+    {
+        if (clinicId == Guid.Empty)
+            return Result.Failure("Payments.Validation", "ClinicId gecersiz.");
+        if (clientId == Guid.Empty)
+            return Result.Failure("Payments.Validation", "ClientId gecersiz.");
+        if (amount <= 0)
+            return Result.Failure("Payments.Validation", "Tutar sifirdan buyuk olmalidir.");
+        if (string.IsNullOrWhiteSpace(currency))
+            return Result.Failure("Payments.Validation", "Para birimi bos olamaz.");
+
+        var c = currency.Trim().ToUpperInvariant();
+        if (c.Length != 3)
+            return Result.Failure("Payments.Validation", "Para birimi ISO 4217 alpha-3 (3 harf) olmalidir.");
+
+        ClinicId = clinicId;
+        ClientId = clientId;
+        PetId = petId;
+        AppointmentId = appointmentId;
+        ExaminationId = examinationId;
+        Amount = amount;
+        Currency = c;
+        Method = method;
+        PaidAtUtc = NormalizeUtc(paidAtUtc);
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        return Result.Success();
+    }
+
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch
         {

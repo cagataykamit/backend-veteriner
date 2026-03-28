@@ -4,7 +4,9 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Payments.Commands.Create;
+using Backend.Veteriner.Application.Payments.Commands.Update;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
+using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Application.Payments.Queries.GetById;
 using Backend.Veteriner.Application.Payments.Queries.GetList;
 using Backend.Veteriner.Domain.Payments;
@@ -54,6 +56,38 @@ public sealed class PaymentsController : ControllerBase
             nameof(GetById),
             new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
             id);
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = PermissionCatalog.Payments.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdatePaymentBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        if (body.Id is { } bid && bid != Guid.Empty && bid != id)
+            return Result.Failure("Payments.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+
+        var cmd = new UpdatePaymentCommand(
+            id,
+            body.ClinicId,
+            body.ClientId,
+            body.PetId,
+            body.AppointmentId,
+            body.ExaminationId,
+            body.Amount,
+            body.Currency,
+            body.Method,
+            body.PaidAtUtc,
+            body.Notes);
+
+        var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
     }
 
     [HttpGet("{id:guid}")]

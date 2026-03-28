@@ -54,6 +54,34 @@ public sealed class Vaccination : AggregateRoot
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
 
+    public Result UpdateDetails(
+        Guid petId,
+        Guid clinicId,
+        Guid? examinationId,
+        string vaccineName,
+        VaccinationStatus status,
+        DateTime? appliedAtUtc,
+        DateTime? dueAtUtc,
+        string? notes)
+    {
+        if (petId == Guid.Empty)
+            return Result.Failure("Vaccinations.Validation", "PetId gecersiz.");
+        if (clinicId == Guid.Empty)
+            return Result.Failure("Vaccinations.Validation", "ClinicId gecersiz.");
+        if (string.IsNullOrWhiteSpace(vaccineName))
+            return Result.Failure("Vaccinations.Validation", "Asi adi bos olamaz.");
+
+        PetId = petId;
+        ClinicId = clinicId;
+        ExaminationId = examinationId;
+        VaccineName = vaccineName.Trim();
+        Status = status;
+        AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
+        DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        return Result.Success();
+    }
+
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch
         {

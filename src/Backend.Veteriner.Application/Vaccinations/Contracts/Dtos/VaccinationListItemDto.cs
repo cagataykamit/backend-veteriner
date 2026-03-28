@@ -5,6 +5,8 @@ namespace Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
 public sealed record VaccinationListItemDto(
     Guid Id,
     Guid PetId,
+    string PetName,
+    string ClientName,
     Guid ClinicId,
     Guid? ExaminationId,
     string VaccineName,

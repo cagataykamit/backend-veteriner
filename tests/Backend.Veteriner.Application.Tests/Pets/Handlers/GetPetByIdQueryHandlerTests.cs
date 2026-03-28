@@ -38,5 +38,34 @@ public sealed class GetPetByIdQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.SpeciesId.Should().Be(TestSpeciesIds.Cat);
         result.Value.SpeciesName.Should().Be("Kedi");
+        result.Value.BreedId.Should().BeNull();
+        result.Value.Gender.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_Should_MapBreedIdAndGender_When_Set()
+    {
+        var tid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var breedId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+
+        var species = new Species("CAT", "Kedi");
+        typeof(Species).GetProperty(nameof(Species.Id))!.SetValue(species, TestSpeciesIds.Cat);
+        var pet = new Pet(tid, cid, "Pamuk", TestSpeciesIds.Cat, null, null);
+        typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, pid);
+        typeof(Pet).GetProperty(nameof(Pet.Species))!.SetValue(pet, species);
+        typeof(Pet).GetProperty(nameof(Pet.BreedId))!.SetValue(pet, breedId);
+        typeof(Pet).GetProperty(nameof(Pet.Gender))!.SetValue(pet, PetGender.Female);
+
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pet);
+
+        var result = await CreateHandler().Handle(new GetPetByIdQuery(pid), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.BreedId.Should().Be(breedId);
+        result.Value.Gender.Should().Be(PetGender.Female);
     }
 }

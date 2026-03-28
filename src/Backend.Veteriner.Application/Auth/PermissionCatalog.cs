@@ -96,12 +96,14 @@ public static class PermissionCatalog
     {
         public const string Read = "Vaccinations.Read";
         public const string Create = "Vaccinations.Create";
+        public const string Update = "Vaccinations.Update";
     }
 
     public static class Payments
     {
         public const string Read = "Payments.Read";
         public const string Create = "Payments.Create";
+        public const string Update = "Payments.Update";
     }
 
     public static class Admin
@@ -163,9 +165,11 @@ public static class PermissionCatalog
 
         new(Vaccinations.Read, "Aşı kayıtlarını listeleme ve görüntüleme yetkisi", "Vaccinations"),
         new(Vaccinations.Create, "Aşı kaydı oluşturma yetkisi", "Vaccinations"),
+        new(Vaccinations.Update, "Aşı kaydı güncelleme yetkisi", "Vaccinations"),
 
         new(Payments.Read, "Ödeme kayıtlarını listeleme ve görüntüleme yetkisi", "Payments"),
         new(Payments.Create, "Ödeme kaydı oluşturma yetkisi", "Payments"),
+        new(Payments.Update, "Ödeme kaydı güncelleme yetkisi", "Payments"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 

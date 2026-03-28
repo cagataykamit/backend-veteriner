@@ -42,7 +42,9 @@ public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Re
             pet.SpeciesId,
             pet.Species.Name,
             pet.Breed,
-            pet.BirthDate);
+            pet.BirthDate,
+            pet.BreedId,
+            pet.Gender);
         return Result<PetDetailDto>.Success(dto);
     }
 }

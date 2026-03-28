@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.BreedsReference.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -18,6 +19,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Species> _speciesRead;
+    private readonly IReadRepository<Breed> _breedsRead;
     private readonly IReadRepository<Pet> _petsRead;
     private readonly IRepository<Pet> _petsWrite;
 
@@ -26,6 +28,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clients,
         IReadRepository<Species> speciesRead,
+        IReadRepository<Breed> breedsRead,
         IReadRepository<Pet> petsRead,
         IRepository<Pet> petsWrite)
     {
@@ -33,6 +36,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         _tenants = tenants;
         _clients = clients;
         _speciesRead = speciesRead;
+        _breedsRead = breedsRead;
         _petsRead = petsRead;
         _petsWrite = petsWrite;
     }
@@ -66,6 +70,19 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
                 "Pets.SpeciesNotFound",
                 "Tür bulunamadı veya pasif; geçerli bir SpeciesId gönderin.");
 
+        if (request.BreedId is { } breedId)
+        {
+            var breed = await _breedsRead.FirstOrDefaultAsync(new BreedByIdWithSpeciesSpec(breedId), ct);
+            if (breed is null || !breed.IsActive)
+                return Result<Guid>.Failure(
+                    "Pets.BreedNotFound",
+                    "Irk bulunamadı veya pasif; geçerli bir BreedId gönderin.");
+            if (breed.SpeciesId != request.SpeciesId)
+                return Result<Guid>.Failure(
+                    "Pets.BreedSpeciesMismatch",
+                    "Seçilen ırk, seçilen tür ile uyuşmuyor.");
+        }
+
         if (request.BirthDate.HasValue
             && request.BirthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))
             return Result<Guid>.Failure("Pets.BirthDateInFuture", "Doğum tarihi gelecekte olamaz.");
@@ -84,7 +101,9 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             request.Name,
             request.SpeciesId,
             request.Breed,
-            request.BirthDate);
+            request.BirthDate,
+            request.BreedId,
+            request.Gender);
         await _petsWrite.AddAsync(pet, ct);
         await _petsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(pet.Id);

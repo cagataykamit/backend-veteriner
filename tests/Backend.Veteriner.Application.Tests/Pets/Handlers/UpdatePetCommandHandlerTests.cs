@@ -19,6 +19,7 @@ public sealed class UpdatePetCommandHandlerTests
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IReadRepository<Client>> _clientsRead = new();
     private readonly Mock<IReadRepository<Species>> _speciesRead = new();
+    private readonly Mock<IReadRepository<Breed>> _breedsRead = new();
     private readonly Mock<IReadRepository<Pet>> _petsRead = new();
     private readonly Mock<IRepository<Pet>> _petsWrite = new();
 
@@ -28,6 +29,7 @@ public sealed class UpdatePetCommandHandlerTests
             _tenantsRead.Object,
             _clientsRead.Object,
             _speciesRead.Object,
+            _breedsRead.Object,
             _petsRead.Object,
             _petsWrite.Object);
 

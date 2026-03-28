@@ -1,19 +1,19 @@
 using Backend.Veteriner.Domain.Payments;
+using Backend.Veteriner.Domain.Shared;
+using MediatR;
 
-namespace Backend.Veteriner.Application.Payments.Contracts.Dtos;
+namespace Backend.Veteriner.Application.Payments.Commands.Update;
 
-public sealed record PaymentDetailDto(
+public sealed record UpdatePaymentCommand(
     Guid Id,
-    Guid TenantId,
     Guid ClinicId,
     Guid ClientId,
-    string ClientName,
     Guid? PetId,
-    string PetName,
     Guid? AppointmentId,
     Guid? ExaminationId,
     decimal Amount,
     string Currency,
     PaymentMethod Method,
     DateTime PaidAtUtc,
-    string? Notes);
+    string? Notes)
+    : IRequest<Result>;

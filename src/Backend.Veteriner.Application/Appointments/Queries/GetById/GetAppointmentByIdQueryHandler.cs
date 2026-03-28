@@ -4,7 +4,9 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -22,6 +24,7 @@ public sealed class GetAppointmentByIdQueryHandler
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IReadRepository<Species> _species;
 
     public GetAppointmentByIdQueryHandler(
         ITenantContext tenantContext,
@@ -29,7 +32,8 @@ public sealed class GetAppointmentByIdQueryHandler
         IReadRepository<Appointment> appointments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        IReadRepository<Species> species)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -37,6 +41,7 @@ public sealed class GetAppointmentByIdQueryHandler
         _pets = pets;
         _clients = clients;
         _clinics = clinics;
+        _species = species;
     }
 
     public async Task<Result<AppointmentDetailDto>> Handle(GetAppointmentByIdQuery request, CancellationToken ct)
@@ -56,11 +61,20 @@ public sealed class GetAppointmentByIdQueryHandler
             return Result<AppointmentDetailDto>.Failure("Appointments.NotFound", "Randevu bulunamadi.");
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, a.PetId), ct);
+        var clientId = pet?.ClientId ?? Guid.Empty;
         var clientName = string.Empty;
         if (pet is not null)
         {
             var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, pet.ClientId), ct);
             clientName = client?.FullName ?? string.Empty;
+        }
+
+        var speciesId = pet?.SpeciesId ?? Guid.Empty;
+        var typeLabel = string.Empty;
+        if (speciesId != Guid.Empty)
+        {
+            var species = await _species.FirstOrDefaultAsync(new SpeciesByIdSpec(speciesId), ct);
+            typeLabel = species?.Name ?? string.Empty;
         }
 
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, a.ClinicId), ct);
@@ -73,6 +87,9 @@ public sealed class GetAppointmentByIdQueryHandler
             a.PetId,
             pet?.Name ?? string.Empty,
             clientName,
+            clientId,
+            speciesId,
+            typeLabel,
             a.ScheduledAtUtc,
             a.Status,
             a.Notes);

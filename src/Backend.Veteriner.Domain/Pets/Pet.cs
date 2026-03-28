@@ -16,14 +16,31 @@ public sealed class Pet : AggregateRoot
     public string Name { get; private set; } = default!;
     public Guid SpeciesId { get; private set; }
     public string? Breed { get; private set; }
+
+    /// <summary>Global ırk kaydı (FK); serbest metin <see cref="Breed"/> (string) ile birlikte kullanılabilir.</summary>
+    public Guid? BreedId { get; private set; }
+
+    public PetGender? Gender { get; private set; }
+
     public DateOnly? BirthDate { get; private set; }
 
     /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
     public Species? Species { get; private set; }
 
+    /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
+    public Breed? BreedRef { get; private set; }
+
     private Pet() { }
 
-    public Pet(Guid tenantId, Guid clientId, string name, Guid speciesId, string? breed = null, DateOnly? birthDate = null)
+    public Pet(
+        Guid tenantId,
+        Guid clientId,
+        string name,
+        Guid speciesId,
+        string? breed = null,
+        DateOnly? birthDate = null,
+        Guid? breedId = null,
+        PetGender? gender = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -40,9 +57,17 @@ public sealed class Pet : AggregateRoot
         SpeciesId = speciesId;
         Breed = string.IsNullOrWhiteSpace(breed) ? null : breed.Trim();
         BirthDate = birthDate;
+        BreedId = breedId;
+        Gender = gender;
     }
 
-    public void UpdateDetails(string name, Guid speciesId, string? breed, DateOnly? birthDate)
+    public void UpdateDetails(
+        string name,
+        Guid speciesId,
+        string? breed,
+        DateOnly? birthDate,
+        Guid? breedId = null,
+        PetGender? gender = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Hayvan adı boş olamaz.", nameof(name));
@@ -52,5 +77,7 @@ public sealed class Pet : AggregateRoot
         SpeciesId = speciesId;
         Breed = string.IsNullOrWhiteSpace(breed) ? null : breed.Trim();
         BirthDate = birthDate;
+        BreedId = breedId;
+        Gender = gender;
     }
 }

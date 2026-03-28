@@ -29,12 +29,22 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
         b.Property(x => x.Breed)
             .HasMaxLength(150);
 
+        b.Property(x => x.BreedId).IsRequired(false);
+
+        b.Property(x => x.Gender)
+            .HasConversion<int>();
+
         b.Property(x => x.BirthDate);
 
         b.HasOne(x => x.Species)
             .WithMany()
             .HasForeignKey(x => x.SpeciesId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        b.HasOne(x => x.BreedRef)
+            .WithMany()
+            .HasForeignKey(x => x.BreedId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ClientId });

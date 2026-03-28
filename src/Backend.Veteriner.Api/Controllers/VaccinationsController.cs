@@ -4,9 +4,11 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Vaccinations.Commands.Create;
+using Backend.Veteriner.Application.Vaccinations.Commands.Update;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetById;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetList;
+using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -54,6 +56,36 @@ public sealed class VaccinationsController : ControllerBase
             nameof(GetById),
             new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
             id);
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateVaccinationBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        if (body.Id is { } bid && bid != Guid.Empty && bid != id)
+            return Result.Failure("Vaccinations.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+
+        var cmd = new UpdateVaccinationCommand(
+            id,
+            body.ClinicId,
+            body.PetId,
+            body.ExaminationId,
+            body.VaccineName,
+            body.Status,
+            body.AppliedAtUtc,
+            body.DueAtUtc,
+            body.Notes);
+
+        var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
     }
 
     [HttpGet("{id:guid}")]

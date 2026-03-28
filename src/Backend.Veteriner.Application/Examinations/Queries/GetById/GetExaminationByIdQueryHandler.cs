@@ -1,7 +1,11 @@
+using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -13,15 +17,21 @@ public sealed class GetExaminationByIdQueryHandler
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Examination> _examinations;
+    private readonly IReadRepository<Pet> _pets;
+    private readonly IReadRepository<Client> _clients;
 
     public GetExaminationByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
-        IReadRepository<Examination> examinations)
+        IReadRepository<Examination> examinations,
+        IReadRepository<Pet> pets,
+        IReadRepository<Client> clients)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _examinations = examinations;
+        _pets = pets;
+        _clients = clients;
     }
 
     public async Task<Result<ExaminationDetailDto>> Handle(GetExaminationByIdQuery request, CancellationToken ct)
@@ -40,11 +50,24 @@ public sealed class GetExaminationByIdQueryHandler
         if (_clinicContext.ClinicId is { } clinicId && e.ClinicId != clinicId)
             return Result<ExaminationDetailDto>.Failure("Examinations.NotFound", "Muayene kaydi bulunamadi.");
 
+        var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, e.PetId), ct);
+        var petName = pet?.Name ?? string.Empty;
+        var clientId = pet?.ClientId ?? Guid.Empty;
+        var clientName = string.Empty;
+        if (pet is not null)
+        {
+            var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, pet.ClientId), ct);
+            clientName = client?.FullName ?? string.Empty;
+        }
+
         var dto = new ExaminationDetailDto(
             e.Id,
             e.TenantId,
             e.ClinicId,
             e.PetId,
+            petName,
+            clientId,
+            clientName,
             e.AppointmentId,
             e.ExaminedAtUtc,
             e.VisitReason,

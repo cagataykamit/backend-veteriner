@@ -3,6 +3,8 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetList;
 using Backend.Veteriner.Application.Vaccinations.Specs;
+using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Vaccinations;
 using FluentAssertions;
 using Moq;
@@ -14,11 +16,16 @@ public sealed class GetVaccinationsListQueryHandlerTests
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Vaccination>> _vaccinations = new();
+    private readonly Mock<IReadRepository<Pet>> _pets = new();
+    private readonly Mock<IReadRepository<Client>> _clients = new();
 
     private GetVaccinationsListQueryHandler CreateHandler()
         => new(
             _tenantContext.Object,
-            _clinicContext.Object, _vaccinations.Object);
+            _clinicContext.Object,
+            _vaccinations.Object,
+            _pets.Object,
+            _clients.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

@@ -1,5 +1,6 @@
 using System.Reflection;
 using Backend.Veteriner.Api.Contracts;
+using Backend.Veteriner.Api.Controllers;
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -86,10 +87,17 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 return;
             }
 
+            if (context.Type == typeof(UpdatePaymentBody))
+            {
+                MarkRequired(schema, "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc");
+                SetNullable(schema, "currency", false);
+                return;
+            }
+
             if (context.Type == typeof(PaymentDetailDto))
             {
                 MarkRequired(schema,
-                    "id", "tenantId", "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc");
+                    "id", "tenantId", "clinicId", "clientId", "clientName", "petName", "amount", "currency", "method", "paidAtUtc");
                 SetNullable(schema, "currency", false);
                 return;
             }
@@ -97,7 +105,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             if (context.Type == typeof(PaymentListItemDto))
             {
                 MarkRequired(schema,
-                    "id", "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc");
+                    "id", "clinicId", "clientId", "clientName", "petName", "amount", "currency", "method", "paidAtUtc");
                 SetNullable(schema, "currency", false);
             }
         }

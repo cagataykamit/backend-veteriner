@@ -10,6 +10,10 @@ public sealed record AppointmentDetailDto(
     Guid PetId,
     string PetName,
     string ClientName,
+    Guid ClientId,
+    Guid SpeciesId,
+    /// <summary>Pet türü görünen adı (ör. kedi); JSON: <c>type</c>.</summary>
+    string Type,
     DateTime ScheduledAtUtc,
     AppointmentStatus Status,
     string? Notes);

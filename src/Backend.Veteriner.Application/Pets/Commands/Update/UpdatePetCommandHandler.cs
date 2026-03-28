@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.BreedsReference.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -18,6 +19,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Species> _speciesRead;
+    private readonly IReadRepository<Breed> _breedsRead;
     private readonly IReadRepository<Pet> _petsRead;
     private readonly IRepository<Pet> _petsWrite;
 
@@ -26,6 +28,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clients,
         IReadRepository<Species> speciesRead,
+        IReadRepository<Breed> breedsRead,
         IReadRepository<Pet> petsRead,
         IRepository<Pet> petsWrite)
     {
@@ -33,6 +36,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         _tenants = tenants;
         _clients = clients;
         _speciesRead = speciesRead;
+        _breedsRead = breedsRead;
         _petsRead = petsRead;
         _petsWrite = petsWrite;
     }
@@ -64,6 +68,19 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         if (species is null || !species.IsActive)
             return Result.Failure("Pets.SpeciesNotFound", "Tur bulunamadi veya pasif; gecerli bir SpeciesId gonderin.");
 
+        if (request.BreedId is { } breedId)
+        {
+            var breed = await _breedsRead.FirstOrDefaultAsync(new BreedByIdWithSpeciesSpec(breedId), ct);
+            if (breed is null || !breed.IsActive)
+                return Result.Failure(
+                    "Pets.BreedNotFound",
+                    "Irk bulunamadi veya pasif; gecerli bir BreedId gonderin.");
+            if (breed.SpeciesId != request.SpeciesId)
+                return Result.Failure(
+                    "Pets.BreedSpeciesMismatch",
+                    "Secilen irk, secilen tur ile uyusmuyor.");
+        }
+
         if (request.BirthDate.HasValue && request.BirthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))
             return Result.Failure("Pets.BirthDateInFuture", "Dogum tarihi gelecekte olamaz.");
 
@@ -73,7 +90,13 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         if (duplicate is not null)
             return Result.Failure("Pets.DuplicatePet", "Bu musteri icin ayni isim ve turde bir hayvan kaydi zaten var.");
 
-        pet.UpdateDetails(request.Name, request.SpeciesId, request.Breed, request.BirthDate);
+        pet.UpdateDetails(
+            request.Name,
+            request.SpeciesId,
+            request.Breed,
+            request.BirthDate,
+            request.BreedId,
+            request.Gender);
 
         await _petsWrite.UpdateAsync(pet, ct);
         await _petsWrite.SaveChangesAsync(ct);
