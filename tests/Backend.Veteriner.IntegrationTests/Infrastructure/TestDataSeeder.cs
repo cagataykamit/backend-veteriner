@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.Persistence;
@@ -71,6 +72,21 @@ internal static class TestDataSeeder
         if (!db.UserTenants.Any(ut => ut.UserId == admin.Id && ut.TenantId == tenant.Id))
         {
             db.UserTenants.Add(new UserTenant(admin.Id, tenant.Id));
+            db.SaveChanges();
+        }
+
+        var seedClinic = db.Clinics.FirstOrDefault(c =>
+            c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+        if (seedClinic is null)
+        {
+            seedClinic = new Clinic(tenant.Id, DataSeeder.DefaultSeedClinicName, "İstanbul");
+            db.Clinics.Add(seedClinic);
+            db.SaveChanges();
+        }
+
+        if (!db.UserClinics.Any(uc => uc.UserId == admin.Id && uc.ClinicId == seedClinic.Id))
+        {
+            db.UserClinics.Add(new UserClinic(admin.Id, seedClinic.Id));
             db.SaveChanges();
         }
     }

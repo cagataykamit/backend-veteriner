@@ -15,8 +15,9 @@ public sealed class UserTenantRepository : IUserTenantRepository
         return await _db.UserTenants
             .AsNoTracking()
             .Where(x => x.UserId == userId)
-            .OrderBy(x => x.TenantId)
             .Select(x => x.TenantId)
+            .Distinct()
+            .OrderBy(x => x)
             .ToListAsync(ct);
     }
 

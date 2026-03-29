@@ -74,18 +74,30 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
             extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));
 
         var memberships = await _userTenants.GetTenantIdsByUserIdAsync(user.Id, ct);
-        if (memberships.Count == 0)
+        var distinctTenantIds = memberships.Distinct().ToList();
+        if (distinctTenantIds.Count == 0)
         {
             return Result<LoginResultDto>.Failure(
                 "Auth.TenantMembershipRequired",
                 "Bu kullanıcı için kiracı üyeliği tanımlı değil.");
         }
 
-        var resolved = ResolveLoginTenant(request.TenantId, memberships);
-        if (!resolved.IsSuccess)
-            return Result<LoginResultDto>.Failure(resolved.Code!, resolved.Message!);
+        if (distinctTenantIds.Count > 1)
+        {
+            return Result<LoginResultDto>.Failure(
+                "Auth.UserMultipleTenantsForbidden",
+                "Bu kullanıcı birden fazla kiracıya bağlı; yönetici tek kiracıya indirgemelidir.");
+        }
 
-        var tenantId = resolved.TenantId!.Value;
+        var onlyTenantId = distinctTenantIds[0];
+        if (request.TenantId is { } provided && provided != Guid.Empty && provided != onlyTenantId)
+        {
+            return Result<LoginResultDto>.Failure(
+                "Auth.TenantMismatch",
+                "Tek kiracılı kullanıcı için farklı TenantId belirtilemez.");
+        }
+
+        var tenantId = onlyTenantId;
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
@@ -128,39 +140,10 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         await _refreshRepo.AddAsync(rt, ct);
         await _refreshRepo.SaveChangesAsync(ct);
 
-        var dto = new LoginResultDto(access, refreshRaw, accessExp);
+        var dto = new LoginResultDto(access, refreshRaw, accessExp, tenantId, 1);
         return Result<LoginResultDto>.Success(dto);
     }
 
     private static bool IsPlatformAdmin(User user)
         => user.Roles.Any(r => string.Equals(r.Name, "PlatformAdmin", StringComparison.OrdinalIgnoreCase));
-
-    private static (bool IsSuccess, Guid? TenantId, string? Code, string? Message) ResolveLoginTenant(
-        Guid? requested,
-        IReadOnlyList<Guid> memberships)
-    {
-        if (memberships.Count == 1)
-        {
-            var only = memberships[0];
-            if (requested is { } r && r != Guid.Empty && r != only)
-            {
-                return (false, null, "Auth.TenantMismatch",
-                    "Tek kiracılı kullanıcı için farklı TenantId belirtilemez.");
-            }
-
-            return (true, only, null, null);
-        }
-
-        if (requested is null || requested == Guid.Empty)
-        {
-            return (false, null, "Auth.TenantRequired",
-                "Birden fazla kiracıya üyesiniz; girişte TenantId zorunludur.");
-        }
-
-        var req = requested.Value;
-        if (!memberships.Contains(req))
-            return (false, null, "Auth.TenantNotMember", "Bu kiracıda üyeliğiniz yok.");
-
-        return (true, req, null, null);
-    }
 }

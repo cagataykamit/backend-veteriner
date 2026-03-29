@@ -19,6 +19,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
     private readonly IOperationClaimPermissionRepository _ocpRepo;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinics;
 
     public SelectClinicCommandHandler(
@@ -29,6 +30,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         IOperationClaimPermissionRepository ocpRepo,
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
+        IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinics)
     {
         _refreshRepo = refreshRepo;
@@ -38,6 +40,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         _ocpRepo = ocpRepo;
         _tenants = tenants;
         _userTenants = userTenants;
+        _userClinics = userClinics;
         _clinics = clinics;
     }
 
@@ -116,6 +119,13 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
                 "Klinik bulunamadı, pasif veya kiracıya ait değil.");
         }
 
+        if (!await _userClinics.ExistsAsync(user.Id, clinic.Id, ct))
+        {
+            return Result<LoginResultDto>.Failure(
+                "Auth.UserClinicNotAssigned",
+                "Bu kliniğe erişim yetkiniz yok; yöneticinizden atama isteyin.");
+        }
+
         // Claims: permissions + tenant_id + clinic_id (+ platform_admin)
         var permissionCodes = await _ocpRepo.GetPermissionCodesByUserIdAsync(user.Id, ct)
                               ?? Array.Empty<string>();
@@ -146,7 +156,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         await _refreshRepo.AddAsync(newRefresh, ct);
         await _refreshRepo.SaveChangesAsync(ct);
 
-        var dto = new LoginResultDto(access, newRefreshRaw, accessExp);
+        var dto = new LoginResultDto(access, newRefreshRaw, accessExp, sessionTenantId, null);
         return Result<LoginResultDto>.Success(dto);
     }
 }

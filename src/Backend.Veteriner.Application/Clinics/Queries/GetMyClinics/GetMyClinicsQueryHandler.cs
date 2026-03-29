@@ -1,6 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
-using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
@@ -15,20 +14,20 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
     private readonly IClientContext _client;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
-    private readonly IReadRepository<Clinic> _clinics;
+    private readonly IUserClinicRepository _userClinics;
 
     public GetMyClinicsQueryHandler(
         ITenantContext tenantContext,
         IClientContext client,
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
-        IReadRepository<Clinic> clinics)
+        IUserClinicRepository userClinics)
     {
         _tenantContext = tenantContext;
         _client = client;
         _tenants = tenants;
         _userTenants = userTenants;
-        _clinics = clinics;
+        _userClinics = userClinics;
     }
 
     public async Task<Result<IReadOnlyList<ClinicListItemDto>>> Handle(GetMyClinicsQuery request, CancellationToken ct)
@@ -61,8 +60,7 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
                 "Bu kiracıda üyeliğiniz yok.");
         }
 
-        // Minimum model: user-tenant üyeliği olan kullanıcı tenant'taki klinikleri görebilir.
-        var rows = await _clinics.ListAsync(new ClinicsByTenantFilteredSpec(tenantId, request.IsActive), ct);
+        var rows = await _userClinics.ListAccessibleClinicsAsync(userId.Value, tenantId, request.IsActive, ct);
 
         var dtos = rows
             .Select(c => new ClinicListItemDto(c.Id, c.TenantId, c.Name, c.City, c.IsActive))

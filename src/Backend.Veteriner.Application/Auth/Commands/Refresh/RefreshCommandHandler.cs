@@ -158,7 +158,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         await _refreshRepo.AddAsync(newRefresh, ct);
         await _refreshRepo.SaveChangesAsync(ct);
 
-        var dto = new LoginResultDto(access, newRefreshRaw, accessExp);
+        var dto = new LoginResultDto(access, newRefreshRaw, accessExp, sessionTenantId, null);
         return Result<LoginResultDto>.Success(dto);
     }
 }

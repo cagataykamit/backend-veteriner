@@ -9,8 +9,9 @@ namespace Backend.Veteriner.Application.Auth.Commands.Login;
 /// <param name="Email">E-posta.</param>
 /// <param name="Password">Şifre.</param>
 /// <param name="TenantId">
-/// Çok kiracılı kullanıcıda hangi kiracıya girileceği (zorunlu).
-/// Tek kiracılı kullanıcıda atlanabilir; yanlış GUID gönderilirse <c>Auth.TenantMismatch</c>.
+/// İsteğe bağlı uyumluluk alanı: kullanıcı tek kiracılıdır (<c>UserTenants</c> başına en fazla bir satır).
+/// Boş bırakılır veya çözümlenen kiracı ile aynı GUID gönderilir; farklı GUID ise <c>Auth.TenantMismatch</c>.
+/// Veride birden fazla kiracı üyeliği kalırsa <c>Auth.UserMultipleTenantsForbidden</c>.
 /// </param>
 public sealed record LoginCommand(string Email, string Password, Guid? TenantId = null)
     : IRequest<Result<LoginResultDto>>;

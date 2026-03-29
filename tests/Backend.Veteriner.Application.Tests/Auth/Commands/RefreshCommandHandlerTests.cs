@@ -198,6 +198,8 @@ public sealed class RefreshCommandHandlerTests
 
         value.AccessToken.Should().Be("access-new");
         value.RefreshToken.Should().Be("raw-new");
+        value.ResolvedTenantId.Should().Be(tid);
+        value.TenantMembershipCount.Should().BeNull();
 
         _refreshRepo.Verify(r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Once);
         _refreshRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);

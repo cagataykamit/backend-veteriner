@@ -15,9 +15,12 @@ public sealed class UserTenantConfiguration : IEntityTypeConfiguration<UserTenan
         b.Property(x => x.TenantId).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
 
-        b.HasIndex(x => new { x.UserId, x.TenantId }).IsUnique();
+        // Kullanıcı başına tek kiracı üyeliği (nihai SaaS modeli)
+        b.HasIndex(x => x.UserId).IsUnique();
 
         b.HasIndex(x => x.TenantId);
+
+        b.HasIndex(x => new { x.UserId, x.TenantId });
 
         b.HasOne(x => x.User)
             .WithMany()

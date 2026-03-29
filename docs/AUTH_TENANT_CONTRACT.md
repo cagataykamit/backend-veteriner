@@ -8,9 +8,13 @@ Bu belge mevcut backend davranışını özetler; yeni mimari önerisi değildir
 |------|------------|----------|
 | `email` | Evet | |
 | `password` | Evet | |
-| `tenantId` | Koşullu | Kullanıcının **birden fazla** kiracı üyeliği varsa **zorunlu** (GUID). Tek üyelikte **atlanabilir**; yanlış veya farklı GUID gönderilirse `Auth.TenantMismatch`. |
+| `tenantId` | İsteğe bağlı | Nihai model: kullanıcı **tek kiracılı** (`UserTenants.UserId` benzersiz). Gövdede yok/aynı kiracı kabul; farklı GUID `Auth.TenantMismatch`. Veride birden fazla kiracı üyeliği kalmışsa `Auth.UserMultipleTenantsForbidden`. |
 
-Sunucu `UserTenant` üzerinden üyeliği doğrular. Üyelik yoksa `Auth.TenantMembershipRequired` veya `Auth.TenantNotMember`; çok kiracıda seçim yoksa `Auth.TenantRequired`.
+Sunucu `UserTenant` üzerinden üyeliği doğrular. Üyelik yoksa `Auth.TenantMembershipRequired`; üyelik var ama token kiracısı doğrulanamazsa `Auth.TenantNotMember`.
+
+Başarılı yanıtta: `accessToken`, `refreshToken`, `expiresAt`, `resolvedTenantId`, login cevabında `tenantMembershipCount` her zaman `1` (tek kiracı). Refresh/select-clinic yanıtlarında `tenantMembershipCount` genelde `null`; `resolvedTenantId` oturum kiracısıdır.
+
+**Klinik ataması** yalnız `UserClinics` ile; seed otomatik olarak tenant’taki tüm klinikleri kullanıcıya **eklemez** (yalnızca `DataSeeder` içinde adlı varsayılan klinik + admin ataması).
 
 ## Refresh (`POST .../auth/refresh`)
 

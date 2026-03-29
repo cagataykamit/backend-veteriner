@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,9 @@ public static class DataSeeder
 {
     /// <summary>Seed ile oluşturulan varsayılan kiracı adı (tekrar çalıştırmada aynı kayıt bulunur).</summary>
     public const string DefaultTenantName = "Varsayılan Kiracı";
+
+    /// <summary>Varsayılan admin için tek bir seed klinik (tüm aktif kliniklere otomatik atama yapılmaz).</summary>
+    public const string DefaultSeedClinicName = "Varsayılan Klinik";
 
     public static async Task SeedAsync(
         AppDbContext db,
@@ -68,6 +72,24 @@ public static class DataSeeder
             await db.UserTenants.AddAsync(new UserTenant(user.Id, tenant.Id), ct);
             await db.SaveChangesAsync(ct);
             logger?.LogInformation("UserTenant link seeded for admin and default tenant.");
+        }
+
+        var seedClinic = await db.Clinics.FirstOrDefaultAsync(
+            c => c.TenantId == tenant.Id && c.Name == DefaultSeedClinicName,
+            ct);
+        if (seedClinic is null)
+        {
+            seedClinic = new Clinic(tenant.Id, DefaultSeedClinicName, "İstanbul");
+            await db.Clinics.AddAsync(seedClinic, ct);
+            await db.SaveChangesAsync(ct);
+            logger?.LogInformation("Default seed clinic created for tenant {TenantId}.", tenant.Id);
+        }
+
+        if (!await db.UserClinics.AnyAsync(uc => uc.UserId == user.Id && uc.ClinicId == seedClinic.Id, ct))
+        {
+            await db.UserClinics.AddAsync(new UserClinic(user.Id, seedClinic.Id), ct);
+            await db.SaveChangesAsync(ct);
+            logger?.LogInformation("UserClinic seeded for admin and {Clinic}.", DefaultSeedClinicName);
         }
     }
 }

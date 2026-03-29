@@ -122,6 +122,8 @@ public sealed class LoginCommandHandlerTests
 
         value.AccessToken.Should().Be("access-token");
         value.RefreshToken.Should().Be("refresh-token-raw");
+        value.ResolvedTenantId.Should().Be(tid);
+        value.TenantMembershipCount.Should().Be(1);
 
         _refreshRepo.Verify(r => r.RevokeAllByUserAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Once);
         _refreshRepo.Verify(r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -129,7 +131,7 @@ public sealed class LoginCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_IncludeTenantClaim_When_TenantIdProvidedAndActive_MultiTenant()
+    public async Task Handle_Should_IncludeTenantClaim_When_TenantIdProvidedAndActive_SingleTenant()
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
@@ -143,7 +145,7 @@ public sealed class LoginCommandHandlerTests
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
 
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Guid> { tid, Guid.NewGuid() });
+            .ReturnsAsync(new List<Guid> { tid });
         _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
@@ -193,7 +195,42 @@ public sealed class LoginCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_Fail_When_MultiTenant_NoTenantIdSelected()
+    public async Task Handle_Should_LoginSuccessfully_When_DuplicateTenantRows_SingleLogicalTenant()
+    {
+        var handler = CreateHandler();
+        var cmd = new LoginCommand("user@example.com", "password");
+        var user = new User("user@example.com", "hash");
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("Acme");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
+
+        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid> { tid, tid });
+        _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+
+        _ocpRepo.Setup(r => r.GetPermissionCodesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<string>());
+        _jwtOpt.SetupGet(o => o.RefreshTokenDays).Returns(7);
+
+        _jwt.Setup(j => j.Create(user, It.IsAny<IEnumerable<Claim>>()))
+            .Returns(("a", "r", DateTime.UtcNow.AddMinutes(5)));
+        _tokenHash.Setup(t => t.ComputeSha256("r")).Returns("h");
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TenantMembershipCount.Should().Be(1);
+        result.Value.ResolvedTenantId.Should().Be(tid);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_MultipleTenantMemberships_DataIntegrity()
     {
         var handler = CreateHandler();
         var cmd = new LoginCommand("user@example.com", "password");
@@ -208,11 +245,11 @@ public sealed class LoginCommandHandlerTests
         var result = await handler.Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Auth.TenantRequired");
+        result.Error.Code.Should().Be("Auth.UserMultipleTenantsForbidden");
     }
 
     [Fact]
-    public async Task Handle_Should_Fail_When_TenantNotInMembership()
+    public async Task Handle_Should_Fail_When_RequestedTenantNotSingleMembership()
     {
         var handler = CreateHandler();
         var requested = Guid.NewGuid();
@@ -224,12 +261,12 @@ public sealed class LoginCommandHandlerTests
             .ReturnsAsync(user);
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Guid> { memberTid, Guid.NewGuid() });
+            .ReturnsAsync(new List<Guid> { memberTid });
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Auth.TenantNotMember");
+        result.Error.Code.Should().Be("Auth.TenantMismatch");
     }
 
     [Fact]
