@@ -12,5 +12,8 @@ public sealed record UpdatePetCommand(
     string? Breed = null,
     DateOnly? BirthDate = null,
     Guid? BreedId = null,
-    PetGender? Gender = null)
+    PetGender? Gender = null,
+    Guid? ColorId = null,
+    decimal? Weight = null,
+    string? Notes = null)
     : IRequest<Result>;

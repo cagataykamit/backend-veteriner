@@ -96,5 +96,7 @@ public sealed class GetExaminationByIdQueryHandlerTests
         result.Value.PetName.Should().Be("Pamuk");
         result.Value.ClientId.Should().Be(clientId);
         result.Value.ClientName.Should().Be("Ali Veli");
+        result.Value.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10));
+        result.Value.UpdatedAtUtc.Should().BeNull();
     }
 }

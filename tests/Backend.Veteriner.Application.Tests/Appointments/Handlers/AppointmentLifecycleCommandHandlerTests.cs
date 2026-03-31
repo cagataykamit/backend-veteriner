@@ -52,7 +52,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     {
         var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
         _ = appt.Complete();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -71,7 +71,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     {
         var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -90,7 +90,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     {
         var handler = new CompleteAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
         _ = appt.Cancel();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -108,7 +108,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     {
         var handler = new CompleteAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -127,13 +127,13 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(3);
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, appt.ClinicId, Guid.NewGuid(), when, null));
+            .ReturnsAsync(new Appointment(tid, appt.ClinicId, Guid.NewGuid(), when, AppointmentType.Other, null, null));
 
         var result = await handler.Handle(
             new RescheduleAppointmentCommand(appt.Id, when),
@@ -150,7 +150,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(5);
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -175,7 +175,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(3);
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
         _ = appt.Complete();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -197,7 +197,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
         var tid = Guid.NewGuid();
         var past = DateTime.UtcNow.AddDays(-30);
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))

@@ -51,7 +51,7 @@ public sealed class GetAppointmentByIdQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnDetail_With_ClientId_SpeciesId_And_Type_When_Found()
+    public async Task Handle_Should_ReturnDetail_With_ClientId_Species_And_AppointmentType_When_Found()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -60,7 +60,7 @@ public sealed class GetAppointmentByIdQueryHandlerTests
         var apptId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
 
-        var appt = new Appointment(tid, cid, petId, DateTime.UtcNow.AddDays(1), "not");
+        var appt = new Appointment(tid, cid, petId, DateTime.UtcNow.AddDays(1), AppointmentType.Consultation, null, "not");
         typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, apptId);
 
         var pet = new Pet(tid, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
@@ -91,7 +91,8 @@ public sealed class GetAppointmentByIdQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.ClientId.Should().Be(clientId);
         result.Value.SpeciesId.Should().Be(TestSpeciesIds.Cat);
-        result.Value.Type.Should().Be("Kedi");
+        result.Value.SpeciesName.Should().Be("Kedi");
+        result.Value.AppointmentType.Should().Be(AppointmentType.Consultation);
         result.Value.ClientName.Should().Be("Ali Veli");
         result.Value.PetName.Should().Be("Pamuk");
         result.Value.Notes.Should().Be("not");

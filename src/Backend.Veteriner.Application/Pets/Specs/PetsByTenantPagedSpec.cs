@@ -9,6 +9,7 @@ public sealed class PetsByTenantPagedSpec : Specification<Pet>
     {
         Query.Where(p => p.TenantId == tenantId)
             .Include(p => p.Species!)
+            .Include(p => p.ColorRef!)
             .OrderBy(p => p.Name)
             .ThenBy(p => p.Species!.Name)
             .ThenBy(p => p.Id)

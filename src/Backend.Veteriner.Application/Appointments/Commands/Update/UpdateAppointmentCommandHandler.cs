@@ -50,9 +50,12 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadý veya kiracýya ait deðil.");
 
         var scheduledUtc = NormalizeToUtc(request.ScheduledAtUtc);
-        var window = AppointmentScheduleWindow.Validate(scheduledUtc);
-        if (!window.IsSuccess)
-            return Result.Failure(window.Error);
+        if (request.Status == AppointmentStatus.Scheduled)
+        {
+            var window = AppointmentScheduleWindow.Validate(scheduledUtc);
+            if (!window.IsSuccess)
+                return Result.Failure(window.Error);
+        }
 
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
             return Result.Failure("Appointments.ClinicContextMismatch", "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
@@ -70,17 +73,26 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         if (pet is null)
             return Result.Failure("Pets.NotFound", "Hayvan kaydý bulunamadý veya kiracýya ait deðil.");
 
-        var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
-            new AppointmentScheduledSlotAtClinicSpec(tenantId, clinicId, scheduledUtc, appointment.Id), ct);
-        if (clinicBusy is not null)
-            return Result.Failure("Appointments.ClinicSlotDuplicate", "Bu klinikte ayný saatte baþka bir aktif randevu var.");
+        if (request.Status == AppointmentStatus.Scheduled)
+        {
+            var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
+                new AppointmentScheduledSlotAtClinicSpec(tenantId, clinicId, scheduledUtc, appointment.Id), ct);
+            if (clinicBusy is not null)
+                return Result.Failure("Appointments.ClinicSlotDuplicate", "Bu klinikte ayný saatte baþka bir aktif randevu var.");
 
-        var petBusy = await _appointmentsRead.FirstOrDefaultAsync(
-            new AppointmentScheduledSlotForPetSpec(tenantId, request.PetId, scheduledUtc, appointment.Id), ct);
-        if (petBusy is not null)
-            return Result.Failure("Appointments.PetSlotDuplicate", "Bu hayvanýn ayný saatte baþka bir aktif randevusu var.");
+            var petBusy = await _appointmentsRead.FirstOrDefaultAsync(
+                new AppointmentScheduledSlotForPetSpec(tenantId, request.PetId, scheduledUtc, appointment.Id), ct);
+            if (petBusy is not null)
+                return Result.Failure("Appointments.PetSlotDuplicate", "Bu hayvanýn ayný saatte baþka bir aktif randevusu var.");
+        }
 
-        var domain = appointment.UpdateDetails(clinicId, request.PetId, scheduledUtc, request.Notes);
+        var domain = appointment.ApplyWriteUpdate(
+            request.Status,
+            clinicId,
+            request.PetId,
+            scheduledUtc,
+            request.AppointmentType,
+            request.Notes);
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
 

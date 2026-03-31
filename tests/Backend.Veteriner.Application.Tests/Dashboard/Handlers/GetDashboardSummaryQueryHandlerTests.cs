@@ -91,7 +91,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         _appointments.Setup(a => a.CountAsync(It.IsAny<DashboardTodayCancelledCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(2);
         var when = DateTime.UtcNow.AddHours(2);
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), when, null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), when, AppointmentType.Other, null, null);
         _appointments.Setup(a => a.ListAsync(It.IsAny<DashboardUpcomingScheduledListSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Appointment> { appt });
 

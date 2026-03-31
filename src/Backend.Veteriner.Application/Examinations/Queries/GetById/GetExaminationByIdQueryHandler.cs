@@ -73,7 +73,9 @@ public sealed class GetExaminationByIdQueryHandler
             e.VisitReason,
             e.Findings,
             e.Assessment,
-            e.Notes);
+            e.Notes,
+            e.CreatedAtUtc,
+            e.UpdatedAtUtc);
         return Result<ExaminationDetailDto>.Success(dto);
     }
 }

@@ -15,4 +15,6 @@ public sealed record VaccinationDetailDto(
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,
     VaccinationStatus Status,
-    string? Notes);
+    string? Notes,
+    DateTime CreatedAtUtc,
+    DateTime? UpdatedAtUtc);

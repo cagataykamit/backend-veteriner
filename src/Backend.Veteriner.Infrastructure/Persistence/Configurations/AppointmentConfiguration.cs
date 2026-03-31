@@ -24,6 +24,10 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         b.Property(x => x.ScheduledAtUtc)
             .IsRequired();
 
+        b.Property(x => x.AppointmentType)
+            .IsRequired()
+            .HasConversion<int>();
+
         b.Property(x => x.Status)
             .IsRequired()
             .HasConversion<int>();

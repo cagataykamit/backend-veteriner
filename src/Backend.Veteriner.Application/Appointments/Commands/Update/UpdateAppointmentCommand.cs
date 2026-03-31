@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -8,4 +9,6 @@ public sealed record UpdateAppointmentCommand(
     Guid? ClinicId,
     Guid PetId,
     DateTime ScheduledAtUtc,
+    AppointmentType AppointmentType,
+    AppointmentStatus Status,
     string? Notes = null) : IRequest<Result>;

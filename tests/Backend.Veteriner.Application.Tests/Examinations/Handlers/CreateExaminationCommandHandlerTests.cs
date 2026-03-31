@@ -149,7 +149,7 @@ public sealed class CreateExaminationCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
 
-        var wrongClinicAppt = new Appointment(tid, Guid.NewGuid(), pid, DateTime.UtcNow.AddDays(1), null);
+        var wrongClinicAppt = new Appointment(tid, Guid.NewGuid(), pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(wrongClinicAppt);
 
@@ -209,7 +209,7 @@ public sealed class CreateExaminationCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), null));
+            .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
 
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));

@@ -20,6 +20,8 @@ public sealed class Vaccination : AggregateRoot
     public DateTime? DueAtUtc { get; private set; }
     public VaccinationStatus Status { get; private set; }
     public string? Notes { get; private set; }
+    public DateTime CreatedAtUtc { get; private set; }
+    public DateTime? UpdatedAtUtc { get; private set; }
 
     private Vaccination() { }
 
@@ -52,6 +54,8 @@ public sealed class Vaccination : AggregateRoot
         AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
         DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        CreatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = null;
     }
 
     public Result UpdateDetails(
@@ -79,6 +83,7 @@ public sealed class Vaccination : AggregateRoot
         AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
         DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        UpdatedAtUtc = DateTime.UtcNow;
         return Result.Success();
     }
 

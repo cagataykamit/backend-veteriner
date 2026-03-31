@@ -39,7 +39,7 @@ public sealed class CreateAppointmentCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
     {
         var handler = CreateHandler();
-        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns((Guid?)null);
 
@@ -55,7 +55,7 @@ public sealed class CreateAppointmentCommandHandlerTests
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -73,7 +73,7 @@ public sealed class CreateAppointmentCommandHandlerTests
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), null);
+        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
 
         var tenant = new Tenant("X");
         tenant.Deactivate();
@@ -95,7 +95,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var scheduled = DateTime.UtcNow.AddDays(-10);
-        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), scheduled, null);
+        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), scheduled, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -114,7 +114,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var scheduled = DateTime.UtcNow.AddYears(3);
-        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), scheduled, null);
+        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), scheduled, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -133,7 +133,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var cmd = new CreateAppointmentCommand(cid, pid, DateTime.UtcNow.AddDays(1), null);
+        var cmd = new CreateAppointmentCommand(cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -155,7 +155,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(1);
-        var cmd = new CreateAppointmentCommand(null, pid, when, null);
+        var cmd = new CreateAppointmentCommand(null, pid, when, AppointmentType.Examination);
         var onlyClinic = new Clinic(tid, "Tek Klinik", "Ankara");
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -188,7 +188,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(1);
-        var cmd = new CreateAppointmentCommand(null, pid, when, null);
+        var cmd = new CreateAppointmentCommand(null, pid, when, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -213,7 +213,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var cmd = new CreateAppointmentCommand(cid, pid, DateTime.UtcNow.AddDays(1), null);
+        var cmd = new CreateAppointmentCommand(cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -239,7 +239,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(2);
-        var cmd = new CreateAppointmentCommand(cid, pid, when, null);
+        var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -252,7 +252,7 @@ public sealed class CreateAppointmentCommandHandlerTests
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, cid, Guid.NewGuid(), when, null));
+            .ReturnsAsync(new Appointment(tid, cid, Guid.NewGuid(), when, AppointmentType.Other, null, null));
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
@@ -269,7 +269,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(2);
-        var cmd = new CreateAppointmentCommand(cid, pid, when, null);
+        var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -284,7 +284,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
         _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, Guid.NewGuid(), pid, when, null));
+            .ReturnsAsync(new Appointment(tid, Guid.NewGuid(), pid, when, AppointmentType.Other, null, null));
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
@@ -300,7 +300,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(1);
-        var cmd = new CreateAppointmentCommand(cid, pid, when, "  not  ");
+        var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Vaccination, null, "  not  ");
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -327,6 +327,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         captured.Should().NotBeNull();
         captured!.TenantId.Should().Be(tid);
         captured.Status.Should().Be(AppointmentStatus.Scheduled);
+        captured.AppointmentType.Should().Be(AppointmentType.Vaccination);
         captured.Notes.Should().Be("not");
         captured.ScheduledAtUtc.Should().Be(when, "UTC normalization ile aynı an");
 
@@ -342,7 +343,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var activeClinicId = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(1);
-        var cmd = new CreateAppointmentCommand(bodyClinicId, pid, when, null);
+        var cmd = new CreateAppointmentCommand(bodyClinicId, pid, when, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(activeClinicId);
@@ -354,5 +355,57 @@ public sealed class CreateAppointmentCommandHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Appointments.ClinicContextMismatch");
         _appointmentsWrite.Verify(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Create_WithStatusCompleted_WithoutSlotChecks()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var when = DateTime.UtcNow.AddDays(-1);
+        var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination, AppointmentStatus.Completed, null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+
+        Appointment? captured = null;
+        _appointmentsWrite.Setup(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()))
+            .Callback<Appointment, CancellationToken>((a, _) => captured = a);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.Status.Should().Be(AppointmentStatus.Completed);
+        _appointmentsRead.Verify(
+            r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_StatusInvalid()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cmd = new CreateAppointmentCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            DateTime.UtcNow.AddDays(1),
+            AppointmentType.Examination,
+            (AppointmentStatus)99,
+            null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.Validation");
     }
 }

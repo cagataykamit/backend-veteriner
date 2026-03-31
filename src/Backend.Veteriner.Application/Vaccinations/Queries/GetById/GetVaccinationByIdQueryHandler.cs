@@ -74,7 +74,9 @@ public sealed class GetVaccinationByIdQueryHandler
             v.AppliedAtUtc,
             v.DueAtUtc,
             v.Status,
-            v.Notes);
+            v.Notes,
+            v.CreatedAtUtc,
+            v.UpdatedAtUtc);
         return Result<VaccinationDetailDto>.Success(dto);
     }
 }

@@ -62,6 +62,7 @@ public class AppDbContext : DbContext
     public DbSet<Pet> Pets => Set<Pet>();
     public DbSet<Species> Species => Set<Species>();
     public DbSet<Breed> Breeds => Set<Breed>();
+    public DbSet<PetColor> PetColors => Set<PetColor>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Examination> Examinations => Set<Examination>();
     public DbSet<Vaccination> Vaccinations => Set<Vaccination>();

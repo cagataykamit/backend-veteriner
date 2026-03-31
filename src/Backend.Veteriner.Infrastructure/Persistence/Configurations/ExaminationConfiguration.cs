@@ -22,6 +22,8 @@ public sealed class ExaminationConfiguration : IEntityTypeConfiguration<Examinat
         b.Property(x => x.Findings).IsRequired().HasMaxLength(8000);
         b.Property(x => x.Assessment).HasMaxLength(4000);
         b.Property(x => x.Notes).HasMaxLength(4000);
+        b.Property(x => x.CreatedAtUtc).IsRequired();
+        b.Property(x => x.UpdatedAtUtc);
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ExaminedAtUtc });

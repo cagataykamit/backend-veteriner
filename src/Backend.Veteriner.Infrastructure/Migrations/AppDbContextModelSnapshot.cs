@@ -28,6 +28,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("AppointmentType")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
@@ -213,6 +216,174 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Breeds", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.PetColor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("PetColors", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020001"),
+                            Code = "BLACK",
+                            DisplayOrder = 1,
+                            IsActive = true,
+                            Name = "Siyah"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020002"),
+                            Code = "WHITE",
+                            DisplayOrder = 2,
+                            IsActive = true,
+                            Name = "Beyaz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020003"),
+                            Code = "BROWN",
+                            DisplayOrder = 3,
+                            IsActive = true,
+                            Name = "Kahverengi"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020004"),
+                            Code = "GRAY",
+                            DisplayOrder = 4,
+                            IsActive = true,
+                            Name = "Gri"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020005"),
+                            Code = "YELLOW",
+                            DisplayOrder = 5,
+                            IsActive = true,
+                            Name = "Sarı"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020006"),
+                            Code = "CREAM",
+                            DisplayOrder = 6,
+                            IsActive = true,
+                            Name = "Krem"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020007"),
+                            Code = "RED",
+                            DisplayOrder = 7,
+                            IsActive = true,
+                            Name = "Kızıl"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020008"),
+                            Code = "ORANGE",
+                            DisplayOrder = 8,
+                            IsActive = true,
+                            Name = "Turuncu"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020009"),
+                            Code = "BLACK_WHITE",
+                            DisplayOrder = 9,
+                            IsActive = true,
+                            Name = "Siyah-Beyaz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020010"),
+                            Code = "BROWN_WHITE",
+                            DisplayOrder = 10,
+                            IsActive = true,
+                            Name = "Kahverengi-Beyaz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020011"),
+                            Code = "GRAY_WHITE",
+                            DisplayOrder = 11,
+                            IsActive = true,
+                            Name = "Gri-Beyaz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020012"),
+                            Code = "SPOTTED",
+                            DisplayOrder = 12,
+                            IsActive = true,
+                            Name = "Benekli"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020013"),
+                            Code = "STRIPED",
+                            DisplayOrder = 13,
+                            IsActive = true,
+                            Name = "Çizgili"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020014"),
+                            Code = "CALICO",
+                            DisplayOrder = 14,
+                            IsActive = true,
+                            Name = "Alacalı"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020015"),
+                            Code = "MULTI_COLOR",
+                            DisplayOrder = 15,
+                            IsActive = true,
+                            Name = "Çok Renkli"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020016"),
+                            Code = "OTHER",
+                            DisplayOrder = 16,
+                            IsActive = true,
+                            Name = "Diğer"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020017"),
+                            Code = "UNKNOWN",
+                            DisplayOrder = 17,
+                            IsActive = true,
+                            Name = "Bilinmiyor"
+                        });
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.Species", b =>
                 {
                     b.Property<Guid>("Id")
@@ -354,6 +525,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("ExaminedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -371,6 +545,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("VisitReason")
                         .IsRequired()
@@ -471,6 +648,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ColorId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int?>("Gender")
                         .HasColumnType("int");
 
@@ -479,15 +659,24 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<Guid>("SpeciesId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal?>("Weight")
+                        .HasColumnType("decimal(6,2)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("BreedId");
+
+                    b.HasIndex("ColorId");
 
                     b.HasIndex("SpeciesId");
 
@@ -672,6 +861,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime?>("DueAtUtc")
                         .HasColumnType("datetime2");
 
@@ -690,6 +882,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("VaccineName")
                         .IsRequired()
@@ -932,6 +1127,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasForeignKey("BreedId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Backend.Veteriner.Domain.Catalog.PetColor", "ColorRef")
+                        .WithMany()
+                        .HasForeignKey("ColorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Backend.Veteriner.Domain.Catalog.Species", "Species")
                         .WithMany()
                         .HasForeignKey("SpeciesId")
@@ -939,6 +1139,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("BreedRef");
+
+                    b.Navigation("ColorRef");
 
                     b.Navigation("Species");
                 });

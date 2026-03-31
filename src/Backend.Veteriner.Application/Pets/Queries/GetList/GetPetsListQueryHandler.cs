@@ -43,7 +43,10 @@ public sealed class GetPetsListQueryHandler
                 p.Name,
                 p.SpeciesId,
                 p.Species?.Name ?? "",
-                p.Breed))
+                p.ColorId,
+                p.ColorRef?.Name,
+                p.Breed,
+                p.Weight ?? 0))
             .ToList();
 
         return Result<PagedResult<PetListItemDto>>.Success(

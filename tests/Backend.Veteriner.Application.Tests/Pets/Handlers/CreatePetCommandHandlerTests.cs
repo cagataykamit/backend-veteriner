@@ -20,6 +20,7 @@ public sealed class CreatePetCommandHandlerTests
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IReadRepository<Client>> _clientsRead = new();
     private readonly Mock<IReadRepository<Species>> _speciesRead = new();
+    private readonly Mock<IReadRepository<PetColor>> _colorsRead = new();
     private readonly Mock<IReadRepository<Breed>> _breedsRead = new();
     private readonly Mock<IReadRepository<Pet>> _petsRead = new();
     private readonly Mock<IRepository<Pet>> _petsWrite = new();
@@ -30,6 +31,7 @@ public sealed class CreatePetCommandHandlerTests
             _tenantsRead.Object,
             _clientsRead.Object,
             _speciesRead.Object,
+            _colorsRead.Object,
             _breedsRead.Object,
             _petsRead.Object,
             _petsWrite.Object);
@@ -240,7 +242,17 @@ public sealed class CreatePetCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var birth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-2));
-        var cmd = new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, "Tekir", birth);
+        var cmd = new CreatePetCommand(
+            cid,
+            "Pamuk",
+            TestSpeciesIds.Cat,
+            "Tekir",
+            birth,
+            null,
+            PetGender.Female,
+            null,
+            4.25m,
+            "Sağlıklı, hafif kilo almış.");
 
         var tenant = new Tenant("X");
         AlignTenantId(tenant, tid);
@@ -271,7 +283,37 @@ public sealed class CreatePetCommandHandlerTests
         captured.SpeciesId.Should().Be(TestSpeciesIds.Cat);
         captured.Breed.Should().Be("Tekir");
         captured.BirthDate.Should().Be(birth);
+        captured.Gender.Should().Be(PetGender.Female);
+        captured.Weight.Should().Be(4.25m);
+        captured.Notes.Should().Be("Sağlıklı, hafif kilo almış.");
 
         _petsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ColorNotFound()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var cmd = new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, null, null, null, null, Guid.NewGuid());
+
+        var tenant = new Tenant("X");
+        AlignTenantId(tenant, tid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Client(tid, "Ali", null));
+        _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Species("CAT", "Kedi"));
+        _colorsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.PetColors.Specs.PetColorByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((PetColor?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Pets.ColorNotFound");
     }
 }

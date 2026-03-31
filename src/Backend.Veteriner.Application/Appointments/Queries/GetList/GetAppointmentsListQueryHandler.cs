@@ -5,7 +5,9 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -23,6 +25,7 @@ public sealed class GetAppointmentsListQueryHandler
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IReadRepository<Species> _species;
 
     public GetAppointmentsListQueryHandler(
         ITenantContext tenantContext,
@@ -30,7 +33,8 @@ public sealed class GetAppointmentsListQueryHandler
         IReadRepository<Appointment> appointments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        IReadRepository<Species> species)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -38,6 +42,7 @@ public sealed class GetAppointmentsListQueryHandler
         _pets = pets;
         _clients = clients;
         _clinics = clinics;
+        _species = species;
     }
 
     public async Task<Result<PagedResult<AppointmentListItemDto>>> Handle(
@@ -91,6 +96,12 @@ public sealed class GetAppointmentsListQueryHandler
             : await _pets.ListAsync(new PetsByTenantIdsSpec(tenantId, petIds), ct);
         var petById = pets.ToDictionary(x => x.Id);
 
+        var speciesIds = pets.Select(x => x.SpeciesId).Distinct().ToArray();
+        var speciesRows = speciesIds.Length == 0
+            ? []
+            : await _species.ListAsync(new SpeciesByIdsSpec(speciesIds), ct);
+        var speciesNameById = speciesRows.ToDictionary(x => x.Id, x => x.Name);
+
         var clientIds = pets.Select(x => x.ClientId).Distinct().ToArray();
         var clients = clientIds.Length == 0
             ? []
@@ -110,6 +121,10 @@ public sealed class GetAppointmentsListQueryHandler
                     ? cName
                     : string.Empty;
                 var petName = pet?.Name ?? string.Empty;
+                var speciesId = pet?.SpeciesId ?? Guid.Empty;
+                var speciesName = speciesId != Guid.Empty && speciesNameById.TryGetValue(speciesId, out var sName)
+                    ? sName
+                    : string.Empty;
                 var clinicName = clinicNameById.TryGetValue(a.ClinicId, out var clName)
                     ? clName
                     : string.Empty;
@@ -121,6 +136,9 @@ public sealed class GetAppointmentsListQueryHandler
                     clinicName,
                     a.PetId,
                     petName,
+                    speciesId,
+                    speciesName,
+                    a.AppointmentType,
                     clientName,
                     a.ScheduledAtUtc,
                     a.Status,

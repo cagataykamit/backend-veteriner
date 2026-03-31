@@ -1,6 +1,9 @@
 using System.Reflection;
 using Backend.Veteriner.Api.Contracts;
 using Backend.Veteriner.Api.Controllers;
+using Backend.Veteriner.Application.Appointments.Commands.Create;
+using Backend.Veteriner.Application.Appointments.Commands.Update;
+using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -45,6 +48,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         options.OperationFilter<SwaggerDefaultValues>();
         options.OperationFilter<AuthContractCleanupOperationFilter>();
         options.SchemaFilter<PaymentsContractSchemaFilter>();
+        options.SchemaFilter<AppointmentsContractSchemaFilter>();
 
         // (Opsiyonel) XML comments (dosya yoksa sessiz geç)
         TryIncludeXmlComments(options);
@@ -130,6 +134,94 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             }
 
             propertySchema.Nullable = isNullable;
+        }
+    }
+
+    /// <summary>Randevu yanıtlarında <c>type</c> ile <c>status</c> anlamını Swagger’da netleştirir.</summary>
+    private sealed class AppointmentsContractSchemaFilter : ISchemaFilter
+    {
+        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        {
+            if (context.Type == typeof(CreateAppointmentCommand))
+            {
+                MarkRequired(schema, "petId", "scheduledAtUtc", "appointmentType");
+                DescribeAppointmentTypeOnCreateUpdate(schema);
+                Describe(schema, "status",
+                    "Opsiyonel. Verilmezse Scheduled (0). Tamamlanmış/iptal oluşturma için 1 veya 2; bu durumda zaman penceresi ve çakışma kontrolleri uygulanmaz.");
+                return;
+            }
+
+            if (context.Type == typeof(UpdateAppointmentCommand))
+            {
+                MarkRequired(schema, "id", "petId", "scheduledAtUtc", "appointmentType", "status");
+                DescribeAppointmentTypeOnCreateUpdate(schema);
+                DescribeStatusOnWrite(schema);
+                return;
+            }
+
+            if (context.Type == typeof(AppointmentListItemDto))
+            {
+                MarkRequired(schema,
+                    "id", "tenantId", "clinicId", "clinicName", "petId", "petName",
+                    "speciesId", "speciesName", "appointmentType", "clientName", "scheduledAtUtc", "status");
+                Describe(schema, "speciesName", "Evcil hayvan türü görünen adı (global Species kataloğu).");
+                DescribeAppointmentType(schema);
+                DescribeStatus(schema);
+                return;
+            }
+
+            if (context.Type == typeof(AppointmentDetailDto))
+            {
+                MarkRequired(schema,
+                    "id", "tenantId", "clinicId", "clinicName", "petId", "petName",
+                    "clientName", "clientId", "speciesId", "speciesName", "appointmentType", "scheduledAtUtc", "status");
+                Describe(schema, "speciesName", "Evcil hayvan türü görünen adı (global Species kataloğu).");
+                DescribeAppointmentType(schema);
+                DescribeStatus(schema);
+            }
+        }
+
+        private static void MarkRequired(OpenApiSchema schema, params string[] names)
+        {
+            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                if (schema.Properties.ContainsKey(name))
+                {
+                    schema.Required.Add(name);
+                }
+            }
+        }
+
+        private static void Describe(OpenApiSchema schema, string propertyName, string description)
+        {
+            if (schema.Properties.TryGetValue(propertyName, out var p))
+            {
+                p.Description = description;
+            }
+        }
+
+        private static void DescribeStatus(OpenApiSchema schema)
+        {
+            Describe(schema, "status",
+                "Randevu durumu (JSON’da sayı): 0=Scheduled, 1=Completed, 2=Cancelled.");
+        }
+
+        private static void DescribeAppointmentType(OpenApiSchema schema)
+        {
+            Describe(schema, "appointmentType",
+                "Randevu / ziyaret türü (JSON’da sayı): 0=Examination, 1=Vaccination, 2=Checkup, 3=Surgery, 4=Grooming, 5=Consultation, 6=Other.");
+        }
+
+        private static void DescribeAppointmentTypeOnCreateUpdate(OpenApiSchema schema)
+        {
+            DescribeAppointmentType(schema);
+        }
+
+        private static void DescribeStatusOnWrite(OpenApiSchema schema)
+        {
+            Describe(schema, "status",
+                "Randevu durumu (JSON sayı): 0=Scheduled, 1=Completed, 2=Cancelled. Scheduled dışındaki değerlerde çakışma kontrolü yapılmaz.");
         }
     }
 

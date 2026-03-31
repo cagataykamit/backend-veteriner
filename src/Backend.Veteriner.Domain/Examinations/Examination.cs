@@ -24,6 +24,8 @@ public sealed class Examination : AggregateRoot
     public string? Assessment { get; private set; }
 
     public string? Notes { get; private set; }
+    public DateTime CreatedAtUtc { get; private set; }
+    public DateTime? UpdatedAtUtc { get; private set; }
 
     private Examination() { }
 
@@ -59,6 +61,8 @@ public sealed class Examination : AggregateRoot
         Findings = findings.Trim();
         Assessment = string.IsNullOrWhiteSpace(assessment) ? null : assessment.Trim();
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        CreatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = null;
     }
 
     public Result UpdateDetails(
@@ -90,6 +94,7 @@ public sealed class Examination : AggregateRoot
         Findings = findings.Trim();
         Assessment = string.IsNullOrWhiteSpace(assessment) ? null : assessment.Trim();
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        UpdatedAtUtc = DateTime.UtcNow;
         return Result.Success();
     }
 

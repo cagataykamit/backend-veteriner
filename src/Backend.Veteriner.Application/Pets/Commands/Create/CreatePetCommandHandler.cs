@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.BreedsReference.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.PetColors.Specs;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Catalog;
@@ -19,6 +20,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Species> _speciesRead;
+    private readonly IReadRepository<PetColor> _colorsRead;
     private readonly IReadRepository<Breed> _breedsRead;
     private readonly IReadRepository<Pet> _petsRead;
     private readonly IRepository<Pet> _petsWrite;
@@ -28,6 +30,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clients,
         IReadRepository<Species> speciesRead,
+        IReadRepository<PetColor> colorsRead,
         IReadRepository<Breed> breedsRead,
         IReadRepository<Pet> petsRead,
         IRepository<Pet> petsWrite)
@@ -36,6 +39,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         _tenants = tenants;
         _clients = clients;
         _speciesRead = speciesRead;
+        _colorsRead = colorsRead;
         _breedsRead = breedsRead;
         _petsRead = petsRead;
         _petsWrite = petsWrite;
@@ -83,6 +87,15 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
                     "Seçilen ırk, seçilen tür ile uyuşmuyor.");
         }
 
+        if (request.ColorId is { } colorId)
+        {
+            var color = await _colorsRead.FirstOrDefaultAsync(new PetColorByIdSpec(colorId), ct);
+            if (color is null || !color.IsActive)
+                return Result<Guid>.Failure(
+                    "Pets.ColorNotFound",
+                    "Renk bulunamadı veya pasif; geçerli bir ColorId gönderin.");
+        }
+
         if (request.BirthDate.HasValue
             && request.BirthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))
             return Result<Guid>.Failure("Pets.BirthDateInFuture", "Doğum tarihi gelecekte olamaz.");
@@ -103,7 +116,10 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             request.Breed,
             request.BirthDate,
             request.BreedId,
-            request.Gender);
+            request.Gender,
+            request.ColorId,
+            request.Weight,
+            request.Notes);
         await _petsWrite.AddAsync(pet, ct);
         await _petsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(pet.Id);

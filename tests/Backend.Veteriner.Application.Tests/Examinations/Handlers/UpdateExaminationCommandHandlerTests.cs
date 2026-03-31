@@ -85,7 +85,7 @@ public sealed class UpdateExaminationCommandHandlerTests
             .ReturnsAsync(existing);
 
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), null));
+            .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
 
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "Istanbul"));

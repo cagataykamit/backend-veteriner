@@ -13,4 +13,6 @@ public sealed record ExaminationDetailDto(
     string VisitReason,
     string Findings,
     string? Assessment,
-    string? Notes);
+    string? Notes,
+    DateTime CreatedAtUtc,
+    DateTime? UpdatedAtUtc);

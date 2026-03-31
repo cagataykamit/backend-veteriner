@@ -7,4 +7,7 @@ public sealed record PetListItemDto(
     string Name,
     Guid SpeciesId,
     string SpeciesName,
-    string? Breed);
+    Guid? ColorId,
+    string? ColorName,
+    string? Breed,
+    decimal? Weight);

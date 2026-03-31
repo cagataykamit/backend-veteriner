@@ -70,11 +70,11 @@ public sealed class GetAppointmentByIdQueryHandler
         }
 
         var speciesId = pet?.SpeciesId ?? Guid.Empty;
-        var typeLabel = string.Empty;
+        var speciesName = string.Empty;
         if (speciesId != Guid.Empty)
         {
             var species = await _species.FirstOrDefaultAsync(new SpeciesByIdSpec(speciesId), ct);
-            typeLabel = species?.Name ?? string.Empty;
+            speciesName = species?.Name ?? string.Empty;
         }
 
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, a.ClinicId), ct);
@@ -89,7 +89,8 @@ public sealed class GetAppointmentByIdQueryHandler
             clientName,
             clientId,
             speciesId,
-            typeLabel,
+            speciesName,
+            a.AppointmentType,
             a.ScheduledAtUtc,
             a.Status,
             a.Notes);

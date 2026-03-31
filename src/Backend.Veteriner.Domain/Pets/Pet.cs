@@ -16,6 +16,7 @@ public sealed class Pet : AggregateRoot
     public string Name { get; private set; } = default!;
     public Guid SpeciesId { get; private set; }
     public string? Breed { get; private set; }
+    public Guid? ColorId { get; private set; }
 
     /// <summary>Global ırk kaydı (FK); serbest metin <see cref="Breed"/> (string) ile birlikte kullanılabilir.</summary>
     public Guid? BreedId { get; private set; }
@@ -24,11 +25,19 @@ public sealed class Pet : AggregateRoot
 
     public DateOnly? BirthDate { get; private set; }
 
+    /// <summary>Klinik kayıtlarda hayvanın ağırlığı (ör. kilogram); opsiyonel.</summary>
+    public decimal? Weight { get; private set; }
+
+    /// <summary>Klinik notları / veteriner gözlemleri; opsiyonel, serbest metin.</summary>
+    public string? Notes { get; private set; }
+
     /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
     public Species? Species { get; private set; }
 
     /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
     public Breed? BreedRef { get; private set; }
+    /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
+    public PetColor? ColorRef { get; private set; }
 
     private Pet() { }
 
@@ -40,7 +49,10 @@ public sealed class Pet : AggregateRoot
         string? breed = null,
         DateOnly? birthDate = null,
         Guid? breedId = null,
-        PetGender? gender = null)
+        PetGender? gender = null,
+        Guid? colorId = null,
+        decimal? weight = null,
+        string? notes = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -59,6 +71,9 @@ public sealed class Pet : AggregateRoot
         BirthDate = birthDate;
         BreedId = breedId;
         Gender = gender;
+        ColorId = colorId;
+        Weight = weight;
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
 
     public void UpdateDetails(
@@ -67,7 +82,10 @@ public sealed class Pet : AggregateRoot
         string? breed,
         DateOnly? birthDate,
         Guid? breedId = null,
-        PetGender? gender = null)
+        PetGender? gender = null,
+        Guid? colorId = null,
+        decimal? weight = null,
+        string? notes = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Hayvan adı boş olamaz.", nameof(name));
@@ -79,5 +97,8 @@ public sealed class Pet : AggregateRoot
         BirthDate = birthDate;
         BreedId = breedId;
         Gender = gender;
+        ColorId = colorId;
+        Weight = weight;
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
 }

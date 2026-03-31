@@ -21,6 +21,8 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
         b.Property(x => x.DueAtUtc);
         b.Property(x => x.Status).IsRequired();
         b.Property(x => x.Notes).HasMaxLength(4000);
+        b.Property(x => x.CreatedAtUtc).IsRequired();
+        b.Property(x => x.UpdatedAtUtc);
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.PetId });
