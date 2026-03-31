@@ -2,11 +2,13 @@ using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clients.Commands.Create;
+using Backend.Veteriner.Application.Clients.Commands.Update;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetById;
 using Backend.Veteriner.Application.Clients.Queries.GetList;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -58,6 +60,28 @@ public sealed class ClientsController : ControllerBase
                 id = dto.Id
             },
             dto);
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = PermissionCatalog.Clients.Create)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateClientCommand cmd, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        if (cmd.Id != Guid.Empty && id != cmd.Id)
+            return Result.Failure("Clients.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+
+        cmd = cmd with { Id = id };
+
+        var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
     }
 
     [HttpGet("{id:guid}")]

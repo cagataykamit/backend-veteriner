@@ -15,6 +15,12 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
         b.Property(x => x.TenantId)
             .IsRequired();
 
+        b.Property(x => x.CreatedAtUtc)
+            .IsRequired();
+
+        b.Property(x => x.UpdatedAtUtc)
+            .IsRequired(false);
+
         b.Property(x => x.FullName)
             .IsRequired()
             .HasMaxLength(300);
@@ -24,6 +30,9 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
 
         b.Property(x => x.Phone)
             .HasMaxLength(50);
+
+        b.Property(x => x.Address)
+            .HasMaxLength(500);
 
         b.Property(x => x.PhoneNormalized)
             .HasMaxLength(50);

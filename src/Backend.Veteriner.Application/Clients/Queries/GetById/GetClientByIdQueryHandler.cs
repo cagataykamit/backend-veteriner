@@ -31,7 +31,15 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
         if (client is null)
             return Result<ClientDetailDto>.Failure("Clients.NotFound", "Müşteri bulunamadı.");
 
-        var dto = new ClientDetailDto(client.Id, client.TenantId, client.FullName, client.Email, client.Phone);
+        var dto = new ClientDetailDto(
+            client.Id,
+            client.TenantId,
+            client.CreatedAtUtc,
+            client.UpdatedAtUtc,
+            client.FullName,
+            client.Email,
+            client.Phone,
+            client.Address);
         return Result<ClientDetailDto>.Success(dto);
     }
 }

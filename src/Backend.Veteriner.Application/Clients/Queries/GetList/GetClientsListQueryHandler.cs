@@ -36,7 +36,7 @@ public sealed class GetClientsListQueryHandler
         var rows = await _clients.ListAsync(new ClientsByTenantPagedSpec(tenantId, page, pageSize), ct);
 
         var items = rows
-            .Select(c => new ClientListItemDto(c.Id, c.TenantId, c.FullName, c.Email, c.Phone))
+            .Select(c => new ClientListItemDto(c.Id, c.TenantId, c.CreatedAtUtc, c.FullName, c.Email, c.Phone))
             .ToList();
 
         return Result<PagedResult<ClientListItemDto>>.Success(

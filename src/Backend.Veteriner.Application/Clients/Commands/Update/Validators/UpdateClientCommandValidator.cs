@@ -1,16 +1,13 @@
-using Backend.Veteriner.Application.Clients.Commands.Create;
 using Backend.Veteriner.Domain.Clients;
 using FluentValidation;
 
-namespace Backend.Veteriner.Application.Clients.Commands.Create.Validators;
+namespace Backend.Veteriner.Application.Clients.Commands.Update.Validators;
 
-public sealed class CreateClientCommandValidator : AbstractValidator<CreateClientCommand>
+public sealed class UpdateClientCommandValidator : AbstractValidator<UpdateClientCommand>
 {
-    public const string PhoneInvalidMessage =
-        "Telefon numarası geçerli değil. Türkiye cep telefonu olarak 05XXXXXXXXX, 5XXXXXXXXX veya +90 5XX XXX XX XX biçiminde girin.";
-
-    public CreateClientCommandValidator()
+    public UpdateClientCommandValidator()
     {
+        RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.FullName)
             .NotEmpty().WithMessage("Ad soyad gereklidir.")
             .MinimumLength(2).WithMessage("Ad soyad en az 2 karakter olmalıdır.")
@@ -24,7 +21,6 @@ public sealed class CreateClientCommandValidator : AbstractValidator<CreateClien
             .EmailAddress().WithMessage("Geçerli bir e-posta adresi giriniz.")
             .When(x => !string.IsNullOrWhiteSpace(x.Email));
 
-        // Telefon opsiyonel; doluysa Türkiye cep standardı (905XXXXXXXXX).
         RuleFor(x => x.Phone)
             .MaximumLength(50).WithMessage("Telefon numarası en fazla 50 karakter olabilir.")
             .When(x => !string.IsNullOrWhiteSpace(x.Phone));
@@ -32,7 +28,7 @@ public sealed class CreateClientCommandValidator : AbstractValidator<CreateClien
         RuleFor(x => x.Phone)
             .Must(p => string.IsNullOrWhiteSpace(p) || TurkishMobilePhone.TryNormalize(p, out _))
             .When(x => !string.IsNullOrWhiteSpace(x.Phone))
-            .WithMessage(PhoneInvalidMessage);
+            .WithMessage("Telefon numarası geçerli değil. Türkiye cep telefonu olarak 05XXXXXXXXX, 5XXXXXXXXX veya +90 5XX XXX XX XX biçiminde girin.");
 
         RuleFor(x => x.Address)
             .MaximumLength(500).WithMessage("Adres en fazla 500 karakter olabilir.")
