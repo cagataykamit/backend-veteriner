@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Examinations;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Examinations.Specs;
 
@@ -13,7 +14,9 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination>
         DateTime? dateFromUtc,
         DateTime? dateToUtc,
         int page,
-        int pageSize)
+        int pageSize,
+        string? searchContainsLikePattern,
+        Guid[] searchPetIds)
     {
         Query.Where(e => e.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -26,6 +29,18 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination>
             Query.Where(e => e.ExaminedAtUtc >= dateFromUtc.Value);
         if (dateToUtc.HasValue)
             Query.Where(e => e.ExaminedAtUtc <= dateToUtc.Value);
+
+        if (searchContainsLikePattern is not null)
+        {
+            var pat = searchContainsLikePattern;
+            var pids = searchPetIds;
+            Query.Where(e =>
+                EF.Functions.Like(e.VisitReason, pat)
+                || EF.Functions.Like(e.Findings, pat)
+                || (e.Assessment != null && EF.Functions.Like(e.Assessment, pat))
+                || (e.Notes != null && EF.Functions.Like(e.Notes, pat))
+                || (pids.Length > 0 && pids.Contains(e.PetId)));
+        }
 
         Query.OrderByDescending(e => e.ExaminedAtUtc)
             .ThenByDescending(e => e.Id)

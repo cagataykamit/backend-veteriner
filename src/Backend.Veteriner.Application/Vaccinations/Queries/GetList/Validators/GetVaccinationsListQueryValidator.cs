@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetList;
 using FluentValidation;
 
@@ -10,6 +11,10 @@ public sealed class GetVaccinationsListQueryValidator : AbstractValidator<GetVac
         RuleFor(x => x.PageRequest).NotNull();
         RuleFor(x => x.PageRequest.Page).GreaterThanOrEqualTo(1);
         RuleFor(x => x.PageRequest.PageSize).InclusiveBetween(1, 200);
+
+        RuleFor(x => x.PageRequest.Search)
+            .MaximumLength(ListQueryTextSearch.MaxTermLength)
+            .When(x => x.PageRequest.Search != null);
 
         RuleFor(x => x)
             .Must(x => !x.DueFromUtc.HasValue || !x.DueToUtc.HasValue || x.DueFromUtc <= x.DueToUtc)

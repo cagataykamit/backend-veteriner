@@ -97,15 +97,26 @@ public sealed class PetsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>
+    /// Sayfalı hayvan listesi. <c>search</c> (veya <c>page.search</c>) ad, tür adı, serbest ırk metni / katalog ırk adı ve müşteri bilgisinde arar.
+    /// Opsiyonel <c>clientId</c>, <c>speciesId</c> ile AND. <c>sort</c>/<c>order</c> işlenmez.
+    /// </summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Pets.Read)]
     [ProducesResponseType(typeof(PagedResult<PetListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetList([FromQuery] PageRequest page, CancellationToken ct)
+    public async Task<IActionResult> GetList(
+        [FromQuery] PageRequest page,
+        [FromQuery] string? search = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? speciesId = null,
+        CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
-        var result = await _mediator.Send(new GetPetsListQuery(page), ct);
+        var result = await _mediator.Send(
+            new GetPetsListQuery(PageRequestQuery.WithMergedSearch(page, search), clientId, speciesId),
+            ct);
         return result.ToActionResult(this);
     }
 }

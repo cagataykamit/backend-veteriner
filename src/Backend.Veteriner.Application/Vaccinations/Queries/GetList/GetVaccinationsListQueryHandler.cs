@@ -1,5 +1,6 @@
-using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
@@ -56,6 +57,19 @@ public sealed class GetVaccinationsListQueryHandler
                 "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
         }
 
+        var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
+        string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
+        Guid[] searchPetIds = [];
+        if (searchPattern is not null)
+        {
+            searchPetIds = await ListSearchPetIds.ResolveForAggregateListAsync(
+                tenantId,
+                searchPattern,
+                _clients,
+                _pets,
+                ct);
+        }
+
         var total = await _vaccinations.CountAsync(
             new VaccinationsFilteredCountSpec(
                 tenantId,
@@ -65,7 +79,9 @@ public sealed class GetVaccinationsListQueryHandler
                 request.DueFromUtc,
                 request.DueToUtc,
                 request.AppliedFromUtc,
-                request.AppliedToUtc),
+                request.AppliedToUtc,
+                searchPattern,
+                searchPetIds),
             ct);
 
         var rows = await _vaccinations.ListAsync(
@@ -79,7 +95,9 @@ public sealed class GetVaccinationsListQueryHandler
                 request.AppliedFromUtc,
                 request.AppliedToUtc,
                 page,
-                pageSize),
+                pageSize,
+                searchPattern,
+                searchPetIds),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();

@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Appointments;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Specs;
 
@@ -13,7 +14,9 @@ public sealed class AppointmentsFilteredPagedSpec : Specification<Appointment>
         DateTime? dateFromUtc,
         DateTime? dateToUtc,
         int page,
-        int pageSize)
+        int pageSize,
+        string? searchContainsLikePattern,
+        Guid[] searchPetIds)
     {
         Query.Where(a => a.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -26,6 +29,15 @@ public sealed class AppointmentsFilteredPagedSpec : Specification<Appointment>
             Query.Where(a => a.ScheduledAtUtc >= dateFromUtc.Value);
         if (dateToUtc.HasValue)
             Query.Where(a => a.ScheduledAtUtc <= dateToUtc.Value);
+
+        if (searchContainsLikePattern is not null)
+        {
+            var pat = searchContainsLikePattern;
+            var pids = searchPetIds;
+            Query.Where(a =>
+                (a.Notes != null && EF.Functions.Like(a.Notes, pat))
+                || (pids.Length > 0 && pids.Contains(a.PetId)));
+        }
 
         Query.OrderBy(a => a.ScheduledAtUtc)
             .ThenBy(a => a.Id)

@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Payments;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Payments.Specs;
 
@@ -12,7 +13,10 @@ public sealed class PaymentsFilteredCountSpec : Specification<Payment>
         Guid? petId,
         PaymentMethod? method,
         DateTime? paidFromUtc,
-        DateTime? paidToUtc)
+        DateTime? paidToUtc,
+        string? searchContainsLikePattern,
+        Guid[] searchMatchClientIds,
+        Guid[] searchMatchPetIds)
     {
         Query.Where(p => p.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -27,5 +31,17 @@ public sealed class PaymentsFilteredCountSpec : Specification<Payment>
             Query.Where(p => p.PaidAtUtc >= paidFromUtc.Value);
         if (paidToUtc.HasValue)
             Query.Where(p => p.PaidAtUtc <= paidToUtc.Value);
+
+        if (searchContainsLikePattern is not null)
+        {
+            var pattern = searchContainsLikePattern;
+            var cids = searchMatchClientIds;
+            var pids = searchMatchPetIds;
+            Query.Where(p =>
+                (p.Notes != null && EF.Functions.Like(p.Notes, pattern)) ||
+                EF.Functions.Like(p.Currency, pattern) ||
+                (cids.Length > 0 && cids.Contains(p.ClientId)) ||
+                (p.PetId != null && pids.Length > 0 && pids.Contains(p.PetId.Value)));
+        }
     }
 }

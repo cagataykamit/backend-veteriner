@@ -118,12 +118,14 @@ public sealed class ExaminationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Sayfalı muayene listesi. <c>search</c> (veya <c>page.search</c>) başvuru nedeni, bulgular, değerlendirme, notlar ve müşteri/hayvan adı eşleşmesinde arar. <c>sort</c>/<c>order</c> işlenmez.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Examinations.Read)]
     [ProducesResponseType(typeof(PagedResult<ExaminationListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetList(
         [FromQuery] PageRequest page,
+        [FromQuery] string? search = null,
         [FromQuery] Guid? clinicId = null,
         [FromQuery] Guid? petId = null,
         [FromQuery] Guid? appointmentId = null,
@@ -135,7 +137,13 @@ public sealed class ExaminationsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(
-            new GetExaminationsListQuery(page, clinicId, petId, appointmentId, dateFromUtc, dateToUtc),
+            new GetExaminationsListQuery(
+                PageRequestQuery.WithMergedSearch(page, search),
+                clinicId,
+                petId,
+                appointmentId,
+                dateFromUtc,
+                dateToUtc),
             ct);
         return result.ToActionResult(this);
     }

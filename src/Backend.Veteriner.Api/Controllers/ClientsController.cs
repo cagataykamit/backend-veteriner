@@ -97,15 +97,19 @@ public sealed class ClientsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Sayfalı müşteri listesi. <c>search</c> (veya <c>page.search</c>) ad, e-posta ve telefon alanlarında arar. <c>sort</c>/<c>order</c> işlenmez.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Clients.Read)]
     [ProducesResponseType(typeof(PagedResult<ClientListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetList([FromQuery] PageRequest page, CancellationToken ct)
+    public async Task<IActionResult> GetList(
+        [FromQuery] PageRequest page,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
-        var result = await _mediator.Send(new GetClientsListQuery(page), ct);
+        var result = await _mediator.Send(new GetClientsListQuery(PageRequestQuery.WithMergedSearch(page, search)), ct);
         return result.ToActionResult(this);
     }
 }

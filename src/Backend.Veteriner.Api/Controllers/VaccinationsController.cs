@@ -102,12 +102,14 @@ public sealed class VaccinationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>) aşı adı, notlar ve müşteri/hayvan adı eşleşmesinde arar. <c>sort</c>/<c>order</c> işlenmez.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
     [ProducesResponseType(typeof(PagedResult<VaccinationListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetList(
         [FromQuery] PageRequest page,
+        [FromQuery] string? search = null,
         [FromQuery] Guid? clinicId = null,
         [FromQuery] Guid? petId = null,
         [FromQuery] VaccinationStatus? status = null,
@@ -122,7 +124,7 @@ public sealed class VaccinationsController : ControllerBase
 
         var result = await _mediator.Send(
             new GetVaccinationsListQuery(
-                page,
+                PageRequestQuery.WithMergedSearch(page, search),
                 clinicId,
                 petId,
                 status,

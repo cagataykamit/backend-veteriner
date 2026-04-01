@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Appointments;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Specs;
 
@@ -11,7 +12,9 @@ public sealed class AppointmentsFilteredCountSpec : Specification<Appointment>
         Guid? petId,
         AppointmentStatus? status,
         DateTime? dateFromUtc,
-        DateTime? dateToUtc)
+        DateTime? dateToUtc,
+        string? searchContainsLikePattern,
+        Guid[] searchPetIds)
     {
         Query.Where(a => a.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -24,5 +27,14 @@ public sealed class AppointmentsFilteredCountSpec : Specification<Appointment>
             Query.Where(a => a.ScheduledAtUtc >= dateFromUtc.Value);
         if (dateToUtc.HasValue)
             Query.Where(a => a.ScheduledAtUtc <= dateToUtc.Value);
+
+        if (searchContainsLikePattern is not null)
+        {
+            var pat = searchContainsLikePattern;
+            var pids = searchPetIds;
+            Query.Where(a =>
+                (a.Notes != null && EF.Functions.Like(a.Notes, pat))
+                || (pids.Length > 0 && pids.Contains(a.PetId)));
+        }
     }
 }

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Payments.Queries.GetList;
 using FluentValidation;
 
@@ -7,9 +8,13 @@ public sealed class GetPaymentsListQueryValidator : AbstractValidator<GetPayment
 {
     public GetPaymentsListQueryValidator()
     {
-        RuleFor(x => x.PageRequest).NotNull();
-        RuleFor(x => x.PageRequest.Page).GreaterThanOrEqualTo(1);
-        RuleFor(x => x.PageRequest.PageSize).InclusiveBetween(1, 200);
+        RuleFor(x => x.Paging).NotNull();
+        RuleFor(x => x.Paging.Page).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.Paging.PageSize).InclusiveBetween(1, 200);
+
+        RuleFor(x => x.Search)
+            .MaximumLength(ListQueryTextSearch.MaxTermLength)
+            .When(x => x.Search != null);
 
         RuleFor(x => x)
             .Must(x => !x.PaidFromUtc.HasValue || !x.PaidToUtc.HasValue || x.PaidFromUtc <= x.PaidToUtc)

@@ -76,6 +76,7 @@ public sealed class SpeciesController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <remarks><c>PageRequest.search</c>, <c>sort</c> ve <c>order</c> şu an işlenmez.</remarks>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Species.Read)]
     [ProducesResponseType(typeof(PagedResult<SpeciesListItemDto>), StatusCodes.Status200OK)]

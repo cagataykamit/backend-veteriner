@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Vaccinations;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Vaccinations.Specs;
 
@@ -15,7 +16,9 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
         DateTime? appliedFromUtc,
         DateTime? appliedToUtc,
         int page,
-        int pageSize)
+        int pageSize,
+        string? searchContainsLikePattern,
+        Guid[] searchPetIds)
     {
         Query.Where(v => v.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -32,6 +35,16 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
             Query.Where(v => v.AppliedAtUtc != null && v.AppliedAtUtc >= appliedFromUtc.Value);
         if (appliedToUtc.HasValue)
             Query.Where(v => v.AppliedAtUtc != null && v.AppliedAtUtc <= appliedToUtc.Value);
+
+        if (searchContainsLikePattern is not null)
+        {
+            var pat = searchContainsLikePattern;
+            var pids = searchPetIds;
+            Query.Where(v =>
+                EF.Functions.Like(v.VaccineName, pat)
+                || (v.Notes != null && EF.Functions.Like(v.Notes, pat))
+                || (pids.Length > 0 && pids.Contains(v.PetId)));
+        }
 
         // Önce gerçekleşen / planlanan zamana göre (uygulama varsa o, yoksa vade); sonra Id.
         Query.OrderByDescending(v => v.AppliedAtUtc ?? v.DueAtUtc)

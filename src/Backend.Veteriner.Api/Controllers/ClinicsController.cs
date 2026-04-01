@@ -75,6 +75,7 @@ public sealed class ClinicsController : ControllerBase
     }
 
     /// <summary>Kiracıya göre sayfalı klinik listesi.</summary>
+    /// <remarks><c>PageRequest.search</c>, <c>sort</c> ve <c>order</c> şu an işlenmez.</remarks>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Clinics.Read)]
     [ProducesResponseType(typeof(PagedResult<ClinicListItemDto>), StatusCodes.Status200OK)]

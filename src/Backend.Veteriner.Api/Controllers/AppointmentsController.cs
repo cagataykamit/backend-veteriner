@@ -102,12 +102,14 @@ public sealed class AppointmentsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Sayfalı randevu listesi. <c>search</c> (veya <c>page.search</c>) notlarda ve ilgili müşteri/hayvan adı eşleşmesinde arar. <c>sort</c>/<c>order</c> işlenmez.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Appointments.Read)]
     [ProducesResponseType(typeof(PagedResult<AppointmentListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetList(
         [FromQuery] PageRequest page,
+        [FromQuery] string? search = null,
         [FromQuery] Guid? clinicId = null,
         [FromQuery] Guid? petId = null,
         [FromQuery] AppointmentStatus? status = null,
@@ -118,7 +120,13 @@ public sealed class AppointmentsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var result = await _mediator.Send(
-            new GetAppointmentsListQuery(page, clinicId, petId, status, dateFromUtc, dateToUtc),
+            new GetAppointmentsListQuery(
+                PageRequestQuery.WithMergedSearch(page, search),
+                clinicId,
+                petId,
+                status,
+                dateFromUtc,
+                dateToUtc),
             ct);
         return result.ToActionResult(this);
     }

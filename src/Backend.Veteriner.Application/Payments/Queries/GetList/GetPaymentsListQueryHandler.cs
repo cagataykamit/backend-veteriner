@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
@@ -46,14 +47,31 @@ public sealed class GetPaymentsListQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
-        var page = Math.Max(1, request.PageRequest.Page);
-        var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
+        var page = Math.Max(1, request.Paging.Page);
+        var pageSize = Math.Clamp(request.Paging.PageSize, 1, 200);
         var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
             return Result<PagedResult<PaymentListItemDto>>.Failure(
                 "Payments.ClinicContextMismatch",
                 "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+        }
+
+        string? searchPattern = null;
+        Guid[] searchClientIds = [];
+        Guid[] searchPetIds = [];
+        var normalizedSearch = ListQueryTextSearch.Normalize(request.Search);
+        if (normalizedSearch is not null)
+        {
+            searchPattern = ListQueryTextSearch.BuildContainsLikePattern(normalizedSearch);
+            var nameClients = await _clients.ListAsync(
+                new ClientsByTenantTextSearchSpec(tenantId, searchPattern),
+                ct);
+            searchClientIds = nameClients.Select(c => c.Id).Distinct().ToArray();
+            var namePets = await _pets.ListAsync(
+                new PetsByTenantNameSearchSpec(tenantId, searchPattern),
+                ct);
+            searchPetIds = namePets.Select(p => p.Id).Distinct().ToArray();
         }
 
         var total = await _payments.CountAsync(
@@ -64,7 +82,10 @@ public sealed class GetPaymentsListQueryHandler
                 request.PetId,
                 request.Method,
                 request.PaidFromUtc,
-                request.PaidToUtc),
+                request.PaidToUtc,
+                searchPattern,
+                searchClientIds,
+                searchPetIds),
             ct);
 
         var rows = await _payments.ListAsync(
@@ -77,7 +98,10 @@ public sealed class GetPaymentsListQueryHandler
                 request.PaidFromUtc,
                 request.PaidToUtc,
                 page,
-                pageSize),
+                pageSize,
+                searchPattern,
+                searchClientIds,
+                searchPetIds),
             ct);
 
         var clientIds = rows.Select(x => x.ClientId).Distinct().ToArray();

@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Clients;
@@ -31,9 +32,11 @@ public sealed class GetClientsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
+        var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
+        var searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
 
-        var total = await _clients.CountAsync(new ClientsByTenantCountSpec(tenantId), ct);
-        var rows = await _clients.ListAsync(new ClientsByTenantPagedSpec(tenantId, page, pageSize), ct);
+        var total = await _clients.CountAsync(new ClientsByTenantCountSpec(tenantId, searchPattern), ct);
+        var rows = await _clients.ListAsync(new ClientsByTenantPagedSpec(tenantId, page, pageSize, searchPattern), ct);
 
         var items = rows
             .Select(c => new ClientListItemDto(c.Id, c.TenantId, c.CreatedAtUtc, c.FullName, c.Email, c.Phone))

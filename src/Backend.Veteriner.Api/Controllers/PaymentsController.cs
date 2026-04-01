@@ -112,8 +112,14 @@ public sealed class PaymentsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    /// <summary>
+    /// Filtreler: <c>clinicId</c>, <c>clientId</c>, <c>petId</c>, <c>method</c>, <c>paidFromUtc</c>, <c>paidToUtc</c> (ödeme zamanı UTC).
+    /// Metin araması: <c>search</c> — müşteri adı, hayvan adı, para birimi (ISO), notlar; diğer filtrelerle AND.
+    /// </summary>
     public async Task<IActionResult> GetList(
-        [FromQuery] PageRequest page,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
         [FromQuery] Guid? clinicId = null,
         [FromQuery] Guid? clientId = null,
         [FromQuery] Guid? petId = null,
@@ -125,8 +131,9 @@ public sealed class PaymentsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
+        var paging = new PaymentListPagingRequest { Page = page, PageSize = pageSize };
         var result = await _mediator.Send(
-            new GetPaymentsListQuery(page, clinicId, clientId, petId, method, paidFromUtc, paidToUtc),
+            new GetPaymentsListQuery(paging, clinicId, clientId, petId, method, paidFromUtc, paidToUtc, search),
             ct);
         return result.ToActionResult(this);
     }

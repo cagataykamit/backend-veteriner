@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -53,7 +54,7 @@ public sealed class GetAppointmentsListQueryHandler
         {
             return Result<PagedResult<AppointmentListItemDto>>.Failure(
                 "Tenants.ContextMissing",
-                "Kirac� ba�lam� yok. JWT tenant_id veya sorgu tenantId gerekir.");
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         var page = Math.Max(1, request.PageRequest.Page);
@@ -66,6 +67,19 @@ public sealed class GetAppointmentsListQueryHandler
                 "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
         }
 
+        var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
+        string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
+        Guid[] searchPetIds = [];
+        if (searchPattern is not null)
+        {
+            searchPetIds = await ListSearchPetIds.ResolveForAggregateListAsync(
+                tenantId,
+                searchPattern,
+                _clients,
+                _pets,
+                ct);
+        }
+
         var total = await _appointments.CountAsync(
             new AppointmentsFilteredCountSpec(
                 tenantId,
@@ -73,7 +87,9 @@ public sealed class GetAppointmentsListQueryHandler
                 request.PetId,
                 request.Status,
                 request.DateFromUtc,
-                request.DateToUtc),
+                request.DateToUtc,
+                searchPattern,
+                searchPetIds),
             ct);
 
         var rows = await _appointments.ListAsync(
@@ -85,7 +101,9 @@ public sealed class GetAppointmentsListQueryHandler
                 request.DateFromUtc,
                 request.DateToUtc,
                 page,
-                pageSize),
+                pageSize,
+                searchPattern,
+                searchPetIds),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();

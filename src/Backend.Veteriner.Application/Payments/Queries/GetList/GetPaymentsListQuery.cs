@@ -6,12 +6,14 @@ using MediatR;
 
 namespace Backend.Veteriner.Application.Payments.Queries.GetList;
 
+/// <summary>Ödeme listesi sorgusu. Metin araması için HTTP query: <c>search</c> (boş/whitespace yok sayılır).</summary>
 public sealed record GetPaymentsListQuery(
-    PageRequest PageRequest,
+    PaymentListPagingRequest Paging,
     Guid? ClinicId = null,
     Guid? ClientId = null,
     Guid? PetId = null,
     PaymentMethod? Method = null,
     DateTime? PaidFromUtc = null,
-    DateTime? PaidToUtc = null)
+    DateTime? PaidToUtc = null,
+    string? Search = null)
     : IRequest<Result<PagedResult<PaymentListItemDto>>>;

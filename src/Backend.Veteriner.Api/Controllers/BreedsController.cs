@@ -77,6 +77,7 @@ public sealed class BreedsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <remarks><c>PageRequest.search</c>, <c>sort</c> ve <c>order</c> şu an işlenmez.</remarks>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Breeds.Read)]
     [ProducesResponseType(typeof(PagedResult<BreedListItemDto>), StatusCodes.Status200OK)]

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Clients.Specs;
@@ -56,6 +57,19 @@ public sealed class GetExaminationsListQueryHandler
                 "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
         }
 
+        var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
+        string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
+        Guid[] searchPetIds = [];
+        if (searchPattern is not null)
+        {
+            searchPetIds = await ListSearchPetIds.ResolveForAggregateListAsync(
+                tenantId,
+                searchPattern,
+                _clients,
+                _pets,
+                ct);
+        }
+
         var total = await _examinations.CountAsync(
             new ExaminationsFilteredCountSpec(
                 tenantId,
@@ -63,7 +77,9 @@ public sealed class GetExaminationsListQueryHandler
                 request.PetId,
                 request.AppointmentId,
                 request.DateFromUtc,
-                request.DateToUtc),
+                request.DateToUtc,
+                searchPattern,
+                searchPetIds),
             ct);
 
         var rows = await _examinations.ListAsync(
@@ -75,7 +91,9 @@ public sealed class GetExaminationsListQueryHandler
                 request.DateFromUtc,
                 request.DateToUtc,
                 page,
-                pageSize),
+                pageSize,
+                searchPattern,
+                searchPetIds),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
