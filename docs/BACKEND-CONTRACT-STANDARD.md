@@ -97,6 +97,7 @@ Bu standardın amacı:
 | Examinations | Kanonik `visitReason`; yazmada opsiyonel legacy `complaint` (Faz 0 / Adım 3; §11) | — | İstemciler `visitReason` kullanmalı | Tamamlandı (Faz 0) | Orta (alias kaldırma takvimi) |
 | Vaccinations | Clinic context entegrasyonu var | `clinicId` ownership algısı modüller arası tutarsız | Context-first kuralını açık ve tek hale getirme | P1 | Orta |
 | Payments | Create/update/list/detail DTO + `PaymentsContractSchemaFilter` ile OpenAPI hizalı (Faz 0 / Adım 4; §12) | İş kuralı: clinic/müşteri/hayvan tutarlılığı | Context-first klinik uyumu operasyonel | Tamamlandı (Faz 0) | Orta (typegen) |
+| Treatments | List/detail/create/update DTO + `TreatmentsContractSchemaFilter`; muayene ile isteğe bağlı ilişki (§13) | Examination clinic/pet tutarlılığı; tarih penceresi | Examinations ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | Contract açık | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
 | Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
@@ -134,6 +135,7 @@ Bu standardın amacı:
 - Breeds
 - Dashboard
 - Payments (Faz 0: §12 — şema/required/nullability)
+- Treatments (§13 — şema/required/nullability)
 
 ### Kısmi Hazır
 - Clinics
@@ -235,6 +237,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | Examinations | `GET /api/v1/examinations` | Evet | `VisitReason`, `Findings`, `Assessment`, `Notes`; pet id’ler: müşteri + hayvan metin (yukarıdaki gibi). **AND** klinik/pet/randevu/tarih filtreleri. |
 | Vaccinations | `GET /api/v1/vaccinations` | Evet | `VaccineName`, `Notes`; pet id’ler: müşteri + hayvan metin. **AND** klinik/pet/durum/tarih filtreleri. |
 | Payments | `GET /api/v1/payments` | Evet | `Notes`, `Currency`; eşleşen `ClientId` / `PetId` ön kümesi (müşteri metni + `PetsByTenantTextFieldsSearchSpec`). **AND** klinik, müşteri, hayvan, yöntem, ödeme tarihi. |
+| Treatments | `GET /api/v1/treatments` | Evet | `Title`, `Description`, `Notes`; pet id’ler: müşteri + hayvan metin (examinations ile aynı `ListSearchPetIds` örüntüsü). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc` (liste query). |
 
 **Performans notu:** `LIKE '%...%'` ve çok kiracılı indeks kullanımı; arama terimi uzunluğu üst sınırlı; pet tarafında ön liste id’leri ile `Contains` birleşimi kullanılır.
 
@@ -288,3 +291,34 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Payments.NotFound`, `Clients.NotFound`, `Tenants.TenantInactive`).
 
 **Swagger:** `PaymentsContractSchemaFilter` — `required` dizisi runtime zorunlularla uyumlu; opsiyonel referans alanlarda `nullable: true`; alan açıklamaları ISO/enum/tutarlılık için doldurulur.
+
+---
+
+## 13) Treatments — request/response ve OpenAPI
+
+**Liste** `GET /api/v1/treatments` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `Treatments.ClinicContextMismatch`. `sort`/`order` işlenmez.
+
+**Create** `POST /api/v1/treatments` gövdesi: `CreateTreatmentCommand`.
+
+| Alan | Zorunlu | Nullable (OpenAPI) | Not |
+|------|---------|---------------------|-----|
+| `clinicId` | Evet | Hayır | Context clinic ile uyumsuzsa `Treatments.ClinicContextMismatch` |
+| `petId` | Evet | Hayır | Tenant’ta aktif pet; klinik/pet uyumu handler’da |
+| `examinationId` | Hayır | Evet | Doluysa tenant’ta muayene; clinic ve pet tedavi ile eşleşmeli (`Treatments.ExaminationClinicMismatch`, `Treatments.ExaminationPetMismatch`) |
+| `treatmentDateUtc` | Evet | Hayır | `TreatmentDateUtcWindow` — en fazla 7 gün geçmiş, en fazla 2 yıl ileri (examinations `ExaminedAtUtc` ile aynı) |
+| `title` | Evet | Hayır | Max 500 |
+| `description` | Evet | Hayır | Max 8000 |
+| `notes` | Hayır | Evet | Max 4000 |
+| `followUpDateUtc` | Hayır | Evet | Tedavi tarihinden önce olamaz (`Treatments.FollowUpBeforeTreatment`) |
+
+**Update** `PUT /api/v1/treatments/{id}` gövdesi: `UpdateTreatmentBody` (route id esas; body `id` dolu ve farklıysa `Treatments.RouteIdMismatch`). Alanlar create ile aynı zorunluluk/validasyon seti.
+
+**Detay** `GET /api/v1/treatments/{id}` yanıtı: `TreatmentDetailDto` (`tenantId`, `examinationId`, `notes`, `followUpDateUtc`, `updatedAtUtc` null olabilir).
+
+**Liste öğesi:** `TreatmentListItemDto` — `examinationId`, `followUpDateUtc` null olabilir; `petName` / `clientName` boş string olabilir.
+
+**Başarı kodları:** Create → `201 Created` gövde `Guid` (yeni id); Update → `204 NoContent`.
+
+**Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Treatments.NotFound`, `Pets.NotFound`, `Examinations.NotFound`, `Tenants.TenantInactive`).
+
+**Swagger:** `TreatmentsContractSchemaFilter` — create command, update body, detail/list DTO required/nullability ile hizalı.

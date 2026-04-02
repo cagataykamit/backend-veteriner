@@ -7,6 +7,8 @@ using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
+using Backend.Veteriner.Application.Treatments.Commands.Create;
+using Backend.Veteriner.Application.Treatments.Contracts.Dtos;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.Extensions.Options;
@@ -51,6 +53,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         options.SchemaFilter<PaymentsContractSchemaFilter>();
         options.SchemaFilter<AppointmentsContractSchemaFilter>();
         options.SchemaFilter<ExaminationsContractSchemaFilter>();
+        options.SchemaFilter<TreatmentsContractSchemaFilter>();
 
         // (Opsiyonel) XML comments (dosya yoksa sessiz geç)
         TryIncludeXmlComments(options);
@@ -306,6 +309,68 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 p.Description = description;
             }
+        }
+    }
+
+    private sealed class TreatmentsContractSchemaFilter : ISchemaFilter
+    {
+        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        {
+            if (context.Type == typeof(CreateTreatmentCommand))
+            {
+                MarkRequired(schema, "clinicId", "petId", "treatmentDateUtc", "title", "description");
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "notes", true);
+                SetNullable(schema, "followUpDateUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(UpdateTreatmentBody))
+            {
+                MarkRequired(schema, "clinicId", "petId", "treatmentDateUtc", "title", "description");
+                SetNullable(schema, "id", true);
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "notes", true);
+                SetNullable(schema, "followUpDateUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(TreatmentDetailDto))
+            {
+                MarkRequired(schema,
+                    "id", "tenantId", "clinicId", "petId", "petName", "clientId", "clientName",
+                    "treatmentDateUtc", "title", "description", "createdAtUtc");
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "notes", true);
+                SetNullable(schema, "followUpDateUtc", true);
+                SetNullable(schema, "updatedAtUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(TreatmentListItemDto))
+            {
+                MarkRequired(schema,
+                    "id", "clinicId", "petId", "petName", "clientId", "clientName", "treatmentDateUtc", "title");
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "followUpDateUtc", true);
+            }
+        }
+
+        private static void MarkRequired(OpenApiSchema schema, params string[] names)
+        {
+            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                if (schema.Properties.ContainsKey(name))
+                    schema.Required.Add(name);
+            }
+        }
+
+        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
+        {
+            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
+                return;
+            propertySchema.Nullable = isNullable;
         }
     }
 
