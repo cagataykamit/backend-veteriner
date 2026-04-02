@@ -35,7 +35,7 @@ public static class ResultExtensions
         var problem = new ProblemDetails
         {
             Status = statusCode,
-            Title = "Business rule violation",
+            Title = ResolveProblemTitle(error.Code, statusCode),
             Detail = string.IsNullOrWhiteSpace(error.Message)
                 ? "A business rule was violated."
                 : error.Message,
@@ -103,6 +103,28 @@ public static class ResultExtensions
         }
 
         return (StatusCodes.Status400BadRequest, "https://httpstatuses.io/400");
+    }
+
+    /// <summary>
+    /// ModelState/FluentValidation ile aynı dil ve anlam hizası; kod öncelikli (validation vs HTTP durumu).
+    /// </summary>
+    private static string ResolveProblemTitle(string? code, int statusCode)
+    {
+        var normalized = code?.ToLowerInvariant() ?? "";
+
+        if (normalized.Contains("validation"))
+            return "Doğrulama hatası";
+
+        return statusCode switch
+        {
+            StatusCodes.Status401Unauthorized => "Yetkisiz erişim",
+            StatusCodes.Status403Forbidden => "Erişim reddedildi",
+            StatusCodes.Status404NotFound => "Bulunamadı",
+            StatusCodes.Status409Conflict => "Çakışma",
+            StatusCodes.Status400BadRequest when normalized.Contains("unauthorized")
+                || normalized.Contains("unauthenticated") => "Yetkisiz erişim",
+            _ => "İş kuralı ihlali"
+        };
     }
 }
 

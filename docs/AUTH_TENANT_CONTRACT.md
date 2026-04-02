@@ -2,6 +2,8 @@
 
 Bu belge mevcut backend davranışını özetler; yeni mimari önerisi değildir.
 
+Hata zarfı (`ProblemDetails`, `extensions.code`, validation vs. iş kuralı ayrımı) için ekip standardı: `docs/BACKEND-CONTRACT-STANDARD.md` §9.
+
 ## Login (`POST .../auth/login`)
 
 | Alan | Zorunluluk | Açıklama |

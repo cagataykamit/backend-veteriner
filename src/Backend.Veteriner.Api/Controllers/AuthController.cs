@@ -32,7 +32,8 @@ public sealed class AuthController : ControllerBase
     [ProducesResponseType(typeof(LoginResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login([FromBody] LoginCommand? command, CancellationToken ct)
     {
         if (command is null)
@@ -56,7 +57,9 @@ public sealed class AuthController : ControllerBase
     [ProducesResponseType(typeof(LoginResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Refresh([FromBody] RefreshCommand? cmd, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(cmd?.RefreshToken))
@@ -81,6 +84,7 @@ public sealed class AuthController : ControllerBase
     [ProducesResponseType(typeof(LoginResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SelectClinic([FromBody] SelectClinicCommand? cmd, CancellationToken ct)
     {
@@ -96,7 +100,6 @@ public sealed class AuthController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    // POST /api/v1/auth/logout
     [Authorize]
     [HttpPost("logout")]
     [Consumes("application/json")]
@@ -105,25 +108,22 @@ public sealed class AuthController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Logout([FromBody] AuthLogoutBodyDto? body, CancellationToken ct)
     {
-        // Idempotent no-op
         if (string.IsNullOrWhiteSpace(body?.RefreshToken))
-            return Ok(new AuthActionResultDto(true, "Refresh token yok (no-op)."));
+        {
+            return Result<AuthActionResultDto>.Success(
+                    new AuthActionResultDto(true, "Refresh token yok (no-op)."))
+                .ToActionResult(this);
+        }
 
-        // Kurumsal: kullanıcı kimliğini token'dan doğrula (handler'da da kontrol edilmeli)
         var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (!Guid.TryParse(sub, out var userId))
+        if (!Guid.TryParse(sub, out _))
             return Result.Failure("Auth.Unauthorized.UserContextMissing", "Kullanici kimligi token icinde bulunamadi.")
                 .ToActionResult(this);
 
-        // ÖNERİLEN: LogoutCommand içinde UserId alanı varsa:
-        // cmd = cmd with { UserId = userId };
-        // (record değilse cmd.UserId = userId;)
-
         await _mediator.Send(new LogoutCommand(body.RefreshToken), ct);
-        return Ok(new AuthActionResultDto(true));
+        return Result<AuthActionResultDto>.Success(new AuthActionResultDto(true)).ToActionResult(this);
     }
 
-    // POST /api/v1/auth/logout-all
     [Authorize]
     [HttpPost("logout-all")]
     [Produces("application/json")]
@@ -137,6 +137,6 @@ public sealed class AuthController : ControllerBase
                 .ToActionResult(this);
 
         await _mediator.Send(new LogoutAllCommand(userId), ct);
-        return Ok(new AuthActionResultDto(true));
+        return Result<AuthActionResultDto>.Success(new AuthActionResultDto(true)).ToActionResult(this);
     }
 }
