@@ -94,9 +94,9 @@ Bu standardın amacı:
 | Clients | En tutarlı modüllerden | Düşük | Mevcut standardı referans modül olarak koruma | P2 | Düşük |
 | Pets | Route/body id standardı güçlü | Create response çıplak `Guid` | Create response standardizasyonu | P2 | Düşük |
 | Appointments | Update/lifecycle akışları güçlü | Bazı hata dallarında envelope farklılaşma riski | Error contract tekilleştirme | P1 | Orta |
-| Examinations | Genel akış stabil | Legacy alias (`complaint`) | Canonical `visitReason` + alias deprecate | P0 | Yüksek |
+| Examinations | Kanonik `visitReason`; yazmada opsiyonel legacy `complaint` (Faz 0 / Adım 3; §11) | — | İstemciler `visitReason` kullanmalı | Tamamlandı (Faz 0) | Orta (alias kaldırma takvimi) |
 | Vaccinations | Clinic context entegrasyonu var | `clinicId` ownership algısı modüller arası tutarsız | Context-first kuralını açık ve tek hale getirme | P1 | Orta |
-| Payments | Clinic context entegrasyonu var | Required/nullability ve clinic ownership netliği | OpenAPI doğruluğu + context-first netliği | P0 | Yüksek |
+| Payments | Create/update/list/detail DTO + `PaymentsContractSchemaFilter` ile OpenAPI hizalı (Faz 0 / Adım 4; §12) | İş kuralı: clinic/müşteri/hayvan tutarlılığı | Context-first klinik uyumu operasyonel | Tamamlandı (Faz 0) | Orta (typegen) |
 | Dashboard | Contract açık | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
 | Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
@@ -107,8 +107,8 @@ Bu standardın amacı:
 
 ### P0 (hemen)
 - **Auth:** ~~Controller dönüşlerini tek `Result/ProblemDetails` hattına çekmek.~~ (Faz 0 / Adım 1 tamamlandı; ayrıntı §9.)
-- **Examinations:** `complaint` alias’ı için deprecate planı ve kaldırma takvimi oluşturmak.
-- **Payments:** OpenAPI required/nullability sözleşmesini gerçek validation ile birebir eşitlemek.
+- **Examinations:** ~~`complaint` alias’ı için deprecate planı ve kaldırma takvimi.~~ (Faz 0 / Adım 3: `visitReason` canonical + istekte `complaint` kabul; §11.)
+- **Payments:** ~~OpenAPI required/nullability sözleşmesini gerçek validation ile birebir eşitlemek.~~ (Faz 0 / Adım 4 — §12.)
 - **Cross-module:** `clinicId` ownership standardını tek kurala bağlamak (context-first).
 
 ### P1
@@ -133,6 +133,7 @@ Bu standardın amacı:
 - Species
 - Breeds
 - Dashboard
+- Payments (Faz 0: §12 — şema/required/nullability)
 
 ### Kısmi Hazır
 - Clinics
@@ -141,8 +142,8 @@ Bu standardın amacı:
 
 ### Önce Contract Temizliği Gerekli
 - ~~Auth~~ (Faz 0: login/refresh/select-clinic/logout hattı standardize; §9)
-- Examinations
-- Payments
+- ~~Examinations~~ (Faz 0: `visitReason` / `complaint` §11)
+- ~~Payments~~ (Faz 0: §12)
 
 ### Neden modül modül geçiş?
 - Her modülün sözleşme olgunluğu farklıdır.
@@ -185,8 +186,8 @@ Bu standardın amacı:
 Bu doküman, backend contract kararlarının ekip genelinde tek referans metin üzerinden yönetilmesini sağlar.  
 Öncelikli uygulanması gereken kararlar:
 - Auth hata/response standardizasyonu,
-- Examinations alias deprecate planı,
-- Payments OpenAPI doğruluğu,
+- ~~Examinations alias deprecate planı~~ (Faz 0 / Adım 3 — §11),
+- ~~Payments OpenAPI doğruluğu~~ (Faz 0 / Adım 4 — §12),
 - Context-first `clinicId/tenantId` ownership kuralının modüller arası tekilleştirilmesi.
 
 Doküman, yeni endpoint geliştirmelerinde ve mevcut endpoint refactorlarında zorunlu checklist olarak kullanılmalıdır.
@@ -214,3 +215,76 @@ Doküman, yeni endpoint geliştirmelerinde ve mevcut endpoint refactorlarında z
 **Önemli iş kodları (örnek):** `Auth.Unauthorized.InvalidCredentials`, `Auth.Unauthorized.RefreshTokenNotFound`, `Auth.Unauthorized.RefreshTokenExpired`, `Auth.Unauthorized.RefreshTokenReused`, `Auth.ClinicNotFound`, `Auth.UserClinicNotAssigned`, `Tenants.TenantInactive`, `Auth.UserMultipleTenantsForbidden`.
 
 Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
+
+---
+
+## 10) Liste endpoint’leri — `search` (Faz 0 / Adım 2)
+
+**Ortak kurallar**
+
+- Kanonik query parametre adı: **`search`**. `PageRequest` ile bağlanan listelerde ayrıca **`page.search`** kullanılabilir; **üst düzey `search` doluysa** (trim sonrası) o değer kullanılır (`PageRequestQuery.WithMergedSearch`).
+- Normalizasyon: `ListQueryTextSearch.Normalize` (trim, max 200 karakter); SQL `LIKE` için `%term%` ve joker kaçışı (`ListQueryTextSearch.BuildContainsLikePattern`).
+- **Sort/order:** Bu listelerde `PageRequest.Sort` / `Order` **işlenmez** (controller özetlerinde belirtilir).
+- **Kiracı:** `ITenantContext.TenantId` zorunlu; klinik bağlamı olan listelerde `clinicId` istek parametresi ile JWT/header clinic uyumsuzluğunda iş kuralı hatası.
+
+| Modül | GET endpoint | `search` | Metin hangi alanlarda |
+|--------|----------------|----------|------------------------|
+| Clients | `GET /api/v1/clients` | Evet | `FullName`, `Email`, `Phone`, `PhoneNormalized` |
+| Pets | `GET /api/v1/pets` | Evet | Hayvan: `Name`, `Breed`, `Species.Name`, `BreedRef.Name`; müşteri metni: `ClientsByTenantTextSearchSpec` ile eşleşen sahiplerin petleri. **AND** `clientId`, `speciesId` filtreleri. |
+| Appointments | `GET /api/v1/appointments` | Evet | Randevu `Notes`; pet id’ler: müşteri metni + hayvan metin alanları (`PetsByTenantTextFieldsSearchSpec` ile hayvan listesi ile aynı küme). **AND** `clinicId`, `petId`, `status`, tarih aralığı. |
+| Examinations | `GET /api/v1/examinations` | Evet | `VisitReason`, `Findings`, `Assessment`, `Notes`; pet id’ler: müşteri + hayvan metin (yukarıdaki gibi). **AND** klinik/pet/randevu/tarih filtreleri. |
+| Vaccinations | `GET /api/v1/vaccinations` | Evet | `VaccineName`, `Notes`; pet id’ler: müşteri + hayvan metin. **AND** klinik/pet/durum/tarih filtreleri. |
+| Payments | `GET /api/v1/payments` | Evet | `Notes`, `Currency`; eşleşen `ClientId` / `PetId` ön kümesi (müşteri metni + `PetsByTenantTextFieldsSearchSpec`). **AND** klinik, müşteri, hayvan, yöntem, ödeme tarihi. |
+
+**Performans notu:** `LIKE '%...%'` ve çok kiracılı indeks kullanımı; arama terimi uzunluğu üst sınırlı; pet tarafında ön liste id’leri ile `Contains` birleşimi kullanılır.
+
+---
+
+## 11) Examinations — `visitReason` / `complaint` (Faz 0 / Adım 3)
+
+**Kanonik alan:** `visitReason` (domain, komutlar, yanıt DTO’ları, liste/detay). Türkçe ürün adı: başvuru nedeni.
+
+**Legacy (yalnızca istek gövdesi):** JSON property `complaint` — eski istemciler için kabul edilir. Çözümleme: `ExaminationVisitReasonResolver.Resolve(visitReason, complaint)`:
+
+- `visitReason` doluysa (trim sonrası) **yalnızca bu** kullanılır; `complaint` yok sayılır.
+- `visitReason` boş/whitespace ve `complaint` doluysa `complaint` (trim) kullanılır.
+- İkisi de boşsa validasyon (`VisitReason` zorunlu, max 2000) devreye girer.
+
+**Yanıt:** `ExaminationDetailDto` / `ExaminationListItemDto` yalnızca **`visitReason`** döner; `complaint` **yok**.
+
+**OpenAPI:** `CreateExaminationBody` / `UpdateExaminationBody` şemasında her iki property görünür; `complaint` açıklamasında DEPRECATED. Kaldırma **hedefi:** en az 12 ay uyarı sonrası veya iki major API sürümü (ör. 2027-Q1 — ekip sprint planına göre netleştirilir); kaldırılmadan önce istemci telemetri/usage kontrolü önerilir.
+
+**Frontend:** Form ve state tek alan: `visitReason`. Eski `complaint` gönderen kodlar kademeli kaldırılabilir; yeni kod yalnızca `visitReason` kullanmalı.
+
+---
+
+## 12) Payments — request/response ve OpenAPI (Faz 0 / Adım 4)
+
+**Create** `POST /api/v1/payments` gövdesi: `CreatePaymentCommand`.
+
+| Alan | Zorunlu | Nullable (OpenAPI) | Not |
+|------|---------|---------------------|-----|
+| `clinicId` | Evet | Hayır | JWT clinic ile uyumsuzsa `Payments.ClinicContextMismatch` |
+| `clientId` | Evet | Hayır | |
+| `petId` | Hayır | Evet | Doluysa müşterinin hayvanı olmalı |
+| `appointmentId` | Hayır | Evet | İş kuralı tutarlılığı handler’da |
+| `examinationId` | Hayır | Evet | İş kuralı tutarlılığı handler’da |
+| `amount` | Evet | Hayır | &gt; 0 |
+| `currency` | Evet | Hayır | ISO 4217 alpha-3 |
+| `method` | Evet | Hayır | Enum: Cash, Card, Transfer |
+| `paidAtUtc` | Evet | Hayır | `default` kabul edilmez; pencere `PaymentPaidAtWindow` |
+| `notes` | Hayır | Evet | Max 4000 |
+
+**Update** `PUT /api/v1/payments/{id}` gövdesi: `UpdatePaymentBody` (route id esas).
+
+| Alan | Zorunlu | Nullable |
+|------|---------|----------|
+| `id` (body) | Hayır | Evet | Doluysa route ile aynı olmalı |
+| `clinicId`, `clientId`, `amount`, `currency`, `method`, `paidAtUtc` | Evet | Hayır (value types / currency string) |
+| `petId`, `appointmentId`, `examinationId`, `notes` | Hayır | Evet |
+
+**Yanıtlar:** `PaymentDetailDto` (detayda `tenantId`, `appointmentId`, `examinationId`, `notes` null olabilir; `petName` string, hayvan yoksa `""`). `PaymentListItemDto` (`petId` null olabilir; `petName` boş string olabilir).
+
+**Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Payments.NotFound`, `Clients.NotFound`, `Tenants.TenantInactive`).
+
+**Swagger:** `PaymentsContractSchemaFilter` — `required` dizisi runtime zorunlularla uyumlu; opsiyonel referans alanlarda `nullable: true`; alan açıklamaları ISO/enum/tutarlılık için doldurulur.

@@ -114,7 +114,7 @@ public sealed class PaymentsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     /// <summary>
     /// Filtreler: <c>clinicId</c>, <c>clientId</c>, <c>petId</c>, <c>method</c>, <c>paidFromUtc</c>, <c>paidToUtc</c> (ödeme zamanı UTC).
-    /// Metin araması: <c>search</c> — müşteri adı, hayvan adı, para birimi (ISO), notlar; diğer filtrelerle AND.
+    /// Metin araması: <c>search</c> — müşteri ad/e-posta/telefon; hayvan adı, tür adı, serbest ırk ve katalog ırk (hayvan listesi ile aynı LIKE kümesi); ödeme <c>notes</c>; <c>currency</c> (ISO); tümü OR, diğer filtrelerle AND.
     /// </summary>
     public async Task<IActionResult> GetList(
         [FromQuery] int page = 1,

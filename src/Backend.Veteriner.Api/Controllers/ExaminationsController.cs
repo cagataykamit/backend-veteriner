@@ -3,6 +3,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Examinations.Commands.Create;
 using Backend.Veteriner.Application.Examinations.Commands.Update;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
@@ -41,12 +42,13 @@ public sealed class ExaminationsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    /// <remarks>Kanonik alan <c>visitReason</c>. Eski istemciler <c>complaint</c> gönderebilir (yalnızca <c>visitReason</c> boşken kullanılır). Yanıtta yalnızca <c>visitReason</c> döner.</remarks>
     public async Task<IActionResult> Create([FromBody] CreateExaminationBody body, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var visitReason = body.VisitReason ?? string.Empty;
+        var visitReason = ExaminationVisitReasonResolver.Resolve(body.VisitReason, body.Complaint);
         var findings = body.Findings ?? string.Empty;
 
         var cmd = new CreateExaminationCommand(
@@ -78,6 +80,7 @@ public sealed class ExaminationsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    /// <remarks>Kanonik alan <c>visitReason</c>. Eski istemciler <c>complaint</c> gönderebilir. Yanıtta yalnızca <c>visitReason</c>.</remarks>
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateExaminationBody body, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -86,7 +89,7 @@ public sealed class ExaminationsController : ControllerBase
         if (body.Id is { } bid && bid != Guid.Empty && bid != id)
             return Result.Failure("Examinations.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
 
-        var visitReason = body.VisitReason ?? string.Empty;
+        var visitReason = ExaminationVisitReasonResolver.Resolve(body.VisitReason, body.Complaint);
         var findings = body.Findings ?? string.Empty;
 
         var cmd = new UpdateExaminationCommand(
@@ -118,7 +121,7 @@ public sealed class ExaminationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Sayfalı muayene listesi. <c>search</c> (veya <c>page.search</c>) başvuru nedeni, bulgular, değerlendirme, notlar ve müşteri/hayvan adı eşleşmesinde arar. <c>sort</c>/<c>order</c> işlenmez.</summary>
+    /// <summary>Sayfalı muayene listesi. <c>search</c> (veya <c>page.search</c>): başvuru nedeni, bulgular, değerlendirme, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>sort</c>/<c>order</c> işlenmez.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Examinations.Read)]
     [ProducesResponseType(typeof(PagedResult<ExaminationListItemDto>), StatusCodes.Status200OK)]

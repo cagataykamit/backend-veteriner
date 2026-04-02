@@ -68,10 +68,10 @@ public sealed class GetPaymentsListQueryHandler
                 new ClientsByTenantTextSearchSpec(tenantId, searchPattern),
                 ct);
             searchClientIds = nameClients.Select(c => c.Id).Distinct().ToArray();
-            var namePets = await _pets.ListAsync(
-                new PetsByTenantNameSearchSpec(tenantId, searchPattern),
+            var petsMatchingText = await _pets.ListAsync(
+                new PetsByTenantTextFieldsSearchSpec(tenantId, searchPattern),
                 ct);
-            searchPetIds = namePets.Select(p => p.Id).Distinct().ToArray();
+            searchPetIds = petsMatchingText.Select(p => p.Id).Distinct().ToArray();
         }
 
         var total = await _payments.CountAsync(

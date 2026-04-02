@@ -102,7 +102,7 @@ public sealed class VaccinationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>) aşı adı, notlar ve müşteri/hayvan adı eşleşmesinde arar. <c>sort</c>/<c>order</c> işlenmez.</summary>
+    /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>): aşı adı, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>sort</c>/<c>order</c> işlenmez.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
     [ProducesResponseType(typeof(PagedResult<VaccinationListItemDto>), StatusCodes.Status200OK)]

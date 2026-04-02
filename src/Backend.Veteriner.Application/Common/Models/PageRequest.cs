@@ -1,6 +1,6 @@
 namespace Backend.Veteriner.Application.Common.Models;
 
-/// <summary>Sayfalama + opsiyonel sıralama/arama alanları. Her liste endpointi bu alanların hepsini uygulamaz; ilgili action XML açıklamasına bakın.</summary>
+/// <summary>Sayfalama + opsiyonel sıralama/arama alanları. Her liste endpointi bu alanların hepsini uygulamaz; ilgili action XML açıklamasına ve <c>docs/BACKEND-CONTRACT-STANDARD.md</c> §10’a bakın.</summary>
 public sealed class PageRequest
 {
     public int Page { get; init; } = 1;        // 1-based

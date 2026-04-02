@@ -2,6 +2,7 @@ using Backend.Veteriner.Domain.Payments;
 
 namespace Backend.Veteriner.Application.Payments.Contracts.Dtos;
 
+/// <summary>GET /payments/{id} yanıtı. <see cref="PetId"/>, <see cref="AppointmentId"/>, <see cref="ExaminationId"/>, <see cref="Notes"/> null olabilir.</summary>
 public sealed record PaymentDetailDto(
     Guid Id,
     Guid TenantId,

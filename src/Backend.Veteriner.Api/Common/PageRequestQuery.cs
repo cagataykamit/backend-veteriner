@@ -5,7 +5,8 @@ namespace Backend.Veteriner.Api.Common;
 /// <summary>
 /// Listelerde <see cref="PageRequest"/> parametre adı <c>page</c> olduğundan model binding varsayılanı
 /// <c>page.search</c> önekidir; SPA/client çoğunlukla düz <c>search=</c> gönderir (Payments ile aynı).
-/// Üst düzey <c>search</c> query parametresi doluysa <see cref="PageRequest.Search"/> ile birleştirilir.
+/// Üst düzey <c>search</c> query parametresi boş değilse trimlenmiş değeri <see cref="PageRequest.Search"/> olarak kullanır
+/// (<c>page.search</c> ile birlikte gönderilirse üst düzey <c>search</c> önceliklidir).
 /// </summary>
 internal static class PageRequestQuery
 {

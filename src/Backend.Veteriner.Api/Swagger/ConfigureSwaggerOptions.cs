@@ -4,6 +4,7 @@ using Backend.Veteriner.Api.Controllers;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
 using Backend.Veteriner.Application.Appointments.Commands.Update;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
+using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -49,6 +50,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         options.OperationFilter<AuthContractCleanupOperationFilter>();
         options.SchemaFilter<PaymentsContractSchemaFilter>();
         options.SchemaFilter<AppointmentsContractSchemaFilter>();
+        options.SchemaFilter<ExaminationsContractSchemaFilter>();
 
         // (Opsiyonel) XML comments (dosya yoksa sessiz geç)
         TryIncludeXmlComments(options);
@@ -88,6 +90,18 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 MarkRequired(schema, "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc");
                 SetNullable(schema, "currency", false);
+                SetNullable(schema, "petId", true);
+                SetNullable(schema, "appointmentId", true);
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "notes", true);
+                Describe(schema, "amount", "Tutar; sıfırdan büyük olmalıdır (FluentValidation).");
+                Describe(schema, "currency", "Zorunlu. ISO 4217 alpha-3 (örn. TRY); boş/whitespace kabul edilmez.");
+                Describe(schema, "method", "Zorunlu. 0=Cash, 1=Card, 2=Transfer.");
+                Describe(schema, "paidAtUtc", "Ödeme anı UTC; default(DateTime) kabul edilmez.");
+                Describe(schema, "petId", "Opsiyonel. Doluysa müşteriye ait olmalıdır (iş kuralı).");
+                Describe(schema, "appointmentId", "Opsiyonel; doluysa klinik/müşteri/hayvan ile tutarlı olmalıdır.");
+                Describe(schema, "examinationId", "Opsiyonel; doluysa klinik/müşteri/hayvan ile tutarlı olmalıdır.");
+                Describe(schema, "notes", "Opsiyonel; en fazla 4000 karakter.");
                 return;
             }
 
@@ -95,6 +109,15 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 MarkRequired(schema, "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc");
                 SetNullable(schema, "currency", false);
+                SetNullable(schema, "id", true);
+                SetNullable(schema, "petId", true);
+                SetNullable(schema, "appointmentId", true);
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "notes", true);
+                Describe(schema, "id", "Opsiyonel; doluysa route id ile aynı olmalıdır.");
+                Describe(schema, "currency", "Zorunlu. ISO 4217 alpha-3.");
+                Describe(schema, "method", "Zorunlu. 0=Cash, 1=Card, 2=Transfer.");
+                Describe(schema, "notes", "Opsiyonel.");
                 return;
             }
 
@@ -103,6 +126,14 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 MarkRequired(schema,
                     "id", "tenantId", "clinicId", "clientId", "clientName", "petName", "amount", "currency", "method", "paidAtUtc");
                 SetNullable(schema, "currency", false);
+                SetNullable(schema, "petId", true);
+                SetNullable(schema, "appointmentId", true);
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "notes", true);
+                Describe(schema, "petId", "Hayvan yoksa null; petName o zaman genelde boş string.");
+                Describe(schema, "appointmentId", "Bağlı randevu yoksa null.");
+                Describe(schema, "examinationId", "Bağlı muayene yoksa null.");
+                Describe(schema, "notes", "Yoksa veya boşsa null dönebilir.");
                 return;
             }
 
@@ -111,6 +142,16 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 MarkRequired(schema,
                     "id", "clinicId", "clientId", "clientName", "petName", "amount", "currency", "method", "paidAtUtc");
                 SetNullable(schema, "currency", false);
+                SetNullable(schema, "petId", true);
+                Describe(schema, "petId", "Hayvan yoksa null.");
+            }
+        }
+
+        private static void Describe(OpenApiSchema schema, string propertyName, string description)
+        {
+            if (schema.Properties.TryGetValue(propertyName, out var p))
+            {
+                p.Description = description;
             }
         }
 
@@ -222,6 +263,49 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         {
             Describe(schema, "status",
                 "Randevu durumu (JSON sayı): 0=Scheduled, 1=Completed, 2=Cancelled. Scheduled dışındaki değerlerde çakışma kontrolü yapılmaz.");
+        }
+    }
+
+    private sealed class ExaminationsContractSchemaFilter : ISchemaFilter
+    {
+        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        {
+            if (context.Type == typeof(CreateExaminationBody))
+            {
+                Describe(schema, "visitReason",
+                    "Canonical: başvuru nedeni. Doluysa bu değer kullanılır; complaint yok sayılır.");
+                Describe(schema, "complaint",
+                    "DEPRECATED — geriye dönük uyumluluk. Yalnızca visitReason boş/whitespace ise kullanılır. Kaldırma hedefi: docs/BACKEND-CONTRACT-STANDARD.md §11.");
+                return;
+            }
+
+            if (context.Type == typeof(UpdateExaminationBody))
+            {
+                Describe(schema, "visitReason",
+                    "Canonical: başvuru nedeni. Doluysa bu değer kullanılır; complaint yok sayılır.");
+                Describe(schema, "complaint",
+                    "DEPRECATED — geriye dönük uyumluluk. Yalnızca visitReason boş/whitespace ise kullanılır.");
+                return;
+            }
+
+            if (context.Type == typeof(ExaminationDetailDto))
+            {
+                Describe(schema, "visitReason", "Başvuru nedeni (tek kanonik alan; complaint yanıtta yok).");
+                return;
+            }
+
+            if (context.Type == typeof(ExaminationListItemDto))
+            {
+                Describe(schema, "visitReason", "Başvuru nedeni.");
+            }
+        }
+
+        private static void Describe(OpenApiSchema schema, string propertyName, string description)
+        {
+            if (schema.Properties.TryGetValue(propertyName, out var p))
+            {
+                p.Description = description;
+            }
         }
     }
 

@@ -61,7 +61,7 @@ public sealed class GetPaymentsListQueryHandlerTests
             r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
         _pets.Verify(
-            r => r.ListAsync(It.IsAny<PetsByTenantNameSearchSpec>(), It.IsAny<CancellationToken>()),
+            r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -72,7 +72,7 @@ public sealed class GetPaymentsListQueryHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client>());
-        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantNameSearchSpec>(), It.IsAny<CancellationToken>()))
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Pet>());
         _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
@@ -87,7 +87,7 @@ public sealed class GetPaymentsListQueryHandlerTests
             r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _pets.Verify(
-            r => r.ListAsync(It.IsAny<PetsByTenantNameSearchSpec>(), It.IsAny<CancellationToken>()),
+            r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
