@@ -7,6 +7,8 @@ using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
+using Backend.Veteriner.Application.Prescriptions.Commands.Create;
+using Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 using Backend.Veteriner.Application.Treatments.Commands.Create;
 using Backend.Veteriner.Application.Treatments.Contracts.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -54,6 +56,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         options.SchemaFilter<AppointmentsContractSchemaFilter>();
         options.SchemaFilter<ExaminationsContractSchemaFilter>();
         options.SchemaFilter<TreatmentsContractSchemaFilter>();
+        options.SchemaFilter<PrescriptionsContractSchemaFilter>();
 
         // (Opsiyonel) XML comments (dosya yoksa sessiz geç)
         TryIncludeXmlComments(options);
@@ -352,6 +355,72 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 MarkRequired(schema,
                     "id", "clinicId", "petId", "petName", "clientId", "clientName", "treatmentDateUtc", "title");
                 SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "followUpDateUtc", true);
+            }
+        }
+
+        private static void MarkRequired(OpenApiSchema schema, params string[] names)
+        {
+            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                if (schema.Properties.ContainsKey(name))
+                    schema.Required.Add(name);
+            }
+        }
+
+        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
+        {
+            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
+                return;
+            propertySchema.Nullable = isNullable;
+        }
+    }
+
+    private sealed class PrescriptionsContractSchemaFilter : ISchemaFilter
+    {
+        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        {
+            if (context.Type == typeof(CreatePrescriptionCommand))
+            {
+                MarkRequired(schema, "clinicId", "petId", "prescribedAtUtc", "title", "content");
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "treatmentId", true);
+                SetNullable(schema, "notes", true);
+                SetNullable(schema, "followUpDateUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(UpdatePrescriptionBody))
+            {
+                MarkRequired(schema, "clinicId", "petId", "prescribedAtUtc", "title", "content");
+                SetNullable(schema, "id", true);
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "treatmentId", true);
+                SetNullable(schema, "notes", true);
+                SetNullable(schema, "followUpDateUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(PrescriptionDetailDto))
+            {
+                MarkRequired(schema,
+                    "id", "tenantId", "clinicId", "petId", "petName", "clientId", "clientName",
+                    "prescribedAtUtc", "title", "content", "createdAtUtc");
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "treatmentId", true);
+                SetNullable(schema, "notes", true);
+                SetNullable(schema, "followUpDateUtc", true);
+                SetNullable(schema, "updatedAtUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(PrescriptionListItemDto))
+            {
+                MarkRequired(schema,
+                    "id", "clinicId", "petId", "petName", "clientId", "clientName", "prescribedAtUtc", "title");
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "treatmentId", true);
                 SetNullable(schema, "followUpDateUtc", true);
             }
         }

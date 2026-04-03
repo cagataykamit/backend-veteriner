@@ -83,6 +83,11 @@ Bu standardın amacı:
 - `clinicId`: context-first.
 - Body’de varsa yalnızca uyumsuzluk kontrolü için kullanılır; context ile çelişirse açık hata kodu döndürülür.
 
+### 3.8 Yeni permission kodları ve JWT
+- `PermissionCatalog`’a eklenen kodlar uygulama açılışında `PermissionSeeder` + (Admin için) `AdminClaimSeeder` ile DB ve rol bağlarına yansır.
+- Access token içindeki `permission` claim’leri **login / refresh / select-clinic** sırasında DB’den okunur; deploy sonrası veya seed sonrası **eski token’da yeni kodlar yoktur** — kullanıcıların **refresh veya yeniden login** ile token alması gerekir (403 Forbidden, policy eksik).
+- `IntegrationTests` ortamında `CustomWebApplicationFactory`, production ile aynı Admin permission zincirini uygular (`PermissionSeeder` + `AdminClaimSeeder`); aksi halde test admin’i yalnızca dar Outbox claim’ine sahip kalır.
+
 ---
 
 ## 4) Modül Bazlı Mevcut Durum Özeti
@@ -98,6 +103,7 @@ Bu standardın amacı:
 | Vaccinations | Clinic context entegrasyonu var | `clinicId` ownership algısı modüller arası tutarsız | Context-first kuralını açık ve tek hale getirme | P1 | Orta |
 | Payments | Create/update/list/detail DTO + `PaymentsContractSchemaFilter` ile OpenAPI hizalı (Faz 0 / Adım 4; §12) | İş kuralı: clinic/müşteri/hayvan tutarlılığı | Context-first klinik uyumu operasyonel | Tamamlandı (Faz 0) | Orta (typegen) |
 | Treatments | List/detail/create/update DTO + `TreatmentsContractSchemaFilter`; muayene ile isteğe bağlı ilişki (§13) | Examination clinic/pet tutarlılığı; tarih penceresi | Examinations ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
+| Prescriptions | List/detail/create/update DTO + `PrescriptionsContractSchemaFilter`; isteğe bağlı examination + treatment (§14) | İkili referansta examination–treatment tutarlılığı; tarih penceresi | Treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | Contract açık | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
 | Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
@@ -136,6 +142,7 @@ Bu standardın amacı:
 - Dashboard
 - Payments (Faz 0: §12 — şema/required/nullability)
 - Treatments (§13 — şema/required/nullability)
+- Prescriptions (§14 — şema/required/nullability)
 
 ### Kısmi Hazır
 - Clinics
@@ -238,6 +245,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | Vaccinations | `GET /api/v1/vaccinations` | Evet | `VaccineName`, `Notes`; pet id’ler: müşteri + hayvan metin. **AND** klinik/pet/durum/tarih filtreleri. |
 | Payments | `GET /api/v1/payments` | Evet | `Notes`, `Currency`; eşleşen `ClientId` / `PetId` ön kümesi (müşteri metni + `PetsByTenantTextFieldsSearchSpec`). **AND** klinik, müşteri, hayvan, yöntem, ödeme tarihi. |
 | Treatments | `GET /api/v1/treatments` | Evet | `Title`, `Description`, `Notes`; pet id’ler: müşteri + hayvan metin (examinations ile aynı `ListSearchPetIds` örüntüsü). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc` (liste query). |
+| Prescriptions | `GET /api/v1/prescriptions` | Evet | `Title`, `Content`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. |
 
 **Performans notu:** `LIKE '%...%'` ve çok kiracılı indeks kullanımı; arama terimi uzunluğu üst sınırlı; pet tarafında ön liste id’leri ile `Contains` birleşimi kullanılır.
 
@@ -322,3 +330,37 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Treatments.NotFound`, `Pets.NotFound`, `Examinations.NotFound`, `Tenants.TenantInactive`).
 
 **Swagger:** `TreatmentsContractSchemaFilter` — create command, update body, detail/list DTO required/nullability ile hizalı.
+
+---
+
+## 14) Prescriptions — request/response ve OpenAPI
+
+**Liste** `GET /api/v1/prescriptions` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `Prescriptions.ClinicContextMismatch`. `sort`/`order` işlenmez.
+
+**Create** `POST /api/v1/prescriptions` gövdesi: `CreatePrescriptionCommand`.
+
+| Alan | Zorunlu | Nullable (OpenAPI) | Not |
+|------|---------|---------------------|-----|
+| `clinicId` | Evet | Hayır | Context clinic ile uyumsuzsa `Prescriptions.ClinicContextMismatch` |
+| `petId` | Evet | Hayır | Tenant’ta pet; clinic/pet uyumu handler’da |
+| `examinationId` | Hayır | Evet | Doluysa tenant’ta muayene; clinic ve pet reçete ile eşleşmeli (`Prescriptions.ExaminationClinicMismatch`, `Prescriptions.ExaminationPetMismatch`) |
+| `treatmentId` | Hayır | Evet | Doluysa tenant’ta tedavi; clinic ve pet eşleşmeli (`Prescriptions.TreatmentClinicMismatch`, `Prescriptions.TreatmentPetMismatch`); yoksa `Treatments.NotFound` |
+| `prescribedAtUtc` | Evet | Hayır | `PrescribedAtUtcWindow` — en fazla 7 gün geçmiş, en fazla 2 yıl ileri (treatment/examination ile aynı pencere) |
+| `title` | Evet | Hayır | Max 500 |
+| `content` | Evet | Hayır | Max 8000 (tek metin alanı; ilaç satırları yok) |
+| `notes` | Hayır | Evet | Max 4000 |
+| `followUpDateUtc` | Hayır | Evet | Reçete tarihinden önce olamaz (`Prescriptions.FollowUpBeforePrescription`) |
+
+**Çift referans:** `examinationId` ve `treatmentId` birlikte doluysa tedavinin `ExaminationId` değeri, reçetenin `examinationId` ile aynı olmalı; aksi halde `Prescriptions.ExaminationTreatmentMismatch`.
+
+**Update** `PUT /api/v1/prescriptions/{id}` gövdesi: `UpdatePrescriptionBody` (route id esas; body `id` dolu ve farklıysa `Prescriptions.RouteIdMismatch`). Alanlar create ile aynı zorunluluk/validasyon seti.
+
+**Detay** `GET /api/v1/prescriptions/{id}` yanıtı: `PrescriptionDetailDto` (`tenantId`, `examinationId`, `treatmentId`, `notes`, `followUpDateUtc`, `updatedAtUtc` null olabilir).
+
+**Liste öğesi:** `PrescriptionListItemDto` — `examinationId`, `treatmentId`, `followUpDateUtc` null olabilir; `petName` / `clientName` boş string olabilir.
+
+**Başarı kodları:** Create → `201 Created` gövde `Guid` (yeni id); Update → `204 NoContent`.
+
+**Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Prescriptions.NotFound`, `Pets.NotFound`, `Examinations.NotFound`, `Treatments.NotFound`, `Tenants.TenantInactive`).
+
+**Swagger:** `PrescriptionsContractSchemaFilter` — create command, update body, detail/list DTO required/nullability ile hizalı.

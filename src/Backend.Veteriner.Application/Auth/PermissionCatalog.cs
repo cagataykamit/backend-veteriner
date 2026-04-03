@@ -113,6 +113,13 @@ public static class PermissionCatalog
         public const string Update = "Treatments.Update";
     }
 
+    public static class Prescriptions
+    {
+        public const string Read = "Prescriptions.Read";
+        public const string Create = "Prescriptions.Create";
+        public const string Update = "Prescriptions.Update";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -181,6 +188,10 @@ public static class PermissionCatalog
         new(Treatments.Read, "Tedavi kayıtlarını listeleme ve görüntüleme yetkisi", "Treatments"),
         new(Treatments.Create, "Tedavi kaydı oluşturma yetkisi", "Treatments"),
         new(Treatments.Update, "Tedavi kaydı güncelleme yetkisi", "Treatments"),
+
+        new(Prescriptions.Read, "Reçete kayıtlarını listeleme ve görüntüleme yetkisi", "Prescriptions"),
+        new(Prescriptions.Create, "Reçete kaydı oluşturma yetkisi", "Prescriptions"),
+        new(Prescriptions.Update, "Reçete kaydı güncelleme yetkisi", "Prescriptions"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 

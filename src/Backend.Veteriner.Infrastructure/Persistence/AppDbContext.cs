@@ -8,6 +8,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -69,6 +70,7 @@ public class AppDbContext : DbContext
     public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Treatment> Treatments => Set<Treatment>();
+    public DbSet<Prescription> Prescriptions => Set<Prescription>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

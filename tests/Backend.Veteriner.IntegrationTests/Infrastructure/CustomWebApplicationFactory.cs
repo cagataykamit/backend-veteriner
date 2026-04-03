@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,11 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
             // Database schema migration baseline apply
             db.Database.Migrate();
             TestDataSeeder.Seed(db, hasher);
+
+            // Production boot ile aynı permission zinciri: catalog → DB Permissions, Admin claim → tüm izinler, admin kullanıcı → Admin claim.
+            // TestDataSeeder yalnızca IntegrationTasksAdmin + Outbox bağlar; policy tabanlı modüller (Prescriptions, Treatments, …) için AdminClaimSeeder şart.
+            PermissionSeeder.SeedAsync(db).GetAwaiter().GetResult();
+            AdminClaimSeeder.SeedAsync(db).GetAwaiter().GetResult();
         });
     }
 }
