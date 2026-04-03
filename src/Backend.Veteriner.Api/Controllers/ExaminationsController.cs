@@ -121,7 +121,12 @@ public sealed class ExaminationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Sayfalı muayene listesi. <c>search</c> (veya <c>page.search</c>): başvuru nedeni, bulgular, değerlendirme, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>sort</c>/<c>order</c> işlenmez.</summary>
+    /// <summary>
+    /// Sayfalı muayene listesi.
+    /// Filtreler (hepsi AND): opsiyonel <c>clinicId</c>, <c>petId</c>, <c>appointmentId</c> (bu randevuya bağlı kayıtlar; <c>Examination.AppointmentId</c>), <c>dateFromUtc</c> / <c>dateToUtc</c> (<c>ExaminedAtUtc</c> üzerinde).
+    /// Metin araması: <c>search</c> veya <c>page.search</c> — başvuru nedeni, bulgular, değerlendirme, notlar; müşteri + hayvan metin eşlemesi ile pet id kümesi (hayvan listesi ile aynı örüntü). Arama doluysa mevcut LIKE/OR metin kuralları diğer filtrelerle AND birleşir.
+    /// <c>sort</c>/<c>order</c> işlenmez.
+    /// </summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Examinations.Read)]
     [ProducesResponseType(typeof(PagedResult<ExaminationListItemDto>), StatusCodes.Status200OK)]

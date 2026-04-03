@@ -51,6 +51,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
 
         // (Opsiyonel) Swagger’da version parametresi gösterimini toparlamak için
         options.OperationFilter<SwaggerDefaultValues>();
+        options.OperationFilter<ExaminationsListOperationFilter>();
         options.OperationFilter<AuthContractCleanupOperationFilter>();
         options.SchemaFilter<PaymentsContractSchemaFilter>();
         options.SchemaFilter<AppointmentsContractSchemaFilter>();
@@ -440,6 +441,51 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
                 return;
             propertySchema.Nullable = isNullable;
+        }
+    }
+
+    /// <summary>
+    /// GET /examinations liste parametreleri için OpenAPI açıklamaları (Appointment detail gibi senaryolarda <c>appointmentId</c> sözleşmesi).
+    /// </summary>
+    private sealed class ExaminationsListOperationFilter : IOperationFilter
+    {
+        public void Apply(OpenApiOperation operation, OperationFilterContext context)
+        {
+            var route = context.ApiDescription.ActionDescriptor.RouteValues;
+            if (!route.TryGetValue("controller", out var controller)
+                || !string.Equals(controller, "Examinations", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (!route.TryGetValue("action", out var action)
+                || !string.Equals(action, "GetList", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (operation.Parameters is null)
+                return;
+
+            static void SetDesc(OpenApiOperation op, string name, string description)
+            {
+                var p = op.Parameters!.FirstOrDefault(x =>
+                    string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+                if (p is null)
+                    return;
+                if (string.IsNullOrWhiteSpace(p.Description))
+                    p.Description = description;
+            }
+
+            SetDesc(operation, "appointmentId",
+                "Optional. Returns examinations where Examination.AppointmentId equals this value. Combined with clinicId, petId, date range, and search using AND.");
+            SetDesc(operation, "clinicId",
+                "Optional clinic filter. Must match JWT/header clinic context when both are set.");
+            SetDesc(operation, "petId", "Optional pet filter.");
+            SetDesc(operation, "dateFromUtc", "Optional lower bound (inclusive) on ExaminedAtUtc.");
+            SetDesc(operation, "dateToUtc", "Optional upper bound (inclusive) on ExaminedAtUtc.");
+            SetDesc(operation, "search",
+                "Optional text search; merged with page.search when both are used (see PageRequestQuery.WithMergedSearch).");
         }
     }
 

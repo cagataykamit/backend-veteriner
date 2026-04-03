@@ -241,7 +241,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | Clients | `GET /api/v1/clients` | Evet | `FullName`, `Email`, `Phone`, `PhoneNormalized` |
 | Pets | `GET /api/v1/pets` | Evet | Hayvan: `Name`, `Breed`, `Species.Name`, `BreedRef.Name`; müşteri metni: `ClientsByTenantTextSearchSpec` ile eşleşen sahiplerin petleri. **AND** `clientId`, `speciesId` filtreleri. |
 | Appointments | `GET /api/v1/appointments` | Evet | Randevu `Notes`; pet id’ler: müşteri metni + hayvan metin alanları (`PetsByTenantTextFieldsSearchSpec` ile hayvan listesi ile aynı küme). **AND** `clinicId`, `petId`, `status`, tarih aralığı. |
-| Examinations | `GET /api/v1/examinations` | Evet | `VisitReason`, `Findings`, `Assessment`, `Notes`; pet id’ler: müşteri + hayvan metin (yukarıdaki gibi). **AND** klinik/pet/randevu/tarih filtreleri. |
+| Examinations | `GET /api/v1/examinations` | Evet | `VisitReason`, `Findings`, `Assessment`, `Notes`; pet id’ler: müşteri + hayvan metin (yukarıdaki gibi). **AND** `clinicId`, `petId`, **`appointmentId`** (randevuya bağlı muayene), `dateFromUtc`, `dateToUtc` (hepsi AND). |
 | Vaccinations | `GET /api/v1/vaccinations` | Evet | `VaccineName`, `Notes`; pet id’ler: müşteri + hayvan metin. **AND** klinik/pet/durum/tarih filtreleri. |
 | Payments | `GET /api/v1/payments` | Evet | `Notes`, `Currency`; eşleşen `ClientId` / `PetId` ön kümesi (müşteri metni + `PetsByTenantTextFieldsSearchSpec`). **AND** klinik, müşteri, hayvan, yöntem, ödeme tarihi. |
 | Treatments | `GET /api/v1/treatments` | Evet | `Title`, `Description`, `Notes`; pet id’ler: müşteri + hayvan metin (examinations ile aynı `ListSearchPetIds` örüntüsü). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc` (liste query). |
@@ -266,6 +266,8 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **OpenAPI:** `CreateExaminationBody` / `UpdateExaminationBody` şemasında her iki property görünür; `complaint` açıklamasında DEPRECATED. Kaldırma **hedefi:** en az 12 ay uyarı sonrası veya iki major API sürümü (ör. 2027-Q1 — ekip sprint planına göre netleştirilir); kaldırılmadan önce istemci telemetri/usage kontrolü önerilir.
 
 **Frontend:** Form ve state tek alan: `visitReason`. Eski `complaint` gönderen kodlar kademeli kaldırılabilir; yeni kod yalnızca `visitReason` kullanmalı.
+
+**Liste `GET /api/v1/examinations`:** `PageRequest` (`page`, `pageSize`, `search` / `page.search`), opsiyonel `clinicId`, `petId`, **`appointmentId`** (`Examination.AppointmentId` eşitliği; randevu detayından doğrudan muayene listesi için), `dateFromUtc`, `dateToUtc`. Tüm yapılandırılmış filtreler birbiri ile **AND**; `search` doluysa mevcut metin + pet kümesi kuralları bu filtrelerle **AND** birleşir. `sort`/`order` işlenmez. Boş GUID filtre değerleri 400 (validasyon).
 
 ---
 

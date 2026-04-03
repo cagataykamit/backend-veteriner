@@ -16,6 +16,18 @@ public sealed class GetExaminationsListQueryValidator : AbstractValidator<GetExa
             .MaximumLength(ListQueryTextSearch.MaxTermLength)
             .When(x => x.PageRequest.Search != null);
 
+        RuleFor(x => x.ClinicId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("clinicId is invalid.");
+
+        RuleFor(x => x.PetId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("petId is invalid.");
+
+        RuleFor(x => x.AppointmentId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("appointmentId is invalid.");
+
         RuleFor(x => x)
             .Must(x => !x.DateFromUtc.HasValue || !x.DateToUtc.HasValue || x.DateFromUtc <= x.DateToUtc)
             .WithMessage("dateFromUtc, dateToUtc'den küçük veya eşit olmalıdır.");
