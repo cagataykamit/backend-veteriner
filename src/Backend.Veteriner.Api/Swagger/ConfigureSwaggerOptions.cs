@@ -4,6 +4,7 @@ using Backend.Veteriner.Api.Controllers;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
 using Backend.Veteriner.Application.Appointments.Commands.Update;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
+using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
@@ -58,6 +59,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         options.SchemaFilter<ExaminationsContractSchemaFilter>();
         options.SchemaFilter<TreatmentsContractSchemaFilter>();
         options.SchemaFilter<PrescriptionsContractSchemaFilter>();
+        options.SchemaFilter<ClientsContractSchemaFilter>();
 
         // (Opsiyonel) XML comments (dosya yoksa sessiz geç)
         TryIncludeXmlComments(options);
@@ -423,6 +425,47 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 SetNullable(schema, "examinationId", true);
                 SetNullable(schema, "treatmentId", true);
                 SetNullable(schema, "followUpDateUtc", true);
+            }
+        }
+
+        private static void MarkRequired(OpenApiSchema schema, params string[] names)
+        {
+            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                if (schema.Properties.ContainsKey(name))
+                    schema.Required.Add(name);
+            }
+        }
+
+        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
+        {
+            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
+                return;
+            propertySchema.Nullable = isNullable;
+        }
+    }
+
+    private sealed class ClientsContractSchemaFilter : ISchemaFilter
+    {
+        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        {
+            if (context.Type == typeof(ClientRecentSummaryDto))
+            {
+                MarkRequired(schema, "clientId", "recentAppointments", "recentExaminations");
+                return;
+            }
+
+            if (context.Type == typeof(ClientRecentAppointmentSummaryItemDto))
+            {
+                MarkRequired(schema, "id", "scheduledAtUtc", "petId", "petName", "status");
+                SetNullable(schema, "notes", true);
+                return;
+            }
+
+            if (context.Type == typeof(ClientRecentExaminationSummaryItemDto))
+            {
+                MarkRequired(schema, "id", "examinedAtUtc", "petId", "petName", "visitReason");
             }
         }
 

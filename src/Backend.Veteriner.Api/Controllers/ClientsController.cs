@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Clients.Commands.Update;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetById;
 using Backend.Veteriner.Application.Clients.Queries.GetList;
+using Backend.Veteriner.Application.Clients.Queries.GetRecentSummary;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Shared;
@@ -94,6 +95,24 @@ public sealed class ClientsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var result = await _mediator.Send(new GetClientByIdQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Müşteri detay ekranı için son randevular ve son muayeneler (tek yanıt). Yalnız bu müşterinin hayvanlarına ait kayıtlar;
+    /// aktif klinik bağlamı varsa sonuçlar bu kliniğe indirgenir. Sıra: en yeni tarih önce; her blok en fazla 10 kayıt.
+    /// </summary>
+    [HttpGet("{id:guid}/recent-summary")]
+    [Authorize(Policy = PermissionCatalog.Clients.Read)]
+    [ProducesResponseType(typeof(ClientRecentSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetRecentSummary([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClientRecentSummaryQuery(id), ct);
         return result.ToActionResult(this);
     }
 

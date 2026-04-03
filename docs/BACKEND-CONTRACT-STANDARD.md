@@ -108,6 +108,8 @@ Bu standardın amacı:
 | Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 
+**Clients (müşteri detay özeti):** `GET /api/v1/clients/{id}/recent-summary` — `Clients.Read`; tek yanıtta `ClientRecentSummaryDto` (`recentAppointments`, `recentExaminations`). Kayıtlar yalnız route’taki müşterinin **pet’lerine** aittir; sıra en yeni tarih önce; her blok en fazla **10** kayıt (`ClientRecentSummaryConstants`). Aktif klinik bağlamı (`IClinicContext`) varsa randevu ve muayene listeleri bu **kliniğe** indirgenir. Müşteri tenant dışı / yoksa `Clients.NotFound`. OpenAPI: `ClientsContractSchemaFilter`.
+
 ---
 
 ## 5) Öncelikli Refactor Backlog
@@ -135,7 +137,7 @@ Bu standardın amacı:
 ## 6) OpenAPI / Type-Generation Readiness
 
 ### Hazır (yakın)
-- Clients
+- Clients (liste + `recent-summary` şeması: `ClientsContractSchemaFilter`)
 - Pets
 - Species
 - Breeds
