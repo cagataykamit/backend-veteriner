@@ -15,6 +15,7 @@ public sealed record AppointmentListItemDto(
     Guid SpeciesId,
     string SpeciesName,
     AppointmentType AppointmentType,
+    Guid ClientId,
     string ClientName,
     DateTime ScheduledAtUtc,
     AppointmentStatus Status,

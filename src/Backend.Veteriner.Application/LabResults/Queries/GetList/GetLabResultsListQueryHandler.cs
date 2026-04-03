@@ -1,48 +1,48 @@
+using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
-using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
+using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
-using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
-using Backend.Veteriner.Application.Vaccinations.Specs;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using Backend.Veteriner.Domain.Vaccinations;
 using MediatR;
 
-namespace Backend.Veteriner.Application.Vaccinations.Queries.GetList;
+namespace Backend.Veteriner.Application.LabResults.Queries.GetList;
 
-public sealed class GetVaccinationsListQueryHandler
-    : IRequestHandler<GetVaccinationsListQuery, Result<PagedResult<VaccinationListItemDto>>>
+public sealed class GetLabResultsListQueryHandler
+    : IRequestHandler<GetLabResultsListQuery, Result<PagedResult<LabResultListItemDto>>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
-    private readonly IReadRepository<Vaccination> _vaccinations;
+    private readonly IReadRepository<LabResult> _labResults;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
 
-    public GetVaccinationsListQueryHandler(
+    public GetLabResultsListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
-        IReadRepository<Vaccination> vaccinations,
+        IReadRepository<LabResult> labResults,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
-        _vaccinations = vaccinations;
+        _labResults = labResults;
         _pets = pets;
         _clients = clients;
     }
 
-    public async Task<Result<PagedResult<VaccinationListItemDto>>> Handle(
-        GetVaccinationsListQuery request,
+    public async Task<Result<PagedResult<LabResultListItemDto>>> Handle(
+        GetLabResultsListQuery request,
         CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {
-            return Result<PagedResult<VaccinationListItemDto>>.Failure(
+            return Result<PagedResult<LabResultListItemDto>>.Failure(
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
@@ -52,8 +52,8 @@ public sealed class GetVaccinationsListQueryHandler
         var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
-            return Result<PagedResult<VaccinationListItemDto>>.Failure(
-                "Vaccinations.ClinicContextMismatch",
+            return Result<PagedResult<LabResultListItemDto>>.Failure(
+                "LabResults.ClinicContextMismatch",
                 "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
         }
 
@@ -70,30 +70,24 @@ public sealed class GetVaccinationsListQueryHandler
                 ct);
         }
 
-        var total = await _vaccinations.CountAsync(
-            new VaccinationsFilteredCountSpec(
+        var total = await _labResults.CountAsync(
+            new LabResultsFilteredCountSpec(
                 tenantId,
                 effectiveClinicId,
                 request.PetId,
-                request.Status,
-                request.DueFromUtc,
-                request.DueToUtc,
-                request.AppliedFromUtc,
-                request.AppliedToUtc,
+                request.DateFromUtc,
+                request.DateToUtc,
                 searchPattern,
                 searchPetIds),
             ct);
 
-        var rows = await _vaccinations.ListAsync(
-            new VaccinationsFilteredPagedSpec(
+        var rows = await _labResults.ListAsync(
+            new LabResultsFilteredPagedSpec(
                 tenantId,
                 effectiveClinicId,
                 request.PetId,
-                request.Status,
-                request.DueFromUtc,
-                request.DueToUtc,
-                request.AppliedFromUtc,
-                request.AppliedToUtc,
+                request.DateFromUtc,
+                request.DateToUtc,
                 page,
                 pageSize,
                 searchPattern,
@@ -113,31 +107,29 @@ public sealed class GetVaccinationsListQueryHandler
         var clientNameById = clients.ToDictionary(x => x.Id, x => x.FullName);
 
         var items = rows
-            .Select(v =>
+            .Select(lr =>
             {
-                petById.TryGetValue(v.PetId, out var pet);
+                petById.TryGetValue(lr.PetId, out var pet);
                 var petName = pet?.Name ?? string.Empty;
                 var clientId = pet?.ClientId ?? Guid.Empty;
-                var clientName = clientId != Guid.Empty && clientNameById.TryGetValue(clientId, out var cName)
-                    ? cName
+                var clientName = clientId != Guid.Empty && clientNameById.TryGetValue(clientId, out var cn)
+                    ? cn
                     : string.Empty;
 
-                return new VaccinationListItemDto(
-                    v.Id,
-                    v.PetId,
+                return new LabResultListItemDto(
+                    lr.Id,
+                    lr.ClinicId,
+                    lr.PetId,
                     petName,
                     clientId,
                     clientName,
-                    v.ClinicId,
-                    v.ExaminationId,
-                    v.VaccineName,
-                    v.AppliedAtUtc,
-                    v.DueAtUtc,
-                    v.Status);
+                    lr.ResultDateUtc,
+                    lr.TestName,
+                    lr.ExaminationId);
             })
             .ToList();
 
-        return Result<PagedResult<VaccinationListItemDto>>.Success(
-            PagedResult<VaccinationListItemDto>.Create(items, total, page, pageSize));
+        return Result<PagedResult<LabResultListItemDto>>.Success(
+            PagedResult<LabResultListItemDto>.Create(items, total, page, pageSize));
     }
 }

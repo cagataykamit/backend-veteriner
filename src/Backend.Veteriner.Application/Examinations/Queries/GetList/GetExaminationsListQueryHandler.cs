@@ -113,7 +113,8 @@ public sealed class GetExaminationsListQueryHandler
             {
                 petById.TryGetValue(e.PetId, out var pet);
                 var petName = pet?.Name ?? string.Empty;
-                var clientName = pet is not null && clientNameById.TryGetValue(pet.ClientId, out var cName)
+                var clientId = pet?.ClientId ?? Guid.Empty;
+                var clientName = clientId != Guid.Empty && clientNameById.TryGetValue(clientId, out var cName)
                     ? cName
                     : string.Empty;
 
@@ -122,6 +123,7 @@ public sealed class GetExaminationsListQueryHandler
                     e.ClinicId,
                     e.PetId,
                     petName,
+                    clientId,
                     clientName,
                     e.AppointmentId,
                     e.ExaminedAtUtc,

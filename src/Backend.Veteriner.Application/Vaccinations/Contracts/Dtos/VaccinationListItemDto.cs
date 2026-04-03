@@ -6,6 +6,7 @@ public sealed record VaccinationListItemDto(
     Guid Id,
     Guid PetId,
     string PetName,
+    Guid ClientId,
     string ClientName,
     Guid ClinicId,
     Guid? ExaminationId,

@@ -5,6 +5,7 @@ public sealed record ExaminationListItemDto(
     Guid ClinicId,
     Guid PetId,
     string PetName,
+    Guid ClientId,
     string ClientName,
     Guid? AppointmentId,
     DateTime ExaminedAtUtc,

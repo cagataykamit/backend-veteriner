@@ -4,6 +4,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Backend.Veteriner.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260403035815_AddLabResultsTable")]
+    partial class AddLabResultsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -577,67 +580,6 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "PetId");
 
                     b.ToTable("Examinations", (string)null);
-                });
-
-            modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.Hospitalization", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("AdmittedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("ClinicId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("DischargedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("ExaminationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<Guid>("PetId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("PlannedDischargeAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "AdmittedAtUtc");
-
-                    b.HasIndex("TenantId", "ClinicId");
-
-                    b.HasIndex("TenantId", "ExaminationId");
-
-                    b.HasIndex("TenantId", "PetId");
-
-                    b.HasIndex("TenantId", "ClinicId", "PetId")
-                        .IsUnique()
-                        .HasFilter("[DischargedAtUtc] IS NULL");
-
-                    b.ToTable("Hospitalizations", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.LabResults.LabResult", b =>

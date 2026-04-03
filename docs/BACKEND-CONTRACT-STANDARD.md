@@ -104,6 +104,8 @@ Bu standardın amacı:
 | Payments | Create/update/list/detail DTO + `PaymentsContractSchemaFilter` ile OpenAPI hizalı (Faz 0 / Adım 4; §12) | İş kuralı: clinic/müşteri/hayvan tutarlılığı | Context-first klinik uyumu operasyonel | Tamamlandı (Faz 0) | Orta (typegen) |
 | Treatments | List/detail/create/update DTO + `TreatmentsContractSchemaFilter`; muayene ile isteğe bağlı ilişki (§13) | Examination clinic/pet tutarlılığı; tarih penceresi | Examinations ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Prescriptions | List/detail/create/update DTO + `PrescriptionsContractSchemaFilter`; isteğe bağlı examination + treatment (§14) | İkili referansta examination–treatment tutarlılığı; tarih penceresi | Treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
+| Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
+| Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | Contract açık | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
 | Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
@@ -145,6 +147,8 @@ Bu standardın amacı:
 - Payments (Faz 0: §12 — şema/required/nullability)
 - Treatments (§13 — şema/required/nullability)
 - Prescriptions (§14 — şema/required/nullability)
+- Lab Results (§15 — şema/required/nullability)
+- Hospitalizations (§16 — şema/required/nullability)
 
 ### Kısmi Hazır
 - Clinics
@@ -248,6 +252,8 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | Payments | `GET /api/v1/payments` | Evet | `Notes`, `Currency`; eşleşen `ClientId` / `PetId` ön kümesi (müşteri metni + `PetsByTenantTextFieldsSearchSpec`). **AND** klinik, müşteri, hayvan, yöntem, ödeme tarihi. |
 | Treatments | `GET /api/v1/treatments` | Evet | `Title`, `Description`, `Notes`; pet id’ler: müşteri + hayvan metin (examinations ile aynı `ListSearchPetIds` örüntüsü). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc` (liste query). |
 | Prescriptions | `GET /api/v1/prescriptions` | Evet | `Title`, `Content`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. |
+| Lab Results | `GET /api/v1/lab-results` | Evet | `TestName`, `ResultText`, `Interpretation`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. |
+| Hospitalizations | `GET /api/v1/hospitalizations` | Evet | `Reason`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, **`activeOnly`** (`true` = yalnız açık yatış, `false` = yalnız taburcu), `dateFromUtc`, `dateToUtc` (`admittedAtUtc` üzerinden). |
 
 **Performans notu:** `LIKE '%...%'` ve çok kiracılı indeks kullanımı; arama terimi uzunluğu üst sınırlı; pet tarafında ön liste id’leri ile `Contains` birleşimi kullanılır.
 
@@ -368,3 +374,68 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Prescriptions.NotFound`, `Pets.NotFound`, `Examinations.NotFound`, `Treatments.NotFound`, `Tenants.TenantInactive`).
 
 **Swagger:** `PrescriptionsContractSchemaFilter` — create command, update body, detail/list DTO required/nullability ile hizalı.
+
+---
+
+## 15) Lab Results — request/response ve OpenAPI
+
+**Liste** `GET /api/v1/lab-results` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `LabResults.ClinicContextMismatch`. `sort`/`order` işlenmez. Boş `clinicId` / `petId` GUID filtreleri liste validator’ünde reddedilir.
+
+**Create** `POST /api/v1/lab-results` gövdesi: `CreateLabResultCommand`.
+
+| Alan | Zorunlu | Nullable (OpenAPI) | Not |
+|------|---------|---------------------|-----|
+| `clinicId` | Evet | Hayır | Context clinic ile uyumsuzsa `LabResults.ClinicContextMismatch` |
+| `petId` | Evet | Hayır | Tenant’ta pet |
+| `examinationId` | Hayır | Evet | Doluysa tenant’ta muayene; clinic ve pet lab sonucu ile eşleşmeli (`LabResults.ExaminationClinicMismatch`, `LabResults.ExaminationPetMismatch`) |
+| `resultDateUtc` | Evet | Hayır | `ResultDateUtcWindow` — en fazla 7 gün geçmiş, en fazla 2 yıl ileri (prescriptions/treatments ile aynı) |
+| `testName` | Evet | Hayır | Max 500 |
+| `resultText` | Evet | Hayır | Max 8000 (tek metin; analiz satırları yok) |
+| `interpretation` | Hayır | Evet | Max 4000 |
+| `notes` | Hayır | Evet | Max 4000 |
+
+**Update** `PUT /api/v1/lab-results/{id}` gövdesi: `UpdateLabResultBody` (route id esas; body `id` dolu ve farklıysa `LabResults.RouteIdMismatch`). Alanlar create ile aynı zorunluluk/validasyon seti.
+
+**Detay** `GET /api/v1/lab-results/{id}` yanıtı: `LabResultDetailDto` (`tenantId`, `examinationId`, `interpretation`, `notes`, `updatedAtUtc` null olabilir). Aktif klinik bağlamı varsa ve kayıt farklı klinikteyse `LabResults.NotFound` (Prescriptions ile aynı gizleme örüntüsü).
+
+**Liste öğesi:** `LabResultListItemDto` — `examinationId` null olabilir; `petName` / `clientName` boş string olabilir.
+
+**Başarı kodları:** Create → `201 Created` gövde `Guid` (yeni id); Update → `204 NoContent`.
+
+**Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `LabResults.NotFound`, `LabResults.DateTooFarInPast`, `Pets.NotFound`, `Examinations.NotFound`, `Tenants.TenantInactive`).
+
+**Swagger:** `LabResultsContractSchemaFilter` — create command, update body, detail/list DTO required/nullability ile hizalı.
+
+---
+
+## 16) Hospitalizations — request/response ve OpenAPI
+
+**Liste** `GET /api/v1/hospitalizations` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, **`activeOnly`** (`true` → yalnız `dischargedAtUtc == null`; `false` → yalnız taburcu edilmiş; **omit** → tümü), `dateFromUtc`, `dateToUtc` (**`admittedAtUtc`** alanına göre). JWT/header clinic ile `clinicId` uyumsuzsa `Hospitalizations.ClinicContextMismatch`. `sort`/`order` işlenmez. Boş `clinicId` / `petId` GUID filtreleri liste validator’ünde reddedilir.
+
+**Create** `POST /api/v1/hospitalizations` gövdesi: `CreateHospitalizationCommand`.
+
+| Alan | Zorunlu | Nullable (OpenAPI) | Not |
+|------|---------|---------------------|-----|
+| `clinicId` | Evet | Hayır | Context clinic ile uyumsuzsa `Hospitalizations.ClinicContextMismatch` |
+| `petId` | Evet | Hayır | Aynı tenant’ta pet |
+| `examinationId` | Hayır | Evet | Doluysa muayene clinic/pet ile eşleşmeli (`Hospitalizations.ExaminationClinicMismatch`, `Hospitalizations.ExaminationPetMismatch`) |
+| `admittedAtUtc` | Evet | Hayır | `AdmittedAtUtcWindow` — en fazla 7 gün geçmiş, en fazla 2 yıl ileri |
+| `plannedDischargeAtUtc` | Hayır | Evet | Varsa `admittedAtUtc`’den önce olamaz (`Hospitalizations.PlannedDischargeBeforeAdmission`) |
+| `reason` | Evet | Hayır | Max 2000 |
+| `notes` | Hayır | Evet | Max 4000 |
+
+**Tek aktif yatış:** Aynı `tenantId` + `clinicId` + `petId` için `dischargedAtUtc` null ikinci kayıt oluşturulamaz (`Hospitalizations.ActiveHospitalizationExists`); DB’de filtreli unique indeks ile de korunur.
+
+**Update** `PUT /api/v1/hospitalizations/{id}` gövdesi: `UpdateHospitalizationBody` (route id esas; body `id` dolu ve farklıysa `Hospitalizations.RouteIdMismatch`). Taburcu edilmiş kayıt güncellenemez (`Hospitalizations.AlreadyDischarged`). Pet/klinik değişiminde başka aktif yatış çakışması yine `Hospitalizations.ActiveHospitalizationExists`.
+
+**Discharge** `POST /api/v1/hospitalizations/{id}/discharge` gövdesi: `DischargeHospitalizationBody`. Yetki: `Hospitalizations.Discharge`. `dischargedAtUtc` zorunlu; `admittedAtUtc`’den önce olamaz (`Hospitalizations.DischargedBeforeAdmission`). Zaten taburcu ise `Hospitalizations.AlreadyDischarged`. **`notes`:** JSON’da property **yok** veya `null` → mevcut notlar değişmez; **dolu** (boş string dahil) → not alanı trim sonrası güncellenir (boş string → `null`).
+
+**Detay** `GET /api/v1/hospitalizations/{id}` yanıtı: `HospitalizationDetailDto` (`examinationId`, `plannedDischargeAtUtc`, `dischargedAtUtc`, `notes`, `updatedAtUtc` null olabilir; `isActive` = `dischargedAtUtc == null`). Aktif klinik bağlamı varsa ve kayıt farklı klinikteyse `Hospitalizations.NotFound`.
+
+**Liste öğesi:** `HospitalizationListItemDto` — `isActive` dahil; opsiyonel tarih alanları null olabilir.
+
+**Başarı kodları:** Create → `201 Created` gövde `Guid`; Update / Discharge → `204 NoContent`.
+
+**Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Hospitalizations.NotFound`, `Tenants.TenantInactive`, `Examinations.NotFound`).
+
+**Swagger:** `HospitalizationsContractSchemaFilter` — create, update body, discharge body, detail/list DTO required/nullability ile hizalı.

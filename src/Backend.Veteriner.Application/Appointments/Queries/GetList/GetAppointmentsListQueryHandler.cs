@@ -135,7 +135,8 @@ public sealed class GetAppointmentsListQueryHandler
             .Select(a =>
             {
                 petById.TryGetValue(a.PetId, out var pet);
-                var clientName = pet is not null && clientNameById.TryGetValue(pet.ClientId, out var cName)
+                var clientId = pet?.ClientId ?? Guid.Empty;
+                var clientName = clientId != Guid.Empty && clientNameById.TryGetValue(clientId, out var cName)
                     ? cName
                     : string.Empty;
                 var petName = pet?.Name ?? string.Empty;
@@ -157,6 +158,7 @@ public sealed class GetAppointmentsListQueryHandler
                     speciesId,
                     speciesName,
                     a.AppointmentType,
+                    clientId,
                     clientName,
                     a.ScheduledAtUtc,
                     a.Status,
