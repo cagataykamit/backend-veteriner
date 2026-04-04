@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Appointments.Commands.Create;
 using Backend.Veteriner.Application.Appointments.Commands.Update;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
+using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Hospitalizations.Commands.Create;
 using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
@@ -68,6 +69,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         options.SchemaFilter<HospitalizationsContractSchemaFilter>();
         options.SchemaFilter<PetsContractSchemaFilter>();
         options.SchemaFilter<ClientsContractSchemaFilter>();
+        options.SchemaFilter<DashboardContractSchemaFilter>();
 
         // (Opsiyonel) XML comments (dosya yoksa sessiz geç)
         TryIncludeXmlComments(options);
@@ -734,6 +736,30 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 return;
             }
 
+            if (context.Type == typeof(ClientPaymentSummaryDto))
+            {
+                MarkRequired(schema,
+                    "clientId", "clientName", "totalPaymentsCount", "totalPaidAmount",
+                    "currencyTotals", "recentPayments");
+                SetNullable(schema, "lastPaymentAtUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(ClientPaymentCurrencyTotalDto))
+            {
+                MarkRequired(schema, "currency", "totalAmount");
+                return;
+            }
+
+            if (context.Type == typeof(ClientPaymentRecentItemDto))
+            {
+                MarkRequired(schema,
+                    "id", "paidAtUtc", "clinicId", "clinicName", "petName", "amount", "currency", "method");
+                SetNullable(schema, "petId", true);
+                SetNullable(schema, "notes", true);
+                return;
+            }
+
             if (context.Type == typeof(ClientRecentAppointmentSummaryItemDto))
             {
                 MarkRequired(schema, "id", "scheduledAtUtc", "petId", "petName", "status");
@@ -744,6 +770,44 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             if (context.Type == typeof(ClientRecentExaminationSummaryItemDto))
             {
                 MarkRequired(schema, "id", "examinedAtUtc", "petId", "petName", "visitReason");
+            }
+        }
+
+        private static void MarkRequired(OpenApiSchema schema, params string[] names)
+        {
+            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                if (schema.Properties.ContainsKey(name))
+                    schema.Required.Add(name);
+            }
+        }
+
+        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
+        {
+            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
+                return;
+            propertySchema.Nullable = isNullable;
+        }
+    }
+
+    private sealed class DashboardContractSchemaFilter : ISchemaFilter
+    {
+        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        {
+            if (context.Type == typeof(DashboardFinanceSummaryDto))
+            {
+                MarkRequired(schema,
+                    "todayTotalPaid", "weekTotalPaid", "monthTotalPaid",
+                    "todayPaymentsCount", "weekPaymentsCount", "monthPaymentsCount", "recentPayments");
+                return;
+            }
+
+            if (context.Type == typeof(DashboardFinanceRecentPaymentDto))
+            {
+                MarkRequired(schema,
+                    "id", "paidAtUtc", "clientId", "clientName", "petName", "amount", "currency", "method");
+                SetNullable(schema, "petId", true);
             }
         }
 

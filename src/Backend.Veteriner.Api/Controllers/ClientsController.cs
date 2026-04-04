@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Clients.Commands.Update;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetById;
 using Backend.Veteriner.Application.Clients.Queries.GetList;
+using Backend.Veteriner.Application.Clients.Queries.GetPaymentSummary;
 using Backend.Veteriner.Application.Clients.Queries.GetRecentSummary;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
@@ -113,6 +114,23 @@ public sealed class ClientsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetClientRecentSummaryQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Müşteri ödeme özeti: toplamlar, para birimi kırılımı ve son ödemeler (aktif klinik bağlamı varsa bu kliniğe indirgenir).
+    /// </summary>
+    [HttpGet("{id:guid}/payment-summary")]
+    [Authorize(Policy = PermissionCatalog.Clients.Read)]
+    [ProducesResponseType(typeof(ClientPaymentSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPaymentSummary([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClientPaymentSummaryQuery(id), ct);
         return result.ToActionResult(this);
     }
 

@@ -96,7 +96,7 @@ Bu standardın amacı:
 |---|---|---|---|---|---|
 | Auth | `Result` + `ToActionResult` + açık DTO (`LoginResultDto`, `AuthActionResultDto`); logout akışı da aynı hatta | Eski istemciler `ProblemDetails.title` metninde değişiklik görebilir (`ResultExtensions`) | Faz 0: auth endpoint’leri tek sözleşmeye alındı; drift için bu doküman §9 | Tamamlandı (Faz 0) | Orta (title gösterimi) |
 | Clinics | Genel olarak tutarlı | Create response yalnız `Guid` | Create response DTO standardı | P2 | Düşük |
-| Clients | En tutarlı modüllerden | Düşük | Mevcut standardı referans modül olarak koruma | P2 | Düşük |
+| Clients | `recent-summary` + `payment-summary` (§19) | Düşük | Mevcut standardı referans modül olarak koruma | P2 | Düşük |
 | Pets | Route/body id standardı güçlü; pet detay için `history-summary` (§17) | Create response çıplak `Guid` | Create response standardizasyonu | P2 | Düşük |
 | Appointments | Update/lifecycle akışları güçlü | Bazı hata dallarında envelope farklılaşma riski | Error contract tekilleştirme | P1 | Orta |
 | Examinations | Kanonik `visitReason`; yazmada opsiyonel legacy `complaint` (Faz 0 / Adım 3; §11); muayene detay `related-summary` (§18) | — | İstemciler `visitReason` kullanmalı | Tamamlandı (Faz 0) | Orta (alias kaldırma takvimi) |
@@ -106,11 +106,13 @@ Bu standardın amacı:
 | Prescriptions | List/detail/create/update DTO + `PrescriptionsContractSchemaFilter`; isteğe bağlı examination + treatment (§14) | İkili referansta examination–treatment tutarlılığı; tarih penceresi | Treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
-| Dashboard | Contract açık | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
+| Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
 | Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 
 **Clients (müşteri detay özeti):** `GET /api/v1/clients/{id}/recent-summary` — `Clients.Read`; tek yanıtta `ClientRecentSummaryDto` (`recentAppointments`, `recentExaminations`). Kayıtlar yalnız route’taki müşterinin **pet’lerine** aittir; sıra en yeni tarih önce; her blok en fazla **10** kayıt (`ClientRecentSummaryConstants`). Aktif klinik bağlamı (`IClinicContext`) varsa randevu ve muayene listeleri bu **kliniğe** indirgenir. Müşteri tenant dışı / yoksa `Clients.NotFound`. OpenAPI: `ClientsContractSchemaFilter`.
+
+**Clients (müşteri ödeme özeti — Finance+ v1):** `GET /api/v1/clients/{id}/payment-summary` — `Clients.Read`; `ClientPaymentSummaryDto` (`totalPaymentsCount`, `totalPaidAmount`, `currencyTotals`, `lastPaymentAtUtc`, `recentPayments`). Yalnız route’taki **müşterinin** ödemeleri; `recentPayments` en fazla **10** (`ClientPaymentSummaryConstants`); sıra `paidAtUtc` en yeni önce. `totalPaidAmount` tek para birimi olduğunda o birimin toplamı; aksi halde **0** — çoklu birim için `currencyTotals` esas. Aktif klinik bağlamı varsa ödemeler bu kliniğe indirgenir. Müşteri yoksa `Clients.NotFound`. Ayrıntı §19.
 
 **Pets (hayvan detay geçmiş özeti):** `GET /api/v1/pets/{id}/history-summary` — `Pets.Read`; tek yanıtta `PetHistorySummaryDto` (`recentAppointments`, `recentExaminations`, `recentTreatments`, `recentPrescriptions`, `recentLabResults`, `recentHospitalizations`, `recentPayments`) + üst düzey `petId`, `petName`, `clientId`, `clientName`. Kayıtlar yalnız route’taki **pet**’e aittir; sıra en yeni tarih önce; her blok en fazla **10** kayıt (`PetHistorySummaryConstants`). Aktif klinik bağlamı (`IClinicContext`) varsa tüm bloklar bu **kliniğe** indirgenir; yoksa tenant içindeki tüm klinikler. Pet tenant’ta yoksa `Pets.NotFound`. OpenAPI: `PetsContractSchemaFilter`. Ayrıntı §17.
 
@@ -141,10 +143,10 @@ Bu standardın amacı:
 ## 6) OpenAPI / Type-Generation Readiness
 
 ### Hazır (yakın)
-- Clients (liste + `recent-summary` şeması: `ClientsContractSchemaFilter`)
+- Clients (liste + `recent-summary` + `payment-summary`: `ClientsContractSchemaFilter` — §19)
 - Species
 - Breeds
-- Dashboard
+- Dashboard (`summary` + `finance-summary`: `DashboardContractSchemaFilter` — §19)
 - Payments (Faz 0: §12 — şema/required/nullability)
 - Treatments (§13 — şema/required/nullability)
 - Prescriptions (§14 — şema/required/nullability)
@@ -478,3 +480,35 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** Tenant bağlamı yoksa `Tenants.ContextMissing`; muayene yok / tenant dışı / aktif klinik ile uyumsuzsa `Examinations.NotFound`. FluentValidation (boş route id) → 400.
 
 **Swagger:** `ExaminationsContractSchemaFilter` — `ExaminationRelatedSummaryDto` ve alt öğe DTO’ları required/nullability ile hizalı.
+
+---
+
+## 19) Finance+ v1 — `payment-summary` & `finance-summary`
+
+### 19.1 Clients — `GET /api/v1/clients/{id}/payment-summary`
+
+**Yetki:** `Clients.Read` (müşteri detay ile aynı).
+
+**Yanıt:** `ClientPaymentSummaryDto` — `clientId`, `clientName`, `totalPaymentsCount`, `totalPaidAmount`, `currencyTotals[]` (`currency`, `totalAmount`), `lastPaymentAtUtc` (yoksa null), `recentPayments[]` (`id`, `paidAtUtc`, `clinicId`, `clinicName`, `petId`, `petName`, `amount`, `currency`, `method`, `notes`).
+
+**Klinik bağlamı:** `IClinicContext.ClinicId` doluysa yalnız bu klinikteki ödemeler; boşsa tenant içindeki tüm kliniklerdeki bu müşterinin ödemeleri.
+
+**Hatalar:** Tenant yok → `Tenants.ContextMissing`; müşteri yok → `Clients.NotFound`. FluentValidation (boş route id) → 400.
+
+**Swagger:** `ClientsContractSchemaFilter` — `ClientPaymentSummaryDto` ve alt DTO’lar.
+
+### 19.2 Dashboard — `GET /api/v1/dashboard/finance-summary`
+
+**Yetki:** `Dashboard.Read` (`GET /dashboard/summary` ile aynı).
+
+**Yanıt:** `DashboardFinanceSummaryDto` — `todayTotalPaid`, `weekTotalPaid`, `monthTotalPaid`, `todayPaymentsCount`, `weekPaymentsCount`, `monthPaymentsCount`, `recentPayments[]` (`id`, `paidAtUtc`, `clientId`, `clientName`, `petId`, `petName`, `amount`, `currency`, `method`).
+
+**Tarih pencereleri:** İstanbul takvimine göre **bugün** (`OperationDayBounds` ile aynı gün kutusu); **hafta** Pazartesi 00:00–Pazartesi 00:00 (bitiş hariç); **ay** ayın 1’i 00:00–sonraki ayın 1’i 00:00 (bitiş hariç). `PaidAtUtc` bu aralıklarda `[start, end)` kuralıyla filtrelenir.
+
+**Toplamlar:** Aynı penceredeki ödemelerin `amount` değerleri toplanır; **kur dönüşümü yok** (farklı para birimleri aynı toplama eklenir — KPI yorumu için `currencyTotals` yok; ileri sürümde ayrılabilir).
+
+**Klinik bağlamı:** Aktif klinik varsa tüm metrikler ve `recentPayments` yalnız bu klinik için.
+
+**Hatalar:** `Tenants.ContextMissing`.
+
+**Swagger:** `DashboardContractSchemaFilter` — `DashboardFinanceSummaryDto`, `DashboardFinanceRecentPaymentDto`.

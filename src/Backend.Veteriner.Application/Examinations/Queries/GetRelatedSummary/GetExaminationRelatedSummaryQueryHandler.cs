@@ -75,7 +75,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         if (e is null)
             return Result<ExaminationRelatedSummaryDto>.Failure("Examinations.NotFound", "Muayene kaydı bulunamadı.");
         if (_clinicContext.ClinicId is { } activeClinicId && e.ClinicId != activeClinicId)
-            return Result<ExaminationRelatedSummaryDto>.Failure("Examinations.NotFound", "Muayene kaydi bulunamadi.");
+            return Result<ExaminationRelatedSummaryDto>.Failure("Examinations.NotFound", "Muayene kaydı bulunamadı.");
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, e.PetId), ct);
         var petName = pet?.Name ?? string.Empty;
