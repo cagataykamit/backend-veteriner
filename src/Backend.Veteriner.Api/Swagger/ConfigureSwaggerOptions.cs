@@ -10,6 +10,7 @@ using Backend.Veteriner.Application.Hospitalizations.Commands.Create;
 using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Commands.Create;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
+using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Prescriptions.Commands.Create;
@@ -65,6 +66,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         options.SchemaFilter<PrescriptionsContractSchemaFilter>();
         options.SchemaFilter<LabResultsContractSchemaFilter>();
         options.SchemaFilter<HospitalizationsContractSchemaFilter>();
+        options.SchemaFilter<PetsContractSchemaFilter>();
         options.SchemaFilter<ClientsContractSchemaFilter>();
 
         // (Opsiyonel) XML comments (dosya yoksa sessiz geç)
@@ -564,6 +566,86 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 SetNullable(schema, "examinationId", true);
                 SetNullable(schema, "plannedDischargeAtUtc", true);
                 SetNullable(schema, "dischargedAtUtc", true);
+            }
+        }
+
+        private static void MarkRequired(OpenApiSchema schema, params string[] names)
+        {
+            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                if (schema.Properties.ContainsKey(name))
+                    schema.Required.Add(name);
+            }
+        }
+
+        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
+        {
+            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
+                return;
+            propertySchema.Nullable = isNullable;
+        }
+    }
+
+    private sealed class PetsContractSchemaFilter : ISchemaFilter
+    {
+        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        {
+            if (context.Type == typeof(PetHistorySummaryDto))
+            {
+                MarkRequired(schema,
+                    "petId", "petName", "clientId", "clientName",
+                    "recentAppointments", "recentExaminations", "recentTreatments", "recentPrescriptions",
+                    "recentLabResults", "recentHospitalizations", "recentPayments");
+                return;
+            }
+
+            if (context.Type == typeof(PetHistoryAppointmentItemDto))
+            {
+                MarkRequired(schema,
+                    "id", "scheduledAtUtc", "clinicId", "clinicName", "status", "appointmentType");
+                SetNullable(schema, "notes", true);
+                return;
+            }
+
+            if (context.Type == typeof(PetHistoryExaminationItemDto))
+            {
+                MarkRequired(schema, "id", "examinedAtUtc", "clinicId", "clinicName", "visitReason");
+                return;
+            }
+
+            if (context.Type == typeof(PetHistoryTreatmentItemDto))
+            {
+                MarkRequired(schema, "id", "treatmentDateUtc", "clinicId", "clinicName", "title");
+                SetNullable(schema, "examinationId", true);
+                return;
+            }
+
+            if (context.Type == typeof(PetHistoryPrescriptionItemDto))
+            {
+                MarkRequired(schema, "id", "prescribedAtUtc", "clinicId", "clinicName", "title");
+                SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "treatmentId", true);
+                return;
+            }
+
+            if (context.Type == typeof(PetHistoryLabResultItemDto))
+            {
+                MarkRequired(schema, "id", "resultDateUtc", "clinicId", "clinicName", "testName");
+                SetNullable(schema, "examinationId", true);
+                return;
+            }
+
+            if (context.Type == typeof(PetHistoryHospitalizationItemDto))
+            {
+                MarkRequired(schema, "id", "admittedAtUtc", "clinicId", "clinicName", "reason", "isActive");
+                SetNullable(schema, "dischargedAtUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(PetHistoryPaymentItemDto))
+            {
+                MarkRequired(schema, "id", "paidAtUtc", "clinicId", "clinicName", "amount", "currency", "method");
             }
         }
 

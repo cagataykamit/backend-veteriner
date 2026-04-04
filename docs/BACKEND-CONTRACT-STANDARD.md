@@ -97,7 +97,7 @@ Bu standardın amacı:
 | Auth | `Result` + `ToActionResult` + açık DTO (`LoginResultDto`, `AuthActionResultDto`); logout akışı da aynı hatta | Eski istemciler `ProblemDetails.title` metninde değişiklik görebilir (`ResultExtensions`) | Faz 0: auth endpoint’leri tek sözleşmeye alındı; drift için bu doküman §9 | Tamamlandı (Faz 0) | Orta (title gösterimi) |
 | Clinics | Genel olarak tutarlı | Create response yalnız `Guid` | Create response DTO standardı | P2 | Düşük |
 | Clients | En tutarlı modüllerden | Düşük | Mevcut standardı referans modül olarak koruma | P2 | Düşük |
-| Pets | Route/body id standardı güçlü | Create response çıplak `Guid` | Create response standardizasyonu | P2 | Düşük |
+| Pets | Route/body id standardı güçlü; pet detay için `history-summary` (§17) | Create response çıplak `Guid` | Create response standardizasyonu | P2 | Düşük |
 | Appointments | Update/lifecycle akışları güçlü | Bazı hata dallarında envelope farklılaşma riski | Error contract tekilleştirme | P1 | Orta |
 | Examinations | Kanonik `visitReason`; yazmada opsiyonel legacy `complaint` (Faz 0 / Adım 3; §11) | — | İstemciler `visitReason` kullanmalı | Tamamlandı (Faz 0) | Orta (alias kaldırma takvimi) |
 | Vaccinations | Clinic context entegrasyonu var | `clinicId` ownership algısı modüller arası tutarsız | Context-first kuralını açık ve tek hale getirme | P1 | Orta |
@@ -111,6 +111,8 @@ Bu standardın amacı:
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 
 **Clients (müşteri detay özeti):** `GET /api/v1/clients/{id}/recent-summary` — `Clients.Read`; tek yanıtta `ClientRecentSummaryDto` (`recentAppointments`, `recentExaminations`). Kayıtlar yalnız route’taki müşterinin **pet’lerine** aittir; sıra en yeni tarih önce; her blok en fazla **10** kayıt (`ClientRecentSummaryConstants`). Aktif klinik bağlamı (`IClinicContext`) varsa randevu ve muayene listeleri bu **kliniğe** indirgenir. Müşteri tenant dışı / yoksa `Clients.NotFound`. OpenAPI: `ClientsContractSchemaFilter`.
+
+**Pets (hayvan detay geçmiş özeti):** `GET /api/v1/pets/{id}/history-summary` — `Pets.Read`; tek yanıtta `PetHistorySummaryDto` (`recentAppointments`, `recentExaminations`, `recentTreatments`, `recentPrescriptions`, `recentLabResults`, `recentHospitalizations`, `recentPayments`) + üst düzey `petId`, `petName`, `clientId`, `clientName`. Kayıtlar yalnız route’taki **pet**’e aittir; sıra en yeni tarih önce; her blok en fazla **10** kayıt (`PetHistorySummaryConstants`). Aktif klinik bağlamı (`IClinicContext`) varsa tüm bloklar bu **kliniğe** indirgenir; yoksa tenant içindeki tüm klinikler. Pet tenant’ta yoksa `Pets.NotFound`. OpenAPI: `PetsContractSchemaFilter`. Ayrıntı §17.
 
 ---
 
@@ -140,7 +142,6 @@ Bu standardın amacı:
 
 ### Hazır (yakın)
 - Clients (liste + `recent-summary` şeması: `ClientsContractSchemaFilter`)
-- Pets
 - Species
 - Breeds
 - Dashboard
@@ -149,6 +150,7 @@ Bu standardın amacı:
 - Prescriptions (§14 — şema/required/nullability)
 - Lab Results (§15 — şema/required/nullability)
 - Hospitalizations (§16 — şema/required/nullability)
+- Pets (liste + pet detay `history-summary`: `PetsContractSchemaFilter` — §17)
 
 ### Kısmi Hazır
 - Clinics
@@ -439,3 +441,21 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Hospitalizations.NotFound`, `Tenants.TenantInactive`, `Examinations.NotFound`).
 
 **Swagger:** `HospitalizationsContractSchemaFilter` — create, update body, discharge body, detail/list DTO required/nullability ile hizalı.
+
+---
+
+## 17) Pets — `history-summary` (pet detay timeline)
+
+**Endpoint:** `GET /api/v1/pets/{id}/history-summary` — yetki: `Pets.Read` (pet detay ile aynı).
+
+**Amaç:** Pet detay ekranında birden fazla modül listesini ayrı ayrı çağırmak yerine, ilgili pet’in son klinik kayıtlarını tek yanıtta sunmak.
+
+**Yanıt:** `PetHistorySummaryDto` — üst düzey `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `recentAppointments`, `recentExaminations`, `recentTreatments`, `recentPrescriptions`, `recentLabResults`, `recentHospitalizations`, `recentPayments`. Her blok öğesi ilgili modülün özet alanlarını taşır (klinik adı `clinicName` ile birlikte `clinicId`).
+
+**Sıralama ve limit:** Her blok kendi tarih alanına göre **en yeni önce** (`scheduledAtUtc`, `examinedAtUtc`, `treatmentDateUtc`, `prescribedAtUtc`, `resultDateUtc`, `admittedAtUtc`, `paidAtUtc`); blok başına en fazla **10** kayıt (`PetHistorySummaryConstants.RecentItemsTake`).
+
+**Klinik bağlamı:** `IClinicContext.ClinicId` doluysa tüm bloklar yalnız bu klinikteki kayıtlarla sınırlıdır; boşsa tenant içindeki tüm kliniklerdeki ilgili pet kayıtları dahil edilir (client `recent-summary` ile aynı yaklaşım).
+
+**Hatalar:** Tenant bağlamı yoksa `Tenants.ContextMissing`; pet yok / tenant dışıysa `Pets.NotFound`. FluentValidation (boş route id) → 400.
+
+**Swagger:** `PetsContractSchemaFilter` — `PetHistorySummaryDto` ve alt öğe DTO’ları required/nullability ile hizalı.

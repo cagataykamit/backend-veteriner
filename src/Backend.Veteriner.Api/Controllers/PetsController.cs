@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Pets.Commands.Create;
 using Backend.Veteriner.Application.Pets.Commands.Update;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Queries.GetById;
+using Backend.Veteriner.Application.Pets.Queries.GetHistorySummary;
 using Backend.Veteriner.Application.Pets.Queries.GetList;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
@@ -94,6 +95,25 @@ public sealed class PetsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var result = await _mediator.Send(new GetPetByIdQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Pet detail için klinik geçmişi özeti: randevu, muayene, tedavi, reçete, lab, yatış ve ödeme blokları tek yanıtta; her blok en yeni tarih önce, üst sınırlı.
+    /// Aktif klinik bağlamı varsa kayıtlar bu kliniğe indirgenir; yoksa tenant içindeki tüm klinikler.
+    /// </summary>
+    [HttpGet("{id:guid}/history-summary")]
+    [Authorize(Policy = PermissionCatalog.Pets.Read)]
+    [ProducesResponseType(typeof(PetHistorySummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetHistorySummary([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var result = await _mediator.Send(new GetPetHistorySummaryQuery(id), ct);
         return result.ToActionResult(this);
     }
 
