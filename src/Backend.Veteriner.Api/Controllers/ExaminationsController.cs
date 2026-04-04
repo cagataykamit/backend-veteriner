@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.Examinations.Commands.Update;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Queries.GetById;
 using Backend.Veteriner.Application.Examinations.Queries.GetList;
+using Backend.Veteriner.Application.Examinations.Queries.GetRelatedSummary;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -118,6 +119,23 @@ public sealed class ExaminationsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetExaminationByIdQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Muayene detayına bağlı tedavi, reçete, laboratuvar sonucu, yatış ve ödeme özetleri (tek yanıt).
+    /// </summary>
+    [HttpGet("{id:guid}/related-summary")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(ExaminationRelatedSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetRelatedSummary([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetExaminationRelatedSummaryQuery(id), ct);
         return result.ToActionResult(this);
     }
 

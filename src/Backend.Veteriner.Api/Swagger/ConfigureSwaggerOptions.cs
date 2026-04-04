@@ -311,6 +311,46 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 return;
             }
 
+            if (context.Type == typeof(ExaminationRelatedSummaryDto))
+            {
+                MarkRequired(schema,
+                    "examinationId", "petId", "petName", "clientId", "clientName",
+                    "treatments", "prescriptions", "labResults", "hospitalizations", "payments");
+                return;
+            }
+
+            if (context.Type == typeof(ExaminationRelatedTreatmentItemDto))
+            {
+                MarkRequired(schema, "id", "treatmentDateUtc", "clinicId", "clinicName", "title");
+                return;
+            }
+
+            if (context.Type == typeof(ExaminationRelatedPrescriptionItemDto))
+            {
+                MarkRequired(schema, "id", "prescribedAtUtc", "clinicId", "clinicName", "title");
+                SetNullable(schema, "treatmentId", true);
+                return;
+            }
+
+            if (context.Type == typeof(ExaminationRelatedLabResultItemDto))
+            {
+                MarkRequired(schema, "id", "resultDateUtc", "clinicId", "clinicName", "testName");
+                return;
+            }
+
+            if (context.Type == typeof(ExaminationRelatedHospitalizationItemDto))
+            {
+                MarkRequired(schema, "id", "admittedAtUtc", "clinicId", "clinicName", "reason", "isActive");
+                SetNullable(schema, "dischargedAtUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(ExaminationRelatedPaymentItemDto))
+            {
+                MarkRequired(schema, "id", "paidAtUtc", "clinicId", "clinicName", "amount", "currency", "method");
+                return;
+            }
+
             if (context.Type == typeof(ExaminationListItemDto))
             {
                 Describe(schema, "visitReason", "Başvuru nedeni.");
@@ -323,6 +363,23 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 p.Description = description;
             }
+        }
+
+        private static void MarkRequired(OpenApiSchema schema, params string[] names)
+        {
+            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
+            foreach (var name in names)
+            {
+                if (schema.Properties.ContainsKey(name))
+                    schema.Required.Add(name);
+            }
+        }
+
+        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
+        {
+            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
+                return;
+            propertySchema.Nullable = isNullable;
         }
     }
 

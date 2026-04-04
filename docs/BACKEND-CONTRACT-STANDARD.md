@@ -99,7 +99,7 @@ Bu standardın amacı:
 | Clients | En tutarlı modüllerden | Düşük | Mevcut standardı referans modül olarak koruma | P2 | Düşük |
 | Pets | Route/body id standardı güçlü; pet detay için `history-summary` (§17) | Create response çıplak `Guid` | Create response standardizasyonu | P2 | Düşük |
 | Appointments | Update/lifecycle akışları güçlü | Bazı hata dallarında envelope farklılaşma riski | Error contract tekilleştirme | P1 | Orta |
-| Examinations | Kanonik `visitReason`; yazmada opsiyonel legacy `complaint` (Faz 0 / Adım 3; §11) | — | İstemciler `visitReason` kullanmalı | Tamamlandı (Faz 0) | Orta (alias kaldırma takvimi) |
+| Examinations | Kanonik `visitReason`; yazmada opsiyonel legacy `complaint` (Faz 0 / Adım 3; §11); muayene detay `related-summary` (§18) | — | İstemciler `visitReason` kullanmalı | Tamamlandı (Faz 0) | Orta (alias kaldırma takvimi) |
 | Vaccinations | Clinic context entegrasyonu var | `clinicId` ownership algısı modüller arası tutarsız | Context-first kuralını açık ve tek hale getirme | P1 | Orta |
 | Payments | Create/update/list/detail DTO + `PaymentsContractSchemaFilter` ile OpenAPI hizalı (Faz 0 / Adım 4; §12) | İş kuralı: clinic/müşteri/hayvan tutarlılığı | Context-first klinik uyumu operasyonel | Tamamlandı (Faz 0) | Orta (typegen) |
 | Treatments | List/detail/create/update DTO + `TreatmentsContractSchemaFilter`; muayene ile isteğe bağlı ilişki (§13) | Examination clinic/pet tutarlılığı; tarih penceresi | Examinations ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
@@ -151,6 +151,7 @@ Bu standardın amacı:
 - Lab Results (§15 — şema/required/nullability)
 - Hospitalizations (§16 — şema/required/nullability)
 - Pets (liste + pet detay `history-summary`: `PetsContractSchemaFilter` — §17)
+- Examinations (liste + muayene detay `related-summary`: `ExaminationsContractSchemaFilter` — §18)
 
 ### Kısmi Hazır
 - Clinics
@@ -459,3 +460,21 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** Tenant bağlamı yoksa `Tenants.ContextMissing`; pet yok / tenant dışıysa `Pets.NotFound`. FluentValidation (boş route id) → 400.
 
 **Swagger:** `PetsContractSchemaFilter` — `PetHistorySummaryDto` ve alt öğe DTO’ları required/nullability ile hizalı.
+
+---
+
+## 18) Examinations — `related-summary` (muayene detay ilişkili kayıtlar)
+
+**Endpoint:** `GET /api/v1/examinations/{id}/related-summary` — yetki: `Examinations.Read` (muayene detay ile aynı).
+
+**Amaç:** Muayene detay ekranında bu muayeneye bağlı tedavi, reçete, lab, yatış ve ödemeleri ayrı liste endpoint’leri yerine tek yanıtta sunmak.
+
+**Yanıt:** `ExaminationRelatedSummaryDto` — üst düzey `examinationId`, `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `treatments`, `prescriptions`, `labResults`, `hospitalizations`, `payments`. Her blok öğesi ilgili modülün özet alanlarını taşır (`clinicName` ile birlikte `clinicId`). Tedavi öğelerinde `examinationId` tekrarlanmaz (route’taki muayene zaten bağlamdır).
+
+**Sıralama ve limit:** Her blok kendi tarih alanına göre **en yeni önce** (`treatmentDateUtc`, `prescribedAtUtc`, `resultDateUtc`, `admittedAtUtc`, `paidAtUtc`); blok başına en fazla **10** kayıt (`ExaminationRelatedSummaryConstants.RelatedItemsTake`).
+
+**Klinik bağlamı:** `IClinicContext.ClinicId` doluysa önce muayenenin kendisi bu klinikte olmalıdır (aksi halde `Examinations.NotFound`, `GET /api/v1/examinations/{id}` ile aynı gizleme); ardından her blok yalnız bu klinikteki ve `ExaminationId` bu muayeneye eşit kayıtları içerir. Bağlam yoksa tenant içindeki tüm kliniklerde bu muayeneye bağlı kayıtlar dahildir (pet `history-summary` ile uyumlu yaklaşım).
+
+**Hatalar:** Tenant bağlamı yoksa `Tenants.ContextMissing`; muayene yok / tenant dışı / aktif klinik ile uyumsuzsa `Examinations.NotFound`. FluentValidation (boş route id) → 400.
+
+**Swagger:** `ExaminationsContractSchemaFilter` — `ExaminationRelatedSummaryDto` ve alt öğe DTO’ları required/nullability ile hizalı.
