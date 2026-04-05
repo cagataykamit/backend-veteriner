@@ -244,14 +244,14 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 - Kanonik query parametre adı: **`search`**. `PageRequest` ile bağlanan listelerde ayrıca **`page.search`** kullanılabilir; **üst düzey `search` doluysa** (trim sonrası) o değer kullanılır (`PageRequestQuery.WithMergedSearch`).
 - Normalizasyon: `ListQueryTextSearch.Normalize` (trim, max 200 karakter); SQL `LIKE` için `%term%` ve joker kaçışı (`ListQueryTextSearch.BuildContainsLikePattern`).
-- **Sort/order:** Bu listelerde `PageRequest.Sort` / `Order` **işlenmez** (controller özetlerinde belirtilir).
+- **Sort/order:** Çoğu listede `PageRequest.Sort` / `Order` **işlenmez** (controller özetlerinde belirtilir). **İstisna:** `GET /api/v1/appointments` — yalnızca `sort=ScheduledAtUtc` (büyük/küçük harf duyarsız) ve `order=asc|desc`; sort yoksa varsayılan **en yeni üstte** (`scheduledAtUtc` azalan).
 - **Kiracı:** `ITenantContext.TenantId` zorunlu; klinik bağlamı olan listelerde `clinicId` istek parametresi ile JWT/header clinic uyumsuzluğunda iş kuralı hatası.
 
 | Modül | GET endpoint | `search` | Metin hangi alanlarda |
 |--------|----------------|----------|------------------------|
 | Clients | `GET /api/v1/clients` | Evet | `FullName`, `Email`, `Phone`, `PhoneNormalized` |
 | Pets | `GET /api/v1/pets` | Evet | Hayvan: `Name`, `Breed`, `Species.Name`, `BreedRef.Name`; müşteri metni: `ClientsByTenantTextSearchSpec` ile eşleşen sahiplerin petleri. **AND** `clientId`, `speciesId` filtreleri. |
-| Appointments | `GET /api/v1/appointments` | Evet | Randevu `Notes`; pet id’ler: müşteri metni + hayvan metin alanları (`PetsByTenantTextFieldsSearchSpec` ile hayvan listesi ile aynı küme). **AND** `clinicId`, `petId`, `status`, tarih aralığı. |
+| Appointments | `GET /api/v1/appointments` | Evet | Randevu `Notes`; pet id’ler: müşteri metni + hayvan metin alanları (`PetsByTenantTextFieldsSearchSpec` ile hayvan listesi ile aynı küme). **AND** `clinicId`, `petId`, `status`, tarih aralığı. **Sıralama:** `sort`/`order` yalnızca `ScheduledAtUtc` + `asc`/`desc`; sort yoksa en yeni üstte. |
 | Examinations | `GET /api/v1/examinations` | Evet | `VisitReason`, `Findings`, `Assessment`, `Notes`; pet id’ler: müşteri + hayvan metin (yukarıdaki gibi). **AND** `clinicId`, `petId`, **`appointmentId`** (randevuya bağlı muayene), `dateFromUtc`, `dateToUtc` (hepsi AND). |
 | Vaccinations | `GET /api/v1/vaccinations` | Evet | `VaccineName`, `Notes`; pet id’ler: müşteri + hayvan metin. **AND** klinik/pet/durum/tarih filtreleri. |
 | Payments | `GET /api/v1/payments` | Evet | `Notes`, `Currency`; eşleşen `ClientId` / `PetId` ön kümesi (müşteri metni + `PetsByTenantTextFieldsSearchSpec`). **AND** klinik, müşteri, hayvan, yöntem, ödeme tarihi. |

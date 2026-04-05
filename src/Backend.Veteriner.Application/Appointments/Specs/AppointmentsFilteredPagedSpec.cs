@@ -16,7 +16,8 @@ public sealed class AppointmentsFilteredPagedSpec : Specification<Appointment>
         int page,
         int pageSize,
         string? searchContainsLikePattern,
-        Guid[] searchPetIds)
+        Guid[] searchPetIds,
+        bool scheduledAtDescending)
     {
         Query.Where(a => a.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -39,9 +40,12 @@ public sealed class AppointmentsFilteredPagedSpec : Specification<Appointment>
                 || (pids.Length > 0 && pids.Contains(a.PetId)));
         }
 
-        Query.OrderBy(a => a.ScheduledAtUtc)
-            .ThenBy(a => a.Id)
-            .Skip((page - 1) * pageSize)
+        if (scheduledAtDescending)
+            Query.OrderByDescending(a => a.ScheduledAtUtc).ThenByDescending(a => a.Id);
+        else
+            Query.OrderBy(a => a.ScheduledAtUtc).ThenBy(a => a.Id);
+
+        Query.Skip((page - 1) * pageSize)
             .Take(pageSize);
     }
 }

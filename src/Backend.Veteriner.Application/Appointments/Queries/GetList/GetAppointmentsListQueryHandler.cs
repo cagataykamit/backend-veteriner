@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -80,6 +81,8 @@ public sealed class GetAppointmentsListQueryHandler
                 ct);
         }
 
+        var scheduledAtDescending = AppointmentListSort.ResolveScheduledAtDescending(request.PageRequest);
+
         var total = await _appointments.CountAsync(
             new AppointmentsFilteredCountSpec(
                 tenantId,
@@ -103,7 +106,8 @@ public sealed class GetAppointmentsListQueryHandler
                 page,
                 pageSize,
                 searchPattern,
-                searchPetIds),
+                searchPetIds,
+                scheduledAtDescending),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
