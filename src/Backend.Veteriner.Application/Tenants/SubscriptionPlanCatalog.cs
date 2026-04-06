@@ -21,4 +21,20 @@ public static class SubscriptionPlanCatalog
         => All.FirstOrDefault(x => x.Code == code)?.Description;
 
     public static string ToApiCode(SubscriptionPlanCode code) => code.ToString();
+
+    public static bool TryParseApiCode(string? value, out SubscriptionPlanCode code)
+    {
+        code = default;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        if (!Enum.TryParse<SubscriptionPlanCode>(value.Trim(), ignoreCase: true, out var parsed))
+            return false;
+
+        if (!All.Any(x => x.Code == parsed))
+            return false;
+
+        code = parsed;
+        return true;
+    }
 }

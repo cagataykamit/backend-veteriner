@@ -531,3 +531,30 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** Kiracı bağlamı yok → `Tenants.ContextMissing`; abonelik satırı yok → `Subscriptions.NotFound`; tenant yok → `Tenants.NotFound`; izin yok → `Auth.PermissionDenied` veya `Tenants.AccessDenied`. FluentValidation (geçersiz route `tenantId`) → `400`.
 
 **Swagger:** Controller `ProducesResponseType(typeof(TenantSubscriptionSummaryDto), 200)`; enum şeması OpenAPI’da `TenantSubscriptionStatus` olarak görünür.
+
+---
+
+## 21) Public — `owner-signup` (Faz 2 public onboarding)
+
+**Endpoint:** `POST /api/v1/public/owner-signup`
+
+**Yetki:** `AllowAnonymous` (public endpoint). Mevcut panel içi onboarding/tenant setup akışının yerine geçmez; ayrı use-case.
+
+**Amaç:** İlk müşterinin tek çağrıda seçtiği paket ile owner hesabı, tenant, ilk klinik ve üyelik bağlarını kurmak.
+
+**Request body:** `planCode`, `tenantName`, `clinicName`, `clinicCity`, `email`, `password`.
+
+**İş akışı (tek command transaction sınırı):**
+- `planCode` katalog doğrulaması (`Basic`, `Pro`, `Premium`).
+- `email` duplicate kontrolü (`Users.DuplicateEmail`).
+- `tenantName` duplicate kontrolü (`Tenants.DuplicateName`).
+- owner user oluşturma + `Admin` role.
+- tenant + seçilen plan ile `TenantSubscription.StartTrial(...)`.
+- ilk clinic oluşturma + `UserTenant` / `UserClinic` üyelikleri.
+- `Admin` operation-claim bağlantısı (login/refresh permission claim zinciri ile uyumlu).
+
+**Response:** `PublicOwnerSignupResultDto` — `tenantId`, `clinicId`, `userId`, `planCode`, `trialStartsAtUtc`, `trialEndsAtUtc`, `canLogin`, `nextStep` (`login`).
+
+**Hatalar:** FluentValidation → `400 ValidationProblemDetails`; iş kuralı hataları `Result` + `ProblemDetails` (`extensions.code`) döner. Örnek kodlar: `Subscriptions.PlanCodeInvalid`, `Users.DuplicateEmail`, `Tenants.DuplicateName`, `Clinics.DuplicateName`, `Auth.AdminClaimMissing`.
+
+**Out-of-scope (Faz 2):** ödeme entegrasyonu, invite/join, trial sonrası read-only enforcement.
