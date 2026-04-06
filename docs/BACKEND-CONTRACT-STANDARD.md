@@ -107,6 +107,7 @@ Bu standardın amacı:
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
+| Tenants | `subscription-summary` (§20); kiracı başına `TenantSubscriptions` (Faz 1 omurga) | Yeni permission `Subscriptions.Read`; enum JSON numeric | Abonelik/plan genişlemesi ile OpenAPI ve seed senkronu | P1 | Orta (panel billing ekranı) |
 | Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 
@@ -512,3 +513,21 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** `Tenants.ContextMissing`.
 
 **Swagger:** `DashboardContractSchemaFilter` — `DashboardFinanceSummaryDto`, `DashboardFinanceRecentPaymentDto`.
+
+---
+
+## 20) Tenants — `subscription-summary` (kiracı abonelik özeti, Faz 1)
+
+**Endpoint:** `GET /api/v1/tenants/{tenantId}/subscription-summary`
+
+**Yetki:** `Subscriptions.Read` **veya** `Tenants.Read`. JWT’deki `tenant_id` ile route `tenantId` aynı olmalıdır; **başka kiracının** özetini yalnızca `Tenants.Read` (platform) ile görebilirsiniz. Aksi halde `Tenants.AccessDenied` (`403`).
+
+**Amaç:** Kiracıya bağlı plan kataloğu, abonelik durumu, trial tarihleri ve kalan gün bilgisini tek yanıtta sunmak (ödeme entegrasyonu yok; Faz 1 salt okunur özet).
+
+**Yanıt:** `TenantSubscriptionSummaryDto` — `tenantId`, `tenantName`, `planCode` (string API kodu: `basic` / `pro` / `premium`), `planName`, `status` (`TenantSubscriptionStatus` enum, JSON **numeric**: `Trialing=0`, `Active=1`, `ReadOnly=2`, `Cancelled=3`), `trialStartsAtUtc`, `trialEndsAtUtc` (opsiyonel), `daysRemaining` (yalnız `Trialing` ve `trialEndsAtUtc` varken; aksi halde null), `isReadOnly` (`status == ReadOnly`), `canManageSubscription` (`Tenants.Create` yetkisi varsa true — ileride paket yönetimi için kanca), `availablePlans[]` (`code`, `name`, `description`).
+
+**Veri:** `TenantSubscriptions` tablosu kiracı ile 1:1 (`TenantId` PK). Yeni kiracı oluşturma (`POST /tenants`) sonrası varsayılan olarak Basic plan + Trialing + 14 gün trial (`SubscriptionTrialDefaults.TrialDays`) yazılır. Eski kiracılar için migration ile backfill uygulanır.
+
+**Hatalar:** Kiracı bağlamı yok → `Tenants.ContextMissing`; abonelik satırı yok → `Subscriptions.NotFound`; tenant yok → `Tenants.NotFound`; izin yok → `Auth.PermissionDenied` veya `Tenants.AccessDenied`. FluentValidation (geçersiz route `tenantId`) → `400`.
+
+**Swagger:** Controller `ProducesResponseType(typeof(TenantSubscriptionSummaryDto), 200)`; enum şeması OpenAPI’da `TenantSubscriptionStatus` olarak görünür.

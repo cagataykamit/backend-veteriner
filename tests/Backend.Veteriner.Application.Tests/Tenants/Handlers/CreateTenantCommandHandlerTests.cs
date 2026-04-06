@@ -12,8 +12,9 @@ public sealed class CreateTenantCommandHandlerTests
 {
     private readonly Mock<IReadRepository<Tenant>> _read = new();
     private readonly Mock<IRepository<Tenant>> _write = new();
+    private readonly Mock<IRepository<TenantSubscription>> _subs = new();
 
-    private CreateTenantCommandHandler CreateHandler() => new(_read.Object, _write.Object);
+    private CreateTenantCommandHandler CreateHandler() => new(_read.Object, _write.Object, _subs.Object);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_DuplicateName_CaseInsensitive()
@@ -31,6 +32,7 @@ public sealed class CreateTenantCommandHandlerTests
 
         _write.Verify(r => r.AddAsync(It.IsAny<Tenant>(), It.IsAny<CancellationToken>()), Times.Never);
         _write.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _subs.Verify(r => r.AddAsync(It.IsAny<TenantSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -56,6 +58,7 @@ public sealed class CreateTenantCommandHandlerTests
         captured.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
 
         _write.Verify(r => r.AddAsync(captured, It.IsAny<CancellationToken>()), Times.Once);
+        _subs.Verify(r => r.AddAsync(It.Is<TenantSubscription>(s => s.TenantId == captured!.Id), It.IsAny<CancellationToken>()), Times.Once);
         _write.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 }

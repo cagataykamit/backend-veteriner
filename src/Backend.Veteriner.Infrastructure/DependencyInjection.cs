@@ -15,7 +15,7 @@ using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaims;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.UserOperationClaims;
 using Backend.Veteriner.Infrastructure.Security;                                  // JwtOptions, JwtTokenService, Sha256TokenHashService, BcryptPasswordHasher, JwtOptionsProvider
-using Backend.Veteriner.Infrastructure.Web;                                       // ClientContext, TenantContext, ClinicContext, AppUrlProvider, HttpAuditContext
+using Backend.Veteriner.Infrastructure.Web;                                       // ClientContext, TenantContext, ClinicContext, AppUrlProvider, HttpAuditContext, CurrentUserPermissionChecker
 using Backend.Veteriner.Infrastructure.Auditing;                                  // AuditLogWriter
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -90,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<IClientContext, ClientContext>();
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<IClinicContext, ClinicContext>();
+        services.AddScoped<ICurrentUserPermissionChecker, CurrentUserPermissionChecker>();
         services.AddScoped<IAppUrlProvider, AppUrlProvider>();
         services.AddScoped<IAuditContext, HttpAuditContext>();
         services.AddScoped<IAuditLogWriter, AuditLogWriter>();
