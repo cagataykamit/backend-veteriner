@@ -28,6 +28,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
             // TestDataSeeder yalnızca IntegrationTasksAdmin + Outbox bağlar; policy tabanlı modüller (Prescriptions, Treatments, …) için AdminClaimSeeder şart.
             PermissionSeeder.SeedAsync(db).GetAwaiter().GetResult();
             AdminClaimSeeder.SeedAsync(db).GetAwaiter().GetResult();
+            InviteAssignableOperationClaimsSeeder.SeedAsync(db).GetAwaiter().GetResult();
         });
     }
 }

@@ -1,0 +1,80 @@
+using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Public.Contracts.Dtos;
+using Backend.Veteriner.Application.Tenants.Invites;
+using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Users.Specs;
+using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Users;
+using MediatR;
+
+namespace Backend.Veteriner.Application.Public.Commands.AcceptInvite;
+
+public sealed class AcceptTenantInviteCommandHandler
+    : IRequestHandler<AcceptTenantInviteCommand, Result<TenantInviteAcceptResultDto>>
+{
+    private readonly ITokenHashService _tokenHash;
+    private readonly IRepository<TenantInvite> _invites;
+    private readonly IUserReadRepository _usersRead;
+    private readonly TenantInviteAcceptanceService _acceptance;
+
+    public AcceptTenantInviteCommandHandler(
+        ITokenHashService tokenHash,
+        IRepository<TenantInvite> invites,
+        IUserReadRepository usersRead,
+        TenantInviteAcceptanceService acceptance)
+    {
+        _tokenHash = tokenHash;
+        _invites = invites;
+        _usersRead = usersRead;
+        _acceptance = acceptance;
+    }
+
+    public async Task<Result<TenantInviteAcceptResultDto>> Handle(AcceptTenantInviteCommand request, CancellationToken ct)
+    {
+        string hash;
+        try
+        {
+            hash = _tokenHash.ComputeSha256(request.RawToken.Trim());
+        }
+        catch
+        {
+            return Result<TenantInviteAcceptResultDto>.Failure(
+                "Invites.TokenInvalid",
+                "Davet token geçersiz.");
+        }
+
+        var invite = await _invites.FirstOrDefaultAsync(new TenantInviteByTokenHashSpec(hash), ct);
+        if (invite is null)
+        {
+            return Result<TenantInviteAcceptResultDto>.Failure(
+                "Invites.NotFound",
+                "Davet bulunamadı.");
+        }
+
+        if (invite.Status != TenantInviteStatus.Pending)
+        {
+            return Result<TenantInviteAcceptResultDto>.Failure(
+                "Invites.NotPending",
+                "Bu davet artık geçerli değil.");
+        }
+
+        if (DateTime.UtcNow >= invite.ExpiresAtUtc)
+        {
+            return Result<TenantInviteAcceptResultDto>.Failure(
+                "Invites.Expired",
+                "Davet süresi dolmuş.");
+        }
+
+        var user = await _usersRead.FirstOrDefaultAsync(
+            new UserByIdWithRolesSpec(request.CurrentUserId), ct);
+        if (user is null)
+        {
+            return Result<TenantInviteAcceptResultDto>.Failure(
+                "Users.NotFound",
+                "Kullanıcı bulunamadı.");
+        }
+
+        return await _acceptance.AcceptAsync(invite, user, ct);
+    }
+}

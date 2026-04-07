@@ -1,5 +1,7 @@
 using System.Reflection;
 using Backend.Veteriner.Application.Common.Behaviors;
+using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Application.Tenants.Invites;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +19,9 @@ public static class DependencyInjection
         // - T�m Command/Query handler'lar?n? bu assembly �zerinden otomatik kaydeder.
         // =========================================================
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
+
+        services.AddScoped<TenantSubscriptionSeatEvaluator>();
+        services.AddScoped<TenantInviteAcceptanceService>();
 
         // =========================================================
         // FluentValidation

@@ -15,4 +15,4 @@ public sealed record TenantSubscriptionSummaryDto(
     bool CanManageSubscription,
     IReadOnlyList<SubscriptionPlanOptionDto> AvailablePlans);
 
-public sealed record SubscriptionPlanOptionDto(string Code, string Name, string? Description);
+public sealed record SubscriptionPlanOptionDto(string Code, string Name, string? Description, int MaxUsers);

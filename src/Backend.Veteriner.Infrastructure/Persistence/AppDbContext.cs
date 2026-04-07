@@ -61,6 +61,7 @@ public class AppDbContext : DbContext
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
     public DbSet<UserTenant> UserTenants => Set<UserTenant>();
+    public DbSet<TenantInvite> TenantInvites => Set<TenantInvite>();
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<UserClinic> UserClinics => Set<UserClinic>();
     public DbSet<Client> Clients => Set<Client>();

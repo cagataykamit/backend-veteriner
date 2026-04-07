@@ -37,6 +37,7 @@ public static class PermissionCatalog
     {
         public const string Read = "Tenants.Read";
         public const string Create = "Tenants.Create";
+        public const string InviteCreate = "Tenants.InviteCreate";
     }
 
     public static class Subscriptions
@@ -167,6 +168,7 @@ public static class PermissionCatalog
 
         new(Tenants.Read, "Kiracıları listeleme ve görüntüleme yetkisi", "Tenants"),
         new(Tenants.Create, "Kiracı oluşturma yetkisi", "Tenants"),
+        new(Tenants.InviteCreate, "Kiracıya kullanıcı daveti oluşturma yetkisi", "Tenants"),
 
         new(Subscriptions.Read, "Kiracı abonelik özetini görüntüleme yetkisi", "Subscriptions"),
 

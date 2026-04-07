@@ -92,6 +92,21 @@ public static class ResultExtensions
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }
 
+        if (normalized.Contains("userlimitexceeded"))
+        {
+            return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
+        if (normalized.Contains("notassignable"))
+        {
+            return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
+        if (normalized.Contains("subscriptionreadonly") || normalized.Contains("subscriptioncancelled"))
+        {
+            return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
         if (normalized.Contains("unauthorized") || normalized.Contains("unauthenticated"))
         {
             return (StatusCodes.Status401Unauthorized, "https://httpstatuses.io/401");

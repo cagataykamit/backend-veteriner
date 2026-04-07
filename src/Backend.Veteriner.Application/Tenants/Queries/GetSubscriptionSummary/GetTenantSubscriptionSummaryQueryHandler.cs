@@ -85,7 +85,8 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
             .Select(p => new SubscriptionPlanOptionDto(
                 SubscriptionPlanCatalog.ToApiCode(p.Code),
                 p.Name,
-                p.Description))
+                p.Description,
+                p.MaxUsers))
             .ToList();
 
         var dto = new TenantSubscriptionSummaryDto(

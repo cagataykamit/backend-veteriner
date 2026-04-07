@@ -107,7 +107,7 @@ Bu standardın amacı:
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
-| Tenants | `subscription-summary` (§20); kiracı başına `TenantSubscriptions` (Faz 1 omurga) | Yeni permission `Subscriptions.Read`; enum JSON numeric | Abonelik/plan genişlemesi ile OpenAPI ve seed senkronu | P1 | Orta (panel billing ekranı) |
+| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + admin davet) |
 | Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 
@@ -558,3 +558,62 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** FluentValidation → `400 ValidationProblemDetails`; iş kuralı hataları `Result` + `ProblemDetails` (`extensions.code`) döner. Örnek kodlar: `Subscriptions.PlanCodeInvalid`, `Users.DuplicateEmail`, `Tenants.DuplicateName`, `Clinics.DuplicateName`, `Auth.AdminClaimMissing`.
 
 **Out-of-scope (Faz 2):** ödeme entegrasyonu, invite/join, trial sonrası read-only enforcement.
+
+---
+
+## 22) Tenants — davet / join (Faz 3) + kullanıcı kotası
+
+### 22.1 Kullanıcı limiti (ürün kararı)
+
+- **Kotanın kaynağı:** `SubscriptionPlanCatalog` içindeki `MaxUsers` (Basic **3**, Pro **10**, Premium **50**).
+- **Sayım tanımı:** Belirli bir `tenantId` için **`UserTenants` satır sayısı** = o kiracıdaki aktif üyelik sayısı (slot).
+- **Bekleyen davetler:** Süresi dolmamış ve `Pending` durumundaki `TenantInvites` kayıtları da slot rezervasyonu sayılır (davet oluştururken `üye + bekleyen davet + 1 ≤ maxUsers` kuralı).
+- **İki noktada kontrol:** (1) `POST …/invites` oluşturma, (2) kabul (`accept` / `signup-and-accept`) — araya giren yeni üyeler için kabul anında tekrar `üye sayısı < maxUsers` doğrulanır.
+- **Kota aşımı kodu:** `Subscriptions.UserLimitExceeded` → HTTP **403** (`ResultExtensions`).
+
+**Tek-kiracı kullanıcı modeli:** `UserTenants` üzerinde kullanıcı başına tek satır (mevcut indeks). Davet kabulü, kullanıcının zaten **başka bir kiracıda** üyeliği varsa reddedilir (`Invites.UserBelongsToAnotherTenant`).
+
+### 22.2 Abonelik / tenant durumu
+
+Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trialing** veya **Active** olmalı. **ReadOnly** veya **Cancelled** abonelikte davet engellenir (`Subscriptions.SubscriptionReadOnly`, `Subscriptions.SubscriptionCancelled`).
+
+### 22.3 Endpoint’ler
+
+**A) Davet oluştur** — `POST /api/v1/tenants/{tenantId}/invites`
+
+- **Yetki:** `Tenants.InviteCreate`; JWT `tenant_id` route `tenantId` ile aynı olmalı (`TryGetResolvedTenant`).
+- **Body:** `email`, `clinicId`, `operationClaimId`, isteğe bağlı `expiresAtUtc` (yoksa **7 gün**).
+- **Response:** `CreateTenantInviteResultDto` — `inviteId`, `token` (ham, yalnızca bu yanıtta), `email`, `tenantId`, `clinicId`, `expiresAtUtc`.
+
+**B) Davet doğrula (public)** — `GET /api/v1/public/invites/{token}`
+
+- **Yetki:** `AllowAnonymous`.
+- **Response:** `PublicTenantInviteDetailDto` — `inviteToken`, `tenantId`, `tenantName`, `clinicId`, `clinicName`, `email`, `expiresAtUtc`, `isExpired`, `isPending`, `canJoin`, `requiresLogin`, `requiresSignup`.
+
+**C) Mevcut kullanıcı kabul** — `POST /api/v1/public/invites/{token}/accept`
+
+- **Yetki:** `[Authorize]` (access token).
+- Oturumdaki kullanıcının e-postası davetteki `email` ile eşleşmeli (`Invites.EmailMismatch`).
+
+**D) Kayıt + kabul** — `POST /api/v1/public/invites/{token}/signup-and-accept`
+
+- **Yetki:** `AllowAnonymous`; **body:** `password`.
+- Davet e-postası ile hesap zaten varsa `Invites.RequiresLogin` (login + `accept` kullanılmalı).
+
+### 22.4 `subscription-summary` plan seçenekleri
+
+`SubscriptionPlanOptionDto` alanları: `code`, `name`, `description`, **`maxUsers`** (panelde kota gösterimi için).
+
+### 22.5 Davet — atanabilir operation claim (rol) listesi
+
+**Endpoint:** `GET /api/v1/tenants/{tenantId}/assignable-operation-claims`
+
+**Yetki:** `Tenants.InviteCreate`; JWT `tenant_id` route `tenantId` ile aynı (`TryGetResolvedTenant`).
+
+**Amaç:** Davet oluşturma ekranındaki rol dropdown’unu beslemek. Liste **kullanıcının sahip olduğu claim’lerden değil**, **`OperationClaims` tablosundaki whitelist’li kiracı-üyelik rollerinden** üretilir; dönen `operationClaimId` değerleri doğrudan `POST /api/v1/tenants/{tenantId}/invites` gövdesindeki `operationClaimId` ile aynı olmalıdır.
+
+**Ürün kararı:** Tüm `OperationClaim` kayıtları expose edilmez; uygulama tarafında `InviteAssignableOperationClaimsCatalog.NamesInDisplayOrder` **whitelist** (ör. `Admin`, `ClinicAdmin`, `Veteriner`, `Sekreter`). Teknik/internal roller bu listede yoksa API’de görünmez. Startup’ta `InviteAssignableOperationClaimsSeeder` eksik claim satırlarını idempotent oluşturur (permission matrisi bu seeder’da bağlanmaz; yalnız satır vardır).
+
+**Yanıt:** `AssignableOperationClaimForInviteDto[]` — `operationClaimId`, `operationClaimName` (sıra whitelist görüntü sırasıyla uyumlu).
+
+**Invite create ile ilişki:** `POST …/invites` hem kaydın `OperationClaims` içinde varlığını hem de adının whitelist’te olduğunu doğrular; whitelist dışı id için `Invites.OperationClaimNotAssignable` (`403`).

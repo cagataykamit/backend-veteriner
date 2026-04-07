@@ -199,6 +199,7 @@ public static class WebApplicationExtensions
                 await PermissionSeeder.SeedAsync(db);
                 await DataSeeder.SeedAsync(db, hasher);
                 await AdminClaimSeeder.SeedAsync(db);
+                await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
 
                 logger.LogInformation("Database migration and seeding completed successfully.");
             }

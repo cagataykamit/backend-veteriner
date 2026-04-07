@@ -23,4 +23,13 @@ public sealed class UserTenantRepository : IUserTenantRepository
 
     public Task<bool> ExistsAsync(Guid userId, Guid tenantId, CancellationToken ct)
         => _db.UserTenants.AsNoTracking().AnyAsync(x => x.UserId == userId && x.TenantId == tenantId, ct);
+
+    public async Task<Guid?> GetExistingTenantIdForUserAsync(Guid userId, CancellationToken ct)
+    {
+        return await _db.UserTenants
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .Select(x => (Guid?)x.TenantId)
+            .FirstOrDefaultAsync(ct);
+    }
 }
