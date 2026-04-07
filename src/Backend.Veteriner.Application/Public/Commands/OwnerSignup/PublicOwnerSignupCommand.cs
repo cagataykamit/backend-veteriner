@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
@@ -10,4 +11,4 @@ public sealed record PublicOwnerSignupCommand(
     string ClinicName,
     string ClinicCity,
     string Email,
-    string Password) : IRequest<Result<PublicOwnerSignupResultDto>>;
+    string Password) : IRequest<Result<PublicOwnerSignupResultDto>>, IIgnoreTenantWriteSubscriptionGuard;

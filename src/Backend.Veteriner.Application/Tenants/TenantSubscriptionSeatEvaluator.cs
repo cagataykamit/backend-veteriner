@@ -28,9 +28,6 @@ public sealed class TenantSubscriptionSeatEvaluator
         _invites = invites;
     }
 
-    public static bool SubscriptionAllowsInvites(TenantSubscriptionStatus status)
-        => status is TenantSubscriptionStatus.Trialing or TenantSubscriptionStatus.Active;
-
     public async Task<Result<SubscriptionSeatSnapshot>> TryBuildAsync(Guid tenantId, CancellationToken ct)
     {
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
@@ -51,29 +48,15 @@ public sealed class TenantSubscriptionSeatEvaluator
                 "Bu kiracı için abonelik kaydı bulunamadı.");
         }
 
-        if (sub.Status == TenantSubscriptionStatus.ReadOnly)
+        var utcNow = DateTime.UtcNow;
+        if (!TenantSubscriptionEffectiveWriteEvaluator.AllowsTenantMutations(sub, utcNow))
         {
             return Result<SubscriptionSeatSnapshot>.Failure(
-                "Subscriptions.SubscriptionReadOnly",
-                "Abonelik salt okunur; davet oluşturulamaz veya kabul edilemez.");
-        }
-
-        if (sub.Status == TenantSubscriptionStatus.Cancelled)
-        {
-            return Result<SubscriptionSeatSnapshot>.Failure(
-                "Subscriptions.SubscriptionCancelled",
-                "Abonelik iptal edilmiş; davet oluşturulamaz veya kabul edilemez.");
-        }
-
-        if (!SubscriptionAllowsInvites(sub.Status))
-        {
-            return Result<SubscriptionSeatSnapshot>.Failure(
-                "Subscriptions.InvitesNotAllowed",
-                "Mevcut abonelik durumunda davet desteklenmiyor.");
+                "Subscriptions.TenantReadOnly",
+                "Abonelik deneme süresi sona ermiş veya salt okunur durumdadır; davet işlemi yapılamaz.");
         }
 
         var maxUsers = SubscriptionPlanCatalog.GetMaxUsers(sub.PlanCode);
-        var utcNow = DateTime.UtcNow;
 
         var memberCount = await _userTenants.CountAsync(new UserTenantsByTenantCountSpec(tenantId), ct);
         var pendingCount = await _invites.CountAsync(new PendingTenantInvitesByTenantCountSpec(tenantId, utcNow), ct);

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -14,4 +15,4 @@ namespace Backend.Veteriner.Application.Auth.Commands.Login;
 /// Veride birden fazla kiracı üyeliği kalırsa <c>Auth.UserMultipleTenantsForbidden</c>.
 /// </param>
 public sealed record LoginCommand(string Email, string Password, Guid? TenantId = null)
-    : IRequest<Result<LoginResultDto>>;
+    : IRequest<Result<LoginResultDto>>, IIgnoreTenantWriteSubscriptionGuard;

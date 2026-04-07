@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
@@ -12,6 +13,7 @@ namespace Backend.Veteriner.Application.Tenants.Invites;
 /// <summary>Davet kabulünde üyelik, klinik ataması ve operation claim bağını tek transaction sınırında tamamlar.</summary>
 public sealed class TenantInviteAcceptanceService
 {
+    private readonly ITenantSubscriptionWriteGuard _writeGuard;
     private readonly TenantSubscriptionSeatEvaluator _seatEvaluator;
     private readonly IUserTenantRepository _userTenantRepo;
     private readonly IUserClinicRepository _userClinicRepo;
@@ -22,6 +24,7 @@ public sealed class TenantInviteAcceptanceService
     private readonly IUnitOfWork _uow;
 
     public TenantInviteAcceptanceService(
+        ITenantSubscriptionWriteGuard writeGuard,
         TenantSubscriptionSeatEvaluator seatEvaluator,
         IUserTenantRepository userTenantRepo,
         IUserClinicRepository userClinicRepo,
@@ -31,6 +34,7 @@ public sealed class TenantInviteAcceptanceService
         IReadRepository<Clinic> clinics,
         IUnitOfWork uow)
     {
+        _writeGuard = writeGuard;
         _seatEvaluator = seatEvaluator;
         _userTenantRepo = userTenantRepo;
         _userClinicRepo = userClinicRepo;
@@ -68,6 +72,10 @@ public sealed class TenantInviteAcceptanceService
                 "Invites.UserBelongsToAnotherTenant",
                 "Hesabınız başka bir kiracıya bağlı; bu daveti kabul edemezsiniz.");
         }
+
+        var write = await _writeGuard.EnsureWritesAllowedAsync(invite.TenantId, ct);
+        if (!write.IsSuccess)
+            return Result<TenantInviteAcceptResultDto>.Failure(write.Error);
 
         var seat = await _seatEvaluator.TryBuildAsync(invite.TenantId, ct);
         if (!seat.IsSuccess)

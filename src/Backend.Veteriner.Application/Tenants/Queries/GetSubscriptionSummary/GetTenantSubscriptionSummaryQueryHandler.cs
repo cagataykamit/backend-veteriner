@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
@@ -76,7 +77,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
             daysRemaining = span.TotalDays <= 0 ? 0 : (int)Math.Ceiling(span.TotalDays);
         }
 
-        var isReadOnly = sub.Status == TenantSubscriptionStatus.ReadOnly;
+        var isReadOnly = !TenantSubscriptionEffectiveWriteEvaluator.AllowsTenantMutations(sub, utcNow);
         var canManage = _permissions.HasPermission(PermissionCatalog.Tenants.Create);
 
         var planCodeStr = SubscriptionPlanCatalog.ToApiCode(sub.PlanCode);

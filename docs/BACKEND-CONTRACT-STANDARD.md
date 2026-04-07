@@ -107,7 +107,7 @@ Bu standardın amacı:
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
-| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + admin davet) |
+| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); kiracı başına `TenantSubscriptions` + `TenantInvites`; **Faz 4** merkezi yazma koruması (§23) | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; `Subscriptions.TenantReadOnly` | Davet/limit drift; token URL encoding; read-only tenant mutation | P1 | Orta (join ekranı + admin davet + salt okunur banner) |
 | Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 
@@ -524,7 +524,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **Amaç:** Kiracıya bağlı plan kataloğu, abonelik durumu, trial tarihleri ve kalan gün bilgisini tek yanıtta sunmak (ödeme entegrasyonu yok; Faz 1 salt okunur özet).
 
-**Yanıt:** `TenantSubscriptionSummaryDto` — `tenantId`, `tenantName`, `planCode` (string API kodu: `basic` / `pro` / `premium`), `planName`, `status` (`TenantSubscriptionStatus` enum, JSON **numeric**: `Trialing=0`, `Active=1`, `ReadOnly=2`, `Cancelled=3`), `trialStartsAtUtc`, `trialEndsAtUtc` (opsiyonel), `daysRemaining` (yalnız `Trialing` ve `trialEndsAtUtc` varken; aksi halde null), `isReadOnly` (`status == ReadOnly`), `canManageSubscription` (`Tenants.Create` yetkisi varsa true — ileride paket yönetimi için kanca), `availablePlans[]` (`code`, `name`, `description`).
+**Yanıt:** `TenantSubscriptionSummaryDto` — `tenantId`, `tenantName`, `planCode` (string API kodu: `basic` / `pro` / `premium`), `planName`, `status` (`TenantSubscriptionStatus` enum, JSON **numeric**: `Trialing=0`, `Active=1`, `ReadOnly=2`, `Cancelled=3`), `trialStartsAtUtc`, `trialEndsAtUtc` (opsiyonel), `daysRemaining` (yalnız `Trialing` ve `trialEndsAtUtc` varken; aksi halde null), `isReadOnly` (**effective** salt okunur: `Cancelled`, `ReadOnly` veya `Trialing` iken `trialEndsAtUtc` geçmiş; Faz 4 ile mutation koruması ile hizalı), `canManageSubscription` (`Tenants.Create` yetkisi varsa true — ileride paket yönetimi için kanca), `availablePlans[]` (`code`, `name`, `description`).
 
 **Veri:** `TenantSubscriptions` tablosu kiracı ile 1:1 (`TenantId` PK). Yeni kiracı oluşturma (`POST /tenants`) sonrası varsayılan olarak Basic plan + Trialing + 14 gün trial (`SubscriptionTrialDefaults.TrialDays`) yazılır. Eski kiracılar için migration ile backfill uygulanır.
 
@@ -557,7 +557,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **Hatalar:** FluentValidation → `400 ValidationProblemDetails`; iş kuralı hataları `Result` + `ProblemDetails` (`extensions.code`) döner. Örnek kodlar: `Subscriptions.PlanCodeInvalid`, `Users.DuplicateEmail`, `Tenants.DuplicateName`, `Clinics.DuplicateName`, `Auth.AdminClaimMissing`.
 
-**Out-of-scope (Faz 2):** ödeme entegrasyonu, invite/join, trial sonrası read-only enforcement.
+**Out-of-scope (Faz 2):** ödeme entegrasyonu, invite/join. Trial sonrası read-only enforcement **Faz 4** (§23) ile backend’de uygulanır.
 
 ---
 
@@ -575,7 +575,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 ### 22.2 Abonelik / tenant durumu
 
-Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trialing** veya **Active** olmalı. **ReadOnly** veya **Cancelled** abonelikte davet engellenir (`Subscriptions.SubscriptionReadOnly`, `Subscriptions.SubscriptionCancelled`).
+Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik satırı **yazma için effective uygun** olmalı (Faz 4): `Active`, veya `Trialing` ve `trialEndsAtUtc` henüz gelmemiş. `ReadOnly`, `Cancelled` veya **trial bitmiş** `Trialing` (DB durumu gecikse bile) davet engellenir — tek iş kuralı kodu **`Subscriptions.TenantReadOnly`** (`403`). Abonelik satırı yoksa **`Subscriptions.NotFound`** (`404`).
 
 ### 22.3 Endpoint’ler
 
@@ -617,3 +617,25 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 **Yanıt:** `AssignableOperationClaimForInviteDto[]` — `operationClaimId`, `operationClaimName` (sıra whitelist görüntü sırasıyla uyumlu).
 
 **Invite create ile ilişki:** `POST …/invites` hem kaydın `OperationClaims` içinde varlığını hem de adının whitelist’te olduğunu doğrular; whitelist dışı id için `Invites.OperationClaimNotAssignable` (`403`).
+
+---
+
+## 23) Abonelik — kiracı yazma koruması (Faz 4, trial sonrası read-only)
+
+**Amaç:** Trial bittiğinde otomatik ücretli plana geçiş yok; kiracı **effective read-only** iken tenant verisini değiştiren mutation’lar backend’de merkezi kesilir. Okuma (GET/list/detail/summary/dashboard, `subscription-summary`, login / refresh / select-clinic) açık kalır.
+
+**Effective yazma kararı** (`TenantSubscriptionEffectiveWriteEvaluator`):
+- **İzinli:** `Active`; `Trialing` ve (`trialEndsAtUtc` yok **veya** `UtcNow < trialEndsAtUtc`).
+- **Engelli:** `ReadOnly`, `Cancelled`; `Trialing` ve `trialEndsAtUtc ≤ UtcNow` (DB `Status` henüz güncellenmemiş olsa bile).
+
+**Abonelik satırı yok:** Yazma yolu güvenli — **`Subscriptions.NotFound`** → HTTP **404**. *(Not: `POST /api/v1/public/owner-signup` ve platform `POST /api/v1/tenants` yeni kiracı + abonelik oluşturur; bu akışlar guard dışındadır.)*
+
+**Merkezi enforcement:** MediatR `TenantWriteSubscriptionGuardBehavior` — JWT’de `tenant_id` çözümlüyse ve istek `Result` / `Result<T>` dönen bir **command** ise (tip adı `*Query` ile bitmiyorsa) `ITenantSubscriptionWriteGuard` çalışır. **Muaf:** `IIgnoreTenantWriteSubscriptionGuard` (login, refresh, select-clinic, public owner-signup, platform tenant create, davet accept/signup-and-accept pipeline girişi, oturum iptalleri).
+
+**Davet kabulü:** `AcceptTenantInvite` / `SignupAndAcceptTenantInvite` JWT’de hedef kiracı bağlamı olmayabilir; guard pipeline’da muaf tutulur, **`TenantInviteAcceptanceService`** içinde `invite.TenantId` için aynı kural uygulanır.
+
+**Hata kodları:**
+- **`Subscriptions.TenantReadOnly`** — effective yazma kapalı → HTTP **403** (`ResultExtensions`).
+- **`Subscriptions.NotFound`** — abonelik satırı yok (yazma sırasında) → HTTP **404**.
+
+**Frontend:** Salt okunur / abonelik CTA için `GET …/subscription-summary` içindeki `isReadOnly` (effective) + mutation yanıtlarında `extensions.code === "Subscriptions.TenantReadOnly"` veya `Subscriptions.NotFound` birlikte ele alınabilir.

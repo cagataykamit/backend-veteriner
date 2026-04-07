@@ -102,7 +102,9 @@ public static class ResultExtensions
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }
 
-        if (normalized.Contains("subscriptionreadonly") || normalized.Contains("subscriptioncancelled"))
+        if (normalized.Contains("subscriptionreadonly")
+            || normalized.Contains("subscriptioncancelled")
+            || normalized.Contains("tenantreadonly"))
         {
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }
