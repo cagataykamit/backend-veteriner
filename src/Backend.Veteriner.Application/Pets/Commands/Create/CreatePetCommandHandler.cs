@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.PetColors.Specs;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clients;
@@ -24,6 +25,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
     private readonly IReadRepository<Breed> _breedsRead;
     private readonly IReadRepository<Pet> _petsRead;
     private readonly IRepository<Pet> _petsWrite;
+    private readonly TenantSubscriptionEffectiveWriteEvaluator _writeEvaluator;
 
     public CreatePetCommandHandler(
         ITenantContext tenantContext,
@@ -33,7 +35,8 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         IReadRepository<PetColor> colorsRead,
         IReadRepository<Breed> breedsRead,
         IReadRepository<Pet> petsRead,
-        IRepository<Pet> petsWrite)
+        IRepository<Pet> petsWrite,
+        TenantSubscriptionEffectiveWriteEvaluator writeEvaluator)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
@@ -43,6 +46,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         _breedsRead = breedsRead;
         _petsRead = petsRead;
         _petsWrite = petsWrite;
+        _writeEvaluator = writeEvaluator;
     }
 
     public async Task<Result<Guid>> Handle(CreatePetCommand request, CancellationToken ct)
@@ -62,6 +66,10 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             return Result<Guid>.Failure(
                 "Tenants.TenantInactive",
                 "Pasif kiracı için hayvan kaydı oluşturulamaz.");
+
+        var writeGate = await _writeEvaluator.EnsureWriteAllowedAsync(tenantId, ct);
+        if (!writeGate.IsSuccess)
+            return Result<Guid>.Failure(writeGate.Error);
 
         var client = await _clients.FirstOrDefaultAsync(
             new ClientByIdSpec(tenantId, request.ClientId), ct);

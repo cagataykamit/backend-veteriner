@@ -48,6 +48,16 @@ public sealed class TenantSubscription : AggregateRoot
         };
     }
 
+    public void ActivatePaidPlan(SubscriptionPlanCode targetPlanCode, DateTime utcNow)
+    {
+        var now = NormalizeUtc(utcNow);
+        PlanCode = targetPlanCode;
+        Status = TenantSubscriptionStatus.Active;
+        ActivatedAtUtc = now;
+        CancelledAtUtc = null;
+        UpdatedAtUtc = now;
+    }
+
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch
         {

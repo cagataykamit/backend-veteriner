@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Commands.Create;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clients;
@@ -18,6 +19,7 @@ public sealed class CreatePetCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
+    private readonly Mock<IReadRepository<TenantSubscription>> _subscriptionsRead = new();
     private readonly Mock<IReadRepository<Client>> _clientsRead = new();
     private readonly Mock<IReadRepository<Species>> _speciesRead = new();
     private readonly Mock<IReadRepository<PetColor>> _colorsRead = new();
@@ -26,7 +28,14 @@ public sealed class CreatePetCommandHandlerTests
     private readonly Mock<IRepository<Pet>> _petsWrite = new();
 
     private CreatePetCommandHandler CreateHandler()
-        => new(
+    {
+        _subscriptionsRead
+            .Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TenantSubscription.StartTrial(Guid.NewGuid(), SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
+
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenantsRead.Object, _subscriptionsRead.Object);
+
+        return new(
             _tenantContext.Object,
             _tenantsRead.Object,
             _clientsRead.Object,
@@ -34,7 +43,9 @@ public sealed class CreatePetCommandHandlerTests
             _colorsRead.Object,
             _breedsRead.Object,
             _petsRead.Object,
-            _petsWrite.Object);
+            _petsWrite.Object,
+            writeEvaluator);
+    }
 
     private static void AlignTenantId(Tenant tenant, Guid id)
         => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);

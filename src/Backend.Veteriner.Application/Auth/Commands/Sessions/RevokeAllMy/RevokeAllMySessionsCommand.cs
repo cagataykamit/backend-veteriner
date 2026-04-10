@@ -5,7 +5,7 @@ using MediatR;
 namespace Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeAllMy;
 
 public sealed record RevokeAllMySessionsCommand(Guid UserId)
-    : IRequest<Result>, IAuditableRequest, IIgnoreTenantWriteSubscriptionGuard
+    : IRequest<Result>, IAuditableRequest
 {
     public string AuditAction => "Session.LogoutAll";
     public string AuditTarget => $"UserId={UserId}";

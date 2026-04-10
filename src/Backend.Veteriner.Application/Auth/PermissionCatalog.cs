@@ -43,6 +43,7 @@ public static class PermissionCatalog
     public static class Subscriptions
     {
         public const string Read = "Subscriptions.Read";
+        public const string Manage = "Subscriptions.Manage";
     }
 
     public static class Clinics
@@ -171,6 +172,7 @@ public static class PermissionCatalog
         new(Tenants.InviteCreate, "Kiracıya kullanıcı daveti oluşturma yetkisi", "Tenants"),
 
         new(Subscriptions.Read, "Kiracı abonelik özetini görüntüleme yetkisi", "Subscriptions"),
+        new(Subscriptions.Manage, "Kiracı abonelik checkout/aktivasyon yönetimi yetkisi", "Subscriptions"),
 
         new(Clinics.Read, "Klinikleri listeleme ve görüntüleme yetkisi", "Clinics"),
         new(Clinics.Create, "Klinik oluşturma yetkisi", "Clinics"),

@@ -6,10 +6,12 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Api.Contracts;
 using Backend.Veteriner.Application.Tenants.Commands.Create;
 using Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
+using Backend.Veteriner.Application.Tenants.Commands.Checkout;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Queries.GetById;
 using Backend.Veteriner.Application.Tenants.Queries.GetList;
 using Backend.Veteriner.Application.Tenants.Queries.GetAssignableOperationClaimsForInvite;
+using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionCheckout;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionSummary;
 using Backend.Veteriner.Domain.Shared;
 using System.Collections.Generic;
@@ -122,6 +124,74 @@ public sealed class TenantsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetTenantSubscriptionSummaryQuery(tenantId), ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpPost("{tenantId:guid}/subscription-checkout")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(SubscriptionCheckoutSessionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> StartSubscriptionCheckout(
+        [FromRoute] Guid tenantId,
+        [FromBody] StartSubscriptionCheckoutBody? body,
+        CancellationToken ct)
+    {
+        if (body is null)
+        {
+            return Result<SubscriptionCheckoutSessionDto>.Failure(
+                    "Subscriptions.Checkout.Validation.InvalidRequestBody",
+                    "Istek govdesi bos veya hatali JSON.")
+                .ToActionResult(this);
+        }
+
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new StartSubscriptionCheckoutCommand(tenantId, body.TargetPlanCode), ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpGet("{tenantId:guid}/subscription-checkout/{checkoutSessionId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [ProducesResponseType(typeof(SubscriptionCheckoutSessionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSubscriptionCheckoutStatus(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid checkoutSessionId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetSubscriptionCheckoutQuery(tenantId, checkoutSessionId), ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpPost("{tenantId:guid}/subscription-checkout/{checkoutSessionId:guid}/finalize")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(SubscriptionCheckoutSessionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> FinalizeSubscriptionCheckout(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid checkoutSessionId,
+        [FromBody] FinalizeSubscriptionCheckoutBody? body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new FinalizeSubscriptionCheckoutCommand(tenantId, checkoutSessionId, body?.ExternalReference), ct);
         return result.ToActionResult(this);
     }
 

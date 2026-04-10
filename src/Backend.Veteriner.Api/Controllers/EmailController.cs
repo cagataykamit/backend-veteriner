@@ -16,7 +16,7 @@ public sealed class EmailController : ControllerBase
     public EmailController(IMediator mediator) => _mediator = mediator;
 
     /// <summary>
-    /// Verilen e-posta i�in do�rulama e-postas� g�nderir (outbox �zerinden).
+    /// Verilen e-posta için doğrulama e-postası gönderir (outbox üzerinden).
     /// </summary>
     [EnableRateLimiting("email-verify-request")]
     [AllowAnonymous]
@@ -33,8 +33,8 @@ public sealed class EmailController : ControllerBase
     }
 
     /// <summary>
-    /// E-postadaki linkten gelen do�rulama (URL �zerinden token).
-    /// �rn: GET /api/v1/email/confirm?token=RAW_TOKEN
+    /// E-postadaki linkten gelen doğrulama (URL üzerinden token).
+    /// Örn: GET /api/v1/email/confirm?token=RAW_TOKEN
     /// </summary>
     [AllowAnonymous]
     [HttpGet("confirm")]
@@ -44,11 +44,11 @@ public sealed class EmailController : ControllerBase
     public async Task<IActionResult> Confirm([FromQuery] string token, CancellationToken ct)
     {
         await _mediator.Send(new ConfirmEmailVerificationCommand(token), ct);
-        return Ok(new { ok = true, message = "E-posta do�ruland�." });
+        return Ok(new { ok = true, message = "E-posta doğrulandı." });
     }
 
     /// <summary>
-    /// (Opsiyonel) Linke t�klamak zorunda kalmadan POST ile de onaylayabilmek i�in alternatif u�.
+    /// (Opsiyonel) Linke tıklamak zorunda kalmadan POST ile de onaylayabilmek için alternatif uç.
     /// </summary>
     [AllowAnonymous]
     [HttpPost("confirm")]
@@ -59,6 +59,6 @@ public sealed class EmailController : ControllerBase
     public async Task<IActionResult> ConfirmPost([FromBody] ConfirmEmailVerificationCommand cmd, CancellationToken ct)
     {
         await _mediator.Send(cmd, ct);
-        return Ok(new { ok = true, message = "E-posta do�ruland�." });
+        return Ok(new { ok = true, message = "E-posta doğrulandı." });
     }
 }

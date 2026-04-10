@@ -1,5 +1,4 @@
 using Backend.Veteriner.Application.Auth.Commands.Login;
-using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -10,4 +9,4 @@ namespace Backend.Veteriner.Application.Auth.Commands.Refresh;
 /// </summary>
 /// <param name="RefreshToken">Ham refresh token (JSON alanı: <c>refreshToken</c>).</param>
 public sealed record RefreshCommand(string RefreshToken)
-    : IRequest<Result<LoginResultDto>>, IIgnoreTenantWriteSubscriptionGuard;
+    : IRequest<Result<LoginResultDto>>;

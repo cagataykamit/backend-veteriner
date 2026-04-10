@@ -77,6 +77,11 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        if (normalized.Contains("sameplan") || normalized.Contains("notopen"))
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         if (normalized.Contains("notfound"))
         {
             return (StatusCodes.Status404NotFound, "https://httpstatuses.io/404");
@@ -102,9 +107,12 @@ public static class ResultExtensions
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }
 
-        if (normalized.Contains("subscriptionreadonly")
-            || normalized.Contains("subscriptioncancelled")
-            || normalized.Contains("tenantreadonly"))
+        if (normalized.Contains("subscriptionreadonly") || normalized.Contains("subscriptioncancelled"))
+        {
+            return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
+        if (normalized.Contains("tenantreadonly") || normalized.Contains("tenantcancelled"))
         {
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }

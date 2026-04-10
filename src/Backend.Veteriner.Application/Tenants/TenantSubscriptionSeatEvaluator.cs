@@ -15,18 +15,24 @@ public sealed class TenantSubscriptionSeatEvaluator
     private readonly IReadRepository<TenantSubscription> _subscriptions;
     private readonly IReadRepository<UserTenant> _userTenants;
     private readonly IReadRepository<TenantInvite> _invites;
+    private readonly TenantSubscriptionEffectiveWriteEvaluator _writeEvaluator;
 
     public TenantSubscriptionSeatEvaluator(
         IReadRepository<Tenant> tenants,
         IReadRepository<TenantSubscription> subscriptions,
         IReadRepository<UserTenant> userTenants,
-        IReadRepository<TenantInvite> invites)
+        IReadRepository<TenantInvite> invites,
+        TenantSubscriptionEffectiveWriteEvaluator writeEvaluator)
     {
         _tenants = tenants;
         _subscriptions = subscriptions;
         _userTenants = userTenants;
         _invites = invites;
+        _writeEvaluator = writeEvaluator;
     }
+
+    public static bool SubscriptionAllowsInvites(TenantSubscriptionStatus status)
+        => status is TenantSubscriptionStatus.Trialing or TenantSubscriptionStatus.Active;
 
     public async Task<Result<SubscriptionSeatSnapshot>> TryBuildAsync(Guid tenantId, CancellationToken ct)
     {
@@ -48,12 +54,34 @@ public sealed class TenantSubscriptionSeatEvaluator
                 "Bu kiracı için abonelik kaydı bulunamadı.");
         }
 
+        var writeAllowed = await _writeEvaluator.EnsureWriteAllowedAsync(tenantId, ct);
+        if (!writeAllowed.IsSuccess)
+        {
+            return Result<SubscriptionSeatSnapshot>.Failure(writeAllowed.Error);
+        }
+
         var utcNow = DateTime.UtcNow;
-        if (!TenantSubscriptionEffectiveWriteEvaluator.AllowsTenantMutations(sub, utcNow))
+        var effectiveStatus = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, utcNow);
+
+        if (effectiveStatus == TenantSubscriptionStatus.ReadOnly)
         {
             return Result<SubscriptionSeatSnapshot>.Failure(
                 "Subscriptions.TenantReadOnly",
-                "Abonelik deneme süresi sona ermiş veya salt okunur durumdadır; davet işlemi yapılamaz.");
+                "Abonelik salt okunur; davet oluşturulamaz veya kabul edilemez.");
+        }
+
+        if (effectiveStatus == TenantSubscriptionStatus.Cancelled)
+        {
+            return Result<SubscriptionSeatSnapshot>.Failure(
+                "Subscriptions.TenantCancelled",
+                "Abonelik iptal edilmiş; davet oluşturulamaz veya kabul edilemez.");
+        }
+
+        if (!SubscriptionAllowsInvites(effectiveStatus))
+        {
+            return Result<SubscriptionSeatSnapshot>.Failure(
+                "Subscriptions.InvitesNotAllowed",
+                "Mevcut abonelik durumunda davet desteklenmiyor.");
         }
 
         var maxUsers = SubscriptionPlanCatalog.GetMaxUsers(sub.PlanCode);
@@ -62,6 +90,6 @@ public sealed class TenantSubscriptionSeatEvaluator
         var pendingCount = await _invites.CountAsync(new PendingTenantInvitesByTenantCountSpec(tenantId, utcNow), ct);
 
         return Result<SubscriptionSeatSnapshot>.Success(
-            new SubscriptionSeatSnapshot(memberCount, pendingCount, maxUsers, sub.Status));
+            new SubscriptionSeatSnapshot(memberCount, pendingCount, maxUsers, effectiveStatus));
     }
 }

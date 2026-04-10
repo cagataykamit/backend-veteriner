@@ -1,6 +1,8 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.SpeciesReference.Commands.Create;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
+using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
 using FluentAssertions;
@@ -10,10 +12,28 @@ namespace Backend.Veteriner.Application.Tests.Catalog;
 
 public sealed class CreateSpeciesCommandHandlerTests
 {
+    private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IReadRepository<Tenant>> _tenants = new();
+    private readonly Mock<IReadRepository<TenantSubscription>> _subscriptions = new();
     private readonly Mock<IReadRepository<Species>> _read = new();
     private readonly Mock<IRepository<Species>> _write = new();
 
-    private CreateSpeciesCommandHandler CreateHandler() => new(_read.Object, _write.Object);
+    private CreateSpeciesCommandHandler CreateHandler()
+    {
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant("X");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
+        var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        return new(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object);
+    }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_DuplicateCode()

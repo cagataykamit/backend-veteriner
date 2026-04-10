@@ -2,8 +2,10 @@ using Backend.Veteriner.Application.BreedsReference.Commands.Create;
 using Backend.Veteriner.Application.BreedsReference.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
 using Moq;
 
@@ -11,12 +13,29 @@ namespace Backend.Veteriner.Application.Tests.Catalog;
 
 public sealed class CreateBreedCommandHandlerTests
 {
+    private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IReadRepository<Tenant>> _tenants = new();
+    private readonly Mock<IReadRepository<TenantSubscription>> _subscriptions = new();
     private readonly Mock<IReadRepository<Species>> _speciesRead = new();
     private readonly Mock<IReadRepository<Breed>> _breedsRead = new();
     private readonly Mock<IRepository<Breed>> _breedsWrite = new();
 
     private CreateBreedCommandHandler CreateHandler()
-        => new(_speciesRead.Object, _breedsRead.Object, _breedsWrite.Object);
+    {
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant("X");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
+        var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        return new(_tenantContext.Object, writeEvaluator, _speciesRead.Object, _breedsRead.Object, _breedsWrite.Object);
+    }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_SpeciesMissing()

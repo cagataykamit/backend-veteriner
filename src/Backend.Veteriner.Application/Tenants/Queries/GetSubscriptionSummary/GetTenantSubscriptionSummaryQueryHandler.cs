@@ -1,6 +1,5 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
-using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
@@ -16,17 +15,20 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<TenantSubscription> _subscriptions;
+    private readonly TenantSubscriptionEffectiveWriteEvaluator _effectiveWriteEvaluator;
 
     public GetTenantSubscriptionSummaryQueryHandler(
         ITenantContext tenantContext,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<Tenant> tenants,
-        IReadRepository<TenantSubscription> subscriptions)
+        IReadRepository<TenantSubscription> subscriptions,
+        TenantSubscriptionEffectiveWriteEvaluator effectiveWriteEvaluator)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
         _tenants = tenants;
         _subscriptions = subscriptions;
+        _effectiveWriteEvaluator = effectiveWriteEvaluator;
     }
 
     public async Task<Result<TenantSubscriptionSummaryDto>> Handle(
@@ -70,6 +72,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         }
 
         var utcNow = DateTime.UtcNow;
+        var effectiveStatus = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, utcNow);
         int? daysRemaining = null;
         if (sub.Status == TenantSubscriptionStatus.Trialing && sub.TrialEndsAtUtc is { } trialEnd)
         {
@@ -77,7 +80,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
             daysRemaining = span.TotalDays <= 0 ? 0 : (int)Math.Ceiling(span.TotalDays);
         }
 
-        var isReadOnly = !TenantSubscriptionEffectiveWriteEvaluator.AllowsTenantMutations(sub, utcNow);
+        var isReadOnly = !TenantSubscriptionEffectiveWriteEvaluator.WriteAllowed(effectiveStatus);
         var canManage = _permissions.HasPermission(PermissionCatalog.Tenants.Create);
 
         var planCodeStr = SubscriptionPlanCatalog.ToApiCode(sub.PlanCode);
@@ -95,7 +98,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
             tenant.Name,
             planCodeStr,
             planName,
-            sub.Status,
+            effectiveStatus,
             sub.TrialStartsAtUtc,
             sub.TrialEndsAtUtc,
             daysRemaining,

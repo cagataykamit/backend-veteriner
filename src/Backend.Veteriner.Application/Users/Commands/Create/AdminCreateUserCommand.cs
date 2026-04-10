@@ -10,7 +10,7 @@ namespace Backend.Veteriner.Application.Users.Commands.Create;
 public sealed record AdminCreateUserCommand(
     string Email,
     string Password
-) : IRequest<Result<Guid>>, IAuditableRequest, IIgnoreTenantWriteSubscriptionGuard
+) : IRequest<Result<Guid>>, IAuditableRequest
 {
     public string AuditAction => "User.Create";
     public string AuditTarget => $"Email={Email}";

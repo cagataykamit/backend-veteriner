@@ -8,7 +8,7 @@ namespace Backend.Veteriner.Application.Auth.Commands.UserOperationClaims.Assign
 /// Kullanıcıya OperationClaim (rol) atar.
 /// </summary>
 public sealed record AssignUserOperationClaimCommand(Guid UserId, Guid OperationClaimId)
-    : IRequest<Result<Guid>>, IAuditableRequest, IIgnoreTenantWriteSubscriptionGuard
+    : IRequest<Result<Guid>>, IAuditableRequest
 {
     public string AuditAction => "UserOperationClaim.Assign";
     public string AuditTarget => $"UserId={UserId}, OperationClaimId={OperationClaimId}";

@@ -42,12 +42,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 Title = "Backend Veteriner API",
                 Version = desc.ApiVersion.ToString(),
-                Description = desc.IsDeprecated
-                    ? "DEPRECATED"
-                    : "Faz 4: JWT kiracı bağlamı varken çoğu yazma (command) işlemi abonelik + trial bitişine göre kesilir: "
-                      + "effective read-only veya iptal → `403` + `Subscriptions.TenantReadOnly`; abonelik satırı yok → `404` + `Subscriptions.NotFound`. "
-                      + "Login, refresh, select-clinic, GET okumaları ve `subscription-summary` etkilenmez. "
-                      + "`POST /api/v1/public/owner-signup` ve platform `POST /api/v1/tenants` guard dışındadır. Davet kabulü read-only kiracıda `Subscriptions.TenantReadOnly`."
+                Description = desc.IsDeprecated ? "DEPRECATED" : null
             });
         }
 

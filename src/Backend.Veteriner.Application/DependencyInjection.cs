@@ -20,8 +20,8 @@ public static class DependencyInjection
         // =========================================================
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
 
+        services.AddScoped<TenantSubscriptionEffectiveWriteEvaluator>();
         services.AddScoped<TenantSubscriptionSeatEvaluator>();
-        services.AddScoped<ITenantSubscriptionWriteGuard, TenantSubscriptionWriteGuard>();
         services.AddScoped<TenantInviteAcceptanceService>();
 
         // =========================================================
@@ -56,10 +56,11 @@ public static class DependencyInjection
         // =========================================================
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TenantWriteSubscriptionGuardBehavior<,>));
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TenantSubscriptionWriteGuardBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuditBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
 
         return services;
     }
