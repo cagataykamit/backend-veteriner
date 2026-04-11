@@ -117,6 +117,58 @@ public static class ResultExtensions
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }
 
+        if (normalized.Contains("webhooksignatureinvalid") || normalized.Contains("webhooksignaturemissing"))
+        {
+            return (StatusCodes.Status401Unauthorized, "https://httpstatuses.io/401");
+        }
+
+        if (normalized.Contains("stripewebhooknotconfigured")
+            || normalized.Contains("iyzicowebhooknotconfigured")
+            || normalized.Contains("iyzicoconfigurationincomplete")
+            || normalized.Contains("providerconfigurationincomplete")
+            || normalized.Contains("iyzicoplanpricenotconfigured"))
+        {
+            return (StatusCodes.Status503ServiceUnavailable, "https://httpstatuses.io/503");
+        }
+
+        if (normalized.Contains("stripeapierror") || normalized.Contains("iyzicoapierror"))
+        {
+            return (StatusCodes.Status502BadGateway, "https://httpstatuses.io/502");
+        }
+
+        if (normalized.Contains("stripesecretmissing")
+            || normalized.Contains("stripecheckouturlsmissing")
+            || normalized.Contains("stripepricenotconfigured")
+            || normalized.Contains("stripeconfigurationincomplete"))
+        {
+            return (StatusCodes.Status503ServiceUnavailable, "https://httpstatuses.io/503");
+        }
+
+        if (normalized.Contains("invalidcheckoutprovider"))
+        {
+            return (StatusCodes.Status400BadRequest, "https://httpstatuses.io/400");
+        }
+
+        if (normalized.Contains("iyzicobuyeremailmissing") || normalized.Contains("iyzicobuyeremailinvalid"))
+        {
+            return (StatusCodes.Status400BadRequest, "https://httpstatuses.io/400");
+        }
+
+        if (normalized.Contains("providermismatch"))
+        {
+            return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
+        if (normalized.Contains("webhookpayloadinvalid") || normalized.Contains("webhookpayloadunsupported"))
+        {
+            return (StatusCodes.Status400BadRequest, "https://httpstatuses.io/400");
+        }
+
+        if (normalized.Contains("webhookreceiptpersistfailed"))
+        {
+            return (StatusCodes.Status500InternalServerError, "https://httpstatuses.io/500");
+        }
+
         if (normalized.Contains("unauthorized") || normalized.Contains("unauthenticated"))
         {
             return (StatusCodes.Status401Unauthorized, "https://httpstatuses.io/401");
@@ -146,6 +198,9 @@ public static class ResultExtensions
             StatusCodes.Status403Forbidden => "Erişim reddedildi",
             StatusCodes.Status404NotFound => "Bulunamadı",
             StatusCodes.Status409Conflict => "Çakışma",
+            StatusCodes.Status502BadGateway => "Upstream servis hatası",
+            StatusCodes.Status503ServiceUnavailable => "Servis kullanılamıyor",
+            StatusCodes.Status500InternalServerError => "Sunucu hatası",
             StatusCodes.Status400BadRequest when normalized.Contains("unauthorized")
                 || normalized.Contains("unauthenticated") => "Yetkisiz erişim",
             _ => "İş kuralı ihlali"

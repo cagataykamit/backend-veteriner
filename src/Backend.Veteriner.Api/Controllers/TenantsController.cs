@@ -7,12 +7,14 @@ using Backend.Veteriner.Api.Contracts;
 using Backend.Veteriner.Application.Tenants.Commands.Create;
 using Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
 using Backend.Veteriner.Application.Tenants.Commands.Checkout;
+using Backend.Veteriner.Application.Tenants.Commands.PlanChanges;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Queries.GetById;
 using Backend.Veteriner.Application.Tenants.Queries.GetList;
 using Backend.Veteriner.Application.Tenants.Queries.GetAssignableOperationClaimsForInvite;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionCheckout;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionSummary;
+using Backend.Veteriner.Application.Tenants.Queries.GetPendingPlanChange;
 using Backend.Veteriner.Domain.Shared;
 using System.Collections.Generic;
 using MediatR;
@@ -124,6 +126,69 @@ public sealed class TenantsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetTenantSubscriptionSummaryQuery(tenantId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Bekleyen plan değişikliği kaydını döner.
+    /// Kayıt yoksa yanıt 200 OK + null içerik döner (404 değildir).
+    /// </summary>
+    [HttpGet("{tenantId:guid}/subscription-plan-change/pending")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [ProducesResponseType(typeof(PendingSubscriptionPlanChangeDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetPendingSubscriptionPlanChange([FromRoute] Guid tenantId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetPendingSubscriptionPlanChangeQuery(tenantId), ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpPost("{tenantId:guid}/subscription-plan-change/downgrade")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(PendingSubscriptionPlanChangeDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ScheduleSubscriptionDowngrade(
+        [FromRoute] Guid tenantId,
+        [FromBody] ScheduleSubscriptionDowngradeBody? body,
+        CancellationToken ct)
+    {
+        if (body is null)
+        {
+            return Result<PendingSubscriptionPlanChangeDto>.Failure(
+                    "Subscriptions.PlanChange.Validation.InvalidRequestBody",
+                    "Istek govdesi bos veya hatali JSON.")
+                .ToActionResult(this);
+        }
+
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new ScheduleSubscriptionDowngradeCommand(tenantId, body.TargetPlanCode, body.Reason),
+            ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpDelete("{tenantId:guid}/subscription-plan-change/pending")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [ProducesResponseType(typeof(PendingSubscriptionPlanChangeDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CancelPendingSubscriptionPlanChange([FromRoute] Guid tenantId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CancelPendingSubscriptionPlanChangeCommand(tenantId), ct);
         return result.ToActionResult(this);
     }
 

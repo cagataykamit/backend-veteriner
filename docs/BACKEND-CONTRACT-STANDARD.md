@@ -657,8 +657,16 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 ### 24.1 Amaç ve tasarım
 
 - Trial/read-only omurgası üzerine, owner/admin'in bilinçli plan aktivasyonu için provider-agnostic checkout session modeli eklendi.
-- Otomatik ücret alma yok; ödeme/checkout başarılı sinyali geldiğinde finalize ile `TenantSubscription` **Active** yapılır.
+- **Manual** provider’da otomatik tahsilat yok; ödeme sinyali **panel finalize** ile tamamlanır. **Iyzico** (production default) ve **Stripe** gerçek checkout hazırlığı sağlar; aktivasyon webhook-first modelle tamamlanır.
 - Sağlayıcı bağımlılığı tek noktada tutuldu: `BillingProvider` enum (`None`, `Manual`, `Stripe`, `Iyzico`).
+- Uygulama / altyapı sınırı: `IBillingCheckoutProvider` (checkout hazırlığı), `IBillingWebhookSignatureVerifier` + `IBillingWebhookPayloadParser` (webhook), `ISubscriptionCheckoutActivationService` (ortak aktivasyon; idempotent).
+- Varsayılan checkout sağlayıcısı: `Billing:DefaultCheckoutProvider` — `Manual`, `Stripe`, `Iyzico`, `Auto` veya boş string.
+  - **`Manual`:** Her zaman manuel/test akışı; provider önkoşulları aranmaz.
+  - **`Iyzico`:** Production akış; ApiKey / SecretKey / BaseUrl / CallbackUrl / tüm katalog planları için `PlanPricesTry` eksikse checkout **başlamaz** (`Billing.IyzicoConfigurationIncomplete`, **503**).
+  - **`Stripe`:** Stripe zorunlu; SecretKey / SuccessUrl / CancelUrl / tüm katalog planları için `SubscriptionPriceIds` eksikse checkout **başlamaz** (`Billing.StripeConfigurationIncomplete`, **503**).
+  - **`Auto` veya boş:** öncelik **Iyzico → Stripe**; hiçbiri hazır değilse **503** (`Billing.ProviderConfigurationIncomplete`) — sessizce `Manual`e düşülmez.
+  - Geçersiz değer: `Billing.InvalidCheckoutProvider` (**400**).
+  - `appsettings.Development.json` şablonu: `Manual`; `appsettings.Production.json` şablonu: `Iyzico`.
 
 ### 24.2 Checkout session modeli
 
@@ -683,6 +691,30 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
   - Aynı plan zaten aktifse reddedilir (`Subscriptions.SamePlanAlreadyActive`, `409`)
   - ReadOnly tenant checkout başlatabilir
   - Cancelled tenant checkout başlatamaz (`Subscriptions.TenantCancelled`, `403`)
+- **Stripe provider (`DefaultCheckoutProvider` = `Stripe` veya `Auto` ve Stripe önkoşulları tam):**
+  - `PrepareCheckout` Stripe’da **subscription** Checkout Session açar; dönen `checkoutUrl` DTO’da döner, `externalReference` = Stripe `cs_...` id’si `BillingCheckoutSession` üzerine yazılır.
+  - Stripe oturum metadata (ve `SubscriptionData.Metadata`): `billing_checkout_session_id`, `tenant_id`, `target_plan_code`, `current_plan_code` — webhook çözümlemesi ile uyumlu.
+  - Yapılandırma: `Billing:Stripe:SecretKey`, `SuccessUrl` (isteğe bağlı `{CHECKOUT_SESSION_ID}`), `CancelUrl`, `SubscriptionPriceIds` (plan API kodu → recurring `price_...`). Para birimi/tutar **Stripe Price** kaydındadır.
+  - Eksik secret/URL/price veya Stripe API hatası: handler iç session silinir; kodlar `Billing.StripeSecretMissing` / `Billing.StripeCheckoutUrlsMissing` / `Billing.StripePriceNotConfigured` (**503**), `Billing.StripeApiError` (**502**).
+- **Iyzico provider (`DefaultCheckoutProvider` = `Iyzico` veya `Auto` ve Iyzico önkoşulları tam):**
+  - `PrepareCheckout` Iyzico Checkout Form initialize çağrısı yapar; `paymentPageUrl` DTO `checkoutUrl` alanına döner.
+  - `CallbackUrl` bir **backend POST endpoint** olmalıdır (SPA route değil): `POST /api/v1/billing/iyzico/callback`.
+  - `conversationId` ve `basketId` olarak dahili `billing_checkout_session_id` (GUID) kullanılır; webhook çözümlemesi `paymentConversationId` üzerinden yapılır.
+  - `externalReference` olarak Iyzico `token` (fallback `conversationId`) yazılır.
+  - `buyerEmail` kaynağı: checkout başlatan authenticated kullanıcı (`IClientContext.UserId` -> `User.Email`). Boş/format dışı email Iyzico'ya gitmeden fail-fast (`Billing.IyzicoBuyerEmailMissing` / `Billing.IyzicoBuyerEmailInvalid`, **400**).
+  - Yapılandırma: `Billing:Iyzico:ApiKey`, `SecretKey`, `MerchantId`, `BaseUrl`, `CallbackUrl`, `ReturnSuccessUrl`, `ReturnFailureUrl`, `PlanPricesTry`, `WebhookSecret`.
+  - Eksik yapılandırma/fiyat veya provider API hatası: handler iç session silinir; kodlar `Billing.IyzicoConfigurationIncomplete` / `Billing.IyzicoPlanPriceNotConfigured` (**503**), `Billing.IyzicoApiError` (**502**).
+
+### 24.3.1 Iyzico callback bridge
+
+- Endpoint: `POST /api/v1/billing/iyzico/callback` (`application/x-www-form-urlencoded`, anonim).
+- Amaç: Iyzico hosted checkout sonrası gelen POST'u backend'de karşılamak, `token` ile `CheckoutForm.Retrieve` yapmak ve kullanıcıyı frontend subscription sayfasına yönlendirmek.
+- Redirect:
+  - success: `Billing:Iyzico:ReturnSuccessUrl?checkout=success&provider=iyzico&checkoutSessionId=...`
+  - fail/cancel: `Billing:Iyzico:ReturnFailureUrl?checkout=cancel&provider=iyzico&reason=...`
+- Güvenlik:
+  - callback payload'daki token frontend'e ham haliyle taşınmaz.
+  - retrieve sonucu başarılı ve `PaymentStatus=SUCCESS` ise ortak aktivasyon servisi çağrılır (idempotent); webhook ile yarış durumunda yan etki üretmez.
 
 **B) Checkout durumu** — `GET /api/v1/tenants/{tenantId}/subscription-checkout/{checkoutSessionId}`
 
@@ -705,5 +737,66 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 ### 24.4 Read-only guard ilişkisi
 
 - Faz 4 merkezi write guard korunur.
-- Sadece billing checkout komutları (`StartSubscriptionCheckout`, `FinalizeSubscriptionCheckout`) kontrollü şekilde guard muafiyet marker'ı ile çalışır.
-- Bu sayede read-only tenant billing aktivasyon akışına girebilir, diğer mutation’lar kapalı kalır.
+- Billing checkout komutları (`StartSubscriptionCheckout`, `FinalizeSubscriptionCheckout`) ve **`ProcessBillingWebhook`** kontrollü şekilde guard muafiyet marker'ı ile çalışır (`IIgnoreTenantWriteSubscriptionGuard`).
+- Bu sayede read-only tenant panel finalize ile aktivasyon akışına girebilir; webhook ise JWT’siz çalışır ancak imza doğrulaması zorunludur.
+
+### 24.5 Provider webhook’ları ve idempotency
+
+- **Stripe** — `POST /api/v1/webhooks/billing/stripe`
+  - **Auth:** Yok (`AllowAnonymous`); güvenlik `Stripe-Signature` + `Billing:Stripe:WebhookSecret` ile `Stripe.EventUtility.ConstructEvent` doğrulamasından gelir.
+  - **Gövde:** Ham JSON (imza için değiştirilmemiş).
+  - **Normalize olaylar:** `checkout.session.completed` → ödeme başarılı; `checkout.session.async_payment_failed` → session açıksa `Failed`; diğer tipler işlenmez (`Ignored`).
+  - **Korelasyon:** `StripeBillingCheckoutProvider` Checkout Session + `SubscriptionData` üzerinde `billing_checkout_session_id`, `tenant_id`, `target_plan_code`, `current_plan_code` metadata’sını yazar; webhook bu alanlardan `billing_checkout_session_id` ile iç session’ı çözer.
+- **İyzico** — `POST /api/v1/webhooks/billing/iyzico`
+  - **Auth:** Yok (`AllowAnonymous`); güvenlik `X-IYZ-SIGNATURE-V3` doğrulamasından gelir.
+  - **İmza doğrulama:** HPP / Direct / Subscription formatları için docs.iyzico.com V3 HMAC-SHA256 kuralıyla (`WebhookSecret` fallback `SecretKey`).
+  - **Normalize olaylar:** `status=SUCCESS` veya `subscription.order.success` → `PaymentSucceeded`; `status=FAILURE` veya `subscription.order.failure` → `PaymentFailed`; diğerleri `Ignored`.
+  - **Korelasyon:** `paymentConversationId` alanı GUID ise doğrudan `BillingCheckoutSessionId` olarak çözülür.
+- **Yanıt (başarı):** `BillingWebhookAckDto` — `duplicate`, `processed`, `providerEventId`.
+  - Aynı `(Provider, ProviderEventId)` ikinci kez gelirse `duplicate: true`, `processed: false`, HTTP **200** (sağlayıcı yeniden denemeleri için güvenli).
+- **Idempotency tablosu:** `BillingWebhookReceipt` — benzersiz indeks `(Provider, ProviderEventId)`.
+- **Çakışma kuralları:**
+  - Webhook aktivasyonu yalnızca session `Provider` değeri webhook sağlayıcısı ile eşleşiyorsa çalışır (`Billing.ProviderMismatch`, **403**).
+  - Panel finalize `provider` eşlemesi zorunlu tutulmaz (`providerMustMatch: null`).
+  - Aynı session için finalize tekrarı: session zaten `Completed` ve abonelik hedef planda **Active** ise başarılı yanıt (yan etki yok).
+- **Hata eşlemesi (özet):** `Billing.WebhookSignatureInvalid` / `Billing.WebhookSignatureMissing` → **401**; `Billing.ProviderMismatch` → **403**; `Billing.StripeWebhookNotConfigured` / `Billing.IyzicoWebhookNotConfigured` / `Billing.StripeSecretMissing` / `Billing.StripeCheckoutUrlsMissing` / `Billing.StripePriceNotConfigured` / `Billing.IyzicoConfigurationIncomplete` / `Billing.ProviderConfigurationIncomplete` / `Billing.IyzicoPlanPriceNotConfigured` → **503**; `Billing.StripeApiError` / `Billing.IyzicoApiError` → **502**; payload hataları → **400**; iş kuralı (session kapalı vb.) → mevcut `Subscriptions.*` kodları (çoğu **409**).
+
+### 24.6 State geçişleri (özet)
+
+- **Completed:** `ActivatePaidPlan` + `MarkCompleted` (manuel veya webhook `PaymentSucceeded`).
+- **Failed:** `TryMarkFailedIfOpen` (webhook `PaymentFailed`; terminal session’da no-op).
+- **Expired:** Okuma veya finalize denemesinde açık session için süre dolmuşsa `MarkExpired`.
+- **Cancelled:** Yeni checkout’ta farklı hedef plan için önceki açık session iptal.
+
+### 24.7 Scheduled downgrade lifecycle (stabilizasyon notu)
+
+- Aynı plan seçimi her durumda reddedilir (active/trialing fark etmeksizin checkout veya downgrade schedule açılamaz).
+- Downgrade hiçbir koşulda checkout akışına girmez; yalnız schedule edilir.
+- Pending downgrade varken yeni downgrade gelirse mevcut pending kayıt iptal edilip yenisi açılır (replace).
+- Pending downgrade varken upgrade checkout başlatılırsa pending downgrade otomatik iptal edilir.
+- `GET /api/v1/tenants/{tenantId}/subscription-plan-change/pending` endpoint’i pending yoksa **200 OK + `null`** döner.
+- Scheduled apply idempotent çalışır: abonelik zaten hedef planda aktifse plan tekrar yazımı no-op kalır, change kaydı `Applied` durumuna alınır.
+- `EffectiveAt` önceliği: modelde mevcut gerçek dönem sonu verisi (`trialEndsAtUtc`) -> aktivasyon bazlı dönem sonu yaklaşımı -> kontrollü fallback (`utcNow + 1 gün`).
+
+### 24.8 Model A (membership transition)
+
+- **Aynı plan** her durumda reddedilir (active/trial/read-only fark etmez).
+- **Upgrade** immediate uygulanır; billing cycle anchor korunur, yeni dönem başlatılmaz.
+- **Downgrade** checkout'a gitmez; bir sonraki dönem başlangıcına schedule edilir.
+- **Pending downgrade** görüntülenebilir / iptal edilebilir; yeni downgrade geldiğinde replace edilir.
+- Pending downgrade varken upgrade checkout başlatılırsa pending kayıt otomatik iptal edilir.
+- Pending endpoint davranışı: kayıt yoksa `200 OK + null`.
+
+Proration hesabı dönem oranı ile yapılır:
+
+- `remaining = CurrentPeriodEndUtc - now`
+- `totalPeriod = CurrentPeriodEndUtc - CurrentPeriodStartUtc`
+- `prorationRatio = remaining / totalPeriod`
+- `priceDiff = newPlanPriceMinor - currentPlanPriceMinor`
+- `proratedChargeMinor = round(priceDiff * prorationRatio)`
+
+Notlar:
+
+- Tüm tarih/zaman alanları UTC'dir.
+- Parasal hesaplar minor unit (TRY için kurus) ile yapılır.
+- Plan fiyatları `Billing:PlanPricesMinor` üzerinden okunur; yoksa Iyzico `PlanPricesTry` değerlerinden türetilir.

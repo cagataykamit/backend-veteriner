@@ -57,7 +57,10 @@ public sealed class GetSubscriptionCheckoutQueryHandler
             session.Provider,
             session.CheckoutUrl,
             session.IsOpen(utcNow),
-            session.ExpiresAtUtc);
+            session.ExpiresAtUtc,
+            null,
+            null,
+            null);
 
         return Result<SubscriptionCheckoutSessionDto>.Success(dto);
     }

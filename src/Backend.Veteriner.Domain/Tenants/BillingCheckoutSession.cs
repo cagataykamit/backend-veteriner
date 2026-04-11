@@ -84,6 +84,19 @@ public sealed class BillingCheckoutSession : AggregateRoot
             ExternalReference = externalReference.Trim();
     }
 
+    /// <summary>Açık ve süresi dolmamış session için başarısızlık işaretler; aksi halde no-op.</summary>
+    public void TryMarkFailedIfOpen(DateTime utcNow, string? externalReference = null)
+    {
+        if (!IsOpen(utcNow))
+            return;
+
+        Status = BillingCheckoutSessionStatus.Failed;
+        FailedAtUtc = NormalizeUtc(utcNow);
+        UpdatedAtUtc = FailedAtUtc;
+        if (!string.IsNullOrWhiteSpace(externalReference))
+            ExternalReference = externalReference.Trim();
+    }
+
     public void MarkExpired(DateTime utcNow)
     {
         if (Status is BillingCheckoutSessionStatus.Completed

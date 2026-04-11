@@ -17,6 +17,8 @@ using Backend.Veteriner.Infrastructure.Persistence.Repositories.UserOperationCla
 using Backend.Veteriner.Infrastructure.Security;                                  // JwtOptions, JwtTokenService, Sha256TokenHashService, BcryptPasswordHasher, JwtOptionsProvider
 using Backend.Veteriner.Infrastructure.Web;                                       // ClientContext, TenantContext, ClinicContext, AppUrlProvider, HttpAuditContext, CurrentUserPermissionChecker
 using Backend.Veteriner.Infrastructure.Auditing;                                  // AuditLogWriter
+using Backend.Veteriner.Infrastructure.Billing;
+using Backend.Veteriner.Application.Common.Billing;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -117,6 +119,16 @@ public static class DependencyInjection
 
         // ===== Session options =====
         services.Configure<SessionOptions>(configuration.GetSection("Session"));
+
+        services.Configure<BillingOptions>(configuration.GetSection("Billing"));
+        services.Configure<ScheduledPlanChangeProcessorOptions>(configuration.GetSection("Billing:ScheduledPlanChangeProcessor"));
+        services.AddScoped<IBillingCheckoutProvider, ManualBillingCheckoutProvider>();
+        services.AddScoped<IBillingCheckoutProvider, StripeBillingCheckoutProvider>();
+        services.AddScoped<IBillingCheckoutProvider, IyzicoBillingCheckoutProvider>();
+        services.AddScoped<IBillingCheckoutProviderResolver, BillingCheckoutProviderResolver>();
+        services.AddScoped<IBillingWebhookSignatureVerifier, BillingWebhookSignatureVerifier>();
+        services.AddScoped<IBillingWebhookPayloadParser, BillingWebhookPayloadParser>();
+        services.AddHostedService<ScheduledPlanChangeProcessorHostedService>();
 
         // ===== Permission options =====
         services.Configure<PermissionChangeOptions>(configuration.GetSection("PermissionChange"));

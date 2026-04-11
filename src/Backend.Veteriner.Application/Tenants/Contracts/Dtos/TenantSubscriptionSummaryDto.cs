@@ -13,6 +13,21 @@ public sealed record TenantSubscriptionSummaryDto(
     int? DaysRemaining,
     bool IsReadOnly,
     bool CanManageSubscription,
+    DateTime CurrentPeriodStartUtc,
+    DateTime CurrentPeriodEndUtc,
+    DateTime BillingCycleAnchorUtc,
+    DateTime NextBillingAtUtc,
+    PendingSubscriptionPlanChangeDto? PendingPlanChange,
     IReadOnlyList<SubscriptionPlanOptionDto> AvailablePlans);
 
 public sealed record SubscriptionPlanOptionDto(string Code, string Name, string? Description, int MaxUsers);
+
+public sealed record PendingSubscriptionPlanChangeDto(
+    Guid Id,
+    string CurrentPlanCode,
+    string TargetPlanCode,
+    SubscriptionPlanChangeType ChangeType,
+    SubscriptionPlanChangeStatus Status,
+    DateTime RequestedAtUtc,
+    DateTime EffectiveAtUtc,
+    string? Reason);

@@ -51,9 +51,17 @@ public sealed class TenantSubscription : AggregateRoot
     public void ActivatePaidPlan(SubscriptionPlanCode targetPlanCode, DateTime utcNow)
     {
         var now = NormalizeUtc(utcNow);
+        if (Status == TenantSubscriptionStatus.Active && PlanCode == targetPlanCode)
+        {
+            UpdatedAtUtc = now;
+            return;
+        }
+
+        // Billing cycle anchor korunur: aktif abonelikte plan geçişi anchor'ı reset etmez.
+        var anchor = ActivatedAtUtc;
         PlanCode = targetPlanCode;
         Status = TenantSubscriptionStatus.Active;
-        ActivatedAtUtc = now;
+        ActivatedAtUtc = anchor ?? now;
         CancelledAtUtc = null;
         UpdatedAtUtc = now;
     }

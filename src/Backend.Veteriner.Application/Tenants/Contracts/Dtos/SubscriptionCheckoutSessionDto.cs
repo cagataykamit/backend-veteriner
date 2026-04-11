@@ -11,5 +11,8 @@ public sealed record SubscriptionCheckoutSessionDto(
     BillingProvider Provider,
     string? CheckoutUrl,
     bool CanContinue,
-    DateTime? ExpiresAtUtc);
+    DateTime? ExpiresAtUtc,
+    string? ChargeCurrencyCode,
+    long? ProratedChargeMinor,
+    decimal? ProrationRatio);
 

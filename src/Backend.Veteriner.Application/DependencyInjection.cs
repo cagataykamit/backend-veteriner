@@ -1,6 +1,8 @@
 using System.Reflection;
 using Backend.Veteriner.Application.Common.Behaviors;
+using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Application.Tenants.Billing;
 using Backend.Veteriner.Application.Tenants.Invites;
 using FluentValidation;
 using MediatR;
@@ -23,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<TenantSubscriptionEffectiveWriteEvaluator>();
         services.AddScoped<TenantSubscriptionSeatEvaluator>();
         services.AddScoped<TenantInviteAcceptanceService>();
+        services.AddScoped<ISubscriptionCheckoutActivationService, SubscriptionCheckoutActivationService>();
 
         // =========================================================
         // FluentValidation

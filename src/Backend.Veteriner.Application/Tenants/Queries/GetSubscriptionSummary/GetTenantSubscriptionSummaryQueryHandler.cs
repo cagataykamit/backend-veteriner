@@ -15,6 +15,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<TenantSubscription> _subscriptions;
+    private readonly IReadRepository<ScheduledSubscriptionPlanChange> _planChanges;
     private readonly TenantSubscriptionEffectiveWriteEvaluator _effectiveWriteEvaluator;
 
     public GetTenantSubscriptionSummaryQueryHandler(
@@ -22,12 +23,14 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         ICurrentUserPermissionChecker permissions,
         IReadRepository<Tenant> tenants,
         IReadRepository<TenantSubscription> subscriptions,
+        IReadRepository<ScheduledSubscriptionPlanChange> planChanges,
         TenantSubscriptionEffectiveWriteEvaluator effectiveWriteEvaluator)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
         _tenants = tenants;
         _subscriptions = subscriptions;
+        _planChanges = planChanges;
         _effectiveWriteEvaluator = effectiveWriteEvaluator;
     }
 
@@ -82,6 +85,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
 
         var isReadOnly = !TenantSubscriptionEffectiveWriteEvaluator.WriteAllowed(effectiveStatus);
         var canManage = _permissions.HasPermission(PermissionCatalog.Tenants.Create);
+        var period = TenantSubscriptionPeriodCalculator.ResolveCurrentWindow(sub, utcNow);
 
         var planCodeStr = SubscriptionPlanCatalog.ToApiCode(sub.PlanCode);
         var planName = SubscriptionPlanCatalog.GetName(sub.PlanCode);
@@ -92,6 +96,21 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
                 p.Description,
                 p.MaxUsers))
             .ToList();
+
+        var pending = await _planChanges.FirstOrDefaultAsync(new OpenScheduledPlanChangeByTenantSpec(request.TenantId), ct);
+        PendingSubscriptionPlanChangeDto? pendingDto = null;
+        if (pending is not null)
+        {
+            pendingDto = new PendingSubscriptionPlanChangeDto(
+                pending.Id,
+                SubscriptionPlanCatalog.ToApiCode(pending.CurrentPlanCode),
+                SubscriptionPlanCatalog.ToApiCode(pending.TargetPlanCode),
+                pending.ChangeType,
+                pending.Status,
+                pending.RequestedAtUtc,
+                pending.EffectiveAtUtc,
+                pending.Reason);
+        }
 
         var dto = new TenantSubscriptionSummaryDto(
             tenant.Id,
@@ -104,6 +123,11 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
             daysRemaining,
             isReadOnly,
             canManage,
+            period.PeriodStartUtc,
+            period.PeriodEndUtc,
+            period.BillingCycleAnchorUtc,
+            period.PeriodEndUtc,
+            pendingDto,
             available);
 
         return Result<TenantSubscriptionSummaryDto>.Success(dto);

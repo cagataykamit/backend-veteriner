@@ -933,6 +933,95 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("BillingCheckoutSessions", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.BillingWebhookReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BillingCheckoutSessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("EventType")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProviderEventId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "ProviderEventId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_BillingWebhookReceipts_Provider_EventId");
+
+                    b.ToTable("BillingWebhookReceipts", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.ScheduledSubscriptionPlanChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("AppliedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ChangeType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CurrentPlanCode")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EffectiveAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("RequestedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetPlanCode")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "EffectiveAtUtc")
+                        .HasDatabaseName("IX_ScheduledPlanChange_Status_Effective");
+
+                    b.HasIndex("TenantId", "Status")
+                        .HasDatabaseName("IX_ScheduledPlanChange_Tenant_Status");
+
+                    b.ToTable("ScheduledSubscriptionPlanChanges", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1537,6 +1626,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.BillingCheckoutSession", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.ScheduledSubscriptionPlanChange", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Tenants.Tenant", null)
                         .WithMany()
