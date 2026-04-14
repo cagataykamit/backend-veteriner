@@ -11,12 +11,16 @@ namespace Backend.Veteriner.Infrastructure.Security;
 public sealed class JwtTokenService : IJwtTokenService
 {
     private readonly JwtOptions _opt;
+    private readonly SigningCredentials _signingCredentials;
 
     public JwtTokenService(IOptions<JwtOptions> options)
     {
         _opt = options.Value ?? throw new ArgumentNullException(nameof(options));
         if (string.IsNullOrWhiteSpace(_opt.Key) || _opt.Key.Length < 32)
             throw new InvalidOperationException("Jwt:Key en az 32 karakter olmal�.");
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opt.Key));
+        _signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
     }
 
     /// <summary>
@@ -26,9 +30,6 @@ public sealed class JwtTokenService : IJwtTokenService
         User user,
         IEnumerable<Claim>? extraClaims = null)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opt.Key));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
         var now = DateTimeOffset.UtcNow;
         var jti = Guid.NewGuid().ToString("N");
 
@@ -66,7 +67,7 @@ public sealed class JwtTokenService : IJwtTokenService
             claims: claims,
             notBefore: now.UtcDateTime,
             expires: expires.UtcDateTime,
-            signingCredentials: creds
+            signingCredentials: _signingCredentials
         );
 
         var handler = new JwtSecurityTokenHandler();

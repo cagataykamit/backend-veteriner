@@ -4,6 +4,10 @@ public sealed class RefreshTokenCleanupOptions
 {
     public bool Enabled { get; init; } = true;
 
+    // Uygulama açıldıktan kaç saniye sonra ilk cleanup denemesi başlasın.
+    // Startup kritik yolunda DB temasını azaltır.
+    public int InitialDelaySeconds { get; init; } = 300;
+
     // kaç dakikada bir çalışsın
     public int IntervalMinutes { get; init; } = 360; // 6 saat
 

@@ -1,5 +1,4 @@
 using Backend.Veteriner.Application.Auth.Specs;
-using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -10,6 +9,7 @@ using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using FluentAssertions;
 using Moq;
+using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Tests.Public.Handlers;
 
@@ -19,7 +19,6 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     private readonly Mock<IUserRepository> _usersWrite = new();
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IRepository<Tenant>> _tenantsWrite = new();
-    private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IRepository<Clinic>> _clinicsWrite = new();
     private readonly Mock<IRepository<UserTenant>> _userTenantsWrite = new();
     private readonly Mock<IRepository<UserClinic>> _userClinicsWrite = new();
@@ -28,6 +27,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     private readonly Mock<IRepository<TenantSubscription>> _subscriptionsWrite = new();
     private readonly Mock<IPasswordHasher> _hasher = new();
     private readonly Mock<IUnitOfWork> _uow = new();
+    private readonly Mock<ILogger<PublicOwnerSignupCommandHandler>> _logger = new();
 
     private PublicOwnerSignupCommandHandler CreateHandler()
         => new(
@@ -35,7 +35,6 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             _usersWrite.Object,
             _tenantsRead.Object,
             _tenantsWrite.Object,
-            _clinicsRead.Object,
             _clinicsWrite.Object,
             _userTenantsWrite.Object,
             _userClinicsWrite.Object,
@@ -43,7 +42,8 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             _userOperationClaims.Object,
             _subscriptionsWrite.Object,
             _hasher.Object,
-            _uow.Object);
+            _uow.Object,
+            _logger.Object);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_PlanCodeInvalid()
@@ -55,7 +55,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Subscriptions.PlanCodeInvalid");
-        _usersRead.Verify(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+        _usersRead.Verify(r => r.AnyAsync(It.IsAny<UserExistsByEmailSpec>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -64,8 +64,8 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         var handler = CreateHandler();
         var command = new PublicOwnerSignupCommand("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "12345678");
 
-        _usersRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User("owner@a.com", "hash"));
+        _usersRead.Setup(r => r.AnyAsync(It.IsAny<UserExistsByEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -81,14 +81,12 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "12345678");
         var adminClaim = new OperationClaim("Admin");
 
-        _usersRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
-        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByNameCaseInsensitiveSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Tenant?)null);
+        _usersRead.Setup(r => r.AnyAsync(It.IsAny<UserExistsByEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _tenantsRead.Setup(r => r.AnyAsync(It.IsAny<TenantByNameCaseInsensitiveSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
         _operationClaimsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<OperationClaimByNameSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(adminClaim);
-        _clinicsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByTenantAndNameCaseInsensitiveSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Clinic?)null);
         _hasher.Setup(h => h.Hash(command.Password)).Returns("hashed");
 
         TenantSubscription? capturedSub = null;

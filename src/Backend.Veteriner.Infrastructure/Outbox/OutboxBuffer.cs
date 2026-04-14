@@ -20,7 +20,7 @@ public sealed class OutboxBuffer : IOutboxBuffer
         if (payload is null) throw new ArgumentNullException(nameof(payload));
 
         _items.Add(new OutboxEnvelope { Type = type, Payload = payload });
-        _logger.LogInformation("OutboxBuffer: Enqueued Type={Type}, Len={Len}, Count={Count}",
+        _logger.LogDebug("OutboxBuffer: Enqueued Type={Type}, Len={Len}, Count={Count}",
             type, payload.Length, _items.Count);
 
         return Task.CompletedTask;
@@ -30,7 +30,7 @@ public sealed class OutboxBuffer : IOutboxBuffer
     {
         if (_items.Count == 0)
         {
-            _logger.LogInformation("OutboxBuffer: Drain called, nothing to drain");
+            _logger.LogDebug("OutboxBuffer: Drain called, nothing to drain");
             return Array.Empty<OutboxEnvelope>();
         }
 

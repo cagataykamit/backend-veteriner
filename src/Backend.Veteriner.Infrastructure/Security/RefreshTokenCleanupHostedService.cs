@@ -31,7 +31,23 @@ public sealed class RefreshTokenCleanupHostedService : BackgroundService
             return;
         }
 
+        var initialDelay = TimeSpan.FromSeconds(Math.Max(0, _opt.InitialDelaySeconds));
         var interval = TimeSpan.FromMinutes(Math.Max(1, _opt.IntervalMinutes));
+
+        if (initialDelay > TimeSpan.Zero)
+        {
+            _logger.LogInformation(
+                "RefreshToken cleanup initial delay is {InitialDelaySeconds}s.",
+                (int)initialDelay.TotalSeconds);
+            try
+            {
+                await Task.Delay(initialDelay, stoppingToken);
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -60,6 +76,11 @@ public sealed class RefreshTokenCleanupHostedService : BackgroundService
         var now = DateTime.UtcNow;
         var cutoff = now.AddDays(-Math.Max(0, _opt.RetentionDays));
         var batchSize = Math.Max(100, _opt.BatchSize);
+
+        _logger.LogDebug(
+            "RefreshToken cleanup run started. BatchSize={BatchSize} RetentionDays={RetentionDays}",
+            batchSize,
+            _opt.RetentionDays);
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

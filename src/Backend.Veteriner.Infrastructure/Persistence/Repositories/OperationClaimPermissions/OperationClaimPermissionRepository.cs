@@ -62,18 +62,20 @@ public sealed class OperationClaimPermissionRepository : IOperationClaimPermissi
     public async Task<IReadOnlyList<string>> GetPermissionCodesByUserIdAsync(Guid userId, CancellationToken ct)
     {
         // Önceden derlenmiş sorgu: ilk çağrıda model derleme maliyetini düşürür; tek SELECT (üçlü join).
-        // Küçük sonuçta bellekte Distinct + sıralı liste; permission kümesi öncekiyle aynı.
-        var codes = new List<string>();
+        // Sonuçları akış sırasında tekilleştirerek gereksiz materyalizasyonu azaltır.
+        var uniqueCodes = new HashSet<string>(StringComparer.Ordinal);
         await foreach (var code in PermissionCodesByUserIdCompiled(_db, userId).WithCancellation(ct))
-            codes.Add(code);
+            uniqueCodes.Add(code);
 
-        if (codes.Count == 0)
+        if (uniqueCodes.Count == 0)
             return Array.Empty<string>();
 
-        if (codes.Count == 1)
-            return codes;
+        if (uniqueCodes.Count == 1)
+            return [uniqueCodes.First()];
 
-        return codes.Distinct(StringComparer.Ordinal).OrderBy(c => c, StringComparer.Ordinal).ToList();
+        var ordered = uniqueCodes.ToList();
+        ordered.Sort(StringComparer.Ordinal);
+        return ordered;
     }
 
     /// <summary>

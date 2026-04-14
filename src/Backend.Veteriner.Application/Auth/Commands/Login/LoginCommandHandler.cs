@@ -99,7 +99,10 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         var permissionCodes = await _permissionReader.GetPermissionsAsync(user.Id, principal: null, ct)
                               ?? Array.Empty<string>();
         MarkStep("permissionCodes");
-        var extraClaims = permissionCodes.Select(code => new Claim("permission", code)).ToList();
+        var extraClaims = new List<Claim>(permissionCodes.Count + 2);
+        foreach (var code in permissionCodes)
+            extraClaims.Add(new Claim("permission", code));
+        MarkStep("permissionClaimsBuild");
 
         if (IsPlatformAdmin(user))
             extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));
@@ -158,6 +161,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         extraClaims.Add(new Claim(VeterinerClaims.TenantId, tenantId.ToString("D")));
 
         var (access, refreshRaw, accessExp) = _jwt.Create(user, extraClaims);
+        MarkStep("jwtCreate");
 
         var refreshHash = _tokenHash.ComputeSha256(refreshRaw);
 
@@ -173,6 +177,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         user.AddRefreshToken(rt);
         await _refreshRepo.AddAsync(rt, ct);
         await _refreshRepo.SaveChangesAsync(ct);
+        MarkStep("saveRefreshToken");
 
         _logger.LogInformation(
             "Login succeeded. UserId={UserId} TenantId={TenantId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",

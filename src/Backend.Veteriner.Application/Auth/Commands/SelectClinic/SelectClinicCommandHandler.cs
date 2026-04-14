@@ -162,7 +162,10 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         var permissionCodes = await _permissionReader.GetPermissionsAsync(user.Id, principal: null, ct)
                               ?? Array.Empty<string>();
         MarkStep("permissionCodes");
-        var extraClaims = permissionCodes.Select(code => new Claim("permission", code)).ToList();
+        var extraClaims = new List<Claim>(permissionCodes.Count + 3);
+        foreach (var code in permissionCodes)
+            extraClaims.Add(new Claim("permission", code));
+        MarkStep("permissionClaimsBuild");
 
         if (user.Roles.Any(r => string.Equals(r.Name, "PlatformAdmin", StringComparison.OrdinalIgnoreCase)))
             extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));
@@ -171,6 +174,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         extraClaims.Add(new Claim(VeterinerClaims.ClinicId, request.ClinicId.ToString("D")));
 
         var (access, newRefreshRaw, accessExp) = _jwt.Create(user, extraClaims);
+        MarkStep("jwtCreate");
 
         var newHash = _hash.ComputeSha256(newRefreshRaw);
         stored.ReplaceWith(newHash);
@@ -188,6 +192,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         user.AddRefreshToken(newRefresh);
         await _refreshRepo.AddAsync(newRefresh, ct);
         await _refreshRepo.SaveChangesAsync(ct);
+        MarkStep("saveRefreshToken");
 
         _logger.LogInformation(
             "Select clinic succeeded. UserId={UserId} TenantId={TenantId} ClinicId={ClinicId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",

@@ -125,7 +125,9 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
                               ?? Array.Empty<string>();
         MarkStep("permissionCodes");
 
-        var extraClaims = permissionCodes.Select(code => new Claim("permission", code)).ToList();
+        var extraClaims = new List<Claim>(permissionCodes.Count + 3);
+        foreach (var code in permissionCodes)
+            extraClaims.Add(new Claim("permission", code));
 
         if (user.Roles.Any(r => string.Equals(r.Name, "PlatformAdmin", StringComparison.OrdinalIgnoreCase)))
             extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));

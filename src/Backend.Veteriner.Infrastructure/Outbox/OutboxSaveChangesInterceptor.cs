@@ -38,16 +38,19 @@ public sealed class OutboxSaveChangesInterceptor : SaveChangesInterceptor
             return;
         }
 
-        _logger.LogInformation("OutboxInterceptor: SavingChanges triggered");
         var batch = _buffer.Drain();
-        _logger.LogInformation("OutboxInterceptor: drained {Count} item(s).", batch.Count);
+        if (batch.Count == 0)
+        {
+            _logger.LogDebug("OutboxInterceptor: no buffered message for this SaveChanges.");
+            return;
+        }
 
-        if (batch.Count == 0) return;
+        _logger.LogInformation("OutboxInterceptor: drained {Count} item(s).", batch.Count);
 
         var now = DateTime.UtcNow;
         foreach (var item in batch)
         {
-            _logger.LogInformation("OutboxInterceptor: append type={Type}, len={Len}", item.Type, item.Payload?.Length ?? 0);
+            _logger.LogDebug("OutboxInterceptor: append type={Type}, len={Len}", item.Type, item.Payload?.Length ?? 0);
             db.OutboxMessages.Add(new OutboxMessage
             {
                 Id = Guid.NewGuid(),

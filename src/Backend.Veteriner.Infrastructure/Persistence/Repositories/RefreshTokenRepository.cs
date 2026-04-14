@@ -30,22 +30,14 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
     }
 
     /// <summary>
-    /// TokenHash üzerinden tek satır, ardından FK ile User ve UserRoles ayrı SELECT (split-include / geniş join yok).
+    /// Refresh/select-clinic için token + user + roles tek sorguda alınır (cold path round-trip azaltımı).
     /// </summary>
     public async Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken ct = default)
     {
-        var rt = await _db.RefreshTokens
+        return await _db.RefreshTokens
+            .Include(r => r.User)
+            .ThenInclude(u => u.Roles)
             .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, ct);
-
-        if (rt is null)
-            return null;
-
-        await _db.Entry(rt).Reference(r => r.User).LoadAsync(ct);
-
-        if (rt.User is not null)
-            await _db.Entry(rt.User).Collection(u => u.Roles).LoadAsync(ct);
-
-        return rt;
     }
 
     public Task<List<RefreshToken>> GetActiveByUserAsync(Guid userId, CancellationToken ct = default)
