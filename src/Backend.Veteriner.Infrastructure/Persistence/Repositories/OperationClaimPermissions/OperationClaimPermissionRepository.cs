@@ -18,6 +18,17 @@ public sealed class OperationClaimPermissionRepository : IOperationClaimPermissi
 {
     private readonly AppDbContext _db;
 
+    /// <summary>
+    /// Soğuk yolda model derleme maliyetini düşürmek için önceden derlenmiş okuma (tek round-trip, üçlü join).
+    /// </summary>
+    private static readonly Func<AppDbContext, Guid, IAsyncEnumerable<string>> PermissionCodesByUserIdCompiled =
+        EF.CompileAsyncQuery((AppDbContext db, Guid userId) =>
+            from uoc in db.UserOperationClaims.AsNoTracking()
+            where uoc.UserId == userId
+            join ocp in db.OperationClaimPermissions.AsNoTracking() on uoc.OperationClaimId equals ocp.OperationClaimId
+            join p in db.Permissions.AsNoTracking() on ocp.PermissionId equals p.Id
+            select p.Code);
+
     public OperationClaimPermissionRepository(AppDbContext db)
         => _db = db;
 
@@ -50,17 +61,19 @@ public sealed class OperationClaimPermissionRepository : IOperationClaimPermissi
     /// </summary>
     public async Task<IReadOnlyList<string>> GetPermissionCodesByUserIdAsync(Guid userId, CancellationToken ct)
     {
-        var codes = await (
-            from uoc in _db.UserOperationClaims
-            join ocp in _db.OperationClaimPermissions on uoc.OperationClaimId equals ocp.OperationClaimId
-            join p in _db.Permissions on ocp.PermissionId equals p.Id
-            where uoc.UserId == userId
-            select p.Code
-        )
-        .Distinct()
-        .ToListAsync(ct);
+        // Önceden derlenmiş sorgu: ilk çağrıda model derleme maliyetini düşürür; tek SELECT (üçlü join).
+        // Küçük sonuçta bellekte Distinct + sıralı liste; permission kümesi öncekiyle aynı.
+        var codes = new List<string>();
+        await foreach (var code in PermissionCodesByUserIdCompiled(_db, userId).WithCancellation(ct))
+            codes.Add(code);
 
-        return codes;
+        if (codes.Count == 0)
+            return Array.Empty<string>();
+
+        if (codes.Count == 1)
+            return codes;
+
+        return codes.Distinct(StringComparer.Ordinal).OrderBy(c => c, StringComparer.Ordinal).ToList();
     }
 
     /// <summary>

@@ -9,6 +9,7 @@ public sealed class ClientsByTenantTextSearchSpec : Specification<Client>
 {
     public ClientsByTenantTextSearchSpec(Guid tenantId, string containsLikePattern)
     {
+        Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId)
             .Where(c =>
                 EF.Functions.Like(c.FullName, containsLikePattern)

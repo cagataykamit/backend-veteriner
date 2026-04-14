@@ -12,6 +12,7 @@ public sealed class PetsByTenantTextFieldsSearchSpec : Specification<Pet>
 {
     public PetsByTenantTextFieldsSearchSpec(Guid tenantId, string containsLikePattern)
     {
+        Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId)
             .Where(p =>
                 EF.Functions.Like(p.Name, containsLikePattern)

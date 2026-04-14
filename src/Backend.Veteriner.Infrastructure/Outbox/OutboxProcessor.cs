@@ -40,6 +40,12 @@ public sealed class OutboxProcessor : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!_opt.Enabled)
+        {
+            Log.Information("OutboxProcessor disabled via Outbox:Enabled=false; background outbox polling skipped.");
+            return;
+        }
+
         var interval = TimeSpan.FromSeconds(Math.Max(1, _opt.LoopIntervalSeconds));
         var timer = new PeriodicTimer(interval);
 

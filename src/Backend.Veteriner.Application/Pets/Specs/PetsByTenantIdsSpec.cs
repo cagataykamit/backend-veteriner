@@ -7,6 +7,7 @@ public sealed class PetsByTenantIdsSpec : Specification<Pet>
 {
     public PetsByTenantIdsSpec(Guid tenantId, IReadOnlyCollection<Guid> petIds)
     {
+        Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId && petIds.Contains(p.Id));
     }
 }

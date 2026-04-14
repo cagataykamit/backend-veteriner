@@ -38,6 +38,8 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ScheduledAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ClinicId });
+        // Dashboard günlük sayımlar + klinik filtreli aralık sorguları için aralık taramasını daraltır.
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.ScheduledAtUtc });
         b.HasIndex(x => new { x.TenantId, x.PetId });
     }
 }

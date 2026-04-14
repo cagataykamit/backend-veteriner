@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Auth.Commands.SelectClinic;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -15,7 +16,7 @@ public sealed class SelectClinicCommandHandlerTests
     private readonly Mock<ITokenHashService> _hash = new();
     private readonly Mock<IJwtTokenService> _jwt = new();
     private readonly Mock<IJwtOptionsProvider> _opt = new();
-    private readonly Mock<IOperationClaimPermissionRepository> _ocpRepo = new();
+    private readonly Mock<IPermissionReader> _permissionReader = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IUserTenantRepository> _userTenants = new();
     private readonly Mock<IUserClinicRepository> _userClinics = new();
@@ -27,7 +28,7 @@ public sealed class SelectClinicCommandHandlerTests
             _hash.Object,
             _jwt.Object,
             _opt.Object,
-            _ocpRepo.Object,
+            _permissionReader.Object,
             _tenants.Object,
             _userTenants.Object,
             _userClinics.Object,
@@ -56,7 +57,7 @@ public sealed class SelectClinicCommandHandlerTests
         _clinicsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Application.Clinics.Specs.ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(clinic);
 
-        _userClinics.Setup(r => r.ExistsAsync(user.Id, cid, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _userClinics.Setup(r => r.ExistsActiveInTenantAsync(user.Id, tid, cid, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         var result = await CreateHandler().Handle(new SelectClinicCommand("raw", cid), CancellationToken.None);
 

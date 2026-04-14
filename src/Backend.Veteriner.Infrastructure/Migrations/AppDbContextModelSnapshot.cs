@@ -60,6 +60,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "ScheduledAtUtc");
 
+                    b.HasIndex("TenantId", "ClinicId", "ScheduledAtUtc");
+
                     b.ToTable("Appointments", (string)null);
                 });
 

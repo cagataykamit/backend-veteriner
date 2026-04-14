@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Security.Claims;
+using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Auth.Commands.Login;
 using Backend.Veteriner.Application.Auth.Commands.Refresh;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -20,7 +21,7 @@ public sealed class RefreshCommandHandlerTests
     private readonly Mock<ITokenHashService> _hash = new();
     private readonly Mock<IJwtTokenService> _jwt = new();
     private readonly Mock<IJwtOptionsProvider> _opt = new();
-    private readonly Mock<IOperationClaimPermissionRepository> _ocpRepo = new();
+    private readonly Mock<IPermissionReader> _permissionReader = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IUserTenantRepository> _userTenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
@@ -34,7 +35,7 @@ public sealed class RefreshCommandHandlerTests
             _hash.Object,
             _jwt.Object,
             _opt.Object,
-            _ocpRepo.Object,
+            _permissionReader.Object,
             _tenants.Object,
             _userTenants.Object,
             _clinics.Object);
@@ -175,7 +176,7 @@ public sealed class RefreshCommandHandlerTests
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
 
-        _ocpRepo.Setup(r => r.GetPermissionCodesByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+        _permissionReader.Setup(r => r.GetPermissionsAsync(user.Id, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<string> { "p1" });
 
         _opt.SetupGet(o => o.RefreshTokenDays).Returns(7);
@@ -223,7 +224,7 @@ public sealed class RefreshCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
         _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
-        _ocpRepo.Setup(r => r.GetPermissionCodesByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+        _permissionReader.Setup(r => r.GetPermissionsAsync(user.Id, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<string>());
         _opt.SetupGet(o => o.RefreshTokenDays).Returns(7);
 

@@ -2,6 +2,9 @@ namespace Backend.Veteriner.Infrastructure.Outbox;
 
 public sealed class OutboxOptions
 {
+    /// <summary>False ise OutboxProcessor hiç çalışmaz (ör. development DB rahatlatma).</summary>
+    public bool Enabled { get; set; } = true;
+
     /// Maksimum tekrar deneme say�s� (sonras�nda dead-letter)
     public int MaxRetryCount { get; set; } = 10;
 

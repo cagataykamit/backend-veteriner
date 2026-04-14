@@ -10,6 +10,7 @@ using Backend.Veteriner.Infrastructure.Mailing;                                 
 using Backend.Veteriner.Infrastructure.Outbox;                                    // EfOutbox, OutboxProcessor, OutboxOptions, OutboxBuffer, OutboxSaveChangesInterceptor
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;                 // EfRepository, EfReadRepository, UserRepository, RefreshTokenRepository, VerificationTokenRepository
+using Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaimPermissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaims;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
@@ -46,10 +47,14 @@ public static class DependencyInjection
 
         // ===== Outbox =====
         services.Configure<OutboxOptions>(configuration.GetSection("Outbox"));
+        services.Configure<PerformanceDiagnosticsOptions>(
+            configuration.GetSection(PerformanceDiagnosticsOptions.SectionName));
 
         services.AddScoped<OutboxBuffer>();
         services.AddScoped<IOutboxBuffer>(sp => sp.GetRequiredService<OutboxBuffer>());
         services.AddScoped<OutboxSaveChangesInterceptor>();
+        services.AddScoped<SlowQueryLoggingInterceptor>();
+        services.AddScoped<DbConnectionSlowOpenInterceptor>();
         services.AddScoped<DomainEventOutboxInterceptor>();
         services.AddSingleton<DomainEventTypeRegistry>();
 
@@ -57,7 +62,10 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, opt) =>
         {
             opt.UseSqlServer(connStr);
-            opt.AddInterceptors(sp.GetRequiredService<OutboxSaveChangesInterceptor>());
+            opt.AddInterceptors(
+                sp.GetRequiredService<OutboxSaveChangesInterceptor>(),
+                sp.GetRequiredService<SlowQueryLoggingInterceptor>(),
+                sp.GetRequiredService<DbConnectionSlowOpenInterceptor>());
         });
 
         // ===== Repositories =====
@@ -73,6 +81,7 @@ public static class DependencyInjection
         services.AddScoped<IUserOperationClaimRepository, UserOperationClaimRepository>();
         services.AddScoped<IUserTenantRepository, UserTenantRepository>();
         services.AddScoped<IUserClinicRepository, UserClinicRepository>();
+        services.AddScoped<IDashboardTodayAppointmentStatusCountsReader, DashboardTodayAppointmentStatusCountsReader>();
         services.AddScoped<IOutbox, EfOutbox>();
 
 

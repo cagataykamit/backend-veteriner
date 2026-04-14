@@ -7,6 +7,7 @@ public sealed class SpeciesByIdsSpec : Specification<Species>
 {
     public SpeciesByIdsSpec(IReadOnlyCollection<Guid> ids)
     {
+        Query.AsNoTracking();
         Query.Where(s => ids.Contains(s.Id));
     }
 }

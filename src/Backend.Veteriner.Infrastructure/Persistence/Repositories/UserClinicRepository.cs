@@ -14,6 +14,17 @@ public sealed class UserClinicRepository : IUserClinicRepository
         => _db.UserClinics.AsNoTracking()
             .AnyAsync(x => x.UserId == userId && x.ClinicId == clinicId, ct);
 
+    public Task<bool> ExistsActiveInTenantAsync(Guid userId, Guid tenantId, Guid clinicId, CancellationToken ct)
+        => (
+            from uc in _db.UserClinics.AsNoTracking()
+            join c in _db.Clinics.AsNoTracking() on uc.ClinicId equals c.Id
+            where uc.UserId == userId
+                  && uc.ClinicId == clinicId
+                  && c.TenantId == tenantId
+                  && c.IsActive
+            select uc.ClinicId
+        ).AnyAsync(ct);
+
     public async Task<IReadOnlyList<Clinic>> ListAccessibleClinicsAsync(
         Guid userId,
         Guid tenantId,

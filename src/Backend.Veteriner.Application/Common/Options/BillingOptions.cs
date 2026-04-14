@@ -87,4 +87,10 @@ public sealed class IyzicoBillingOptions
 
     /// <summary>Fatura/teslimat adresinde kullanılacak varsayılan şehir.</summary>
     public string City { get; init; } = "Istanbul";
+
+    /// <summary>
+    /// Yalnızca Development + Iyzico sandbox BaseUrl + çözülen Buyer IP loopback ise
+    /// fraud (ör. 6001) riskini azaltmak için kullanılır. Production’da kullanılmaz.
+    /// </summary>
+    public string SandboxBuyerIp { get; init; } = "";
 }

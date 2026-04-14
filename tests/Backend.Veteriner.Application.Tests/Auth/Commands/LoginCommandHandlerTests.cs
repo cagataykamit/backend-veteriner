@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Security.Claims;
+using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Auth.Commands.Login;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
@@ -24,7 +25,7 @@ public sealed class LoginCommandHandlerTests
     private readonly Mock<IRefreshTokenRepository> _refreshRepo = new();
     private readonly Mock<IClientContext> _client = new();
     private readonly Mock<IJwtOptionsProvider> _jwtOpt = new();
-    private readonly Mock<IOperationClaimPermissionRepository> _ocpRepo = new();
+    private readonly Mock<IPermissionReader> _permissionReader = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IUserTenantRepository> _userTenants = new();
 
@@ -41,7 +42,7 @@ public sealed class LoginCommandHandlerTests
             _refreshRepo.Object,
             _client.Object,
             _jwtOpt.Object,
-            _ocpRepo.Object,
+            _permissionReader.Object,
             _tenants.Object,
             _userTenants.Object,
             opt);
@@ -103,7 +104,7 @@ public sealed class LoginCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
-        _ocpRepo.Setup(r => r.GetPermissionCodesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        _permissionReader.Setup(r => r.GetPermissionsAsync(It.IsAny<Guid>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<string> { "p1", "p2" });
 
         _jwtOpt.SetupGet(o => o.RefreshTokenDays).Returns(7);
@@ -150,7 +151,7 @@ public sealed class LoginCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
-        _ocpRepo.Setup(r => r.GetPermissionCodesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        _permissionReader.Setup(r => r.GetPermissionsAsync(It.IsAny<Guid>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<string>());
         _jwtOpt.SetupGet(o => o.RefreshTokenDays).Returns(7);
 
@@ -214,7 +215,7 @@ public sealed class LoginCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
-        _ocpRepo.Setup(r => r.GetPermissionCodesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        _permissionReader.Setup(r => r.GetPermissionsAsync(It.IsAny<Guid>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<string>());
         _jwtOpt.SetupGet(o => o.RefreshTokenDays).Returns(7);
 

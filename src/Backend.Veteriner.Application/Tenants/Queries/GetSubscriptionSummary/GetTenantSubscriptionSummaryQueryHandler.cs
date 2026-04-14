@@ -5,6 +5,9 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionSummary;
 
@@ -17,6 +20,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
     private readonly IReadRepository<TenantSubscription> _subscriptions;
     private readonly IReadRepository<ScheduledSubscriptionPlanChange> _planChanges;
     private readonly TenantSubscriptionEffectiveWriteEvaluator _effectiveWriteEvaluator;
+    private readonly ILogger<GetTenantSubscriptionSummaryQueryHandler> _logger;
 
     public GetTenantSubscriptionSummaryQueryHandler(
         ITenantContext tenantContext,
@@ -24,7 +28,8 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         IReadRepository<Tenant> tenants,
         IReadRepository<TenantSubscription> subscriptions,
         IReadRepository<ScheduledSubscriptionPlanChange> planChanges,
-        TenantSubscriptionEffectiveWriteEvaluator effectiveWriteEvaluator)
+        TenantSubscriptionEffectiveWriteEvaluator effectiveWriteEvaluator,
+        ILogger<GetTenantSubscriptionSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
@@ -32,6 +37,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         _subscriptions = subscriptions;
         _planChanges = planChanges;
         _effectiveWriteEvaluator = effectiveWriteEvaluator;
+        _logger = logger ?? NullLogger<GetTenantSubscriptionSummaryQueryHandler>.Instance;
     }
 
     public async Task<Result<TenantSubscriptionSummaryDto>> Handle(
@@ -61,12 +67,33 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
                 "Bu kiracının abonelik özetine erişim yok.");
         }
 
+        var totalSw = Stopwatch.StartNew();
+        var stepSw = Stopwatch.StartNew();
+        var querySteps = 0;
+        var slowestStep = string.Empty;
+        long slowestMs = 0;
+
+        void MarkStep(string name)
+        {
+            querySteps++;
+            var elapsed = stepSw.ElapsedMilliseconds;
+            if (elapsed > slowestMs)
+            {
+                slowestMs = elapsed;
+                slowestStep = name;
+            }
+
+            stepSw.Restart();
+        }
+
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(request.TenantId), ct);
+        MarkStep("tenantLookup");
         if (tenant is null)
             return Result<TenantSubscriptionSummaryDto>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
 
         var sub = await _subscriptions.FirstOrDefaultAsync(
             new TenantSubscriptionByTenantIdSpec(request.TenantId), ct);
+        MarkStep("subscriptionLookup");
         if (sub is null)
         {
             return Result<TenantSubscriptionSummaryDto>.Failure(
@@ -98,6 +125,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
             .ToList();
 
         var pending = await _planChanges.FirstOrDefaultAsync(new OpenScheduledPlanChangeByTenantSpec(request.TenantId), ct);
+        MarkStep("pendingPlanChangeLookup");
         PendingSubscriptionPlanChangeDto? pendingDto = null;
         if (pending is not null)
         {
@@ -129,6 +157,14 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
             period.PeriodEndUtc,
             pendingDto,
             available);
+
+        _logger.LogInformation(
+            "Tenant subscription summary generated. TenantId={TenantId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            request.TenantId,
+            querySteps,
+            slowestStep,
+            slowestMs,
+            totalSw.ElapsedMilliseconds);
 
         return Result<TenantSubscriptionSummaryDto>.Success(dto);
     }

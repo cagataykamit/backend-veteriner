@@ -19,6 +19,7 @@ public sealed class AppointmentsFilteredPagedSpec : Specification<Appointment>
         Guid[] searchPetIds,
         bool scheduledAtDescending)
     {
+        Query.AsNoTracking();
         Query.Where(a => a.TenantId == tenantId);
         if (clinicId.HasValue)
             Query.Where(a => a.ClinicId == clinicId.Value);

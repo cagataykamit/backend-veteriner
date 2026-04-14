@@ -9,6 +9,9 @@ using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Dashboard.Queries.GetFinanceSummary;
 
@@ -20,19 +23,22 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
+    private readonly ILogger<GetDashboardFinanceSummaryQueryHandler> _logger;
 
     public GetDashboardFinanceSummaryQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IReadRepository<Payment> payments,
         IReadRepository<Client> clients,
-        IReadRepository<Pet> pets)
+        IReadRepository<Pet> pets,
+        ILogger<GetDashboardFinanceSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _payments = payments;
         _clients = clients;
         _pets = pets;
+        _logger = logger ?? NullLogger<GetDashboardFinanceSummaryQueryHandler>.Instance;
     }
 
     public async Task<Result<DashboardFinanceSummaryDto>> Handle(
@@ -51,29 +57,64 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         var (weekStart, weekEnd) = OperationPeriodBounds.WeekForUtcNow(utcNow);
         var (monthStart, monthEnd) = OperationPeriodBounds.MonthForUtcNow(utcNow);
         var clinicId = _clinicContext.ClinicId;
+        var totalSw = Stopwatch.StartNew();
+        var stepSw = Stopwatch.StartNew();
+        var querySteps = 0;
+        var slowestStep = string.Empty;
+        long slowestMs = 0;
 
-        var todayAmounts = await _payments.ListAsync(
-            new PaymentsAmountInPaidAtWindowSpec(tenantId, clinicId, dayStart, dayEnd), ct);
-        var weekAmounts = await _payments.ListAsync(
-            new PaymentsAmountInPaidAtWindowSpec(tenantId, clinicId, weekStart, weekEnd), ct);
-        var monthAmounts = await _payments.ListAsync(
-            new PaymentsAmountInPaidAtWindowSpec(tenantId, clinicId, monthStart, monthEnd), ct);
+        void MarkStep(string name)
+        {
+            querySteps++;
+            var elapsed = stepSw.ElapsedMilliseconds;
+            if (elapsed > slowestMs)
+            {
+                slowestMs = elapsed;
+                slowestStep = name;
+            }
 
-        var todayTotalPaid = todayAmounts.Sum();
-        var weekTotalPaid = weekAmounts.Sum();
-        var monthTotalPaid = monthAmounts.Sum();
-        var todayPaymentsCount = todayAmounts.Count;
-        var weekPaymentsCount = weekAmounts.Count;
-        var monthPaymentsCount = monthAmounts.Count;
+            stepSw.Restart();
+        }
+
+        var monthPayments = await _payments.ListAsync(
+            new PaymentsPaidAtAmountInWindowSpec(tenantId, clinicId, monthStart, monthEnd), ct);
+        MarkStep("monthPaymentsScanSource");
+
+        decimal todayTotalPaid = 0m;
+        decimal weekTotalPaid = 0m;
+        decimal monthTotalPaid = 0m;
+        var todayPaymentsCount = 0;
+        var weekPaymentsCount = 0;
+        var monthPaymentsCount = 0;
+
+        foreach (var payment in monthPayments)
+        {
+            monthTotalPaid += payment.Amount;
+            monthPaymentsCount++;
+
+            if (payment.PaidAtUtc >= weekStart && payment.PaidAtUtc < weekEnd)
+            {
+                weekTotalPaid += payment.Amount;
+                weekPaymentsCount++;
+            }
+
+            if (payment.PaidAtUtc >= dayStart && payment.PaidAtUtc < dayEnd)
+            {
+                todayTotalPaid += payment.Amount;
+                todayPaymentsCount++;
+            }
+        }
 
         var recentRows = await _payments.ListAsync(
             new PaymentsForDashboardRecentSpec(tenantId, clinicId, DashboardFinanceSummaryConstants.RecentPaymentsTake),
             ct);
+        MarkStep("recentPayments");
 
         var clientIds = recentRows.Select(r => r.ClientId).Distinct().ToArray();
         var clients = clientIds.Length == 0
             ? []
             : await _clients.ListAsync(new ClientsByTenantIdsSpec(tenantId, clientIds), ct);
+        MarkStep("recentClientsLookup");
         var clientNameById = clients.ToDictionary(c => c.Id, c => c.FullName);
 
         var petIds = recentRows
@@ -85,6 +126,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         if (petIds.Length > 0)
         {
             var pets = await _pets.ListAsync(new PetsByTenantIdsSpec(tenantId, petIds), ct);
+            MarkStep("recentPetsLookup");
             petNameById = pets.ToDictionary(p => p.Id, p => p.Name);
         }
 
@@ -109,6 +151,17 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             weekPaymentsCount,
             monthPaymentsCount,
             recentDtos);
+
+        _logger.LogInformation(
+            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} MonthPaymentsScanned={MonthPaymentsScanned} RecentPayments={RecentPayments} TotalElapsedMs={TotalElapsedMs}",
+            tenantId,
+            clinicId,
+            querySteps,
+            slowestStep,
+            slowestMs,
+            monthPaymentsCount,
+            recentDtos.Count,
+            totalSw.ElapsedMilliseconds);
 
         return Result<DashboardFinanceSummaryDto>.Success(dto);
     }

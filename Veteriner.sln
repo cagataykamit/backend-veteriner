@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -20,6 +20,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backend.Veteriner.Domain.Tests", "tests\Backend.Veteriner.Domain.Tests\Backend.Veteriner.Domain.Tests.csproj", "{3F9B7C5D-6D1E-4B2A-8F1C-ABCDEF123456}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backend.Veteriner.IntegrationTests", "tests\Backend.Veteriner.IntegrationTests\Backend.Veteriner.IntegrationTests.csproj", "{AB8F979D-EA9E-430F-B736-BFDC22EE9BA9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backend.Veteriner.DbMigrator", "src\Backend.Veteriner.DbMigrator\Backend.Veteriner.DbMigrator.csproj", "{DC9A13F4-51A1-4E93-9684-C31A0A738F47}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -115,6 +117,18 @@ Global
 		{AB8F979D-EA9E-430F-B736-BFDC22EE9BA9}.Release|x64.Build.0 = Release|Any CPU
 		{AB8F979D-EA9E-430F-B736-BFDC22EE9BA9}.Release|x86.ActiveCfg = Release|Any CPU
 		{AB8F979D-EA9E-430F-B736-BFDC22EE9BA9}.Release|x86.Build.0 = Release|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Debug|x64.Build.0 = Debug|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Debug|x86.Build.0 = Debug|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Release|x64.ActiveCfg = Release|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Release|x64.Build.0 = Release|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Release|x86.ActiveCfg = Release|Any CPU
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -127,5 +141,6 @@ Global
 		{2E9A8E4A-5C9D-4A09-9E4C-1234567890AB} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{3F9B7C5D-6D1E-4B2A-8F1C-ABCDEF123456} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{AB8F979D-EA9E-430F-B736-BFDC22EE9BA9} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{DC9A13F4-51A1-4E93-9684-C31A0A738F47} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

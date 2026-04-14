@@ -18,18 +18,35 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
     public Task AddAsync(RefreshToken token, CancellationToken ct = default)
         => _db.RefreshTokens.AddAsync(token, ct).AsTask();
 
+    /// <summary>
+    /// Logout gibi senaryolar: yalnızca refresh satırı gerekir (User/Roles yok). İki ek round-trip kaldırılır.
+    /// Refresh / select-clinic için <see cref="GetByHashAsync"/> kullanılmaya devam eder.
+    /// </summary>
     public Task<RefreshToken?> GetByTokenAsync(string token, CancellationToken ct = default)
     {
         var tokenHash = _hash.ComputeSha256(token);
-        return GetByHashAsync(tokenHash, ct);
+        return _db.RefreshTokens
+            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, ct);
     }
 
-    public Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken ct = default)
-        => _db.RefreshTokens
-              .Include(rt => rt.User)
-              .ThenInclude(u => u.Roles)
-              .OrderByDescending(rt => rt.CreatedAtUtc)
-              .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash, ct);
+    /// <summary>
+    /// TokenHash üzerinden tek satır, ardından FK ile User ve UserRoles ayrı SELECT (split-include / geniş join yok).
+    /// </summary>
+    public async Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken ct = default)
+    {
+        var rt = await _db.RefreshTokens
+            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, ct);
+
+        if (rt is null)
+            return null;
+
+        await _db.Entry(rt).Reference(r => r.User).LoadAsync(ct);
+
+        if (rt.User is not null)
+            await _db.Entry(rt.User).Collection(u => u.Roles).LoadAsync(ct);
+
+        return rt;
+    }
 
     public Task<List<RefreshToken>> GetActiveByUserAsync(Guid userId, CancellationToken ct = default)
     {

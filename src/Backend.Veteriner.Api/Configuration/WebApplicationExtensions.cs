@@ -1,13 +1,8 @@
 using Backend.Veteriner.Api.Middleware;
-using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
-using Backend.Veteriner.Infrastructure.Persistence;
-using Backend.Veteriner.Infrastructure.Persistence.Seeding;
-using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using System.Diagnostics;
@@ -16,17 +11,18 @@ using System.Text.Json;
 namespace Backend.Veteriner.Api.Configuration;
 
 /// <summary>
-/// Program.cs bootstrap: HTTP pipeline, endpoint haritaları ve migration/seed (sıra korunur).
+/// Program.cs bootstrap: HTTP pipeline ve endpoint haritaları. Migration/seed ayrı DbMigrator aracıyla.
 /// </summary>
 public static class WebApplicationExtensions
 {
-    public static async Task<WebApplication> ConfigureBackendAsync(this WebApplication app)
+    public static Task<WebApplication> ConfigureBackendAsync(this WebApplication app)
     {
         app.UseForwardedHeaders();
 
         app.UseSerilogRequestLogging();
 
         app.UseCorrelationId();
+        app.UseMiddleware<ActiveHttpRequestCountingMiddleware>();
         app.UseRequestEnrichment();
 
         app.UseGlobalExceptionHandler(app.Environment);
@@ -154,62 +150,9 @@ public static class WebApplicationExtensions
 
         app.MapHealthChecks("/health");
 
-        if (!app.Environment.IsEnvironment("IntegrationTests"))
-        {
-            using var scope = app.Services.CreateScope();
-            var services = scope.ServiceProvider;
-            var logger = services.GetRequiredService<ILogger<Program>>();
+        app.Logger.LogInformation(
+            "API startup does not run EF migrations or database seeding. Apply schema with `dotnet ef database update` or run: dotnet run --project src/Backend.Veteriner.DbMigrator -- migrate | seed | all");
 
-            try
-            {
-                var db = services.GetRequiredService<AppDbContext>();
-                var hasher = services.GetRequiredService<IPasswordHasher>();
-
-                // Geçici tanılama: migration öncesi gerçek bağlantı hedefi (User Secrets / env override doğrulaması).
-                var aspNetCoreEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
-                    ?? app.Environment.EnvironmentName;
-                var rawConnectionString = db.Database.GetConnectionString();
-                string? server = null;
-                string? databaseName = null;
-                if (!string.IsNullOrWhiteSpace(rawConnectionString))
-                {
-                    try
-                    {
-                        var csb = new SqlConnectionStringBuilder(rawConnectionString);
-                        server = csb.DataSource;
-                        databaseName = csb.InitialCatalog;
-                    }
-                    catch (Exception parseEx)
-                    {
-                        logger.LogWarning(parseEx, "[Startup DB] Connection string parse edilemedi.");
-                    }
-                }
-
-                logger.LogWarning(
-                    "[Startup DB] Migration öncesi — Environment={Environment} | DatabaseServer={DatabaseServer} | DatabaseName={DatabaseName} | FullConnectionString={FullConnectionString}",
-                    aspNetCoreEnv,
-                    server,
-                    databaseName,
-                    rawConnectionString ?? "(null)");
-
-                await db.Database.MigrateAsync();
-
-                // Sıra: önce permission'lar, sonra admin kullanıcı (DataSeeder), en son Admin claim ↔ user ↔ permission bağları.
-                // AdminClaimSeeder kullanıcı yoksa erken çıktığı için DataSeeder'dan önce çalıştırılmamalı (ilk boot).
-                await PermissionSeeder.SeedAsync(db);
-                await DataSeeder.SeedAsync(db, hasher);
-                await AdminClaimSeeder.SeedAsync(db);
-                await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
-
-                logger.LogInformation("Database migration and seeding completed successfully.");
-            }
-            catch (Exception ex)
-            {
-                logger.LogCritical(ex, "Database seeding failed. Application startup aborted.");
-                throw;
-            }
-        }
-
-        return app;
+        return Task.FromResult(app);
     }
 }

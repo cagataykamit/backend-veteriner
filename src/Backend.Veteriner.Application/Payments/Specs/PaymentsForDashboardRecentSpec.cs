@@ -17,6 +17,7 @@ public sealed class PaymentsForDashboardRecentSpec : Specification<Payment, Dash
 {
     public PaymentsForDashboardRecentSpec(Guid tenantId, Guid? clinicId, int take)
     {
+        Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
         if (clinicId.HasValue)
             Query.Where(p => p.ClinicId == clinicId.Value);

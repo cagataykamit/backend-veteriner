@@ -16,6 +16,7 @@ public sealed class ExaminationsFilteredCountSpec : Specification<Examination>
         string? searchContainsLikePattern,
         Guid[] searchPetIds)
     {
+        Query.AsNoTracking();
         Query.Where(e => e.TenantId == tenantId);
         if (clinicId.HasValue)
             Query.Where(e => e.ClinicId == clinicId.Value);

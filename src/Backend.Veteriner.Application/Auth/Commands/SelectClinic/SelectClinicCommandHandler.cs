@@ -1,12 +1,17 @@
 using System.Security.Claims;
+using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Auth.Commands.Login;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Auth.Commands.SelectClinic;
 
@@ -16,32 +21,35 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
     private readonly ITokenHashService _hash;
     private readonly IJwtTokenService _jwt;
     private readonly IJwtOptionsProvider _opt;
-    private readonly IOperationClaimPermissionRepository _ocpRepo;
+    private readonly IPermissionReader _permissionReader;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly ILogger<SelectClinicCommandHandler> _logger;
 
     public SelectClinicCommandHandler(
         IRefreshTokenRepository refreshRepo,
         ITokenHashService hash,
         IJwtTokenService jwt,
         IJwtOptionsProvider opt,
-        IOperationClaimPermissionRepository ocpRepo,
+        IPermissionReader permissionReader,
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
         IUserClinicRepository userClinics,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        ILogger<SelectClinicCommandHandler>? logger = null)
     {
         _refreshRepo = refreshRepo;
         _hash = hash;
         _jwt = jwt;
         _opt = opt;
-        _ocpRepo = ocpRepo;
+        _permissionReader = permissionReader;
         _tenants = tenants;
         _userTenants = userTenants;
         _userClinics = userClinics;
         _clinics = clinics;
+        _logger = logger ?? NullLogger<SelectClinicCommandHandler>.Instance;
     }
 
     public async Task<Result<LoginResultDto>> Handle(SelectClinicCommand request, CancellationToken ct)
@@ -54,7 +62,27 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         }
 
         var tokenHash = _hash.ComputeSha256(request.RefreshToken);
+        var totalSw = Stopwatch.StartNew();
+        var stepSw = Stopwatch.StartNew();
+        var querySteps = 0;
+        var slowestStep = string.Empty;
+        long slowestMs = 0;
+
+        void MarkStep(string name)
+        {
+            querySteps++;
+            var elapsed = stepSw.ElapsedMilliseconds;
+            if (elapsed > slowestMs)
+            {
+                slowestMs = elapsed;
+                slowestStep = name;
+            }
+
+            stepSw.Restart();
+        }
+
         var stored = await _refreshRepo.GetByHashAsync(tokenHash, ct);
+        MarkStep("refreshTokenByHash");
 
         if (stored is null)
         {
@@ -97,6 +125,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         stored.MarkUsed();
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(sessionTenantId), ct);
+        MarkStep("tenantLookup");
         if (tenant is null)
             return Result<LoginResultDto>.Failure("Tenants.NotFound", "Kiracı bulunamadı.");
         if (!tenant.IsActive)
@@ -108,40 +137,44 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
                 "Auth.TenantNotMember",
                 "Bu kiracıda üyeliğiniz artık yok; yeniden giriş yapın.");
         }
+        MarkStep("userTenantMembership");
 
-        // Clinic tenant içinde ve aktif olmalı.
-        var clinic = await _clinics.FirstOrDefaultAsync(
-            new Backend.Veteriner.Application.Clinics.Specs.ClinicByIdSpec(sessionTenantId, request.ClinicId), ct);
-        if (clinic is null || !clinic.IsActive)
+        var clinicAssignedAndActive = await _userClinics.ExistsActiveInTenantAsync(
+            user.Id, sessionTenantId, request.ClinicId, ct);
+        MarkStep("clinicAssignmentAndActive");
+        if (!clinicAssignedAndActive)
         {
-            return Result<LoginResultDto>.Failure(
-                "Auth.ClinicNotFound",
-                "Klinik bulunamadı, pasif veya kiracıya ait değil.");
-        }
+            var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(sessionTenantId, request.ClinicId), ct);
+            MarkStep("clinicExistenceFallback");
+            if (clinic is null || !clinic.IsActive)
+            {
+                return Result<LoginResultDto>.Failure(
+                    "Auth.ClinicNotFound",
+                    "Klinik bulunamadı, pasif veya kiracıya ait değil.");
+            }
 
-        if (!await _userClinics.ExistsAsync(user.Id, clinic.Id, ct))
-        {
             return Result<LoginResultDto>.Failure(
                 "Auth.UserClinicNotAssigned",
                 "Bu kliniğe erişim yetkiniz yok; yöneticinizden atama isteyin.");
         }
 
         // Claims: permissions + tenant_id + clinic_id (+ platform_admin)
-        var permissionCodes = await _ocpRepo.GetPermissionCodesByUserIdAsync(user.Id, ct)
+        var permissionCodes = await _permissionReader.GetPermissionsAsync(user.Id, principal: null, ct)
                               ?? Array.Empty<string>();
+        MarkStep("permissionCodes");
         var extraClaims = permissionCodes.Select(code => new Claim("permission", code)).ToList();
 
         if (user.Roles.Any(r => string.Equals(r.Name, "PlatformAdmin", StringComparison.OrdinalIgnoreCase)))
             extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));
 
         extraClaims.Add(new Claim(VeterinerClaims.TenantId, sessionTenantId.ToString("D")));
-        extraClaims.Add(new Claim(VeterinerClaims.ClinicId, clinic.Id.ToString("D")));
+        extraClaims.Add(new Claim(VeterinerClaims.ClinicId, request.ClinicId.ToString("D")));
 
         var (access, newRefreshRaw, accessExp) = _jwt.Create(user, extraClaims);
 
         var newHash = _hash.ComputeSha256(newRefreshRaw);
         stored.ReplaceWith(newHash);
-        stored.BindClinic(clinic.Id);
+        stored.BindClinic(request.ClinicId);
 
         var newRefresh = new Backend.Veteriner.Domain.Users.RefreshToken(
             user.Id,
@@ -150,14 +183,23 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
             null,
             null,
             sessionTenantId,
-            clinic.Id);
+            request.ClinicId);
 
         user.AddRefreshToken(newRefresh);
         await _refreshRepo.AddAsync(newRefresh, ct);
         await _refreshRepo.SaveChangesAsync(ct);
 
+        _logger.LogInformation(
+            "Select clinic succeeded. UserId={UserId} TenantId={TenantId} ClinicId={ClinicId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            user.Id,
+            sessionTenantId,
+            request.ClinicId,
+            querySteps,
+            slowestStep,
+            slowestMs,
+            totalSw.ElapsedMilliseconds);
+
         var dto = new LoginResultDto(access, newRefreshRaw, accessExp, sessionTenantId, null);
         return Result<LoginResultDto>.Success(dto);
     }
 }
-

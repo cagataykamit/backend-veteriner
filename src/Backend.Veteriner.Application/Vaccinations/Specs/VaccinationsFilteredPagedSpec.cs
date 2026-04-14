@@ -20,6 +20,7 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
         string? searchContainsLikePattern,
         Guid[] searchPetIds)
     {
+        Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId);
         if (clinicId.HasValue)
             Query.Where(v => v.ClinicId == clinicId.Value);

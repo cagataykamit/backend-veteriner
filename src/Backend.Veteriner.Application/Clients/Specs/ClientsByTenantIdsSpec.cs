@@ -7,6 +7,7 @@ public sealed class ClientsByTenantIdsSpec : Specification<Client>
 {
     public ClientsByTenantIdsSpec(Guid tenantId, IReadOnlyCollection<Guid> clientIds)
     {
+        Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId && clientIds.Contains(c.Id));
     }
 }

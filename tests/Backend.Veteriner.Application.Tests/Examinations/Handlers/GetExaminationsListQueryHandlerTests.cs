@@ -50,7 +50,7 @@ public sealed class GetExaminationsListQueryHandlerTests
         _examinations.Setup(r => r.CountAsync(It.IsAny<ExaminationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _examinations.Setup(r => r.ListAsync(It.IsAny<ExaminationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Examination>());
+            .ReturnsAsync(new List<ExaminationListRow>());
         var page = new PageRequest { Page = 1, PageSize = 20 };
 
         var result = await CreateHandler().Handle(new GetExaminationsListQuery(page), CancellationToken.None);

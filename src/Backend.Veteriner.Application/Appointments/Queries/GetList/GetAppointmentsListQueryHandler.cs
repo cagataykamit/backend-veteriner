@@ -7,14 +7,15 @@ using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Pets.Specs;
-using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Domain.Appointments;
-using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Appointments.Queries.GetList;
 
@@ -27,7 +28,7 @@ public sealed class GetAppointmentsListQueryHandler
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Clinic> _clinics;
-    private readonly IReadRepository<Species> _species;
+    private readonly ILogger<GetAppointmentsListQueryHandler> _logger;
 
     public GetAppointmentsListQueryHandler(
         ITenantContext tenantContext,
@@ -36,7 +37,7 @@ public sealed class GetAppointmentsListQueryHandler
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
         IReadRepository<Clinic> clinics,
-        IReadRepository<Species> species)
+        ILogger<GetAppointmentsListQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -44,7 +45,7 @@ public sealed class GetAppointmentsListQueryHandler
         _pets = pets;
         _clients = clients;
         _clinics = clinics;
-        _species = species;
+        _logger = logger ?? NullLogger<GetAppointmentsListQueryHandler>.Instance;
     }
 
     public async Task<Result<PagedResult<AppointmentListItemDto>>> Handle(
@@ -60,6 +61,25 @@ public sealed class GetAppointmentsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
+        var totalSw = Stopwatch.StartNew();
+        var stepSw = Stopwatch.StartNew();
+        var querySteps = 0;
+        var slowestStep = string.Empty;
+        long slowestMs = 0;
+
+        void MarkStep(string name)
+        {
+            querySteps++;
+            var elapsed = stepSw.ElapsedMilliseconds;
+            if (elapsed > slowestMs)
+            {
+                slowestMs = elapsed;
+                slowestStep = name;
+            }
+
+            stepSw.Restart();
+        }
+
         var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
@@ -79,6 +99,7 @@ public sealed class GetAppointmentsListQueryHandler
                 _clients,
                 _pets,
                 ct);
+            MarkStep("searchPetIdsLookup");
         }
 
         var scheduledAtDescending = AppointmentListSort.ResolveScheduledAtDescending(request.PageRequest);
@@ -94,6 +115,7 @@ public sealed class GetAppointmentsListQueryHandler
                 searchPattern,
                 searchPetIds),
             ct);
+        MarkStep("appointmentsCount");
 
         var rows = await _appointments.ListAsync(
             new AppointmentsFilteredPagedSpec(
@@ -109,30 +131,31 @@ public sealed class GetAppointmentsListQueryHandler
                 searchPetIds,
                 scheduledAtDescending),
             ct);
+        MarkStep("appointmentsPage");
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
         var clinicIds = rows.Select(x => x.ClinicId).Distinct().ToArray();
 
         var pets = petIds.Length == 0
             ? []
-            : await _pets.ListAsync(new PetsByTenantIdsSpec(tenantId, petIds), ct);
+            : await _pets.ListAsync(new PetsByTenantIdsNameClientSpeciesSpec(tenantId, petIds), ct);
+        if (petIds.Length > 0)
+            MarkStep("petsLookup");
         var petById = pets.ToDictionary(x => x.Id);
-
-        var speciesIds = pets.Select(x => x.SpeciesId).Distinct().ToArray();
-        var speciesRows = speciesIds.Length == 0
-            ? []
-            : await _species.ListAsync(new SpeciesByIdsSpec(speciesIds), ct);
-        var speciesNameById = speciesRows.ToDictionary(x => x.Id, x => x.Name);
 
         var clientIds = pets.Select(x => x.ClientId).Distinct().ToArray();
         var clients = clientIds.Length == 0
             ? []
-            : await _clients.ListAsync(new ClientsByTenantIdsSpec(tenantId, clientIds), ct);
+            : await _clients.ListAsync(new ClientsByTenantIdsNameSpec(tenantId, clientIds), ct);
+        if (clientIds.Length > 0)
+            MarkStep("clientsLookup");
         var clientNameById = clients.ToDictionary(x => x.Id, x => x.FullName);
 
         var clinics = clinicIds.Length == 0
             ? []
-            : await _clinics.ListAsync(new ClinicsByTenantIdsSpec(tenantId, clinicIds), ct);
+            : await _clinics.ListAsync(new ClinicsByTenantIdsNameSpec(tenantId, clinicIds), ct);
+        if (clinicIds.Length > 0)
+            MarkStep("clinicsLookup");
         var clinicNameById = clinics.ToDictionary(x => x.Id, x => x.Name);
 
         var items = rows
@@ -145,9 +168,7 @@ public sealed class GetAppointmentsListQueryHandler
                     : string.Empty;
                 var petName = pet?.Name ?? string.Empty;
                 var speciesId = pet?.SpeciesId ?? Guid.Empty;
-                var speciesName = speciesId != Guid.Empty && speciesNameById.TryGetValue(speciesId, out var sName)
-                    ? sName
-                    : string.Empty;
+                var speciesName = pet?.SpeciesName ?? string.Empty;
                 var clinicName = clinicNameById.TryGetValue(a.ClinicId, out var clName)
                     ? clName
                     : string.Empty;
@@ -169,6 +190,17 @@ public sealed class GetAppointmentsListQueryHandler
                     a.Notes);
             })
             .ToList();
+
+        _logger.LogInformation(
+            "Appointments list generated. TenantId={TenantId} ClinicId={ClinicId} Page={Page} PageSize={PageSize} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            tenantId,
+            effectiveClinicId,
+            page,
+            pageSize,
+            querySteps,
+            slowestStep,
+            slowestMs,
+            totalSw.ElapsedMilliseconds);
 
         return Result<PagedResult<AppointmentListItemDto>>.Success(
             PagedResult<AppointmentListItemDto>.Create(items, total, page, pageSize));

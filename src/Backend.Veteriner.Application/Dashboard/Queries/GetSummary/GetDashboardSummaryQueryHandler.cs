@@ -7,6 +7,9 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Dashboard.Queries.GetSummary;
 
@@ -19,21 +22,27 @@ public sealed class GetDashboardSummaryQueryHandler
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Appointment> _appointments;
+    private readonly IDashboardTodayAppointmentStatusCountsReader _todayAppointmentCounts;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
+    private readonly ILogger<GetDashboardSummaryQueryHandler> _logger;
 
     public GetDashboardSummaryQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IReadRepository<Appointment> appointments,
+        IDashboardTodayAppointmentStatusCountsReader todayAppointmentCounts,
         IReadRepository<Client> clients,
-        IReadRepository<Pet> pets)
+        IReadRepository<Pet> pets,
+        ILogger<GetDashboardSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _appointments = appointments;
+        _todayAppointmentCounts = todayAppointmentCounts;
         _clients = clients;
         _pets = pets;
+        _logger = logger ?? NullLogger<GetDashboardSummaryQueryHandler>.Instance;
     }
 
     public async Task<Result<DashboardSummaryDto>> Handle(GetDashboardSummaryQuery request, CancellationToken ct)
@@ -48,26 +57,49 @@ public sealed class GetDashboardSummaryQueryHandler
         var utcNow = DateTime.UtcNow;
         var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(utcNow);
         var clinicId = _clinicContext.ClinicId;
+        var totalSw = Stopwatch.StartNew();
+        var stepSw = Stopwatch.StartNew();
+        var querySteps = 0;
+        var slowestStep = string.Empty;
+        long slowestMs = 0;
+
+        void MarkStep(string name)
+        {
+            querySteps++;
+            var elapsed = stepSw.ElapsedMilliseconds;
+            if (elapsed > slowestMs)
+            {
+                slowestMs = elapsed;
+                slowestStep = name;
+            }
+
+            stepSw.Restart();
+        }
 
         // Tek DbContext: paralel Task.WhenAll yerine sıralı await (EF Core concurrency kuralı).
-        var todayScheduled = await _appointments.CountAsync(
-            new DashboardTodayScheduledCountSpec(tenantId, clinicId, dayStart, dayEnd), ct);
+        var todayCounts = await _todayAppointmentCounts.GetAsync(tenantId, clinicId, dayStart, dayEnd, ct);
+        MarkStep("todayAppointmentStatusCounts");
+        var todayScheduled = todayCounts.Scheduled;
+        var completedToday = todayCounts.Completed;
+        var cancelledToday = todayCounts.Cancelled;
         var upcomingCount = await _appointments.CountAsync(
             new DashboardUpcomingScheduledCountSpec(tenantId, clinicId, utcNow), ct);
-        var completedToday = await _appointments.CountAsync(
-            new DashboardTodayCompletedCountSpec(tenantId, clinicId, dayStart, dayEnd), ct);
-        var cancelledToday = await _appointments.CountAsync(
-            new DashboardTodayCancelledCountSpec(tenantId, clinicId, dayStart, dayEnd), ct);
+        MarkStep("upcomingCount");
         var clientsTotal = await _clients.CountAsync(new DashboardClientsTotalCountSpec(tenantId), ct);
+        MarkStep("clientsTotalCount");
         var petsTotal = await _pets.CountAsync(new DashboardPetsTotalCountSpec(tenantId), ct);
+        MarkStep("petsTotalCount");
 
         // Dashboard listesi "bugun + gelecek" planlanmis randevulari gosterir; gecmis gun kayitlari disarida kalir.
         var upcomingRows = await _appointments.ListAsync(
             new DashboardUpcomingScheduledListSpec(tenantId, clinicId, dayStart, UpcomingListTake), ct);
+        MarkStep("upcomingList");
         var recentClientRows = await _clients.ListAsync(
             new DashboardRecentClientsListSpec(tenantId, RecentListTake), ct);
+        MarkStep("recentClientsList");
         var recentPetRows = await _pets.ListAsync(
             new DashboardRecentPetsListSpec(tenantId, RecentListTake), ct);
+        MarkStep("recentPetsList");
 
         var dto = new DashboardSummaryDto(
             TodayAppointmentsCount: todayScheduled,
@@ -92,8 +124,17 @@ public sealed class GetDashboardSummaryQueryHandler
                     p.Id,
                     p.ClientId,
                     p.Name,
-                    p.Species?.Name ?? ""))
+                    p.SpeciesName))
                 .ToList());
+
+        _logger.LogInformation(
+            "Dashboard summary generated. TenantId={TenantId} ClinicId={ClinicId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            tenantId,
+            clinicId,
+            querySteps,
+            slowestStep,
+            slowestMs,
+            totalSw.ElapsedMilliseconds);
 
         return Result<DashboardSummaryDto>.Success(dto);
     }

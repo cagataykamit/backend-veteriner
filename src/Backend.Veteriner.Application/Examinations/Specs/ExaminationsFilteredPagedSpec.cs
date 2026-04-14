@@ -4,7 +4,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Examinations.Specs;
 
-public sealed class ExaminationsFilteredPagedSpec : Specification<Examination>
+public sealed record ExaminationListRow(
+    Guid Id,
+    Guid ClinicId,
+    Guid PetId,
+    Guid? AppointmentId,
+    DateTime ExaminedAtUtc,
+    string VisitReason);
+
+public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, ExaminationListRow>
 {
     public ExaminationsFilteredPagedSpec(
         Guid tenantId,
@@ -18,6 +26,7 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination>
         string? searchContainsLikePattern,
         Guid[] searchPetIds)
     {
+        Query.AsNoTracking();
         Query.Where(e => e.TenantId == tenantId);
         if (clinicId.HasValue)
             Query.Where(e => e.ClinicId == clinicId.Value);
@@ -45,6 +54,13 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination>
         Query.OrderByDescending(e => e.ExaminedAtUtc)
             .ThenByDescending(e => e.Id)
             .Skip((page - 1) * pageSize)
-            .Take(pageSize);
+            .Take(pageSize)
+            .Select(e => new ExaminationListRow(
+                e.Id,
+                e.ClinicId,
+                e.PetId,
+                e.AppointmentId,
+                e.ExaminedAtUtc,
+                e.VisitReason));
     }
 }
