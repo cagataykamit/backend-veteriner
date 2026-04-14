@@ -19,7 +19,7 @@ public sealed class Client : AggregateRoot
     public string? Phone { get; private set; }
     /// <summary>Serbest metin adres; boş/whitespace ise null.</summary>
     public string? Address { get; private set; }
-    /// <summary>Mükerrer (e-posta+telefon) için; Phone ile aynı standart.</summary>
+    /// <summary>Mükerrer (ad+telefon) için; Phone ile aynı standart.</summary>
     public string? PhoneNormalized { get; private set; }
 
     private Client() { }
@@ -70,6 +70,10 @@ public sealed class Client : AggregateRoot
     /// <summary>Mükerrer kontrol ve saklama ile aynı kural (trim + küçük harf).</summary>
     public static string? NormalizeEmailForStorage(string? email)
         => string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
+
+    /// <summary>Aynı ad + e-posta mükerreri için; saklanan <see cref="FullName"/> trim ile uyumlu, karşılaştırma küçük harf.</summary>
+    public static string NormalizeFullNameForDuplicateCheck(string fullName)
+        => string.IsNullOrWhiteSpace(fullName) ? string.Empty : fullName.Trim().ToLowerInvariant();
 
     private static string? NormalizeAddress(string? address)
         => string.IsNullOrWhiteSpace(address) ? null : address.Trim();

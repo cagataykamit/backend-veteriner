@@ -54,15 +54,32 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
         if (!string.IsNullOrWhiteSpace(request.Phone))
             TurkishMobilePhone.TryNormalize(request.Phone, out phoneNorm);
 
-        if (!string.IsNullOrEmpty(emailNorm) && !string.IsNullOrEmpty(phoneNorm))
+        const string duplicateMessage =
+            "Bu kiracı altında aynı ad ve e-posta veya aynı ad ve telefon ile kayıtlı bir müşteri zaten var.";
+
+        var fullNameKey = Client.NormalizeFullNameForDuplicateCheck(request.FullName);
+
+        if (!string.IsNullOrEmpty(emailNorm))
         {
-            var duplicate = await _clientsRead.FirstOrDefaultAsync(
-                new ClientByTenantNormalizedEmailAndPhoneSpec(tenantId, emailNorm, phoneNorm), ct);
-            if (duplicate is not null && duplicate.Id != request.Id)
+            var dupByNameEmail = await _clientsRead.FirstOrDefaultAsync(
+                new ClientByTenantNormalizedFullNameAndEmailSpec(tenantId, fullNameKey, emailNorm), ct);
+            if (dupByNameEmail is not null && dupByNameEmail.Id != request.Id)
             {
                 return Result.Failure(
                     "Clients.DuplicateClient",
-                    "Bu kiracı altında aynı e-posta ve telefon ile kayıtlı bir müşteri zaten var.");
+                    duplicateMessage);
+            }
+        }
+
+        if (!string.IsNullOrEmpty(phoneNorm))
+        {
+            var dupByNamePhone = await _clientsRead.FirstOrDefaultAsync(
+                new ClientByTenantNormalizedFullNameAndPhoneSpec(tenantId, fullNameKey, phoneNorm), ct);
+            if (dupByNamePhone is not null && dupByNamePhone.Id != request.Id)
+            {
+                return Result.Failure(
+                    "Clients.DuplicateClient",
+                    duplicateMessage);
             }
         }
 

@@ -75,7 +75,9 @@ public sealed class UpdateClientCommandHandlerTests
             .ReturnsAsync(tenant);
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
-        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedEmailAndPhoneSpec>(), It.IsAny<CancellationToken>()))
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Client?)null);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndPhoneSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Client?)null);
 
         var before = DateTime.UtcNow.AddSeconds(-1);
@@ -89,5 +91,127 @@ public sealed class UpdateClientCommandHandlerTests
         existing.Address.Should().Be("Ankara");
         existing.UpdatedAtUtc.Should().NotBeNull();
         existing.UpdatedAtUtc!.Value.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_When_DuplicateNameEmailOrNamePhoneQueryReturnsSameClient()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var cmd = new UpdateClientCommand(cid, "Ayşe Yılmaz", "ayse@example.com", "05321234567", "Ankara");
+
+        var tenant = new Tenant("Klinik A.Ş.");
+        AlignTenantId(tenant, tid);
+        var existing = new Client(tid, "Ayşe Yılmaz", "05321234567", "ayse@example.com", "Ankara");
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(existing, cid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndPhoneSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _clientsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_DuplicateFullNameAndEmail_MatchesOtherClient()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var otherId = Guid.NewGuid();
+        var cmd = new UpdateClientCommand(cid, "Çakışan Ad", "dup@example.com", null, null);
+
+        var tenant = new Tenant("Klinik A.Ş.");
+        AlignTenantId(tenant, tid);
+        var self = new Client(tid, "Eski", null, "old@example.com");
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(self, cid);
+        var other = new Client(tid, "Çakışan Ad", null, "dup@example.com");
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(other, otherId);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(self);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(other);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndPhoneSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Client?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clients.DuplicateClient");
+        _clientsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_DuplicateFullNameAndPhone_MatchesOtherClient()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var otherId = Guid.NewGuid();
+        var cmd = new UpdateClientCommand(cid, "Ortak Ad", "yeni@example.com", "05321112233", null);
+
+        var tenant = new Tenant("Klinik A.Ş.");
+        AlignTenantId(tenant, tid);
+        var self = new Client(tid, "Eski Ad", "05329999999", "self@example.com");
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(self, cid);
+        var other = new Client(tid, "Ortak Ad", "05321112233", "other@example.com");
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(other, otherId);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(self);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Client?)null);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndPhoneSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(other);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clients.DuplicateClient");
+        _clientsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_When_NoDuplicateInTenant_FullNameEmailCheckReturnsNull()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cmd = new UpdateClientCommand(Guid.NewGuid(), "Yalnız Bu Tenant", "only@example.com", null, null);
+
+        var tenant = new Tenant("Klinik A.Ş.");
+        AlignTenantId(tenant, tid);
+        var self = new Client(tid, "Eski", null, "only@example.com");
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(self, cmd.Id);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(self);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Client?)null);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndPhoneSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Client?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
     }
 }

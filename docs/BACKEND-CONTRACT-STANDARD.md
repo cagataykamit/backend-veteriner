@@ -96,7 +96,7 @@ Bu standardın amacı:
 |---|---|---|---|---|---|
 | Auth | `Result` + `ToActionResult` + açık DTO (`LoginResultDto`, `AuthActionResultDto`); logout akışı da aynı hatta | Eski istemciler `ProblemDetails.title` metninde değişiklik görebilir (`ResultExtensions`) | Faz 0: auth endpoint’leri tek sözleşmeye alındı; drift için bu doküman §9 | Tamamlandı (Faz 0) | Orta (title gösterimi) |
 | Clinics | Genel olarak tutarlı | Create response yalnız `Guid` | Create response DTO standardı | P2 | Düşük |
-| Clients | `recent-summary` + `payment-summary` (§19) | Düşük | Mevcut standardı referans modül olarak koruma | P2 | Düşük |
+| Clients | CRUD + liste (§18.5); `recent-summary` + `payment-summary` (§19) | Düşük | CRUD contract Sprint 2 ile netleştirildi | P2 | Düşük |
 | Pets | Route/body id standardı güçlü; pet detay için `history-summary` (§17) | Create response çıplak `Guid` | Create response standardizasyonu | P2 | Düşük |
 | Appointments | Update/lifecycle akışları güçlü | Bazı hata dallarında envelope farklılaşma riski | Error contract tekilleştirme | P1 | Orta |
 | Examinations | Kanonik `visitReason`; yazmada opsiyonel legacy `complaint` (Faz 0 / Adım 3; §11); muayene detay `related-summary` (§18) | — | İstemciler `visitReason` kullanmalı | Tamamlandı (Faz 0) | Orta (alias kaldırma takvimi) |
@@ -481,6 +481,60 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** Tenant bağlamı yoksa `Tenants.ContextMissing`; muayene yok / tenant dışı / aktif klinik ile uyumsuzsa `Examinations.NotFound`. FluentValidation (boş route id) → 400.
 
 **Swagger:** `ExaminationsContractSchemaFilter` — `ExaminationRelatedSummaryDto` ve alt öğe DTO’ları required/nullability ile hizalı.
+
+---
+
+## 18.5) Clients — CRUD ve liste
+
+**Kapsam:** Müşteri (hayvan sahibi) oluşturma, güncelleme, detay ve sayfalı liste. Tüm kayıtlar **kiracı (`tenant_id`)** kapsamındadır; müşteri **klinik bazlı değildir** (`ClientsController` + handler’lar `ITenantContext`).
+
+### Endpoint ve yetki
+
+| Method | Path | Policy | Not |
+|--------|------|--------|-----|
+| `POST` | `/api/v1/clients` | `Clients.Create` | `201 Created` + `ClientCreatedDto`; `Location` → `GET .../clients/{id}` |
+| `PUT` | `/api/v1/clients/{id}` | `Clients.Create` | **Ayrı `Clients.Update` permission yok**; oluşturma ile aynı policy (ürün kararı). `204 No Content` |
+| `GET` | `/api/v1/clients` | `Clients.Read` | Sayfalı liste `PagedResult<ClientListItemDto>` |
+| `GET` | `/api/v1/clients/{id}` | `Clients.Read` | `ClientDetailDto` |
+
+Controller, tenant çözülemezse `TryGetResolvedTenant` ile **işleme girmeden** hata döner (diğer modüllerle aynı).
+
+### Route / body id (`Clients.RouteIdMismatch`)
+
+- `PUT` isteğinde **route `id` esas kaynaktır** (§3.4).
+- Body’deki `UpdateClientCommand.Id` **boş (`Guid.Empty`)** ise route id ile doldurulur.
+- Body id **dolu** ve route id ile **farklıysa** → `400`, `extensions.code`: **`Clients.RouteIdMismatch`**.
+
+### DTO farkları (yanıt şekli değiştirilmez)
+
+| DTO | Amaç | Alanlar (özet) |
+|-----|------|----------------|
+| `ClientCreatedDto` | `POST` başarı gövdesi | `Id`, `TenantId`, `FullName`, `Email`, `Phone` — **Address, CreatedAtUtc yok** (tam alan için `GET` detay) |
+| `ClientListItemDto` | Liste satırı | `Id`, `TenantId`, `CreatedAtUtc`, `FullName`, `Email`, `Phone` — **Address, UpdatedAtUtc yok** |
+| `ClientDetailDto` | `GET` detay | `Id`, `TenantId`, `CreatedAtUtc`, `UpdatedAtUtc`, `FullName`, `Email`, `Phone`, `Address` |
+
+### Liste: sayfalama ve arama
+
+- Query: `page`, `pageSize` (1–200, handler içinde **clamp**), `search` ve/veya `page.search` — üst düzey `search` doluysa **önceliklidir** (`PageRequestQuery.WithMergedSearch`, Payments ile aynı).
+- **Sıralama:** `PageRequest.Sort` / `Order` alanları **işlenmez**; liste `FullName` sonra `Id` ile sabit sıralıdır (`ClientsByTenantPagedSpec`).
+- **Arama:** Normalize edilmiş terim `LIKE %...%` ile `FullName`, `Email`, `Phone`, `PhoneNormalized` üzerinde (§10 arama tablosu ile uyumlu).
+
+### İş kuralı hataları (`Result` → `ProblemDetails` + `extensions.code`)
+
+| Kod | HTTP | Koşul |
+|-----|------|--------|
+| `Tenants.ContextMissing` | `400` | JWT / context’te kiracı yok |
+| `Tenants.NotFound` | `404` | Kiracı satırı yok |
+| `Tenants.TenantInactive` | `403` | Pasif kiracıda oluşturma/güncelleme |
+| `Clients.NotFound` | `404` | Bu kiracıda müşteri yok / yanlış id |
+| **`Clients.DuplicateClient`** | **`409`** | Aynı kiracıda **(1)** normalize **ad + e-posta** (e-posta dolu) veya **(2)** normalize **ad + telefon** (telefon dolu); ad `Trim` + küçük harf ile karşılaştırılır. **Yalnızca** aynı e-posta, **yalnızca** aynı telefon veya **e-posta+telefon ama farklı ad** tek başına engel değildir (create/update; güncellemede kendi `id` hariç) |
+| `Clients.RouteIdMismatch` | `400` | `PUT` route id ≠ body id |
+
+FluentValidation (validator’lar) → `400` `ValidationProblemDetails` (MediatR pipeline).
+
+### Özet endpoint’ler (değişmedi)
+
+`GET .../recent-summary` ve `GET .../payment-summary` için §19 ve mevcut §4/§19 maddeleri geçerlidir.
 
 ---
 
