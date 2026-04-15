@@ -82,6 +82,60 @@ public sealed class CreateVaccinationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TenantInactive()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("A");
+        tenant.Deactivate();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+
+        var cmd = new CreateVaccinationCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Tenants.TenantInactive");
+        _clinics.Verify(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_RequestClinic_Differs_From_ActiveClinicContext()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var cmd = new CreateVaccinationCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.ClinicContextMismatch");
+        _clinics.Verify(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_PetNotFound()
     {
         var tid = Guid.NewGuid();
@@ -162,6 +216,44 @@ public sealed class CreateVaccinationCommandHandlerTests
             tid,
             Guid.NewGuid(),
             pid,
+            null,
+            DateTime.UtcNow.AddHours(-1),
+            "Şikayet",
+            "Bulgu",
+            null,
+            null);
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(wrongExam);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.ExaminationPetClinicMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationPetDoesNotMatch()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var eid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            eid,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+        var wrongExam = new Examination(
+            tid,
+            cid,
+            Guid.NewGuid(),
             null,
             DateTime.UtcNow.AddHours(-1),
             "Şikayet",
@@ -300,6 +392,56 @@ public sealed class CreateVaccinationCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Vaccinations.AppliedTooFarInPast");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_AppliedTooFarInFuture()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            DateTime.UtcNow.AddYears(3),
+            null,
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.AppliedTooFarInFuture");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_DueTooFarInPast()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddYears(-11),
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.DueTooFarInPast");
     }
 
     [Fact]

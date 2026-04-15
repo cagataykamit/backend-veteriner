@@ -285,6 +285,116 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **Liste `GET /api/v1/examinations`:** `PageRequest` (`page`, `pageSize`, `search` / `page.search`), opsiyonel `clinicId`, `petId`, **`appointmentId`** (`Examination.AppointmentId` eşitliği; randevu detayından doğrudan muayene listesi için), `dateFromUtc`, `dateToUtc`. Tüm yapılandırılmış filtreler birbiri ile **AND**; `search` doluysa mevcut metin + pet kümesi kuralları bu filtrelerle **AND** birleşir. `sort`/`order` işlenmez. Boş GUID filtre değerleri 400 (validasyon).
 
+### 11.1) Examinations — CRUD / list / detail / update sözleşmesi
+
+**Endpoint ve yetki:**
+
+- `POST /api/v1/examinations` → `Examinations.Create`, başarı `201 Created`, gövde **çıplak `Guid`** (oluşan `id`).
+- `PUT /api/v1/examinations/{id}` → `Examinations.Update`, başarı `204 NoContent`.
+- `GET /api/v1/examinations/{id}` → `Examinations.Read`, başarı `200` + `ExaminationDetailDto`.
+- `GET /api/v1/examinations` → `Examinations.Read`, başarı `200` + `PagedResult<ExaminationListItemDto>`.
+- `GET /api/v1/examinations/{id}/related-summary` → `Examinations.Read`, başarı `200` + `ExaminationRelatedSummaryDto` (ilişkili tedavi/reçete/lab/yatış/ödeme özetleri).
+
+**Kanonik/legacy alanlar:**
+
+- Kanonik request/response alanı `visitReason`.
+- Legacy `complaint` yalnızca request body’de kabul edilir; `visitReason` doluysa `complaint` yok sayılır.
+- Response DTO’ları (`ExaminationDetailDto`, `ExaminationListItemDto`) yalnızca `visitReason` döner; `complaint` dönmez.
+
+**Create/Update iş kuralları (davranış):**
+
+- `tenantId` yalnızca `ITenantContext` üzerinden çözülür; context yoksa `Tenants.ContextMissing`.
+- `appointmentId` varsa `clinicId` ve `petId` randevu ile tutarlı olmalıdır; aksi `Examinations.AppointmentPetClinicMismatch`.
+- `appointmentId` yoksa create tarafında `clinicId` + `petId` zorunlu (`Examinations.Validation`).
+- Aktif clinic context varsa ve request `clinicId` ile çakışıyorsa `Examinations.ClinicContextMismatch`.
+- Create/Update yolunda `clinicId`/`petId` tenant içinde bulunamazsa sırasıyla `Clinics.NotFound` / `Pets.NotFound`.
+- `appointmentId` bulunamaz veya tenant dışıysa `Appointments.NotFound`.
+
+**UTC normalization ve examined window:**
+
+- `ExaminedAtUtc` `DateTimeKind` ne olursa olsun önce UTC’ye normalize edilir (`ToUniversalTime` / `SpecifyKind`).
+- Pencere kuralı (`ExaminationExaminedAtWindow`): en fazla **7 gün geçmiş**, en fazla **2 yıl ileri**.
+- İhlal kodları: `Examinations.ExaminedTooFarInPast`, `Examinations.ExaminedTooFarInFuture`.
+
+**List/Detail DTO farkları:**
+
+- Liste öğesi `ExaminationListItemDto`: özet alanlar (`id`, `clinicId`, `petId`, `petName`, `clientId`, `clientName`, `appointmentId`, `examinedAtUtc`, `visitReason`).
+- Detay `ExaminationDetailDto`: liste alanlarına ek olarak `tenantId`, `findings`, `assessment`, `notes`, `createdAtUtc`, `updatedAtUtc`.
+- Pet/client lookup bulunamazsa isim alanları boş string fallback ile döner (davranış korunur).
+
+**Update route/body kuralı:**
+
+- `PUT` body içindeki `id` opsiyoneldir; doluysa route `id` ile aynı olmalıdır.
+- Uyumsuzlukta `409 Conflict` + `extensions.code = Examinations.RouteIdMismatch`.
+
+**ProblemDetails / hata kodları:**
+
+- Validasyon (FluentValidation/model state) → `400 ValidationProblemDetails`.
+- İş kuralı hataları `Result` üzerinden `ProblemDetails` + `extensions.code` ile döner.
+- Sık kodlar: `Examinations.NotFound`, `Examinations.Validation`, `Examinations.ClinicContextMismatch`, `Examinations.AppointmentPetClinicMismatch`, `Appointments.NotFound`, `Clinics.NotFound`, `Pets.NotFound`, `Tenants.TenantInactive`.
+
+### 11.2) Vaccinations — CRUD / list / detail / update sözleşmesi
+
+**Endpoint ve yetki:**
+
+- `POST /api/v1/vaccinations` → `Vaccinations.Create`, başarı `201 Created`, gövde **çıplak `Guid`** (oluşan `id`).
+- `PUT /api/v1/vaccinations/{id}` → `Vaccinations.Update`, başarı `204 NoContent`.
+- `GET /api/v1/vaccinations/{id}` → `Vaccinations.Read`, başarı `200` + `VaccinationDetailDto`.
+- `GET /api/v1/vaccinations` → `Vaccinations.Read`, başarı `200` + `PagedResult<VaccinationListItemDto>`.
+
+**Canonical alan notu:**
+
+- Vaccinations request/response alanları canonical ve tekildir; Examinations tarafındaki `visitReason/complaint` benzeri bir legacy alias **yoktur**.
+- Status enum sözleşmesi backend’de `Scheduled`, `Applied`, `Cancelled` olarak taşınır; ürün dili eşlemesi sırasıyla planlı/uygulandı/iptal edildi olarak okunur.
+
+**Route / body id kuralı:**
+
+- `PUT` body `id` opsiyoneldir; doluysa route `id` ile aynı olmalıdır.
+- Uyumsuzlukta `400` + `extensions.code = Vaccinations.RouteIdMismatch`.
+
+**Create/Update ilişki ve context kuralları:**
+
+- Tenant yalnızca `ITenantContext` ile çözülür; context yoksa `Tenants.ContextMissing`.
+- Aktif clinic context varsa ve request `clinicId` farklıysa `Vaccinations.ClinicContextMismatch`.
+- `clinicId` tenant içinde yoksa `Clinics.NotFound`; `petId` tenant içinde yoksa `Pets.NotFound`.
+- `examinationId` doluysa muayene tenant içinde bulunmalı (`Examinations.NotFound`) ve muayenenin `ClinicId` + `PetId` değerleri istekle birebir eşleşmelidir (`Vaccinations.ExaminationPetClinicMismatch`).
+
+**Status/date rule matrisi (davranış değişmeden):**
+
+| Status | AppliedAtUtc | DueAtUtc | Kural | Kod |
+|--------|--------------|----------|-------|-----|
+| `Scheduled` | **olamaz** | **zorunlu** | Planlı kayıtta uygulama tarihi girilmez, vade zorunlu | `Vaccinations.ScheduledMustNotHaveAppliedAt`, `Vaccinations.ScheduledRequiresDueAt` |
+| `Applied` | **zorunlu** | opsiyonel | Uygulanan kayıtta uygulama tarihi zorunlu | `Vaccinations.AppliedRequiresAppliedAt` |
+| `Cancelled` | **olamaz** | opsiyonel | İptal kayıtta uygulama tarihi girilmez | `Vaccinations.CancelledMustNotHaveAppliedAt` |
+
+**UTC normalization ve pencere kuralları:**
+
+- `AppliedAtUtc` ve `DueAtUtc` değerleri `DateTimeKind` ne olursa olsun UTC’ye normalize edilir (`ToUniversalTime` / `SpecifyKind`).
+- `AppliedAtUtc` penceresi: en fazla **7 gün geçmiş**, en fazla **2 yıl ileri**.
+  - Kodlar: `Vaccinations.AppliedTooFarInPast`, `Vaccinations.AppliedTooFarInFuture`.
+- `DueAtUtc` penceresi: en fazla **10 yıl geçmiş**, en fazla **5 yıl ileri**.
+  - Kodlar: `Vaccinations.DueTooFarInPast`, `Vaccinations.DueTooFarInFuture`.
+
+**List/filter/search/pagination:**
+
+- Query: `page`, `pageSize`, `search`/`page.search`, `clinicId`, `petId`, `status`, `dueFromUtc`, `dueToUtc`, `appliedFromUtc`, `appliedToUtc`.
+- Tüm yapısal filtreler birbiriyle **AND** birleşir.
+- `search` doluysa `VaccineName`, `Notes` ve müşteri+hayvan metninden türetilen pet kümesi üzerinden eşleşme yapılır.
+- `sort`/`order` işlenmez; liste sırası `AppliedAtUtc ?? DueAtUtc` azalan, sonra `Id` azalan.
+- Handler `page >= 1`, `pageSize 1..200` clamp uygular.
+
+**Liste/detay DTO farkı:**
+
+- `VaccinationListItemDto`: özet alanlar (`id`, `petId`, `petName`, `clientId`, `clientName`, `clinicId`, `examinationId`, `vaccineName`, `appliedAtUtc`, `dueAtUtc`, `status`).
+- `VaccinationDetailDto`: liste alanlarına ek olarak `tenantId`, `notes`, `createdAtUtc`, `updatedAtUtc`.
+- Pet/client lookup bulunamazsa isimler boş string fallback ile döner (davranış korunur).
+
+**Hata kodları:**
+
+- İş kuralları `Result` → `ProblemDetails` + `extensions.code` ile döner.
+- Sık kodlar: `Vaccinations.NotFound`, `Vaccinations.ClinicContextMismatch`, `Vaccinations.ExaminationPetClinicMismatch`, `Vaccinations.RouteIdMismatch`, status/date kural kodları, `Tenants.TenantInactive`, `Clinics.NotFound`, `Pets.NotFound`, `Examinations.NotFound`.
+- FluentValidation/model state hataları `400 ValidationProblemDetails`.
+
 ---
 
 ## 12) Payments — request/response ve OpenAPI (Faz 0 / Adım 4)
@@ -317,6 +427,74 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Payments.NotFound`, `Clients.NotFound`, `Tenants.TenantInactive`).
 
 **Swagger:** `PaymentsContractSchemaFilter` — `required` dizisi runtime zorunlularla uyumlu; opsiyonel referans alanlarda `nullable: true`; alan açıklamaları ISO/enum/tutarlılık için doldurulur.
+
+### 12.1) Payments — CRUD / list / detail / update operasyonel sözleşme
+
+**Endpoint ve yetki:**
+
+- `POST /api/v1/payments` → `Payments.Create`, başarı `201 Created`, gövde **çıplak `Guid`** (oluşan `id`).
+- `PUT /api/v1/payments/{id}` → `Payments.Update`, başarı `204 NoContent`.
+- `GET /api/v1/payments/{id}` → `Payments.Read`, başarı `200` + `PaymentDetailDto`.
+- `GET /api/v1/payments` → `Payments.Read`, başarı `200` + `PagedResult<PaymentListItemDto>`.
+
+**Status alanı notu:**
+
+- Payments aggregate içinde `status` alanı yoktur; tahsilat kaydı tek olay anını (`paidAtUtc`) ve yöntemi (`method`) taşır.
+- Bu nedenle backend sözleşmesinde `PaymentMethod` enum’u (`Cash`, `Card`, `Transfer`) vardır; “pending/failed/refunded” benzeri bir lifecycle status bu modülün kapsamı dışındadır.
+
+**Route / body id kuralı:**
+
+- `PUT` body `id` opsiyoneldir; doluysa route `id` ile aynı olmalıdır.
+- Uyumsuzlukta `400` + `extensions.code = Payments.RouteIdMismatch`.
+
+**Amount / currency / method / paidAt kuralları:**
+
+- `amount > 0` zorunlu; ihlal `Payments.InvalidAmount`.
+- `currency` ISO 4217 alpha-3 (3 harf) olmalıdır; domain tarafında `Trim().ToUpperInvariant()` normalize edilir.
+- `method` enum doğrulaması zorunludur (`Cash`, `Card`, `Transfer`).
+- `paidAtUtc` önce UTC’ye normalize edilir (`ToUniversalTime` / `SpecifyKind`), sonra pencere doğrulanır (`PaymentPaidAtWindow`):
+  - en fazla **7 gün geçmiş** → aksi `Payments.PaidTooFarInPast`
+  - en fazla **2 yıl ileri** → aksi `Payments.PaidTooFarInFuture`
+
+**Tenant / clinic / entity ilişki kuralları:**
+
+- `tenantId` yalnızca context’ten çözülür; context yoksa `Tenants.ContextMissing`.
+- Aktif clinic context varsa ve request clinic farklıysa `Payments.ClinicContextMismatch`.
+- `clinicId`, `clientId`, `petId` tenant içinde bulunamazsa sırasıyla `Clinics.NotFound`, `Clients.NotFound`, `Pets.NotFound`.
+- `petId` doluysa pet’in `clientId` ile eşleşmesi zorunlu: `Payments.PetClientMismatch`.
+
+**Relationship error code matrisi:**
+
+| Alan | Doğrulama | Kod |
+|------|-----------|-----|
+| `appointmentId` | Tenant içinde bulunmalı | `Appointments.NotFound` |
+| `appointmentId` | Appointment clinic = payment clinic | `Payments.AppointmentClinicMismatch` |
+| `appointmentId` | Appointment pet -> client, payment client ile aynı olmalı | `Payments.AppointmentClientMismatch` |
+| `appointmentId` + `petId` | Appointment pet = seçilen pet | `Payments.AppointmentPetMismatch` |
+| `examinationId` | Tenant içinde bulunmalı | `Examinations.NotFound` |
+| `examinationId` | Examination clinic = payment clinic | `Payments.ExaminationClinicMismatch` |
+| `examinationId` | Examination pet -> client, payment client ile aynı olmalı | `Payments.ExaminationClientMismatch` |
+| `examinationId` + `petId` | Examination pet = seçilen pet | `Payments.ExaminationPetMismatch` |
+
+**Appointment + examination birlikte doluysa mevcut davranış (değiştirilmedi):**
+
+- Her referans kendi içinde clinic/client/(varsa pet) kurallarına göre **ayrı ayrı** doğrulanır.
+- `petId` gönderilmediği durumda appointment ve examination’ın aynı pet’e işaret etmesi için ek bir çapraz doğrulama yoktur; bu mevcut davranış bilinçli olarak korunmuştur.
+
+**List/filter/search/pagination:**
+
+- Query: `page`, `pageSize`, `search`, `clinicId`, `clientId`, `petId`, `method`, `paidFromUtc`, `paidToUtc`.
+- Yapısal filtreler (`clinic/client/pet/method/date`) birbiriyle **AND** birleşir.
+- `search` doluysa şu alanlar OR ile taranır: `notes`, `currency`, aramaya uyan müşteri kimlikleri, aramaya uyan pet kimlikleri.
+- `search` normalize edilir (`trim`, max uzunluk), whitespace-only arama yok sayılır.
+- Sıralama sabittir: `paidAtUtc desc`, ardından `id desc`; `sort/order` desteklenmez.
+- Sayfalama handler içinde clamp edilir (`page >= 1`, `pageSize 1..200`).
+
+**Liste / detay DTO farkları:**
+
+- `PaymentListItemDto`: `id`, `clinicId`, `clientId`, `clientName`, `petId`, `petName`, `amount`, `currency`, `method`, `paidAtUtc`.
+- `PaymentDetailDto`: listeye ek olarak `tenantId`, `appointmentId`, `examinationId`, `notes` içerir.
+- `petId` null olabilir; bu durumda `petName` boş string dönebilir (mevcut davranış).
 
 ---
 

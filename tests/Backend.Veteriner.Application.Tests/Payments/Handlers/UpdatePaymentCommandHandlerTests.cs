@@ -1,6 +1,8 @@
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Payments.Commands.Update;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -124,6 +126,23 @@ public sealed class UpdatePaymentCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TenantInactive()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("A");
+        tenant.Deactivate();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+
+        var result = await CreateHandler().Handle(Cmd(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Tenants.TenantInactive");
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_RequestClinicIdDoesNotMatchActiveClinicContext()
     {
         var tid = Guid.NewGuid();
@@ -185,6 +204,209 @@ public sealed class UpdatePaymentCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Clinics.NotFound");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_InvalidAmount()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
+
+        var result = await CreateHandler().Handle(Cmd(paymentId, cid, clientId, amount: 0m), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.InvalidAmount");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_PaidAtTooFarInFuture()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
+
+        var result = await CreateHandler().Handle(
+            Cmd(paymentId, cid, clientId, paidAt: DateTime.UtcNow.AddYears(3)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.PaidTooFarInFuture");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_PetClientMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+
+        var result = await CreateHandler().Handle(Cmd(paymentId, cid, clientId, petId: petId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.PetClientMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_AppointmentClinicMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var appointmentId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+
+        var result = await CreateHandler().Handle(Cmd(paymentId, cid, clientId, appointmentId: appointmentId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.AppointmentClinicMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_AppointmentClientMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var appointmentId = Guid.NewGuid();
+        var appointmentPetId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Appointment(tid, cid, appointmentPetId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+
+        var result = await CreateHandler().Handle(Cmd(paymentId, cid, clientId, appointmentId: appointmentId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.AppointmentClientMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_AppointmentPetMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var appointmentId = Guid.NewGuid();
+        var appointmentPetId = Guid.NewGuid();
+        var selectedPetId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Appointment(tid, cid, appointmentPetId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null));
+
+        var result = await CreateHandler().Handle(
+            Cmd(paymentId, cid, clientId, petId: selectedPetId, appointmentId: appointmentId),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.AppointmentPetMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationClinicMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var examinationId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Examination(tid, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow.AddHours(-1), "S", "F", null, null));
+
+        var result = await CreateHandler().Handle(Cmd(paymentId, cid, clientId, examinationId: examinationId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.ExaminationClinicMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationClientMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var examinationId = Guid.NewGuid();
+        var examinationPetId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Examination(tid, cid, examinationPetId, null, DateTime.UtcNow.AddHours(-1), "S", "F", null, null));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+
+        var result = await CreateHandler().Handle(Cmd(paymentId, cid, clientId, examinationId: examinationId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.ExaminationClientMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationPetMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var examinationId = Guid.NewGuid();
+        var examPetId = Guid.NewGuid();
+        var selectedPetId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Examination(tid, cid, examPetId, null, DateTime.UtcNow.AddHours(-1), "S", "F", null, null));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null));
+
+        var result = await CreateHandler().Handle(
+            Cmd(paymentId, cid, clientId, petId: selectedPetId, examinationId: examinationId),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.ExaminationPetMismatch");
     }
 
     [Fact]

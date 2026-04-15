@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Payments.Queries.GetList;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Payments.Specs;
@@ -106,6 +107,91 @@ public sealed class GetPaymentsListQueryHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.TotalItems.Should().Be(0);
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _payments.Verify(
+            r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_MapRows_When_ItemsExist()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+
+        var payment = new Payment(
+            tid,
+            clinicId,
+            clientId,
+            petId,
+            null,
+            null,
+            250m,
+            "TRY",
+            PaymentMethod.Card,
+            DateTime.UtcNow.AddHours(-2),
+            "Not");
+
+        _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Payment> { payment });
+
+        var client = new Client(tid, "Ali Veli");
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
+        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Client> { client });
+
+        var pet = new Pet(tid, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
+        typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Pet> { pet });
+
+        var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler().Handle(new GetPaymentsListQuery(paging), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var item = result.Value!.Items.Should().ContainSingle().Subject;
+        item.Id.Should().Be(payment.Id);
+        item.ClinicId.Should().Be(clinicId);
+        item.ClientId.Should().Be(clientId);
+        item.ClientName.Should().Be("Ali Veli");
+        item.PetId.Should().Be(petId);
+        item.PetName.Should().Be("Pamuk");
+        item.Amount.Should().Be(250m);
+        item.Currency.Should().Be("TRY");
+        item.Method.Should().Be(PaymentMethod.Card);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ApplyFilterCombination_And_ClampPaging()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var paidFrom = DateTime.UtcNow.AddDays(-2);
+        var paidTo = DateTime.UtcNow;
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+
+        _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Payment>());
+
+        var paging = new PaymentListPagingRequest { Page = 0, PageSize = 500 };
+        var result = await CreateHandler().Handle(
+            new GetPaymentsListQuery(paging, clinicId, clientId, petId, PaymentMethod.Transfer, paidFrom, paidTo, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Page.Should().Be(1);
+        result.Value.PageSize.Should().Be(200);
         _payments.Verify(
             r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);

@@ -112,5 +112,150 @@ public sealed class UpdateExaminationCommandHandlerTests
         existing.VisitReason.Should().Be("Sikayet");
         _examinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_ClinicContextMismatch_OnAppointmentFlow()
+    {
+        var tid = Guid.NewGuid();
+        var eid = Guid.NewGuid();
+        var aid = Guid.NewGuid();
+        var appointmentClinicId = Guid.NewGuid();
+        var requestClinicId = Guid.NewGuid();
+        var activeClinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(activeClinicId);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Examination(tid, appointmentClinicId, petId, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
+        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Appointment(tid, appointmentClinicId, petId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+
+        var cmd = new UpdateExaminationCommand(
+            eid,
+            ClinicId: requestClinicId,
+            PetId: petId,
+            AppointmentId: aid,
+            ExaminedAtUtc: DateTime.UtcNow,
+            VisitReason: "Sikayet",
+            Findings: "Bulgu",
+            Assessment: null,
+            Notes: null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.ClinicContextMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_ExaminedTooFarInPast()
+    {
+        var tid = Guid.NewGuid();
+        var eid = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Examination(tid, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
+        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var cmd = new UpdateExaminationCommand(
+            eid,
+            ClinicId: existing.ClinicId,
+            PetId: existing.PetId,
+            AppointmentId: null,
+            ExaminedAtUtc: DateTime.UtcNow.AddDays(-30),
+            VisitReason: "Sikayet",
+            Findings: "Bulgu",
+            Assessment: null,
+            Notes: null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.ExaminedTooFarInPast");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_AppointmentPetClinicMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var eid = Guid.NewGuid();
+        var aid = Guid.NewGuid();
+        var reqClinicId = Guid.NewGuid();
+        var reqPetId = Guid.NewGuid();
+        var apptClinicId = Guid.NewGuid();
+        var apptPetId = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Examination(tid, reqClinicId, reqPetId, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
+        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Appointment(tid, apptClinicId, apptPetId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+
+        var cmd = new UpdateExaminationCommand(
+            eid,
+            ClinicId: reqClinicId,
+            PetId: reqPetId,
+            AppointmentId: aid,
+            ExaminedAtUtc: DateTime.UtcNow,
+            VisitReason: "Sikayet",
+            Findings: "Bulgu",
+            Assessment: null,
+            Notes: null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.AppointmentPetClinicMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_AppointmentNotFound()
+    {
+        var tid = Guid.NewGuid();
+        var eid = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Examination(tid, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
+        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+
+        var cmd = new UpdateExaminationCommand(
+            eid,
+            ClinicId: null,
+            PetId: null,
+            AppointmentId: Guid.NewGuid(),
+            ExaminedAtUtc: DateTime.UtcNow,
+            VisitReason: "Sikayet",
+            Findings: "Bulgu",
+            Assessment: null,
+            Notes: null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.NotFound");
+    }
 }
 

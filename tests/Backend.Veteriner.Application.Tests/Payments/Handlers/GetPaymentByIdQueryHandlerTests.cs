@@ -56,6 +56,37 @@ public sealed class GetPaymentByIdQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnNotFound_When_RecordBelongsToDifferentClinicContext()
+    {
+        var tid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
+        var entity = new Payment(
+            tid,
+            Guid.NewGuid(),
+            clientId,
+            null,
+            null,
+            null,
+            10m,
+            "TRY",
+            PaymentMethod.Card,
+            DateTime.UtcNow.AddMinutes(-30),
+            null);
+        _payments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(entity);
+
+        var result = await CreateHandler().Handle(new GetPaymentByIdQuery(entity.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.NotFound");
+        _clients.Verify(
+            r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnDetail_When_Found()
     {
         var tid = Guid.NewGuid();

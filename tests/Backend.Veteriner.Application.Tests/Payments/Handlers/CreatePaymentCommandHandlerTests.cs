@@ -101,6 +101,24 @@ public sealed class CreatePaymentCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TenantInactive()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("A");
+        tenant.Deactivate();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+
+        var result = await CreateHandler().Handle(Cmd(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Tenants.TenantInactive");
+        _clinics.Verify(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_ClientNotFound()
     {
         var tid = Guid.NewGuid();
@@ -263,6 +281,23 @@ public sealed class CreatePaymentCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Payments.InvalidAmount");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_PaidAtTooFarInFuture()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+
+        var result = await CreateHandler().Handle(
+            Cmd(cid, clientId, paidAt: DateTime.UtcNow.AddYears(3)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.PaidTooFarInFuture");
     }
 
     [Fact]

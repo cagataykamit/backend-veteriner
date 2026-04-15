@@ -161,6 +161,65 @@ public sealed class CreateExaminationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ClinicContextMismatch_OnAppointmentFlow()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var activeClinicId = Guid.NewGuid();
+        var requestClinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var appointmentId = Guid.NewGuid();
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(activeClinicId);
+
+        var cmd = CmdWithAppointmentAndOverrides(appointmentId, requestClinicId, petId, DateTime.UtcNow.AddHours(-1));
+
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Appointment(tid, requestClinicId, petId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.ClinicContextMismatch");
+        _examinationsWrite.Verify(r => r.AddAsync(It.IsAny<Examination>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminedTooFarInPast()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = Cmd(tid, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow.AddDays(-30));
+
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.ExaminedTooFarInPast");
+        _clinics.Verify(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminedTooFarInFuture()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = Cmd(tid, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow.AddYears(3));
+
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.ExaminedTooFarInFuture");
+        _clinics.Verify(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Should_CreateExamination_When_ValidWithoutAppointment()
     {
         var tid = Guid.NewGuid();

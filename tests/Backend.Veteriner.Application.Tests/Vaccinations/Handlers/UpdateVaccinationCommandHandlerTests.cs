@@ -39,6 +39,30 @@ public sealed class UpdateVaccinationCommandHandlerTests
             _vaccinationsWrite.Object);
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
+    {
+        _tenantContext.SetupGet(t => t.TenantId).Returns((Guid?)null);
+        var cmd = new UpdateVaccinationCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(3),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Tenants.ContextMissing");
+        _vaccinationsRead.Verify(
+            r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Vaccination>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_VaccinationNotFound()
     {
         var tid = Guid.NewGuid();
@@ -67,6 +91,34 @@ public sealed class UpdateVaccinationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TenantInactive()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("A");
+        tenant.Deactivate();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+
+        var cmd = new UpdateVaccinationCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(3),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Tenants.TenantInactive");
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_RequestClinic_Differs_From_ActiveClinicContext()
     {
         var tid = Guid.NewGuid();
@@ -92,6 +144,292 @@ public sealed class UpdateVaccinationCommandHandlerTests
         _vaccinationsRead.Verify(
             r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Vaccination>>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ClinicNotFound()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var vaccinationId = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Vaccination(
+            tid,
+            petId,
+            clinicId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(5),
+            null);
+        typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
+        _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Clinic?)null);
+
+        var cmd = new UpdateVaccinationCommand(
+            vaccinationId,
+            clinicId,
+            petId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clinics.NotFound");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_PetNotFound()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var vaccinationId = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Vaccination(
+            tid,
+            petId,
+            clinicId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(5),
+            null);
+        typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
+        _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Pet?)null);
+
+        var cmd = new UpdateVaccinationCommand(
+            vaccinationId,
+            clinicId,
+            petId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Pets.NotFound");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationNotFound()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var vaccinationId = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Vaccination(
+            tid,
+            petId,
+            clinicId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(5),
+            null);
+        typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
+        _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Examination?)null);
+
+        var cmd = new UpdateVaccinationCommand(
+            vaccinationId,
+            clinicId,
+            petId,
+            Guid.NewGuid(),
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.NotFound");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationPetClinicMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var vaccinationId = Guid.NewGuid();
+        var examinationId = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Vaccination(
+            tid,
+            petId,
+            clinicId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(5),
+            null);
+        typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
+        _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Examination(
+                tid,
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                null,
+                DateTime.UtcNow.AddHours(-1),
+                "Şikayet",
+                "Bulgu",
+                null,
+                null));
+
+        var cmd = new UpdateVaccinationCommand(
+            vaccinationId,
+            clinicId,
+            petId,
+            examinationId,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.ExaminationPetClinicMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_StatusDateRuleViolated()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var vaccinationId = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Vaccination(
+            tid,
+            petId,
+            clinicId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(5),
+            null);
+        typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
+        _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var cmd = new UpdateVaccinationCommand(
+            vaccinationId,
+            clinicId,
+            petId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            DateTime.UtcNow.AddHours(-2),
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.ScheduledMustNotHaveAppliedAt");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_AppliedTooFarInFuture()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var vaccinationId = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Vaccination(
+            tid,
+            petId,
+            clinicId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(5),
+            null);
+        typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
+        _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var cmd = new UpdateVaccinationCommand(
+            vaccinationId,
+            clinicId,
+            petId,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            DateTime.UtcNow.AddYears(3),
+            null,
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.AppliedTooFarInFuture");
     }
 
     [Fact]
