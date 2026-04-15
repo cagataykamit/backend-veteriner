@@ -97,8 +97,8 @@ Bu standardın amacı:
 | Auth | `Result` + `ToActionResult` + açık DTO (`LoginResultDto`, `AuthActionResultDto`); logout akışı da aynı hatta | Eski istemciler `ProblemDetails.title` metninde değişiklik görebilir (`ResultExtensions`) | Faz 0: auth endpoint’leri tek sözleşmeye alındı; drift için bu doküman §9 | Tamamlandı (Faz 0) | Orta (title gösterimi) |
 | Clinics | Genel olarak tutarlı | Create response yalnız `Guid` | Create response DTO standardı | P2 | Düşük |
 | Clients | CRUD + liste (§18.5); `recent-summary` + `payment-summary` (§19) | Düşük | CRUD contract Sprint 2 ile netleştirildi | P2 | Düşük |
-| Pets | Route/body id standardı güçlü; pet detay için `history-summary` (§17) | Create response çıplak `Guid` | Create response standardizasyonu | P2 | Düşük |
-| Appointments | Update/lifecycle akışları güçlü | Bazı hata dallarında envelope farklılaşma riski | Error contract tekilleştirme | P1 | Orta |
+| Pets | CRUD + liste (§16.5); `history-summary` (§17) | Create yanıtı çıplak `Guid` (§16.5) | Create DTO standardı P2 | P2 | Düşük |
+| Appointments | CRUD + liste/lifecycle (§16.6) | Null-body ve bazı hata dallarında envelope farklılaşma riski | Appointments contract Sprint 2 ile netleştirildi | P1 | Orta |
 | Examinations | Kanonik `visitReason`; yazmada opsiyonel legacy `complaint` (Faz 0 / Adım 3; §11); muayene detay `related-summary` (§18) | — | İstemciler `visitReason` kullanmalı | Tamamlandı (Faz 0) | Orta (alias kaldırma takvimi) |
 | Vaccinations | Clinic context entegrasyonu var | `clinicId` ownership algısı modüller arası tutarsız | Context-first kuralını açık ve tek hale getirme | P1 | Orta |
 | Payments | Create/update/list/detail DTO + `PaymentsContractSchemaFilter` ile OpenAPI hizalı (Faz 0 / Adım 4; §12) | İş kuralı: clinic/müşteri/hayvan tutarlılığı | Context-first klinik uyumu operasyonel | Tamamlandı (Faz 0) | Orta (typegen) |
@@ -114,6 +114,8 @@ Bu standardın amacı:
 **Clients (müşteri detay özeti):** `GET /api/v1/clients/{id}/recent-summary` — `Clients.Read`; tek yanıtta `ClientRecentSummaryDto` (`recentAppointments`, `recentExaminations`). Kayıtlar yalnız route’taki müşterinin **pet’lerine** aittir; sıra en yeni tarih önce; her blok en fazla **10** kayıt (`ClientRecentSummaryConstants`). Aktif klinik bağlamı (`IClinicContext`) varsa randevu ve muayene listeleri bu **kliniğe** indirgenir. Müşteri tenant dışı / yoksa `Clients.NotFound`. OpenAPI: `ClientsContractSchemaFilter`.
 
 **Clients (müşteri ödeme özeti — Finance+ v1):** `GET /api/v1/clients/{id}/payment-summary` — `Clients.Read`; `ClientPaymentSummaryDto` (`totalPaymentsCount`, `totalPaidAmount`, `currencyTotals`, `lastPaymentAtUtc`, `recentPayments`). Yalnız route’taki **müşterinin** ödemeleri; `recentPayments` en fazla **10** (`ClientPaymentSummaryConstants`); sıra `paidAtUtc` en yeni önce. `totalPaidAmount` tek para birimi olduğunda o birimin toplamı; aksi halde **0** — çoklu birim için `currencyTotals` esas. Aktif klinik bağlamı varsa ödemeler bu kliniğe indirgenir. Müşteri yoksa `Clients.NotFound`. Ayrıntı §19.
+
+**Pets (CRUD + liste):** `POST/PUT/GET /api/v1/pets` ve sayfalı liste — sözleşme özeti **§16.5** (DTO farkları, hata kodları, `POST` gövdesi `Guid`, abonelik yazma notu).
 
 **Pets (hayvan detay geçmiş özeti):** `GET /api/v1/pets/{id}/history-summary` — `Pets.Read`; tek yanıtta `PetHistorySummaryDto` (`recentAppointments`, `recentExaminations`, `recentTreatments`, `recentPrescriptions`, `recentLabResults`, `recentHospitalizations`, `recentPayments`) + üst düzey `petId`, `petName`, `clientId`, `clientName`. Kayıtlar yalnız route’taki **pet**’e aittir; sıra en yeni tarih önce; her blok en fazla **10** kayıt (`PetHistorySummaryConstants`). Aktif klinik bağlamı (`IClinicContext`) varsa tüm bloklar bu **kliniğe** indirgenir; yoksa tenant içindeki tüm klinikler. Pet tenant’ta yoksa `Pets.NotFound`. OpenAPI: `PetsContractSchemaFilter`. Ayrıntı §17.
 
@@ -153,7 +155,7 @@ Bu standardın amacı:
 - Prescriptions (§14 — şema/required/nullability)
 - Lab Results (§15 — şema/required/nullability)
 - Hospitalizations (§16 — şema/required/nullability)
-- Pets (liste + pet detay `history-summary`: `PetsContractSchemaFilter` — §17)
+- Pets (CRUD/liste §16.5 + pet detay `history-summary` §17: `PetsContractSchemaFilter`)
 - Examinations (liste + muayene detay `related-summary`: `ExaminationsContractSchemaFilter` — §18)
 
 ### Kısmi Hazır
@@ -445,6 +447,166 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Hospitalizations.NotFound`, `Tenants.TenantInactive`, `Examinations.NotFound`).
 
 **Swagger:** `HospitalizationsContractSchemaFilter` — create, update body, discharge body, detail/list DTO required/nullability ile hizalı.
+
+---
+
+## 16.5) Pets — CRUD ve liste
+
+**Kapsam:** Kiracıya ve müşteriye bağlı hayvan kayıtları. Tüm okuma/yazma **JWT / context `tenant_id`** (`ITenantContext`) ile sınırlıdır; müşteri `ClientByIdSpec(tenantId, clientId)` ile doğrulanır. Tür (`SpeciesId`) ve isteğe bağlı katalog **ırk** (`BreedId`) global katalog tablolarına bağlıdır (`SpeciesByIdSpec`, `BreedByIdWithSpeciesSpec`).
+
+### Endpoint ve yetki
+
+| Method | Path | Policy | Başarı yanıtı |
+|--------|------|--------|----------------|
+| `POST` | `/api/v1/pets` | `Pets.Create` | **`201 Created`**; gövde **`Guid`** (yeni `petId`); `Location` → `GET .../pets/{id}`. Anlamlı wrapper DTO **yok** (P2 backlog; typegen/istemci `Guid` beklemelidir). |
+| `PUT` | `/api/v1/pets/{id}` | `Pets.Create` | Ayrı `Pets.Update` yok; oluşturma ile aynı policy. **`204 No Content`** |
+| `GET` | `/api/v1/pets/{id}` | `Pets.Read` | `PetDetailDto` |
+| `GET` | `/api/v1/pets` | `Pets.Read` | `PagedResult<PetListItemDto>` |
+
+Controller `TryGetResolvedTenant` ile tenant çözülmezse işlem başlamaz (diğer modüllerle aynı).
+
+### Route / body id (`Pets.RouteIdMismatch`)
+
+- `PUT` için route `id` **esas kaynak** (§3.4). Body `UpdatePetCommand.Id` boş (`Guid.Empty`) ise route id ile doldurulur. Body id dolu ve route ile **farklıysa** → `400`, `extensions.code`: **`Pets.RouteIdMismatch`**.
+
+### Liste: sayfalama, arama, filtre
+
+- Query: `page`, `pageSize` (handler içinde **1** ve **200** clamp), `search` ve/veya `page.search` — üst düzey `search` doluysa **önceliklidir** (`PageRequestQuery.WithMergedSearch`).
+- Opsiyonel **`clientId`**, **`speciesId`** (`Guid?`); doluysa `PetsByTenantCountSpec` / `PetsByTenantPagedSpec` ile **AND** filtre.
+- **`sort` / `order` işlenmez** (controller XML ile uyumlu).
+- **`search` dolu ve anlamlıysa:** önce müşteri metni `ClientsByTenantTextSearchSpec` → eşleşen müşterilerin pet id’leri `PetsByTenantForClientIdsSpec`; ardından hayvan alanları (`Name`, serbest `Breed`, `Species.Name`, `BreedRef.Name`) ve bu pet id kümesi **OR** ile birleştirilir (§10 arama tablosu ile uyumlu).
+
+### Detay vs liste DTO farkları
+
+| Alan / konu | `PetDetailDto` (GET `{id}`) | `PetListItemDto` (GET liste) |
+|-------------|-----------------------------|------------------------------|
+| Müşteri özeti | `ClientName`, `ClientPhone`, `ClientEmail` | Yok (yalnız `ClientId`) |
+| `BirthDate`, `BreedId`, `Gender`, `Notes` | Var | Yok |
+| `Weight` | `decimal?` (null = bilinmiyor) | `decimal` — kaynak `Weight` **null ise `0`** atanır (`?? 0`). **Liste ile detay arasında “ağırlık yok” vs “sıfır kg” ayrımı yoktur**; istemci tam ayrım için detay endpoint’ine bakmalıdır. |
+| `SpeciesName` | Tür ilişkisinden | `Species?.Name ?? ""` |
+
+### Abonelik / yazma kapısı (davranış değişmedi — not)
+
+- **`POST` (Create):** `TenantSubscriptionEffectiveWriteEvaluator` ile kiracı **salt okunur** vb. durumda yazma engellenebilir (evaluator sonucu `Result` hatası).
+- **`PUT` (Update):** Bu evaluator **çağrılmaz**; güncelleme yolu kiracı aktif + entity doğrulamaları ile devam eder. **Bilinçli ürün/engine farkı olabilir**; tekilleştirme ayrı onay + iş kuralı değişikliği gerektirir. Bu doküman yalnızca mevcut davranışı kaydeder.
+
+### İş kuralı hataları (`Result` → `ProblemDetails` + `extensions.code`)
+
+| Kod | HTTP (tipik) | Koşul |
+|-----|----------------|--------|
+| `Tenants.ContextMissing` | `400` | Kiracı bağlamı yok |
+| `Tenants.NotFound` / `Tenants.TenantInactive` | `404` / `403` | Tenant yok / pasif |
+| `Clients.NotFound` | `404` | Müşteri yok veya tenant’a ait değil |
+| `Pets.SpeciesNotFound` | `400` | Tür yok veya pasif |
+| `Pets.BreedNotFound` / `Pets.BreedSpeciesMismatch` | `400` | Irk yok/pasif veya tür ile uyumsuz |
+| `Pets.ColorNotFound` | `400` | Renk yok veya pasif |
+| `Pets.BirthDateInFuture` | `400` | Doğum tarihi gelecekte |
+| **`Pets.DuplicatePet`** | **`409`** | Aynı müşteri + aynı isim (normalize) + aynı `SpeciesId` (create/update; update’te kendi `id` hariç) |
+| `Pets.NotFound` | `404` | Pet yok veya tenant dışı |
+| **`Pets.Inconsistent`** | **`400`** | Detayda tür navigasyonu yüklenemedi (`Species` null) |
+| `Pets.RouteIdMismatch` | `400` | PUT route ≠ body id |
+
+FluentValidation → `400` `ValidationProblemDetails`.
+
+### Özet endpoint (değişmedi)
+
+`GET .../history-summary` için **§17** geçerlidir.
+
+---
+
+## 16.6) Appointments — CRUD, liste ve lifecycle
+
+**Kapsam:** Randevular tenant bazlıdır (`ITenantContext`). Klinik etkisi context-first çalışır (`IClinicContext` varsa istek `clinicId` ile uyumlu olmalıdır). Bu bölüm `POST/PUT/GET list/detail` ve `cancel/complete/reschedule` davranışlarını tek yerde toplar.
+
+### Endpoint, yetki ve yanıt şekli
+
+| Method | Path | Policy | Başarı yanıtı |
+|--------|------|--------|----------------|
+| `POST` | `/api/v1/appointments` | `Appointments.Create` | **`201 Created`**; gövde **çıplak `Guid`** (`appointmentId`), `Location` → `GET .../appointments/{id}` |
+| `PUT` | `/api/v1/appointments/{id}` | `Appointments.Reschedule` | `204 NoContent` |
+| `GET` | `/api/v1/appointments/{id}` | `Appointments.Read` | `AppointmentDetailDto` |
+| `GET` | `/api/v1/appointments` | `Appointments.Read` | `PagedResult<AppointmentListItemDto>` |
+| `POST` | `/api/v1/appointments/{id}/cancel` | `Appointments.Cancel` | `204 NoContent` |
+| `POST` | `/api/v1/appointments/{id}/complete` | `Appointments.Complete` | `204 NoContent` |
+| `POST` | `/api/v1/appointments/{id}/reschedule` | `Appointments.Reschedule` | `204 NoContent` |
+
+### Enum contract (numeric)
+
+- `AppointmentStatus` JSON’da **numeric int**: `Scheduled=0`, `Completed=1`, `Cancelled=2`.
+- `AppointmentType` JSON’da **numeric int**: `Examination=0`, `Vaccination=1`, `Checkup=2`, `Surgery=3`, `Grooming=4`, `Consultation=5`, `Other=6`.
+- Create’te `status` opsiyoneldir; verilmezse `Scheduled` kabul edilir.
+- Update’te `status` zorunludur (`UpdateAppointmentCommand`).
+
+### Route/body id, context ve ilişki doğrulaması
+
+- `PUT /appointments/{id}` için route `id` kaynaktır; body `id` dolu ve farklıysa `Appointments.RouteIdMismatch` (`400`).
+- Clinic context kuralı:
+  - Liste/create/update’da istek `clinicId` + aktif context clinic uyuşmazsa `Appointments.ClinicContextMismatch`.
+  - Detail/lifecycle’da clinic uyuşmazlığında kaynak gizleme için `Appointments.NotFound`.
+- Create/update’da `petId` tenant içinde doğrulanır (`Pets.NotFound`).
+- Create/update’da clinic tenant içinde ve aktif olmalıdır (`Clinics.NotFound`, `Clinics.Inactive`).
+- Create’te `clinicId` gönderilmezse: tek aktif klinik otomatik seçilir; birden fazla aktif klinikte `Clinics.ClinicSelectionRequired`.
+
+### UTC normalization, schedule window ve conflict semantiği
+
+- `scheduledAtUtc` create/update/reschedule’da normalize edilir:
+  - `Utc` → olduğu gibi
+  - `Local` → `ToUniversalTime()`
+  - `Unspecified` → `DateTimeKind.Utc` varsayımı ile işlenir
+- Schedule window yalnız `Scheduled` statüsünde uygulanır:
+  - en fazla 7 gün geçmiş (`Appointments.ScheduledTooFarInPast`)
+  - en fazla 2 yıl gelecek (`Appointments.ScheduledTooFarInFuture`)
+- Conflict kuralları yalnız `Scheduled` için uygulanır:
+  - aynı clinic + aynı timestamp (`Appointments.ClinicSlotDuplicate`)
+  - aynı pet + aynı timestamp (`Appointments.PetSlotDuplicate`)
+- **Conflict semantiği timestamp-equality’dir**: interval/overlap hesaplaması yoktur.
+
+### Liste davranışı (filter/search/paging/sort)
+
+- Query: `page`, `pageSize`, `search`/`page.search`, `clinicId`, `petId`, `status`, `dateFromUtc`, `dateToUtc`.
+- `search` metin kümesi:
+  - randevu `notes`
+  - pet metni (`name`, `species`, `breed`) + müşteri metni ile eşleşen pet id kümesi (`ListSearchPetIds`)
+- Filtreler (`clinicId/petId/status/date`) birbirleri ile **AND** uygulanır.
+- Sort yalnızca `scheduledAtUtc` + `asc|desc`; sort boşsa varsayılan **desc** (en yeni önce).
+- `page/pageSize` handler içinde clamp edilir (`1..200`).
+
+### DTO/response shape netliği
+
+- Create response gövdesi `Guid` (wrapper DTO yok).
+- `AppointmentListItemDto` ve `AppointmentDetailDto` alanları paraleldir:
+  `clinicId/name`, `petId/name`, `clientId/name`, `speciesId/name`, `appointmentType`, `scheduledAtUtc`, `status`, `notes`.
+- Detail’de ilişki kayıtları bulunamazsa bazı string alanlar boş (`""`) dönebilir (örn. `clientName`, `speciesName`).
+
+### Lifecycle ve status geçişleri
+
+- `cancel`, `complete`, `reschedule` yalnız `Scheduled` randevuda geçerlidir; aksi `Appointments.InvalidStatusTransition`.
+- Update (`PUT`) domain `ApplyWriteUpdate` ile status geçişini uygular:
+  - `Scheduled` -> detay güncelle
+  - `Scheduled` -> `Completed` / `Cancelled` kabul
+  - `Completed/Cancelled` -> sadece aynı statü no-op; başka statü reddedilir
+
+### Gate / standard sapması notları (davranış değişmedi)
+
+- **Gate farkı:** Create akışında `tenant.IsActive` kontrolü vardır; update/lifecycle handler’larında tenant aktiflik gate’i yoktur. Bu doküman mevcut davranışı kaydeder; değişiklik business onayı gerektirir.
+- **Reschedule null-body sapması:** Controller’da `body is null` dalı doğrudan `Problem(...)` döner; `Result -> ToActionResult` standardından sapar. Bu sprintte davranış değişikliği yapılmamıştır; teknik borç olarak izlenir.
+
+### Hata kodları (özet)
+
+| Kod | HTTP (tipik) | Koşul |
+|-----|--------------|-------|
+| `Tenants.ContextMissing` | `400` | Tenant bağlamı yok |
+| `Tenants.NotFound` / `Tenants.TenantInactive` | `404` / `403` | Create akışında tenant yok/pasif |
+| `Appointments.RouteIdMismatch` | `400` | PUT route id ≠ body id |
+| `Appointments.ClinicContextMismatch` | `400` | Query/body clinic aktif context ile çelişir |
+| `Clinics.NotFound` / `Clinics.Inactive` | `404` / `400` | Klinik yok/pasif |
+| `Clinics.ClinicSelectionRequired` | `400` | Create’te clinicId yok + birden fazla aktif klinik |
+| `Pets.NotFound` | `404` | Pet yok / tenant dışı |
+| `Appointments.ScheduledTooFarInPast/Future` | `400` | Schedule window ihlali |
+| `Appointments.ClinicSlotDuplicate` / `Appointments.PetSlotDuplicate` | `409` | Timestamp-equality slot conflict |
+| `Appointments.InvalidStatusTransition` | `400` | Geçersiz lifecycle/status geçişi |
+| `Appointments.NotFound` | `404` | Kayıt yok veya clinic context nedeniyle gizlendi |
+| `Appointments.Validation` | `400` | Enum/alan validasyonu |
 
 ---
 
