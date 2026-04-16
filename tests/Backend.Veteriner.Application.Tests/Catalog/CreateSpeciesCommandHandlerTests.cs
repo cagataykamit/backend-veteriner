@@ -93,4 +93,46 @@ public sealed class CreateSpeciesCommandHandlerTests
         captured.DisplayOrder.Should().Be(5);
         _write.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
+    {
+        _tenantContext.SetupGet(x => x.TenantId).Returns((Guid?)null);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var handler = new CreateSpeciesCommandHandler(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object);
+
+        var result = await handler.Handle(new CreateSpeciesCommand("DOG", "Köpek", 0), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Tenants.ContextMissing");
+        _write.Verify(r => r.AddAsync(It.IsAny<Species>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_SubscriptionReadOnly()
+    {
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant("X");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
+        var sub = TenantSubscription.StartTrial(
+            tenantId,
+            SubscriptionPlanCode.Basic,
+            new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            trialDays: 0);
+
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var handler = new CreateSpeciesCommandHandler(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object);
+
+        var result = await handler.Handle(new CreateSpeciesCommand("DOG", "Köpek", 0), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.TenantReadOnly");
+        _write.Verify(r => r.AddAsync(It.IsAny<Species>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

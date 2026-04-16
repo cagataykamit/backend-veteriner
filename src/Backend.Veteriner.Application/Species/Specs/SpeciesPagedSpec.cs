@@ -5,8 +5,12 @@ namespace Backend.Veteriner.Application.SpeciesReference.Specs;
 
 public sealed class SpeciesPagedSpec : Specification<Species>
 {
+    /// <summary>Liste filtresi: null ise tüm kayıtlar döner.</summary>
+    public bool? IsActiveFilter { get; }
+
     public SpeciesPagedSpec(int page, int pageSize, bool? isActive)
     {
+        IsActiveFilter = isActive;
         if (isActive.HasValue)
             Query.Where(s => s.IsActive == isActive.Value);
 

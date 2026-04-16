@@ -108,7 +108,7 @@ Bu standardın amacı:
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
 | Tenants | `subscription-summary` (§20); `POST …/invites` (§22); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + admin davet) |
-| Species | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
+| Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 | Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
 
 **Clients (müşteri detay özeti):** `GET /api/v1/clients/{id}/recent-summary` — `Clients.Read`; tek yanıtta `ClientRecentSummaryDto` (`recentAppointments`, `recentExaminations`). Kayıtlar yalnız route’taki müşterinin **pet’lerine** aittir; sıra en yeni tarih önce; her blok en fazla **10** kayıt (`ClientRecentSummaryConstants`). Aktif klinik bağlamı (`IClinicContext`) varsa randevu ve muayene listeleri bu **kliniğe** indirgenir. Müşteri tenant dışı / yoksa `Clients.NotFound`. OpenAPI: `ClientsContractSchemaFilter`.
@@ -147,7 +147,7 @@ Bu standardın amacı:
 
 ### Hazır (yakın)
 - Clients (liste + `recent-summary` + `payment-summary`: `ClientsContractSchemaFilter` — §19)
-- Species
+- Species (§16.4)
 - Breeds
 - Dashboard (`summary` + `finance-summary`: `DashboardContractSchemaFilter` — §19)
 - Payments (Faz 0: §12 — şema/required/nullability)
@@ -507,7 +507,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | Alan | Zorunlu | Nullable (OpenAPI) | Not |
 |------|---------|---------------------|-----|
 | `clinicId` | Evet | Hayır | Context clinic ile uyumsuzsa `Treatments.ClinicContextMismatch` |
-| `petId` | Evet | Hayır | Tenant’ta aktif pet; klinik/pet uyumu handler’da |
+| `petId` | Evet | Hayır | Kiracı kapsamında mevcut pet (`PetByIdSpec`); opsiyonel muayene doluysa clinic/pet tutumu muayene ile doğrulanır |
 | `examinationId` | Hayır | Evet | Doluysa tenant’ta muayene; clinic ve pet tedavi ile eşleşmeli (`Treatments.ExaminationClinicMismatch`, `Treatments.ExaminationPetMismatch`) |
 | `treatmentDateUtc` | Evet | Hayır | `TreatmentDateUtcWindow` — en fazla 7 gün geçmiş, en fazla 2 yıl ileri (examinations `ExaminedAtUtc` ile aynı) |
 | `title` | Evet | Hayır | Max 500 |
@@ -526,6 +526,14 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Treatments.NotFound`, `Pets.NotFound`, `Examinations.NotFound`, `Tenants.TenantInactive`).
 
 **Swagger:** `TreatmentsContractSchemaFilter` — create command, update body, detail/list DTO required/nullability ile hizalı.
+
+**Operasyonel notlar (davranış değişikliği değildir; mevcut API sözleşmesinin netleştirilmesi):**
+
+- **Detay maskeleme:** `GET /api/v1/treatments/{id}` için JWT/header ile aktif klinik bağlamı varken, kayıt başka bir kliniğe aitse yanıt **404** ve `Treatments.NotFound` ile maskelenir. Klinik bağlamı yoksa bu maskeleme uygulanmaz.
+- **Liste vs detay:** `TreatmentListItemDto` özet taşır (`id`, `clinicId`, `petId`, `petName`, `clientId`, `clientName`, `treatmentDateUtc`, `title`, `examinationId`, `followUpDateUtc`). **`description`**, **`notes`**, **`tenantId`**, **`createdAtUtc`**, **`updatedAtUtc`** yalnız **`TreatmentDetailDto`** içindedir.
+- **Create yanıtı:** `201 Created`, gövde yalnızca yeni **`Guid`** (id); ek sarmalayıcı yok.
+- **Canonical / legacy alias:** Create gövdesi doğrudan `CreateTreatmentCommand`. Update’te route id esas; gövde `UpdateTreatmentBody` → `UpdateTreatmentCommand`. **İkinci bir legacy JSON alan adı veya eş anlamlı alias yoktur.**
+- **Tip / durum alanı:** Tedavi **türü veya iş akışı durumu** için ayrı şema alanı **yoktur** (`treatmentType`, `status` vb.). İçerik **`title`**, **`description`**, isteğe bağlı **`notes`** ile metin olarak taşınır. Bu not **yeni alan ekleme talebi değildir**; mevcut sözleşme korunur.
 
 ---
 
@@ -561,6 +569,13 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **Swagger:** `PrescriptionsContractSchemaFilter` — create command, update body, detail/list DTO required/nullability ile hizalı.
 
+**Operasyonel notlar (davranış değişikliği değildir; mevcut API sözleşmesinin netleştirilmesi):**
+
+- **Detay maskeleme:** `GET /api/v1/prescriptions/{id}` için JWT/header ile aktif klinik bağlamı varken, kayıt başka bir kliniğe aitse yanıt **404** ve `Prescriptions.NotFound` ile maskelenir (yetki sızıntısı olmaması için gerçek varlık varlığı ifşa edilmez). Klinik bağlamı yoksa (yalnızca tenant ile sorgu) bu maskeleme uygulanmaz.
+- **Canonical / legacy alias:** Reçete modülünde **ek bir legacy alan adı veya alias** (ör. eski isimle aynı anlama gelen ikinci bir JSON alanı) **yoktur**. İstemci ve entegrasyonlar **`title`**, **`content`**, isteğe bağlı **`notes`**, isteğe bağlı **`followUpDateUtc`** ve route/body’deki canonical alanları kullanmalıdır.
+- **Takip tarihi / reçete tarihi:** `followUpDateUtc` doluysa, **UTC normalizasyonundan sonra** reçete tarihi (`prescribedAtUtc`) ile karşılaştırılır; takip tarihi reçete tarihinden **önce** olamaz (`Prescriptions.FollowUpBeforePrescription`). Reçete tarihi ayrıca `PrescribedAtUtcWindow` ile sınırlıdır (geçmiş/ileri pencere; treatments/examinations ile aynı mantık).
+- **Metin tabanlı model:** İlaç satırları, adet, doz, frekans vb. için **ayrı şema alanları yoktur**; klinik içerik **`title`** (özet başlık), **`content`** (ana metin; ilaç ve kullanım tarifinin yazıldığı tek blok) ve isteğe bağlı **`notes`** üzerinden taşınır. Bu dokümantasyon **yeni alan talebi veya şema genişletmesi anlamına gelmez**; mevcut sözleşme korunur.
+
 ---
 
 ## 15) Lab Results — request/response ve OpenAPI
@@ -572,7 +587,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | Alan | Zorunlu | Nullable (OpenAPI) | Not |
 |------|---------|---------------------|-----|
 | `clinicId` | Evet | Hayır | Context clinic ile uyumsuzsa `LabResults.ClinicContextMismatch` |
-| `petId` | Evet | Hayır | Tenant’ta pet |
+| `petId` | Evet | Hayır | Kiracı kapsamında mevcut pet (`PetByIdSpec`); opsiyonel muayene doluysa clinic/pet tutumu muayene ile doğrulanır |
 | `examinationId` | Hayır | Evet | Doluysa tenant’ta muayene; clinic ve pet lab sonucu ile eşleşmeli (`LabResults.ExaminationClinicMismatch`, `LabResults.ExaminationPetMismatch`) |
 | `resultDateUtc` | Evet | Hayır | `ResultDateUtcWindow` — en fazla 7 gün geçmiş, en fazla 2 yıl ileri (prescriptions/treatments ile aynı) |
 | `testName` | Evet | Hayır | Max 500 |
@@ -592,6 +607,15 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **Swagger:** `LabResultsContractSchemaFilter` — create command, update body, detail/list DTO required/nullability ile hizalı.
 
+**Operasyonel notlar (davranış değişikliği değildir; mevcut API sözleşmesinin netleştirilmesi):**
+
+- **Detay maskeleme:** `GET /api/v1/lab-results/{id}` için JWT/header ile aktif klinik bağlamı varken, kayıt başka bir kliniğe aitse yanıt **404** ve `LabResults.NotFound` ile maskelenir. Klinik bağlamı yoksa bu maskeleme uygulanmaz.
+- **Liste vs detay:** `LabResultListItemDto` özet taşır (`id`, `clinicId`, `petId`, `petName`, `clientId`, `clientName`, `resultDateUtc`, `testName`, `examinationId`). **`resultText`**, **`interpretation`**, **`notes`**, **`tenantId`**, **`createdAtUtc`**, **`updatedAtUtc`** yalnız **`LabResultDetailDto`** içindedir.
+- **Create yanıtı:** `201 Created`, gövde yalnızca yeni **`Guid`** (id); ek sarmalayıcı yok.
+- **Canonical / legacy alias:** Create gövdesi doğrudan `CreateLabResultCommand`. Update’te route id esas; gövde `UpdateLabResultBody` → `UpdateLabResultCommand`. **İkinci bir legacy JSON alan adı veya eş anlamlı alias yoktur.**
+- **Sonuç durumu / tip alanı:** Laboratuvar kaydı için **ayrı `status` veya `resultType` enum şema alanı yoktur**; yorum ve sınıflama ihtiyacı **`interpretation`** ve serbest metin alanlarıyla taşınır. Bu not **yeni alan talebi değildir**; mevcut sözleşme korunur.
+- **Tek kayıt / tek metin modeli:** API **tek bir lab sonuç kaydı** döner; çok satırlı analiz tablosu veya satır bazlı sonuç koleksiyonu **şemada yoktur**. Ölçüm özeti **`testName`** + zorunlu **`resultText`** (tek blok metin) ve isteğe bağlı **`interpretation`** / **`notes`** ile temsil edilir.
+
 ---
 
 ## 16) Hospitalizations — request/response ve OpenAPI
@@ -603,7 +627,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | Alan | Zorunlu | Nullable (OpenAPI) | Not |
 |------|---------|---------------------|-----|
 | `clinicId` | Evet | Hayır | Context clinic ile uyumsuzsa `Hospitalizations.ClinicContextMismatch` |
-| `petId` | Evet | Hayır | Aynı tenant’ta pet |
+| `petId` | Evet | Hayır | Kiracı kapsamında mevcut pet (`PetByIdSpec`); opsiyonel muayene doluysa clinic/pet tutumu muayene ile doğrulanır |
 | `examinationId` | Hayır | Evet | Doluysa muayene clinic/pet ile eşleşmeli (`Hospitalizations.ExaminationClinicMismatch`, `Hospitalizations.ExaminationPetMismatch`) |
 | `admittedAtUtc` | Evet | Hayır | `AdmittedAtUtcWindow` — en fazla 7 gün geçmiş, en fazla 2 yıl ileri |
 | `plannedDischargeAtUtc` | Hayır | Evet | Varsa `admittedAtUtc`’den önce olamaz (`Hospitalizations.PlannedDischargeBeforeAdmission`) |
@@ -625,6 +649,70 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 **Hatalar:** FluentValidation → 400 `ValidationProblemDetails`; iş kuralları → `Result` → `ProblemDetails` + `extensions.code` (ör. `Hospitalizations.NotFound`, `Tenants.TenantInactive`, `Examinations.NotFound`).
 
 **Swagger:** `HospitalizationsContractSchemaFilter` — create, update body, discharge body, detail/list DTO required/nullability ile hizalı.
+
+**Operasyonel notlar (davranış değişikliği değildir; mevcut API sözleşmesinin netleştirilmesi):**
+
+- **Detay maskeleme:** `GET /api/v1/hospitalizations/{id}` için JWT/header ile aktif klinik bağlamı varken, kayıt başka bir kliniğe aitse yanıt **404** ve `Hospitalizations.NotFound` ile maskelenir.
+- **Discharge maskeleme:** `POST /api/v1/hospitalizations/{id}/discharge` için aktif klinik bağlamı varken, kayıt satırının `clinicId`’si bağlamdan farklıysa yanıt **404** ve `Hospitalizations.NotFound` ile maskelenir (detay ile aynı güvenlik örüntüsü). Klinik bağlamı yoksa bu maskeleme uygulanmaz.
+- **Liste vs detay:** `HospitalizationListItemDto` özet taşır; **`tenantId`**, **`notes`**, **`createdAtUtc`**, **`updatedAtUtc`** yalnız **`HospitalizationDetailDto`** içindedir. Her iki şemada da **`isActive`** = `dischargedAtUtc == null` (türetilmiş; ayrı kalıcı alan yok).
+- **Create yanıtı:** `201 Created`, gövde yalnızca yeni **`Guid`** (id); ek sarmalayıcı yok.
+- **Canonical / legacy alias:** Create `CreateHospitalizationCommand`; update `UpdateHospitalizationBody` → `UpdateHospitalizationCommand`; taburcu `DischargeHospitalizationBody`. **İkinci bir legacy JSON alan adı veya eş anlamlı alias yoktur.**
+- **Ayrı status enum:** Şemada **`HospitalizationStatus` benzeri ayrı bir enum alanı yoktur**; “aktif / taburcu” durumu **`dischargedAtUtc`** (null = aktif yatış) ve DTO’daki **`isActive`** ile türetilir.
+- **Tek aktif yatış:** Aynı `tenantId` + `clinicId` + `petId` için aynı anda yalnızca **bir** `dischargedAtUtc == null` kaydına izin verilir (`Hospitalizations.ActiveHospitalizationExists`; EF filtreli unique indeks ile uyumlu).
+- **Discharge `notes` semantiği:** Komutta `notes` **`null`** (property yok veya JSON `null`) → taburcu sırasında **mevcut notlar değişmez**; **`null` olmayan** (boş string dahil) → `applyNotes` ile not alanı trim sonrası güncellenir (boş string → `null`).
+
+---
+
+## 16.4) Species — global katalog (CRUD)
+
+**Veri modeli:** `Species` **global referans kataloğudur**; satırda **`TenantId` yoktur** (tüm kiracılar aynı `Species` tablosunu paylaşır). Sıralama alanı kanonik olarak **`DisplayOrder`** (`sortOrder` adı kullanılmaz).
+
+### Endpoint ve yetki
+
+| Method | Path | Policy | Başarı yanıtı |
+|--------|------|--------|----------------|
+| `POST` | `/api/v1/species` | `Species.Create` | **`201 Created`**; gövde yalnızca **`Guid`** (yeni `speciesId`); `Location` → `GET .../species/{id}`. |
+| `PUT` | `/api/v1/species/{id}` | `Species.Update` | **`204 No Content`** |
+| `GET` | `/api/v1/species/{id}` | `Species.Read` | `SpeciesDetailDto` |
+| `GET` | `/api/v1/species` | `Species.Read` | `PagedResult<SpeciesListItemDto>` |
+
+### Liste: sayfalama ve `isActive`
+
+- Query: `page`, `pageSize` (handler içinde **1** ve **200** clamp), opsiyonel **`isActive`** (`bool?`).
+- **`isActive` yok (`null`):** filtre uygulanmaz (aktif + pasif).
+- **`isActive=true` / `false`:** yalnız ilgili `IsActive` değerine kayıtlar.
+- **`PageRequest.search`**, **`sort`**, **`order` işlenmez** (`SpeciesController` XML ile uyumlu; §10 genel tablo ile çelişirse bu endpoint için bu bölüm esastır).
+
+### Detay vs liste DTO
+
+- **`SpeciesListItemDto`** ve **`SpeciesDetailDto`** aynı alan setini taşır: `Id`, `Code`, `Name`, `IsActive`, **`DisplayOrder`**.
+- **`GET` detay** pasif türü de döndürebilir (yönetim / referans). **Pet oluşturma-güncellemede** pasif tür seçilemez → `Pets.SpeciesNotFound` (§16.5 tablo).
+
+### Yazma kapısı: create vs update (mevcut davranış)
+
+- **`POST` (Create):** `ITenantContext` zorunludur; ardından **`TenantSubscriptionEffectiveWriteEvaluator`** ile abonelik yazma izni değerlendirilir (kiracı bağlamı yoksa veya abonelik yazmayı engelliyorsa `Result` hatası).
+- **`PUT` (Update):** Bu evaluator **çağrılmaz**; güncelleme yalnızca entity ve duplicate kuralları ile yapılır (Pets §16.5’teki create/update farkına paralel **bilinçli ürün/engine ayrımı**; tekilleştirme ayrı onay + iş kuralı değişikliği gerektirir).
+
+### Route / body id (`Species.RouteIdMismatch`)
+
+- `PUT` için route `id` esas kaynaktır (§3.4). Body’de `UpdateSpeciesCommand.Id` dolu ve route ile farklıysa → **`400`**, `extensions.code`: **`Species.RouteIdMismatch`**.
+
+### İş kuralı ve doğrulama hataları (`Result` → `ProblemDetails` + `extensions.code`)
+
+| Kod | HTTP (tipik) | Koşul |
+|-----|----------------|--------|
+| `Tenants.ContextMissing` | `400` | Create: kiracı bağlamı yok |
+| `Tenants.NotFound` / `Tenants.TenantInactive` | `404` / `403` | Tenant yok / pasif (evaluator) |
+| `Subscriptions.NotFound` | `404` | Abonelik kaydı yok |
+| `Subscriptions.TenantReadOnly` | `403` | Trial bitmiş salt okunur vb. (evaluator) |
+| `Subscriptions.TenantCancelled` | `403` | Abonelik iptal |
+| `Subscriptions.WriteNotAllowed` | `403` | Yazma desteklenmiyor |
+| `Species.DuplicateCode` | `409` | Kod çakışması |
+| `Species.DuplicateName` | `409` | Ad çakışması (büyük/küçük harf duyarsız) |
+| `Species.NotFound` | `404` | GetById / Update’te yok |
+| `Species.RouteIdMismatch` | `400` | PUT route ≠ body id |
+
+FluentValidation → `400` `ValidationProblemDetails` (`Validation.ModelStateInvalid`).
 
 ---
 
