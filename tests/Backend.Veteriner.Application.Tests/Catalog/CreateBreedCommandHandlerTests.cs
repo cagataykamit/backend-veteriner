@@ -4,7 +4,6 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Catalog;
-using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
 using Moq;
@@ -96,5 +95,57 @@ public sealed class CreateBreedCommandHandlerTests
         captured!.SpeciesId.Should().Be(sid);
         captured.Name.Should().Be("Golden Retriever");
         _breedsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
+    {
+        _tenantContext.SetupGet(x => x.TenantId).Returns((Guid?)null);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var handler = new CreateBreedCommandHandler(
+            _tenantContext.Object,
+            writeEvaluator,
+            _speciesRead.Object,
+            _breedsRead.Object,
+            _breedsWrite.Object);
+
+        var result = await handler.Handle(new CreateBreedCommand(Guid.NewGuid(), "Golden"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Tenants.ContextMissing");
+        _breedsWrite.Verify(r => r.AddAsync(It.IsAny<Breed>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_SubscriptionReadOnly()
+    {
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant("X");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
+        var sub = TenantSubscription.StartTrial(
+            tenantId,
+            SubscriptionPlanCode.Basic,
+            new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            trialDays: 0);
+
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var handler = new CreateBreedCommandHandler(
+            _tenantContext.Object,
+            writeEvaluator,
+            _speciesRead.Object,
+            _breedsRead.Object,
+            _breedsWrite.Object);
+
+        var result = await handler.Handle(new CreateBreedCommand(Guid.NewGuid(), "Golden"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.TenantReadOnly");
+        _breedsWrite.Verify(r => r.AddAsync(It.IsAny<Breed>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -109,7 +109,7 @@ Bu standardın amacı:
 | Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
 | Tenants | `subscription-summary` (§20); `POST …/invites` (§22); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + admin davet) |
 | Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
-| Breeds | Update contract tutarlı | Düşük | Tutarlı dokümantasyon ve naming temizliği | P3 | Düşük |
+| Breeds | CRUD + liste (§16.4.1) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 
 **Clients (müşteri detay özeti):** `GET /api/v1/clients/{id}/recent-summary` — `Clients.Read`; tek yanıtta `ClientRecentSummaryDto` (`recentAppointments`, `recentExaminations`). Kayıtlar yalnız route’taki müşterinin **pet’lerine** aittir; sıra en yeni tarih önce; her blok en fazla **10** kayıt (`ClientRecentSummaryConstants`). Aktif klinik bağlamı (`IClinicContext`) varsa randevu ve muayene listeleri bu **kliniğe** indirgenir. Müşteri tenant dışı / yoksa `Clients.NotFound`. OpenAPI: `ClientsContractSchemaFilter`.
 
@@ -148,7 +148,7 @@ Bu standardın amacı:
 ### Hazır (yakın)
 - Clients (liste + `recent-summary` + `payment-summary`: `ClientsContractSchemaFilter` — §19)
 - Species (§16.4)
-- Breeds
+- Breeds (§16.4.1)
 - Dashboard (`summary` + `finance-summary`: `DashboardContractSchemaFilter` — §19)
 - Payments (Faz 0: §12 — şema/required/nullability)
 - Treatments (§13 — şema/required/nullability)
@@ -711,6 +711,64 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | `Species.DuplicateName` | `409` | Ad çakışması (büyük/küçük harf duyarsız) |
 | `Species.NotFound` | `404` | GetById / Update’te yok |
 | `Species.RouteIdMismatch` | `400` | PUT route ≠ body id |
+
+FluentValidation → `400` `ValidationProblemDetails` (`Validation.ModelStateInvalid`).
+
+---
+
+## 16.4.1) Breeds — global katalog (CRUD)
+
+**Veri modeli:** `Breed` **global referans kataloğudur**; satırda **`TenantId` yoktur**. Her ırk **`SpeciesId`** ile bir **Species** satırına bağlıdır (FK). Irk için ayrı bir **`code`** veya **`displayOrder`** alanı yoktur; kanonik alanlar **`SpeciesId`**, **`Name`**, **`IsActive`**.
+
+### Endpoint ve yetki
+
+| Method | Path | Policy | Başarı yanıtı |
+|--------|------|--------|----------------|
+| `POST` | `/api/v1/breeds` | `Breeds.Create` | **`201 Created`**; gövde yalnızca **`Guid`** (yeni `breedId`); `Location` → `GET .../breeds/{id}`. |
+| `PUT` | `/api/v1/breeds/{id}` | `Breeds.Update` | **`204 No Content`** |
+| `GET` | `/api/v1/breeds/{id}` | `Breeds.Read` | `BreedDetailDto` |
+| `GET` | `/api/v1/breeds` | `Breeds.Read` | `PagedResult<BreedListItemDto>` |
+
+### Create vs update body (DTO farkları)
+
+- **Create (`CreateBreedCommand`):** **`speciesId`** + **`name`** — yeni ırk ilgili türe bağlanır.
+- **Update (`UpdateBreedCommand`):** **`id`** + **`name`** + **`isActive`** — **`speciesId` yoktur**; güncelleme **türü değiştirmez** (ırkın türü **immutable**).
+
+### Liste: sayfalama, `isActive`, `speciesId`
+
+- Query: `page`, `pageSize` (handler içinde **1** ve **200** clamp), opsiyonel **`isActive`** (`bool?`), opsiyonel **`speciesId`** (`Guid?`); filtreler **AND** ile birleşir (her ikisi de doluysa hem aktiflik hem tür).
+- **`PageRequest.search`**, **`sort`**, **`order` işlenmez** (`BreedsController` XML ile uyumlu).
+
+### Detay vs liste DTO
+
+- **Liste (`BreedListItemDto`):** `Id`, `SpeciesId`, **`SpeciesName`**, `Name`, `IsActive` — **`SpeciesCode` yok**.
+- **Detay (`BreedDetailDto`):** ayrıca **`SpeciesCode`** (`Species.Code`) ve **`SpeciesName`** — tür kodu **yalnız detayda** döner.
+- **Pet oluşturma/güncellemede** pasif ırk seçilemez → `Pets.BreedNotFound` (§16.5 tablo).
+
+### Yazma kapısı: create vs update (mevcut davranış)
+
+- **`POST` (Create):** `ITenantContext` zorunludur; **`TenantSubscriptionEffectiveWriteEvaluator`** ile abonelik yazma izni; ardından `SpeciesByIdSpec` ile tür varlığı (`Breeds.SpeciesNotFound`); aynı tür altında isim tekilliği (`Breeds.DuplicateName`).
+- **`PUT` (Update):** Abonelik evaluator **çağrılmaz**; yalnızca ırk bulunabilirlik + aynı tür altında isim tekilliği.
+
+### Route / body id (`Breeds.RouteIdMismatch`)
+
+- `PUT` için route `id` esas kaynaktır (§3.4). Body `UpdateBreedCommand.Id` dolu ve route ile farklıysa → **`400`**, `extensions.code`: **`Breeds.RouteIdMismatch`**.
+
+### İş kuralı ve doğrulama hataları (`Result` → `ProblemDetails` + `extensions.code`)
+
+| Kod | HTTP (tipik) | Koşul |
+|-----|----------------|--------|
+| `Tenants.ContextMissing` | `400` | Create: kiracı bağlamı yok |
+| `Tenants.NotFound` / `Tenants.TenantInactive` | `404` / `403` | Tenant yok / pasif (evaluator) |
+| `Subscriptions.NotFound` | `404` | Abonelik kaydı yok |
+| `Subscriptions.TenantReadOnly` | `403` | Trial bitmiş salt okunur vb. |
+| `Subscriptions.TenantCancelled` | `403` | Abonelik iptal |
+| `Subscriptions.WriteNotAllowed` | `403` | Yazma desteklenmiyor |
+| `Breeds.SpeciesNotFound` | `404` | Create: tür yok |
+| `Breeds.DuplicateName` | `409` | Aynı `SpeciesId` altında aynı ad (büyük/küçük harf duyarsız) |
+| `Breeds.NotFound` | `404` | GetById / Update’te yok |
+| `Breeds.Inconsistent` | `400` | Detayda tür navigasyonu yüklenemedi (`Species` null) |
+| `Breeds.RouteIdMismatch` | `400` | PUT route ≠ body id |
 
 FluentValidation → `400` `ValidationProblemDetails` (`Validation.ModelStateInvalid`).
 
