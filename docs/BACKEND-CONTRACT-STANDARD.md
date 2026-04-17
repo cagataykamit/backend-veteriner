@@ -734,10 +734,11 @@ FluentValidation → `400` `ValidationProblemDetails` (`Validation.ModelStateInv
 - **Create (`CreateBreedCommand`):** **`speciesId`** + **`name`** — yeni ırk ilgili türe bağlanır.
 - **Update (`UpdateBreedCommand`):** **`id`** + **`name`** + **`isActive`** — **`speciesId` yoktur**; güncelleme **türü değiştirmez** (ırkın türü **immutable**).
 
-### Liste: sayfalama, `isActive`, `speciesId`
+### Liste: sayfalama, `isActive`, `speciesId`, `search`
 
-- Query: `page`, `pageSize` (handler içinde **1** ve **200** clamp), opsiyonel **`isActive`** (`bool?`), opsiyonel **`speciesId`** (`Guid?`); filtreler **AND** ile birleşir (her ikisi de doluysa hem aktiflik hem tür).
-- **`PageRequest.search`**, **`sort`**, **`order` işlenmez** (`BreedsController` XML ile uyumlu).
+- Query: `page`, `pageSize` (handler içinde **1** ve **200** clamp), opsiyonel **`isActive`** (`bool?`), opsiyonel **`speciesId`** (`Guid?`), opsiyonel **`search`** (`PageRequest.Search` / query `search`); tüm dolu filtreler **AND** ile birleşir.
+- **`search`:** boş veya yalnız whitespace ise **uygulanmaz**. Aksi halde **büyük/küçük harf duyarsız** alt-dize eşlemesi: **`Breed.Name`** veya **`Species.Name`** (içerir / `Contains`).
+- **`sort`** ve **`order` işlenmez**; sıralama sabittir: tür adı → ırk adı → `Id` (`BreedsPagedSpec`).
 
 ### Detay vs liste DTO
 
@@ -1064,13 +1065,49 @@ FluentValidation (validator’lar) → `400` `ValidationProblemDetails` (MediatR
 
 **Amaç:** Kiracıya bağlı plan kataloğu, abonelik durumu, trial tarihleri ve kalan gün bilgisini tek yanıtta sunmak (ödeme entegrasyonu yok; Faz 1 salt okunur özet).
 
-**Yanıt:** `TenantSubscriptionSummaryDto` — `tenantId`, `tenantName`, `planCode` (string API kodu: `basic` / `pro` / `premium`), `planName`, `status` (`TenantSubscriptionStatus` enum, JSON **numeric**: `Trialing=0`, `Active=1`, `ReadOnly=2`, `Cancelled=3`), `trialStartsAtUtc`, `trialEndsAtUtc` (opsiyonel), `daysRemaining` (yalnız `Trialing` ve `trialEndsAtUtc` varken; aksi halde null), `isReadOnly` (`status == ReadOnly`), `canManageSubscription` (`Tenants.Create` yetkisi varsa true — ileride paket yönetimi için kanca), `availablePlans[]` (`code`, `name`, `description`).
+**Yanıt:** `TenantSubscriptionSummaryDto` — `tenantId`, `tenantName`, `planCode` (string API kodu: `Basic` / `Pro` / `Premium`), `planName`, `status` (**effective** `TenantSubscriptionStatus`; JSON **numeric**: `Trialing=0`, `Active=1`, `ReadOnly=2`, `Cancelled=3`), `trialStartsAtUtc`, `trialEndsAtUtc` (opsiyonel), `daysRemaining` (yalnız `Trialing` ve `trialEndsAtUtc` varken; aksi halde null), `isReadOnly`, `canManageSubscription` (**`Tenants.Create`** — **checkout yetkisi değil**; ayrıntı **§20.1**), `currentPeriodStartUtc`, `currentPeriodEndUtc`, `billingCycleAnchorUtc`, `nextBillingAtUtc`, `pendingPlanChange`, `availablePlans[]` (`code`, `name`, `description`, `maxUsers`).
 
 **Veri:** `TenantSubscriptions` tablosu kiracı ile 1:1 (`TenantId` PK). Yeni kiracı oluşturma (`POST /tenants`) sonrası varsayılan olarak Basic plan + Trialing + 14 gün trial (`SubscriptionTrialDefaults.TrialDays`) yazılır. Eski kiracılar için migration ile backfill uygulanır.
 
 **Hatalar:** Kiracı bağlamı yok → `Tenants.ContextMissing`; abonelik satırı yok → `Subscriptions.NotFound`; tenant yok → `Tenants.NotFound`; izin yok → `Auth.PermissionDenied` veya `Tenants.AccessDenied`. FluentValidation (geçersiz route `tenantId`) → `400`.
 
 **Swagger:** Controller `ProducesResponseType(typeof(TenantSubscriptionSummaryDto), 200)`; enum şeması OpenAPI’da `TenantSubscriptionStatus` olarak görünür.
+
+### 20.1) Settings / Subscription — özet contract (tek kaynak)
+
+**Kapsam:** Panel “ayarlar / abonelik” ekranı; uçlar `TenantsController` (`/api/v1/tenants/{tenantId}/…`) ve anonim billing uçları (`BillingCallbacksController`, `BillingWebhooksController`). Sağlayıcı soyutlaması: `BillingProvider`, `IBillingCheckoutProvider`, `ISubscriptionCheckoutActivationService` (ayrıntı **§24**).
+
+#### Yetki matrisi (özet okuma vs yönetim)
+
+| İşlem | Policy / kontrol | Not |
+|--------|------------------|-----|
+| `GET …/subscription-summary` | Handler: `Subscriptions.Read` **veya** `Tenants.Read`; JWT `tenant_id` = route **veya** platform `Tenants.Read` | Controller’da tek policy yok; yetki handler’da. |
+| Checkout başlat / durum / finalize; plan değişikliği (downgrade schedule, pending, cancel) | `Subscriptions.Manage` + `TryGetResolvedTenant` | Abonelik **yönetimi** dar yetki. |
+| `canManageSubscription` (özet DTO) | **`Tenants.Create` claim’i** ile hesaplanır | **Checkout yönetimi değildir.** Gerçek checkout/plan işlemleri için **`Subscriptions.Manage`** gerekir; UI bu iki bayrağı karıştırmamalıdır. |
+
+#### `TenantSubscriptionSummaryDto` (özet)
+
+- Kimlik: `tenantId`, `tenantName`.
+- Plan: `planCode`, `planName` (API string kodları: `Basic` / `Pro` / `Premium` — `SubscriptionPlanCatalog.ToApiCode`).
+- Durum: `status` (**effective** status: trial bitişi sonrası `Trialing` bile olsa effective `ReadOnly` olabilir), `trialStartsAtUtc`, `trialEndsAtUtc`, `daysRemaining`, `isReadOnly`.
+- Dönem: `currentPeriodStartUtc`, `currentPeriodEndUtc`, `billingCycleAnchorUtc`, `nextBillingAtUtc`.
+- UI bayrakları: `canManageSubscription` (**yukarıdaki tablo**).
+- `pendingPlanChange` (`PendingSubscriptionPlanChangeDto` veya null), `availablePlans[]` (`SubscriptionPlanOptionDto`: `code`, `name`, `description`, `maxUsers`).
+
+#### `SubscriptionCheckoutSessionDto` (checkout oturumu)
+
+- `checkoutSessionId`, `tenantId`, `currentPlanCode`, `targetPlanCode`, `status` (`BillingCheckoutSessionStatus`), `provider` (`BillingProvider`), `checkoutUrl`, `canContinue`, `expiresAtUtc`.
+- Opsiyonel proration: `chargeCurrencyCode`, `proratedChargeMinor`, `prorationRatio` (upgrade ve fiyat yapılandırması varsa).
+
+#### Callback vs webhook vs finalize (kodla uyumlu akış)
+
+- **Iyzico callback** — `POST /api/v1/billing/iyzico/callback` (`AllowAnonymous`, form POST): **üretim kodu yalnızca HTTP redirect** ile panel subscription URL’sine köprüler (`checkout=processing`, `provider=iyzico`, isteğe bağlı `checkoutSessionId`). **Ödeme/aktivasyon doğrulaması burada yapılmaz**; kaynak gerçeklik **webhook** veya panel **`…/finalize`** ile **§24**’te anlatıldığı gibi.
+- **Webhook** — `POST /api/v1/webhooks/billing/stripe` | `…/iyzico`: ham gövde + imza; `ProcessBillingWebhookCommand` → idempotent aktivasyon hattı.
+- **Finalize** — `POST /api/v1/tenants/{tenantId}/subscription-checkout/{checkoutSessionId}/finalize` (`Subscriptions.Manage`): **`BillingActivationSource.Manual`** ile `ISubscriptionCheckoutActivationService.TryActivateAsync`; read-only tenant için guard **muafiyeti** **§24.4**.
+
+#### Read-only tenant
+
+- Yazma çoğu mutation’da **§23** ile engellenir; **checkout komutları ve webhook işleme** kontrollü muafiyet ile çalışır (**§24.4**). Özet okuma (`subscription-summary`) read-only kiracıda da **açıktır** (**§23.1**).
 
 ---
 

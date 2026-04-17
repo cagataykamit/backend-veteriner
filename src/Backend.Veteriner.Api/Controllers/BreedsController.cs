@@ -77,7 +77,10 @@ public sealed class BreedsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <remarks><c>PageRequest.search</c>, <c>sort</c> ve <c>order</c> şu an işlenmez.</remarks>
+    /// <remarks>
+    /// <c>PageRequest.search</c> (query <c>search</c>): ırk adı ve tür adı üzerinde büyük/küçük harf duyarsız alt-dize araması.
+    /// <c>sort</c> ve <c>order</c> işlenmez (sabit sıralama: tür adı, ırk adı, id).
+    /// </remarks>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Breeds.Read)]
     [ProducesResponseType(typeof(PagedResult<BreedListItemDto>), StatusCodes.Status200OK)]
@@ -87,7 +90,7 @@ public sealed class BreedsController : ControllerBase
         [FromQuery] Guid? speciesId,
         CancellationToken ct)
     {
-        var result = await _mediator.Send(new GetBreedListQuery(page, isActive, speciesId), ct);
+        var result = await _mediator.Send(new GetBreedListQuery(page, isActive, speciesId, page.Search), ct);
         return result.ToActionResult(this);
     }
 }

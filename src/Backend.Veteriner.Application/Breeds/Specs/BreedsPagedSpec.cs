@@ -11,14 +11,24 @@ public sealed class BreedsPagedSpec : Specification<Breed>
     /// <summary>Liste filtresi: null ise tür ile sınırlama yok.</summary>
     public Guid? SpeciesIdFilter { get; }
 
-    public BreedsPagedSpec(int page, int pageSize, bool? isActive, Guid? speciesId)
+    /// <summary>İşlenmiş arama (küçük harf); null ise metin araması yok.</summary>
+    public string? SearchTermLower { get; }
+
+    public BreedsPagedSpec(int page, int pageSize, bool? isActive, Guid? speciesId, string? searchTermLower)
     {
         IsActiveFilter = isActive;
         SpeciesIdFilter = speciesId;
+        SearchTermLower = searchTermLower;
         if (isActive.HasValue)
             Query.Where(b => b.IsActive == isActive.Value);
         if (speciesId.HasValue)
             Query.Where(b => b.SpeciesId == speciesId.Value);
+        if (!string.IsNullOrEmpty(searchTermLower))
+        {
+            Query.Where(b =>
+                b.Name.ToLower().Contains(searchTermLower) ||
+                (b.Species != null && b.Species.Name.ToLower().Contains(searchTermLower)));
+        }
 
         Query.Include(b => b.Species!)
             .OrderBy(b => b.Species!.Name)
