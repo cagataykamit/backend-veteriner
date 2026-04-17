@@ -12,10 +12,13 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Queries.GetById;
 using Backend.Veteriner.Application.Tenants.Queries.GetList;
 using Backend.Veteriner.Application.Tenants.Queries.GetAssignableOperationClaimsForInvite;
+using Backend.Veteriner.Application.Tenants.Queries.GetInvites;
+using Backend.Veteriner.Application.Tenants.Queries.GetMembers;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionCheckout;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionSummary;
 using Backend.Veteriner.Application.Tenants.Queries.GetPendingPlanChange;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using System.Collections.Generic;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -88,6 +91,46 @@ public sealed class TenantsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetAssignableOperationClaimsForInviteQuery(tenantId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: kiracı üyelerini sayfalı listeler (<c>UserTenants</c>). <c>PageRequest.search</c> e-postada contains (büyük/küçük harf duyarsız);
+    /// <c>sort</c>/<c>order</c> işlenmez. Global <c>/api/v1/admin/users</c> ile karıştırılmamalıdır. Yetki: <c>Tenants.InviteCreate</c>; JWT <c>tenant_id</c> route ile aynı olmalı.
+    /// </summary>
+    [HttpGet("{tenantId:guid}/members")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(PagedResult<TenantMemberListItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetMembers([FromRoute] Guid tenantId, [FromQuery] PageRequest req, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetTenantMembersQuery(tenantId, req), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: kiracı davetlerini sayfalı listeler. Opsiyonel <c>status</c> (<see cref="TenantInviteStatus"/>).
+    /// <c>PageRequest.search</c> e-postada contains; <c>sort</c>/<c>order</c> işlenmez. Yetki: <c>Tenants.InviteCreate</c>; JWT <c>tenant_id</c> route ile aynı olmalı.
+    /// </summary>
+    [HttpGet("{tenantId:guid}/invites")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(PagedResult<TenantInviteListItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetInvites(
+        [FromRoute] Guid tenantId,
+        [FromQuery] PageRequest req,
+        [FromQuery] TenantInviteStatus? status,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetTenantInvitesQuery(tenantId, req, status), ct);
         return result.ToActionResult(this);
     }
 

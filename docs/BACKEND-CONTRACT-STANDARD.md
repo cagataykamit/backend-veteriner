@@ -107,7 +107,7 @@ Bu standardın amacı:
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
-| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + admin davet) |
+| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + tenant panel üye/davet listesi) |
 | Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 | Breeds | CRUD + liste (§16.4.1) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 
@@ -1198,6 +1198,29 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 **Yanıt:** `AssignableOperationClaimForInviteDto[]` — `operationClaimId`, `operationClaimName` (sıra whitelist görüntü sırasıyla uyumlu).
 
 **Invite create ile ilişki:** `POST …/invites` hem kaydın `OperationClaims` içinde varlığını hem de adının whitelist’te olduğunu doğrular; whitelist dışı id için `Invites.OperationClaimNotAssignable` (`403`).
+
+### 22.6 Tenant paneli — üye listesi ve davet listesi (tenant-scoped)
+
+**Amaç:** Tenant panelinde kullanılacak **kiracıya özgü** listeler; platform geneli `GET /api/v1/admin/users` ile karıştırılmamalıdır (farklı yetki modeli ve veri sınırı).
+
+**Ortak kurallar**
+
+- **Yetki:** `Tenants.InviteCreate` (davet oluşturma / assignable claims ile aynı çizgi).
+- **Tenant eşlemesi:** JWT `tenant_id` route `tenantId` ile aynı olmalı (`TryGetResolvedTenant` + handler’da `jwtTenantId == tenantId`). Aksi: `Tenants.AccessDenied` veya bağlam yoksa `Tenants.ContextMissing`.
+- **Sayfalama:** `PageRequest` — `page` (1 tabanlı), `pageSize` (1–200 clamp).
+- **Arama:** `search` → e-posta üzerinde **contains** (trim + küçük harf; büyük/küçük harf duyarsız).
+- **Sıralama:** `sort` / `order` **işlenmez**; sabit sıra: üyelerde e-posta artan; davetlerde `createdAtUtc` azalan.
+
+**E) Kiracı üyeleri** — `GET /api/v1/tenants/{tenantId}/members`
+
+- **Kaynak:** `UserTenants` + `User` (yalnızca `TenantId == tenantId` satırları).
+- **Yanıt:** `PagedResult<TenantMemberListItemDto>` — `userId`, `email`, `emailConfirmed`, `createdAtUtc` (kullanıcı kaydı).
+
+**F) Kiracı davetleri** — `GET /api/v1/tenants/{tenantId}/invites`
+
+- **Kaynak:** `TenantInvites` (yalnızca ilgili `tenantId`).
+- **Opsiyonel sorgu:** `status` — `TenantInviteStatus` (`Pending`, `Accepted`, `Revoked`).
+- **Yanıt:** `PagedResult<TenantInviteListItemDto>` — `id`, `email`, `clinicId`, `clinicName` (varsa), `operationClaimId`, `operationClaimName` (varsa), `status`, `isExpired` (`Pending` ve `expiresAtUtc` geçmişse `true`), `expiresAtUtc`, `createdAtUtc`.
 
 ---
 
