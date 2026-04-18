@@ -4,15 +4,21 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Api.Contracts;
+using Backend.Veteriner.Application.Tenants.Commands.AssignMemberRole;
+using Backend.Veteriner.Application.Tenants.Commands.CancelInvite;
 using Backend.Veteriner.Application.Tenants.Commands.Create;
 using Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
+using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberRole;
+using Backend.Veteriner.Application.Tenants.Commands.ResendInvite;
 using Backend.Veteriner.Application.Tenants.Commands.Checkout;
 using Backend.Veteriner.Application.Tenants.Commands.PlanChanges;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Queries.GetById;
 using Backend.Veteriner.Application.Tenants.Queries.GetList;
 using Backend.Veteriner.Application.Tenants.Queries.GetAssignableOperationClaimsForInvite;
+using Backend.Veteriner.Application.Tenants.Queries.GetInviteById;
 using Backend.Veteriner.Application.Tenants.Queries.GetInvites;
+using Backend.Veteriner.Application.Tenants.Queries.GetMemberById;
 using Backend.Veteriner.Application.Tenants.Queries.GetMembers;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionCheckout;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionSummary;
@@ -113,6 +119,80 @@ public sealed class TenantsController : ControllerBase
     }
 
     /// <summary>
+    /// Tenant paneli: tek üye detayı. Tenant-scoped; <c>createdAtUtc</c> <c>UserTenant.CreatedAtUtc</c>'dir.
+    /// <c>roles</c> yalnız whitelist claim'lerini içerir (teknik/internal claim'ler gizlenir);
+    /// <c>clinics</c> üyenin bu kiracı içindeki kliniklerini listeler. Üye bu kiracıda yoksa 404 <c>Members.NotFound</c> (sızma maskelemesi).
+    /// Global <c>/api/v1/admin/users/{id}</c> ile karıştırılmamalıdır. Yetki: <c>Tenants.InviteCreate</c>.
+    /// </summary>
+    [HttpGet("{tenantId:guid}/members/{memberId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(TenantMemberDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMemberById(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid memberId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetTenantMemberByIdQuery(tenantId, memberId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: üyeye whitelist içinden rol (OperationClaim) atar. Idempotent (<c>alreadyAssigned</c>).
+    /// Global <c>/api/v1/admin/users/{userId}/operation-claims/{claimId}</c> yüzeyine düşmez.
+    /// Yetki: <c>Tenants.InviteCreate</c>. Read-only/cancelled tenant'ta §23 write-guard bu command'ı keser.
+    /// </summary>
+    [HttpPost("{tenantId:guid}/members/{memberId:guid}/roles/{operationClaimId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(AssignTenantMemberRoleResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AssignMemberRole(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid memberId,
+        [FromRoute] Guid operationClaimId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new AssignTenantMemberRoleCommand(tenantId, memberId, operationClaimId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: üyeden whitelist içinden rol (OperationClaim) kaldırır. Idempotent (<c>alreadyRemoved</c>).
+    /// Self-protect: çağıran kendi üzerinden rol çıkaramaz (<c>Invites.SelfRoleRemoveForbidden</c>).
+    /// Yetki: <c>Tenants.InviteCreate</c>. Read-only/cancelled tenant'ta §23 write-guard bu command'ı keser.
+    /// </summary>
+    [HttpDelete("{tenantId:guid}/members/{memberId:guid}/roles/{operationClaimId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(RemoveTenantMemberRoleResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveMemberRole(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid memberId,
+        [FromRoute] Guid operationClaimId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new RemoveTenantMemberRoleCommand(tenantId, memberId, operationClaimId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
     /// Tenant paneli: kiracı davetlerini sayfalı listeler. Opsiyonel <c>status</c> (<see cref="TenantInviteStatus"/>).
     /// <c>PageRequest.search</c> e-postada contains; <c>sort</c>/<c>order</c> işlenmez. Yetki: <c>Tenants.InviteCreate</c>; JWT <c>tenant_id</c> route ile aynı olmalı.
     /// </summary>
@@ -131,6 +211,76 @@ public sealed class TenantsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetTenantInvitesQuery(tenantId, req, status), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: tek davet detayı. Tenant-scoped; davetin <c>TenantId</c>'si route ve JWT <c>tenant_id</c> ile eşleşmelidir.
+    /// Ham token asla dönmez (yalnız create/resend yanıtında bir kez görülür). Yetki: <c>Tenants.InviteCreate</c>.
+    /// </summary>
+    [HttpGet("{tenantId:guid}/invites/{inviteId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(TenantInviteDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetInviteById(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid inviteId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetTenantInviteByIdQuery(tenantId, inviteId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: bekleyen daveti iptal eder (Revoked). Idempotent: zaten iptal edilmişse
+    /// 200 OK + <c>alreadyCancelled=true</c> döner. Accepted davet iptal edilemez (409 benzeri iş kuralı).
+    /// Read-only/cancelled abonelikler için abonelik guard'ı engelleyebilir. Yetki: <c>Tenants.InviteCreate</c>.
+    /// </summary>
+    [HttpPost("{tenantId:guid}/invites/{inviteId:guid}/cancel")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(CancelTenantInviteResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CancelInvite(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid inviteId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CancelTenantInviteCommand(tenantId, inviteId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: bekleyen daveti yeniden üretir. Aynı davet kaydı üzerinde yeni token hash ve yeni expiry yazılır
+    /// (Id değişmez; <c>CreatedAtUtc</c> korunur). Yalnızca Pending davet için çalışır. Ham token yanıtta bir kez döner.
+    /// Create akışı değişmez; duplicate-pending kuralı aynı kayıt güncellendiği için tetiklenmez. Yetki: <c>Tenants.InviteCreate</c>.
+    /// </summary>
+    [HttpPost("{tenantId:guid}/invites/{inviteId:guid}/resend")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ResendTenantInviteResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ResendInvite(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid inviteId,
+        [FromBody] ResendTenantInviteBody? body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ResendTenantInviteCommand(tenantId, inviteId, body?.ExpiresAtUtc), ct);
         return result.ToActionResult(this);
     }
 

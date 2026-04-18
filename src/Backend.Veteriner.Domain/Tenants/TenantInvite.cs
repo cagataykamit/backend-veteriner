@@ -67,4 +67,34 @@ public sealed class TenantInvite
         AcceptedAtUtc = utcNow.Kind == DateTimeKind.Utc ? utcNow : utcNow.ToUniversalTime();
         AcceptedByUserId = userId;
     }
+
+    /// <summary>
+    /// Bekleyen daveti iptal eder (<see cref="TenantInviteStatus.Revoked"/>). Accepted/Revoked üzerinde çağırılmamalıdır.
+    /// </summary>
+    public void Revoke()
+    {
+        if (Status != TenantInviteStatus.Pending)
+            throw new InvalidOperationException("Yalnızca bekleyen davet iptal edilebilir.");
+        Status = TenantInviteStatus.Revoked;
+    }
+
+    /// <summary>
+    /// Bekleyen daveti yeniden üretir: yeni token hash ve yeni expiry atar. Accepted/Revoked üzerinde çağırılmamalıdır.
+    /// <c>CreatedAtUtc</c> değişmez (davetin ilk oluşturulma tarihini korumak için).
+    /// </summary>
+    public void Reissue(string newTokenHash, DateTime newExpiresAtUtc, DateTime utcNow)
+    {
+        if (Status != TenantInviteStatus.Pending)
+            throw new InvalidOperationException("Yalnızca bekleyen davet yeniden gönderilebilir.");
+        if (string.IsNullOrWhiteSpace(newTokenHash))
+            throw new ArgumentException("Token hash boş olamaz.", nameof(newTokenHash));
+
+        var nowUtc = utcNow.Kind == DateTimeKind.Utc ? utcNow : utcNow.ToUniversalTime();
+        var expiresUtc = newExpiresAtUtc.Kind == DateTimeKind.Utc ? newExpiresAtUtc : newExpiresAtUtc.ToUniversalTime();
+        if (expiresUtc <= nowUtc)
+            throw new ArgumentException("expiresAtUtc gelecekte bir zaman olmalıdır.", nameof(newExpiresAtUtc));
+
+        TokenHash = newTokenHash;
+        ExpiresAtUtc = expiresUtc;
+    }
 }
