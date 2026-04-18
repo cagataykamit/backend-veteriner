@@ -107,7 +107,7 @@ Bu standardın amacı:
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
-| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol atama) |
+| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); üye klinik atama/çıkarma `POST/DELETE …/members/{memberId}/clinics/{clinicId}` (§22.10); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol/klinik atama) |
 | Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 | Breeds | CRUD + liste (§16.4.1) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 
@@ -1312,7 +1312,47 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
   - İlişki **yok** → **idempotent success**: silme çağrılmaz, cache düşürülmez; `alreadyRemoved = true`.
 - **Hatalar:** `Auth.PermissionDenied`, `Tenants.ContextMissing`, `Tenants.AccessDenied`, `Invites.SelfRoleRemoveForbidden`, `Members.NotFound` (**404**), `Invites.OperationClaimNotFound`, `Invites.OperationClaimNotAssignable`, `Subscriptions.TenantReadOnly` / `Subscriptions.TenantCancelled` (**403**).
 
-**Kapsam dışı (bu fazda):** Kullanıcı-klinik üyeliği yazma (`UserClinic`), son-admin koruması (tenant başına en az bir `Admin` zorunluluğu), toplu (bulk) rol atama, tenant-scoped permission assign/remove (permission catalog düzeyi), global admin yüzeyi değişiklikleri.
+**Kapsam dışı (bu fazda):** Kullanıcı-klinik üyeliği yazma (`UserClinic`, §22.10'da açılmıştır), son-admin koruması (tenant başına en az bir `Admin` zorunluluğu), toplu (bulk) rol atama, tenant-scoped permission assign/remove (permission catalog düzeyi), global admin yüzeyi değişiklikleri.
+
+### 22.10 Tenant paneli — üyeye klinik atama / çıkarma (Faz 4B)
+
+**Amaç:** Tenant adminin, kendi kiracısındaki üyelere bu kiracıya ait klinik üyeliği (`UserClinic`) ekleyip/çıkarabilmesi. Faz 4A kapsamındaki read yüzeyi **§22.8 üye detayının `clinics[]`** alanıyla zaten karşılanır; bu fazda yeni read endpoint açılmaz. Global `/api/v1/admin/users/...` ve `/api/v1/clinics/...` yüzeyleri **tenant panelinde kullanılmaz**.
+
+**Ortak kurallar**
+
+- **Yetki:** `Tenants.InviteCreate` (Faz 3B/§22.9 ile aynı çizgi; yeni permission açılmadı). `Clinics.*` permission seti bu uç için kullanılmaz — bunlar global klinik yönetimine aittir.
+- **Tenant eşlemesi:** `TryGetResolvedTenant` + handler'da `jwtTenantId == request.TenantId`. Aksi: `Tenants.AccessDenied` / bağlam yoksa `Tenants.ContextMissing`.
+- **Member tenant doğrulaması:** `IUserTenantRepository.ExistsAsync(memberId, tenantId)`. Üye bu kiracıda değilse **404 `Members.NotFound`** (§22.8/§22.9 ile aynı maskeleme çizgisi; farklı kiracının kullanıcısı bu koda düşer, sızma yok).
+- **Klinik doğrulaması:** Klinik `ClinicByIdSpec(tenantId, clinicId)` ile çözülür; kiracıya ait değilse `Clinics.NotFound` (404 envelope).
+- **Subscription guard:** Command olduğundan §23.2 merkezi `TenantSubscriptionWriteGuardBehavior` bu istekleri önce değerlendirir; `ReadOnly`/`Cancelled` tenantta `Subscriptions.TenantReadOnly` / `Subscriptions.TenantCancelled` (**403**). Namespace `Tenants.Commands.*` (Auth dışı) — guard çizgisine uyar.
+- **Permission cache:** Bu uçta **çağrılmaz**. Klinik üyeliği permission setini değiştirmez; `IPermissionCacheInvalidator` kullanılmaz.
+- **Session / refresh revoke:** Bu fazda **kapsam dışı**. Remove sonrası mevcut access token TTL'ine kadar geçerli kalır; yeni `select-clinic` akışı `Auth.UserClinicNotAssigned` ile doğrular.
+- **Son-klinik koruması:** Bu fazda **kapsam dışı**. Son kliniği kaldırılan üye `select-clinic` yapamaz; UI uyarı / yönetici aksiyonu sorumluluğundadır.
+- **Şema etkisi:** yok (migration / model değişikliği açılmadı). `UserClinic(UserId, ClinicId)` tekil kayıt modeli korunur.
+- **Repository yazım çizgisi:** `IUserClinicRepository.AddAsync/RemoveAsync` eklenmiştir; implementasyon **SaveChanges çağırmaz**, commit sınırı handler'da `IUnitOfWork.SaveChangesAsync` ile yönetilir (§ `IUserOperationClaimRepository` ile aynı kurumsal çizgi).
+
+**L) Klinik ata** — `POST /api/v1/tenants/{tenantId}/members/{memberId}/clinics/{clinicId}`
+
+- **Gövde:** yok.
+- **Yanıt:** `AssignTenantMemberClinicResultDto` — `userId`, `clinicId`, `clinicName`, `alreadyAssigned`.
+- **Ön koşullar:** Klinik **aktif** olmalı — pasifse `Clinics.Inactive` (**400**; mevcut `Clinics.Inactive` çizgisiyle tutarlı).
+- **Durum makinesi:**
+  - İlişki **yok** → `UserClinic` eklenir, commit edilir; `alreadyAssigned = false`.
+  - İlişki **var** → **idempotent success**: yazım yapılmaz; `alreadyAssigned = true`.
+- **Hatalar:** `Auth.PermissionDenied`, `Tenants.ContextMissing`, `Tenants.AccessDenied`, `Members.NotFound` (**404**), `Clinics.NotFound` (**404**), `Clinics.Inactive` (**400**), `Subscriptions.TenantReadOnly` / `Subscriptions.TenantCancelled` (**403**).
+
+**M) Klinik çıkar** — `DELETE /api/v1/tenants/{tenantId}/members/{memberId}/clinics/{clinicId}`
+
+- **Gövde:** yok.
+- **Yanıt:** `RemoveTenantMemberClinicResultDto` — `userId`, `clinicId`, `alreadyRemoved`.
+- **Self-protect:** Çağıran kendi `userId` üzerinden klinik üyeliği çıkaramaz → `Clinics.SelfClinicRemoveForbidden` (kendi kendini oturum dışına atma riskini azaltır; §22.9 `Invites.SelfRoleRemoveForbidden` ile aynı desen).
+- **Pasif klinik:** Remove akışını engellemez (yanlış atamaları temizlemek mümkün olmalı).
+- **Durum makinesi:**
+  - İlişki **var** → `UserClinic` silinir, commit edilir; `alreadyRemoved = false`.
+  - İlişki **yok** → **idempotent success**: silme çağrılmaz; `alreadyRemoved = true`.
+- **Hatalar:** `Auth.PermissionDenied`, `Tenants.ContextMissing`, `Tenants.AccessDenied`, `Clinics.SelfClinicRemoveForbidden`, `Members.NotFound` (**404**), `Clinics.NotFound` (**404**), `Subscriptions.TenantReadOnly` / `Subscriptions.TenantCancelled` (**403**).
+
+**Kapsam dışı (bu fazda):** Son-klinik koruması, session/refresh revoke, bulk atama/çıkarma, `TenantMemberClinicDto` alan genişletme (ör. `city`, `createdAtUtc`), global admin yüzeyi değişiklikleri, permission cache invalidation, yeni read endpoint.
 
 ---
 

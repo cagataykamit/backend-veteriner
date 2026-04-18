@@ -4,10 +4,12 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Api.Contracts;
+using Backend.Veteriner.Application.Tenants.Commands.AssignMemberClinic;
 using Backend.Veteriner.Application.Tenants.Commands.AssignMemberRole;
 using Backend.Veteriner.Application.Tenants.Commands.CancelInvite;
 using Backend.Veteriner.Application.Tenants.Commands.Create;
 using Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
+using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberClinic;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberRole;
 using Backend.Veteriner.Application.Tenants.Commands.ResendInvite;
 using Backend.Veteriner.Application.Tenants.Commands.Checkout;
@@ -189,6 +191,58 @@ public sealed class TenantsController : ControllerBase
 
         var result = await _mediator.Send(
             new RemoveTenantMemberRoleCommand(tenantId, memberId, operationClaimId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: üyeye bu kiracının kliniğini atar (Faz 4B). Idempotent (<c>alreadyAssigned</c>).
+    /// Global admin yüzeyine düşmez; klinik bu kiracıya ait değilse <c>Clinics.NotFound</c>, pasifse <c>Clinics.Inactive</c>.
+    /// Yetki: <c>Tenants.InviteCreate</c>. Read-only/cancelled tenant'ta §23 write-guard bu command'ı keser.
+    /// Permission cache invalidation yapılmaz (clinic membership permission setini değiştirmez).
+    /// </summary>
+    [HttpPost("{tenantId:guid}/members/{memberId:guid}/clinics/{clinicId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(AssignTenantMemberClinicResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AssignMemberClinic(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid memberId,
+        [FromRoute] Guid clinicId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new AssignTenantMemberClinicCommand(tenantId, memberId, clinicId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: üyeden bu kiracının kliniğini kaldırır (Faz 4B). Idempotent (<c>alreadyRemoved</c>).
+    /// Self-protect: çağıran kendi üzerinden klinik çıkaramaz (<c>Clinics.SelfClinicRemoveForbidden</c>).
+    /// Pasif klinik üzerinde de çalışır (yanlış atamayı temizlemek için). Son-klinik koruması ve
+    /// session/refresh revoke bu fazda kapsam dışıdır. Yetki: <c>Tenants.InviteCreate</c>.
+    /// </summary>
+    [HttpDelete("{tenantId:guid}/members/{memberId:guid}/clinics/{clinicId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(RemoveTenantMemberClinicResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveMemberClinic(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid memberId,
+        [FromRoute] Guid clinicId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new RemoveTenantMemberClinicCommand(tenantId, memberId, clinicId), ct);
         return result.ToActionResult(this);
     }
 

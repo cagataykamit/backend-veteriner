@@ -46,4 +46,22 @@ public sealed class UserClinicRepository : IUserClinicRepository
             .ThenBy(c => c.Id)
             .ToListAsync(ct);
     }
+
+    public Task AddAsync(UserClinic entity, CancellationToken ct)
+    {
+        // SaveChanges burada yok; commit handler/UoW seviyesinde yapılır.
+        _db.UserClinics.Add(entity);
+        return Task.CompletedTask;
+    }
+
+    public async Task RemoveAsync(Guid userId, Guid clinicId, CancellationToken ct)
+    {
+        var entity = await _db.UserClinics
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.ClinicId == clinicId, ct);
+
+        if (entity is null) return;
+
+        // SaveChanges burada yok; commit handler/UoW seviyesinde yapılır.
+        _db.UserClinics.Remove(entity);
+    }
 }
