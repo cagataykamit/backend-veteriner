@@ -12,6 +12,7 @@ using Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberClinic;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberRole;
 using Backend.Veteriner.Application.Tenants.Commands.ResendInvite;
+using Backend.Veteriner.Application.Tenants.Commands.UpdateSettings;
 using Backend.Veteriner.Application.Tenants.Commands.Checkout;
 using Backend.Veteriner.Application.Tenants.Commands.PlanChanges;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
@@ -335,6 +336,48 @@ public sealed class TenantsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new ResendTenantInviteCommand(tenantId, inviteId, body?.ExpiresAtUtc), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant-scoped kurum (tenant) ayarlarını günceller. Yetki: <c>Tenants.InviteCreate</c>;
+    /// JWT <c>tenant_id</c> route <c>tenantId</c> ile aynı olmalı. Global admin
+    /// <c>POST /api/v1/tenants</c> yüzeyine dokunmaz.
+    /// </summary>
+    /// <remarks>Route tenantId kaynak doğrudur; body.tenantId verilmişse route ile aynı olmalıdır.</remarks>
+    [HttpPut("{tenantId:guid}/settings")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(TenantDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateSettings(
+        [FromRoute] Guid tenantId,
+        [FromBody] UpdateTenantSettingsBody? body,
+        CancellationToken ct)
+    {
+        if (body is null)
+        {
+            return Result<TenantDetailDto>.Failure(
+                    "Tenants.Settings.Validation.InvalidRequestBody",
+                    "Istek govdesi bos veya hatali JSON.")
+                .ToActionResult(this);
+        }
+
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        if (body.TenantId is { } bodyTenantId && bodyTenantId != Guid.Empty && bodyTenantId != tenantId)
+        {
+            return Result<TenantDetailDto>.Failure(
+                    "Tenants.RouteIdMismatch",
+                    "Route tenantId ile body tenantId uyuşmuyor.")
+                .ToActionResult(this);
+        }
+
+        var result = await _mediator.Send(new UpdateTenantSettingsCommand(tenantId, body.Name), ct);
         return result.ToActionResult(this);
     }
 

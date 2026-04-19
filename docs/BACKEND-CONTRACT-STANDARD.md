@@ -107,7 +107,7 @@ Bu standardın amacı:
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
-| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); üye klinik atama/çıkarma `POST/DELETE …/members/{memberId}/clinics/{clinicId}` (§22.10); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol/klinik atama) |
+| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); üye klinik atama/çıkarma `POST/DELETE …/members/{memberId}/clinics/{clinicId}` (§22.10); tenant-scoped kurum ayarları `PUT …/settings` (§26); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol/klinik atama + kurum adı düzenleme) |
 | Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 | Breeds | CRUD + liste (§16.4.1) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 
@@ -1604,3 +1604,52 @@ Mevcut `POST /api/v1/clinics`, `GET /api/v1/clinics`, `GET /api/v1/clinics/{id}`
 - **Bulk işlem**: Toplu activate/deactivate veya bulk update endpoint'i açılmaz.
 - **Clinic create response formatı**: `POST /api/v1/clinics` yanıtı çıplak `Guid` olarak kalır.
 - **Permission cache invalidation**: Klinik update/activate/deactivate kullanıcı permission setini etkilemez; refresh/session revocation tetiklenmez.
+
+---
+
+## 26) Tenants — tenant-scoped kurum ayarları (Faz 5B)
+
+Tenant adminin kendi kurumunun adını güncelleyebileceği minimal yüzey. Global admin `POST /api/v1/tenants` ve `GET /api/v1/tenants/{id}` yüzeylerine **dokunmaz**; bu fazda yalnızca **tenant-scoped** yazım açılır.
+
+### 26.1 Permission kararı
+
+- **Yeni permission açılmaz.** `Tenants.InviteCreate` reuse edilir (Faz 3B/4B ile aynı çizgi: tenant panel tarafındaki idari yazımlar bu permission altındadır).
+- Global admin yüzeyine (`Tenants.Create`, `Tenants.Read`) kaymayı özellikle önlemek için route tenant-scoped (`/tenants/{tenantId}/settings`) olarak tasarlanmıştır.
+
+### 26.2 PUT `/api/v1/tenants/{tenantId}/settings`
+
+- Auth: `Tenants.InviteCreate` (controller-level `[Authorize(Policy=…)]` + handler-level `ICurrentUserPermissionChecker` — defense-in-depth).
+- Request body: `UpdateTenantSettingsBody` (`{ tenantId?, name }`). Route `tenantId` kaynak doğrudur; body `tenantId` doluysa route ile eşleşmelidir (aksi halde `Tenants.RouteIdMismatch` / 400).
+- Validation: `name` 2–300 karakter, non-empty (FluentValidation). `TenantId` boş olamaz.
+- Tenant bağlamı zorunlu (`TryGetResolvedTenant`): JWT `tenant_id` yoksa 400 `Tenants.ContextMissing`; JWT `tenant_id` ≠ route `tenantId` ise 403 `Tenants.AccessDenied`.
+- Tenant bulunamazsa (silinmiş ya da başka tenant) 404 `Tenants.NotFound`.
+- Aynı ada sahip başka tenant (case-insensitive) varsa 409 `Tenants.DuplicateName`. **Kendi `Id`'si duplicate sayılmaz** — sadece case değişikliği (örn. `Acme Vet` → `ACME VET`) izinli no-op'tur.
+- Domain: `Tenant.Rename(name)` çağrılır (trim + boş kontrolü domain içinde).
+- Başarılı yanıt: **200 OK + `TenantDetailDto`** (`{ id, name, isActive, createdAtUtc }`). Yanıt şekli `GET /api/v1/tenants/{id}` ile hizalıdır — frontend ek round-trip yapmadan güncel kurum adını alır.
+- Subscription: `UpdateTenantSettingsCommand` `Application.Tenants.Commands.UpdateSettings` namespace'i altında; merkezi `TenantSubscriptionWriteGuardBehavior` ReadOnly/Cancelled tenant için otomatik keser (`Tenants.TenantSubscriptionReadOnly` / `Tenants.TenantSubscriptionCancelled`). Custom handler guard yazılmaz.
+
+### 26.3 Tenant-scoped isolation
+
+- Endpoint yalnız JWT `tenant_id` ile çözümlenmiş kiracı üzerinde çalışır. Başka kiracıya yazma denemesi `Tenants.AccessDenied` ile kesilir — kayıt varlığı sızdırılmaz.
+- `GET /api/v1/tenants/{id}` ve `POST /api/v1/tenants` **global admin** yüzeyleri olarak kalır (`Tenants.Read` / `Tenants.Create`); tenant admin için ayrı "settings" yüzeyi açılmıştır.
+
+### 26.4 Hata kodları (özet)
+
+| Kod | HTTP | Bağlam |
+|---|---|---|
+| `Auth.PermissionDenied` | 401/400 | Handler-level guard; controller-level `[Authorize(Policy=Tenants.InviteCreate)]` zaten 403 verir. |
+| `Tenants.ContextMissing` | 400 | JWT `tenant_id` yok. |
+| `Tenants.AccessDenied` | 403 | JWT `tenant_id` route `tenantId` ile uyuşmuyor (cross-tenant yazma denemesi). |
+| `Tenants.NotFound` | 404 | Kiracı bulunamadı. |
+| `Tenants.DuplicateName` | 409 | Aynı isimde başka kiracı var (case-insensitive; kendi Id hariç). |
+| `Tenants.RouteIdMismatch` | 400 | Body `tenantId` doluysa route ile eşleşmeli. |
+| `Tenants.Settings.Validation.InvalidRequestBody` | 400 | İstek gövdesi boş veya hatalı JSON. |
+| `Tenants.TenantSubscriptionReadOnly` / `Tenants.TenantSubscriptionCancelled` | 403 | Merkezi `TenantSubscriptionWriteGuardBehavior` tarafından eklenir (§23). |
+
+### 26.5 Out-of-scope (Faz 5B)
+
+- **Activate/Deactivate tenant**: Tenant seviyesinde aktif/pasif geçişi bu fazda açılmaz; global admin akışı değişmez.
+- **Ek kurum alanları**: `address`, `taxNumber`, `phone`, `logoUrl` vb. alanlar bu fazda yok (şema/migration gerektirir).
+- **Tenant create contract**: `POST /api/v1/tenants` body/response şekli değişmez.
+- **Global tenant CRUD genişletmesi**: `GET /api/v1/tenants`, `GET /api/v1/tenants/{id}` gibi uçlar olduğu gibi kalır.
+- **Permission cache invalidation**: Kurum adı güncellemesi permission setini değiştirmez; re-login/session revocation tetiklenmez.
