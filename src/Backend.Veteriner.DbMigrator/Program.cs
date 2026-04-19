@@ -73,6 +73,10 @@ static async Task RunSeedPipelineAsync(
     await DataSeeder.SeedAsync(db, hasher, logger, ct);
     await AdminClaimSeeder.SeedAsync(db, ct);
     await InviteAssignableOperationClaimsSeeder.SeedAsync(db, ct);
+    // Invite-assignable rollerin (Admin, ClinicAdmin, ...) minimum permission bağlarını uygular.
+    // AdminClaimSeeder zaten Admin'e tüm permission'ları bağlar; bu seeder idempotent ek bağ atar
+    // ve ClinicAdmin gibi rollerin Clinics.Update gibi spesifik yetkileri almasını sağlar.
+    await RolePermissionBindingSeeder.SeedAsync(db, logger, ct);
 }
 
 static void PrintHelp()

@@ -95,7 +95,7 @@ Bu standardın amacı:
 | Modül | Mevcut durum | Riskli alanlar | Gerekli standardizasyon | Öncelik | Frontend etkisi |
 |---|---|---|---|---|---|
 | Auth | `Result` + `ToActionResult` + açık DTO (`LoginResultDto`, `AuthActionResultDto`); logout akışı da aynı hatta | Eski istemciler `ProblemDetails.title` metninde değişiklik görebilir (`ResultExtensions`) | Faz 0: auth endpoint’leri tek sözleşmeye alındı; drift için bu doküman §9 | Tamamlandı (Faz 0) | Orta (title gösterimi) |
-| Clinics | Genel olarak tutarlı | Create response yalnız `Guid` | Create response DTO standardı | P2 | Düşük |
+| Clinics | CRUD + list (§16.6 Appointments dışındaki core); klinik ayarları update/activate/deactivate (§25); `Clinics.Update` permission | Create response yalnız `Guid` | Create response DTO standardı | P2 | Düşük |
 | Clients | CRUD + liste (§18.5); `recent-summary` + `payment-summary` (§19) | Düşük | CRUD contract Sprint 2 ile netleştirildi | P2 | Düşük |
 | Pets | CRUD + liste (§16.5); `history-summary` (§17) | Create yanıtı çıplak `Guid` (§16.5) | Create DTO standardı P2 | P2 | Düşük |
 | Appointments | CRUD + liste/lifecycle (§16.6) | Null-body ve bazı hata dallarında envelope farklılaşma riski | Appointments contract Sprint 2 ile netleştirildi | P1 | Orta |
@@ -1532,3 +1532,75 @@ Notlar:
 - Tüm tarih/zaman alanları UTC'dir.
 - Parasal hesaplar minor unit (TRY için kurus) ile yapılır.
 - Plan fiyatları `Billing:PlanPricesMinor` üzerinden okunur; yoksa Iyzico `PlanPricesTry` değerlerinden türetilir.
+
+---
+
+## 25) Clinics — klinik ayarları CRUD / activation (Faz 5A)
+
+"Kurum / Klinik Ayarları" ekranının blocker'ı olan klinik güncelleme + aktif/pasif akışı.
+Mevcut `POST /api/v1/clinics`, `GET /api/v1/clinics`, `GET /api/v1/clinics/{id}` contract'ları **değişmez**; yeni yüzey bunların yanına eklenir. Domain metotları (`Clinic.UpdateDetails`, `Clinic.Activate`, `Clinic.Deactivate`) önceden vardı; bu fazda dış yüzey açıldı.
+
+### 25.1 Permission kararı
+
+- Yeni permission: **`Clinics.Update`** (`PermissionCatalog.Clinics.Update`).
+- Klinik güncelleme **ve** aktif/pasif değişimi **aynı** permission altında yürür. Ayrı "Deactivate" permission açılmaz.
+- `Clinics.Read` ve `Clinics.Create` davranışı değişmez; Create yanıtı çıplak `Guid` olarak kalır (bu faz DTO zenginleştirme yapmaz).
+- **Rol bağlaması (seed/backfill):** `Clinics.Update` şu rollere idempotent olarak bağlanır:
+  - **`Admin`** — tüm permission'ları zaten `AdminClaimSeeder` üzerinden otomatik alır; ayrıca `RolePermissionBindings.Map` içinde de explicit listelenir (niyet belgesi + seeder sırası sigortası).
+  - **`ClinicAdmin`** — bu rol davet whitelist'inde sadece isim olarak açılırdı; `Clinics.Update` ona `RolePermissionBindingSeeder` tarafından bağlanır.
+  - `Veteriner` ve `Sekreter` bu fazda klinik ayarlarına dokunamaz (operasyonel olarak admin paneli üzerinden özel olarak atanabilir).
+- Seed yolu: `dotnet run --project src/Backend.Veteriner.DbMigrator -- seed` (veya `all`). Pipeline sırası: `PermissionSeeder → DataSeeder → AdminClaimSeeder → InviteAssignableOperationClaimsSeeder → RolePermissionBindingSeeder`. Tekrar çalıştırma duplicate bağ üretmez.
+- Cache notu: Etkin kullanıcının permission seti `PermissionReader` tarafından 10 dk + jitter TTL ile cache'lenir. Seed sonrası yeni binding'ler, kullanıcı bazlı cache süresi dolduğunda veya API yeniden başlatıldığında etkinleşir; re-login zorunlu değildir ancak immediate etki için en temiz yol login'dir.
+
+### 25.2 PUT `/api/v1/clinics/{id}`
+
+- Auth: `Clinics.Update`.
+- Request body: `UpdateClinicBody` (`{ id?, name, city }`); route id kaynak doğrudur. Body `id` doluysa route id ile eşleşmelidir (aksi halde `Clinics.RouteIdMismatch` / 400).
+- Validation: `name` 2–300 karakter, `city` 2–200 karakter (FluentValidation).
+- Tenant bağlamı zorunlu; `ClinicByIdSpec(tenantId, id)` ile çözümlenir. Başka kiracının kliniği 404 `Clinics.NotFound` olarak maskelenir.
+- Aynı kiracı altında **case-insensitive** aynı isim → 409 `Clinics.DuplicateName`. Kendi `Id`'si duplicate sayılmaz (sadece case değişikliği / aynı isim geçerli no-op).
+- Başarılı yanıt: **200 OK + `ClinicDetailDto`** (`{ id, tenantId, name, city, isActive }`). Yanıt şekli `GET /api/v1/clinics/{id}` ile hizalıdır — client round-trip gerektirmez.
+- Subscription: `UpdateClinicCommand` `Application.Clinics.Commands.Update` namespace'i altında; merkezi `TenantSubscriptionWriteGuardBehavior` ReadOnly/Cancelled tenant için otomatik keser. Custom handler guard yazılmaz.
+
+### 25.3 POST `/api/v1/clinics/{id}/deactivate`
+
+- Auth: `Clinics.Update`.
+- Request body: yok.
+- Tenant bağlamı zorunlu; `ClinicByIdSpec(tenantId, id)` ile çözümlenir. Başka kiracının kliniği 404 `Clinics.NotFound`.
+- Başarılı yanıt: **200 OK + `DeactivateClinicResultDto`** (`{ clinicId, alreadyInactive }`).
+- Idempotent: klinik zaten pasifse `alreadyInactive = true` döner, DB yazımı yapılmaz, merkezi write-guard da tetiklenir ama iş açısından no-op.
+- Subscription: merkezi guard otomatik keser.
+
+### 25.4 POST `/api/v1/clinics/{id}/activate`
+
+- Auth: `Clinics.Update`.
+- Request body: yok.
+- Tenant bağlamı zorunlu; `ClinicByIdSpec(tenantId, id)` ile çözümlenir. Başka kiracının kliniği 404 `Clinics.NotFound`.
+- Başarılı yanıt: **200 OK + `ActivateClinicResultDto`** (`{ clinicId, alreadyActive }`).
+- Idempotent: klinik zaten aktifse `alreadyActive = true` döner, DB yazımı yapılmaz.
+- Subscription: merkezi guard otomatik keser.
+
+### 25.5 Tenant-scoped isolation
+
+- Her üç endpoint de **yalnız** JWT `tenant_id` ile çözümlenmiş kiracının klinikleri üzerinde çalışır.
+- Başka kiracının klinik Id'si verildiğinde 404 `Clinics.NotFound` döner; 403 leak edilmez, kayıt varlığı sızdırılmaz.
+- Global admin yüzeyine (ör. `Tenants.Read`) kaymayı özellikle önlemek için `Clinics.Update` ayrı bir permission olarak tanımlıdır.
+
+### 25.6 Hata kodları (özet)
+
+| Kod | HTTP | Bağlam |
+|---|---|---|
+| `Auth.PermissionDenied` | 401/400 | Handler-level guard; controller-level `[Authorize(Policy=Clinics.Update)]` zaten 403 verir. |
+| `Tenants.ContextMissing` | 400 | JWT `tenant_id` yok. |
+| `Clinics.NotFound` | 404 | Klinik yok veya başka kiracıya ait. |
+| `Clinics.DuplicateName` | 409 | Aynı kiracıda aynı isimde başka klinik var (Update). |
+| `Clinics.RouteIdMismatch` | 400 | Body `id` doluysa route ile eşleşmeli (Update). |
+| `Tenants.TenantSubscriptionReadOnly` / `Tenants.TenantSubscriptionCancelled` | 403 | Merkezi `TenantSubscriptionWriteGuardBehavior` tarafından eklenir (§23). |
+
+### 25.7 Out-of-scope (Faz 5A)
+
+- **Last-active-clinic protection**: Tenant'ta en az 1 aktif klinik kalsın kuralı bu fazda eklenmez. Deactivate akışı tenant'ın tüm kliniklerini pasife alabilir. Bu kural ileri bir fazda `Clinics.LastActiveForbidden` kodu ile gelecek.
+- **Clinic DTO zenginleştirme**: `ClinicDetailDto`/`ClinicListItemDto` şekli değiştirilmez; `address`, `phone` vb. yeni alanlar şema/migration gerektireceği için bu fazda yok.
+- **Bulk işlem**: Toplu activate/deactivate veya bulk update endpoint'i açılmaz.
+- **Clinic create response formatı**: `POST /api/v1/clinics` yanıtı çıplak `Guid` olarak kalır.
+- **Permission cache invalidation**: Klinik update/activate/deactivate kullanıcı permission setini etkilemez; refresh/session revocation tetiklenmez.

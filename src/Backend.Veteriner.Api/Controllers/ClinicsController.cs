@@ -1,12 +1,17 @@
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
+using Backend.Veteriner.Api.Contracts;
 using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.Clinics.Commands.Activate;
 using Backend.Veteriner.Application.Clinics.Commands.Create;
+using Backend.Veteriner.Application.Clinics.Commands.Deactivate;
+using Backend.Veteriner.Application.Clinics.Commands.Update;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.Queries.GetById;
 using Backend.Veteriner.Application.Clinics.Queries.GetList;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -85,6 +90,61 @@ public sealed class ClinicsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var result = await _mediator.Send(new GetClinicsListQuery(page), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Klinik bilgilerini (ad, şehir) günceller.</summary>
+    /// <remarks>Route id kaynak doğrudur; body.id verilmişse route ile aynı olmalıdır.</remarks>
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ClinicDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateClinicBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        if (body.Id is { } bodyId && bodyId != Guid.Empty && bodyId != id)
+            return Result.Failure("Clinics.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+
+        var cmd = new UpdateClinicCommand(id, body.Name, body.City);
+        var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Kliniği pasife alır (idempotent).</summary>
+    [HttpPost("{id:guid}/deactivate")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [ProducesResponseType(typeof(DeactivateClinicResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Deactivate([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new DeactivateClinicCommand(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Kliniği yeniden aktifleştirir (idempotent).</summary>
+    [HttpPost("{id:guid}/activate")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [ProducesResponseType(typeof(ActivateClinicResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Activate([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ActivateClinicCommand(id), ct);
         return result.ToActionResult(this);
     }
 }

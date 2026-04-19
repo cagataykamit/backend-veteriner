@@ -50,6 +50,7 @@ public static class PermissionCatalog
     {
         public const string Read = "Clinics.Read";
         public const string Create = "Clinics.Create";
+        public const string Update = "Clinics.Update";
     }
 
     public static class Clients
@@ -176,6 +177,7 @@ public static class PermissionCatalog
 
         new(Clinics.Read, "Klinikleri listeleme ve görüntüleme yetkisi", "Clinics"),
         new(Clinics.Create, "Klinik oluşturma yetkisi", "Clinics"),
+        new(Clinics.Update, "Klinik bilgilerini güncelleme ve aktif/pasif durumunu değiştirme yetkisi", "Clinics"),
 
         new(Clients.Read, "Müşterileri listeleme ve görüntüleme yetkisi", "Clients"),
         new(Clients.Create, "Müşteri oluşturma yetkisi", "Clients"),
