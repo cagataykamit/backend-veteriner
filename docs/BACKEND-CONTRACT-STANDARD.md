@@ -108,6 +108,7 @@ Bu standardın amacı:
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19); contract + klinik scope kuralları (§27) | Klinik seçiliyken Client/Pet alanları Appointment üzerinden çözümlenir; mixed-currency finans henüz yok | Dashboard contract (§27), OpenAPI required alanları ve klinik scope semantiği | P2 | Düşük (aktif klinik değiştiğinde toplamlar daralır) |
 | Reports (Payments) | `GET …/reports/payments` + `…/export` CSV + `…/export-xlsx` XLSX (§28); `Payments.Read` | Dashboard ile birleştirilmez; tarih aralığı ve satır tavanı | Filtre kümesi `PaymentsFiltered*`; UTC aralığı §28 | Tamamlandı (6C.1 + XLSX) | Orta (yeni panel ekranı) |
+| Reports (Appointments) | `GET …/reports/appointments` + `…/export` CSV + `…/export-xlsx` XLSX (§29); `Appointments.Read` | Dashboard ile birleştirilmez; `ScheduledAtUtc` UTC aralığı; satır tavanı ödemelerle aynı | Filtre kümesi `AppointmentsReport*`; semantik §29 | Tamamlandı (6C.2) | Orta (ikinci panel raporu) |
 | Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); üye klinik atama/çıkarma `POST/DELETE …/members/{memberId}/clinics/{clinicId}` (§22.10); tenant paneli üye adı display fallback (§22.11); tenant-scoped kurum ayarları `PUT …/settings` (§26); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding; kalıcı `User.Name` alanı eksikliği (§22.11) | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol/klinik atama + kurum adı düzenleme + üye adı display fallback) |
 | Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 | Breeds | CRUD + liste (§16.4.1) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
@@ -1829,7 +1830,7 @@ Her iki handler aşağıdaki log alanlarını üretir: `TenantId`, `ClinicId`, `
 
 - **Uzun zaman serisi / karşılaştırma**: Son 7 gün **mini trend** (§27.11) dışında zaman serisi yok; bir önceki döneme göre karşılaştırma (%Δ), haftalık/aylık trend, chart ekseni parametreleri yok.
 - **Top-list'ler**: En çok kazanan klinik / en aktif veteriner / en çok kullanılan ödeme yöntemi gibi sıralamalar yok.
-- **Dashboard export**: Dashboard uçlarında PDF/CSV/Excel yok. **Ödeme raporu + CSV** ayrı uçlar olarak tanımlıdır — bkz. **§28 Reports — Payments** (`/api/v1/reports/payments`, `/export`). Rapor zamanlaması / e-posta dağıtımı / XLSX-PDF hâlâ kapsam dışı.
+- **Dashboard export**: Dashboard uçlarında PDF/CSV/Excel yok. **Ödeme raporu** ve **randevu raporu** ayrı `reports` uçlarıdır — bkz. **§28 Reports — Payments**, **§29 Reports — Appointments**. Rapor zamanlaması / e-posta dağıtımı hâlâ kapsam dışı.
 - **Mixed-currency aggregation**: Para birimine göre kırılım (`currencyTotals`) bu fazda eklenmez; §19 clients payment-summary pattern'i ileride reuse edilebilir. Trend (`last7DaysPaid`) da mixed-currency notunu aynen miras alır.
 - **Upcoming vaccinations / hospitalizations / outstanding receivables**: Operasyonel ve alacak özeti blokları bu fazda yok.
 - **Filtre / periyot seçici**: Dashboard uçları parametresizdir; period / dateFrom / dateTo parametreleri yok. Müşteri tarafı filtreleme raporlama paketine kalır.
@@ -1961,5 +1962,82 @@ Satır: `PaymentReportItemDto` — `paymentId`, `paidAtUtc`, `clinicId`, `clinic
 - Payment status yaşam döngüsü veya domain’de yeni status alanı.
 - Dashboard handler’larıyla birleşik sorgu veya tek permission dışı ek permission.
 - Top-list / analitik / chart endpoint’leri.
+
+---
+
+## 29) Reports — Appointments (Faz 6C.2)
+
+Dashboard’dan **ayrı** paket (§27’den bağımsız): tarih aralıklı randevu raporu, **CSV** ve **XLSX** dışa aktarımı. İzin: **`Appointments.Read`** (ayrı export / rapor permission yok).
+
+### 29.1 Uçlar
+
+| Method | Path | Açıklama |
+|--------|------|----------|
+| `GET` | `/api/v1/reports/appointments` | Sayfalı JSON raporu: `totalCount`, `items`, `statusCounts`. |
+| `GET` | `/api/v1/reports/appointments/export` | Aynı filtrelerle **tam liste** CSV (UTF-8 BOM; ayırıcı `;`); `page` / `pageSize` yok. |
+| `GET` | `/api/v1/reports/appointments/export-xlsx` | Aynı filtrelerle **tam liste** XLSX; `page` / `pageSize` yok. |
+
+Tüm rapor uçları `[Authorize]` + çözümlenmiş tenant (`TryGetResolvedTenant`) gerektirir; JWT `tenant_id` zorunlu.
+
+### 29.2 Sorgu parametreleri
+
+**Zorunlu:** `from`, `to` — **UTC anları**; filtre **`Appointment.ScheduledAtUtc`** üzerinde **kapalı aralık** `[from, to]` (her iki uç dahil). **Europe/Istanbul takvim gününe çevrilmez** (ödeme raporu §28.2 ile aynı UTC kapalı aralık çizgisi; dashboard günlük pencerelerinden farklıdır).
+
+**Opsiyonel:** `clinicId`, `status` (`AppointmentStatus`), `clientId`, `petId`, `search`, `page`, `pageSize` (yalnız JSON raporda; **CSV/XLSX’te yok**).
+
+- **Klinik çözümleme:** `effectiveClinicId = clinicId ?? IClinicContext.ClinicId`. İstekte `clinicId` varsa ve JWT’de aktif klinik farklıysa: `Appointments.ClinicContextMismatch`. Etkin klinik varsa ilgili kayıt tenant’ta doğrulanır; yoksa `Clinics.NotFound`.
+- **`search`:** Randevu liste ekranı ile uyumlu metin araması (mevcut rapor `AppointmentsReportSearchHelper` / list çizgisi).
+- **`statusCounts` (JSON):** Aynı `from`/`to` ve diğer filtrelerle ( **`status` hariç** ) penceredeki `Scheduled` / `Completed` / `Cancelled` adetleri; `totalCount` ise istekte `status` verilmişse o filtreyi de uygular.
+
+### 29.3 Tarih ve güvenlik tavanları
+
+- `from <= to`; aksi: `Appointments.ReportDateRangeInvalid`.
+- Kapalı aralık süresi: `(to - from)` en fazla **93 gün** (`AppointmentsReportConstants.MaxRangeDays`); aşım: `Appointments.ReportRangeTooLong`.
+- **CSV/XLSX export:** eşleşen satır sayısı **50.000**’i aşarsa `Appointments.ReportExportTooManyRows` (işlem yapılmadan önce `Count` ile kontrol; ödeme raporu ile aynı tavan `MaxExportRows`).
+
+### 29.4 JSON yanıt — `AppointmentReportResultDto`
+
+| Alan | Açıklama |
+|------|----------|
+| `totalCount` | Filtreyle eşleşen satır sayısı (tüm sonuç kümesi). |
+| `items` | Sayfa (`page`, `pageSize`; üst sınır `MaxPageSize = 200`). |
+| `statusCounts` | Pencere özeti: `scheduled`, `completed`, `cancelled` ( **`status` filtresi uygulanmaz** — bkz. §29.2). |
+
+Satır: `AppointmentReportItemDto` — `appointmentId`, `scheduledAtUtc`, `clinicId`, `clinicName`, `clientId`, `clientName`, `petId`, `petName`, `status` (enum JSON’da numeric, §3.5), `notes`.
+
+**JSON vs export ayrımı:** JSON uç (`/reports/appointments`) **tam teknik satır** ve **`scheduledAtUtc` UTC** ile sözleşmelidir. **CSV ve XLSX** (`/export`, `/export-xlsx`) **son kullanıcıya verilecek rapor** olarak ele alınır: **teknik ID kolonları yok**, tarih/saat **Europe/Istanbul duvar saati** olarak yazılır, durum metni **Türkçe**; veri filtreleri ve `AppointmentReportItemMapping` ile JSON ile **aynı kayıt kümesi ve aynı isim alanları** kullanılır.
+
+### 29.5 CSV — kullanıcı odaklı kolonlar (JSON’dan farklı çıktı)
+
+- İçerik: `text/csv; charset=utf-8`, **UTF-8 BOM**. **Ayırıcı: noktalı virgül (`;`)** (ödeme raporu §28.5 ile aynı Excel-TR uyumu).
+- Başlıklar (Türkçe, sırayla): **Randevu Zamanı**, **Klinik**, **Müşteri**, **Hayvan**, **Durum**, **Not**. Teknik alanlar (`appointmentId`, `clinicId`, `clientId`, `petId`) **export’ta yok**.
+- **Randevu Zamanı:** `ScheduledAtUtc` → **Europe/Istanbul**, metin formatı **`dd.MM.yyyy HH:mm`** (`tr-TR`). Ham UTC ISO değil (JSON’daki UTC ile karıştırılmamalı).
+- **Durum:** Türkçe (örn. Planlanmış / Tamamlandı / İptal); JSON’daki enum sayısı ile aynı iş anlamı.
+- Boş `notes` / boş isimler: güvenli boş alan; özel karakterde RFC tarzı tırnak kaçışı.
+
+### 29.5.1 XLSX
+
+- **Content-Type:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+- **Sayfa adı:** `Randevular`
+- **Kolonlar** CSV §29.5 ile aynı anlam (teknik ID yok); ilk sütun gerçek tarih/saat hücresi (`dd.MM.yyyy HH:mm`), Europe/Istanbul — **CSV ile aynı zaman semantiği**.
+- **Başlık satırı kalın**, **otomatik filtre**, **ilk satır dondurulmuş**, sütun genişlikleri içeriğe göre (üst sınır ile).
+- Kayıt seçimi `AppointmentsReportExportPipeline` + `AppointmentReportItemDto` ile CSV ile özdeş; yalnız sunum biçimi farklıdır.
+
+### 29.6 Hata kodları (özet)
+
+| Kod | Koşul |
+|-----|--------|
+| `Tenants.ContextMissing` | Tenant çözülemedi. |
+| `Appointments.ReportDateRangeInvalid` | `from`/`to` geçersiz veya `from > to`. |
+| `Appointments.ReportRangeTooLong` | Aralık 93 günden uzun. |
+| `Appointments.ReportExportTooManyRows` | Export satır sayısı tavanı. |
+| `Appointments.ClinicContextMismatch` | İstek `clinicId` ile JWT kliniği çelişiyor. |
+| `Clinics.NotFound` | Verilen / etkin klinik tenant’ta yok. |
+
+### 29.7 Out-of-scope (6C.2)
+
+- Takvim görünümü, randevu analitiği / trend grafikleri.
+- PDF veya dashboard handler’larıyla birleşik sorgu.
+- Ayrı rapor permission; `Appointments.Read` dışında ek policy.
 
 ---

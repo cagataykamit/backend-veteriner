@@ -2,8 +2,11 @@ using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Reports.Appointments.Queries.ExportAppointmentReport;
+using Backend.Veteriner.Application.Reports.Appointments.Queries.GetAppointmentReport;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
 using Backend.Veteriner.Application.Reports.Payments.Queries.GetPaymentReport;
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Payments;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -11,7 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Veteriner.Api.Controllers;
 
-/// <summary>Panel raporlama uçları (dashboard’dan ayrıdır). Faz 6C.1 — ödeme raporu.</summary>
+/// <summary>Panel raporlama uçları (dashboard’dan ayrıdır). Ödeme ve randevu raporları.</summary>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/reports")]
@@ -110,6 +113,91 @@ public sealed class ReportsController : ControllerBase
             return problem!;
 
         var query = new ExportPaymentsReportXlsxQuery(from, to, clinicId, method, clientId, petId, search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        return File(v.Content, contentType, v.FileDownloadName);
+    }
+
+    /// <summary>
+    /// Randevu raporu (sayfalı). <c>from</c>/<c>to</c> UTC — <c>ScheduledAtUtc</c> <c>[from,to]</c> dahil.
+    /// </summary>
+    [HttpGet("appointments")]
+    [Authorize(Policy = PermissionCatalog.Appointments.Read)]
+    [ProducesResponseType(typeof(Backend.Veteriner.Application.Reports.Appointments.Contracts.Dtos.AppointmentReportResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetAppointmentsReport(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] AppointmentStatus? status = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new GetAppointmentsReportQuery(from, to, clinicId, status, clientId, petId, search, page, pageSize);
+        var result = await _mediator.Send(query, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Randevu raporu CSV (UTF-8 BOM; ayırıcı <c>;</c>). Filtreler JSON ile aynı.</summary>
+    [HttpGet("appointments/export")]
+    [Authorize(Policy = PermissionCatalog.Appointments.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportAppointmentsReport(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] AppointmentStatus? status = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportAppointmentsReportQuery(from, to, clinicId, status, clientId, petId, search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        const string contentType = "text/csv; charset=utf-8";
+        return File(v.ContentUtf8Bom, contentType, v.FileDownloadName);
+    }
+
+    [HttpGet("appointments/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.Appointments.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportAppointmentsReportXlsx(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] AppointmentStatus? status = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportAppointmentsReportXlsxQuery(from, to, clinicId, status, clientId, petId, search);
         var result = await _mediator.Send(query, ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);

@@ -11,6 +11,6 @@ public sealed class ClientsByTenantIdsNameSpec : Specification<Client, ClientNam
     {
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId && clientIds.Contains(c.Id))
-            .Select(c => new ClientNameRow(c.Id, c.FullName));
+            .Select(c => new ClientNameRow(c.Id, c.FullName ?? string.Empty));
     }
 }
