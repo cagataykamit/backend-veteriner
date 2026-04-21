@@ -4,6 +4,8 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Appointments.Queries.ExportAppointmentReport;
 using Backend.Veteriner.Application.Reports.Appointments.Queries.GetAppointmentReport;
+using Backend.Veteriner.Application.Reports.Examinations.Queries.ExportExaminationReport;
+using Backend.Veteriner.Application.Reports.Examinations.Queries.GetExaminationReport;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
 using Backend.Veteriner.Application.Reports.Payments.Queries.GetPaymentReport;
 using Backend.Veteriner.Domain.Appointments;
@@ -14,7 +16,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Veteriner.Api.Controllers;
 
-/// <summary>Panel raporlama uçları (dashboard’dan ayrıdır). Ödeme ve randevu raporları.</summary>
+/// <summary>Panel raporlama uçları (dashboard’dan ayrıdır). Ödeme, randevu ve muayene raporları.</summary>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/reports")]
@@ -198,6 +200,113 @@ public sealed class ReportsController : ControllerBase
             return problem!;
 
         var query = new ExportAppointmentsReportXlsxQuery(from, to, clinicId, status, clientId, petId, search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        return File(v.Content, contentType, v.FileDownloadName);
+    }
+
+    /// <summary>
+    /// Muayene raporu (sayfalı). <c>from</c>/<c>to</c> UTC — <c>ExaminedAtUtc</c> <c>[from,to]</c> dahil.
+    /// </summary>
+    [HttpGet("examinations")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(Backend.Veteriner.Application.Reports.Examinations.Contracts.Dtos.ExaminationReportResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetExaminationsReport(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] Guid? appointmentId = null,
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new GetExaminationsReportQuery(
+            from,
+            to,
+            clinicId,
+            clientId,
+            petId,
+            appointmentId,
+            search,
+            page,
+            pageSize);
+        var result = await _mediator.Send(query, ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpGet("examinations/export")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportExaminationsReport(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] Guid? appointmentId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportExaminationsReportQuery(
+            from,
+            to,
+            clinicId,
+            clientId,
+            petId,
+            appointmentId,
+            search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        const string contentType = "text/csv; charset=utf-8";
+        return File(v.ContentUtf8Bom, contentType, v.FileDownloadName);
+    }
+
+    [HttpGet("examinations/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportExaminationsReportXlsx(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] Guid? appointmentId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportExaminationsReportXlsxQuery(
+            from,
+            to,
+            clinicId,
+            clientId,
+            petId,
+            appointmentId,
+            search);
         var result = await _mediator.Send(query, ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
