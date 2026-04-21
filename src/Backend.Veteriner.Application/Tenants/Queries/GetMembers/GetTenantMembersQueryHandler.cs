@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Tenants.Common;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
@@ -64,7 +65,12 @@ public sealed class GetTenantMembersQueryHandler
             .Select(ut =>
             {
                 var u = ut.User!;
-                return new TenantMemberListItemDto(u.Id, u.Email, u.EmailConfirmed, u.CreatedAtUtc);
+                return new TenantMemberListItemDto(
+                    u.Id,
+                    u.Email,
+                    TenantMemberDisplayName.DeriveFromEmail(u.Email),
+                    u.EmailConfirmed,
+                    u.CreatedAtUtc);
             })
             .ToList();
 

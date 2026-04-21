@@ -799,7 +799,10 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 MarkRequired(schema,
                     "todayTotalPaid", "weekTotalPaid", "monthTotalPaid",
-                    "todayPaymentsCount", "weekPaymentsCount", "monthPaymentsCount", "recentPayments");
+                    "todayPaymentsCount", "weekPaymentsCount", "monthPaymentsCount",
+                    "recentPayments", "last7DaysPaid");
+                Describe(schema, "last7DaysPaid",
+                    "Son 7 takvim günü tahsilat toplamları (Europe/Istanbul). Bugün dahil, oldest→newest sıralı, tam 7 eleman; boş günler 0 ile doldurulur. Mixed-currency davranışı §27.6 ile aynıdır.");
                 return;
             }
 
@@ -808,6 +811,63 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 MarkRequired(schema,
                     "id", "paidAtUtc", "clientId", "clientName", "petName", "amount", "currency", "method");
                 SetNullable(schema, "petId", true);
+                return;
+            }
+
+            if (context.Type == typeof(DashboardDailyTotalDto))
+            {
+                MarkRequired(schema, "date", "totalAmount");
+                Describe(schema, "date", "İstanbul yerel takvim günü (yyyy-MM-dd).");
+                Describe(schema, "totalAmount", "Gün için tüm para birimleri aynı toplamda birikir (mixed-currency).");
+                return;
+            }
+
+            if (context.Type == typeof(DashboardSummaryDto))
+            {
+                MarkRequired(schema,
+                    "todayAppointmentsCount", "upcomingAppointmentsCount",
+                    "completedTodayCount", "cancelledTodayCount",
+                    "totalClientsCount", "totalPetsCount",
+                    "upcomingAppointments", "recentClients", "recentPets",
+                    "last7DaysAppointments");
+                Describe(schema, "last7DaysAppointments",
+                    "Son 7 takvim günü randevu sayıları (Europe/Istanbul). Bugün dahil, oldest→newest sıralı, tam 7 eleman; boş günler 0 ile doldurulur. Tüm statüler (Scheduled+Completed+Cancelled) sayılır — §27.11.");
+                return;
+            }
+
+            if (context.Type == typeof(DashboardDailyCountDto))
+            {
+                MarkRequired(schema, "date", "count");
+                Describe(schema, "date", "İstanbul yerel takvim günü (yyyy-MM-dd).");
+                Describe(schema, "count", "O gün ScheduledAtUtc'ye göre kayıtlı tüm statüdeki randevu sayısı.");
+                return;
+            }
+
+            if (context.Type == typeof(DashboardAppointmentItemDto))
+            {
+                MarkRequired(schema,
+                    "id", "clinicId", "petId", "scheduledAtUtc", "status");
+                return;
+            }
+
+            if (context.Type == typeof(DashboardRecentClientDto))
+            {
+                MarkRequired(schema, "id", "fullName");
+                SetNullable(schema, "phone", true);
+                return;
+            }
+
+            if (context.Type == typeof(DashboardRecentPetDto))
+            {
+                MarkRequired(schema, "id", "clientId", "name", "species");
+            }
+        }
+
+        private static void Describe(OpenApiSchema schema, string propertyName, string description)
+        {
+            if (schema.Properties.TryGetValue(propertyName, out var p))
+            {
+                p.Description = description;
             }
         }
 

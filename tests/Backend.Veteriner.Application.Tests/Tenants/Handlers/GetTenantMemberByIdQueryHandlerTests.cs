@@ -134,10 +134,34 @@ public sealed class GetTenantMemberByIdQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.UserId.Should().Be(mid);
         result.Value.Email.Should().Be("ali@klinik.com");
+        result.Value.Name.Should().Be("ali");
         result.Value.EmailConfirmed.Should().BeTrue();
         result.Value.CreatedAtUtc.Should().Be(membership.CreatedAtUtc);
         result.Value.Roles.Should().BeEmpty();
         result.Value.Clinics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Map_Name_From_Email_LocalPart_With_Dotted_Prefix()
+    {
+        var tid = Guid.NewGuid();
+        var mid = Guid.NewGuid();
+        var membership = BuildMembership(tid, mid, "ahmet.yilmaz@acme.com", confirmed: true);
+
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _userTenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<UserTenantByMemberSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(membership);
+        _userOperationClaims.Setup(x => x.GetDetailsByUserIdAsync(mid, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserOperationClaimDetailDto>());
+        _userClinics.Setup(x => x.ListAccessibleClinicsAsync(mid, tid, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic>());
+
+        var result = await CreateHandler().Handle(
+            new GetTenantMemberByIdQuery(tid, mid), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Name.Should().Be("ahmet.yilmaz");
     }
 
     [Fact]

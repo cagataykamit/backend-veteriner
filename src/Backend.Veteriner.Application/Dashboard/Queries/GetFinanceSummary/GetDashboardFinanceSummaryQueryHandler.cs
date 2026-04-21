@@ -56,6 +56,16 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(utcNow);
         var (weekStart, weekEnd) = OperationPeriodBounds.WeekForUtcNow(utcNow);
         var (monthStart, monthEnd) = OperationPeriodBounds.MonthForUtcNow(utcNow);
+        var trendBuckets = OperationPeriodBounds.Last7DaysForUtcNow(utcNow);
+        var trendStartUtc = trendBuckets[0].StartUtcInclusive;
+        var trendEndUtc = trendBuckets[^1].EndUtcExclusive;
+        // Tek DB penceresi: gün + ISO hafta + ay + 7 günlük trend kapsayan birleşim.
+        // Sadece "bu ay" tarayan önceki akış, ay başında önceki ayın günlerindeki (hâlâ geçerli haftada olan)
+        // ödemeleri dışarıda bırakıyordu; week/today 0 görünüp recentPayments dolu kalabiliyordu.
+        var financeWindowStartUtc = new[]
+            { dayStart, weekStart, monthStart, trendStartUtc }.Min();
+        var financeWindowEndUtc = new[]
+            { dayEnd, weekEnd, monthEnd, trendEndUtc }.Max();
         var clinicId = _clinicContext.ClinicId;
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();
@@ -76,34 +86,30 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             stepSw.Restart();
         }
 
-        var monthPayments = await _payments.ListAsync(
-            new PaymentsPaidAtAmountInWindowSpec(tenantId, clinicId, monthStart, monthEnd), ct);
-        MarkStep("monthPaymentsScanSource");
+        var financeWindowRows = await _payments.ListAsync(
+            new PaymentsPaidAtAmountInWindowSpec(tenantId, clinicId, financeWindowStartUtc, financeWindowEndUtc), ct);
+        MarkStep("financeWindowScan");
 
-        decimal todayTotalPaid = 0m;
-        decimal weekTotalPaid = 0m;
-        decimal monthTotalPaid = 0m;
-        var todayPaymentsCount = 0;
-        var weekPaymentsCount = 0;
-        var monthPaymentsCount = 0;
+        DashboardFinanceWindowAggregation.SumBuckets(
+            financeWindowRows,
+            dayStart,
+            dayEnd,
+            weekStart,
+            weekEnd,
+            monthStart,
+            monthEnd,
+            out var todayTotalPaid,
+            out var todayPaymentsCount,
+            out var weekTotalPaid,
+            out var weekPaymentsCount,
+            out var monthTotalPaid,
+            out var monthPaymentsCount);
 
-        foreach (var payment in monthPayments)
-        {
-            monthTotalPaid += payment.Amount;
-            monthPaymentsCount++;
-
-            if (payment.PaidAtUtc >= weekStart && payment.PaidAtUtc < weekEnd)
-            {
-                weekTotalPaid += payment.Amount;
-                weekPaymentsCount++;
-            }
-
-            if (payment.PaidAtUtc >= dayStart && payment.PaidAtUtc < dayEnd)
-            {
-                todayTotalPaid += payment.Amount;
-                todayPaymentsCount++;
-            }
-        }
+        var trendRows = financeWindowRows
+            .Where(r => r.PaidAtUtc >= trendStartUtc && r.PaidAtUtc < trendEndUtc)
+            .ToList();
+        MarkStep("last7DaysPaid");
+        var last7DaysPaid = BuildDailyTotals(trendBuckets, trendRows);
 
         var recentRows = await _payments.ListAsync(
             new PaymentsForDashboardRecentSpec(tenantId, clinicId, DashboardFinanceSummaryConstants.RecentPaymentsTake),
@@ -150,19 +156,59 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             todayPaymentsCount,
             weekPaymentsCount,
             monthPaymentsCount,
-            recentDtos);
+            recentDtos,
+            last7DaysPaid);
 
         _logger.LogInformation(
-            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} MonthPaymentsScanned={MonthPaymentsScanned} RecentPayments={RecentPayments} TotalElapsedMs={TotalElapsedMs}",
+            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} UtcNow={UtcNow} FinanceWindowUtc={FinanceWindowStartUtc}..{FinanceWindowEndUtc} DayWindowUtc={DayStartUtc}..{DayEndUtc} WeekWindowUtc={WeekStartUtc}..{WeekEndUtc} MonthWindowUtc={MonthStartUtc}..{MonthEndUtc} FinanceWindowRows={FinanceWindowRows} TodayCount={TodayCount} WeekCount={WeekCount} MonthCount={MonthCount} RecentPayments={RecentPayments} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
             tenantId,
             clinicId,
+            utcNow,
+            financeWindowStartUtc,
+            financeWindowEndUtc,
+            dayStart,
+            dayEnd,
+            weekStart,
+            weekEnd,
+            monthStart,
+            monthEnd,
+            financeWindowRows.Count,
+            todayPaymentsCount,
+            weekPaymentsCount,
+            monthPaymentsCount,
+            recentDtos.Count,
             querySteps,
             slowestStep,
             slowestMs,
-            monthPaymentsCount,
-            recentDtos.Count,
             totalSw.ElapsedMilliseconds);
 
         return Result<DashboardFinanceSummaryDto>.Success(dto);
+    }
+
+    /// <summary>
+    /// Ödeme tutarlarını 7 günlük İstanbul bucket'larına [start, end) aralığı ile eşler; sonuç oldest→newest
+    /// sıralı tam 7 eleman döner, boş günler <c>0m</c> ile doldurulur. Mixed-currency davranışı §27.6 ile aynıdır.
+    /// </summary>
+    private static List<DashboardDailyTotalDto> BuildDailyTotals(
+        IReadOnlyList<OperationPeriodBounds.DailyWindow> buckets,
+        IReadOnlyList<PaymentPaidAtAmountRow> rows)
+    {
+        var totals = new decimal[buckets.Count];
+        foreach (var row in rows)
+        {
+            for (var i = 0; i < buckets.Count; i++)
+            {
+                if (row.PaidAtUtc >= buckets[i].StartUtcInclusive && row.PaidAtUtc < buckets[i].EndUtcExclusive)
+                {
+                    totals[i] += row.Amount;
+                    break;
+                }
+            }
+        }
+
+        var result = new List<DashboardDailyTotalDto>(buckets.Count);
+        for (var i = 0; i < buckets.Count; i++)
+            result.Add(new DashboardDailyTotalDto(buckets[i].LocalDate, totals[i]));
+        return result;
     }
 }

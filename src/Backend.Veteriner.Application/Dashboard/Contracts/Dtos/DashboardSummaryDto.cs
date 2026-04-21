@@ -13,4 +13,9 @@ public sealed record DashboardSummaryDto(
     int TotalPetsCount,
     IReadOnlyList<DashboardAppointmentItemDto> UpcomingAppointments,
     IReadOnlyList<DashboardRecentClientDto> RecentClients,
-    IReadOnlyList<DashboardRecentPetDto> RecentPets);
+    IReadOnlyList<DashboardRecentPetDto> RecentPets,
+    // Faz 6B: son 7 takvim gününün randevu sayıları (sparkline için). İstanbul yerel günü bazında,
+    // bugün dahil, oldest→newest sıralı, tam 7 eleman — boş günler 0 ile doldurulur.
+    // Semantik §27.11: tüm statüler (Scheduled+Completed+Cancelled) dahil; TodayAppointmentsCount yalnız
+    // Scheduled statüsü saydığı için bu iki alanın semantik tanımı farklıdır, çakışma değildir.
+    IReadOnlyList<DashboardDailyCountDto> Last7DaysAppointments);

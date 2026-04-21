@@ -325,4 +325,64 @@ public sealed class CreatePaymentCommandHandlerTests
         captured.Method.Should().Be(PaymentMethod.Cash);
         _paymentsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_Should_Store_PaidAtUtc_AsIstanbulLocal_When_KindIsUnspecified()
+    {
+        // Frontend timezone bilgisi olmadan "2026-04-17T23:30:00" gönderdiğinde (TR kullanıcısının yerel saati)
+        // backend bu değeri Europe/Istanbul yorumlayıp 20:30Z olarak kaydetmelidir; böylece dashboard'ın "bugün"
+        // penceresine (İstanbul takvim gününe bağlı UTC sınırları) düşer. (§12.5)
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null));
+
+        Payment? captured = null;
+        _paymentsWrite.Setup(r => r.AddAsync(It.IsAny<Payment>(), It.IsAny<CancellationToken>()))
+            .Callback<Payment, CancellationToken>((p, _) => captured = p);
+
+        var naiveLocal = new DateTime(
+            DateTime.UtcNow.Year,
+            DateTime.UtcNow.Month,
+            DateTime.UtcNow.Day,
+            23, 30, 0,
+            DateTimeKind.Unspecified);
+
+        var result = await CreateHandler().Handle(Cmd(cid, clientId, petId, paidAt: naiveLocal), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured.Should().NotBeNull();
+        captured!.PaidAtUtc.Kind.Should().Be(DateTimeKind.Utc);
+        captured.PaidAtUtc.Hour.Should().Be(20);
+        captured.PaidAtUtc.Minute.Should().Be(30);
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotMutate_AppointmentStatus_When_PaymentLinkedToAppointment()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var aid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+
+        var appt = new Appointment(tid, cid, petId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, AppointmentStatus.Scheduled, null);
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(appt);
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null));
+
+        var result = await CreateHandler().Handle(
+            Cmd(cid, clientId, petId: petId, appointmentId: aid),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        appt.Status.Should().Be(AppointmentStatus.Scheduled);
+    }
 }

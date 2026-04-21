@@ -13,7 +13,11 @@ public sealed record DashboardFinanceSummaryDto(
     int TodayPaymentsCount,
     int WeekPaymentsCount,
     int MonthPaymentsCount,
-    IReadOnlyList<DashboardFinanceRecentPaymentDto> RecentPayments);
+    IReadOnlyList<DashboardFinanceRecentPaymentDto> RecentPayments,
+    // Faz 6B: son 7 takvim gününün tahsilat toplamları (sparkline için). İstanbul yerel günü bazında,
+    // bugün dahil, oldest→newest sıralı, tam 7 eleman — boş günler 0 ile doldurulur.
+    // Mixed-currency notu §27.6'daki çizgi ile aynı: farklı para birimli ödemeler ayrım yapılmadan toplanır.
+    IReadOnlyList<DashboardDailyTotalDto> Last7DaysPaid);
 
 public sealed record DashboardFinanceRecentPaymentDto(
     Guid Id,

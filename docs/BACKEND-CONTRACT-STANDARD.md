@@ -106,8 +106,8 @@ Bu standardın amacı:
 | Prescriptions | List/detail/create/update DTO + `PrescriptionsContractSchemaFilter`; isteğe bağlı examination + treatment (§14) | İkili referansta examination–treatment tutarlılığı; tarih penceresi | Treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
-| Dashboard | `summary` + `finance-summary` (§19) | Dokümantasyon drift riski | Contract metinleri ve OpenAPI doğruluğunu koruma | P2 | Düşük |
-| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); üye klinik atama/çıkarma `POST/DELETE …/members/{memberId}/clinics/{clinicId}` (§22.10); tenant-scoped kurum ayarları `PUT …/settings` (§26); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol/klinik atama + kurum adı düzenleme) |
+| Dashboard | `summary` + `finance-summary` (§19); contract + klinik scope kuralları (§27) | Klinik seçiliyken Client/Pet alanları Appointment üzerinden çözümlenir; mixed-currency finans henüz yok | Dashboard contract (§27), OpenAPI required alanları ve klinik scope semantiği | P2 | Düşük (aktif klinik değiştiğinde toplamlar daralır) |
+| Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); üye klinik atama/çıkarma `POST/DELETE …/members/{memberId}/clinics/{clinicId}` (§22.10); tenant paneli üye adı display fallback (§22.11); tenant-scoped kurum ayarları `PUT …/settings` (§26); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding; kalıcı `User.Name` alanı eksikliği (§22.11) | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol/klinik atama + kurum adı düzenleme + üye adı display fallback) |
 | Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 | Breeds | CRUD + liste (§16.4.1) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 
@@ -309,6 +309,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 - Aktif clinic context varsa ve request `clinicId` ile çakışıyorsa `Examinations.ClinicContextMismatch`.
 - Create/Update yolunda `clinicId`/`petId` tenant içinde bulunamazsa sırasıyla `Clinics.NotFound` / `Pets.NotFound`.
 - `appointmentId` bulunamaz veya tenant dışıysa `Appointments.NotFound`.
+- **Appointment auto-complete (Create):** `appointmentId` doluyken muayene başarıyla oluşturulursa, aynı uygulama çağrısında bağlı randevu otomatik tamamlanır. Durum matrisi: `Scheduled → Completed`, `Completed → no-op`, `Cancelled → fail (`Examinations.AppointmentCancelled`)` — iptal edilmiş randevuya muayene oluşturulmasına izin verilmez. Ayrıntılar için bkz. §16.6 "Muayene oluşturulunca otomatik tamamlanma". Ödeme akışı (`POST /api/v1/payments`) randevu durumuna dokunmaz.
 
 **UTC normalization ve examined window:**
 
@@ -331,7 +332,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 - Validasyon (FluentValidation/model state) → `400 ValidationProblemDetails`.
 - İş kuralı hataları `Result` üzerinden `ProblemDetails` + `extensions.code` ile döner.
-- Sık kodlar: `Examinations.NotFound`, `Examinations.Validation`, `Examinations.ClinicContextMismatch`, `Examinations.AppointmentPetClinicMismatch`, `Appointments.NotFound`, `Clinics.NotFound`, `Pets.NotFound`, `Tenants.TenantInactive`.
+- Sık kodlar: `Examinations.NotFound`, `Examinations.Validation`, `Examinations.ClinicContextMismatch`, `Examinations.AppointmentPetClinicMismatch`, `Examinations.AppointmentCancelled`, `Appointments.NotFound`, `Clinics.NotFound`, `Pets.NotFound`, `Tenants.TenantInactive`.
 
 ### 11.2) Vaccinations — CRUD / list / detail / update sözleşmesi
 
@@ -452,7 +453,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 - `amount > 0` zorunlu; ihlal `Payments.InvalidAmount`.
 - `currency` ISO 4217 alpha-3 (3 harf) olmalıdır; domain tarafında `Trim().ToUpperInvariant()` normalize edilir.
 - `method` enum doğrulaması zorunludur (`Cash`, `Card`, `Transfer`).
-- `paidAtUtc` önce UTC’ye normalize edilir (`ToUniversalTime` / `SpecifyKind`), sonra pencere doğrulanır (`PaymentPaidAtWindow`):
+- `paidAtUtc` önce UTC’ye normalize edilir (`PaymentPaidAtWindow.ToUtc`, ayrıntı §12.5), sonra pencere doğrulanır (`PaymentPaidAtWindow.Validate`):
   - en fazla **7 gün geçmiş** → aksi `Payments.PaidTooFarInPast`
   - en fazla **2 yıl ileri** → aksi `Payments.PaidTooFarInFuture`
 
@@ -495,6 +496,33 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 - `PaymentListItemDto`: `id`, `clinicId`, `clientId`, `clientName`, `petId`, `petName`, `amount`, `currency`, `method`, `paidAtUtc`.
 - `PaymentDetailDto`: listeye ek olarak `tenantId`, `appointmentId`, `examinationId`, `notes` içerir.
 - `petId` null olabilir; bu durumda `petName` boş string dönebilir (mevcut davranış).
+
+### 12.5) Payments — `paidAtUtc` timezone semantiği (TR yerel saat)
+
+`PaymentPaidAtWindow.ToUtc` gelen `DateTime` değerini üç `Kind` durumuna göre normalize eder; dashboard finance summary (§27) pencerelerinin (**`[start, end)` UTC**) ödemeyi doğru İstanbul takvim gününde yakalaması bu normalizasyona bağlıdır:
+
+| `DateTime.Kind` | Davranış | Örnek |
+|------------------|----------|-------|
+| `Utc` | Olduğu gibi alınır. | Frontend ISO8601 ile `Z` gönderirse (`"2026-04-17T20:30:00Z"`) → kayıt `20:30Z`. |
+| `Local` | `ToUniversalTime()` ile sunucu yerelinden UTC’ye çevrilir. | Sunucu yereli çözülmüş bir değer için mevcut davranış; container’da sunucu TZ genellikle UTC olduğundan bu dal production’da nadirdir. |
+| `Unspecified` | **Europe/Istanbul** yerel saat olarak yorumlanır ve UTC’ye çevrilir. | Frontend TZ bilgisi olmadan `"2026-04-17T23:30:00"` gönderirse → `2026-04-17T20:30:00Z` (UTC+3). |
+
+**Neden Europe/Istanbul?** TR pazarı için datepicker/HTML `<input type="datetime-local">` çıktısı ISO8601 olsa da çoğunlukla **timezone bilgisi içermez** (`Kind=Unspecified`). Bu değeri sessizce "UTC etiketi" olarak kaydetmek, akşam geç saatte yapılan ödemelerin (ör. 23:30 İstanbul) dashboard **bugün** penceresinin (`[yerel-gün-başı-UTC, yerel-gün-sonu-UTC)`) dışına düşmesine ve `todayTotalPaid = 0` görünmesine yol açar. Bu yüzden Unspecified girdiler İstanbul yerel kabul edilir ve doğru UTC’ye çevrilir.
+
+**Frontend sözleşmesi (önerilen):**
+
+- Tercih edilen: ISO8601 UTC (örn. `new Date().toISOString()` → `"…Z"`).
+- Kabul edilen: ISO8601 offset’li (örn. `"2026-04-17T23:30:00+03:00"`) — parser `Kind=Local` üretir, `ToUniversalTime()` ile çevrilir.
+- Kabul edilen: ISO8601 TZ’siz (örn. `"2026-04-17T23:30:00"`) — **Europe/Istanbul** kabul edilir.
+
+**Display tarafı (frontend notu):** Listelerde `paidAtUtc` daima UTC döner (`Kind=Utc` ISO). Kullanıcıya gösterirken **Europe/Istanbul**’a çevrilmelidir (ör. `toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })`). Ham UTC’yi doğrudan göstermek "06:03’te oluşturulan ödeme 03:03 görünüyor" gibi görünür asimetriye yol açar; bu **display** katmanının sorumluluğudur, backend kaydı doğru UTC’dir.
+
+**Troubleshooting — dashboard finance boş görünüyor:**
+
+1. Ödeme listesinde görünen kayıtların `paidAtUtc` değerleri **gerçekten bugünkü İstanbul takvim günü**nde mi? Liste bile TZ olmayan ham UTC gösteriyorsa önce §12.5 display notuyla frontend’i hizalayın.
+2. Ödeme `clinicId`’si dashboard’daki `_clinicContext.ClinicId` ile eşleşiyor mu? Aktif klinik farklıysa dashboard boş gelir — bu **beklenen** davranıştır (§27.6).
+3. `recentPayments` dolu ama `todayTotalPaid/weekTotalPaid/monthTotalPaid = 0` ise önce şunlar ayırt edilir: **`paidAtUtc` ilgili İstanbul penceresi dışında mı?** (§27.6 / §27.11). `recentPayments` pencere filtresizdir; `weekTotalPaid` **ISO haftası** (Pzt→Pzt), **son 7 gün değil** (onun için `last7DaysPaid` kullanın). **Ay başı köşe durumu (düzeltildi):** Önceki uygulama yalnızca “bu ay” İstanbul penceresindeki satırlardan bugün/hafta toplamlarını üretiyordu; önceki takvim ayında kalan ama hâlâ **aynı ISO haftası** içindeki ödemeler haftalık toplamdan düşüyordu (liste + `recentPayments` dolu, hafta sıfır). Güncel backend tek birleşim UTC penceresi (gün ∪ hafta ∪ ay ∪ son 7 gün) ile tek sorgu yapar — §27.5 notu.
+4. Yukarıdakiler net ise ve hâlâ sapma varsa: `GetDashboardFinanceSummaryQueryHandler` log’u `FinanceWindowUtc={…}`, `DayWindowUtc={…}`, `WeekWindowUtc={…}`, `MonthWindowUtc={…}`, `FinanceWindowRows={…}` ile sorgulanabilir.
 
 ---
 
@@ -911,6 +939,18 @@ FluentValidation → `400` `ValidationProblemDetails`.
   - `Scheduled` -> `Completed` / `Cancelled` kabul
   - `Completed/Cancelled` -> sadece aynı statü no-op; başka statü reddedilir
 
+### Muayene oluşturulunca otomatik tamamlanma (operasyonel kural)
+
+- **Akış:** `POST /api/v1/examinations` isteğinde `appointmentId` doluysa, bağlı randevu erken resolve edilir; Cancelled guard geçerse muayene oluşturulur ve aynı uygulama çağrısı içinde randevu otomatik tamamlanır. Frontend ikinci bir `POST /appointments/{id}/complete` çağrısı göndermemelidir.
+- **Durum matrisi (`appointmentId` doluyken):**
+  - `Scheduled` → `Completed` (otomatik; aynı `SaveChanges` transaction’ında).
+  - `Completed` → no-op (idempotent; muayene yine oluşturulur).
+  - `Cancelled` → **fail** `Examinations.AppointmentCancelled` (HTTP `400`). Muayene oluşturulmaz, randevu durumu değişmez, `SaveChanges` çağrılmaz, klinik/pet resolve adımları bile atlanır.
+- **`appointmentId` yoksa:** Hiçbir randevu etkilenmez; manuel muayene yaratımı yan etki doğurmaz.
+- **Ödeme akışı:** `POST /api/v1/payments` hiçbir koşulda randevu durumunu değiştirmez. Finansal akış (ödeme) ile operasyonel akış (randevu lifecycle) birbirinden ayrıktır; ödeme modülü randevuyu yalnız doğrulama için okur (`IReadRepository<Appointment>`), write yüzeyi yoktur.
+- **Durum enum’u:** Bu fazda `InProgress` eklenmemiştir; başarılı muayene = randevu `Completed` kabul edilir.
+- **Hata yayılımı:** Domain `Complete()` başarısız olursa handler `Appointments.InvalidStatusTransition` ile başarısız döner; yarım kayıt oluşmaz (`SaveChanges` çağrılmamıştır).
+
 ### Gate / standard sapması notları (davranış değişmedi)
 
 - **Gate farkı:** Create akışında `tenant.IsActive` kontrolü vardır; update/lifecycle handler’larında tenant aktiflik gate’i yoktur. Bu doküman mevcut davranışı kaydeder; değişiklik business onayı gerektirir.
@@ -1214,7 +1254,7 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 **E) Kiracı üyeleri** — `GET /api/v1/tenants/{tenantId}/members`
 
 - **Kaynak:** `UserTenants` + `User` (yalnızca `TenantId == tenantId` satırları).
-- **Yanıt:** `PagedResult<TenantMemberListItemDto>` — `userId`, `email`, `emailConfirmed`, `createdAtUtc` (kullanıcı kaydı).
+- **Yanıt:** `PagedResult<TenantMemberListItemDto>` — `userId`, `email`, `name?` (display fallback; detay §22.11), `emailConfirmed`, `createdAtUtc` (kullanıcı kaydı).
 
 **F) Kiracı davetleri** — `GET /api/v1/tenants/{tenantId}/invites`
 
@@ -1268,7 +1308,7 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 - **Tenant eşlemesi:** JWT `tenant_id` route `tenantId` ile aynı olmalı (`TryGetResolvedTenant` + handler’da `jwtTenantId == tenantId`). Aksi: `Tenants.AccessDenied` / bağlam yoksa `Tenants.ContextMissing`.
 - **Tenant-scoped çözümleme:** Üye `UserTenantByMemberSpec` (`TenantId + UserId`) ile çözülür; farklı kiracının kullanıcısı **asla** görünmez → bulunamazsa `Members.NotFound` (**404**). Kullanıcının sistemde başka kiracıda var olup olmadığı tenant panelinden gözlemlenemez (sızma maskelemesi).
 - **Yanıt:** `TenantMemberDetailDto`
-  - `userId`, `email`, `emailConfirmed`
+  - `userId`, `email`, `name?` (display fallback; detay §22.11), `emailConfirmed`
   - `createdAtUtc` — **`UserTenant.CreatedAtUtc`** (kiracıya katılım zamanı; kullanıcı oluşturma değil).
   - `roles: TenantMemberRoleDto[]` — **yalnız** `InviteAssignableOperationClaimsCatalog.NamesInDisplayOrder` whitelist’ini (`Admin`, `ClinicAdmin`, `Veteriner`, `Sekreter`) içerir. `Admin.Diagnostics` gibi teknik/internal claim’ler tenant panelinde **gizlenir**.
   - `clinics: TenantMemberClinicDto[]` — `IUserClinicRepository.ListAccessibleClinicsAsync(userId, tenantId, null)` sonucundan map edilir (`clinicId`, `name`, `isActive`).
@@ -1353,6 +1393,39 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 - **Hatalar:** `Auth.PermissionDenied`, `Tenants.ContextMissing`, `Tenants.AccessDenied`, `Clinics.SelfClinicRemoveForbidden`, `Members.NotFound` (**404**), `Clinics.NotFound` (**404**), `Subscriptions.TenantReadOnly` / `Subscriptions.TenantCancelled` (**403**).
 
 **Kapsam dışı (bu fazda):** Son-klinik koruması, session/refresh revoke, bulk atama/çıkarma, `TenantMemberClinicDto` alan genişletme (ör. `city`, `createdAtUtc`), global admin yüzeyi değişiklikleri, permission cache invalidation, yeni read endpoint.
+
+### 22.11 Tenant paneli — üye adı (`name`) display fallback
+
+**Amaç:** Tenant panelinde üye listesi ve üye detayı sözleşmesinde **görünen ad** alanını açmak. Bu sayede frontend üyeleri yalnız e-posta yerine okunabilir bir etiketle gösterebilir.
+
+**Domain gerçeği (dürüst durum):** Bugün `User` aggregate’inde `Name` / `FullName` / `DisplayName` türünde **güvenilir bir ad alanı yoktur**. Signup, owner-signup ve davet kabul akışları yalnız e-posta + şifre toplar. Bu nedenle kalıcı bir ad kaynağı eklenene kadar geçici bir **display fallback** kullanılır.
+
+**Derivasyon kuralı** (`Backend.Veteriner.Application.Tenants.Common.TenantMemberDisplayName`)
+
+- `email` trim edilir; `@` bulunursa öncesindeki **local-part** döner, yeniden trim edilir.
+- `@` yoksa değerin kendisi (trim) döner.
+- `email` `null`/whitespace ise veya local-part boşa düşerse **`null`** döner (güvenli fallback).
+- Karakter dönüşümü yapılmaz: **case/nokta/tire/alt çizgi korunur** (frontend istediği gibi biçimlendirebilir; backend “kanonik ad” iddia etmez).
+- Unicode / non-ASCII karakterler korunur.
+
+**Uygulandığı DTO’lar**
+
+- `TenantMemberListItemDto.name: string?` — `GET /api/v1/tenants/{tenantId}/members` öğeleri için.
+- `TenantMemberDetailDto.name: string?` — `GET /api/v1/tenants/{tenantId}/members/{memberId}` için.
+
+**Sözleşme kuralları**
+
+- Alan **nullable** tutulur (`string?`); kırıcı olmayan additive bir genişletmedir.
+- Frontend güvenli gösterim uygulamalıdır: `displayName = name ?? email`.
+- Backend bu değerden **iş mantığı** (auth, yetki, arama) türetmez; arama ve sıralama bugünkü çizgisinde **e-posta** üzerinden kalır.
+- Değer **deterministiktir**: aynı e-posta hep aynı `name`’i üretir; ayrı bir alanda saklanmaz.
+
+**Yol haritası** (bilgi amaçlı, bu fazda değişiklik yok)
+
+- Domain’e kalıcı `User.Name` / `User.DisplayName` alanı eklendiğinde, handler’lar `TenantMemberDisplayName.DeriveFromEmail` yerine domain alanını okur; **DTO sözleşmesi değişmez** (alan zaten `string?`).
+- Kalıcı ad alanı geldiğinde liste arama/sıralama da ada doğru genişletilebilir; bu **bu fazın kapsamı dışındadır**.
+
+**Kapsam dışı (bu fazda):** Yeni şema/migration, yeni permission, `name` üzerinden arama/sıralama, global admin `users` yüzeyinin genişletilmesi, e-posta dışı başka kaynaktan (ör. davet metadatası) türetme, kanonik isim biçimlendirme (noktaları boşluğa çevirme, title-case vb.).
 
 ---
 
@@ -1653,3 +1726,153 @@ Tenant adminin kendi kurumunun adını güncelleyebileceği minimal yüzey. Glob
 - **Tenant create contract**: `POST /api/v1/tenants` body/response şekli değişmez.
 - **Global tenant CRUD genişletmesi**: `GET /api/v1/tenants`, `GET /api/v1/tenants/{id}` gibi uçlar olduğu gibi kalır.
 - **Permission cache invalidation**: Kurum adı güncellemesi permission setini değiştirmez; re-login/session revocation tetiklenmez.
+
+---
+
+## 27) Dashboard — özet & finans özeti (Faz 6A / 6B)
+
+Dashboard modülü bir kiracıya ait özet sayıları ve finansal metrikleri **iki okuma ucu** üzerinden sağlar. Bu bölüm sözleşmeyi, klinik scope semantiğini, zaman pencerelerini ve bilerek kapsam dışı bırakılan alanları sabitler. Karşılaştırma/delta/export/top-list hâlâ kapsam dışıdır (aşağı bkz.); Faz 6B ile yalnızca **mini trend** (son 7 gün) eklenmiştir (§27.11).
+
+### 27.1 Permission kararı
+
+- **Her iki uç için tek permission**: `Dashboard.Read`.
+- Global admin yüzeyleriyle karıştırılmaz; uçlar yalnız JWT `tenant_id` ile çözümlenmiş kiracı verisi döner. Cross-tenant okuma mümkün değildir.
+
+### 27.2 Uçlar
+
+- **GET `/api/v1/dashboard/summary`** — operasyonel özet (randevu + müşteri/hayvan toplamları + yaklaşan randevu listesi + son müşteri/hayvan listesi).
+- **GET `/api/v1/dashboard/finance-summary`** — finansal özet (gün/hafta/ay toplamları + adet + son ödemeler).
+
+Her iki uç da `200 OK + DTO` döner; hata dallarında `ProblemDetails` + `extensions.code` çizgisi korunur (`Tenants.ContextMissing`, `Auth.PermissionDenied`, …).
+
+### 27.3 İstanbul zaman pencereleri
+
+Tüm zaman bazlı filtreler **Europe/Istanbul** operasyon takvimine göre hesaplanır, depolama UTC kalır. Sınırlar `[start, end)` (start dahil, end hariç):
+
+| Pencere | Yardımcı | Hesaplama |
+|---|---|---|
+| Bugün | `OperationDayBounds.ForUtcNow` | İstanbul 00:00 → ertesi İstanbul 00:00 (UTC'ye çevrilmiş). |
+| Hafta | `OperationPeriodBounds.WeekForUtcNow` | İstanbul Pazartesi 00:00 → sonraki Pazartesi 00:00. |
+| Ay | `OperationPeriodBounds.MonthForUtcNow` | İstanbul ayın 1'i 00:00 → sonraki ayın 1'i 00:00. |
+| Son 7 gün (trend) | `OperationPeriodBounds.Last7DaysForUtcNow` | Bugün dahil 7 ardışık İstanbul takvim günü; her gün için yerel tarih + UTC `[start, end)` bucket. DST geçişlerinde her bucket bağımsız hesaplanır. |
+
+### 27.4 `GET /api/v1/dashboard/summary` — `DashboardSummaryDto`
+
+| Alan | Tip | Scope | Açıklama |
+|---|---|---|---|
+| `todayAppointmentsCount` | `int` | **Klinik-dar** (aktif klinik varsa), aksi halde tenant-geniş | Bugün `ScheduledAtUtc` ∈ [dayStart, dayEnd). Sadece `Scheduled` statüsü. |
+| `upcomingAppointmentsCount` | `int` | Aynı | `ScheduledAtUtc >= dayStart` tüm gelecek `Scheduled` randevular (liste değil, toplam sayı). |
+| `completedTodayCount` | `int` | Aynı | Bugün pencere; `Completed`. |
+| `cancelledTodayCount` | `int` | Aynı | Bugün pencere; `Cancelled`. |
+| `upcomingAppointments` | `DashboardAppointmentItemDto[]` | Aynı | Sıra `ScheduledAtUtc` ASC, en fazla **10** kayıt. |
+| `totalClientsCount` | `int` | **Klinik-dar** (aktif klinik varsa) | Aktif klinik yoksa tenant geneli Client sayısı. Aktif klinik seçiliyken: "en az bir randevusu olan Pet'ların sahibi" olan distinct Client sayısı (Appointment üzerinden). |
+| `totalPetsCount` | `int` | **Klinik-dar** (aktif klinik varsa) | Aktif klinik yoksa tenant geneli Pet sayısı. Aktif klinik seçiliyken: o klinikte en az bir randevusu olan distinct Pet sayısı. |
+| `recentClients` | `DashboardRecentClientDto[]` | **Klinik-dar** (aktif klinik varsa) | Tenant-geniş yolda `Client.Id DESC`, klinik-dar yolda o klinikteki **en güncel randevu zamanına** göre DESC. En fazla **5** kayıt. |
+| `recentPets` | `DashboardRecentPetDto[]` | **Klinik-dar** (aktif klinik varsa) | Tenant-geniş yolda `Pet.Id DESC`, klinik-dar yolda o klinikteki en güncel randevu zamanına göre DESC. En fazla **5** kayıt. |
+| `last7DaysAppointments` | `DashboardDailyCountDto[]` | Aynı | Son 7 İstanbul takvim günü (bugün dahil) için `ScheduledAtUtc` penceresine düşen randevu sayıları; **tüm statüler** sayılır. Bkz. §27.11. |
+
+Notlar:
+
+- `Client` ve `Pet` entity'lerinde `ClinicId` **yoktur** (tenant-level). Klinik-dar sonuç bu yüzden `Appointment` üzerinden kurulur (`IDashboardClinicScopedReader`). Aktif klinik yoksa mevcut tenant-geniş fallback aynen korunur; bu fallback özellikle bir klinik seçmemiş tenant admin görünümü için önemlidir.
+- Sözleşme (DTO şekli) klinik seçiminden etkilenmez; yalnız içerik daralır.
+- Upcoming list 10, recent list 5 kayıt sabittir; frontend paging yoktur.
+
+### 27.5 `GET /api/v1/dashboard/finance-summary` — `DashboardFinanceSummaryDto`
+
+| Alan | Tip | Scope | Açıklama |
+|---|---|---|---|
+| `todayTotalPaid` / `todayPaymentsCount` | `decimal` / `int` | **Klinik-dar** (aktif klinik varsa) | `Payment.PaidAtUtc` ∈ bugün penceresi. |
+| `weekTotalPaid` / `weekPaymentsCount` | `decimal` / `int` | Aynı | `PaidAtUtc` ∈ hafta penceresi. |
+| `monthTotalPaid` / `monthPaymentsCount` | `decimal` / `int` | Aynı | `PaidAtUtc` ∈ ay penceresi. |
+| `recentPayments` | `DashboardFinanceRecentPaymentDto[]` | Aynı | `PaidAtUtc` DESC, `Id` DESC; en fazla **10** kayıt (`DashboardFinanceSummaryConstants.RecentPaymentsTake`). Her satır `clientName` + (varsa) `petName` ile zenginleştirilir; `petId` null olabilir. |
+| `last7DaysPaid` | `DashboardDailyTotalDto[]` | Aynı | Son 7 İstanbul takvim günü (bugün dahil) için `PaidAtUtc` penceresine düşen ödeme tutarlarının günlük toplamı. Mixed-currency çizgisi §27.6 ile aynıdır. Bkz. §27.11. |
+
+Notlar:
+
+- Aktif klinik varsa **tüm** finans alanları ilgili `Payment.ClinicId` ile daraltılır — `PaymentsPaidAtAmountInWindowSpec` ve `PaymentsForDashboardRecentSpec` `clinicId` parametresini uygular.
+- **Sorgu penceresi:** Bugün (İstanbul günü), mevcut ISO haftası, mevcut İstanbul takvim ayı ve son 7 gün trendinin **UTC birleşim aralığı** (`min(start)…max(end)`) tek `PaymentsPaidAtAmountInWindowSpec` çağrısıyla yüklenir; `today` / `week` / `month` toplamları bu kümeden `[start,end)` kurallarıyla bellek içinde ayrılır. Ay başında önceki aya düşen `PaidAtUtc`’li ödemeler artık haftalık toplamdan düşmez. `last7DaysPaid` satırları aynı birleşim sorgusundan süzülür (ayrı ikinci finans sorgusu yok). Ödeme hacmi çok büyük kiracılarda ileri fazda aggregate-side optimizasyonu değerlendirilir (kapsam dışı).
+- **`PaidAtUtc` TZ bağımlılığı (Faz 6C)**: Pencereler İstanbul takvim günlerine göre UTC `[start, end)` olarak kurulur. Bu yüzden `PaidAtUtc` değerinin create/update akışında **doğru UTC**’ye normalize edilmesi kritiktir — frontend TZ bilgisi olmadan (`Kind=Unspecified`) yerel saat gönderirse backend bunu **Europe/Istanbul** olarak yorumlar (§12.5). Aksi halde özellikle akşam geç saatte yapılan ödemeler **bugün** penceresinin dışına düşer ve `todayTotalPaid = 0` görünür.
+
+### 27.6 Mixed-currency davranışı (mevcut çizgi)
+
+- `Payment.Currency` field mevcutken, finans özeti toplamları **para birimine bakmadan** aynı sayıyla toplanır (legacy davranış). Tek kiracıda birden çok currency kullanılıyorsa toplam yanıltıcı olabilir.
+- Bu faz kapsamında **davranış değişmez**; sözleşmeye çoklu-para birimi alanı eklenmez. Ürün kararı olarak ileride `currencyTotals` gibi bir alan §19 clients payment-summary yaklaşımıyla hizalı eklenebilir (backlog).
+
+### 27.7 OpenAPI / Swagger
+
+`DashboardContractSchemaFilter` (§`Backend.Veteriner.Api/Swagger/ConfigureSwaggerOptions.cs`) aşağıdaki alanları **required** olarak işaretler:
+
+- `DashboardSummaryDto`: tüm sayısal alanlar + 3 liste (`upcomingAppointments`, `recentClients`, `recentPets`) + `last7DaysAppointments`.
+- `DashboardAppointmentItemDto`: `id`, `clinicId`, `petId`, `scheduledAtUtc`, `status`.
+- `DashboardRecentClientDto`: `id`, `fullName`; `phone` nullable.
+- `DashboardRecentPetDto`: `id`, `clientId`, `name`, `species`.
+- `DashboardDailyCountDto`: `date` (yyyy-MM-dd, İstanbul yerel), `count`.
+- `DashboardFinanceSummaryDto`: 3 toplam + 3 adet + `recentPayments` + `last7DaysPaid`.
+- `DashboardFinanceRecentPaymentDto`: `id`, `paidAtUtc`, `clientId`, `clientName`, `petName`, `amount`, `currency`, `method`; `petId` nullable.
+- `DashboardDailyTotalDto`: `date` (yyyy-MM-dd, İstanbul yerel), `totalAmount`.
+
+### 27.8 Hata kodları (özet)
+
+| Kod | HTTP | Bağlam |
+|---|---|---|
+| `Tenants.ContextMissing` | 400 | JWT `tenant_id` yok. |
+| `Auth.PermissionDenied` | 401/400/403 | `Dashboard.Read` yoksa controller-level `[Authorize]` 403 verir. |
+
+Diğer tüm "kayıt bulunamadı" senaryoları dashboard için gündemde değil (özet yüzey; boş liste `200 OK + []` olarak döner).
+
+### 27.9 Telemetri
+
+Her iki handler aşağıdaki log alanlarını üretir: `TenantId`, `ClinicId`, `QuerySteps`, `SlowestStep`, `SlowestStepMs`, `TotalElapsedMs`. Summary handler ayrıca `ClinicScope` (`"clinic"` / `"tenant"`) alanını yazar — klinik-dar yol tüketildiğinde log parse tarafında ayırt edilebilsin diye.
+
+### 27.10 Out-of-scope (Faz 6A / 6B)
+
+- **Uzun zaman serisi / karşılaştırma**: Son 7 gün **mini trend** (§27.11) dışında zaman serisi yok; bir önceki döneme göre karşılaştırma (%Δ), haftalık/aylık trend, chart ekseni parametreleri yok.
+- **Top-list'ler**: En çok kazanan klinik / en aktif veteriner / en çok kullanılan ödeme yöntemi gibi sıralamalar yok.
+- **Export / reporting**: PDF/CSV/Excel çıktısı, rapor zamanlaması veya e-posta dağıtımı yok. Raporlama tamamen ayrı bir paket olarak gelecek.
+- **Mixed-currency aggregation**: Para birimine göre kırılım (`currencyTotals`) bu fazda eklenmez; §19 clients payment-summary pattern'i ileride reuse edilebilir. Trend (`last7DaysPaid`) da mixed-currency notunu aynen miras alır.
+- **Upcoming vaccinations / hospitalizations / outstanding receivables**: Operasyonel ve alacak özeti blokları bu fazda yok.
+- **Filtre / periyot seçici**: Dashboard uçları parametresizdir; period / dateFrom / dateTo parametreleri yok. Müşteri tarafı filtreleme raporlama paketine kalır.
+- **Permission cache / re-login**: `Dashboard.Read` rol binding'leri değişmez.
+
+### 27.11 Mini trend — son 7 gün (Faz 6B)
+
+Dashboard'daki sparkline/küçük chart bileşenlerini beslemek için iki mevcut uca **additive** iki yeni alan eklendi. Yeni endpoint açılmadı, mevcut DTO şekli kırılmadı.
+
+**Alanlar**
+
+| Uç | DTO alanı | Tip | Açıklama |
+|---|---|---|---|
+| `GET /api/v1/dashboard/summary` | `last7DaysAppointments` | `DashboardDailyCountDto[]` | Son 7 günün günlük randevu sayıları. |
+| `GET /api/v1/dashboard/finance-summary` | `last7DaysPaid` | `DashboardDailyTotalDto[]` | Son 7 günün günlük tahsilat toplamları. |
+
+**Pencere**
+
+- **Tam 7 eleman**; döngü iliği `OperationPeriodBounds.Last7DaysForUtcNow(utcNow)`.
+- **Europe/Istanbul** yerel takvim gününe göre, **bugün dahil** (yani 6 gün öncesi → bugün).
+- Sıralama **oldest → newest** (ASC); UI sparkline soldan sağa eski→yeni akar.
+- Her bucket bağımsız UTC `[start, end)` penceresiyle hesaplanır — DST geçişlerinde 23/25 saatlik günler doğru eşlenir.
+- `date` alanı `DateOnly` (JSON'da `yyyy-MM-dd`); UTC yoktur, UI timezone dönüşümü yapmaz.
+- Boş günler **0** (count) / **0m** (totalAmount) ile doldurulur; array uzunluğu kiracı aktivitesinden bağımsızdır.
+
+**Scope davranışı (klinik seçiliyse)**
+
+- `last7DaysAppointments`: aktif klinik varsa `Appointment.ClinicId` ile daraltılır; yoksa tenant-geniş. Aynı klinik-scope kararı `todayAppointmentsCount` ve diğer randevu alanlarıyla tutarlıdır.
+- `last7DaysPaid`: aktif klinik varsa `Payment.ClinicId` ile daraltılır (diğer finans alanlarıyla tutarlı).
+
+**Statü semantiği (`last7DaysAppointments`)**
+
+- Trend **tüm statüleri** sayar: `Scheduled` + `Completed` + `Cancelled`. `ScheduledAtUtc` alanı üzerinden bucket'a düşer.
+- Bu **bilinçli** bir ayrılıktır: `todayAppointmentsCount` yalnız `Scheduled` statüsünü sayar (hâlâ bekleyen randevular). Trend ise "o gün için planlanmış kayıtların hacmini" gösterir; geçmiş günler için `Scheduled` çoktan `Completed`/`Cancelled`'a geçmiş olacağından yalnız `Scheduled` sayılsaydı trend anlamlı olmazdı.
+- İki alanın semantiği birbirini kırmaz; UI kutularla sparkline aynı anda gösterilebilir.
+
+**Mixed-currency uyarısı (`last7DaysPaid`)**
+
+- Mevcut `todayTotalPaid` / `weekTotalPaid` / `monthTotalPaid` davranışıyla **birebir aynı**: farklı `Payment.Currency` değerleri aynı `decimal` toplamına eklenir; kur dönüşümü yok.
+- Tek kiracıda birden çok para birimi kullanılıyorsa günlük toplam yanıltıcı olabilir. Bu sınırlama §27.6'da kayıtlıdır ve bu fazda çözülmez; `currencyTotals` benzeri kırılım **backlog**'tadır.
+
+**Uygulama ayrıntıları**
+
+- Summary tarafında `DashboardAppointmentScheduledAtInWindowSpec` yalnız `ScheduledAtUtc` projeksiyonunu çeker (entity materialize edilmez, `AsNoTracking`).
+- Finance tarafında mevcut `PaymentsPaidAtAmountInWindowSpec` 7 günlük pencere için **ayrı** çağrılır — ay penceresi 7-gün penceresini her zaman kapsamaz (ör. ayın 3'ünde trend önceki aya taşar), bu yüzden `monthPayments` listesi üzerinden bucket'lamaz, yeni bir pencere sorgusu yapar.
+- Bucket'lama in-memory yapılır, 7 bucket × N ödeme/randevu doğrusal O(N*7) ≈ O(N). Pratikte son 7 gün içindeki satır sayısı binli aralığın altındadır; ileride aggregate-side (`GROUP BY date_trunc('day', ...)`) optimizasyonu için backlog notu.
+- Logging: mevcut telemetri çizgisi korunur; iki handler `last7DaysAppointments` / `last7DaysPaid` step'lerini `QuerySteps` sayımına dahil eder, en yavaş step tespiti etkilenmez.

@@ -22,6 +22,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Appointment> _appointments;
+    private readonly IRepository<Appointment> _appointmentsWrite;
     private readonly IRepository<Examination> _examinationsWrite;
 
     public CreateExaminationCommandHandler(
@@ -31,6 +32,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
         IReadRepository<Appointment> appointments,
+        IRepository<Appointment> appointmentsWrite,
         IRepository<Examination> examinationsWrite)
     {
         _tenantContext = tenantContext;
@@ -39,6 +41,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         _clinics = clinics;
         _pets = pets;
         _appointments = appointments;
+        _appointmentsWrite = appointmentsWrite;
         _examinationsWrite = examinationsWrite;
     }
 
@@ -81,6 +84,16 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
                 return Result<Guid>.Failure(
                     "Appointments.NotFound",
                     "Randevu bulunamadı veya kiracıya ait değil.");
+            }
+
+            // İptal edilmiş randevuya muayene eklemek ürün açısından yanlıştır.
+            // Erken fail; daha ileri validasyon/klinik-pet doğrulaması yapılmaz,
+            // SaveChanges çağrılmaz.
+            if (appt.Status == AppointmentStatus.Cancelled)
+            {
+                return Result<Guid>.Failure(
+                    "Examinations.AppointmentCancelled",
+                    "İptal edilmiş randevu için muayene kaydı oluşturulamaz.");
             }
 
             if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
@@ -137,6 +150,20 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             request.Notes);
 
         await _examinationsWrite.AddAsync(examination, ct);
+
+        // Appointment lifecycle: muayene başarıyla eklendiyse ve akış bir randevuya
+        // bağlıysa, planlanmış randevuyu otomatik olarak tamamla. Completed/Cancelled
+        // durumları için mevcut kural korunur (no-op). Ödeme akışı bu mantığa hiçbir
+        // zaman dokunmaz (CreatePaymentCommandHandler yalnızca okur).
+        if (appt is not null && appt.Status == AppointmentStatus.Scheduled)
+        {
+            var completion = appt.Complete();
+            if (!completion.IsSuccess)
+                return Result<Guid>.Failure(completion.Error);
+
+            await _appointmentsWrite.UpdateAsync(appt, ct);
+        }
+
         await _examinationsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(examination.Id);
     }

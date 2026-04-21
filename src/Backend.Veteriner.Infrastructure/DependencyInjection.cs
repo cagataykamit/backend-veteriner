@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IUserTenantRepository, UserTenantRepository>();
         services.AddScoped<IUserClinicRepository, UserClinicRepository>();
         services.AddScoped<IDashboardTodayAppointmentStatusCountsReader, DashboardTodayAppointmentStatusCountsReader>();
+        services.AddScoped<IDashboardClinicScopedReader, DashboardClinicScopedReader>();
         services.AddScoped<IOutbox, EfOutbox>();
 
 

@@ -23,6 +23,7 @@ public sealed class CreateExaminationCommandHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
+    private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
     private readonly Mock<IRepository<Examination>> _examinationsWrite = new();
 
     private CreateExaminationCommandHandler CreateHandler()
@@ -33,6 +34,7 @@ public sealed class CreateExaminationCommandHandlerTests
             _clinics.Object,
             _pets.Object,
             _appointments.Object,
+            _appointmentsWrite.Object,
             _examinationsWrite.Object);
 
     private static CreateExaminationCommand Cmd(
@@ -251,10 +253,13 @@ public sealed class CreateExaminationCommandHandlerTests
         captured.PetId.Should().Be(pid);
         captured.AppointmentId.Should().BeNull();
         _examinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _appointmentsWrite.Verify(
+            r => r.UpdateAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
-    public async Task Handle_Should_CreateExamination_When_AppointmentMatchesClinicAndPet()
+    public async Task Handle_Should_CompleteScheduledAppointment_When_ExaminationLinkedToAppointment()
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -267,8 +272,9 @@ public sealed class CreateExaminationCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
 
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, AppointmentStatus.Scheduled, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+            .ReturnsAsync(appt);
 
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
@@ -284,5 +290,80 @@ public sealed class CreateExaminationCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         captured!.AppointmentId.Should().Be(aid);
+        appt.Status.Should().Be(AppointmentStatus.Completed);
+        _appointmentsWrite.Verify(
+            r => r.UpdateAsync(It.Is<Appointment>(a => a == appt), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _examinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_NoOp_When_AppointmentAlreadyCompleted()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var aid = Guid.NewGuid();
+        var cmd = CmdWithAppointmentOnly(aid, DateTime.UtcNow.AddMinutes(-10));
+
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, AppointmentStatus.Completed, null);
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(appt);
+
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        appt.Status.Should().Be(AppointmentStatus.Completed);
+        _appointmentsWrite.Verify(
+            r => r.UpdateAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_AppointmentCancelled()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var aid = Guid.NewGuid();
+        var cmd = CmdWithAppointmentOnly(aid, DateTime.UtcNow.AddMinutes(-10));
+
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, AppointmentStatus.Cancelled, null);
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(appt);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.AppointmentCancelled");
+        appt.Status.Should().Be(AppointmentStatus.Cancelled);
+        _examinationsWrite.Verify(
+            r => r.AddAsync(It.IsAny<Examination>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _examinationsWrite.Verify(
+            r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+        _appointmentsWrite.Verify(
+            r => r.UpdateAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _clinics.Verify(
+            r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _pets.Verify(
+            r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

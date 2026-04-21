@@ -150,5 +150,37 @@ public sealed class GetTenantMembersQueryHandlerTests
         result.Value.Items[0].UserId.Should().Be(uid);
         result.Value.Items[0].Email.Should().Be("x@y.com");
         result.Value.Items[0].EmailConfirmed.Should().BeTrue();
+        result.Value.Items[0].Name.Should().Be("x");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Map_Name_From_Email_LocalPart()
+    {
+        var tid = Guid.NewGuid();
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+
+        var rows = new List<UserTenant>();
+        foreach (var email in new[] { "ali.veli@klinik.com", "MIXED.Case@Example.COM" })
+        {
+            var u = new User(email, "hash");
+            var ut = new UserTenant(u.Id, tid);
+            typeof(UserTenant).GetProperty(nameof(UserTenant.User))!.SetValue(ut, u);
+            rows.Add(ut);
+        }
+
+        _userTenants.Setup(x => x.CountAsync(It.IsAny<TenantMembersCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(rows.Count);
+        _userTenants.Setup(x => x.ListAsync(It.IsAny<TenantMembersPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(rows);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(
+            new GetTenantMembersQuery(tid, new PageRequest()),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Items.Select(i => i.Name).Should()
+            .BeEquivalentTo(new[] { "ali.veli", "MIXED.Case" });
     }
 }
