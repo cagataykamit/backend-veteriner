@@ -59,6 +59,7 @@ internal static class VaccinationsReportItemMapping
                     v.Status,
                     v.AppliedAtUtc,
                     v.DueAtUtc,
+                    VaccinationsReportEffectiveDate.FromEntity(v),
                     v.Notes);
             })
             .ToList();

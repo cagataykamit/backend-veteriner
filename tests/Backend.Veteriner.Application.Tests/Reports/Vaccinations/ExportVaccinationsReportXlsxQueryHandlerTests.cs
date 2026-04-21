@@ -70,8 +70,9 @@ public sealed class ExportVaccinationsReportXlsxQueryHandlerTests
         using var wb = new XLWorkbook(new MemoryStream(r.Value!.Content));
         wb.Worksheets.Should().Contain(ws => ws.Name == "Aşılar");
         var ws = wb.Worksheet("Aşılar");
-        ws.Cell(1, 6).GetString().Should().Be("Aşı");
-        ws.Cell(2, 8).GetString().Should().Be("not");
+        ws.Cell(1, 1).GetString().Should().Be("Rapor Tarihi");
+        ws.Cell(1, 5).GetString().Should().Be("Aşı");
+        ws.Cell(2, 9).GetString().Should().Be("not");
         ws.Cell(2, 1).DataType.Should().Be(XLDataType.DateTime);
     }
 }

@@ -142,6 +142,57 @@ public sealed class GetVaccinationsReportQueryHandlerTests
         r.Value!.TotalCount.Should().Be(5);
         r.Value.Items.Should().HaveCount(1);
         r.Value.Items[0].Status.Should().Be(VaccinationStatus.Applied);
+        r.Value.Items[0].AppliedAtUtc.Should().Be(applied);
+        r.Value.Items[0].NextDueAtUtc.Should().Be(from.AddDays(60));
+        r.Value.Items[0].EffectiveReportDateUtc.Should().Be(applied);
+    }
+
+    [Fact]
+    public async Task Handle_Should_MapEffectiveDate_FromDue_When_Scheduled()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns(clinicId);
+        _clinics.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "M"));
+
+        var from = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 5, 31, 0, 0, 0, DateTimeKind.Utc);
+        var due = from.AddDays(12);
+
+        _vaccinations.Setup(x => x.CountAsync(It.IsAny<VaccinationsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        var vac = new Vaccination(
+            tid,
+            petId,
+            clinicId,
+            null,
+            "Lepto",
+            VaccinationStatus.Scheduled,
+            null,
+            due,
+            null);
+        _vaccinations
+            .Setup(x => x.ListAsync(It.IsAny<VaccinationsReportFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Vaccination> { vac });
+
+        _pets.Setup(x => x.ListAsync(It.IsAny<PetsByTenantIdsNameClientSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _clients.Setup(x => x.ListAsync(It.IsAny<ClientsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _clinics.Setup(x => x.ListAsync(It.IsAny<ClinicsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var r = await CreateHandler().Handle(
+            new GetVaccinationsReportQuery(from, to, null, VaccinationStatus.Scheduled, null, null, null, 1, 50),
+            CancellationToken.None);
+
+        r.IsSuccess.Should().BeTrue();
+        r.Value!.Items[0].EffectiveReportDateUtc.Should().Be(due);
+        r.Value.Items[0].AppliedAtUtc.Should().BeNull();
+        r.Value.Items[0].NextDueAtUtc.Should().Be(due);
     }
 
     [Fact]

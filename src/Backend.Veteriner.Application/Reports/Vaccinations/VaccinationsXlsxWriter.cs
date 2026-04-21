@@ -9,6 +9,7 @@ internal static class VaccinationsXlsxWriter
 
     private const string SheetName = "Aşılar";
     private const double MaxColumnWidth = 55;
+    private const int ColCount = 9;
 
     public static byte[] WriteReportWorkbook(IReadOnlyList<VaccinationReportItemDto> rows)
     {
@@ -17,7 +18,7 @@ internal static class VaccinationsXlsxWriter
 
         var headers = new[]
         {
-            "Uygulama Tarihi", "Sonraki Tarih", "Klinik", "Müşteri", "Hayvan", "Aşı", "Durum", "Not"
+            "Rapor Tarihi", "Klinik", "Müşteri", "Hayvan", "Aşı", "Durum", "Uygulama Tarihi", "Sonraki Tarih", "Not",
         };
 
         for (var c = 0; c < headers.Length; c++)
@@ -30,25 +31,28 @@ internal static class VaccinationsXlsxWriter
         var rowIdx = 2;
         foreach (var r in rows)
         {
-            WriteOptionalLocalDate(ws, rowIdx, 1, r.AppliedAtUtc);
-            WriteOptionalLocalDate(ws, rowIdx, 2, r.DueAtUtc);
+            WriteOptionalLocalDate(ws, rowIdx, 1, r.EffectiveReportDateUtc);
 
-            ws.Cell(rowIdx, 3).Value = r.ClinicName;
-            ws.Cell(rowIdx, 4).Value = r.ClientName;
-            ws.Cell(rowIdx, 5).Value = r.PetName;
-            ws.Cell(rowIdx, 6).Value = r.VaccineName;
-            ws.Cell(rowIdx, 7).Value = VaccinationStatusTurkishDisplay.ToLabel(r.Status);
-            ws.Cell(rowIdx, 8).Value = r.Notes ?? string.Empty;
+            ws.Cell(rowIdx, 2).Value = r.ClinicName;
+            ws.Cell(rowIdx, 3).Value = r.ClientName;
+            ws.Cell(rowIdx, 4).Value = r.PetName;
+            ws.Cell(rowIdx, 5).Value = r.VaccineName;
+            ws.Cell(rowIdx, 6).Value = VaccinationStatusTurkishDisplay.ToLabel(r.Status);
+
+            WriteOptionalLocalDate(ws, rowIdx, 7, r.AppliedAtUtc);
+            WriteOptionalLocalDate(ws, rowIdx, 8, r.NextDueAtUtc);
+
+            ws.Cell(rowIdx, 9).Value = r.Notes ?? string.Empty;
             rowIdx++;
         }
 
         if (rowIdx > 2)
-            ws.Range(1, 1, rowIdx - 1, headers.Length).SetAutoFilter();
+            ws.Range(1, 1, rowIdx - 1, ColCount).SetAutoFilter();
 
         ws.SheetView.FreezeRows(1);
 
         var lastRow = Math.Max(rowIdx - 1, 1);
-        for (var col = 1; col <= headers.Length; col++)
+        for (var col = 1; col <= ColCount; col++)
         {
             ws.Column(col).AdjustToContents(1, lastRow);
             if (ws.Column(col).Width > MaxColumnWidth)

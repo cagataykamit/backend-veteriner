@@ -68,6 +68,7 @@ public sealed class ExportVaccinationsReportQueryHandlerTests
 
         r.IsSuccess.Should().BeTrue();
         var text = System.Text.Encoding.UTF8.GetString(r.Value!.ContentUtf8Bom);
+        text.Should().Contain("Rapor Tarihi");
         text.Should().Contain("Uygulama Tarihi");
         text.Should().Contain("Uygulandı");
         text.Should().NotContain(vac.Id.ToString("D"));

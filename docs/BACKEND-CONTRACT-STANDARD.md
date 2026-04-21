@@ -2122,15 +2122,22 @@ Dashboard’dan **ayrı** paket: tarih aralıklı aşı raporu, **CSV** ve **XLS
 
 ### 31.1 Rapor tarih ekseni (kritik)
 
-Liste sıralaması (`AppliedAtUtc ?? DueAtUtc`) ile **aynı** tekil eksen kullanılır:
+Tek `from`/`to` (UTC, kapalı uçlar) tek **rapor tarihi** ekseninde çalışır; bu eksen **`VaccinationStatus`** ile seçilir:
 
-- **`AppliedAtUtc` doluysa** rapor **`AppliedAtUtc`** üzerinden `[from, to]` (UTC, kapalı uçlar) ile seçilir.
-- **`AppliedAtUtc` yoksa** ve **`DueAtUtc` doluysa** rapor **`DueAtUtc`** üzerinden seçilir.
-- **İkisi de yoksa** satır bu rapora **dâhil edilmez** (anlamsız zaman damgası).
+| `status` | Rapor tarih ekseni (filtre + `effectiveReportDateUtc`) |
+|----------|--------------------------------------------------------|
+| `Applied` | `AppliedAtUtc` |
+| `Scheduled` | `DueAtUtc` (ürün/JSON’da **sonraki/planlanan** anlamında) |
+| `Cancelled` | `DueAtUtc` |
 
-Bu, “hem planlanan hem uygulanan” için tek `from`/`to` parametre çiftiyle en az şaşırtıcı kuraldır. **İstanbul takvim gününe çevrilmez** — filtre **UTC**; export’ta gösterim **Europe/Istanbul** (aşağı).
+- **Applied** için `AppliedAtUtc == null` ise satır aralığa **dâhil edilmez** (eksensiz kayıt).
+- **Scheduled / Cancelled** için `DueAtUtc == null` ise satır aralığa **dâhil edilmez**.
 
-Domain alanı adı `DueAtUtc` (liste DTO’larıyla aynı); bazı ekranlarda “sonraki tarih” olarak anılır.
+Liste sıralaması aynı eksen üzerinden yapılır (Applied → `AppliedAtUtc`; diğerleri → `DueAtUtc`), sonra `Id` azalan.
+
+**İstanbul takvim gününe çevrilmez** — JSON filtresi **UTC**; CSV/XLSX’te gösterim **Europe/Istanbul** (okunur metin / Excel formatı).
+
+Domain alanı adı `DueAtUtc`; JSON satırında **`nextDueAtUtc`** olarak döner. **`effectiveReportDateUtc`** = yukarıdaki kurallara göre tek rapor zamanı (UTC).
 
 ### 31.2 Uçlar
 
@@ -2159,14 +2166,14 @@ Domain alanı adı `DueAtUtc` (liste DTO’larıyla aynı); bazı ekranlarda “
 | `totalCount` | Filtreyle eşleşen kayıt sayısı. |
 | `items` | Sayfa; `MaxPageSize = 200`. |
 
-Satır: `vaccinationId`, `clinicId`, `clinicName`, `clientId`, `clientName`, `petId`, `petName`, `vaccineName`, `status` (numeric enum, §3.5), `appliedAtUtc`, `dueAtUtc`, `notes`.
+Satır: `vaccinationId`, `clinicId`, `clinicName`, `clientId`, `clientName`, `petId`, `petName`, `vaccineName`, `status` (numeric enum, §3.5), `appliedAtUtc`, `nextDueAtUtc` (`DueAtUtc`), `effectiveReportDateUtc`, `notes`.
 
 **Agregasyon (`statusCounts`):** bu fazda **yok** (opsiyonel, sonraya bırakıldı).
 
 ### 31.5 CSV / XLSX (kullanıcı odaklı)
 
 - Teknik ID kolonları **yok**.
-- Sütunlar: **Uygulama Tarihi**, **Sonraki Tarih**, **Klinik**, **Müşteri**, **Hayvan**, **Aşı**, **Durum** (Türkçe), **Not**. Tarihler Europe/Istanbul, `dd.MM.yyyy HH:mm`; boş tarih/ not güvenli.
+- Sütun sırası: **Rapor Tarihi** (`effectiveReportDateUtc` ile aynı anlam; yerel gösterim), **Klinik**, **Müşteri**, **Hayvan**, **Aşı**, **Durum** (Türkçe), **Uygulama Tarihi**, **Sonraki Tarih**, **Not**. Tarihler Europe/Istanbul, `dd.MM.yyyy HH:mm`; boş tarih / not güvenli.
 - CSV `;` + UTF-8 BOM; dosya adı `asi-raporu-yyyyMMdd-yyyyMMdd.*`; XLSX sayfa **`Aşılar`**.
 
 ### 31.6 Hata kodları (özet)

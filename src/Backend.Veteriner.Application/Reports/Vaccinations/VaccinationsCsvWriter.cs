@@ -16,9 +16,7 @@ internal static class VaccinationsCsvWriter
     {
         var sb = new StringBuilder();
         sb.Append('\uFEFF');
-        sb.Append("Uygulama Tarihi");
-        sb.Append(Delimiter);
-        sb.Append("Sonraki Tarih");
+        sb.Append("Rapor Tarihi");
         sb.Append(Delimiter);
         sb.Append("Klinik");
         sb.Append(Delimiter);
@@ -30,6 +28,10 @@ internal static class VaccinationsCsvWriter
         sb.Append(Delimiter);
         sb.Append("Durum");
         sb.Append(Delimiter);
+        sb.Append("Uygulama Tarihi");
+        sb.Append(Delimiter);
+        sb.Append("Sonraki Tarih");
+        sb.Append(Delimiter);
         sb.AppendLine("Not");
 
         foreach (var r in rows)
@@ -40,9 +42,7 @@ internal static class VaccinationsCsvWriter
 
     private static void AppendLine(StringBuilder sb, VaccinationReportItemDto r)
     {
-        AppendField(sb, FormatOptionalLocal(r.AppliedAtUtc));
-        sb.Append(Delimiter);
-        AppendField(sb, FormatOptionalLocal(r.DueAtUtc));
+        AppendField(sb, FormatOptionalLocal(r.EffectiveReportDateUtc));
         sb.Append(Delimiter);
         AppendField(sb, r.ClinicName);
         sb.Append(Delimiter);
@@ -53,6 +53,10 @@ internal static class VaccinationsCsvWriter
         AppendField(sb, r.VaccineName);
         sb.Append(Delimiter);
         AppendField(sb, VaccinationStatusTurkishDisplay.ToLabel(r.Status));
+        sb.Append(Delimiter);
+        AppendField(sb, FormatOptionalLocal(r.AppliedAtUtc));
+        sb.Append(Delimiter);
+        AppendField(sb, FormatOptionalLocal(r.NextDueAtUtc));
         sb.Append(Delimiter);
         AppendField(sb, r.Notes ?? string.Empty);
         sb.AppendLine();

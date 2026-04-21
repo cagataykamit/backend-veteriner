@@ -29,10 +29,15 @@ public sealed class VaccinationsReportFilteredOrderedForExportSpec : Specificati
             Query.Where(v => v.Status == status.Value);
 
         Query.Where(v =>
-            (v.AppliedAtUtc != null
+            (v.Status == VaccinationStatus.Applied
+                && v.AppliedAtUtc != null
                 && v.AppliedAtUtc >= fromUtc
                 && v.AppliedAtUtc <= toUtc)
-            || (v.AppliedAtUtc == null
+            || (v.Status == VaccinationStatus.Scheduled
+                && v.DueAtUtc != null
+                && v.DueAtUtc >= fromUtc
+                && v.DueAtUtc <= toUtc)
+            || (v.Status == VaccinationStatus.Cancelled
                 && v.DueAtUtc != null
                 && v.DueAtUtc >= fromUtc
                 && v.DueAtUtc <= toUtc));
@@ -47,6 +52,10 @@ public sealed class VaccinationsReportFilteredOrderedForExportSpec : Specificati
                 || (pids.Length > 0 && pids.Contains(v.PetId)));
         }
 
-        Query.OrderByDescending(v => v.AppliedAtUtc ?? v.DueAtUtc).ThenByDescending(v => v.Id);
+        Query.OrderByDescending(v =>
+                v.Status == VaccinationStatus.Applied
+                    ? v.AppliedAtUtc
+                    : v.DueAtUtc)
+            .ThenByDescending(v => v.Id);
     }
 }

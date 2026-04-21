@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.Veteriner.Application.Reports.Vaccinations.Specs;
 
 /// <summary>
-/// Rapor tarih aralığı: önce <see cref="Vaccination.AppliedAtUtc"/>, yoksa <see cref="Vaccination.DueAtUtc"/>
-/// (liste sıralaması <c>AppliedAtUtc ?? DueAtUtc</c> ile aynı eksen). UTC kapalı aralık <c>[fromUtc,toUtc]</c>.
+/// Rapor <c>[fromUtc,toUtc]</c> (UTC, kapalı): Applied → <see cref="Vaccination.AppliedAtUtc"/>;
+/// Scheduled/Cancelled → <see cref="Vaccination.DueAtUtc"/> (planlanan/sonraki tarih).
 /// </summary>
 public sealed class VaccinationsReportFilteredCountSpec : Specification<Vaccination>
 {
@@ -33,10 +33,15 @@ public sealed class VaccinationsReportFilteredCountSpec : Specification<Vaccinat
             Query.Where(v => v.Status == status.Value);
 
         Query.Where(v =>
-            (v.AppliedAtUtc != null
+            (v.Status == VaccinationStatus.Applied
+                && v.AppliedAtUtc != null
                 && v.AppliedAtUtc >= fromUtc
                 && v.AppliedAtUtc <= toUtc)
-            || (v.AppliedAtUtc == null
+            || (v.Status == VaccinationStatus.Scheduled
+                && v.DueAtUtc != null
+                && v.DueAtUtc >= fromUtc
+                && v.DueAtUtc <= toUtc)
+            || (v.Status == VaccinationStatus.Cancelled
                 && v.DueAtUtc != null
                 && v.DueAtUtc >= fromUtc
                 && v.DueAtUtc <= toUtc));
