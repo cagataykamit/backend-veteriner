@@ -107,6 +107,7 @@ Bu standardın amacı:
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19); contract + klinik scope kuralları (§27) | Klinik seçiliyken Client/Pet alanları Appointment üzerinden çözümlenir; mixed-currency finans henüz yok | Dashboard contract (§27), OpenAPI required alanları ve klinik scope semantiği | P2 | Düşük (aktif klinik değiştiğinde toplamlar daralır) |
+| Reports (Payments) | `GET …/reports/payments` + `…/export` CSV + `…/export-xlsx` XLSX (§28); `Payments.Read` | Dashboard ile birleştirilmez; tarih aralığı ve satır tavanı | Filtre kümesi `PaymentsFiltered*`; UTC aralığı §28 | Tamamlandı (6C.1 + XLSX) | Orta (yeni panel ekranı) |
 | Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); üye klinik atama/çıkarma `POST/DELETE …/members/{memberId}/clinics/{clinicId}` (§22.10); tenant paneli üye adı display fallback (§22.11); tenant-scoped kurum ayarları `PUT …/settings` (§26); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding; kalıcı `User.Name` alanı eksikliği (§22.11) | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol/klinik atama + kurum adı düzenleme + üye adı display fallback) |
 | Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 | Breeds | CRUD + liste (§16.4.1) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
@@ -1828,7 +1829,7 @@ Her iki handler aşağıdaki log alanlarını üretir: `TenantId`, `ClinicId`, `
 
 - **Uzun zaman serisi / karşılaştırma**: Son 7 gün **mini trend** (§27.11) dışında zaman serisi yok; bir önceki döneme göre karşılaştırma (%Δ), haftalık/aylık trend, chart ekseni parametreleri yok.
 - **Top-list'ler**: En çok kazanan klinik / en aktif veteriner / en çok kullanılan ödeme yöntemi gibi sıralamalar yok.
-- **Export / reporting**: PDF/CSV/Excel çıktısı, rapor zamanlaması veya e-posta dağıtımı yok. Raporlama tamamen ayrı bir paket olarak gelecek.
+- **Dashboard export**: Dashboard uçlarında PDF/CSV/Excel yok. **Ödeme raporu + CSV** ayrı uçlar olarak tanımlıdır — bkz. **§28 Reports — Payments** (`/api/v1/reports/payments`, `/export`). Rapor zamanlaması / e-posta dağıtımı / XLSX-PDF hâlâ kapsam dışı.
 - **Mixed-currency aggregation**: Para birimine göre kırılım (`currencyTotals`) bu fazda eklenmez; §19 clients payment-summary pattern'i ileride reuse edilebilir. Trend (`last7DaysPaid`) da mixed-currency notunu aynen miras alır.
 - **Upcoming vaccinations / hospitalizations / outstanding receivables**: Operasyonel ve alacak özeti blokları bu fazda yok.
 - **Filtre / periyot seçici**: Dashboard uçları parametresizdir; period / dateFrom / dateTo parametreleri yok. Müşteri tarafı filtreleme raporlama paketine kalır.
@@ -1876,3 +1877,89 @@ Dashboard'daki sparkline/küçük chart bileşenlerini beslemek için iki mevcut
 - Finance tarafında mevcut `PaymentsPaidAtAmountInWindowSpec` 7 günlük pencere için **ayrı** çağrılır — ay penceresi 7-gün penceresini her zaman kapsamaz (ör. ayın 3'ünde trend önceki aya taşar), bu yüzden `monthPayments` listesi üzerinden bucket'lamaz, yeni bir pencere sorgusu yapar.
 - Bucket'lama in-memory yapılır, 7 bucket × N ödeme/randevu doğrusal O(N*7) ≈ O(N). Pratikte son 7 gün içindeki satır sayısı binli aralığın altındadır; ileride aggregate-side (`GROUP BY date_trunc('day', ...)`) optimizasyonu için backlog notu.
 - Logging: mevcut telemetri çizgisi korunur; iki handler `last7DaysAppointments` / `last7DaysPaid` step'lerini `QuerySteps` sayımına dahil eder, en yavaş step tespiti etkilenmez.
+
+---
+
+## 28) Reports — Payments (Faz 6C.1)
+
+Dashboard’dan **ayrı** paket: parametreli ödeme raporu, CSV ve **XLSX** dışa aktarımı. İzin: **`Payments.Read`** (ayrı export permission yok).
+
+### 28.1 Uçlar
+
+| Method | Path | Açıklama |
+|--------|------|----------|
+| `GET` | `/api/v1/reports/payments` | Sayfalı JSON raporu: `totalCount`, `totalAmount`, `items`. |
+| `GET` | `/api/v1/reports/payments/export` | Aynı filtrelerle **tam liste** CSV (UTF-8 BOM; ayırıcı `;`); sayfa parametresi yok. |
+| `GET` | `/api/v1/reports/payments/export-xlsx` | Aynı filtrelerle **tam liste** XLSX (biçimli hücreler); sayfa parametresi yok. |
+
+Tüm rapor uçları `[Authorize]` + çözümlenmiş tenant (`TryGetResolvedTenant`) gerektirir; JWT `tenant_id` zorunlu.
+
+### 28.2 Sorgu parametreleri
+
+**Zorunlu:** `from`, `to` — **UTC anları**; filtre `Payment.PaidAtUtc` üzerinde **kapalı aralık** `[from, to]` (her iki uç dahil). Payment list endpoint’indeki `paidFromUtc` / `paidToUtc` ile aynı mantık; **Europe/Istanbul takvim gününe çevrilmez** (dashboard finance pencerelerinden farklıdır; bkz. §27.3).
+
+**Opsiyonel:** `clinicId`, `method`, `clientId`, `petId`, `search`, `page`, `pageSize` (yalnız JSON raporda; **CSV/XLSX export’ta `page` / `pageSize` yok**).
+
+- **Klinik çözümleme:** `effectiveClinicId = clinicId ?? IClinicContext.ClinicId`. İstekte `clinicId` varsa ve JWT’de aktif klinik farklıysa: `Payments.ClinicContextMismatch`. Etkin klinik varsa ilgili kayıt tenant’ta doğrulanır; yoksa `Clinics.NotFound`.
+- **`search`:** Payment list ile aynı çözüm (`ListQueryTextSearch` + müşteri/pet eşleşmesi + `Notes` / `Currency` LIKE).
+
+### 28.3 Tarih ve güvenlik tavanları
+
+- `from <= to`; aksi: `Payments.ReportDateRangeInvalid`.
+- Kapalı aralık süresi: `(to - from)` en fazla **93 gün** (`PaymentsReportConstants.MaxRangeDays`); aşım: `Payments.ReportRangeTooLong`.
+- **CSV/XLSX export:** eşleşen satır sayısı **50.000**’i aşarsa `Payments.ReportExportTooManyRows` (işlem yapılmadan önce `Count` ile kontrol; CSV ile aynı tavan ve mesaj).
+
+### 28.4 JSON yanıt — `PaymentReportResultDto`
+
+| Alan | Açıklama |
+|------|----------|
+| `totalCount` | Filtreyle eşleşen satır sayısı (tüm sonuç kümesi). |
+| `totalAmount` | Aynı kümedeki tutarların toplamı (sayfa dışındaki satırlar dahil; mixed-currency §12 / dashboard ile aynı **toplama** çizgisi — kur dönüşümü yok). |
+| `items` | Sayfa (`page`, `pageSize`; üst sınır `MaxPageSize = 200`). |
+
+Satır: `PaymentReportItemDto` — `paymentId`, `paidAtUtc`, `clinicId`, `clinicName`, `clientId`, `clientName`, `petId`, `petName`, `amount`, `currency`, `method` (enum JSON’da **numeric**, §3.5), `notes`.
+
+### 28.5 CSV — klinik içi tahsilat raporu
+
+**JSON rapor (§28.4) contract’ı değişmez** — `PaymentReportItemDto` tam alanlarla kalır. **Yalnızca** `/reports/payments/export` çıktısı iş odaklıdır; eski ham teknik CSV kolonlarını parse eden otomasyon kırılır — migration: yeni başlık/satır biçimine uyum.
+
+- İçerik: `text/csv; charset=utf-8`, **UTF-8 BOM**. **Ayırıcı: noktalı virgül (`;`)** — Türkiye Excel için virgül ondalık ayırıcısı ile uyumlu açılış (locale).
+- Başlıklar (sırayla): **Tarih**, **Klinik**, **Müşteri**, **Hayvan**, **Tutar**, **Para Birimi**, **Ödeme Yöntemi**, **Not** (Türkçe).
+- **Tarih:** `PaidAtUtc` → **Europe/Istanbul**, format **`dd.MM.yyyy HH:mm`** (ham UTC ISO değil).
+- **Teknik ID yok:** `paymentId`, `clinicId`, `clientId`, `petId` kolonları export’ta yer almaz.
+- **Tutar:** `tr-TR` sayı biçimi (`0.##`), Excel’de sayı olarak kullanılabilir niyetinde (ondalık ayırıcı virgül).
+- **Ödeme yöntemi:** enum sayısı değil metin — **Nakit** / **Kart** / **Havale-EFT** / (bilinmeyen) **Diğer**.
+- Boş not / boş hayvan adı: gereksiz tırnak üretilmez; alanlar boş bırakılır. Özel karakter/noktalı virgül içeren metinlerde RFC tarzı tırnak kaçışı uygulanır.
+- Dosya adı örneği: `tahsilat-raporu-yyyyMMdd-yyyyMMdd.csv`.
+
+**Ham teknik CSV / API alan birebir dışa aktarım** bu fazda yoktur (gerekirse ayrı uç veya opsiyon ileride ele alınır — backlog).
+
+### 28.5.1 XLSX — biçimli Excel (`export-xlsx`)
+
+- **Content-Type:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+- **Dosya adı örneği:** `tahsilat-raporu-yyyyMMdd-yyyyMMdd.xlsx`
+- **Kütüphane:** ClosedXML (Application projesi); veri yükleme CSV ile **aynı** `PaymentsReportExportPipeline` + `PaymentReportItemMapping` çizgisi.
+- **Sayfa adı:** `Odemeler`
+- **Kolonlar / anlam:** CSV §28.5 ile aynı (Tarih … Not); teknik ID yok.
+- **Fark (neden XLSX):** Hücre türü ve biçimi — **Tarih** sütunu gerçek tarih/saat (Europe/Istanbul duvar saati, Excel `dd.MM.yyyy HH:mm`), **Tutar** sayısal (`#,##0.00`), başlık satırı kalın, **otomatik filtre**, **ilk satır dondurulmuş**, sütun genişliği `AdjustToContents` (üst sınır ile). UTF-8 metin; Türkçe karakter sorunu beklenmez.
+- **Out-of-scope:** PDF; çoklu sheet; zengin conditional styling, grafik, makro.
+
+### 28.6 Hata kodları (özet)
+
+| Kod | Koşul |
+|-----|--------|
+| `Tenants.ContextMissing` | Tenant çözülemedi. |
+| `Payments.ReportDateRangeInvalid` | `from`/`to` geçersiz veya `from > to`. |
+| `Payments.ReportRangeTooLong` | Aralık 93 günden uzun. |
+| `Payments.ReportExportTooManyRows` | Export satır sayısı tavanı. |
+| `Payments.ClinicContextMismatch` | İstek `clinicId` ile JWT kliniği çelişiyor. |
+| `Clinics.NotFound` | Verilen / etkin klinik tenant’ta yok. |
+
+### 28.7 Out-of-scope (6C.1; XLSX sonrası güncel)
+
+- PDF export, zamanlanmış rapor, e-posta ile gönderim. (**XLSX ödeme export §28.5.1 ile eklenmiştir.**)
+- Payment status yaşam döngüsü veya domain’de yeni status alanı.
+- Dashboard handler’larıyla birleşik sorgu veya tek permission dışı ek permission.
+- Top-list / analitik / chart endpoint’leri.
+
+---
