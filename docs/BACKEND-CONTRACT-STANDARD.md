@@ -110,6 +110,7 @@ Bu standardın amacı:
 | Reports (Payments) | `GET …/reports/payments` + `…/export` CSV + `…/export-xlsx` XLSX (§28); `Payments.Read` | Dashboard ile birleştirilmez; tarih aralığı ve satır tavanı | Filtre kümesi `PaymentsFiltered*`; UTC aralığı §28 | Tamamlandı (6C.1 + XLSX) | Orta (yeni panel ekranı) |
 | Reports (Appointments) | `GET …/reports/appointments` + `…/export` CSV + `…/export-xlsx` XLSX (§29); `Appointments.Read` | Dashboard ile birleştirilmez; `ScheduledAtUtc` UTC aralığı; satır tavanı ödemelerle aynı | Filtre kümesi `AppointmentsReport*`; semantik §29 | Tamamlandı (6C.2) | Orta (ikinci panel raporu) |
 | Reports (Examinations) | `GET …/reports/examinations` + `…/export` CSV + `…/export-xlsx` XLSX (§30); `Examinations.Read` | Dashboard ile birleştirilmez; `ExaminedAtUtc` UTC aralığı; export kullanıcı dostu kolonlar §30 | Filtre kümesi `ExaminationsReport*`; semantik §30 | Tamamlandı (6C.3) | Orta (üçüncü panel raporu) |
+| Reports (Vaccinations) | `GET …/reports/vaccinations` + `…/export` CSV + `…/export-xlsx` XLSX (§31); `Vaccinations.Read` | Dashboard ile birleştirilmez; rapor tarih ekseni §31; export kullanıcı dostu kolonlar | Filtre kümesi `VaccinationsReport*`; semantik §31 | Tamamlandı (6C.4) | Orta (dördüncü panel raporu) |
 | Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); üye klinik atama/çıkarma `POST/DELETE …/members/{memberId}/clinics/{clinicId}` (§22.10); tenant paneli üye adı display fallback (§22.11); tenant-scoped kurum ayarları `PUT …/settings` (§26); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding; kalıcı `User.Name` alanı eksikliği (§22.11) | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol/klinik atama + kurum adı düzenleme + üye adı display fallback) |
 | Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 | Breeds | CRUD + liste (§16.4.1) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
@@ -1831,7 +1832,7 @@ Her iki handler aşağıdaki log alanlarını üretir: `TenantId`, `ClinicId`, `
 
 - **Uzun zaman serisi / karşılaştırma**: Son 7 gün **mini trend** (§27.11) dışında zaman serisi yok; bir önceki döneme göre karşılaştırma (%Δ), haftalık/aylık trend, chart ekseni parametreleri yok.
 - **Top-list'ler**: En çok kazanan klinik / en aktif veteriner / en çok kullanılan ödeme yöntemi gibi sıralamalar yok.
-- **Dashboard export**: Dashboard uçlarında PDF/CSV/Excel yok. **Ödeme**, **randevu** ve **muayene** raporları ayrı `reports` uçlarıdır — bkz. **§28**, **§29**, **§30**. Rapor zamanlaması / e-posta dağıtımı hâlâ kapsam dışı.
+- **Dashboard export**: Dashboard uçlarında PDF/CSV/Excel yok. **Ödeme**, **randevu**, **muayene** ve **aşı** raporları ayrı `reports` uçlarıdır — bkz. **§28–§31**. Rapor zamanlaması / e-posta dağıtımı hâlâ kapsam dışı.
 - **Mixed-currency aggregation**: Para birimine göre kırılım (`currencyTotals`) bu fazda eklenmez; §19 clients payment-summary pattern'i ileride reuse edilebilir. Trend (`last7DaysPaid`) da mixed-currency notunu aynen miras alır.
 - **Upcoming vaccinations / hospitalizations / outstanding receivables**: Operasyonel ve alacak özeti blokları bu fazda yok.
 - **Filtre / periyot seçici**: Dashboard uçları parametresizdir; period / dateFrom / dateTo parametreleri yok. Müşteri tarafı filtreleme raporlama paketine kalır.
@@ -2112,5 +2113,77 @@ Satır: `ExaminationReportItemDto` — `examinationId`, `examinedAtUtc`, `clinic
 - Klinik skorlama / istatistik aggregasyonları, trend/analitik endpoint’leri.
 - PDF, zamanlanmış rapor, dashboard ile birleşik sorgu.
 - `Examinations.Read` dışında ek rapor permission.
+
+---
+
+## 31) Reports — Vaccinations (Faz 6C.4)
+
+Dashboard’dan **ayrı** paket: tarih aralıklı aşı raporu, **CSV** ve **XLSX** dışa aktarımı. İzin: **`Vaccinations.Read`**.
+
+### 31.1 Rapor tarih ekseni (kritik)
+
+Liste sıralaması (`AppliedAtUtc ?? DueAtUtc`) ile **aynı** tekil eksen kullanılır:
+
+- **`AppliedAtUtc` doluysa** rapor **`AppliedAtUtc`** üzerinden `[from, to]` (UTC, kapalı uçlar) ile seçilir.
+- **`AppliedAtUtc` yoksa** ve **`DueAtUtc` doluysa** rapor **`DueAtUtc`** üzerinden seçilir.
+- **İkisi de yoksa** satır bu rapora **dâhil edilmez** (anlamsız zaman damgası).
+
+Bu, “hem planlanan hem uygulanan” için tek `from`/`to` parametre çiftiyle en az şaşırtıcı kuraldır. **İstanbul takvim gününe çevrilmez** — filtre **UTC**; export’ta gösterim **Europe/Istanbul** (aşağı).
+
+Domain alanı adı `DueAtUtc` (liste DTO’larıyla aynı); bazı ekranlarda “sonraki tarih” olarak anılır.
+
+### 31.2 Uçlar
+
+| Method | Path | Açıklama |
+|--------|------|----------|
+| `GET` | `/api/v1/reports/vaccinations` | Sayfalı JSON: `totalCount`, `items`. |
+| `GET` | `/api/v1/reports/vaccinations/export` | Tam liste CSV (UTF-8 BOM; `;`). |
+| `GET` | `/api/v1/reports/vaccinations/export-xlsx` | Tam liste XLSX. |
+
+`[Authorize]` + çözümlenmiş tenant zorunlu.
+
+### 31.3 Sorgu parametreleri
+
+**Zorunlu:** `from`, `to` — UTC; §31.1 eksenine göre kapalı aralık.
+
+**Opsiyonel:** `clinicId`, `status` (`VaccinationStatus`), `clientId`, `petId`, `search`, `page`, `pageSize` (sayfa yalnız JSON’da).
+
+- **Klinik:** `effectiveClinicId = clinicId ?? IClinicContext.ClinicId`; mismatch: `Vaccinations.ClinicContextMismatch`; yoksa tenant doğrulama: `Clinics.NotFound`.
+- **Müşteri / pet:** randevu/muayene raporları ile aynı müşteri kapsamı (`VaccinationsReportClientPetFilter`).
+- **`search`:** `VaccineName`, `Notes` LIKE + pet araması (liste ile uyumlu).
+
+### 31.4 JSON — `VaccinationReportResultDto`
+
+| Alan | Açıklama |
+|------|----------|
+| `totalCount` | Filtreyle eşleşen kayıt sayısı. |
+| `items` | Sayfa; `MaxPageSize = 200`. |
+
+Satır: `vaccinationId`, `clinicId`, `clinicName`, `clientId`, `clientName`, `petId`, `petName`, `vaccineName`, `status` (numeric enum, §3.5), `appliedAtUtc`, `dueAtUtc`, `notes`.
+
+**Agregasyon (`statusCounts`):** bu fazda **yok** (opsiyonel, sonraya bırakıldı).
+
+### 31.5 CSV / XLSX (kullanıcı odaklı)
+
+- Teknik ID kolonları **yok**.
+- Sütunlar: **Uygulama Tarihi**, **Sonraki Tarih**, **Klinik**, **Müşteri**, **Hayvan**, **Aşı**, **Durum** (Türkçe), **Not**. Tarihler Europe/Istanbul, `dd.MM.yyyy HH:mm`; boş tarih/ not güvenli.
+- CSV `;` + UTF-8 BOM; dosya adı `asi-raporu-yyyyMMdd-yyyyMMdd.*`; XLSX sayfa **`Aşılar`**.
+
+### 31.6 Hata kodları (özet)
+
+| Kod | Koşul |
+|-----|--------|
+| `Tenants.ContextMissing` | Tenant yok. |
+| `Vaccinations.ReportDateRangeInvalid` | `from`/`to` geçersiz veya `from > to`. |
+| `Vaccinations.ReportRangeTooLong` | Aralık > 93 gün. |
+| `Vaccinations.ReportExportTooManyRows` | Export > 50.000 satır. |
+| `Vaccinations.ClinicContextMismatch` | `clinicId` vs JWT kliniği. |
+| `Vaccinations.Validation` | `clientId`/`petId` uyumsuz. |
+| `Pets.NotFound` | Filtre pet’i yok. |
+| `Clinics.NotFound` | Klinik yok. |
+
+### 31.7 Out-of-scope (6C.4)
+
+- Hatırlatıcı motoru, gelişmiş analitik/trend, PDF, dashboard ile birleşik sorgu, `Vaccinations.Read` dışında ek policy.
 
 ---

@@ -6,17 +6,20 @@ using Backend.Veteriner.Application.Reports.Appointments.Queries.ExportAppointme
 using Backend.Veteriner.Application.Reports.Appointments.Queries.GetAppointmentReport;
 using Backend.Veteriner.Application.Reports.Examinations.Queries.ExportExaminationReport;
 using Backend.Veteriner.Application.Reports.Examinations.Queries.GetExaminationReport;
+using Backend.Veteriner.Application.Reports.Vaccinations.Queries.ExportVaccinationReport;
+using Backend.Veteriner.Application.Reports.Vaccinations.Queries.GetVaccinationReport;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
 using Backend.Veteriner.Application.Reports.Payments.Queries.GetPaymentReport;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Payments;
+using Backend.Veteriner.Domain.Vaccinations;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Veteriner.Api.Controllers;
 
-/// <summary>Panel raporlama uçları (dashboard’dan ayrıdır). Ödeme, randevu ve muayene raporları.</summary>
+/// <summary>Panel raporlama uçları (dashboard’dan ayrıdır). Ödeme, randevu, muayene ve aşı raporları.</summary>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/reports")]
@@ -307,6 +310,93 @@ public sealed class ReportsController : ControllerBase
             petId,
             appointmentId,
             search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        return File(v.Content, contentType, v.FileDownloadName);
+    }
+
+    /// <summary>
+    /// Aşı raporu (sayfalı). <c>from</c>/<c>to</c> UTC — rapor tarih ekseni: <c>AppliedAtUtc</c> varsa o, yoksa <c>DueAtUtc</c>; kapalı aralık.
+    /// </summary>
+    [HttpGet("vaccinations")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(Backend.Veteriner.Application.Reports.Vaccinations.Contracts.Dtos.VaccinationReportResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetVaccinationsReport(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] VaccinationStatus? status = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new GetVaccinationsReportQuery(
+            from, to, clinicId, status, clientId, petId, search, page, pageSize);
+        var result = await _mediator.Send(query, ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpGet("vaccinations/export")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportVaccinationsReport(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] VaccinationStatus? status = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportVaccinationsReportQuery(
+            from, to, clinicId, status, clientId, petId, search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        const string contentType = "text/csv; charset=utf-8";
+        return File(v.ContentUtf8Bom, contentType, v.FileDownloadName);
+    }
+
+    [HttpGet("vaccinations/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportVaccinationsReportXlsx(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] VaccinationStatus? status = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportVaccinationsReportXlsxQuery(
+            from, to, clinicId, status, clientId, petId, search);
         var result = await _mediator.Send(query, ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
