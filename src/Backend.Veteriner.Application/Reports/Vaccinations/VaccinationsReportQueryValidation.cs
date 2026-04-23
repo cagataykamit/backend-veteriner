@@ -37,7 +37,8 @@ internal static class VaccinationsReportQueryValidation
                 "from değeri to değerinden sonra olamaz.");
         }
 
-        if ((toUtc - fromUtc).TotalDays > VaccinationsReportConstants.MaxRangeDays)
+        var spanDays = (toUtc - fromUtc).TotalDays;
+        if (spanDays > VaccinationsReportConstants.MaxRangeDays)
         {
             return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
                 "Vaccinations.ReportRangeTooLong",

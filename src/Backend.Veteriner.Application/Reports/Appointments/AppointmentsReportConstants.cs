@@ -1,12 +1,13 @@
+using Backend.Veteriner.Application.Reports;
+
 namespace Backend.Veteriner.Application.Reports.Appointments;
 
-/// <summary>Randevu raporu tarih aralığı ve export tavanı (dashboard ile karıştırılmaz).</summary>
+/// <summary>Randevu raporu sabitleri; sayısal tavanlar <see cref="ReportsSharedLimits"/> ile hizalıdır.</summary>
 public static class AppointmentsReportConstants
 {
-    public const int MaxRangeDays = 93;
+    public const int MaxRangeDays = ReportsSharedLimits.MaxRangeDays;
 
-    public const int MaxPageSize = 200;
+    public const int MaxPageSize = ReportsSharedLimits.MaxPageSize;
 
-    /// <summary>CSV/XLSX export satır üst sınırı.</summary>
-    public const int MaxExportRows = 50_000;
+    public const int MaxExportRows = ReportsSharedLimits.MaxExportRows;
 }

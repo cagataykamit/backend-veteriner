@@ -6,6 +6,8 @@ namespace Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 /// Tenant paneli için tek davet detayı. <see cref="TenantInviteListItemDto"/>'dan farklı olarak
 /// <c>AcceptedAtUtc</c> ve <c>AcceptedByUserId</c> da içerir. Ham token asla bu DTO'da dönmez.
 /// <c>IsExpired</c>: <see cref="TenantInviteStatus.Pending"/> iken süre dolmuşsa <c>true</c>.
+/// <c>canCancelInvite</c> / <c>canResendInvite</c>: panel CTA’ları; yalnızca <see cref="TenantInviteStatus.Pending"/> iken <c>true</c>
+/// (süresi dolmuş bekleyen davet iptal / resend komutlarıyla uyumlu).
 /// </summary>
 public sealed record TenantInviteDetailDto(
     Guid Id,
@@ -20,4 +22,6 @@ public sealed record TenantInviteDetailDto(
     DateTime ExpiresAtUtc,
     DateTime CreatedAtUtc,
     DateTime? AcceptedAtUtc,
-    Guid? AcceptedByUserId);
+    Guid? AcceptedByUserId,
+    bool CanCancelInvite,
+    bool CanResendInvite);

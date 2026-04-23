@@ -19,6 +19,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Queries.GetById;
 using Backend.Veteriner.Application.Tenants.Queries.GetList;
 using Backend.Veteriner.Application.Tenants.Queries.GetAssignableOperationClaimsForInvite;
+using Backend.Veteriner.Application.Tenants.Queries.GetAssignableRolePermissionMatrix;
 using Backend.Veteriner.Application.Tenants.Queries.GetInviteById;
 using Backend.Veteriner.Application.Tenants.Queries.GetInvites;
 using Backend.Veteriner.Application.Tenants.Queries.GetMemberById;
@@ -100,6 +101,24 @@ public sealed class TenantsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetAssignableOperationClaimsForInviteQuery(tenantId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Davet whitelist rolleri için DB’deki permission bağlarının özeti (read-only matris). Yetki: <c>Tenants.InviteCreate</c>;
+    /// JWT <c>tenant_id</c> route ile aynı olmalı. Davet oluşturma / rol seçimi ile aynı whitelist sırası.
+    /// </summary>
+    [HttpGet("{tenantId:guid}/assignable-role-permission-matrix")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(IReadOnlyList<TenantAssignableRolePermissionMatrixRowDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetAssignableRolePermissionMatrix([FromRoute] Guid tenantId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetTenantAssignableRolePermissionMatrixQuery(tenantId), ct);
         return result.ToActionResult(this);
     }
 

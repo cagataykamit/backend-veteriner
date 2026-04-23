@@ -11,6 +11,10 @@ namespace Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 /// <see cref="Backend.Veteriner.Application.Tenants.Common.TenantMemberDisplayName"/>).
 /// Değer boş olabilir; frontend <c>name ?? email</c> şeklinde güvenli gösterim uygulamalıdır.
 /// </para>
+/// <para>
+/// <c>isCurrentUser</c>: oturumdaki kullanıcı bu üye ile aynıysa <c>true</c> — self-servis rol/klinik kaldırma
+/// CTA’larını gizlemek için (sunucu yine <c>Invites.SelfRoleRemoveForbidden</c> ile korur).
+/// </para>
 /// </summary>
 public sealed record TenantMemberDetailDto(
     Guid UserId,
@@ -19,4 +23,5 @@ public sealed record TenantMemberDetailDto(
     bool EmailConfirmed,
     DateTime CreatedAtUtc,
     IReadOnlyList<TenantMemberRoleDto> Roles,
-    IReadOnlyList<TenantMemberClinicDto> Clinics);
+    IReadOnlyList<TenantMemberClinicDto> Clinics,
+    bool IsCurrentUser);

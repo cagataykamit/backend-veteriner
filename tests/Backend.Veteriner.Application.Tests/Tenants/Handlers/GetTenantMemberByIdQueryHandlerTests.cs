@@ -27,13 +27,14 @@ namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;
 public sealed class GetTenantMemberByIdQueryHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClientContext> _clientContext = new();
     private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
     private readonly Mock<IReadRepository<UserTenant>> _userTenants = new();
     private readonly Mock<IUserOperationClaimRepository> _userOperationClaims = new();
     private readonly Mock<IUserClinicRepository> _userClinics = new();
 
     private GetTenantMemberByIdQueryHandler CreateHandler()
-        => new(_tenantContext.Object, _permissions.Object, _userTenants.Object,
+        => new(_tenantContext.Object, _clientContext.Object, _permissions.Object, _userTenants.Object,
                _userOperationClaims.Object, _userClinics.Object);
 
     private static UserTenant BuildMembership(Guid tenantId, Guid userId, string email, bool confirmed)
@@ -121,6 +122,7 @@ public sealed class GetTenantMemberByIdQueryHandlerTests
 
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
         _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _clientContext.SetupGet(x => x.UserId).Returns((Guid?)null);
         _userTenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<UserTenantByMemberSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(membership);
         _userOperationClaims.Setup(x => x.GetDetailsByUserIdAsync(mid, It.IsAny<CancellationToken>()))
@@ -139,6 +141,31 @@ public sealed class GetTenantMemberByIdQueryHandlerTests
         result.Value.CreatedAtUtc.Should().Be(membership.CreatedAtUtc);
         result.Value.Roles.Should().BeEmpty();
         result.Value.Clinics.Should().BeEmpty();
+        result.Value.IsCurrentUser.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Set_IsCurrentUser_When_CallerMatchesMember()
+    {
+        var tid = Guid.NewGuid();
+        var mid = Guid.NewGuid();
+        var membership = BuildMembership(tid, mid, "self@klinik.com", confirmed: true);
+
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _clientContext.SetupGet(x => x.UserId).Returns(mid);
+        _userTenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<UserTenantByMemberSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(membership);
+        _userOperationClaims.Setup(x => x.GetDetailsByUserIdAsync(mid, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserOperationClaimDetailDto>());
+        _userClinics.Setup(x => x.ListAccessibleClinicsAsync(mid, tid, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic>());
+
+        var result = await CreateHandler().Handle(
+            new GetTenantMemberByIdQuery(tid, mid), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.IsCurrentUser.Should().BeTrue();
     }
 
     [Fact]

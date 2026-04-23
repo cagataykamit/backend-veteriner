@@ -107,10 +107,10 @@ Bu standardın amacı:
 | Lab Results | List/detail/create/update DTO + `LabResultsContractSchemaFilter`; isteğe bağlı examination (§15); tek kayıt (satır analiz yok) | Examination clinic/pet tutarlılığı; `resultDateUtc` penceresi | Prescriptions/treatments ile aynı liste/search örüntüsü | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Hospitalizations | List/detail/create/update + discharge; `HospitalizationsContractSchemaFilter` (§16); isteğe bağlı examination; aktif yatış tekilliği | Aynı pet+klinikte çift aktif yatış; taburcu sonrası update yok; tarih/plan kuralları | LabResults ile aynı liste/search; `activeOnly` filtresi | Tamamlandı (v1 omurga) | Orta (typegen) |
 | Dashboard | `summary` + `finance-summary` (§19); contract + klinik scope kuralları (§27) | Klinik seçiliyken Client/Pet alanları Appointment üzerinden çözümlenir; mixed-currency finans henüz yok | Dashboard contract (§27), OpenAPI required alanları ve klinik scope semantiği | P2 | Düşük (aktif klinik değiştiğinde toplamlar daralır) |
-| Reports (Payments) | `GET …/reports/payments` + `…/export` CSV + `…/export-xlsx` XLSX (§28); `Payments.Read` | Dashboard ile birleştirilmez; tarih aralığı ve satır tavanı | Filtre kümesi `PaymentsFiltered*`; UTC aralığı §28 | Tamamlandı (6C.1 + XLSX) | Orta (yeni panel ekranı) |
-| Reports (Appointments) | `GET …/reports/appointments` + `…/export` CSV + `…/export-xlsx` XLSX (§29); `Appointments.Read` | Dashboard ile birleştirilmez; `ScheduledAtUtc` UTC aralığı; satır tavanı ödemelerle aynı | Filtre kümesi `AppointmentsReport*`; semantik §29 | Tamamlandı (6C.2) | Orta (ikinci panel raporu) |
-| Reports (Examinations) | `GET …/reports/examinations` + `…/export` CSV + `…/export-xlsx` XLSX (§30); `Examinations.Read` | Dashboard ile birleştirilmez; `ExaminedAtUtc` UTC aralığı; export kullanıcı dostu kolonlar §30 | Filtre kümesi `ExaminationsReport*`; semantik §30 | Tamamlandı (6C.3) | Orta (üçüncü panel raporu) |
-| Reports (Vaccinations) | `GET …/reports/vaccinations` + `…/export` CSV + `…/export-xlsx` XLSX (§31); `Vaccinations.Read` | Dashboard ile birleştirilmez; rapor tarih ekseni §31; export kullanıcı dostu kolonlar | Filtre kümesi `VaccinationsReport*`; semantik §31 | Tamamlandı (6C.4) | Orta (dördüncü panel raporu) |
+| Reports (Payments) | `GET …/reports/payments` + `…/export` CSV + `…/export-xlsx` XLSX (§28); `Payments.Read` | Dashboard ile birleştirilmez; ortak tavanlar §27A | Filtre kümesi `PaymentsFiltered*`; UTC aralığı §28 | Tamamlandı (6C.1 + XLSX) | Orta (yeni panel ekranı) |
+| Reports (Appointments) | `GET …/reports/appointments` + `…/export` CSV + `…/export-xlsx` XLSX (§29); `Appointments.Read` | Dashboard ile birleştirilmez; ortak tavanlar §27A | Filtre kümesi `AppointmentsReport*`; semantik §29 | Tamamlandı (6C.2) | Orta (ikinci panel raporu) |
+| Reports (Examinations) | `GET …/reports/examinations` + `…/export` CSV + `…/export-xlsx` XLSX (§30); `Examinations.Read` | Dashboard ile birleştirilmez; ortak tavanlar §27A | Filtre kümesi `ExaminationsReport*`; semantik §30 | Tamamlandı (6C.3) | Orta (üçüncü panel raporu) |
+| Reports (Vaccinations) | `GET …/reports/vaccinations` + `…/export` CSV + `…/export-xlsx` XLSX (§31); `Vaccinations.Read` | Dashboard ile birleştirilmez; ortak tavanlar §27A; rapor tarih ekseni §31 | Filtre kümesi `VaccinationsReport*`; semantik §31 | Tamamlandı (6C.4) | Orta (dördüncü panel raporu) |
 | Tenants | `subscription-summary` (§20); `POST …/invites` (§22); `GET …/members` + `GET …/invites` listeleri (§22.6); invite detail/cancel/resend (§22.7); üye detayı `GET …/members/{memberId}` (§22.8); üye rol atama/çıkarma `POST/DELETE …/members/{memberId}/roles/{operationClaimId}` (§22.9); üye klinik atama/çıkarma `POST/DELETE …/members/{memberId}/clinics/{clinicId}` (§22.10); tenant paneli üye adı display fallback (§22.11); tenant-scoped kurum ayarları `PUT …/settings` (§26); kiracı başına `TenantSubscriptions` + `TenantInvites` | `Tenants.InviteCreate`; plan `maxUsers` + koltuk sayımı; whitelist rol atama | Davet/limit drift; token URL encoding; kalıcı `User.Name` alanı eksikliği (§22.11) | P1 | Orta (join ekranı + tenant panel üye/davet listesi + davet yaşam döngüsü + üye detayı + rol/klinik atama + kurum adı düzenleme + üye adı display fallback) |
 | Species | CRUD + liste (§16.4) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
 | Breeds | CRUD + liste (§16.4.1) | Düşük | Dokümantasyon drift riski | P3 | Düşük |
@@ -1243,6 +1243,18 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 
 **Invite create ile ilişki:** `POST …/invites` hem kaydın `OperationClaims` içinde varlığını hem de adının whitelist’te olduğunu doğrular; whitelist dışı id için `Invites.OperationClaimNotAssignable` (`403`).
 
+### 22.5.1 Davet rolü — permission matrisi (read-only)
+
+**Endpoint:** `GET /api/v1/tenants/{tenantId}/assignable-role-permission-matrix`
+
+**Yetki:** `Tenants.InviteCreate` (§22.5 ile aynı çizgi); JWT `tenant_id` route `tenantId` ile aynı (`TryGetResolvedTenant` + handler tenant eşlemesi).
+
+**Amaç:** Tenant panelinde (veya dokümantasyonda) **whitelist** rollerinin (`InviteAssignableOperationClaimsCatalog`) veritabanındaki `OperationClaimPermission` → `Permission` bağlarını **okunur** şekilde göstermek. **Yazma yok**; global admin `OperationClaimPermissions` yönetim API’sinin yerini almaz.
+
+**Yanıt:** `TenantAssignableRolePermissionMatrixRowDto[]` — sıra §22.5 ile aynı. Her satır: `operationClaimId`, `operationClaimName`, `permissions[]` (`code`, `description`, `group`). Bağlı permission yoksa `permissions` boş dizidir (rol satırı yine döner).
+
+**Not:** Efektif permission kümesi `RolePermissionBindingSeeder` ve operasyonel admin atamalarıyla DB’de evrilir; bu uç canlı bağları yansıtır.
+
 ### 22.6 Tenant paneli — üye listesi ve davet listesi (tenant-scoped)
 
 **Amaç:** Tenant panelinde kullanılacak **kiracıya özgü** listeler; platform geneli `GET /api/v1/admin/users` ile karıştırılmamalıdır (farklı yetki modeli ve veri sınırı).
@@ -1280,7 +1292,8 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 
 **G) Davet detayı** — `GET /api/v1/tenants/{tenantId}/invites/{inviteId}`
 
-- **Yanıt:** `TenantInviteDetailDto` — `id`, `tenantId`, `email`, `clinicId`, `clinicName` (varsa), `operationClaimId`, `operationClaimName` (varsa), `status`, `isExpired`, `expiresAtUtc`, `createdAtUtc`, `acceptedAtUtc?`, `acceptedByUserId?`.
+- **Yanıt:** `TenantInviteDetailDto` — `id`, `tenantId`, `email`, `clinicId`, `clinicName` (varsa), `operationClaimId`, `operationClaimName` (varsa), `status`, `isExpired`, `expiresAtUtc`, `createdAtUtc`, `acceptedAtUtc?`, `acceptedByUserId?`, **`canCancelInvite`**, **`canResendInvite`**.
+- **`canCancelInvite` / `canResendInvite`:** Yalnızca `status === Pending` iken `true` (iptal ve resend komutlarıyla aynı önkoşul; süresi dolmuş bekleyen davetlerde de `true` — komutlar geçerli). `Accepted` / `Revoked` için `false` (UI yanlış CTA göstermesin diye açık bayrak).
 - **Hatalar:** `Auth.PermissionDenied`, `Tenants.ContextMissing`, `Tenants.AccessDenied`, `Invites.NotFound` (**404**).
 
 **H) Daveti iptal et** — `POST /api/v1/tenants/{tenantId}/invites/{inviteId}/cancel`
@@ -1316,6 +1329,7 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
   - `createdAtUtc` — **`UserTenant.CreatedAtUtc`** (kiracıya katılım zamanı; kullanıcı oluşturma değil).
   - `roles: TenantMemberRoleDto[]` — **yalnız** `InviteAssignableOperationClaimsCatalog.NamesInDisplayOrder` whitelist’ini (`Admin`, `ClinicAdmin`, `Veteriner`, `Sekreter`) içerir. `Admin.Diagnostics` gibi teknik/internal claim’ler tenant panelinde **gizlenir**.
   - `clinics: TenantMemberClinicDto[]` — `IUserClinicRepository.ListAccessibleClinicsAsync(userId, tenantId, null)` sonucundan map edilir (`clinicId`, `name`, `isActive`).
+  - **`isCurrentUser`:** Oturumdaki kullanıcı (`IClientContext.UserId`) bu `memberId` ile aynıysa `true`. UI, self-servis rol/klinik kaldırma düğmelerini gizleyebilir (sunucu yine `Invites.SelfRoleRemoveForbidden` / `Clinics.SelfClinicRemoveForbidden` ile korur).
 - **Hatalar:** `Auth.PermissionDenied`, `Tenants.ContextMissing`, `Tenants.AccessDenied`, `Members.NotFound` (**404**).
 - **Şema etkisi:** yok (migration / model değişikliği açılmadı).
 - **Kapsam dışı (bu fazda):** Üyeye tenant-scoped rol/claim atama-çıkarma (Faz 3B), klinik üyelik yazma (ekleme/çıkarma), üye devre dışı bırakma, global admin `/api/v1/admin/users/{id}` yüzeyinin tenant panelinde kullanımı.
@@ -1416,6 +1430,7 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 
 - `TenantMemberListItemDto.name: string?` — `GET /api/v1/tenants/{tenantId}/members` öğeleri için.
 - `TenantMemberDetailDto.name: string?` — `GET /api/v1/tenants/{tenantId}/members/{memberId}` için.
+- `TenantMemberDetailDto.isCurrentUser: bool` — aynı uç; oturum kullanıcısı ile üye eşleşmesi (§22.8).
 
 **Sözleşme kuralları**
 
@@ -1430,6 +1445,14 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 - Kalıcı ad alanı geldiğinde liste arama/sıralama da ada doğru genişletilebilir; bu **bu fazın kapsamı dışındadır**.
 
 **Kapsam dışı (bu fazda):** Yeni şema/migration, yeni permission, `name` üzerinden arama/sıralama, global admin `users` yüzeyinin genişletilmesi, e-posta dışı başka kaynaktan (ör. davet metadatası) türetme, kanonik isim biçimlendirme (noktaları boşluğa çevirme, title-case vb.).
+
+### 22.12 Tenant paneli — kullanıcı / davet / yetki omurgası (özet)
+
+**Zaten açık olan yüzeyler:** `GET/POST …/members`, `GET …/members/{id}`, rol ve klinik ata/kaldır, `GET …/invites`, `GET …/invites/{id}`, `POST …/invites`, iptal, resend, `GET …/assignable-operation-claims`, `PUT …/settings` (§22, §26 ile hizalı). Tenant eşlemesi ve `Tenants.InviteCreate` çizgisi korunur.
+
+**Bu pakette eklenen / sıkılaştırılan:** `GET …/assignable-role-permission-matrix` (rol → permission read matrisi), davet detayında `canCancelInvite` / `canResendInvite`, üye detayında `isCurrentUser`.
+
+**Kasıtlı kapsam dışı / backlog:** Tenant-scoped üye profil güncelleme (ör. kalıcı `User.Name`), kullanıcı pasif/kilit/owner–staff ayrımı için ayrı domain modeli, generic “capability engine”, tenant üyeleri için `Tenants.InviteCreate` dışında yeni permission, davet kaydında e-posta veya atanmış rolü değiştirme, toplu (bulk) davet işlemleri.
 
 ---
 
@@ -1832,7 +1855,7 @@ Her iki handler aşağıdaki log alanlarını üretir: `TenantId`, `ClinicId`, `
 
 - **Uzun zaman serisi / karşılaştırma**: Son 7 gün **mini trend** (§27.11) dışında zaman serisi yok; bir önceki döneme göre karşılaştırma (%Δ), haftalık/aylık trend, chart ekseni parametreleri yok.
 - **Top-list'ler**: En çok kazanan klinik / en aktif veteriner / en çok kullanılan ödeme yöntemi gibi sıralamalar yok.
-- **Dashboard export**: Dashboard uçlarında PDF/CSV/Excel yok. **Ödeme**, **randevu**, **muayene** ve **aşı** raporları ayrı `reports` uçlarıdır — bkz. **§28–§31**. Rapor zamanlaması / e-posta dağıtımı hâlâ kapsam dışı.
+- **Dashboard export**: Dashboard uçlarında PDF/CSV/Excel yok. **Ödeme**, **randevu**, **muayene** ve **aşı** raporları ayrı `reports` uçlarıdır — bkz. **§27A, §28–§31**. Rapor zamanlaması / e-posta dağıtımı hâlâ kapsam dışı.
 - **Mixed-currency aggregation**: Para birimine göre kırılım (`currencyTotals`) bu fazda eklenmez; §19 clients payment-summary pattern'i ileride reuse edilebilir. Trend (`last7DaysPaid`) da mixed-currency notunu aynen miras alır.
 - **Upcoming vaccinations / hospitalizations / outstanding receivables**: Operasyonel ve alacak özeti blokları bu fazda yok.
 - **Filtre / periyot seçici**: Dashboard uçları parametresizdir; period / dateFrom / dateTo parametreleri yok. Müşteri tarafı filtreleme raporlama paketine kalır.
@@ -1883,9 +1906,62 @@ Dashboard'daki sparkline/küçük chart bileşenlerini beslemek için iki mevcut
 
 ---
 
+## 27A) Reports — ortak kurallar (Faz 6D)
+
+Bu bölüm **§28–§31** altındaki dört panel raporu için ortak çerçeveyi özetler. Tarih **ekseni** (hangi alan üzerinden `from`/`to`) ve DTO ayrıntıları her modül §’sinde kalır.
+
+### 27A.1 Route ve permission
+
+| Alan | Ortak kural |
+|------|-------------|
+| Base path | `/api/v1/reports/...` (`ReportsController`) |
+| JSON | `GET …/reports/{payments\|appointments\|examinations\|vaccinations}` |
+| CSV | `GET …/{...}/export` |
+| XLSX | `GET …/{...}/export-xlsx` |
+| Policy | Modül liste okuması ile aynı: `Payments.Read`, `Appointments.Read`, `Examinations.Read`, `Vaccinations.Read`. **`Reports.*` veya ayrı export policy yok.** |
+
+### 27A.2 Tenant ve klinik
+
+- Controller: `TryGetResolvedTenant`; JWT `tenant_id` yoksa `Tenants.ContextMissing`.
+- `effectiveClinicId = clinicId ?? IClinicContext.ClinicId`. İstek `clinicId` ile JWT’deki aktif klinik çelişirse modül önekli `*.ClinicContextMismatch`.
+- Etkin klinik tenant’ta yoksa `Clinics.NotFound`. Veri erişimi repository + spec ile tenant-scoped kalır.
+
+### 27A.3 Tarih aralığı (dörtlü ortak)
+
+- `from`, `to` zorunlu **UTC**; `default` (`0001-01-01`) geçersiz.
+- `from <= to`; aksi `*.ReportDateRangeInvalid`.
+- Kapalı aralık süresi `(to - from).TotalDays` ≤ **93** (`ReportsSharedLimits.MaxRangeDays` / modül `*ReportConstants.MaxRangeDays`); aşım `*.ReportRangeTooLong`.
+
+**Filtre ekseni (JSON UTC):** §28 `PaidAtUtc` · §29 `ScheduledAtUtc` · §30 `ExaminedAtUtc` · §31 status bazlı rapor tarihi (`effectiveReportDateUtc` ile uyumlu).
+
+### 27A.4 Sayfalama ve export satır tavanı
+
+- JSON: `page`, `pageSize`; üst sınır **200** (`ReportsSharedLimits.MaxPageSize`).
+- CSV/XLSX: **sayfa yok**; önce `Count`; eşleşen satır **>** **50.000** (`ReportsSharedLimits.MaxExportRows`) ise `*.ReportExportTooManyRows`.
+
+### 27A.5 JSON vs kullanıcı dışa aktarım
+
+| | JSON rapor | CSV / XLSX |
+|--|------------|------------|
+| Kimlik alanları | İş mantığı için `Guid` / enum / UTC anları kullanılabilir | Teknik **ID kolonları yok** (dörtlüde aynı ilke) |
+| Tarih/saat | UTC anları | **Europe/Istanbul**, okunur biçim (`dd.MM.yyyy HH:mm` veya XLSX tarih biçimi) |
+| CSV teknik | — | UTF-8 **BOM**, ayırıcı **`;`** |
+| Dosya adı | — | `{alan}-raporu-{from:yyyyMMdd}-{to:yyyyMMdd}.{csv\|xlsx}` (ör. `tahsilat-raporu-…`, §28–§31) |
+
+### 27A.6 HTTP içerik tipleri (export yanıtı)
+
+- CSV: `text/csv; charset=utf-8` (`ReportFileContentTypes.CsvUtf8`).
+- XLSX: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (`ReportFileContentTypes.Xlsx`).
+
+### 27A.7 Dashboard ve kapsam dışı
+
+- Bu raporlar dashboard özet uçlarından **ayrı**dır (§27.10). Zamanlanmış rapor, PDF, ek analitik/trend bu pakette yok.
+
+---
+
 ## 28) Reports — Payments (Faz 6C.1)
 
-Dashboard’dan **ayrı** paket: parametreli ödeme raporu, CSV ve **XLSX** dışa aktarımı. İzin: **`Payments.Read`** (ayrı export permission yok).
+Dashboard’dan **ayrı** paket: parametreli ödeme raporu, CSV ve **XLSX** dışa aktarımı. İzin: **`Payments.Read`** (ayrı export permission yok). **Ortak çerçeve: §27A.**
 
 ### 28.1 Uçlar
 
@@ -1907,6 +1983,8 @@ Tüm rapor uçları `[Authorize]` + çözümlenmiş tenant (`TryGetResolvedTenan
 - **`search`:** Payment list ile aynı çözüm (`ListQueryTextSearch` + müşteri/pet eşleşmesi + `Notes` / `Currency` LIKE).
 
 ### 28.3 Tarih ve güvenlik tavanları
+
+Sayısal tavanlar `ReportsSharedLimits` / `PaymentsReportConstants` üzerinden dörtlü ile hizalıdır (**§27A.3–§27A.4**).
 
 - `from <= to`; aksi: `Payments.ReportDateRangeInvalid`.
 - Kapalı aralık süresi: `(to - from)` en fazla **93 gün** (`PaymentsReportConstants.MaxRangeDays`); aşım: `Payments.ReportRangeTooLong`.
@@ -1969,7 +2047,7 @@ Satır: `PaymentReportItemDto` — `paymentId`, `paidAtUtc`, `clinicId`, `clinic
 
 ## 29) Reports — Appointments (Faz 6C.2)
 
-Dashboard’dan **ayrı** paket (§27’den bağımsız): tarih aralıklı randevu raporu, **CSV** ve **XLSX** dışa aktarımı. İzin: **`Appointments.Read`** (ayrı export / rapor permission yok).
+Dashboard’dan **ayrı** paket (§27’den bağımsız): tarih aralıklı randevu raporu, **CSV** ve **XLSX** dışa aktarımı. İzin: **`Appointments.Read`** (ayrı export / rapor permission yok). **Ortak çerçeve: §27A.**
 
 ### 29.1 Uçlar
 
@@ -1992,6 +2070,8 @@ Tüm rapor uçları `[Authorize]` + çözümlenmiş tenant (`TryGetResolvedTenan
 - **`statusCounts` (JSON):** Aynı `from`/`to` ve diğer filtrelerle ( **`status` hariç** ) penceredeki `Scheduled` / `Completed` / `Cancelled` adetleri; `totalCount` ise istekte `status` verilmişse o filtreyi de uygular.
 
 ### 29.3 Tarih ve güvenlik tavanları
+
+Sayısal tavanlar `ReportsSharedLimits` / `AppointmentsReportConstants` ile hizalıdır (**§27A.3–§27A.4**).
 
 - `from <= to`; aksi: `Appointments.ReportDateRangeInvalid`.
 - Kapalı aralık süresi: `(to - from)` en fazla **93 gün** (`AppointmentsReportConstants.MaxRangeDays`); aşım: `Appointments.ReportRangeTooLong`.
@@ -2046,7 +2126,7 @@ Satır: `AppointmentReportItemDto` — `appointmentId`, `scheduledAtUtc`, `clini
 
 ## 30) Reports — Examinations (Faz 6C.3)
 
-Dashboard’dan **ayrı** paket: tarih aralıklı muayene raporu, **CSV** ve **XLSX** dışa aktarımı. İzin: **`Examinations.Read`** (ayrı export permission yok).
+Dashboard’dan **ayrı** paket: tarih aralıklı muayene raporu, **CSV** ve **XLSX** dışa aktarımı. İzin: **`Examinations.Read`** (ayrı export permission yok). **Ortak çerçeve: §27A.**
 
 ### 30.1 Uçlar
 
@@ -2069,6 +2149,8 @@ Tüm rapor uçları `[Authorize]` + çözümlenmiş tenant (`TryGetResolvedTenan
 - **`search`:** Muayene liste endpoint’i ile uyumlu — `VisitReason`, `Findings`, `Assessment`, `Notes` LIKE + müşteri/hayvan eşleşmesinden gelen pet id’leri.
 
 ### 30.3 Tarih ve güvenlik tavanları
+
+Sayısal tavanlar `ReportsSharedLimits` / `ExaminationsReportConstants` ile hizalıdır (**§27A.3–§27A.4**).
 
 - `from <= to`; aksi: `Examinations.ReportDateRangeInvalid`.
 - Kapalı aralık süresi: `(to - from)` en fazla **93 gün** (`ExaminationsReportConstants.MaxRangeDays`); aşım: `Examinations.ReportRangeTooLong`.
@@ -2118,7 +2200,7 @@ Satır: `ExaminationReportItemDto` — `examinationId`, `examinedAtUtc`, `clinic
 
 ## 31) Reports — Vaccinations (Faz 6C.4)
 
-Dashboard’dan **ayrı** paket: tarih aralıklı aşı raporu, **CSV** ve **XLSX** dışa aktarımı. İzin: **`Vaccinations.Read`**.
+Dashboard’dan **ayrı** paket: tarih aralıklı aşı raporu, **CSV** ve **XLSX** dışa aktarımı. İzin: **`Vaccinations.Read`**. **Ortak çerçeve: §27A.**
 
 ### 31.1 Rapor tarih ekseni (kritik)
 
@@ -2152,6 +2234,8 @@ Domain alanı adı `DueAtUtc`; JSON satırında **`nextDueAtUtc`** olarak döner
 ### 31.3 Sorgu parametreleri
 
 **Zorunlu:** `from`, `to` — UTC; §31.1 eksenine göre kapalı aralık.
+
+**Tavanlar (özet):** `from <= to`, aralık süresi ve export satır üst sınırı **§27A.3–§27A.4** ile aynıdır (`ReportsSharedLimits` / `VaccinationsReportConstants`).
 
 **Opsiyonel:** `clinicId`, `status` (`VaccinationStatus`), `clientId`, `petId`, `search`, `page`, `pageSize` (sayfa yalnız JSON’da).
 

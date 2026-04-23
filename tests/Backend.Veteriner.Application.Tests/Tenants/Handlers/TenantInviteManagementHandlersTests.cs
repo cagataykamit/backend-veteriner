@@ -152,6 +152,42 @@ public sealed class TenantInviteManagementHandlersTests
         dto.OperationClaimName.Should().Be("Veteriner");
         dto.Status.Should().Be(TenantInviteStatus.Pending);
         dto.IsExpired.Should().BeTrue();
+        dto.CanCancelInvite.Should().BeTrue();
+        dto.CanResendInvite.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Detail_Should_Disable_LifecycleFlags_When_Accepted()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var claimId = Guid.NewGuid();
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+
+        var invite = BuildPending(tid, cid, claimId, expiresAtUtc: DateTime.UtcNow.AddDays(1));
+        invite.MarkAccepted(Guid.NewGuid(), DateTime.UtcNow);
+
+        _invitesRead.Setup(x => x.FirstOrDefaultAsync(
+                It.Is<TenantInviteByTenantAndIdSpec>(s => true), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(invite);
+
+        var claim = new OperationClaim("Veteriner");
+        typeof(OperationClaim).GetProperty(nameof(OperationClaim.Id))!.SetValue(claim, claimId);
+        _claimsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<OperationClaimByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(claim);
+
+        var clinic = new Clinic(tid, "K1", "Ist");
+        typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, cid);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(clinic);
+
+        var result = await CreateDetailHandler().Handle(
+            new GetTenantInviteByIdQuery(tid, invite.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.CanCancelInvite.Should().BeFalse();
+        result.Value.CanResendInvite.Should().BeFalse();
     }
 
     // ============================================================

@@ -73,6 +73,7 @@ public sealed class GetTenantInviteByIdQueryHandler
 
         var utcNow = DateTime.UtcNow;
         var isExpired = invite.Status == TenantInviteStatus.Pending && invite.ExpiresAtUtc < utcNow;
+        var canLifecycle = invite.Status == TenantInviteStatus.Pending;
 
         return Result<TenantInviteDetailDto>.Success(new TenantInviteDetailDto(
             invite.Id,
@@ -87,6 +88,8 @@ public sealed class GetTenantInviteByIdQueryHandler
             invite.ExpiresAtUtc,
             invite.CreatedAtUtc,
             invite.AcceptedAtUtc,
-            invite.AcceptedByUserId));
+            invite.AcceptedByUserId,
+            canLifecycle,
+            canLifecycle));
     }
 }

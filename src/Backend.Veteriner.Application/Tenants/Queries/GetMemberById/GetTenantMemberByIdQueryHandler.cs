@@ -24,6 +24,7 @@ public sealed class GetTenantMemberByIdQueryHandler
     : IRequestHandler<GetTenantMemberByIdQuery, Result<TenantMemberDetailDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClientContext _clientContext;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<UserTenant> _userTenantsRead;
     private readonly IUserOperationClaimRepository _userOperationClaims;
@@ -31,12 +32,14 @@ public sealed class GetTenantMemberByIdQueryHandler
 
     public GetTenantMemberByIdQueryHandler(
         ITenantContext tenantContext,
+        IClientContext clientContext,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<UserTenant> userTenantsRead,
         IUserOperationClaimRepository userOperationClaims,
         IUserClinicRepository userClinics)
     {
         _tenantContext = tenantContext;
+        _clientContext = clientContext;
         _permissions = permissions;
         _userTenantsRead = userTenantsRead;
         _userOperationClaims = userOperationClaims;
@@ -88,6 +91,7 @@ public sealed class GetTenantMemberByIdQueryHandler
             .ToList();
 
         var user = membership.User!;
+        var isSelf = _clientContext.UserId is { } caller && caller == request.MemberId;
         return Result<TenantMemberDetailDto>.Success(new TenantMemberDetailDto(
             user.Id,
             user.Email,
@@ -95,6 +99,7 @@ public sealed class GetTenantMemberByIdQueryHandler
             user.EmailConfirmed,
             membership.CreatedAtUtc,
             roles,
-            clinics));
+            clinics,
+            isSelf));
     }
 }

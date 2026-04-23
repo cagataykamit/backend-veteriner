@@ -92,8 +92,7 @@ public sealed class ReportsController : ControllerBase
             return result.ToActionResult(this);
 
         var v = result.Value!;
-        const string contentType = "text/csv; charset=utf-8";
-        return File(v.ContentUtf8Bom, contentType, v.FileDownloadName);
+        return File(v.ContentUtf8Bom, ReportFileContentTypes.CsvUtf8, v.FileDownloadName);
     }
 
     /// <summary>
@@ -123,8 +122,7 @@ public sealed class ReportsController : ControllerBase
             return result.ToActionResult(this);
 
         var v = result.Value!;
-        const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        return File(v.Content, contentType, v.FileDownloadName);
+        return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
     }
 
     /// <summary>
@@ -180,10 +178,10 @@ public sealed class ReportsController : ControllerBase
             return result.ToActionResult(this);
 
         var v = result.Value!;
-        const string contentType = "text/csv; charset=utf-8";
-        return File(v.ContentUtf8Bom, contentType, v.FileDownloadName);
+        return File(v.ContentUtf8Bom, ReportFileContentTypes.CsvUtf8, v.FileDownloadName);
     }
 
+    /// <summary>Randevu raporu XLSX; filtreler CSV/JSON ile aynı; sayfa yok.</summary>
     [HttpGet("appointments/export-xlsx")]
     [Authorize(Policy = PermissionCatalog.Appointments.Read)]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
@@ -208,8 +206,7 @@ public sealed class ReportsController : ControllerBase
             return result.ToActionResult(this);
 
         var v = result.Value!;
-        const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        return File(v.Content, contentType, v.FileDownloadName);
+        return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
     }
 
     /// <summary>
@@ -249,6 +246,7 @@ public sealed class ReportsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Muayene raporu CSV (UTF-8 BOM; <c>;</c>). Filtreler JSON ile aynı; sayfa yok.</summary>
     [HttpGet("examinations/export")]
     [Authorize(Policy = PermissionCatalog.Examinations.Read)]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
@@ -280,10 +278,10 @@ public sealed class ReportsController : ControllerBase
             return result.ToActionResult(this);
 
         var v = result.Value!;
-        const string contentType = "text/csv; charset=utf-8";
-        return File(v.ContentUtf8Bom, contentType, v.FileDownloadName);
+        return File(v.ContentUtf8Bom, ReportFileContentTypes.CsvUtf8, v.FileDownloadName);
     }
 
+    /// <summary>Muayene raporu XLSX; filtreler CSV/JSON ile aynı; sayfa yok.</summary>
     [HttpGet("examinations/export-xlsx")]
     [Authorize(Policy = PermissionCatalog.Examinations.Read)]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
@@ -315,12 +313,11 @@ public sealed class ReportsController : ControllerBase
             return result.ToActionResult(this);
 
         var v = result.Value!;
-        const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        return File(v.Content, contentType, v.FileDownloadName);
+        return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
     }
 
     /// <summary>
-    /// Aşı raporu (sayfalı). <c>from</c>/<c>to</c> UTC — rapor tarih ekseni: <c>AppliedAtUtc</c> varsa o, yoksa <c>DueAtUtc</c>; kapalı aralık.
+    /// Aşı raporu (sayfalı). <c>from</c>/<c>to</c> UTC kapalı aralık; rapor tarih ekseni §31.1 (Applied → <c>AppliedAtUtc</c>; Scheduled/Cancelled → <c>DueAtUtc</c>).
     /// </summary>
     [HttpGet("vaccinations")]
     [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
@@ -348,6 +345,7 @@ public sealed class ReportsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Aşı raporu CSV (UTF-8 BOM; <c>;</c>). Filtreler JSON ile aynı; sayfa yok.</summary>
     [HttpGet("vaccinations/export")]
     [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
@@ -373,10 +371,10 @@ public sealed class ReportsController : ControllerBase
             return result.ToActionResult(this);
 
         var v = result.Value!;
-        const string contentType = "text/csv; charset=utf-8";
-        return File(v.ContentUtf8Bom, contentType, v.FileDownloadName);
+        return File(v.ContentUtf8Bom, ReportFileContentTypes.CsvUtf8, v.FileDownloadName);
     }
 
+    /// <summary>Aşı raporu XLSX; filtreler CSV/JSON ile aynı; sayfa yok.</summary>
     [HttpGet("vaccinations/export-xlsx")]
     [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
@@ -402,7 +400,6 @@ public sealed class ReportsController : ControllerBase
             return result.ToActionResult(this);
 
         var v = result.Value!;
-        const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        return File(v.Content, contentType, v.FileDownloadName);
+        return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
     }
 }

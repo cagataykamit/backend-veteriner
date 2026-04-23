@@ -1,12 +1,13 @@
+using Backend.Veteriner.Application.Reports;
+
 namespace Backend.Veteriner.Application.Reports.Examinations;
 
-/// <summary>Muayene raporu tarih aralığı ve export tavanı (dashboard ile karıştırılmaz).</summary>
+/// <summary>Muayene raporu sabitleri; sayısal tavanlar <see cref="ReportsSharedLimits"/> ile hizalıdır.</summary>
 public static class ExaminationsReportConstants
 {
-    public const int MaxRangeDays = 93;
+    public const int MaxRangeDays = ReportsSharedLimits.MaxRangeDays;
 
-    public const int MaxPageSize = 200;
+    public const int MaxPageSize = ReportsSharedLimits.MaxPageSize;
 
-    /// <summary>CSV/XLSX export satır üst sınırı (ödeme/randevu raporu ile aynı).</summary>
-    public const int MaxExportRows = 50_000;
+    public const int MaxExportRows = ReportsSharedLimits.MaxExportRows;
 }
