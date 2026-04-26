@@ -103,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<IClinicContext, ClinicContext>();
         services.AddScoped<ICurrentUserPermissionChecker, CurrentUserPermissionChecker>();
+        services.AddScoped<ICurrentUserRoleAccessor, CurrentUserRoleAccessor>();
         services.AddScoped<IAppUrlProvider, AppUrlProvider>();
         services.AddScoped<IAuditContext, HttpAuditContext>();
         services.AddScoped<IAuditLogWriter, AuditLogWriter>();
