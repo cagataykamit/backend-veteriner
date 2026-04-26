@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Appointments.Commands.Update;
 using Backend.Veteriner.Application.Appointments.Contracts;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.Queries.GetById;
+using Backend.Veteriner.Application.Appointments.Queries.GetCalendar;
 using Backend.Veteriner.Application.Appointments.Queries.GetList;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -127,6 +128,33 @@ public sealed class AppointmentsController : ControllerBase
                 status,
                 dateFromUtc,
                 dateToUtc),
+            ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Takvim görünümü için hafif randevu listesi. dateFromUtc/dateToUtc zorunludur; aralık en fazla 45 gün.
+    /// </summary>
+    [HttpGet("calendar")]
+    [Authorize(Policy = PermissionCatalog.Appointments.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<AppointmentCalendarItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetCalendar(
+        [FromQuery] DateTime? dateFromUtc,
+        [FromQuery] DateTime? dateToUtc,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] AppointmentStatus? status = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new GetAppointmentsCalendarQuery(
+                dateFromUtc,
+                dateToUtc,
+                clinicId,
+                status),
             ct);
         return result.ToActionResult(this);
     }
