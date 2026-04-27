@@ -93,6 +93,12 @@ public static class PermissionCatalog
         public const string Read = "Dashboard.Read";
     }
 
+    public static class Reminders
+    {
+        public const string Read = "Reminders.Read";
+        public const string Manage = "Reminders.Manage";
+    }
+
     public static class Examinations
     {
         public const string Read = "Examinations.Read";
@@ -200,6 +206,9 @@ public static class PermissionCatalog
         new(Appointments.Reschedule, "Planlanmış randevuyu yeniden zamanlama yetkisi", "Appointments"),
 
         new(Dashboard.Read, "Klinik paneli özet dashboard verilerini görüntüleme yetkisi", "Dashboard"),
+
+        new(Reminders.Read, "Reminder ayarlarını ve reminder loglarını görüntüleme yetkisi", "Reminders"),
+        new(Reminders.Manage, "Reminder ayarlarını güncelleme yetkisi", "Reminders"),
 
         new(Examinations.Read, "Muayene kayıtlarını listeleme ve görüntüleme yetkisi", "Examinations"),
         new(Examinations.Create, "Muayene kaydı oluşturma yetkisi", "Examinations"),

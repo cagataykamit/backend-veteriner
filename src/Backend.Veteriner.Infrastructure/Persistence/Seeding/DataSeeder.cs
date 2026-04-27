@@ -67,11 +67,17 @@ public static class DataSeeder
             }
         }
 
-        if (!await db.UserTenants.AnyAsync(x => x.UserId == user.Id && x.TenantId == tenant.Id, ct))
+        var hasUserTenantLink = await db.UserTenants.AnyAsync(x => x.UserId == user.Id, ct);
+        if (!hasUserTenantLink)
         {
             await db.UserTenants.AddAsync(new UserTenant(user.Id, tenant.Id), ct);
             await db.SaveChangesAsync(ct);
             logger?.LogInformation("UserTenant link seeded for admin and default tenant.");
+        }
+        else if (!await db.UserTenants.AnyAsync(x => x.UserId == user.Id && x.TenantId == tenant.Id, ct))
+        {
+            logger?.LogWarning(
+                "Admin user already has a tenant link with different tenant. Default tenant link skipped to preserve single-tenant constraint.");
         }
 
         var seedClinic = await db.Clinics.FirstOrDefaultAsync(

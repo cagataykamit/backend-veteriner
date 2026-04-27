@@ -33,10 +33,19 @@ public static class RolePermissionBindings
             ["Admin"] = new[]
             {
                 PermissionCatalog.Clinics.Update,
+                PermissionCatalog.Reminders.Read,
+                PermissionCatalog.Reminders.Manage,
+            },
+            ["Owner"] = new[]
+            {
+                PermissionCatalog.Reminders.Read,
+                PermissionCatalog.Reminders.Manage,
             },
             ["ClinicAdmin"] = new[]
             {
                 PermissionCatalog.Clinics.Update,
+                PermissionCatalog.Reminders.Read,
+                PermissionCatalog.Reminders.Manage,
             },
         };
 }

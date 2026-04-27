@@ -7,6 +7,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.LabResults;
@@ -80,6 +81,8 @@ public class AppDbContext : DbContext
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<LabResult> LabResults => Set<LabResult>();
     public DbSet<Hospitalization> Hospitalizations => Set<Hospitalization>();
+    public DbSet<TenantReminderSettings> TenantReminderSettings => Set<TenantReminderSettings>();
+    public DbSet<ReminderDispatchLog> ReminderDispatchLogs => Set<ReminderDispatchLog>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

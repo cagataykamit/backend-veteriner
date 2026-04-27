@@ -81,6 +81,61 @@ public sealed class RolePermissionBindingSeederTests
         var clinicAdminLinks = await db.OperationClaimPermissions
             .CountAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == clinicsUpdateId);
         clinicAdminLinks.Should().Be(1, "ClinicAdmin rolü Clinics.Update bağını tam olarak bir kez almalı");
+
+        var remindersReadId = await GetPermissionIdAsync(db, PermissionCatalog.Reminders.Read);
+        var remindersManageId = await GetPermissionIdAsync(db, PermissionCatalog.Reminders.Manage);
+
+        var clinicAdminRemindersRead = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == remindersReadId);
+        clinicAdminRemindersRead.Should().Be(1, "ClinicAdmin rolü Reminders.Read bağını almalı");
+
+        var clinicAdminRemindersManage = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == remindersManageId);
+        clinicAdminRemindersManage.Should().Be(1, "ClinicAdmin rolü Reminders.Manage bağını almalı");
+    }
+
+    [Fact]
+    public async Task Seed_Should_Bind_RemindersReadAndManage_To_Admin_And_Owner()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+
+        var hasher = new StubBcryptPasswordHasher();
+
+        await PermissionSeeder.SeedAsync(db);
+        await DataSeeder.SeedAsync(db, hasher);
+        await AdminClaimSeeder.SeedAsync(db);
+        await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
+
+        var ownerClaim = await db.OperationClaims.FirstOrDefaultAsync(x => x.Name == "Owner");
+        if (ownerClaim is null)
+        {
+            ownerClaim = new OperationClaim("Owner");
+            await db.OperationClaims.AddAsync(ownerClaim);
+            await db.SaveChangesAsync();
+        }
+
+        await RolePermissionBindingSeeder.SeedAsync(db);
+
+        var remindersReadId = await GetPermissionIdAsync(db, PermissionCatalog.Reminders.Read);
+        var remindersManageId = await GetPermissionIdAsync(db, PermissionCatalog.Reminders.Manage);
+        var adminClaimId = await GetClaimIdAsync(db, "Admin");
+        var ownerClaimId = await GetClaimIdAsync(db, "Owner");
+
+        var adminRead = await db.OperationClaimPermissions.CountAsync(x =>
+            x.OperationClaimId == adminClaimId && x.PermissionId == remindersReadId);
+        var adminManage = await db.OperationClaimPermissions.CountAsync(x =>
+            x.OperationClaimId == adminClaimId && x.PermissionId == remindersManageId);
+
+        var ownerRead = await db.OperationClaimPermissions.CountAsync(x =>
+            x.OperationClaimId == ownerClaimId && x.PermissionId == remindersReadId);
+        var ownerManage = await db.OperationClaimPermissions.CountAsync(x =>
+            x.OperationClaimId == ownerClaimId && x.PermissionId == remindersManageId);
+
+        adminRead.Should().Be(1);
+        adminManage.Should().Be(1);
+        ownerRead.Should().Be(1);
+        ownerManage.Should().Be(1);
     }
 
     [Fact]
