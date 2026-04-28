@@ -3,6 +3,7 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
+using Serilog;
 
 namespace Backend.Veteriner.Infrastructure.Mailing;
 
@@ -86,6 +87,18 @@ public sealed class MailKitEmailSender : IEmailSenderImmediate
                 ? SecureSocketOptions.StartTls
                 : (_opt.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None)
         };
+
+        var hasPassword = !string.IsNullOrWhiteSpace(_opt.Pass);
+        var passwordLength = _opt.Pass?.Length ?? 0;
+        Log.Debug(
+            "SMTP runtime options Host={Host} Port={Port} User={User} From={From} Secure={Secure} PasswordPresent={PasswordPresent} PasswordLength={PasswordLength}",
+            _opt.Host,
+            _opt.Port,
+            _opt.User ?? string.Empty,
+            _opt.From,
+            secure,
+            hasPassword,
+            passwordLength);
 
         await client.ConnectAsync(_opt.Host, _opt.Port, secure, ct);
 

@@ -42,8 +42,6 @@ public sealed class ReminderDispatchLog : AggregateRoot
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
         if (sourceEntityId == Guid.Empty)
             throw new ArgumentException("SourceEntityId geçersiz.", nameof(sourceEntityId));
-        if (string.IsNullOrWhiteSpace(recipientEmail))
-            throw new ArgumentException("RecipientEmail boş olamaz.", nameof(recipientEmail));
         if (string.IsNullOrWhiteSpace(dedupeKey))
             throw new ArgumentException("DedupeKey boş olamaz.", nameof(dedupeKey));
 
@@ -52,7 +50,9 @@ public sealed class ReminderDispatchLog : AggregateRoot
         ReminderType = reminderType;
         SourceEntityType = sourceEntityType;
         SourceEntityId = sourceEntityId;
-        RecipientEmail = recipientEmail.Trim().ToLowerInvariant();
+        RecipientEmail = string.IsNullOrWhiteSpace(recipientEmail)
+            ? string.Empty
+            : recipientEmail.Trim().ToLowerInvariant();
         RecipientName = string.IsNullOrWhiteSpace(recipientName) ? string.Empty : recipientName.Trim();
         ScheduledForUtc = NormalizeUtc(scheduledForUtc);
         ReminderDueAtUtc = NormalizeUtc(reminderDueAtUtc);
@@ -60,6 +60,30 @@ public sealed class ReminderDispatchLog : AggregateRoot
         DedupeKey = dedupeKey.Trim();
         CreatedAtUtc = DateTime.UtcNow;
         UpdatedAtUtc = null;
+    }
+
+    public void MarkEnqueued(Guid? outboxMessageId = null)
+    {
+        Status = ReminderDispatchStatus.Enqueued;
+        OutboxMessageId = outboxMessageId;
+        LastError = null;
+        FailedAtUtc = null;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void MarkFailed(string? error)
+    {
+        Status = ReminderDispatchStatus.Failed;
+        LastError = string.IsNullOrWhiteSpace(error) ? "Unknown reminder enqueue error." : error.Trim();
+        FailedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void MarkSkipped(string reason)
+    {
+        Status = ReminderDispatchStatus.Skipped;
+        LastError = string.IsNullOrWhiteSpace(reason) ? "Reminder skipped." : reason.Trim();
+        UpdatedAtUtc = DateTime.UtcNow;
     }
 
     private static DateTime NormalizeUtc(DateTime value)

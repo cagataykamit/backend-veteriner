@@ -15,6 +15,7 @@ using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaimPe
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaims;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.UserOperationClaims;
+using Backend.Veteriner.Infrastructure.Reminders;
 using Backend.Veteriner.Infrastructure.Security;                                  // JwtOptions, JwtTokenService, Sha256TokenHashService, BcryptPasswordHasher, JwtOptionsProvider
 using Backend.Veteriner.Infrastructure.Web;                                       // ClientContext, TenantContext, ClinicContext, AppUrlProvider, HttpAuditContext, CurrentUserPermissionChecker
 using Backend.Veteriner.Infrastructure.Auditing;                                  // AuditLogWriter
@@ -140,6 +141,10 @@ public static class DependencyInjection
         services.AddScoped<IBillingWebhookSignatureVerifier, BillingWebhookSignatureVerifier>();
         services.AddScoped<IBillingWebhookPayloadParser, BillingWebhookPayloadParser>();
         services.AddHostedService<ScheduledPlanChangeProcessorHostedService>();
+
+        services.Configure<ReminderProcessorOptions>(configuration.GetSection("Reminders:Processor"));
+        services.AddScoped<ReminderProcessorService>();
+        services.AddHostedService<ReminderProcessorHostedService>();
 
         // ===== Permission options =====
         services.Configure<PermissionChangeOptions>(configuration.GetSection("PermissionChange"));
