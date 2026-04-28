@@ -74,10 +74,18 @@ public sealed class MailKitEmailSender : IEmailSenderImmediate
 
         using var client = new SmtpClient();
 
-        // ?? Ba�lant� g�venli�i se�imi
-        var secure = _opt.EnableSsl
-            ? SecureSocketOptions.SslOnConnect
-            : (_opt.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None);
+        // Port bazlı güvenli bağlantı seçimi:
+        // - 587: STARTTLS
+        // - 465: SSL on connect
+        // Diğer portlarda mevcut option davranışını koru.
+        var secure = _opt.Port switch
+        {
+            587 => SecureSocketOptions.StartTls,
+            465 => SecureSocketOptions.SslOnConnect,
+            _ => _opt.EnableSsl
+                ? SecureSocketOptions.StartTls
+                : (_opt.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None)
+        };
 
         await client.ConnectAsync(_opt.Host, _opt.Port, secure, ct);
 
