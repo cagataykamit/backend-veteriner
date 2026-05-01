@@ -22,16 +22,16 @@
 		</PackageReference>
 
 		<!-- OpenTelemetry çekirdek -->
-		<PackageReference Include="OpenTelemetry" Version="1.13.1" />
-		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.13.1" />
-		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.13.1" />
+		<PackageReference Include="OpenTelemetry" Version="1.15.3" />
+		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
 
-		<!-- OpenTelemetry instrumentation (1.12.x ailesi) -->
-		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.12.0" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.12.0" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.12.0" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.12.0-beta.3" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.12.0-beta.2" />
+		<!-- OpenTelemetry instrumentation (1.15.x ailesi, OTel core ile hizalı) -->
+		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.15.2" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.15.1-beta.1" />
 
 		<!-- Serilog & Swagger -->
 		<PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />

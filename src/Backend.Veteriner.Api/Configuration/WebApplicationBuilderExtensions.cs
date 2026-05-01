@@ -216,7 +216,7 @@ public static class WebApplicationBuilderExtensions
                 })
                 .AddHttpClientInstrumentation(o => o.RecordException = true)
                 .AddSqlClientInstrumentation(o => o.RecordException = true)
-                .AddEntityFrameworkCoreInstrumentation(o => { o.SetDbStatementForText = false; })
+                .AddEntityFrameworkCoreInstrumentation()
                 .AddSource("Backend.Veteriner.Outbox")
                 .AddSource("Backend.Veteriner.Mailing")
                 .AddOtlpExporter(o =>
