@@ -66,8 +66,18 @@ public sealed class ReminderDispatchLog : AggregateRoot
     {
         Status = ReminderDispatchStatus.Enqueued;
         OutboxMessageId = outboxMessageId;
+        SentAtUtc = null;
         LastError = null;
         FailedAtUtc = null;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void MarkSent(DateTime sentAtUtc)
+    {
+        Status = ReminderDispatchStatus.Sent;
+        SentAtUtc = NormalizeUtc(sentAtUtc);
+        FailedAtUtc = null;
+        LastError = null;
         UpdatedAtUtc = DateTime.UtcNow;
     }
 
@@ -76,6 +86,14 @@ public sealed class ReminderDispatchLog : AggregateRoot
         Status = ReminderDispatchStatus.Failed;
         LastError = string.IsNullOrWhiteSpace(error) ? "Unknown reminder enqueue error." : error.Trim();
         FailedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void MarkFailed(DateTime failedAtUtc, string? error)
+    {
+        Status = ReminderDispatchStatus.Failed;
+        FailedAtUtc = NormalizeUtc(failedAtUtc);
+        LastError = string.IsNullOrWhiteSpace(error) ? "Unknown reminder send error." : error.Trim();
         UpdatedAtUtc = DateTime.UtcNow;
     }
 

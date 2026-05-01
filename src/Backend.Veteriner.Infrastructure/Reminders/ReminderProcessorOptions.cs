@@ -6,4 +6,5 @@ public sealed class ReminderProcessorOptions
     public int IntervalMinutes { get; init; } = 5;
     public int BatchSize { get; init; } = 100;
     public int WindowToleranceMinutes { get; init; } = 10;
+    public int LegacyEnqueuedReconcileAfterMinutes { get; init; } = 30;
 }

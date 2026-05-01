@@ -1,10 +1,10 @@
-using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,18 +14,18 @@ namespace Backend.Veteriner.Infrastructure.Reminders;
 public sealed class ReminderProcessorService
 {
     private readonly AppDbContext _db;
-    private readonly IEmailSender _emailSender;
+    private readonly IReminderEmailOutboxEnqueuer _reminderEmailOutboxEnqueuer;
     private readonly ReminderProcessorOptions _options;
     private readonly ILogger<ReminderProcessorService> _logger;
 
     public ReminderProcessorService(
         AppDbContext db,
-        IEmailSender emailSender,
+        IReminderEmailOutboxEnqueuer reminderEmailOutboxEnqueuer,
         IOptions<ReminderProcessorOptions> options,
         ILogger<ReminderProcessorService> logger)
     {
         _db = db;
-        _emailSender = emailSender;
+        _reminderEmailOutboxEnqueuer = reminderEmailOutboxEnqueuer;
         _options = options.Value;
         _logger = logger;
     }
@@ -37,6 +37,7 @@ public sealed class ReminderProcessorService
 
         var batchSize = Math.Clamp(_options.BatchSize, 1, 500);
         var toleranceMinutes = Math.Clamp(_options.WindowToleranceMinutes, 1, 120);
+        var legacyReconcileAfterMinutes = Math.Clamp(_options.LegacyEnqueuedReconcileAfterMinutes, 5, 24 * 60);
         var nowUtc = DateTime.UtcNow;
         var toleranceStartUtc = nowUtc.AddMinutes(-toleranceMinutes);
 
@@ -45,17 +46,12 @@ public sealed class ReminderProcessorService
             .Where(x => x.EmailChannelEnabled && (x.AppointmentRemindersEnabled || x.VaccinationRemindersEnabled))
             .ToListAsync(ct);
 
-        if (settingsRows.Count == 0)
-            return;
-
         var tenantIds = settingsRows.Select(x => x.TenantId).Distinct().ToArray();
         var activeTenantIds = await _db.Tenants
             .AsNoTracking()
             .Where(t => tenantIds.Contains(t.Id) && t.IsActive)
             .Select(t => t.Id)
             .ToListAsync(ct);
-        if (activeTenantIds.Count == 0)
-            return;
 
         var subscriptions = await _db.TenantSubscriptions
             .AsNoTracking()
@@ -97,6 +93,9 @@ public sealed class ReminderProcessorService
                     ct);
             }
         }
+
+        await SyncEnqueuedDispatchLogsWithOutboxStatusAsync(batchSize, ct);
+        await ReconcileLegacyEnqueuedLogsWithoutOutboxIdAsync(batchSize, nowUtc, legacyReconcileAfterMinutes, ct);
     }
 
     private async Task ProcessAppointmentRemindersAsync(
@@ -207,8 +206,13 @@ public sealed class ReminderProcessorService
                     $"Sayın {recipientName},\n" +
                     $"{petName} için {clinicName} kliniğinde {FormatForDisplay(candidate.ScheduledAtUtc)} tarihinde planlanan randevunuzu hatırlatırız.";
 
-                await _emailSender.SendAsync(recipientEmail, subject, body, ct, isHtml: false);
-                log.MarkEnqueued();
+                var outboxMessageId = await _reminderEmailOutboxEnqueuer.EnqueueReminderEmailAsync(
+                    recipientEmail,
+                    subject,
+                    body,
+                    isHtml: false,
+                    ct);
+                log.MarkEnqueued(outboxMessageId);
             }
             catch (Exception ex)
             {
@@ -216,7 +220,7 @@ public sealed class ReminderProcessorService
                 _logger.LogWarning(ex, "Appointment reminder enqueue failed. Tenant={TenantId} Appointment={AppointmentId}", tenantId, candidate.AppointmentId);
             }
 
-            if (await TryInsertLogAsync(log, ct))
+            if (await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId))
                 dedupeSet.Add(dedupeKey);
         }
     }
@@ -330,8 +334,13 @@ public sealed class ReminderProcessorService
                     $"Sayın {recipientName},\n" +
                     $"{petName} için {candidate.VaccineName} aşısının {FormatForDisplay(candidate.DueAtUtc)} tarihinde planlandığını hatırlatırız. ({clinicName})";
 
-                await _emailSender.SendAsync(recipientEmail, subject, body, ct, isHtml: false);
-                log.MarkEnqueued();
+                var outboxMessageId = await _reminderEmailOutboxEnqueuer.EnqueueReminderEmailAsync(
+                    recipientEmail,
+                    subject,
+                    body,
+                    isHtml: false,
+                    ct);
+                log.MarkEnqueued(outboxMessageId);
             }
             catch (Exception ex)
             {
@@ -339,12 +348,87 @@ public sealed class ReminderProcessorService
                 _logger.LogWarning(ex, "Vaccination reminder enqueue failed. Tenant={TenantId} Vaccination={VaccinationId}", tenantId, candidate.VaccinationId);
             }
 
-            if (await TryInsertLogAsync(log, ct))
+            if (await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId))
                 dedupeSet.Add(dedupeKey);
         }
     }
 
-    private async Task<bool> TryInsertLogAsync(ReminderDispatchLog log, CancellationToken ct)
+    private async Task SyncEnqueuedDispatchLogsWithOutboxStatusAsync(int batchSize, CancellationToken ct)
+    {
+        var enqueuedLogs = await _db.ReminderDispatchLogs
+            .Where(x => x.Status == ReminderDispatchStatus.Enqueued && x.OutboxMessageId != null)
+            .OrderBy(x => x.CreatedAtUtc)
+            .Take(batchSize)
+            .ToListAsync(ct);
+
+        if (enqueuedLogs.Count == 0)
+            return;
+
+        var outboxIds = enqueuedLogs
+            .Select(x => x.OutboxMessageId!.Value)
+            .Distinct()
+            .ToArray();
+
+        var outboxById = await _db.OutboxMessages
+            .AsNoTracking()
+            .Where(x => outboxIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        var hasChanges = false;
+        foreach (var log in enqueuedLogs)
+        {
+            if (log.OutboxMessageId is null)
+                continue;
+
+            if (!outboxById.TryGetValue(log.OutboxMessageId.Value, out var outbox))
+                continue;
+
+            if (outbox.ProcessedAtUtc.HasValue)
+            {
+                log.MarkSent(outbox.ProcessedAtUtc.Value);
+                hasChanges = true;
+                continue;
+            }
+
+            if (outbox.DeadLetterAtUtc.HasValue)
+            {
+                log.MarkFailed(
+                    outbox.DeadLetterAtUtc.Value,
+                    BuildOutboxFailureSummary(outbox));
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges)
+            await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task ReconcileLegacyEnqueuedLogsWithoutOutboxIdAsync(
+        int batchSize,
+        DateTime nowUtc,
+        int staleAfterMinutes,
+        CancellationToken ct)
+    {
+        var cutoffUtc = nowUtc.AddMinutes(-staleAfterMinutes);
+        var legacyLogs = await _db.ReminderDispatchLogs
+            .Where(x => x.Status == ReminderDispatchStatus.Enqueued
+                        && x.OutboxMessageId == null
+                        && x.CreatedAtUtc <= cutoffUtc)
+            .OrderBy(x => x.CreatedAtUtc)
+            .Take(batchSize)
+            .ToListAsync(ct);
+
+        if (legacyLogs.Count == 0)
+            return;
+
+        const string message = "Gönderim sonucu doğrulanamadı. Lütfen gerekirse yeniden hatırlatma oluşturun.";
+        foreach (var log in legacyLogs)
+            log.MarkFailed(nowUtc, message);
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task<bool> TryInsertLogAsync(ReminderDispatchLog log, CancellationToken ct, Guid? detachOutboxMessageIdOnConflict = null)
     {
         try
         {
@@ -355,9 +439,26 @@ public sealed class ReminderProcessorService
         catch (DbUpdateException ex) when (IsDedupeConflict(ex))
         {
             _db.Entry(log).State = EntityState.Detached;
+            if (detachOutboxMessageIdOnConflict.HasValue)
+            {
+                var outboxEntry = _db.ChangeTracker.Entries<OutboxMessage>()
+                    .FirstOrDefault(x => x.Entity.Id == detachOutboxMessageIdOnConflict.Value && x.State == EntityState.Added);
+                if (outboxEntry is not null)
+                    outboxEntry.State = EntityState.Detached;
+            }
+
             _logger.LogDebug("Reminder dedupe conflict skipped. Tenant={TenantId} DedupeKey={DedupeKey}", log.TenantId, log.DedupeKey);
             return false;
         }
+    }
+
+    private static string BuildOutboxFailureSummary(OutboxMessage outboxMessage)
+    {
+        if (!string.IsNullOrWhiteSpace(outboxMessage.LastError))
+            return outboxMessage.LastError!;
+        if (!string.IsNullOrWhiteSpace(outboxMessage.Error))
+            return outboxMessage.Error!.Length > 1000 ? outboxMessage.Error[..1000] : outboxMessage.Error;
+        return "Outbox message moved to dead-letter.";
     }
 
     private static bool IsDedupeConflict(DbUpdateException ex)

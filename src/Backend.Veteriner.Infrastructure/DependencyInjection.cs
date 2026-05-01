@@ -143,6 +143,7 @@ public static class DependencyInjection
         services.AddHostedService<ScheduledPlanChangeProcessorHostedService>();
 
         services.Configure<ReminderProcessorOptions>(configuration.GetSection("Reminders:Processor"));
+        services.AddScoped<IReminderEmailOutboxEnqueuer, ReminderEmailOutboxEnqueuer>();
         services.AddScoped<ReminderProcessorService>();
         services.AddHostedService<ReminderProcessorHostedService>();
 
