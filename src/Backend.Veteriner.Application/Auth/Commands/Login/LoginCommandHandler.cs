@@ -14,11 +14,15 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Backend.Veteriner.Application.Auth.Commands.Login;
 
 public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginResultDto>>
 {
+    /// <summary>Tanılama: ardışık login denemelerinde userLookup süresini karşılaştırmak için (1. genelde soğuk path).</summary>
+    private static long _loginUserLookupAttemptCounter;
+
     private readonly IUserReadRepository _users;
     private readonly IPasswordHasher _hasher;
     private readonly IJwtTokenService _jwt;
@@ -97,8 +101,24 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         var loginEmail = request.Email.Trim();
         MarkStep("normalizeEmail");
 
+        var lookupAttempt = Interlocked.Increment(ref _loginUserLookupAttemptCounter);
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug(
+                "Login userLookup step: attempt #{Attempt} calling IUserReadRepository.GetForLoginByEmailAsync (stopwatch step starts after normalizeEmail)",
+                lookupAttempt);
+        }
+
         var loginUser = await _users.GetForLoginByEmailAsync(loginEmail, ct);
         MarkStep("userLookup");
+
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug(
+                "Login userLookup step: attempt #{Attempt} finished; MarkStep userLookup = {UserLookupMs}ms (compare attempt 1 vs 2 for cold pool / warmup)",
+                lookupAttempt,
+                stepElapsedMs.GetValueOrDefault("userLookup", -1));
+        }
 
         if (loginUser is null)
         {

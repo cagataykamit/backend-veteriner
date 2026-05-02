@@ -1,10 +1,12 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Users.Contracts.Dtos;
 using Backend.Veteriner.Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Repositories;
 
@@ -19,22 +21,54 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Repositories;
 public sealed class UserRepository : EfRepository<User>, IUserRepository
 {
     private readonly AppDbContext _db;
+    private readonly ILogger<UserRepository> _logger;
 
-    public UserRepository(AppDbContext db) : base(db)
-        => _db = db;
+    public UserRepository(AppDbContext db, ILogger<UserRepository> logger) : base(db)
+    {
+        _db = db;
+        _logger = logger;
+    }
 
     /// <inheritdoc />
-    public Task<LoginUserLookupResult?> GetForLoginByEmailAsync(string email, CancellationToken ct = default)
+    /// <remarks>
+    /// Yalnızca <c>Users</c> kolonları; owned <c>UserRoles</c> bu sorguya dahil edilmez.
+    /// Yavaşlık görülüp EF.SlowSql düşmüyorsa süre çoğunlukla bağlantı havuzu / ilk açılış / ağdur;
+    /// DbConnectionSlowOpenInterceptor logları ile birlikte değerlendirin.
+    /// </remarks>
+    public async Task<LoginUserLookupResult?> GetForLoginByEmailAsync(string email, CancellationToken ct = default)
     {
-        return _db.Users
+        var query = _db.Users
             .AsNoTracking()
             .Where(u => u.Email == email)
+            .TagWith("login:user-lookup projection (Users only, no UserRoles)")
             .Select(u => new LoginUserLookupResult(
                 u.Id,
                 u.Email,
                 u.EmailConfirmed,
-                u.PasswordHash))
-            .FirstOrDefaultAsync(ct);
+                u.PasswordHash));
+
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            try
+            {
+                _logger.LogDebug("Login user lookup SQL preview: {Sql}", query.ToQueryString());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Login user lookup: ToQueryString unavailable");
+            }
+        }
+
+        var sw = Stopwatch.StartNew();
+        var result = await query.FirstOrDefaultAsync(ct);
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug(
+                "Login user lookup completed: wall-clock {ElapsedMs}ms (connection lease + execute + reader + scalar materialization; single FirstOrDefaultAsync)",
+                sw.ElapsedMilliseconds);
+        }
+
+        return result;
     }
 
     /// <inheritdoc />
