@@ -1,10 +1,11 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Tenants.Specs;
-using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
@@ -66,11 +67,13 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         var querySteps = 0;
         var slowestStep = string.Empty;
         long slowestMs = 0;
+        var stepElapsedMs = new Dictionary<string, long>(StringComparer.Ordinal);
 
         void MarkStep(string name)
         {
             querySteps++;
             var elapsed = stepSw.ElapsedMilliseconds;
+            stepElapsedMs[name] = elapsed;
             if (elapsed > slowestMs)
             {
                 slowestMs = elapsed;
@@ -80,23 +83,59 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
             stepSw.Restart();
         }
 
-        var user = await _users.FirstOrDefaultAsync(new UserByEmailSpec(request.Email), ct);
-        MarkStep("userByEmail");
-
-        if (user is null || !_hasher.Verify(request.Password, user.PasswordHash))
+        void LogStepBreakdown(string outcome)
         {
+            if (!_logger.IsEnabled(LogLevel.Debug))
+                return;
+
+            var summary = string.Join(
+                ", ",
+                stepElapsedMs.Select(kv => $"{kv.Key}={kv.Value}ms"));
+            _logger.LogDebug("Login perf ({Outcome}): {Steps}", outcome, summary);
+        }
+
+        var loginEmail = request.Email.Trim();
+        MarkStep("normalizeEmail");
+
+        var loginUser = await _users.GetForLoginByEmailAsync(loginEmail, ct);
+        MarkStep("userLookup");
+
+        if (loginUser is null)
+        {
+            LogStepBreakdown("invalid-credentials");
             return Result<LoginResultDto>.Failure(
                 "Auth.Unauthorized.InvalidCredentials",
                 "Kullanıcı veya şifre hatalı.");
         }
 
+        var passwordOk = _hasher.Verify(request.Password, loginUser.PasswordHash);
+        MarkStep("passwordVerify");
+
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            var wf = TryParseBcryptWorkFactor(loginUser.PasswordHash);
+            if (wf.HasValue)
+                _logger.LogDebug("Login BCrypt work factor (cost) from stored hash: {WorkFactor}", wf.Value);
+        }
+
+        if (!passwordOk)
+        {
+            LogStepBreakdown("invalid-credentials");
+            return Result<LoginResultDto>.Failure(
+                "Auth.Unauthorized.InvalidCredentials",
+                "Kullanıcı veya şifre hatalı.");
+        }
+
+        var roleNames = await _users.GetRoleNamesByUserIdAsync(loginUser.Id, ct);
+        MarkStep("roleNamesLookup");
+
         if (_sessionOpt.SingleSessionPerUser)
         {
-            await _refreshRepo.RevokeAllByUserAsync(user.Id, ct);
+            await _refreshRepo.RevokeAllByUserAsync(loginUser.Id, ct);
             MarkStep("revokeAllSessions");
         }
 
-        var permissionCodes = await _permissionReader.GetPermissionsAsync(user.Id, principal: null, ct)
+        var permissionCodes = await _permissionReader.GetPermissionsAsync(loginUser.Id, principal: null, ct)
                               ?? Array.Empty<string>();
         MarkStep("permissionCodes");
         var extraClaims = new List<Claim>(permissionCodes.Count + 2);
@@ -104,10 +143,10 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
             extraClaims.Add(new Claim("permission", code));
         MarkStep("permissionClaimsBuild");
 
-        if (IsPlatformAdmin(user))
+        if (IsPlatformAdmin(roleNames))
             extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));
 
-        var memberships = await _userTenants.GetTenantIdsByUserIdAsync(user.Id, ct);
+        var memberships = await _userTenants.GetTenantIdsByUserIdAsync(loginUser.Id, ct);
         MarkStep("tenantMemberships");
         var distinctTenantIds = memberships.Distinct().ToList();
         if (distinctTenantIds.Count == 0)
@@ -150,7 +189,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
                 "Pasif kiracı için oturum açılamaz.");
         }
 
-        if (!await _userTenants.ExistsAsync(user.Id, tenantId, ct))
+        if (!await _userTenants.ExistsAsync(loginUser.Id, tenantId, ct))
         {
             return Result<LoginResultDto>.Failure(
                 "Auth.TenantNotMember",
@@ -160,13 +199,17 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
 
         extraClaims.Add(new Claim(VeterinerClaims.TenantId, tenantId.ToString("D")));
 
-        var (access, refreshRaw, accessExp) = _jwt.Create(user, extraClaims);
+        var (access, refreshRaw, accessExp) = _jwt.Create(
+            loginUser.Id,
+            loginUser.Email,
+            roleNames,
+            extraClaims);
         MarkStep("jwtCreate");
 
         var refreshHash = _tokenHash.ComputeSha256(refreshRaw);
 
         var rt = new Backend.Veteriner.Domain.Users.RefreshToken(
-            user.Id,
+            loginUser.Id,
             refreshHash,
             DateTime.UtcNow.AddDays(_jwtOpt.RefreshTokenDays),
             _client.IpAddress,
@@ -174,24 +217,41 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
             tenantId,
             clinicId: null);
 
-        user.AddRefreshToken(rt);
         await _refreshRepo.AddAsync(rt, ct);
         await _refreshRepo.SaveChangesAsync(ct);
         MarkStep("saveRefreshToken");
 
         _logger.LogInformation(
             "Login succeeded. UserId={UserId} TenantId={TenantId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
-            user.Id,
+            loginUser.Id,
             tenantId,
             querySteps,
             slowestStep,
             slowestMs,
             totalSw.ElapsedMilliseconds);
 
+        LogStepBreakdown("success");
+
         var dto = new LoginResultDto(access, refreshRaw, accessExp, tenantId, 1);
         return Result<LoginResultDto>.Success(dto);
     }
 
-    private static bool IsPlatformAdmin(User user)
-        => user.Roles.Any(r => string.Equals(r.Name, "PlatformAdmin", StringComparison.OrdinalIgnoreCase));
+    /// <summary>
+    /// BCrypt hash formatı: $2a$10$... → segment index 2 maliyet (cost).
+    /// </summary>
+    private static int? TryParseBcryptWorkFactor(string hash)
+    {
+        if (string.IsNullOrWhiteSpace(hash))
+            return null;
+
+        // Örn: $2a$10$... → Split('$') → "", "2a", "10", ...
+        var parts = hash.Split('$');
+        if (parts.Length < 4)
+            return null;
+
+        return int.TryParse(parts[2], out var cost) ? cost : null;
+    }
+
+    private static bool IsPlatformAdmin(IReadOnlyList<string> roleNames)
+        => roleNames.Any(r => string.Equals(r, "PlatformAdmin", StringComparison.OrdinalIgnoreCase));
 }

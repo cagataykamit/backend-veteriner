@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Users.Contracts.Dtos;
@@ -20,6 +22,31 @@ public sealed class UserRepository : EfRepository<User>, IUserRepository
 
     public UserRepository(AppDbContext db) : base(db)
         => _db = db;
+
+    /// <inheritdoc />
+    public Task<LoginUserLookupResult?> GetForLoginByEmailAsync(string email, CancellationToken ct = default)
+    {
+        return _db.Users
+            .AsNoTracking()
+            .Where(u => u.Email == email)
+            .Select(u => new LoginUserLookupResult(
+                u.Id,
+                u.Email,
+                u.EmailConfirmed,
+                u.PasswordHash))
+            .FirstOrDefaultAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> GetRoleNamesByUserIdAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .SelectMany(u => u.Roles)
+            .Select(r => r.Name)
+            .ToListAsync(ct);
+    }
 
     /// <summary>
     /// Admin kullan�c� listeleme i�in sayfal� sorgu.

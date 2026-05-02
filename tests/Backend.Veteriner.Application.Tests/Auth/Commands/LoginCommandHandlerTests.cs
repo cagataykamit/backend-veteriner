@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.Security.Claims;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Auth.Commands.Login;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Tenants.Specs;
-using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
@@ -18,6 +18,9 @@ namespace Backend.Veteriner.Application.Tests.Auth.Commands;
 
 public sealed class LoginCommandHandlerTests
 {
+    private static LoginUserLookupResult ToLookup(User u)
+        => new(u.Id, u.Email, u.EmailConfirmed, u.PasswordHash);
+
     private readonly Mock<IUserReadRepository> _users = new();
     private readonly Mock<IPasswordHasher> _hasher = new();
     private readonly Mock<IJwtTokenService> _jwt = new();
@@ -34,6 +37,8 @@ public sealed class LoginCommandHandlerTests
         var opt = Options.Create(sessionOptions ?? new SessionOptions { SingleSessionPerUser = false });
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Tenant?)null);
+        _users.Setup(r => r.GetRoleNamesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<string>());
         return new LoginCommandHandler(
             _users.Object,
             _hasher.Object,
@@ -54,8 +59,8 @@ public sealed class LoginCommandHandlerTests
         var handler = CreateHandler();
         var cmd = new LoginCommand("user@example.com", "password");
 
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((LoginUserLookupResult?)null);
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
@@ -71,8 +76,8 @@ public sealed class LoginCommandHandlerTests
         var cmd = new LoginCommand("user@example.com", "wrong");
 
         var user = new User("user@example.com", "hash");
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(false);
 
         var result = await handler.Handle(cmd, CancellationToken.None);
@@ -80,6 +85,7 @@ public sealed class LoginCommandHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Auth.Unauthorized.InvalidCredentials");
         _refreshRepo.Verify(r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Never);
+        _users.Verify(r => r.GetRoleNamesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -94,8 +100,8 @@ public sealed class LoginCommandHandlerTests
         var tenant = new Tenant("Acme");
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
 
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
@@ -109,7 +115,7 @@ public sealed class LoginCommandHandlerTests
 
         _jwtOpt.SetupGet(o => o.RefreshTokenDays).Returns(7);
 
-        _jwt.Setup(j => j.Create(user, It.IsAny<IEnumerable<Claim>>()))
+        _jwt.Setup(j => j.Create(user.Id, user.Email, It.IsAny<IReadOnlyList<string>>(), It.IsAny<IEnumerable<Claim>>()))
             .Returns(("access-token", "refresh-token-raw", DateTime.UtcNow.AddMinutes(5)));
 
         _tokenHash.Setup(t => t.ComputeSha256("refresh-token-raw")).Returns("refresh-hash");
@@ -141,8 +147,8 @@ public sealed class LoginCommandHandlerTests
         var tenant = new Tenant("Acme");
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
 
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
@@ -156,8 +162,9 @@ public sealed class LoginCommandHandlerTests
         _jwtOpt.SetupGet(o => o.RefreshTokenDays).Returns(7);
 
         List<Claim>? captured = null;
-        _jwt.Setup(j => j.Create(user, It.IsAny<IEnumerable<Claim>>()))
-            .Callback<User, IEnumerable<Claim>?>((_, c) => captured = c?.ToList())
+        _jwt.Setup(j => j.Create(user.Id, user.Email, It.IsAny<IReadOnlyList<string>>(), It.IsAny<IEnumerable<Claim>>()))
+            .Callback<Guid, string, IReadOnlyList<string>, IEnumerable<Claim>?>(
+                (_, _, _, c) => captured = c?.ToList())
             .Returns(("a", "r", DateTime.UtcNow.AddMinutes(5)));
         _tokenHash.Setup(t => t.ComputeSha256("r")).Returns("h");
 
@@ -179,8 +186,8 @@ public sealed class LoginCommandHandlerTests
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         tenant.Deactivate();
 
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
 
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
@@ -205,8 +212,8 @@ public sealed class LoginCommandHandlerTests
         var tenant = new Tenant("Acme");
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
 
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
@@ -219,7 +226,7 @@ public sealed class LoginCommandHandlerTests
             .ReturnsAsync(Array.Empty<string>());
         _jwtOpt.SetupGet(o => o.RefreshTokenDays).Returns(7);
 
-        _jwt.Setup(j => j.Create(user, It.IsAny<IEnumerable<Claim>>()))
+        _jwt.Setup(j => j.Create(user.Id, user.Email, It.IsAny<IReadOnlyList<string>>(), It.IsAny<IEnumerable<Claim>>()))
             .Returns(("a", "r", DateTime.UtcNow.AddMinutes(5)));
         _tokenHash.Setup(t => t.ComputeSha256("r")).Returns("h");
 
@@ -237,8 +244,8 @@ public sealed class LoginCommandHandlerTests
         var cmd = new LoginCommand("user@example.com", "password");
         var user = new User("user@example.com", "hash");
 
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Guid> { Guid.NewGuid(), Guid.NewGuid() });
@@ -258,8 +265,8 @@ public sealed class LoginCommandHandlerTests
         var cmd = new LoginCommand("user@example.com", "password", requested);
         var user = new User("user@example.com", "hash");
 
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Guid> { memberTid });
@@ -277,8 +284,8 @@ public sealed class LoginCommandHandlerTests
         var cmd = new LoginCommand("user@example.com", "password");
         var user = new User("user@example.com", "hash");
 
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Guid>());
@@ -298,8 +305,8 @@ public sealed class LoginCommandHandlerTests
         var cmd = new LoginCommand("user@example.com", "password", wrongTid);
         var user = new User("user@example.com", "hash");
 
-        _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
         _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Guid> { onlyTid });

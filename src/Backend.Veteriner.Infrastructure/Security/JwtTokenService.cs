@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -30,32 +32,38 @@ public sealed class JwtTokenService : IJwtTokenService
         User user,
         IEnumerable<Claim>? extraClaims = null)
     {
+        var roleNames = user.Roles.Select(r => r.Name).ToList();
+        return Create(user.Id, user.Email, roleNames, extraClaims);
+    }
+
+    /// <inheritdoc />
+    public (string accessToken, string refreshToken, DateTime expiresAt) Create(
+        Guid userId,
+        string email,
+        IReadOnlyList<string> roleNames,
+        IEnumerable<Claim>? extraClaims = null)
+    {
         var now = DateTimeOffset.UtcNow;
         var jti = Guid.NewGuid().ToString("N");
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.Email, user.Email),
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(JwtRegisteredClaimNames.Email, email),
 
-            // benzersiz id
             new(JwtRegisteredClaimNames.Jti, jti),
 
-            // issued-at (epoch, integer)
             new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
 
-            // ekstra benzersiz de�er (tam farkl�l�k i�in)
             new("nonce", Guid.NewGuid().ToString("N"))
         };
 
-        // rolleri hem standard "role" hem de ClaimTypes.Role olarak yaz
-        foreach (var role in user.Roles)
+        foreach (var roleName in roleNames)
         {
-            claims.Add(new Claim("role", role.Name));               // JWT standard
-            claims.Add(new Claim(ClaimTypes.Role, role.Name));      // .NET uyumluluk
+            claims.Add(new Claim("role", roleName));
+            claims.Add(new Claim(ClaimTypes.Role, roleName));
         }
 
-        // ?? Ekstra claim'leri (permissions vb.) dahil et
         if (extraClaims is not null)
             claims.AddRange(extraClaims);
 
@@ -73,7 +81,6 @@ public sealed class JwtTokenService : IJwtTokenService
         var handler = new JwtSecurityTokenHandler();
         var accessToken = handler.WriteToken(token);
 
-        // basit refresh token (ileride persiste edip revoke edece�iz)
         var refreshToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
 
         return (accessToken, refreshToken, expires.UtcDateTime);
