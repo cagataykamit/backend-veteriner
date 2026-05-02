@@ -97,8 +97,9 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
         if (take <= 0)
             return Array.Empty<DashboardRecentClientRow>();
 
-        // Appointment -> Pet join; ClientId bazında en güncel randevu; DESC sıralı top N.
-        var topClients = await _db.Appointments.AsNoTracking()
+        // Appointment -> Pet -> Client tek projeksiyon:
+        // önce ClientId bazında son randevuyu bul, sonra aynı sorguda Client alanlarını üret.
+        var rows = await _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && a.ClinicId == clinicId)
             .Join(
                 _db.Pets.AsNoTracking().Where(p => p.TenantId == tenantId),
@@ -107,30 +108,16 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
                 (a, p) => new { p.ClientId, a.ScheduledAtUtc })
             .GroupBy(x => x.ClientId)
             .Select(g => new { ClientId = g.Key, LastAt = g.Max(x => x.ScheduledAtUtc) })
+            .Join(
+                _db.Clients.AsNoTracking().Where(c => c.TenantId == tenantId),
+                x => x.ClientId,
+                c => c.Id,
+                (x, c) => new { x.LastAt, c.Id, c.FullName, c.Phone })
             .OrderByDescending(x => x.LastAt)
-            .ThenBy(x => x.ClientId)
+            .ThenBy(x => x.Id)
             .Take(take)
+            .Select(x => new DashboardRecentClientRow(x.Id, x.FullName, x.Phone))
             .ToListAsync(ct);
-
-        if (topClients.Count == 0)
-            return Array.Empty<DashboardRecentClientRow>();
-
-        var clientIds = topClients.Select(x => x.ClientId).ToArray();
-
-        var clients = await _db.Clients.AsNoTracking()
-            .Where(c => c.TenantId == tenantId && clientIds.Contains(c.Id))
-            .Select(c => new { c.Id, c.FullName, c.Phone })
-            .ToListAsync(ct);
-
-        var byId = clients.ToDictionary(c => c.Id);
-
-        var result = new List<DashboardRecentClientRow>(topClients.Count);
-        foreach (var row in topClients)
-        {
-            if (byId.TryGetValue(row.ClientId, out var c))
-                result.Add(new DashboardRecentClientRow(c.Id, c.FullName, c.Phone));
-        }
-
-        return result;
+        return rows;
     }
 }
