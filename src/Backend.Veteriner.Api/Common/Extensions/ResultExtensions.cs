@@ -179,7 +179,7 @@ public static class ResultExtensions
             return (StatusCodes.Status400BadRequest, "https://httpstatuses.io/400");
         }
 
-        if (normalized.Contains("tenants.accessdenied") || normalized.Contains("auth.tenantnotmember"))
+        if (normalized.Contains("accessdenied") || normalized.Contains("auth.tenantnotmember"))
         {
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }

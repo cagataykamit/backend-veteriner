@@ -1,5 +1,7 @@
 using System.Reflection;
 using Backend.Veteriner.Application.Common.Behaviors;
+using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Billing;
@@ -26,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<TenantSubscriptionSeatEvaluator>();
         services.AddScoped<TenantInviteAcceptanceService>();
         services.AddScoped<ISubscriptionCheckoutActivationService, SubscriptionCheckoutActivationService>();
+        services.AddScoped<IClinicAssignmentAccessGuard, ClinicAssignmentAccessGuard>();
 
         // =========================================================
         // FluentValidation

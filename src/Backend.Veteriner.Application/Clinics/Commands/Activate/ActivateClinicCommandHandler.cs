@@ -16,18 +16,27 @@ public sealed class ActivateClinicCommandHandler
     : IRequestHandler<ActivateClinicCommand, Result<ActivateClinicResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClientContext _clientContext;
     private readonly ICurrentUserPermissionChecker _permissions;
+    private readonly IClinicAssignmentAccessGuard _assignmentGuard;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<Clinic> _clinicsWrite;
 
     public ActivateClinicCommandHandler(
         ITenantContext tenantContext,
+        IClientContext clientContext,
         ICurrentUserPermissionChecker permissions,
+        IClinicAssignmentAccessGuard assignmentGuard,
+        IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinicsRead,
         IRepository<Clinic> clinicsWrite)
     {
         _tenantContext = tenantContext;
+        _clientContext = clientContext;
         _permissions = permissions;
+        _assignmentGuard = assignmentGuard;
+        _userClinics = userClinics;
         _clinicsRead = clinicsRead;
         _clinicsWrite = clinicsWrite;
     }
@@ -54,6 +63,23 @@ public sealed class ActivateClinicCommandHandler
             return Result<ActivateClinicResultDto>.Failure(
                 "Clinics.NotFound",
                 "Klinik bulunamadı veya kiracıya ait değil.");
+        }
+
+        if (_clientContext.UserId is not { } userId)
+        {
+            return Result<ActivateClinicResultDto>.Failure(
+                "Auth.Unauthorized.UserContextMissing",
+                "Kullanıcı bağlamı yok.");
+        }
+
+        if (await _assignmentGuard.MustApplyAssignedClinicScopeAsync(userId, ct))
+        {
+            if (!await _userClinics.ExistsAsync(userId, clinic.Id, ct))
+            {
+                return Result<ActivateClinicResultDto>.Failure(
+                    "Clinics.AccessDenied",
+                    "Bu klinik için atanmış üyeliğiniz yok.");
+            }
         }
 
         if (clinic.IsActive)

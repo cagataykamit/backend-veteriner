@@ -17,18 +17,27 @@ public sealed class DeactivateClinicCommandHandler
     : IRequestHandler<DeactivateClinicCommand, Result<DeactivateClinicResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClientContext _clientContext;
     private readonly ICurrentUserPermissionChecker _permissions;
+    private readonly IClinicAssignmentAccessGuard _assignmentGuard;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<Clinic> _clinicsWrite;
 
     public DeactivateClinicCommandHandler(
         ITenantContext tenantContext,
+        IClientContext clientContext,
         ICurrentUserPermissionChecker permissions,
+        IClinicAssignmentAccessGuard assignmentGuard,
+        IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinicsRead,
         IRepository<Clinic> clinicsWrite)
     {
         _tenantContext = tenantContext;
+        _clientContext = clientContext;
         _permissions = permissions;
+        _assignmentGuard = assignmentGuard;
+        _userClinics = userClinics;
         _clinicsRead = clinicsRead;
         _clinicsWrite = clinicsWrite;
     }
@@ -55,6 +64,23 @@ public sealed class DeactivateClinicCommandHandler
             return Result<DeactivateClinicResultDto>.Failure(
                 "Clinics.NotFound",
                 "Klinik bulunamadı veya kiracıya ait değil.");
+        }
+
+        if (_clientContext.UserId is not { } userId)
+        {
+            return Result<DeactivateClinicResultDto>.Failure(
+                "Auth.Unauthorized.UserContextMissing",
+                "Kullanıcı bağlamı yok.");
+        }
+
+        if (await _assignmentGuard.MustApplyAssignedClinicScopeAsync(userId, ct))
+        {
+            if (!await _userClinics.ExistsAsync(userId, clinic.Id, ct))
+            {
+                return Result<DeactivateClinicResultDto>.Failure(
+                    "Clinics.AccessDenied",
+                    "Bu klinik için atanmış üyeliğiniz yok.");
+            }
         }
 
         if (!clinic.IsActive)

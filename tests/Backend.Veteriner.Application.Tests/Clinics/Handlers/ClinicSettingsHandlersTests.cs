@@ -22,18 +22,50 @@ namespace Backend.Veteriner.Application.Tests.Clinics.Handlers;
 public sealed class ClinicSettingsHandlersTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
+    private readonly Mock<IClientContext> _clientContext = new();
     private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
+    private readonly Mock<IClinicAssignmentAccessGuard> _assignmentGuard = new();
+    private readonly Mock<IUserClinicRepository> _userClinics = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IRepository<Clinic>> _clinicsWrite = new();
 
+    public ClinicSettingsHandlersTests()
+    {
+        _clientContext.SetupGet(x => x.UserId).Returns(Guid.NewGuid());
+        _assignmentGuard
+            .Setup(x => x.MustApplyAssignedClinicScopeAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+    }
+
     private UpdateClinicCommandHandler CreateUpdateHandler()
-        => new(_tenantContext.Object, _permissions.Object, _clinicsRead.Object, _clinicsWrite.Object);
+        => new(
+            _tenantContext.Object,
+            _clientContext.Object,
+            _permissions.Object,
+            _assignmentGuard.Object,
+            _userClinics.Object,
+            _clinicsRead.Object,
+            _clinicsWrite.Object);
 
     private DeactivateClinicCommandHandler CreateDeactivateHandler()
-        => new(_tenantContext.Object, _permissions.Object, _clinicsRead.Object, _clinicsWrite.Object);
+        => new(
+            _tenantContext.Object,
+            _clientContext.Object,
+            _permissions.Object,
+            _assignmentGuard.Object,
+            _userClinics.Object,
+            _clinicsRead.Object,
+            _clinicsWrite.Object);
 
     private ActivateClinicCommandHandler CreateActivateHandler()
-        => new(_tenantContext.Object, _permissions.Object, _clinicsRead.Object, _clinicsWrite.Object);
+        => new(
+            _tenantContext.Object,
+            _clientContext.Object,
+            _permissions.Object,
+            _assignmentGuard.Object,
+            _userClinics.Object,
+            _clinicsRead.Object,
+            _clinicsWrite.Object);
 
     private static Clinic BuildClinic(Guid id, Guid tenantId, string name = "Merkez", string city = "İstanbul", bool active = true)
     {
@@ -78,6 +110,80 @@ public sealed class ClinicSettingsHandlersTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Tenants.ContextMissing");
         _clinicsRead.Verify(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_Should_ReturnFailure_When_UserContextMissing()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        AllowClinicsUpdate();
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _clientContext.SetupGet(x => x.UserId).Returns((Guid?)null);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BuildClinic(clinicId, tenantId));
+
+        var result = await CreateUpdateHandler().Handle(
+            new UpdateClinicCommand(clinicId, "Yeni Ad", "Ankara"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Auth.Unauthorized.UserContextMissing");
+        _clinicsWrite.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_Should_ReturnFailure_When_ClinicAdminScope_NotAssigned()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        AllowClinicsUpdate();
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _clientContext.SetupGet(x => x.UserId).Returns(userId);
+        _assignmentGuard
+            .Setup(x => x.MustApplyAssignedClinicScopeAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _userClinics.Setup(x => x.ExistsAsync(userId, clinicId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BuildClinic(clinicId, tenantId));
+
+        var result = await CreateUpdateHandler().Handle(
+            new UpdateClinicCommand(clinicId, "Yeni Ad", "Ankara"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clinics.AccessDenied");
+        _clinicsWrite.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_Should_Succeed_When_ClinicAdminScope_Assigned()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var existing = BuildClinic(clinicId, tenantId, "Merkez", "İstanbul");
+        AllowClinicsUpdate();
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _clientContext.SetupGet(x => x.UserId).Returns(userId);
+        _assignmentGuard
+            .Setup(x => x.MustApplyAssignedClinicScopeAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _userClinics.Setup(x => x.ExistsAsync(userId, clinicId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByTenantAndNameCaseInsensitiveSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Clinic?)null);
+
+        var result = await CreateUpdateHandler().Handle(
+            new UpdateClinicCommand(clinicId, "Yeni Ad", "Ankara"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _clinicsWrite.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

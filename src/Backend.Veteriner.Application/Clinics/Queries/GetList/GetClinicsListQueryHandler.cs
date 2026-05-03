@@ -12,11 +12,22 @@ public sealed class GetClinicsListQueryHandler
     : IRequestHandler<GetClinicsListQuery, Result<PagedResult<ClinicListItemDto>>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IClientContext _clientContext;
+    private readonly IClinicAssignmentAccessGuard _assignmentGuard;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinics;
 
-    public GetClinicsListQueryHandler(ITenantContext tenantContext, IReadRepository<Clinic> clinics)
+    public GetClinicsListQueryHandler(
+        ITenantContext tenantContext,
+        IClientContext clientContext,
+        IClinicAssignmentAccessGuard assignmentGuard,
+        IUserClinicRepository userClinics,
+        IReadRepository<Clinic> clinics)
     {
         _tenantContext = tenantContext;
+        _clientContext = clientContext;
+        _assignmentGuard = assignmentGuard;
+        _userClinics = userClinics;
         _clinics = clinics;
     }
 
@@ -29,11 +40,33 @@ public sealed class GetClinicsListQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
+        if (_clientContext.UserId is not { } userId)
+        {
+            return Result<PagedResult<ClinicListItemDto>>.Failure(
+                "Auth.Unauthorized.UserContextMissing",
+                "Kullanıcı bağlamı yok.");
+        }
+
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
 
-        var total = await _clinics.CountAsync(new ClinicsByTenantCountSpec(tenantId), ct);
-        var rows = await _clinics.ListAsync(new ClinicsByTenantPagedSpec(tenantId, page, pageSize), ct);
+        IReadOnlyList<Clinic> rows;
+        int total;
+
+        if (await _assignmentGuard.MustApplyAssignedClinicScopeAsync(userId, ct))
+        {
+            var accessible = await _userClinics.ListAccessibleClinicsAsync(userId, tenantId, null, ct);
+            total = accessible.Count;
+            rows = accessible
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+        }
+        else
+        {
+            total = await _clinics.CountAsync(new ClinicsByTenantCountSpec(tenantId), ct);
+            rows = await _clinics.ListAsync(new ClinicsByTenantPagedSpec(tenantId, page, pageSize), ct);
+        }
 
         var items = rows
             .Select(c => new ClinicListItemDto(c.Id, c.TenantId, c.Name, c.City, c.IsActive))
