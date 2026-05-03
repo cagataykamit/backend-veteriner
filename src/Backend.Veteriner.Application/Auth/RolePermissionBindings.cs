@@ -6,13 +6,9 @@ namespace Backend.Veteriner.Application.Auth;
 /// Ürün varsayılan rol -> permission bağlama tablosu. Yeni rol izin atamalarını kodda
 /// merkezi olarak tutar ve seed/backfill üzerinden idempotent uygular.
 /// <para>
-/// Kapsam (Faz 5A): Yeni <c>Clinics.Update</c> yetkisi için minimum eşleştirme.
-/// <list type="bullet">
-///   <item><c>Admin</c> — <c>AdminClaimSeeder</c> zaten tüm permission'ları bağlar; burada ek olarak
-///   explicit listelenir ki niyet net olsun ve seeder sırası değişse bile bağlanma garantilensin.</item>
-///   <item><c>ClinicAdmin</c> — bu map olmadan hiçbir permission bağlanmaz; tenant admin davet yüzeyi
-///   (<see cref="Tenants.InviteAssignableOperationClaimsCatalog"/>) rolü sadece isim olarak açar.</item>
-/// </list>
+/// Kapsam: <c>Admin</c> için explicit alt küme (platform Admin yine <c>AdminClaimSeeder</c> ile tüm permission’ları alır);
+/// <c>Owner</c> için reminder odaklı minimum set; <c>ClinicAdmin</c> için klinik operasyon yöneticisi — tenant/abonelik/
+/// üye-davet ve global admin API’leri <b>dışarıda</b> (bkz. map içi yorumlar).
 /// </para>
 /// <para>
 /// <b>Kural:</b> Buraya sadece ürün varsayılan minimum seti girer. Operasyonel olarak kullanıcı bazlı
@@ -41,11 +37,61 @@ public static class RolePermissionBindings
                 PermissionCatalog.Reminders.Read,
                 PermissionCatalog.Reminders.Manage,
             },
-            ["ClinicAdmin"] = new[]
-            {
+            // Klinik operasyon paneli: dashboard + çekirdek modüller; Tenants.* / Subscriptions.* / Users.Roles.Permissions /
+            // Outbox / Clinics.Create / Species-Breeds yazma verilmez (ürün kararı).
+            ["ClinicAdmin"] =
+            [
+                PermissionCatalog.Dashboard.Read,
+
+                PermissionCatalog.Appointments.Read,
+                PermissionCatalog.Appointments.Create,
+                PermissionCatalog.Appointments.Cancel,
+                PermissionCatalog.Appointments.Complete,
+                PermissionCatalog.Appointments.Reschedule,
+
+                PermissionCatalog.Clients.Read,
+                PermissionCatalog.Clients.Create,
+
+                PermissionCatalog.Pets.Read,
+                PermissionCatalog.Pets.Create,
+
+                PermissionCatalog.Clinics.Read,
                 PermissionCatalog.Clinics.Update,
+
+                PermissionCatalog.Examinations.Read,
+                PermissionCatalog.Examinations.Create,
+                PermissionCatalog.Examinations.Update,
+
+                PermissionCatalog.Vaccinations.Read,
+                PermissionCatalog.Vaccinations.Create,
+                PermissionCatalog.Vaccinations.Update,
+
+                PermissionCatalog.Payments.Read,
+                PermissionCatalog.Payments.Create,
+                PermissionCatalog.Payments.Update,
+
+                PermissionCatalog.Prescriptions.Read,
+                PermissionCatalog.Prescriptions.Create,
+                PermissionCatalog.Prescriptions.Update,
+
+                PermissionCatalog.Treatments.Read,
+                PermissionCatalog.Treatments.Create,
+                PermissionCatalog.Treatments.Update,
+
+                PermissionCatalog.LabResults.Read,
+                PermissionCatalog.LabResults.Create,
+                PermissionCatalog.LabResults.Update,
+
+                PermissionCatalog.Hospitalizations.Read,
+                PermissionCatalog.Hospitalizations.Create,
+                PermissionCatalog.Hospitalizations.Update,
+                PermissionCatalog.Hospitalizations.Discharge,
+
+                PermissionCatalog.Species.Read,
+                PermissionCatalog.Breeds.Read,
+
                 PermissionCatalog.Reminders.Read,
                 PermissionCatalog.Reminders.Manage,
-            },
+            ],
         };
 }

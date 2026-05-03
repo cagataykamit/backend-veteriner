@@ -12,7 +12,8 @@ namespace Backend.IntegrationTests.Seeding;
 
 /// <summary>
 /// <see cref="RolePermissionBindingSeeder"/> idempotent bağ ekleme garantilerini doğrular:
-/// - Admin ve ClinicAdmin rolleri <c>Clinics.Update</c> bağını alır.
+/// - Admin ve ClinicAdmin rolleri <c>Clinics.Update</c> bağını alır; ClinicAdmin ayrıca operasyonel permission’lardan
+///   örnek olarak <c>Dashboard.Read</c> alır.
 /// - Mevcut bağlar korunur, duplicate satır oluşmaz.
 /// - Tekrar çalıştırma toplam satır sayısını değiştirmez.
 /// Paylaşılan integration DB'ye dokunmamak için ayrı LocalDB veritabanı kullanılır.
@@ -92,6 +93,11 @@ public sealed class RolePermissionBindingSeederTests
         var clinicAdminRemindersManage = await db.OperationClaimPermissions
             .CountAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == remindersManageId);
         clinicAdminRemindersManage.Should().Be(1, "ClinicAdmin rolü Reminders.Manage bağını almalı");
+
+        var dashboardReadId = await GetPermissionIdAsync(db, PermissionCatalog.Dashboard.Read);
+        var clinicAdminDashboard = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == dashboardReadId);
+        clinicAdminDashboard.Should().Be(1, "ClinicAdmin rolü Dashboard.Read bağını almalı");
     }
 
     [Fact]

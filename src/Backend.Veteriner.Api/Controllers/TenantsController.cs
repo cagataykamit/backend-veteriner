@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.Tenants.Commands.AssignMemberRole;
 using Backend.Veteriner.Application.Tenants.Commands.CancelInvite;
 using Backend.Veteriner.Application.Tenants.Commands.Create;
 using Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
+using Backend.Veteriner.Application.Tenants.Commands.RemoveMember;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberClinic;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberRole;
 using Backend.Veteriner.Application.Tenants.Commands.ResendInvite;
@@ -25,6 +26,7 @@ using Backend.Veteriner.Application.Tenants.Queries.GetInvites;
 using Backend.Veteriner.Application.Tenants.Queries.GetMemberById;
 using Backend.Veteriner.Application.Tenants.Queries.GetMembers;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionCheckout;
+using Backend.Veteriner.Application.Tenants.Queries.GetAccessState;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionSummary;
 using Backend.Veteriner.Application.Tenants.Queries.GetPendingPlanChange;
 using Backend.Veteriner.Domain.Shared;
@@ -161,6 +163,30 @@ public sealed class TenantsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetTenantMemberByIdQuery(tenantId, memberId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tenant paneli: kullanıcıyı kiracı üyeliğinden çıkarır (<c>UserTenant</c>, tenant içi klinik ve whitelist roller).
+    /// Kendi kendini çıkarma, tek üye veya son Admin kalmasına yol açan çıkarma engellenir.
+    /// Yetki: <c>Tenants.InviteCreate</c>. Read-only/cancelled tenant'ta write-guard uygulanır.
+    /// </summary>
+    [HttpDelete("{tenantId:guid}/members/{memberId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Tenants.InviteCreate)]
+    [ProducesResponseType(typeof(RemoveTenantMemberResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RemoveMember(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid memberId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new RemoveTenantMemberCommand(tenantId, memberId), ct);
         return result.ToActionResult(this);
     }
 
@@ -417,6 +443,26 @@ public sealed class TenantsController : ControllerBase
             nameof(GetById),
             new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
             id);
+    }
+
+    /// <summary>
+    /// Panel genelinde kiracı yazılabilir / salt okunur durumu. Abonelik fiyatı veya yönetim ayrıntısı dönmez;
+    /// <c>Subscriptions.Read</c> / <c>Subscriptions.Manage</c> gerektirmez. Oturumdaki kiracı üyeleri (ör. ClinicAdmin) çağırabilir;
+    /// JWT <c>tenant_id</c> route <c>tenantId</c> ile aynı olmalı; çağrı yapan kullanıcı bu kiracıda üye olmalıdır.
+    /// </summary>
+    [HttpGet("{tenantId:guid}/access-state")]
+    [Authorize]
+    [ProducesResponseType(typeof(TenantAccessStateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAccessState([FromRoute] Guid tenantId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetTenantAccessStateQuery(tenantId), ct);
+        return result.ToActionResult(this);
     }
 
     /// <summary>

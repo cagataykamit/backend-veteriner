@@ -32,4 +32,25 @@ public sealed class UserTenantRepository : IUserTenantRepository
             .Select(x => (Guid?)x.TenantId)
             .FirstOrDefaultAsync(ct);
     }
+
+    public Task<int> CountMembersHavingOperationClaimAsync(Guid tenantId, Guid operationClaimId, CancellationToken ct)
+    {
+        return (
+            from ut in _db.UserTenants.AsNoTracking()
+            join uoc in _db.UserOperationClaims.AsNoTracking() on ut.UserId equals uoc.UserId
+            where ut.TenantId == tenantId && uoc.OperationClaimId == operationClaimId
+            select ut.UserId
+        ).Distinct().CountAsync(ct);
+    }
+
+    public async Task<bool> TryRemoveMembershipAsync(Guid userId, Guid tenantId, CancellationToken ct)
+    {
+        var row = await _db.UserTenants
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.TenantId == tenantId, ct);
+        if (row is null)
+            return false;
+
+        _db.UserTenants.Remove(row);
+        return true;
+    }
 }
