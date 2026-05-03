@@ -179,6 +179,32 @@ public static class ResultExtensions
             return (StatusCodes.Status400BadRequest, "https://httpstatuses.io/400");
         }
 
+        if (normalized.Contains("tenants.accessdenied") || normalized.Contains("auth.tenantnotmember"))
+        {
+            return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
+        if (normalized.Contains("tenantmembers.cannotremoveself"))
+        {
+            return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
+        if (normalized.Contains("tenantmembers.cannotremovelastadmin")
+            || normalized.Contains("tenantmembers.cannotremovesolemember"))
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
+        if (normalized.Contains("tenantmembers.notfound"))
+        {
+            return (StatusCodes.Status404NotFound, "https://httpstatuses.io/404");
+        }
+
+        if (normalized.Contains("tenantmembers.removefailed"))
+        {
+            return (StatusCodes.Status500InternalServerError, "https://httpstatuses.io/500");
+        }
+
         return (StatusCodes.Status400BadRequest, "https://httpstatuses.io/400");
     }
 
