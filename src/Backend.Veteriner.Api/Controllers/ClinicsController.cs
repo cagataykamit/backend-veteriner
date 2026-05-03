@@ -6,9 +6,11 @@ using Backend.Veteriner.Application.Clinics.Commands.Activate;
 using Backend.Veteriner.Application.Clinics.Commands.Create;
 using Backend.Veteriner.Application.Clinics.Commands.Deactivate;
 using Backend.Veteriner.Application.Clinics.Commands.Update;
+using Backend.Veteriner.Application.Clinics.Commands.WorkingHours.UpdateClinicWorkingHours;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.Queries.GetById;
 using Backend.Veteriner.Application.Clinics.Queries.GetList;
+using Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkingHours;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Shared;
@@ -63,6 +65,49 @@ public sealed class ClinicsController : ControllerBase
                 id
             },
             id);
+    }
+
+    /// <summary>Klinik haftalık çalışma saatleri. Kayıt yoksa varsayılan program döner.</summary>
+    [HttpGet("{id:guid}/working-hours")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<ClinicWorkingHourDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetWorkingHours([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var result = await _mediator.Send(new GetClinicWorkingHoursQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Klinik haftalık çalışma saatlerini kaydeder (tam 7 gün).</summary>
+    [HttpPut("{id:guid}/working-hours")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(IReadOnlyList<ClinicWorkingHourDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PutWorkingHours(
+        [FromRoute] Guid id,
+        [FromBody] UpdateClinicWorkingHoursRequest? body,
+        CancellationToken ct)
+    {
+        if (body is null)
+        {
+            return Result<IReadOnlyList<ClinicWorkingHourDto>>.Failure(
+                    "Clinics.WorkingHours.Validation.InvalidRequestBody",
+                    "Istek govdesi bos veya hatali JSON.")
+                .ToActionResult(this);
+        }
+
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new UpdateClinicWorkingHoursCommand(id, body.Items), ct);
+        return result.ToActionResult(this);
     }
 
     /// <summary>Klinik detayı.</summary>
