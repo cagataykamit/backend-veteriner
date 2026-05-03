@@ -297,6 +297,55 @@ public sealed class ClinicSettingsHandlersTests
             .IsValid.Should().BeTrue();
     }
 
+    [Fact]
+    public void Update_Validator_Should_Fail_When_EmailInvalid()
+    {
+        var validator = new UpdateClinicCommandValidator();
+        validator.Validate(new UpdateClinicCommand(Guid.NewGuid(), "Merkez", "Ankara", Email: "x"))
+            .IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Update_Validator_Should_Fail_When_PhoneTooLong()
+    {
+        var validator = new UpdateClinicCommandValidator();
+        validator.Validate(new UpdateClinicCommand(Guid.NewGuid(), "Merkez", "Ankara", Phone: new string('9', 51)))
+            .IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Update_Should_PersistProfileFields_When_Valid()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var existing = BuildClinic(clinicId, tenantId, "Merkez", "İstanbul");
+        AllowClinicsUpdate();
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByTenantAndNameCaseInsensitiveSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Clinic?)null);
+
+        var result = await CreateUpdateHandler().Handle(
+            new UpdateClinicCommand(
+                clinicId,
+                "Merkez",
+                "Ankara",
+                Phone: "+90 216",
+                Email: "merkez@test.com",
+                Address: "No 5",
+                Description: "Profil"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Phone.Should().Be("+90 216");
+        result.Value.Email.Should().Be("merkez@test.com");
+        result.Value.Address.Should().Be("No 5");
+        result.Value.Description.Should().Be("Profil");
+        existing.Phone.Should().Be("+90 216");
+        existing.Email.Should().Be("merkez@test.com");
+    }
+
     // =========================================================================
     // DEACTIVATE
     // =========================================================================

@@ -93,7 +93,7 @@ public sealed class ClinicsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Klinik bilgilerini (ad, şehir) günceller.</summary>
+    /// <summary>Klinik bilgilerini (ad, şehir, iletişim/profil alanları) günceller.</summary>
     /// <remarks>Route id kaynak doğrudur; body.id verilmişse route ile aynı olmalıdır.</remarks>
     [HttpPut("{id:guid}")]
     [Authorize(Policy = PermissionCatalog.Clinics.Update)]
@@ -111,7 +111,14 @@ public sealed class ClinicsController : ControllerBase
         if (body.Id is { } bodyId && bodyId != Guid.Empty && bodyId != id)
             return Result.Failure("Clinics.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
 
-        var cmd = new UpdateClinicCommand(id, body.Name, body.City);
+        var cmd = new UpdateClinicCommand(
+            id,
+            body.Name,
+            body.City,
+            body.Phone,
+            body.Email,
+            body.Address,
+            body.Description);
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);
     }

@@ -59,7 +59,16 @@ public sealed class GetClinicByIdQueryHandler : IRequestHandler<GetClinicByIdQue
             }
         }
 
-        var dto = new ClinicDetailDto(clinic.Id, clinic.TenantId, clinic.Name, clinic.City, clinic.IsActive);
+        var dto = new ClinicDetailDto(
+            clinic.Id,
+            clinic.TenantId,
+            clinic.Name,
+            clinic.City,
+            clinic.IsActive,
+            clinic.Phone,
+            clinic.Email,
+            clinic.Address,
+            clinic.Description);
         return Result<ClinicDetailDto>.Success(dto);
     }
 }

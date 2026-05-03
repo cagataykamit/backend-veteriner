@@ -10,4 +10,8 @@ public sealed class UpdateClinicBody
 
     public string Name { get; init; } = default!;
     public string City { get; init; } = default!;
+    public string? Phone { get; init; }
+    public string? Email { get; init; }
+    public string? Address { get; init; }
+    public string? Description { get; init; }
 }

@@ -99,7 +99,13 @@ public sealed class UpdateClinicCommandHandler
                 "Bu kiracı altında aynı isimde başka bir klinik zaten var.");
         }
 
-        clinic.UpdateDetails(request.Name, request.City);
+        clinic.UpdateDetails(
+            request.Name,
+            request.City,
+            request.Phone,
+            request.Email,
+            request.Address,
+            request.Description);
         await _clinicsWrite.SaveChangesAsync(ct);
 
         return Result<ClinicDetailDto>.Success(new ClinicDetailDto(
@@ -107,6 +113,10 @@ public sealed class UpdateClinicCommandHandler
             clinic.TenantId,
             clinic.Name,
             clinic.City,
-            clinic.IsActive));
+            clinic.IsActive,
+            clinic.Phone,
+            clinic.Email,
+            clinic.Address,
+            clinic.Description));
     }
 }

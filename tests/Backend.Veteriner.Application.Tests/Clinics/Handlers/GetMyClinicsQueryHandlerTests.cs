@@ -30,6 +30,7 @@ public sealed class GetMyClinicsQueryHandlerTests
         var tid = Guid.NewGuid();
         var uid = Guid.NewGuid();
         var c1 = new Clinic(tid, "A", "X");
+        c1.UpdateDetails("A", "X", "+90 212", "a@b.test", null, null);
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _client.SetupGet(c => c.UserId).Returns(uid);
         var tenant = new Tenant("T");
@@ -46,5 +47,7 @@ public sealed class GetMyClinicsQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().HaveCount(1);
         result.Value![0].Name.Should().Be("A");
+        result.Value[0].Phone.Should().Be("+90 212");
+        result.Value[0].Email.Should().Be("a@b.test");
     }
 }

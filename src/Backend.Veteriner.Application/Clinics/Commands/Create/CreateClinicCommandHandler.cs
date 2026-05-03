@@ -53,7 +53,14 @@ public sealed class CreateClinicCommandHandler : IRequestHandler<CreateClinicCom
                 "Clinics.DuplicateName",
                 "Bu kiracı altında aynı isimde bir klinik zaten var.");
 
-        var clinic = new Clinic(tenantId, request.Name, request.City);
+        var clinic = new Clinic(
+            tenantId,
+            request.Name,
+            request.City,
+            request.Phone,
+            request.Email,
+            request.Address,
+            request.Description);
         await _clinicsWrite.AddAsync(clinic, ct);
         await _clinicsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(clinic.Id);

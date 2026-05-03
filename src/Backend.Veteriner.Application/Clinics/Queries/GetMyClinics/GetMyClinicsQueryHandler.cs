@@ -63,7 +63,7 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
         var rows = await _userClinics.ListAccessibleClinicsAsync(userId.Value, tenantId, request.IsActive, ct);
 
         var dtos = rows
-            .Select(c => new ClinicListItemDto(c.Id, c.TenantId, c.Name, c.City, c.IsActive))
+            .Select(c => new ClinicListItemDto(c.Id, c.TenantId, c.Name, c.City, c.IsActive, c.Phone, c.Email))
             .ToArray();
 
         return Result<IReadOnlyList<ClinicListItemDto>>.Success(dtos);

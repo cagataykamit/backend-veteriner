@@ -5,4 +5,8 @@ public sealed record ClinicDetailDto(
     Guid TenantId,
     string Name,
     string City,
-    bool IsActive);
+    bool IsActive,
+    string? Phone,
+    string? Email,
+    string? Address,
+    string? Description);

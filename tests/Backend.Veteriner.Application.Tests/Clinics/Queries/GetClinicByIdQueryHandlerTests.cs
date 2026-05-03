@@ -54,6 +54,32 @@ public sealed class GetClinicByIdQueryHandlerTests
     }
 
     [Fact]
+    public async Task Should_MapProfileFields_OnDetail()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var clinic = BuildClinic(clinicId, tenantId);
+        clinic.UpdateDetails(
+            "Merkez",
+            "İstanbul",
+            "+90 212",
+            "klinik@test.com",
+            "Adres",
+            "Tanım");
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(clinic);
+
+        var result = await CreateHandler().Handle(new GetClinicByIdQuery(clinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Phone.Should().Be("+90 212");
+        result.Value.Email.Should().Be("klinik@test.com");
+        result.Value.Address.Should().Be("Adres");
+        result.Value.Description.Should().Be("Tanım");
+    }
+
+    [Fact]
     public async Task Should_ReturnAccessDenied_When_ClinicAdminScope_NotAssigned()
     {
         var tenantId = Guid.NewGuid();

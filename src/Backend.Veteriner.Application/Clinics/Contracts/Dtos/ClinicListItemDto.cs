@@ -5,4 +5,6 @@ public sealed record ClinicListItemDto(
     Guid TenantId,
     string Name,
     string City,
-    bool IsActive);
+    bool IsActive,
+    string? Phone,
+    string? Email);
