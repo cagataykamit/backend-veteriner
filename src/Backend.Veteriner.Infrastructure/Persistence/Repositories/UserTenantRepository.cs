@@ -24,6 +24,27 @@ public sealed class UserTenantRepository : IUserTenantRepository
     public Task<bool> ExistsAsync(Guid userId, Guid tenantId, CancellationToken ct)
         => _db.UserTenants.AsNoTracking().AnyAsync(x => x.UserId == userId && x.TenantId == tenantId, ct);
 
+    public async Task<IReadOnlySet<Guid>> GetExistingUserIdsForTenantAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken ct)
+    {
+        if (userIds is null || userIds.Count == 0)
+            return new HashSet<Guid>();
+
+        var distinct = userIds.Distinct().ToArray();
+        if (distinct.Length == 0)
+            return new HashSet<Guid>();
+
+        var rows = await _db.UserTenants.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && distinct.Contains(x.UserId))
+            .Select(x => x.UserId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return rows.Count == 0 ? new HashSet<Guid>() : rows.ToHashSet();
+    }
+
     public async Task<Guid?> GetExistingTenantIdForUserAsync(Guid userId, CancellationToken ct)
     {
         return await _db.UserTenants

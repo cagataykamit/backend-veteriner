@@ -10,6 +10,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using System.Collections.Generic;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetInvites;
 
@@ -21,19 +22,22 @@ public sealed class GetTenantInvitesQueryHandler
     private readonly IReadRepository<TenantInvite> _invites;
     private readonly IReadRepository<OperationClaim> _claims;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IUserTenantRepository _userTenants;
 
     public GetTenantInvitesQueryHandler(
         ITenantContext tenantContext,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<TenantInvite> invites,
         IReadRepository<OperationClaim> claims,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        IUserTenantRepository userTenants)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
         _invites = invites;
         _claims = claims;
         _clinics = clinics;
+        _userTenants = userTenants;
     }
 
     public async Task<Result<PagedResult<TenantInviteListItemDto>>> Handle(
@@ -84,11 +88,24 @@ public sealed class GetTenantInvitesQueryHandler
             : await _clinics.ListAsync(new ClinicsByTenantAndIdsSpec(request.TenantId, clinicIds), ct);
         var clinicNameById = clinics.ToDictionary(c => c.Id, c => c.Name);
 
+        var acceptedUserIds = rows
+            .Where(i => i.Status == TenantInviteStatus.Accepted && i.AcceptedByUserId.HasValue)
+            .Select(i => i.AcceptedByUserId!.Value)
+            .Distinct()
+            .ToArray();
+
+        IReadOnlySet<Guid> memberUserIds = acceptedUserIds.Length == 0
+            ? new HashSet<Guid>()
+            : await _userTenants.GetExistingUserIdsForTenantAsync(request.TenantId, acceptedUserIds, ct);
+
         var items = rows.Select(i =>
         {
             var isExpired = i.Status == TenantInviteStatus.Pending && i.ExpiresAtUtc < utcNow;
             claimNameById.TryGetValue(i.OperationClaimId, out var claimName);
             clinicNameById.TryGetValue(i.ClinicId, out var clinicName);
+            var isCurrentMember = i.Status == TenantInviteStatus.Accepted
+                && i.AcceptedByUserId is { } accId
+                && memberUserIds.Contains(accId);
             return new TenantInviteListItemDto(
                 i.Id,
                 i.Email,
@@ -99,7 +116,8 @@ public sealed class GetTenantInvitesQueryHandler
                 i.Status,
                 isExpired,
                 i.ExpiresAtUtc,
-                i.CreatedAtUtc);
+                i.CreatedAtUtc,
+                isCurrentMember);
         }).ToList();
 
         return Result<PagedResult<TenantInviteListItemDto>>.Success(

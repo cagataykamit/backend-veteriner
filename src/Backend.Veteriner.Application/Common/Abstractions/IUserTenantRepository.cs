@@ -7,6 +7,14 @@ public interface IUserTenantRepository
 
     Task<bool> ExistsAsync(Guid userId, Guid tenantId, CancellationToken ct);
 
+    /// <summary>
+    /// Verilen kullanıcı Id listesinden bu kiracıda UserTenant üyeliği olanların kümesini döner (tek sorgu).
+    /// </summary>
+    Task<IReadOnlySet<Guid>> GetExistingUserIdsForTenantAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken ct);
+
     /// <summary>Kullanıcının mevcut kiracı üyeliği varsa o kiracının Id'si (tek satır modeli).</summary>
     Task<Guid?> GetExistingTenantIdForUserAsync(Guid userId, CancellationToken ct);
 

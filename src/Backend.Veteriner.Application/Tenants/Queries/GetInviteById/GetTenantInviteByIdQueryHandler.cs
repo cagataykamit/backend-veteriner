@@ -20,19 +20,22 @@ public sealed class GetTenantInviteByIdQueryHandler
     private readonly IReadRepository<TenantInvite> _invites;
     private readonly IReadRepository<OperationClaim> _claims;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IUserTenantRepository _userTenants;
 
     public GetTenantInviteByIdQueryHandler(
         ITenantContext tenantContext,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<TenantInvite> invites,
         IReadRepository<OperationClaim> claims,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        IUserTenantRepository userTenants)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
         _invites = invites;
         _claims = claims;
         _clinics = clinics;
+        _userTenants = userTenants;
     }
 
     public async Task<Result<TenantInviteDetailDto>> Handle(GetTenantInviteByIdQuery request, CancellationToken ct)
@@ -75,6 +78,10 @@ public sealed class GetTenantInviteByIdQueryHandler
         var isExpired = invite.Status == TenantInviteStatus.Pending && invite.ExpiresAtUtc < utcNow;
         var canLifecycle = invite.Status == TenantInviteStatus.Pending;
 
+        var isCurrentMember = invite.Status == TenantInviteStatus.Accepted
+            && invite.AcceptedByUserId is { } uid
+            && await _userTenants.ExistsAsync(uid, invite.TenantId, ct);
+
         return Result<TenantInviteDetailDto>.Success(new TenantInviteDetailDto(
             invite.Id,
             invite.TenantId,
@@ -90,6 +97,7 @@ public sealed class GetTenantInviteByIdQueryHandler
             invite.AcceptedAtUtc,
             invite.AcceptedByUserId,
             canLifecycle,
-            canLifecycle));
+            canLifecycle,
+            isCurrentMember));
     }
 }

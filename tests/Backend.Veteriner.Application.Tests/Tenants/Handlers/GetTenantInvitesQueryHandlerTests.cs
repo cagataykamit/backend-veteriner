@@ -20,6 +20,7 @@ public sealed class GetTenantInvitesQueryHandlerTests
     private readonly Mock<IReadRepository<TenantInvite>> _invites = new();
     private readonly Mock<IReadRepository<OperationClaim>> _claims = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
+    private readonly Mock<IUserTenantRepository> _userTenants = new();
 
     private GetTenantInvitesQueryHandler CreateHandler()
         => new(
@@ -27,7 +28,8 @@ public sealed class GetTenantInvitesQueryHandlerTests
             _permissions.Object,
             _invites.Object,
             _claims.Object,
-            _clinics.Object);
+            _clinics.Object,
+            _userTenants.Object);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_PermissionDenied()
@@ -172,7 +174,137 @@ public sealed class GetTenantInvitesQueryHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Items[0].IsExpired.Should().BeTrue();
+        result.Value.Items[0].IsCurrentMember.Should().BeFalse();
         result.Value.Items[0].ClinicName.Should().Be("K1");
         result.Value.Items[0].OperationClaimName.Should().Be("Veteriner");
+
+        _userTenants.Verify(
+            x => x.GetExistingUserIdsForTenantAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Set_IsCurrentMember_When_AcceptedAndStillMember()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var claimId = Guid.NewGuid();
+        var uid = Guid.NewGuid();
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+
+        var invite = TenantInvite.CreatePending(
+            tid,
+            cid,
+            "a@b.com",
+            new string('b', 64),
+            claimId,
+            DateTime.UtcNow.AddDays(7),
+            DateTime.UtcNow.AddDays(-1));
+        invite.MarkAccepted(uid, DateTime.UtcNow);
+
+        _invites.Setup(x => x.CountAsync(It.IsAny<TenantInvitesCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _invites.Setup(x => x.ListAsync(It.IsAny<TenantInvitesPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TenantInvite> { invite });
+
+        _claims.Setup(x => x.ListAsync(It.IsAny<OperationClaimsByIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OperationClaim>());
+        _clinics.Setup(x => x.ListAsync(It.IsAny<ClinicsByTenantAndIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic>());
+
+        _userTenants
+            .Setup(x => x.GetExistingUserIdsForTenantAsync(tid, It.Is<IReadOnlyCollection<Guid>>(a => a.Contains(uid)), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<Guid> { uid });
+
+        var result = await CreateHandler().Handle(
+            new GetTenantInvitesQuery(tid, new PageRequest(), null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Items[0].IsCurrentMember.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Clear_IsCurrentMember_When_AcceptedButRemovedFromTenant()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var claimId = Guid.NewGuid();
+        var uid = Guid.NewGuid();
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+
+        var invite = TenantInvite.CreatePending(
+            tid,
+            cid,
+            "a@b.com",
+            new string('c', 64),
+            claimId,
+            DateTime.UtcNow.AddDays(7),
+            DateTime.UtcNow.AddDays(-1));
+        invite.MarkAccepted(uid, DateTime.UtcNow);
+
+        _invites.Setup(x => x.CountAsync(It.IsAny<TenantInvitesCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _invites.Setup(x => x.ListAsync(It.IsAny<TenantInvitesPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TenantInvite> { invite });
+
+        _claims.Setup(x => x.ListAsync(It.IsAny<OperationClaimsByIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OperationClaim>());
+        _clinics.Setup(x => x.ListAsync(It.IsAny<ClinicsByTenantAndIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic>());
+
+        _userTenants
+            .Setup(x => x.GetExistingUserIdsForTenantAsync(tid, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<Guid>());
+
+        var result = await CreateHandler().Handle(
+            new GetTenantInvitesQuery(tid, new PageRequest(), null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Items[0].IsCurrentMember.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Set_IsCurrentMember_False_For_Revoked()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var claimId = Guid.NewGuid();
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+
+        var invite = TenantInvite.CreatePending(
+            tid,
+            cid,
+            "a@b.com",
+            new string('d', 64),
+            claimId,
+            DateTime.UtcNow.AddDays(7),
+            DateTime.UtcNow.AddDays(-1));
+        invite.Revoke();
+
+        _invites.Setup(x => x.CountAsync(It.IsAny<TenantInvitesCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _invites.Setup(x => x.ListAsync(It.IsAny<TenantInvitesPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TenantInvite> { invite });
+
+        _claims.Setup(x => x.ListAsync(It.IsAny<OperationClaimsByIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OperationClaim>());
+        _clinics.Setup(x => x.ListAsync(It.IsAny<ClinicsByTenantAndIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic>());
+
+        var result = await CreateHandler().Handle(
+            new GetTenantInvitesQuery(tid, new PageRequest(), null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Items[0].IsCurrentMember.Should().BeFalse();
+
+        _userTenants.Verify(
+            x => x.GetExistingUserIdsForTenantAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

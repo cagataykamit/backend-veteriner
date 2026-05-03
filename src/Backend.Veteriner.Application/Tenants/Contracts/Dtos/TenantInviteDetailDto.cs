@@ -8,6 +8,7 @@ namespace Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 /// <c>IsExpired</c>: <see cref="TenantInviteStatus.Pending"/> iken süre dolmuşsa <c>true</c>.
 /// <c>canCancelInvite</c> / <c>canResendInvite</c>: panel CTA’ları; yalnızca <see cref="TenantInviteStatus.Pending"/> iken <c>true</c>
 /// (süresi dolmuş bekleyen davet iptal / resend komutlarıyla uyumlu).
+/// <c>IsCurrentMember</c>: kabul eden kullanıcı bu kiracıda hâlâ üye mi (davet geçmişi <see cref="TenantInviteStatus.Accepted"/> kalır).
 /// </summary>
 public sealed record TenantInviteDetailDto(
     Guid Id,
@@ -24,4 +25,5 @@ public sealed record TenantInviteDetailDto(
     DateTime? AcceptedAtUtc,
     Guid? AcceptedByUserId,
     bool CanCancelInvite,
-    bool CanResendInvite);
+    bool CanResendInvite,
+    bool IsCurrentMember);

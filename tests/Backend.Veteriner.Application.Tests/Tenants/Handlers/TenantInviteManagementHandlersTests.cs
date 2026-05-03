@@ -31,11 +31,12 @@ public sealed class TenantInviteManagementHandlersTests
     private readonly Mock<IRepository<TenantInvite>> _invitesWrite = new();
     private readonly Mock<IReadRepository<OperationClaim>> _claimsRead = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
+    private readonly Mock<IUserTenantRepository> _userTenants = new();
     private readonly Mock<ITokenHashService> _tokenHash = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private GetTenantInviteByIdQueryHandler CreateDetailHandler()
-        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _claimsRead.Object, _clinicsRead.Object);
+        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _claimsRead.Object, _clinicsRead.Object, _userTenants.Object);
 
     private CancelTenantInviteCommandHandler CreateCancelHandler()
         => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _uow.Object);
@@ -154,6 +155,11 @@ public sealed class TenantInviteManagementHandlersTests
         dto.IsExpired.Should().BeTrue();
         dto.CanCancelInvite.Should().BeTrue();
         dto.CanResendInvite.Should().BeTrue();
+        dto.IsCurrentMember.Should().BeFalse();
+
+        _userTenants.Verify(
+            x => x.ExistsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -162,11 +168,12 @@ public sealed class TenantInviteManagementHandlersTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var claimId = Guid.NewGuid();
+        var acceptedUserId = Guid.NewGuid();
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
         _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
 
         var invite = BuildPending(tid, cid, claimId, expiresAtUtc: DateTime.UtcNow.AddDays(1));
-        invite.MarkAccepted(Guid.NewGuid(), DateTime.UtcNow);
+        invite.MarkAccepted(acceptedUserId, DateTime.UtcNow);
 
         _invitesRead.Setup(x => x.FirstOrDefaultAsync(
                 It.Is<TenantInviteByTenantAndIdSpec>(s => true), It.IsAny<CancellationToken>()))
@@ -182,12 +189,15 @@ public sealed class TenantInviteManagementHandlersTests
         _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(clinic);
 
+        _userTenants.Setup(x => x.ExistsAsync(acceptedUserId, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
         var result = await CreateDetailHandler().Handle(
             new GetTenantInviteByIdQuery(tid, invite.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.CanCancelInvite.Should().BeFalse();
         result.Value.CanResendInvite.Should().BeFalse();
+        result.Value.IsCurrentMember.Should().BeTrue();
     }
 
     // ============================================================
