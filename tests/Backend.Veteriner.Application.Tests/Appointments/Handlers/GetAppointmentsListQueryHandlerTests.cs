@@ -151,6 +151,7 @@ public sealed class GetAppointmentsListQueryHandlerTests
             clinicId,
             petId,
             DateTime.UtcNow.AddDays(1),
+            30,
             AppointmentType.Consultation,
             AppointmentStatus.Scheduled,
             "not");
@@ -184,5 +185,7 @@ public sealed class GetAppointmentsListQueryHandlerTests
         dto.AppointmentType.Should().Be(AppointmentType.Consultation);
         dto.Status.Should().Be(AppointmentStatus.Scheduled);
         dto.Notes.Should().Be("not");
+        dto.DurationMinutes.Should().Be(30);
+        dto.ScheduledEndUtc.Should().Be(appointment.ScheduledEndUtc);
     }
 }

@@ -11,4 +11,5 @@ public sealed record UpdateAppointmentCommand(
     DateTime ScheduledAtUtc,
     AppointmentType AppointmentType,
     AppointmentStatus Status,
-    string? Notes = null) : IRequest<Result>;
+    string? Notes = null,
+    int? DurationMinutes = null) : IRequest<Result>;

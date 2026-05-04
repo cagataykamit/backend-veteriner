@@ -78,7 +78,7 @@ public sealed class ReminderProcessorServiceTests
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), AppointmentType.Checkup, AppointmentStatus.Scheduled);
+        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
         var settings = TenantReminderSettings.CreateDefault(tenant.Id);
         settings.Update(true, 24, false, 3, true);
 
@@ -138,7 +138,7 @@ public sealed class ReminderProcessorServiceTests
         var client = new Client(tenant.Id, "No Mail");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), AppointmentType.Checkup, AppointmentStatus.Scheduled);
+        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
         var settings = TenantReminderSettings.CreateDefault(tenant.Id);
         settings.Update(true, 24, false, 3, true);
 
@@ -166,7 +166,7 @@ public sealed class ReminderProcessorServiceTests
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), AppointmentType.Checkup, AppointmentStatus.Scheduled);
+        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
         var settings = TenantReminderSettings.CreateDefault(tenant.Id);
         settings.Update(true, 24, false, 3, true);
         var dedupe = $"appointment:{appt.Id:D}:hours-before:24";
@@ -205,7 +205,7 @@ public sealed class ReminderProcessorServiceTests
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), AppointmentType.Checkup, AppointmentStatus.Scheduled);
+        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
         var settings = TenantReminderSettings.CreateDefault(tenant.Id);
         settings.Update(true, 24, false, 3, true);
 

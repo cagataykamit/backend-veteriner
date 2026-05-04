@@ -92,6 +92,8 @@ public sealed class GetAppointmentByIdQueryHandler
             speciesName,
             a.AppointmentType,
             a.ScheduledAtUtc,
+            a.DurationMinutes,
+            a.ScheduledEndUtc,
             a.Status,
             a.Notes);
         return Result<AppointmentDetailDto>.Success(dto);

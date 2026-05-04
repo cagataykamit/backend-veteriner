@@ -85,7 +85,7 @@ public sealed class UpdateExaminationCommandHandlerTests
             .ReturnsAsync(existing);
 
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+            .ReturnsAsync(new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null));
 
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "Istanbul"));
@@ -134,7 +134,7 @@ public sealed class UpdateExaminationCommandHandlerTests
         _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, appointmentClinicId, petId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+            .ReturnsAsync(new Appointment(tid, appointmentClinicId, petId, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null));
 
         var cmd = new UpdateExaminationCommand(
             eid,
@@ -205,7 +205,7 @@ public sealed class UpdateExaminationCommandHandlerTests
         _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, apptClinicId, apptPetId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+            .ReturnsAsync(new Appointment(tid, apptClinicId, apptPetId, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null));
 
         var cmd = new UpdateExaminationCommand(
             eid,

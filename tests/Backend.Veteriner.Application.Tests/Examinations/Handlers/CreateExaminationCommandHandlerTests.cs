@@ -151,7 +151,7 @@ public sealed class CreateExaminationCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
 
-        var wrongClinicAppt = new Appointment(tid, Guid.NewGuid(), pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
+        var wrongClinicAppt = new Appointment(tid, Guid.NewGuid(), pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(wrongClinicAppt);
 
@@ -178,7 +178,7 @@ public sealed class CreateExaminationCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, requestClinicId, petId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+            .ReturnsAsync(new Appointment(tid, requestClinicId, petId, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null));
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -272,7 +272,7 @@ public sealed class CreateExaminationCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
 
-        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, AppointmentStatus.Scheduled, null);
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, AppointmentStatus.Scheduled, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
 
@@ -310,7 +310,7 @@ public sealed class CreateExaminationCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
 
-        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, AppointmentStatus.Completed, null);
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, AppointmentStatus.Completed, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
 
@@ -341,7 +341,7 @@ public sealed class CreateExaminationCommandHandlerTests
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
 
-        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, AppointmentStatus.Cancelled, null);
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, AppointmentStatus.Cancelled, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
 

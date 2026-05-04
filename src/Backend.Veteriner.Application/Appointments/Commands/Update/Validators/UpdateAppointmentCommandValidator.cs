@@ -22,5 +22,9 @@ public sealed class UpdateAppointmentCommandValidator : AbstractValidator<Update
             .Must(Enum.IsDefined<AppointmentStatus>)
             .WithMessage("Randevu durumu ge�ersiz.");
         RuleFor(x => x.Notes).MaximumLength(2000);
+
+        RuleFor(x => x.DurationMinutes)
+            .Must(d => !d.HasValue || Appointment.IsValidDurationMinutes(d.Value))
+            .WithMessage("Randevu süresi 5-240 dakika arasında olmalıdır.");
     }
 }

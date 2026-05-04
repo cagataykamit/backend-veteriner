@@ -40,7 +40,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
         var aid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(2);
 
-        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Examination, null, null);
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Examination, null, null);
         typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -74,7 +74,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
         var aid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(2);
 
-        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Examination, null, null);
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Examination, null, null);
         typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -101,7 +101,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var aid = Guid.NewGuid();
-        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Examination, null, null);
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Examination, null, null);
         typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -135,7 +135,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var aid = Guid.NewGuid();
-        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Examination, AppointmentStatus.Completed, null);
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Examination, AppointmentStatus.Completed, null);
         typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -161,7 +161,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var aid = Guid.NewGuid();
-        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Examination, AppointmentStatus.Completed, null);
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Examination, AppointmentStatus.Completed, null);
         typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -178,5 +178,70 @@ public sealed class UpdateAppointmentCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Appointments.InvalidStatusTransition");
+    }
+
+    [Fact]
+    public async Task Handle_Should_UpdateDuration_When_DurationMinutes_Provided()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var aid = Guid.NewGuid();
+        var when = DateTime.UtcNow.AddDays(2);
+
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Examination, null, null);
+        typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(appt);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "X"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+
+        var cmd = new UpdateAppointmentCommand(aid, cid, pid, when, AppointmentType.Surgery, AppointmentStatus.Scheduled, null, DurationMinutes: 120);
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        appt.DurationMinutes.Should().Be(120);
+        appt.ScheduledEndUtc.Should().BeCloseTo(when.AddMinutes(120), TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task Handle_Should_PreserveDuration_When_DurationMinutes_Null()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var aid = Guid.NewGuid();
+        var when = DateTime.UtcNow.AddDays(2);
+
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 45, AppointmentType.Examination, null, null);
+        typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(appt);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "X"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+
+        var cmd = new UpdateAppointmentCommand(aid, cid, pid, when, AppointmentType.Surgery, AppointmentStatus.Scheduled, null, DurationMinutes: null);
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        appt.DurationMinutes.Should().Be(45);
     }
 }

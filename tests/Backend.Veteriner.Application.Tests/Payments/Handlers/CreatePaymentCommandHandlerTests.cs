@@ -182,7 +182,7 @@ public sealed class CreatePaymentCommandHandlerTests
         var aid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         SetupTenantClinicClient(tid, cid, clientId);
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
+        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
 
@@ -203,7 +203,7 @@ public sealed class CreatePaymentCommandHandlerTests
         var aid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         SetupTenantClinicClient(tid, cid, clientId);
-        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null);
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -372,7 +372,7 @@ public sealed class CreatePaymentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         SetupTenantClinicClient(tid, cid, clientId);
 
-        var appt = new Appointment(tid, cid, petId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, AppointmentStatus.Scheduled, null);
+        var appt = new Appointment(tid, cid, petId, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, AppointmentStatus.Scheduled, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))

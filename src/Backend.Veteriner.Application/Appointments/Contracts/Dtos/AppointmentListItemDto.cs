@@ -18,5 +18,7 @@ public sealed record AppointmentListItemDto(
     Guid ClientId,
     string ClientName,
     DateTime ScheduledAtUtc,
+    int DurationMinutes,
+    DateTime ScheduledEndUtc,
     AppointmentStatus Status,
     string? Notes);

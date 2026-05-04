@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
+using ClinicAppointmentSettingsEntity = Backend.Veteriner.Domain.Clinics.ClinicAppointmentSettings;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
@@ -23,6 +24,7 @@ public sealed class CreateAppointmentCommandHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Appointment>> _appointmentsRead = new();
+    private readonly Mock<IReadRepository<ClinicAppointmentSettingsEntity>> _clinicAppointmentSettings = new();
     private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
 
     private CreateAppointmentCommandHandler CreateHandler()
@@ -33,6 +35,7 @@ public sealed class CreateAppointmentCommandHandlerTests
             _clinics.Object,
             _pets.Object,
             _appointmentsRead.Object,
+            _clinicAppointmentSettings.Object,
             _appointmentsWrite.Object);
 
     [Fact]
@@ -252,7 +255,7 @@ public sealed class CreateAppointmentCommandHandlerTests
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, cid, Guid.NewGuid(), when, AppointmentType.Other, null, null));
+            .ReturnsAsync(new Appointment(tid, cid, Guid.NewGuid(), when, 30, AppointmentType.Other, null, null));
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
@@ -284,7 +287,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
         _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, Guid.NewGuid(), pid, when, AppointmentType.Other, null, null));
+            .ReturnsAsync(new Appointment(tid, Guid.NewGuid(), pid, when, 30, AppointmentType.Other, null, null));
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
@@ -407,5 +410,111 @@ public sealed class CreateAppointmentCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Appointments.Validation");
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseExplicitDuration_When_DurationMinutes_Provided()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var when = DateTime.UtcNow.AddDays(1);
+        var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Vaccination, null, null, DurationMinutes: 60);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+
+        Appointment? captured = null;
+        _appointmentsWrite.Setup(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()))
+            .Callback<Appointment, CancellationToken>((a, _) => captured = a);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.DurationMinutes.Should().Be(60);
+        captured.ScheduledEndUtc.Should().Be(when.AddMinutes(60));
+        _clinicAppointmentSettings.Verify(
+            r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseClinicAppointmentSettingsDefault_When_DurationMinutes_Null_And_SettingsExist()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var when = DateTime.UtcNow.AddDays(1);
+        var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
+
+        var settings = ClinicAppointmentSettingsEntity.Create(tid, cid, 45, 15, false);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+
+        Appointment? captured = null;
+        _appointmentsWrite.Setup(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()))
+            .Callback<Appointment, CancellationToken>((a, _) => captured = a);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.DurationMinutes.Should().Be(45);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Use30_When_DurationMinutes_Null_And_NoClinicSettingsRow()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var when = DateTime.UtcNow.AddDays(1);
+        var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ClinicAppointmentSettingsEntity?)null);
+
+        Appointment? captured = null;
+        _appointmentsWrite.Setup(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()))
+            .Callback<Appointment, CancellationToken>((a, _) => captured = a);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.DurationMinutes.Should().Be(30);
     }
 }

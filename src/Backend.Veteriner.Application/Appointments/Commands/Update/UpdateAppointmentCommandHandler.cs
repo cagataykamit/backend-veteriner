@@ -86,11 +86,14 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
                 return Result.Failure("Appointments.PetSlotDuplicate", "Bu hayvanýn ayný saatte baþka bir aktif randevusu var.");
         }
 
+        var durationMinutes = request.DurationMinutes ?? appointment.DurationMinutes;
+
         var domain = appointment.ApplyWriteUpdate(
             request.Status,
             clinicId,
             request.PetId,
             scheduledUtc,
+            durationMinutes,
             request.AppointmentType,
             request.Notes);
         if (!domain.IsSuccess)

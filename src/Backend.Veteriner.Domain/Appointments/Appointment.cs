@@ -7,16 +7,28 @@ namespace Backend.Veteriner.Domain.Appointments;
 /// </summary>
 public sealed class Appointment : AggregateRoot
 {
+    public const int MinDurationMinutes = 5;
+    public const int MaxDurationMinutes = 240;
+    public const int DefaultDurationMinutes = 30;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
     public Guid PetId { get; private set; }
     public DateTime ScheduledAtUtc { get; private set; }
+    /// <summary>Randevu süresi (dakika). Kalıcı alan; bitiş <see cref="ScheduledEndUtc"/> ile türetilir.</summary>
+    public int DurationMinutes { get; private set; }
     public AppointmentType AppointmentType { get; private set; }
     public AppointmentStatus Status { get; private set; }
     public string? Notes { get; private set; }
 
+    /// <summary>UTC bitiş zamanı; <see cref="ScheduledAtUtc"/> + <see cref="DurationMinutes"/>.</summary>
+    public DateTime ScheduledEndUtc => ScheduledAtUtc.AddMinutes(DurationMinutes);
+
     private Appointment() { }
+
+    public static bool IsValidDurationMinutes(int value)
+        => value >= MinDurationMinutes && value <= MaxDurationMinutes;
 
     /// <summary>Yeni randevu; <paramref name="initialStatus"/> verilmezse <see cref="AppointmentStatus.Scheduled"/>.</summary>
     public Appointment(
@@ -24,6 +36,7 @@ public sealed class Appointment : AggregateRoot
         Guid clinicId,
         Guid petId,
         DateTime scheduledAtUtc,
+        int durationMinutes = DefaultDurationMinutes,
         AppointmentType appointmentType = AppointmentType.Other,
         AppointmentStatus? initialStatus = null,
         string? notes = null)
@@ -34,6 +47,8 @@ public sealed class Appointment : AggregateRoot
             throw new ArgumentException("ClinicId geçersiz.", nameof(clinicId));
         if (petId == Guid.Empty)
             throw new ArgumentException("PetId geçersiz.", nameof(petId));
+        if (!IsValidDurationMinutes(durationMinutes))
+            throw new ArgumentOutOfRangeException(nameof(durationMinutes), "Randevu süresi 5-240 dakika arasında olmalıdır.");
         if (!Enum.IsDefined(appointmentType))
             throw new ArgumentOutOfRangeException(nameof(appointmentType));
 
@@ -45,6 +60,7 @@ public sealed class Appointment : AggregateRoot
         ClinicId = clinicId;
         PetId = petId;
         ScheduledAtUtc = NormalizeUtc(scheduledAtUtc);
+        DurationMinutes = durationMinutes;
         AppointmentType = appointmentType;
         Status = status;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
@@ -101,7 +117,13 @@ public sealed class Appointment : AggregateRoot
     /// <summary>
     /// Yalnızca <see cref="AppointmentStatus.Scheduled"/> durumunda randevu detaylarını günceller.
     /// </summary>
-    public Result UpdateDetails(Guid clinicId, Guid petId, DateTime scheduledAtUtc, AppointmentType appointmentType, string? notes)
+    public Result UpdateDetails(
+        Guid clinicId,
+        Guid petId,
+        DateTime scheduledAtUtc,
+        int durationMinutes,
+        AppointmentType appointmentType,
+        string? notes)
     {
         if (Status != AppointmentStatus.Scheduled)
         {
@@ -114,12 +136,17 @@ public sealed class Appointment : AggregateRoot
             return Result.Failure("Appointments.Validation", "ClinicId geçersiz.");
         if (petId == Guid.Empty)
             return Result.Failure("Appointments.Validation", "PetId geçersiz.");
+        if (!IsValidDurationMinutes(durationMinutes))
+            return Result.Failure(
+                "Appointments.Validation",
+                "Randevu süresi 5-240 dakika arasında olmalıdır.");
         if (!Enum.IsDefined(appointmentType))
             return Result.Failure("Appointments.Validation", "Randevu türü geçersiz.");
 
         ClinicId = clinicId;
         PetId = petId;
         ScheduledAtUtc = NormalizeUtc(scheduledAtUtc);
+        DurationMinutes = durationMinutes;
         AppointmentType = appointmentType;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         return Result.Success();
@@ -134,6 +161,7 @@ public sealed class Appointment : AggregateRoot
         Guid clinicId,
         Guid petId,
         DateTime scheduledAtUtc,
+        int durationMinutes,
         AppointmentType appointmentType,
         string? notes)
     {
@@ -153,9 +181,9 @@ public sealed class Appointment : AggregateRoot
         }
 
         if (requestedStatus == AppointmentStatus.Scheduled)
-            return UpdateDetails(clinicId, petId, scheduledAtUtc, appointmentType, notes);
+            return UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes);
 
-        var details = UpdateDetails(clinicId, petId, scheduledAtUtc, appointmentType, notes);
+        var details = UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes);
         if (!details.IsSuccess)
             return details;
 

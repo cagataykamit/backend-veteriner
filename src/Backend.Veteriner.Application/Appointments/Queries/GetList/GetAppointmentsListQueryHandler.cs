@@ -186,6 +186,8 @@ public sealed class GetAppointmentsListQueryHandler
                     clientId,
                     clientName,
                     a.ScheduledAtUtc,
+                    a.DurationMinutes,
+                    a.ScheduledEndUtc,
                     a.Status,
                     a.Notes);
             })

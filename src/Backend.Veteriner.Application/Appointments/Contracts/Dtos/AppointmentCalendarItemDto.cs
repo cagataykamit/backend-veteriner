@@ -8,6 +8,8 @@ public sealed record AppointmentCalendarItemDto(
     Guid PetId,
     Guid ClientId,
     DateTime ScheduledAtUtc,
+    int DurationMinutes,
+    DateTime ScheduledEndUtc,
     AppointmentStatus Status,
     AppointmentType AppointmentType,
     string PetName,

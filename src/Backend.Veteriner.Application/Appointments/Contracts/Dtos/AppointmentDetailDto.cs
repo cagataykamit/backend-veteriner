@@ -18,5 +18,7 @@ public sealed record AppointmentDetailDto(
     string SpeciesName,
     AppointmentType AppointmentType,
     DateTime ScheduledAtUtc,
+    int DurationMinutes,
+    DateTime ScheduledEndUtc,
     AppointmentStatus Status,
     string? Notes);

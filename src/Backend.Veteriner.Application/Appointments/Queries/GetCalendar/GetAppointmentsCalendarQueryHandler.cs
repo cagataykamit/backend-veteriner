@@ -105,12 +105,15 @@ public sealed class GetAppointmentsCalendarQueryHandler
             var clientName = clientId != Guid.Empty && clientNameById.TryGetValue(clientId, out var cName)
                 ? cName
                 : string.Empty;
+            var scheduledEndUtc = r.ScheduledAtUtc.AddMinutes(r.DurationMinutes);
             return new AppointmentCalendarItemDto(
                 r.Id,
                 r.ClinicId,
                 r.PetId,
                 clientId,
                 r.ScheduledAtUtc,
+                r.DurationMinutes,
+                scheduledEndUtc,
                 r.Status,
                 r.AppointmentType,
                 pet?.Name ?? string.Empty,

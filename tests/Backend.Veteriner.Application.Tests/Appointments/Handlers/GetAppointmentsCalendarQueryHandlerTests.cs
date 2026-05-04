@@ -115,8 +115,8 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
 
         var rows = new List<AppointmentCalendarRow>
         {
-            new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(1), AppointmentStatus.Scheduled, AppointmentType.Consultation),
-            new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(2), AppointmentStatus.Cancelled, AppointmentType.Other),
+            new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(1), 30, AppointmentStatus.Scheduled, AppointmentType.Consultation),
+            new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(2), 30, AppointmentStatus.Cancelled, AppointmentType.Other),
         };
         _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsCalendarSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(rows);
@@ -134,6 +134,8 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
         result.Value[0].PetName.Should().Be("Pamuk");
         result.Value[0].ClientName.Should().Be("Ali Veli");
         result.Value[0].ClientId.Should().Be(clientId);
+        result.Value[0].DurationMinutes.Should().Be(30);
+        result.Value[0].ScheduledEndUtc.Should().Be(rows[0].ScheduledAtUtc.AddMinutes(30));
     }
 
     [Fact]

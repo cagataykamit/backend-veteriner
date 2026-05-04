@@ -10,5 +10,6 @@ public sealed record CreateAppointmentCommand(
     DateTime ScheduledAtUtc,
     AppointmentType AppointmentType,
     AppointmentStatus? Status = null,
-    string? Notes = null)
+    string? Notes = null,
+    int? DurationMinutes = null)
     : IRequest<Result<Guid>>;

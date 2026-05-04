@@ -8,6 +8,7 @@ public sealed record AppointmentCalendarRow(
     Guid ClinicId,
     Guid PetId,
     DateTime ScheduledAtUtc,
+    int DurationMinutes,
     AppointmentStatus Status,
     AppointmentType AppointmentType);
 
@@ -36,6 +37,7 @@ public sealed class AppointmentsCalendarSpec : Specification<Appointment, Appoin
             a.ClinicId,
             a.PetId,
             a.ScheduledAtUtc,
+            a.DurationMinutes,
             a.Status,
             a.AppointmentType));
     }

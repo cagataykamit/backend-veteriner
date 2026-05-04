@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.AppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -21,6 +22,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Appointment> _appointmentsRead;
+    private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
     private readonly IRepository<Appointment> _appointmentsWrite;
 
     public CreateAppointmentCommandHandler(
@@ -30,6 +32,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
         IReadRepository<Appointment> appointmentsRead,
+        IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
         IRepository<Appointment> appointmentsWrite)
     {
         _tenantContext = tenantContext;
@@ -38,6 +41,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         _clinics = clinics;
         _pets = pets;
         _appointmentsRead = appointmentsRead;
+        _clinicAppointmentSettings = clinicAppointmentSettings;
         _appointmentsWrite = appointmentsWrite;
     }
 
@@ -87,6 +91,24 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         if (pet is null)
             return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        int durationMinutes;
+        if (request.DurationMinutes is { } requestedDuration)
+            durationMinutes = requestedDuration;
+        else
+        {
+            var appointmentSettings = await _clinicAppointmentSettings.FirstOrDefaultAsync(
+                new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
+            durationMinutes = appointmentSettings?.DefaultAppointmentDurationMinutes
+                ?? ClinicAppointmentSettingsDefaults.Build().DefaultAppointmentDurationMinutes;
+        }
+
+        if (!Appointment.IsValidDurationMinutes(durationMinutes))
+        {
+            return Result<Guid>.Failure(
+                "Appointments.Validation",
+                "Randevu süresi 5-240 dakika arasında olmalıdır.");
+        }
+
         if (effectiveStatus == AppointmentStatus.Scheduled)
         {
             var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
@@ -109,6 +131,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
             clinicId,
             request.PetId,
             scheduledUtc,
+            durationMinutes,
             request.AppointmentType,
             request.Status,
             request.Notes);

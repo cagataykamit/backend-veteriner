@@ -278,7 +278,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+            .ReturnsAsync(new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null));
 
         var result = await CreateHandler().Handle(Cmd(paymentId, cid, clientId, appointmentId: appointmentId), CancellationToken.None);
 
@@ -300,7 +300,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, cid, appointmentPetId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+            .ReturnsAsync(new Appointment(tid, cid, appointmentPetId, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
@@ -325,7 +325,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Appointment(tid, cid, appointmentPetId, DateTime.UtcNow.AddDays(1), AppointmentType.Other, null, null));
+            .ReturnsAsync(new Appointment(tid, cid, appointmentPetId, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null));
 

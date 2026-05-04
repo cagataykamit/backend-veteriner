@@ -60,7 +60,7 @@ public sealed class GetAppointmentByIdQueryHandlerTests
         var apptId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
 
-        var appt = new Appointment(tid, cid, petId, DateTime.UtcNow.AddDays(1), AppointmentType.Consultation, null, "not");
+        var appt = new Appointment(tid, cid, petId, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Consultation, null, "not");
         typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, apptId);
 
         var pet = new Pet(tid, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
@@ -96,5 +96,7 @@ public sealed class GetAppointmentByIdQueryHandlerTests
         result.Value.ClientName.Should().Be("Ali Veli");
         result.Value.PetName.Should().Be("Pamuk");
         result.Value.Notes.Should().Be("not");
+        result.Value.DurationMinutes.Should().Be(30);
+        result.Value.ScheduledEndUtc.Should().Be(appt.ScheduledEndUtc);
     }
 }
