@@ -69,6 +69,7 @@ public class AppDbContext : DbContext
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<UserClinic> UserClinics => Set<UserClinic>();
     public DbSet<ClinicWorkingHour> ClinicWorkingHours => Set<ClinicWorkingHour>();
+    public DbSet<ClinicAppointmentSettings> ClinicAppointmentSettings => Set<ClinicAppointmentSettings>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Pet> Pets => Set<Pet>();
     public DbSet<Species> Species => Set<Species>();

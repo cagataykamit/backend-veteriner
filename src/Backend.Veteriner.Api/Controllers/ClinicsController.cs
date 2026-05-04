@@ -3,11 +3,13 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Api.Contracts;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clinics.Commands.Activate;
+using Backend.Veteriner.Application.Clinics.Commands.AppointmentSettings.UpdateClinicAppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Commands.Create;
 using Backend.Veteriner.Application.Clinics.Commands.Deactivate;
 using Backend.Veteriner.Application.Clinics.Commands.Update;
 using Backend.Veteriner.Application.Clinics.Commands.WorkingHours.UpdateClinicWorkingHours;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
+using Backend.Veteriner.Application.Clinics.Queries.AppointmentSettings.GetClinicAppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Queries.GetById;
 using Backend.Veteriner.Application.Clinics.Queries.GetList;
 using Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkingHours;
@@ -107,6 +109,54 @@ public sealed class ClinicsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new UpdateClinicWorkingHoursCommand(id, body.Items), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Klinik randevu varsayılan ayarları. Kayıt yoksa default değerler döner.</summary>
+    [HttpGet("{id:guid}/appointment-settings")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Read)]
+    [ProducesResponseType(typeof(ClinicAppointmentSettingsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAppointmentSettings([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClinicAppointmentSettingsQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Klinik randevu varsayılan ayarlarını kaydeder.</summary>
+    [HttpPut("{id:guid}/appointment-settings")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ClinicAppointmentSettingsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PutAppointmentSettings(
+        [FromRoute] Guid id,
+        [FromBody] UpdateClinicAppointmentSettingsRequest? body,
+        CancellationToken ct)
+    {
+        if (body is null)
+        {
+            return Result<ClinicAppointmentSettingsDto>.Failure(
+                    "Clinics.AppointmentSettings.Validation.InvalidRequestBody",
+                    "Istek govdesi bos veya hatali JSON.")
+                .ToActionResult(this);
+        }
+
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new UpdateClinicAppointmentSettingsCommand(
+            id,
+            body.DefaultAppointmentDurationMinutes,
+            body.SlotIntervalMinutes,
+            body.AllowOverlappingAppointments), ct);
         return result.ToActionResult(this);
     }
 
