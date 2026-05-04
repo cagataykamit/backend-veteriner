@@ -168,9 +168,9 @@ public sealed class CreateAppointmentCommandHandlerTests
             .ReturnsAsync(new List<Clinic> { onlyClinic });
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
 
         Appointment? captured = null;
@@ -254,13 +254,13 @@ public sealed class CreateAppointmentCommandHandlerTests
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Appointment(tid, cid, Guid.NewGuid(), when, 30, AppointmentType.Other, null, null));
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Appointments.ClinicSlotDuplicate");
+        result.Error.Code.Should().Be("Appointments.ClinicTimeConflict");
         _appointmentsWrite.Verify(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -284,15 +284,15 @@ public sealed class CreateAppointmentCommandHandlerTests
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Appointment(tid, Guid.NewGuid(), pid, when, 30, AppointmentType.Other, null, null));
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Appointments.PetSlotDuplicate");
+        result.Error.Code.Should().Be("Appointments.PetTimeConflict");
     }
 
     [Fact]
@@ -315,9 +315,9 @@ public sealed class CreateAppointmentCommandHandlerTests
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
 
         Appointment? captured = null;
@@ -387,7 +387,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         captured!.Status.Should().Be(AppointmentStatus.Completed);
         _appointmentsRead.Verify(
-            r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()),
+            r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -429,9 +429,9 @@ public sealed class CreateAppointmentCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
 
         Appointment? captured = null;
@@ -445,7 +445,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         captured.ScheduledEndUtc.Should().Be(when.AddMinutes(60));
         _clinicAppointmentSettings.Verify(
             r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()),
-            Times.Never);
+            Times.Once);
     }
 
     [Fact]
@@ -467,9 +467,9 @@ public sealed class CreateAppointmentCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
         _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(settings);
@@ -501,9 +501,9 @@ public sealed class CreateAppointmentCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
         _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClinicAppointmentSettingsEntity?)null);
@@ -516,5 +516,67 @@ public sealed class CreateAppointmentCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         captured!.DurationMinutes.Should().Be(30);
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotQueryClinicInterval_When_AllowOverlappingAppointments_True()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var when = new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc);
+        var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
+        var settings = ClinicAppointmentSettingsEntity.Create(tid, cid, 30, 15, allowOverlappingAppointments: true);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _appointmentsRead.Verify(
+            r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_PetInterval_When_AllowOverlappingAppointments_True()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var when = new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc);
+        var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
+        var settings = ClinicAppointmentSettingsEntity.Create(tid, cid, 30, 15, allowOverlappingAppointments: true);
+        var blockingPetAppt = new Appointment(tid, cid, pid, when.AddMinutes(15), 30, AppointmentType.Other, null, null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(blockingPetAppt);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.PetTimeConflict");
+        _appointmentsWrite.Verify(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

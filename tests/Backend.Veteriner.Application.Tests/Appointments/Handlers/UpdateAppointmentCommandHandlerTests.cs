@@ -20,6 +20,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
     private readonly Mock<IReadRepository<Appointment>> _appointmentsRead = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
+    private readonly Mock<IReadRepository<ClinicAppointmentSettings>> _clinicAppointmentSettings = new();
     private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
 
     private UpdateAppointmentCommandHandler CreateHandler()
@@ -29,6 +30,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
             _appointmentsRead.Object,
             _clinics.Object,
             _pets.Object,
+            _clinicAppointmentSettings.Object,
             _appointmentsWrite.Object);
 
     [Fact]
@@ -51,9 +53,9 @@ public sealed class UpdateAppointmentCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "X"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
 
         var cmd = new UpdateAppointmentCommand(aid, cid, pid, when, AppointmentType.Surgery, AppointmentStatus.Scheduled, null);
@@ -200,9 +202,9 @@ public sealed class UpdateAppointmentCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "X"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
 
         var cmd = new UpdateAppointmentCommand(aid, cid, pid, when, AppointmentType.Surgery, AppointmentStatus.Scheduled, null, DurationMinutes: 120);
@@ -233,9 +235,9 @@ public sealed class UpdateAppointmentCommandHandlerTests
             .ReturnsAsync(new Clinic(tid, "K", "X"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
 
         var cmd = new UpdateAppointmentCommand(aid, cid, pid, when, AppointmentType.Surgery, AppointmentStatus.Scheduled, null, DurationMinutes: null);

@@ -91,16 +91,15 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         if (pet is null)
             return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
+            new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
+
         int durationMinutes;
         if (request.DurationMinutes is { } requestedDuration)
             durationMinutes = requestedDuration;
         else
-        {
-            var appointmentSettings = await _clinicAppointmentSettings.FirstOrDefaultAsync(
-                new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
-            durationMinutes = appointmentSettings?.DefaultAppointmentDurationMinutes
+            durationMinutes = appointmentSettingsRow?.DefaultAppointmentDurationMinutes
                 ?? ClinicAppointmentSettingsDefaults.Build().DefaultAppointmentDurationMinutes;
-        }
 
         if (!Appointment.IsValidDurationMinutes(durationMinutes))
         {
@@ -109,21 +108,32 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
                 "Randevu süresi 5-240 dakika arasında olmalıdır.");
         }
 
+        var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
+            ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
+        var endUtc = scheduledUtc.AddMinutes(durationMinutes);
+
         if (effectiveStatus == AppointmentStatus.Scheduled)
         {
-            var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
-                new AppointmentScheduledSlotAtClinicSpec(tenantId, clinicId, scheduledUtc), ct);
-            if (clinicBusy is not null)
-                return Result<Guid>.Failure(
-                    "Appointments.ClinicSlotDuplicate",
-                    "Bu klinikte aynı saatte başka bir aktif randevu var.");
+            if (!allowClinicOverlap)
+            {
+                var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
+                    new AppointmentOverlappingAtClinicSpec(tenantId, clinicId, scheduledUtc, endUtc), ct);
+                if (clinicBusy is not null)
+                {
+                    return Result<Guid>.Failure(
+                        "Appointments.ClinicTimeConflict",
+                        "Bu zaman aralığında klinikte başka bir planlı randevu var.");
+                }
+            }
 
             var petBusy = await _appointmentsRead.FirstOrDefaultAsync(
-                new AppointmentScheduledSlotForPetSpec(tenantId, request.PetId, scheduledUtc), ct);
+                new AppointmentOverlappingForPetSpec(tenantId, request.PetId, scheduledUtc, endUtc), ct);
             if (petBusy is not null)
+            {
                 return Result<Guid>.Failure(
-                    "Appointments.PetSlotDuplicate",
-                    "Bu hayvanın aynı saatte başka bir aktif randevusu var.");
+                    "Appointments.PetTimeConflict",
+                    "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
+            }
         }
 
         var appointment = new Appointment(

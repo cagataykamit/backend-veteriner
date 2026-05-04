@@ -2,8 +2,10 @@ using Backend.Veteriner.Application.Appointments.Commands.Cancel;
 using Backend.Veteriner.Application.Appointments.Commands.Complete;
 using Backend.Veteriner.Application.Appointments.Commands.Reschedule;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using FluentAssertions;
 using Moq;
@@ -15,6 +17,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Appointment>> _read = new();
+    private readonly Mock<IReadRepository<ClinicAppointmentSettings>> _clinicAppointmentSettings = new();
     private readonly Mock<IRepository<Appointment>> _write = new();
 
     [Fact]
@@ -124,7 +127,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_ClinicSlotDuplicate()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(3);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
@@ -132,7 +135,9 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
-        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ClinicAppointmentSettings?)null);
+        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Appointment(tid, appt.ClinicId, Guid.NewGuid(), when, 30, AppointmentType.Other, null, null));
 
         var result = await handler.Handle(
@@ -140,14 +145,14 @@ public sealed class AppointmentLifecycleCommandHandlerTests
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Appointments.ClinicSlotDuplicate");
+        result.Error.Code.Should().Be("Appointments.ClinicTimeConflict");
         _write.Verify(w => w.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task Reschedule_Should_Succeed_When_NoConflict()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(5);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
@@ -155,9 +160,11 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
-        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotAtClinicSpec>(), It.IsAny<CancellationToken>()))
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ClinicAppointmentSettings?)null);
+        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
-        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentScheduledSlotForPetSpec>(), It.IsAny<CancellationToken>()))
+        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
 
         var result = await handler.Handle(
@@ -173,7 +180,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_NotScheduled()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(3);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
@@ -195,7 +202,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_TooFarInPast()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _write.Object);
         var tid = Guid.NewGuid();
         var past = DateTime.UtcNow.AddDays(-30);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);

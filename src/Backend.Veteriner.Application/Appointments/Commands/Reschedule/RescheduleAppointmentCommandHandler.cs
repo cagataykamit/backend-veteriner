@@ -1,7 +1,10 @@
 using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.AppointmentSettings;
+using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -12,17 +15,20 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Appointment> _appointmentsRead;
+    private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
     private readonly IRepository<Appointment> _appointmentsWrite;
 
     public RescheduleAppointmentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IReadRepository<Appointment> appointmentsRead,
+        IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
         IRepository<Appointment> appointmentsWrite)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _appointmentsRead = appointmentsRead;
+        _clinicAppointmentSettings = clinicAppointmentSettings;
         _appointmentsWrite = appointmentsWrite;
     }
 
@@ -56,32 +62,43 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         if (!window.IsSuccess)
             return Result.Failure(window.Error);
 
-        var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
-            new AppointmentScheduledSlotAtClinicSpec(
-                tenantId,
-                appointment.ClinicId,
-                scheduledUtc,
-                appointment.Id),
-            ct);
-        if (clinicBusy is not null)
+        var endUtc = scheduledUtc.AddMinutes(appointment.DurationMinutes);
+        var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
+            new ClinicAppointmentSettingsByClinicSpec(tenantId, appointment.ClinicId), ct);
+        var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
+            ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
+
+        if (!allowClinicOverlap)
         {
-            return Result.Failure(
-                "Appointments.ClinicSlotDuplicate",
-                "Bu klinikte aynı saatte başka bir aktif randevu var.");
+            var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
+                new AppointmentOverlappingAtClinicSpec(
+                    tenantId,
+                    appointment.ClinicId,
+                    scheduledUtc,
+                    endUtc,
+                    appointment.Id),
+                ct);
+            if (clinicBusy is not null)
+            {
+                return Result.Failure(
+                    "Appointments.ClinicTimeConflict",
+                    "Bu zaman aralığında klinikte başka bir planlı randevu var.");
+            }
         }
 
         var petBusy = await _appointmentsRead.FirstOrDefaultAsync(
-            new AppointmentScheduledSlotForPetSpec(
+            new AppointmentOverlappingForPetSpec(
                 tenantId,
                 appointment.PetId,
                 scheduledUtc,
+                endUtc,
                 appointment.Id),
             ct);
         if (petBusy is not null)
         {
             return Result.Failure(
-                "Appointments.PetSlotDuplicate",
-                "Bu hayvanın aynı saatte başka bir aktif randevusu var.");
+                "Appointments.PetTimeConflict",
+                "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
         }
 
         var domain = appointment.RescheduleTo(scheduledUtc);

@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.AppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -18,6 +19,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
     private readonly IReadRepository<Appointment> _appointmentsRead;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
+    private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
     private readonly IRepository<Appointment> _appointmentsWrite;
 
     public UpdateAppointmentCommandHandler(
@@ -26,6 +28,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         IReadRepository<Appointment> appointmentsRead,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
+        IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
         IRepository<Appointment> appointmentsWrite)
     {
         _tenantContext = tenantContext;
@@ -33,6 +36,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         _appointmentsRead = appointmentsRead;
         _clinics = clinics;
         _pets = pets;
+        _clinicAppointmentSettings = clinicAppointmentSettings;
         _appointmentsWrite = appointmentsWrite;
     }
 
@@ -73,20 +77,37 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         if (pet is null)
             return Result.Failure("Pets.NotFound", "Hayvan kaydý bulunamadý veya kiracýya ait deðil.");
 
+        var durationMinutes = request.DurationMinutes ?? appointment.DurationMinutes;
+        var endUtc = scheduledUtc.AddMinutes(durationMinutes);
+
         if (request.Status == AppointmentStatus.Scheduled)
         {
-            var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
-                new AppointmentScheduledSlotAtClinicSpec(tenantId, clinicId, scheduledUtc, appointment.Id), ct);
-            if (clinicBusy is not null)
-                return Result.Failure("Appointments.ClinicSlotDuplicate", "Bu klinikte ayný saatte baþka bir aktif randevu var.");
+            var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
+                new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
+            var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
+                ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
+
+            if (!allowClinicOverlap)
+            {
+                var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
+                    new AppointmentOverlappingAtClinicSpec(tenantId, clinicId, scheduledUtc, endUtc, appointment.Id), ct);
+                if (clinicBusy is not null)
+                {
+                    return Result.Failure(
+                        "Appointments.ClinicTimeConflict",
+                        "Bu zaman aralığında klinikte başka bir planlı randevu var.");
+                }
+            }
 
             var petBusy = await _appointmentsRead.FirstOrDefaultAsync(
-                new AppointmentScheduledSlotForPetSpec(tenantId, request.PetId, scheduledUtc, appointment.Id), ct);
+                new AppointmentOverlappingForPetSpec(tenantId, request.PetId, scheduledUtc, endUtc, appointment.Id), ct);
             if (petBusy is not null)
-                return Result.Failure("Appointments.PetSlotDuplicate", "Bu hayvanýn ayný saatte baþka bir aktif randevusu var.");
+            {
+                return Result.Failure(
+                    "Appointments.PetTimeConflict",
+                    "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
+            }
         }
-
-        var durationMinutes = request.DurationMinutes ?? appointment.DurationMinutes;
 
         var domain = appointment.ApplyWriteUpdate(
             request.Status,
