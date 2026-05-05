@@ -46,11 +46,14 @@ public sealed class CreateAppointmentCommandHandlerTests
             _appointmentsWrite.Object);
     }
 
+    private static DateTime SlotAlignedUtcPlusDays(int days)
+        => DateTime.UtcNow.Date.AddDays(days).AddHours(9);
+
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
     {
         var handler = CreateHandler();
-        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
+        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns((Guid?)null);
 
@@ -66,7 +69,7 @@ public sealed class CreateAppointmentCommandHandlerTests
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
+        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -84,7 +87,7 @@ public sealed class CreateAppointmentCommandHandlerTests
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
-        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
+        var cmd = new CreateAppointmentCommand(Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), AppointmentType.Examination);
 
         var tenant = new Tenant("X");
         tenant.Deactivate();
@@ -144,7 +147,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var cmd = new CreateAppointmentCommand(cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
+        var cmd = new CreateAppointmentCommand(cid, pid, SlotAlignedUtcPlusDays(1), AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -165,7 +168,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(1);
+        var when = SlotAlignedUtcPlusDays(1);
         var cmd = new CreateAppointmentCommand(null, pid, when, AppointmentType.Examination);
         var onlyClinic = new Clinic(tid, "Tek Klinik", "Ankara");
 
@@ -198,7 +201,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(1);
+        var when = SlotAlignedUtcPlusDays(1);
         var cmd = new CreateAppointmentCommand(null, pid, when, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -224,7 +227,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var cmd = new CreateAppointmentCommand(cid, pid, DateTime.UtcNow.AddDays(1), AppointmentType.Examination);
+        var cmd = new CreateAppointmentCommand(cid, pid, SlotAlignedUtcPlusDays(1), AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -249,7 +252,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(2);
+        var when = SlotAlignedUtcPlusDays(2);
         var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -279,7 +282,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(2);
+        var when = SlotAlignedUtcPlusDays(2);
         var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -310,7 +313,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(1);
+        var when = SlotAlignedUtcPlusDays(1);
         var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Vaccination, null, "  not  ");
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -353,7 +356,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var bodyClinicId = Guid.NewGuid();
         var activeClinicId = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(1);
+        var when = SlotAlignedUtcPlusDays(1);
         var cmd = new CreateAppointmentCommand(bodyClinicId, pid, when, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -375,7 +378,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(-1);
+        var when = SlotAlignedUtcPlusDays(-1);
         var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination, AppointmentStatus.Completed, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -407,7 +410,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var cmd = new CreateAppointmentCommand(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            DateTime.UtcNow.AddDays(1),
+            SlotAlignedUtcPlusDays(1),
             AppointmentType.Examination,
             (AppointmentStatus)99,
             null);
@@ -427,7 +430,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(1);
+        var when = SlotAlignedUtcPlusDays(1);
         var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Vaccination, null, null, DurationMinutes: 60);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -463,7 +466,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(1);
+        var when = SlotAlignedUtcPlusDays(1);
         var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
 
         var settings = ClinicAppointmentSettingsEntity.Create(tid, cid, 45, 15, false);
@@ -499,7 +502,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(1);
+        var when = SlotAlignedUtcPlusDays(1);
         var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -743,5 +746,77 @@ public sealed class CreateAppointmentCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Appointments.OutsideWorkingHours");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_NotAlignedToSlotInterval_Default15()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var scheduledUtc = new DateTime(2026, 6, 1, 6, 10, 0, DateTimeKind.Utc); // 09:10 local
+        var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ClinicAppointmentSettingsEntity?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.NotAlignedToSlotInterval");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Validate_CustomSlotInterval_20()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var okCmd = new CreateAppointmentCommand(cid, pid, new DateTime(2026, 6, 1, 6, 20, 0, DateTimeKind.Utc), AppointmentType.Examination, null, null, DurationMinutes: 30); // 09:20 local
+        var badCmd = okCmd with { ScheduledAtUtc = new DateTime(2026, 6, 1, 6, 30, 0, DateTimeKind.Utc) }; // 09:30 local
+        var settings = ClinicAppointmentSettingsEntity.Create(tid, cid, 30, 20, false);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync((Appointment?)null);
+
+        var ok = await handler.Handle(okCmd, CancellationToken.None);
+        var bad = await handler.Handle(badCmd, CancellationToken.None);
+
+        ok.IsSuccess.Should().BeTrue();
+        bad.IsSuccess.Should().BeFalse();
+        bad.Error.Code.Should().Be("Appointments.NotAlignedToSlotInterval");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_HasSecondOrMillisecond()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var scheduledUtc = new DateTime(2026, 6, 1, 6, 15, 1, DateTimeKind.Utc).AddMilliseconds(1);
+        var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.NotAlignedToSlotInterval");
     }
 }

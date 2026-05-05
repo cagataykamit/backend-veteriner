@@ -85,14 +85,20 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
 
         if (request.Status == AppointmentStatus.Scheduled)
         {
+            var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
+                new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
+            var slotIntervalMinutes = appointmentSettingsRow?.SlotIntervalMinutes
+                ?? ClinicAppointmentSettingsDefaults.Build().SlotIntervalMinutes;
+            var slotAlignment = AppointmentSlotIntervalValidation.Validate(scheduledUtc, slotIntervalMinutes);
+            if (!slotAlignment.IsSuccess)
+                return Result.Failure(slotAlignment.Error);
+
             var hoursRows = await _clinicWorkingHoursRead.ListAsync(
                 new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
             var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);
             if (!workingHours.IsSuccess)
                 return Result.Failure(workingHours.Error);
 
-            var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
-                new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
             var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
                 ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
 

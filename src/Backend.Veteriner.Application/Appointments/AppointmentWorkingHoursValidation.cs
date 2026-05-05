@@ -14,7 +14,7 @@ internal static class AppointmentWorkingHoursValidation
         int durationMinutes,
         IReadOnlyList<ClinicWorkingHour> clinicHoursRows)
     {
-        var localStart = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(scheduledAtUtc, DateTimeKind.Utc), ClinicTimeZone);
+        var localStart = ToClinicLocal(scheduledAtUtc);
         var localEnd = localStart.AddMinutes(durationMinutes);
         if (localStart.Date != localEnd.Date)
         {
@@ -71,6 +71,9 @@ internal static class AppointmentWorkingHoursValidation
 
         return Result.Success();
     }
+
+    internal static DateTime ToClinicLocal(DateTime utcDateTime)
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ClinicTimeZone);
 
     private static TimeZoneInfo ResolveClinicTimeZone()
     {

@@ -111,12 +111,18 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
                 "Randevu süresi 5-240 dakika arasında olmalıdır.");
         }
 
+        var slotIntervalMinutes = appointmentSettingsRow?.SlotIntervalMinutes
+            ?? ClinicAppointmentSettingsDefaults.Build().SlotIntervalMinutes;
         var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
             ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
         var endUtc = scheduledUtc.AddMinutes(durationMinutes);
 
         if (effectiveStatus == AppointmentStatus.Scheduled)
         {
+            var slotAlignment = AppointmentSlotIntervalValidation.Validate(scheduledUtc, slotIntervalMinutes);
+            if (!slotAlignment.IsSuccess)
+                return Result<Guid>.Failure(slotAlignment.Error);
+
             var hoursRows = await _clinicWorkingHoursRead.ListAsync(
                 new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
             var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);

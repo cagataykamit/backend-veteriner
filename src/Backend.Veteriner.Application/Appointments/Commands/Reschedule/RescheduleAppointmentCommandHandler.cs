@@ -68,12 +68,18 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         var endUtc = scheduledUtc.AddMinutes(appointment.DurationMinutes);
         var hoursRows = await _clinicWorkingHoursRead.ListAsync(
             new ClinicWorkingHoursByClinicSpec(tenantId, appointment.ClinicId), ct);
+        var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
+            new ClinicAppointmentSettingsByClinicSpec(tenantId, appointment.ClinicId), ct);
+        var slotIntervalMinutes = appointmentSettingsRow?.SlotIntervalMinutes
+            ?? ClinicAppointmentSettingsDefaults.Build().SlotIntervalMinutes;
+        var slotAlignment = AppointmentSlotIntervalValidation.Validate(scheduledUtc, slotIntervalMinutes);
+        if (!slotAlignment.IsSuccess)
+            return Result.Failure(slotAlignment.Error);
+
         var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, appointment.DurationMinutes, hoursRows);
         if (!workingHours.IsSuccess)
             return Result.Failure(workingHours.Error);
 
-        var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
-            new ClinicAppointmentSettingsByClinicSpec(tenantId, appointment.ClinicId), ct);
         var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
             ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
 
