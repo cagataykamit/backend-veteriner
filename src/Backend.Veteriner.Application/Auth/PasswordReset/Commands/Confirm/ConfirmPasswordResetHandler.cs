@@ -39,7 +39,7 @@ public sealed class ConfirmPasswordResetHandler : IRequestHandler<ConfirmPasswor
     public async Task<Unit> Handle(ConfirmPasswordResetCommand request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Token))
-            throw new UnauthorizedAccessException("Ge�ersiz token.");
+            throw new UnauthorizedAccessException("Geçersiz token.");
 
         // Parola politikas� FluentValidation'da kontrol ediliyor.
 
@@ -53,16 +53,16 @@ public sealed class ConfirmPasswordResetHandler : IRequestHandler<ConfirmPasswor
         // Debug seviyesinde k�smi log (prod�da hassas veri i�ermiyor)
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            var tokenShort = raw.Length > 4 ? raw[..4] + "�" : raw;
-            var hashShort = tokenHash.Length > 12 ? tokenHash[..12] + "�" : tokenHash;
+            var tokenShort = raw.Length > 4 ? raw[..4] + "â€¦" : raw;
+            var hashShort = tokenHash.Length > 12 ? tokenHash[..12] + "â€¦" : tokenHash;
             _logger.LogDebug("ConfirmPR: token='{TokenShort}' hash='{HashShort}'", tokenShort, hashShort);
         }
 
         var vt = await _verRepo.GetActiveByHashAsync(tokenHash, VerificationPurpose.PasswordReset, ct)
-                 ?? throw new UnauthorizedAccessException("Token bulunamad� veya s�resi dolmu�.");
+                 ?? throw new UnauthorizedAccessException("Token bulunamadı veya süresi dolmuş.");
 
         var user = vt.User ?? await _users.GetByIdAsync(vt.UserId, ct)
-                   ?? throw new UnauthorizedAccessException("Kullan�c� bulunamad�.");
+                   ?? throw new UnauthorizedAccessException("Kullanıcı bulunamadı.");
 
         // ?? Yeni parolay� bcrypt ile g�ncelle
         var newHash = _hasher.Hash(request.NewPassword);

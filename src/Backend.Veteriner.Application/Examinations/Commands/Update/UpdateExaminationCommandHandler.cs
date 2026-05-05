@@ -93,7 +93,7 @@ public sealed class UpdateExaminationCommandHandler : IRequestHandler<UpdateExam
             {
                 return Result.Failure(
                     "Examinations.ClinicContextMismatch",
-                    "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                    "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
             }
 
             clinicId = _clinicContext.ClinicId ?? request.ClinicId ?? appt.ClinicId;

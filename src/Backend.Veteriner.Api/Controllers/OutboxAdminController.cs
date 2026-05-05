@@ -135,7 +135,7 @@ public sealed class OutboxAdminController : ControllerBase
 
             return Problem(
                 title: "Invalid operation",
-                detail: "Mesaj dead-letter de�il.",
+                detail: "Mesaj dead-letter değil.",
                 statusCode: StatusCodes.Status400BadRequest);
         }
 

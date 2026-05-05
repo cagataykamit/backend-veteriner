@@ -40,7 +40,7 @@ public sealed class EmailTestController : ControllerBase
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Invalid request",
-                detail: "Ge�ersiz istek g�vdesi."
+                detail: "Geçersiz istek gövdesi."
             );
         }
 
@@ -61,7 +61,7 @@ public sealed class EmailTestController : ControllerBase
         try
         {
             await _immediate.SendAsync(req.To, req.Subject ?? string.Empty, content, ct, isHtml);
-            return Ok(new { message = "E-posta g�nderildi." });
+            return Ok(new { message = "E-posta gönderildi." });
         }
         catch (Exception ex)
         {

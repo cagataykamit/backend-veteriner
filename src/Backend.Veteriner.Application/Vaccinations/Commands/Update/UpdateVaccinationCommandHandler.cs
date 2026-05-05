@@ -94,7 +94,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
         {
             return Result.Failure(
                 "Vaccinations.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
@@ -105,7 +105,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
             return Result.Failure("Vaccinations.NotFound", "Aşı kaydı bulunamadı.");
 
         if (_clinicContext.ClinicId is { } clinicId && v.ClinicId != clinicId)
-            return Result.Failure("Vaccinations.NotFound", "Asi kaydi bulunamadi.");
+            return Result.Failure("Vaccinations.NotFound", "Aşı kaydı bulunamadı.");
 
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, effectiveClinicId), ct);

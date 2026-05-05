@@ -13,7 +13,7 @@ namespace Backend.Veteriner.Application.Auth.Commands.Permissions.Create
         {
             RuleFor(x => x.Code)
                 .NotEmpty().MaximumLength(128)
-                .Matches(@"^[A-Za-z0-9\.\-:]+$").WithMessage("Code sadece harf/rakam . - : i�erebilir.");
+                .Matches(@"^[A-Za-z0-9\.\-:]+$").WithMessage("Code sadece harf/rakam . - : içerebilir.");
             RuleFor(x => x.Description).MaximumLength(512);
         }
     }

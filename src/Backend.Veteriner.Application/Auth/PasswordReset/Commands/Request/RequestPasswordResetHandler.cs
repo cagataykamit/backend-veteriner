@@ -74,8 +74,8 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
 
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            var shortRaw = raw.Length > 6 ? raw[..6] + "�" : raw;
-            var shortHash = tokenHash.Length > 12 ? tokenHash[..12] + "�" : tokenHash;
+            var shortRaw = raw.Length > 6 ? raw[..6] + "â€¦" : raw;
+            var shortHash = tokenHash.Length > 12 ? tokenHash[..12] + "â€¦" : tokenHash;
             _logger.LogDebug("PasswordReset: token generated raw='{Raw}', hash='{Hash}'", shortRaw, shortHash);
         }
 
@@ -89,14 +89,14 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
 
         // 4) Link ve e-posta
         var link = _url.BuildAbsolute("/api/password/confirm", $"token={raw}");
-        var subject = "�ifre S�f�rlama";
+        var subject = "Şifre Sıfırlama";
         var bodyText = new StringBuilder()
             .AppendLine("Merhaba,")
             .AppendLine()
-            .AppendLine("�ifrenizi s�f�rlamak i�in ba�lant�:")
+            .AppendLine("Şifrenizi sıfırlamak için bağlantı:")
             .AppendLine(link)
             .AppendLine()
-            .AppendLine("Bu ba�lant� 1 saat boyunca ge�erlidir.")
+            .AppendLine("Bu bağlantı 1 saat boyunca geçerlidir.")
             .ToString();
 
         await _email.SendAsync(user.Email, subject, bodyText, ct);

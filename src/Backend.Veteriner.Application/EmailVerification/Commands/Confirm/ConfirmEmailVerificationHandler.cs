@@ -23,7 +23,7 @@ public sealed class ConfirmEmailVerificationHandler : IRequestHandler<ConfirmEma
     public async Task<Unit> Handle(ConfirmEmailVerificationCommand request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Token))
-            throw new UnauthorizedAccessException("Ge�ersiz token.");
+            throw new UnauthorizedAccessException("Geçersiz token.");
 
         // ?? Token normalize (URL �zerinden geldi�i i�in encode/decode fark� olabilir)
         var raw = request.Token.Trim();
@@ -46,11 +46,11 @@ public sealed class ConfirmEmailVerificationHandler : IRequestHandler<ConfirmEma
 
         // Aktif, s�resi dolmam��, kullan�lmam�� do�rulama token��n� bul
         var vt = await _repo.GetActiveByHashAsync(tokenHash, VerificationPurpose.EmailVerify, ct)
-                 ?? throw new UnauthorizedAccessException("Token bulunamad� veya s�resi dolmu�.");
+                 ?? throw new UnauthorizedAccessException("Token bulunamadı veya süresi dolmuş.");
 
         // �lgili kullan�c�y� al
         var user = vt.User ?? await _users.GetByIdAsync(vt.UserId, ct)
-                   ?? throw new UnauthorizedAccessException("Kullan�c� bulunamad�.");
+                   ?? throw new UnauthorizedAccessException("Kullanıcı bulunamadı.");
 
         // Domain method: e-posta do�ruland�
         user.ConfirmEmail();

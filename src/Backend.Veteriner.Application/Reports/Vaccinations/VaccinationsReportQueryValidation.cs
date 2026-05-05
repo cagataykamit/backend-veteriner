@@ -51,7 +51,7 @@ internal static class VaccinationsReportQueryValidation
         {
             return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
                 "Vaccinations.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         if (effectiveClinicId is { } ecid)

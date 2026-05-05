@@ -19,7 +19,7 @@ public sealed class JwtTokenService : IJwtTokenService
     {
         _opt = options.Value ?? throw new ArgumentNullException(nameof(options));
         if (string.IsNullOrWhiteSpace(_opt.Key) || _opt.Key.Length < 32)
-            throw new InvalidOperationException("Jwt:Key en az 32 karakter olmal�.");
+            throw new InvalidOperationException("Jwt:Key en az 32 karakter olmalı.");
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opt.Key));
         _signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

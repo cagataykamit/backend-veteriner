@@ -51,7 +51,7 @@ internal static class AppointmentsReportQueryValidation
         {
             return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
                 "Appointments.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         if (effectiveClinicId is { } ecid)

@@ -81,7 +81,7 @@ public sealed class PublicController : ControllerBase
         {
             return Result<TenantInviteAcceptResultDto>.Failure(
                     "Auth.Unauthorized.UserContextMissing",
-                    "Kullanici kimligi token icinde bulunamadi.")
+                    "Kullanıcı kimliği token içinde bulunamadı.")
                 .ToActionResult(this);
         }
 

@@ -10,11 +10,11 @@ namespace Backend.Veteriner.Api.Auth
         public HasPermissionAttribute(string permission)
         {
             if (string.IsNullOrWhiteSpace(permission))
-                throw new ArgumentException("Permission bo� olamaz.", nameof(permission));
+                throw new ArgumentException("Permission boş olamaz.", nameof(permission));
 
             if (!PermissionCatalog.Contains(permission))
                 throw new InvalidOperationException(
-                    $"Tan�ms�z permission kullan�ld�: '{permission}'. PermissionCatalog i�ine eklenmelidir.");
+                    $"Tanımsız permission kullanıldı: '{permission}'. PermissionCatalog içine eklenmelidir.");
 
             Policy = permission;
         }

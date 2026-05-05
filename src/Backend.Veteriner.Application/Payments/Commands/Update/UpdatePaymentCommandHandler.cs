@@ -91,7 +91,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         {
             return Result.Failure(
                 "Payments.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
@@ -102,7 +102,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
             return Result.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
 
         if (_clinicContext.ClinicId is { } ctxClinicId && payment.ClinicId != ctxClinicId)
-            return Result.Failure("Payments.NotFound", "Odeme kaydi bulunamadi.");
+            return Result.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
 
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, effectiveClinicId), ct);

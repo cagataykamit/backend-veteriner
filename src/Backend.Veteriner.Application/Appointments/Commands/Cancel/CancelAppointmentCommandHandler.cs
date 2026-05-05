@@ -40,7 +40,7 @@ public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppo
         if (appointment is null)
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
         if (_clinicContext.ClinicId is { } clinicId && appointment.ClinicId != clinicId)
-            return Result.Failure("Appointments.NotFound", "Randevu bulunamadi veya kiraciya ait degil.");
+            return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
 
         var domain = appointment.Cancel(request.Reason);
         if (!domain.IsSuccess)

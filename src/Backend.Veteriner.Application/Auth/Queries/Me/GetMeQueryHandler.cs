@@ -13,7 +13,7 @@ public sealed class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeDto>
     public async Task<MeDto> Handle(GetMeQuery request, CancellationToken ct)
     {
         var user = await _users.FirstOrDefaultAsync(new UserByIdWithRolesSpec(request.UserId), ct)
-                   ?? throw new UnauthorizedAccessException("Kullan�c� bulunamad�.");
+                   ?? throw new UnauthorizedAccessException("Kullanıcı bulunamadı.");
 
         var roles = user.Roles.Select(r => r.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 

@@ -100,7 +100,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             {
                 return Result<Guid>.Failure(
                     "Examinations.ClinicContextMismatch",
-                    "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                    "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
             }
 
             clinicId = _clinicContext.ClinicId ?? request.ClinicId ?? appt.ClinicId;

@@ -48,7 +48,7 @@ public sealed class GetVaccinationByIdQueryHandler
         if (v is null)
             return Result<VaccinationDetailDto>.Failure("Vaccinations.NotFound", "Aşı kaydı bulunamadı.");
         if (_clinicContext.ClinicId is { } clinicId && v.ClinicId != clinicId)
-            return Result<VaccinationDetailDto>.Failure("Vaccinations.NotFound", "Asi kaydi bulunamadi.");
+            return Result<VaccinationDetailDto>.Failure("Vaccinations.NotFound", "Aşı kaydı bulunamadı.");
 
         var pets = await _pets.ListAsync(new PetsByTenantIdsSpec(tenantId, [v.PetId]), ct);
         var pet = pets.FirstOrDefault();

@@ -80,11 +80,11 @@ public sealed class RequestEmailVerificationHandler : IRequestHandler<RequestEma
 
         // 6) Do�rulama linkini olu�tur
         var link = _url.BuildAbsolute("/api/email/confirm", $"token={Uri.EscapeDataString(raw)}");
-        var subject = "E-posta Do�rulama";
+        var subject = "E-posta doğrulama";
         var body =
             $"Merhaba,\n\n" +
-            $"E-posta adresinizi do�rulamak i�in a�a��daki ba�lant�ya t�klay�n:\n{link}\n\n" +
-            $"Bu ba�lant� 24 saat ge�erlidir.";
+            $"E-posta adresinizi doğrulamak için aşağıdaki bağlantıya tıklayın:\n{link}\n\n" +
+            $"Bu bağlantı 24 saat geçerlidir.";
 
         // 7) E-postay� Outbox�a enqueue et (TransactionalEmailSender)
         await _email.SendAsync(user.Email, subject, body, ct);

@@ -50,15 +50,15 @@ public sealed class GetAppointmentByIdQueryHandler
         {
             return Result<AppointmentDetailDto>.Failure(
                 "Tenants.ContextMissing",
-                "Kirac� ba�lam� yok. JWT tenant_id veya sorgu tenantId gerekir.");
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         var a = await _appointments.FirstOrDefaultAsync(
             new AppointmentByIdSpec(tenantId, request.Id), ct);
         if (a is null)
-            return Result<AppointmentDetailDto>.Failure("Appointments.NotFound", "Randevu bulunamad�.");
+            return Result<AppointmentDetailDto>.Failure("Appointments.NotFound", "Randevu bulunamadı.");
         if (_clinicContext.ClinicId is { } clinicId && a.ClinicId != clinicId)
-            return Result<AppointmentDetailDto>.Failure("Appointments.NotFound", "Randevu bulunamadi.");
+            return Result<AppointmentDetailDto>.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, a.PetId), ct);
         var clientId = pet?.ClientId ?? Guid.Empty;

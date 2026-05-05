@@ -54,7 +54,7 @@ public sealed class GetHospitalizationsListQueryHandler
         {
             return Result<PagedResult<HospitalizationListItemDto>>.Failure(
                 "Hospitalizations.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);

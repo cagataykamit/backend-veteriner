@@ -167,7 +167,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
             {
                 return Result<LoginResultDto>.Failure(
                     "Auth.ClinicSelectionRequired",
-                    "Aktif klinik bulunamadi; lutfen klinik secimi yapin.");
+                    "Aktif klinik bulunamadı; lütfen klinik seçimi yapın.");
             }
 
             extraClaims.Add(new Claim(VeterinerClaims.ClinicId, sessionClinicId.ToString("D")));

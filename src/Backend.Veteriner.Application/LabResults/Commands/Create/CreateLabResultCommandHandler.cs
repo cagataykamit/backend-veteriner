@@ -65,7 +65,7 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
         {
             return Result<Guid>.Failure(
                 "LabResults.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

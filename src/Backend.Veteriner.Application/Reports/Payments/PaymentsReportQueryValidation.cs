@@ -51,7 +51,7 @@ internal static class PaymentsReportQueryValidation
         {
             return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
                 "Payments.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         if (effectiveClinicId is { } ecid)

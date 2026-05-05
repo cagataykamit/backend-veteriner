@@ -17,12 +17,12 @@ public sealed class DatabaseHealthCheck : IHealthCheck
         {
             var canConnect = await _db.Database.CanConnectAsync(cancellationToken);
             return canConnect
-                ? HealthCheckResult.Healthy("SQL Server ba�lant�s� ba�ar�l�.")
-                : HealthCheckResult.Unhealthy("SQL Server ba�lant�s� ba�ar�s�z.");
+                ? HealthCheckResult.Healthy("SQL Server bağlantısı başarılı.")
+                : HealthCheckResult.Unhealthy("SQL Server bağlantısı başarısız.");
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy("SQL kontrol�nde hata.", ex);
+            return HealthCheckResult.Unhealthy("SQL kontrolünde hata.", ex);
         }
     }
 }

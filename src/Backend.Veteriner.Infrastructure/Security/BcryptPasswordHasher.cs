@@ -8,7 +8,7 @@ public sealed class BcryptPasswordHasher : IPasswordHasher
     public string Hash(string password)
     {
         if (string.IsNullOrWhiteSpace(password))
-            throw new ArgumentException("Password bo� olamaz.", nameof(password));
+            throw new ArgumentException("Password boş olamaz.", nameof(password));
 
         return BCrypt.Net.BCrypt.HashPassword(password);
     }

@@ -49,12 +49,12 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         {
             return Result.Failure(
                 "Tenants.ContextMissing",
-                "Kiracý baðlamý yok. JWT tenant_id veya sorgu tenantId gerekir.");
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         var appointment = await _appointmentsRead.FirstOrDefaultAsync(new AppointmentByIdSpec(tenantId, request.Id), ct);
         if (appointment is null)
-            return Result.Failure("Appointments.NotFound", "Randevu bulunamadý veya kiracýya ait deðil.");
+            return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
 
         var scheduledUtc = NormalizeToUtc(request.ScheduledAtUtc);
         if (request.Status == AppointmentStatus.Scheduled)
@@ -65,20 +65,20 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         }
 
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
-            return Result.Failure("Appointments.ClinicContextMismatch", "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+            return Result.Failure("Appointments.ClinicContextMismatch", "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
 
         var clinicId = _clinicContext.ClinicId ?? request.ClinicId ?? appointment.ClinicId;
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, clinicId), ct);
         if (clinic is null)
-            return Result.Failure("Clinics.NotFound", "Klinik bulunamadý veya kiracýya ait deðil.");
+            return Result.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
         if (!clinic.IsActive)
             return Result.Failure("Clinics.Inactive", "Seçilen klinik pasif.");
         if (_clinicContext.ClinicId is { } currentClinicId && clinicId != currentClinicId)
-            return Result.Failure("Appointments.ClinicContextMismatch", "Randevu sadece aktif clinic baglaminda guncellenebilir.");
+            return Result.Failure("Appointments.ClinicContextMismatch", "Randevu sadece aktif clinic bağlamında güncellenebilir.");
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, request.PetId), ct);
         if (pet is null)
-            return Result.Failure("Pets.NotFound", "Hayvan kaydý bulunamadý veya kiracýya ait deðil.");
+            return Result.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
         var durationMinutes = request.DurationMinutes ?? appointment.DurationMinutes;
         var endUtc = scheduledUtc.AddMinutes(durationMinutes);

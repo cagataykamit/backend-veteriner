@@ -73,7 +73,7 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
         {
             return Result.Failure(
                 "Treatments.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

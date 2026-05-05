@@ -73,7 +73,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
         {
             return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(
                 "Appointments.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var rows = await _appointments.ListAsync(

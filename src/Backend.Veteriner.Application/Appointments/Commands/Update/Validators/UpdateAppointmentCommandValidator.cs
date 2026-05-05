@@ -10,17 +10,17 @@ public sealed class UpdateAppointmentCommandValidator : AbstractValidator<Update
         RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.ClinicId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("ClinicId ge�ersiz.");
+            .WithMessage("ClinicId geçersiz.");
         RuleFor(x => x.PetId).NotEmpty();
         RuleFor(x => x.ScheduledAtUtc)
             .Must(d => d != default)
-            .WithMessage("Randevu zaman� zorunludur.");
+            .WithMessage("Randevu zamanı zorunludur.");
         RuleFor(x => x.AppointmentType)
             .Must(Enum.IsDefined<AppointmentType>)
-            .WithMessage("Randevu t�r� ge�ersiz.");
+            .WithMessage("Randevu türü geçersiz.");
         RuleFor(x => x.Status)
             .Must(Enum.IsDefined<AppointmentStatus>)
-            .WithMessage("Randevu durumu ge�ersiz.");
+            .WithMessage("Randevu durumu geçersiz.");
         RuleFor(x => x.Notes).MaximumLength(2000);
 
         RuleFor(x => x.DurationMinutes)

@@ -39,7 +39,7 @@ public sealed class MailKitEmailSender : IEmailSenderImmediate
         bool isHtml = false)
     {
         if (string.IsNullOrWhiteSpace(to))
-            throw new ArgumentException("Al�c� adresi bo� olamaz.", nameof(to));
+            throw new ArgumentException("Alıcı adresi boş olamaz.", nameof(to));
 
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse(_opt.From));

@@ -48,7 +48,7 @@ public sealed class GetPaymentByIdQueryHandler
         if (p is null)
             return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
         if (_clinicContext.ClinicId is { } clinicId && p.ClinicId != clinicId)
-            return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Odeme kaydi bulunamadi.");
+            return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
 
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, p.ClientId), ct);
         var clientName = client?.FullName ?? string.Empty;

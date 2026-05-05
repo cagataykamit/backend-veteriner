@@ -117,7 +117,7 @@ public sealed class AuthController : ControllerBase
 
         var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
         if (!Guid.TryParse(sub, out _))
-            return Result.Failure("Auth.Unauthorized.UserContextMissing", "Kullanici kimligi token icinde bulunamadi.")
+            return Result.Failure("Auth.Unauthorized.UserContextMissing", "Kullanıcı kimliği token içinde bulunamadı.")
                 .ToActionResult(this);
 
         await _mediator.Send(new LogoutCommand(body.RefreshToken), ct);
@@ -133,7 +133,7 @@ public sealed class AuthController : ControllerBase
     {
         var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
         if (!Guid.TryParse(sub, out var userId))
-            return Result.Failure("Auth.Unauthorized.UserContextMissing", "Kullanici kimligi token icinde bulunamadi.")
+            return Result.Failure("Auth.Unauthorized.UserContextMissing", "Kullanıcı kimliği token içinde bulunamadı.")
                 .ToActionResult(this);
 
         await _mediator.Send(new LogoutAllCommand(userId), ct);

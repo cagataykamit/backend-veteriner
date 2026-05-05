@@ -51,26 +51,26 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         {
             return Result.Failure(
                 "Tenants.ContextMissing",
-                "Kiraci baglami yok. JWT tenant_id veya sorgu tenantId gerekir.");
+                "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
-            return Result.Failure("Tenants.NotFound", "Tenant bulunamadi.");
+            return Result.Failure("Tenants.NotFound", "Tenant bulunamadı.");
         if (!tenant.IsActive)
             return Result.Failure("Tenants.TenantInactive", "Pasif kiraci icin hayvan kaydi guncellenemez.");
 
         var pet = await _petsRead.FirstOrDefaultAsync(new PetByIdSpec(tenantId, request.Id), ct);
         if (pet is null)
-            return Result.Failure("Pets.NotFound", "Hayvan kaydi bulunamadi veya kiraciya ait degil.");
+            return Result.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, request.ClientId), ct);
         if (client is null)
-            return Result.Failure("Clients.NotFound", "Musteri bulunamadi veya kiraciya ait degil.");
+            return Result.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");
 
         var species = await _speciesRead.FirstOrDefaultAsync(new SpeciesByIdSpec(request.SpeciesId), ct);
         if (species is null || !species.IsActive)
-            return Result.Failure("Pets.SpeciesNotFound", "Tur bulunamadi veya pasif; gecerli bir SpeciesId gonderin.");
+            return Result.Failure("Pets.SpeciesNotFound", "Tür bulunamadı veya pasif; geçerli bir SpeciesId gönderin.");
 
         if (request.BreedId is { } breedId)
         {
@@ -78,7 +78,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
             if (breed is null || !breed.IsActive)
                 return Result.Failure(
                     "Pets.BreedNotFound",
-                    "Irk bulunamadi veya pasif; gecerli bir BreedId gonderin.");
+                    "Irk bulunamadı veya pasif; geçerli bir BreedId gönderin.");
             if (breed.SpeciesId != request.SpeciesId)
                 return Result.Failure(
                     "Pets.BreedSpeciesMismatch",
@@ -91,7 +91,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
             if (color is null || !color.IsActive)
                 return Result.Failure(
                     "Pets.ColorNotFound",
-                    "Renk bulunamadi veya pasif; gecerli bir ColorId gonderin.");
+                    "Renk bulunamadı veya pasif; geçerli bir ColorId gönderin.");
         }
 
         if (request.BirthDate.HasValue && request.BirthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))

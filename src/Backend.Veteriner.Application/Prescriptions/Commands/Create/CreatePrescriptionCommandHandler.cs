@@ -70,7 +70,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
         {
             return Result<Guid>.Failure(
                 "Prescriptions.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

@@ -54,7 +54,7 @@ public sealed class GetPaymentsListQueryHandler
         {
             return Result<PagedResult<PaymentListItemDto>>.Failure(
                 "Payments.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         string? searchPattern = null;

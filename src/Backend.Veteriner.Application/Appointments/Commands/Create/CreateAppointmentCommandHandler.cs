@@ -79,7 +79,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         }
 
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
-            return Result<Guid>.Failure("Appointments.ClinicContextMismatch", "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+            return Result<Guid>.Failure("Appointments.ClinicContextMismatch", "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
         var clinicResolve = await ResolveClinicAsync(tenantId, effectiveClinicId, ct);

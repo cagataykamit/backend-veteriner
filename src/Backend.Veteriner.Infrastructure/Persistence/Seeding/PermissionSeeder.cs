@@ -28,7 +28,7 @@ public static class PermissionSeeder
         if (duplicateCodes.Count > 0)
         {
             throw new InvalidOperationException(
-                $"PermissionCatalog i�inde duplicate code bulundu: {string.Join(", ", duplicateCodes)}");
+                $"PermissionCatalog içinde duplicate code bulundu: {string.Join(", ", duplicateCodes)}");
         }
 
         var dbPermissions = await db.Set<Permission>()

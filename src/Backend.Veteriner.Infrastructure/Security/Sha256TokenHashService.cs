@@ -7,7 +7,7 @@ public sealed class Sha256TokenHashService : ITokenHashService
     public string ComputeSha256(string rawToken)
     {
         if (string.IsNullOrWhiteSpace(rawToken))
-            throw new ArgumentException("Token bo� olamaz.", nameof(rawToken));
+            throw new ArgumentException("Token boş olamaz.", nameof(rawToken));
 
         using var sha = SHA256.Create();
         var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(rawToken));

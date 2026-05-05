@@ -90,7 +90,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         {
             return Result<Guid>.Failure(
                 "Vaccinations.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

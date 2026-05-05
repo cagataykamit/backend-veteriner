@@ -87,7 +87,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         {
             return Result<Guid>.Failure(
                 "Payments.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

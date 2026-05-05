@@ -8,7 +8,7 @@ public sealed class RequestPasswordResetValidator : AbstractValidator<RequestPas
     {
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("E-posta zorunludur.")
-            .EmailAddress().WithMessage("Ge�erli bir e-posta adresi giriniz.")
+            .EmailAddress().WithMessage("Geçerli bir e-posta adresi giriniz.")
             .MaximumLength(256).WithMessage("E-posta en fazla 256 karakter olabilir.");
     }
 }

@@ -69,7 +69,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         {
             return Result<Guid>.Failure(
                 "Hospitalizations.ClinicContextMismatch",
-                "Istek clinicId degeri aktif clinic baglami ile uyusmuyor.");
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

@@ -10,11 +10,11 @@ public sealed class ConfirmPasswordResetValidator : AbstractValidator<ConfirmPas
             .NotEmpty().WithMessage("Token zorunludur.");
 
         RuleFor(x => x.NewPassword)
-            .NotEmpty().WithMessage("Yeni �ifre zorunludur.")
-            .MinimumLength(8).WithMessage("Yeni �ifre en az 8 karakter olmal�.")
-            .Matches("[A-Z]").WithMessage("En az bir b�y�k harf i�ermelidir.")
-            .Matches("[a-z]").WithMessage("En az bir k���k harf i�ermelidir.")
-            .Matches(@"\d").WithMessage("En az bir rakam i�ermelidir.")
-            .Matches(@"[^\w\s]").WithMessage("En az bir �zel karakter i�ermelidir.");
+            .NotEmpty().WithMessage("Yeni şifre zorunludur.")
+            .MinimumLength(8).WithMessage("Yeni şifre en az 8 karakter olmalı.")
+            .Matches("[A-Z]").WithMessage("En az bir büyük harf içermelidir.")
+            .Matches("[a-z]").WithMessage("En az bir küçük harf içermelidir.")
+            .Matches(@"\d").WithMessage("En az bir rakam içermelidir.")
+            .Matches(@"[^\w\s]").WithMessage("En az bir özel karakter içermelidir.");
     }
 }

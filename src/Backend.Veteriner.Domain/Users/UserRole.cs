@@ -10,7 +10,7 @@ public class UserRole
     public UserRole(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Role ismi bo� olamaz.", nameof(name));
+            throw new ArgumentException("Role ismi boş olamaz.", nameof(name));
 
         Name = name.Trim();
     }
