@@ -18,7 +18,15 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Appointment>> _read = new();
     private readonly Mock<IReadRepository<ClinicAppointmentSettings>> _clinicAppointmentSettings = new();
+    private readonly Mock<IReadRepository<ClinicWorkingHour>> _clinicWorkingHoursRead = new();
     private readonly Mock<IRepository<Appointment>> _write = new();
+
+    public AppointmentLifecycleCommandHandlerTests()
+    {
+        _clinicWorkingHoursRead
+            .Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>());
+    }
 
     [Fact]
     public async Task Cancel_Should_Fail_When_ContextMissing()
@@ -127,7 +135,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_ClinicSlotDuplicate()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(3);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
@@ -152,16 +160,22 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Succeed_When_NoConflict()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
         var tid = Guid.NewGuid();
-        var when = DateTime.UtcNow.AddDays(5);
-        var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
+        var cid = Guid.NewGuid();
+        var when = new DateTime(2026, 6, 1, 6, 0, 0, DateTimeKind.Utc); // 09:00 local
+        var appt = new Appointment(tid, cid, Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(appt);
         _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClinicAppointmentSettings?)null);
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), null, null)
+            });
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
@@ -180,7 +194,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_NotScheduled()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
         var tid = Guid.NewGuid();
         var when = DateTime.UtcNow.AddDays(3);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
@@ -202,7 +216,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_TooFarInPast()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _write.Object);
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
         var tid = Guid.NewGuid();
         var past = DateTime.UtcNow.AddDays(-30);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
@@ -217,5 +231,31 @@ public sealed class AppointmentLifecycleCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Appointments.ScheduledTooFarInPast");
+    }
+
+    [Fact]
+    public async Task Reschedule_Should_Fail_When_OutsideWorkingHours()
+    {
+        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var when = new DateTime(2026, 6, 1, 15, 30, 0, DateTimeKind.Utc); // 18:30 local
+        var appt = new Appointment(tid, cid, Guid.NewGuid(), DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(appt);
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), null, null)
+            });
+
+        var result = await handler.Handle(
+            new RescheduleAppointmentCommand(appt.Id, when),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.OutsideWorkingHours");
     }
 }

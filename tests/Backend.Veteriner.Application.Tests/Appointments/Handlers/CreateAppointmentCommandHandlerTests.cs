@@ -25,10 +25,16 @@ public sealed class CreateAppointmentCommandHandlerTests
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Appointment>> _appointmentsRead = new();
     private readonly Mock<IReadRepository<ClinicAppointmentSettingsEntity>> _clinicAppointmentSettings = new();
+    private readonly Mock<IReadRepository<ClinicWorkingHour>> _clinicWorkingHoursRead = new();
     private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
 
     private CreateAppointmentCommandHandler CreateHandler()
-        => new(
+    {
+        _clinicWorkingHoursRead
+            .Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>());
+
+        return new(
             _tenantContext.Object,
             _clinicContext.Object,
             _tenants.Object,
@@ -36,7 +42,9 @@ public sealed class CreateAppointmentCommandHandlerTests
             _pets.Object,
             _appointmentsRead.Object,
             _clinicAppointmentSettings.Object,
+            _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object);
+    }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
@@ -578,5 +586,162 @@ public sealed class CreateAppointmentCommandHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Appointments.PetTimeConflict");
         _appointmentsWrite.Verify(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_ClinicClosed_OnLocalDay()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var scheduledUtc = new DateTime(2026, 6, 1, 6, 0, 0, DateTimeKind.Utc); // 09:00 local
+        var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, true, null, null, null, null)
+            });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.ClinicClosed");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_OutsideWorkingHours_StartBeforeOpen()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var scheduledUtc = new DateTime(2026, 6, 1, 5, 30, 0, DateTimeKind.Utc); // 08:30 local
+        var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), null, null)
+            });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.OutsideWorkingHours");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_BreakTimeConflict()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var scheduledUtc = new DateTime(2026, 6, 1, 9, 15, 0, DateTimeKind.Utc); // 12:15 local
+        var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), new TimeOnly(12, 0), new TimeOnly(13, 0))
+            });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.BreakTimeConflict");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_When_StartsAtBreakEnd()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var scheduledUtc = new DateTime(2026, 6, 1, 10, 0, 0, DateTimeKind.Utc); // 13:00 local
+        var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), new TimeOnly(12, 0), new TimeOnly(13, 0))
+            });
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync((Appointment?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_EndExceedsClosingTime()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var scheduledUtc = new DateTime(2026, 6, 1, 14, 45, 0, DateTimeKind.Utc); // 17:45 local
+        var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), null, null)
+            });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.OutsideWorkingHours");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_LocalEndFallsOnNextDay()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var scheduledUtc = new DateTime(2026, 6, 1, 20, 30, 0, DateTimeKind.Utc); // 23:30 local
+        var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 60);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(23, 59), null, null)
+            });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.OutsideWorkingHours");
     }
 }

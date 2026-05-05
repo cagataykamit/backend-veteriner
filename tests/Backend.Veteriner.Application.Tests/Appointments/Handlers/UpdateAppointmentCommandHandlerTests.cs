@@ -21,17 +21,25 @@ public sealed class UpdateAppointmentCommandHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<ClinicAppointmentSettings>> _clinicAppointmentSettings = new();
+    private readonly Mock<IReadRepository<ClinicWorkingHour>> _clinicWorkingHoursRead = new();
     private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
 
     private UpdateAppointmentCommandHandler CreateHandler()
-        => new(
+    {
+        _clinicWorkingHoursRead
+            .Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>());
+
+        return new(
             _tenantContext.Object,
             _clinicContext.Object,
             _appointmentsRead.Object,
             _clinics.Object,
             _pets.Object,
             _clinicAppointmentSettings.Object,
+            _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object);
+    }
 
     [Fact]
     public async Task Handle_Should_Update_AppointmentType_When_Scheduled()
@@ -245,5 +253,35 @@ public sealed class UpdateAppointmentCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         appt.DurationMinutes.Should().Be(45);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_NewTime_OutsideWorkingHours()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var aid = Guid.NewGuid();
+        var scheduledUtc = new DateTime(2026, 6, 1, 15, 30, 0, DateTimeKind.Utc); // 18:30 local
+
+        var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Examination, null, null);
+        typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(appt);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "X"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), null, null)
+            });
+
+        var cmd = new UpdateAppointmentCommand(aid, cid, pid, scheduledUtc, AppointmentType.Examination, AppointmentStatus.Scheduled, null, DurationMinutes: 30);
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.OutsideWorkingHours");
     }
 }

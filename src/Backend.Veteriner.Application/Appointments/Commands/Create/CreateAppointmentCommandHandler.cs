@@ -23,6 +23,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Appointment> _appointmentsRead;
     private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
+    private readonly IReadRepository<ClinicWorkingHour> _clinicWorkingHoursRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
 
     public CreateAppointmentCommandHandler(
@@ -33,6 +34,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         IReadRepository<Pet> pets,
         IReadRepository<Appointment> appointmentsRead,
         IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
+        IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
         IRepository<Appointment> appointmentsWrite)
     {
         _tenantContext = tenantContext;
@@ -42,6 +44,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         _pets = pets;
         _appointmentsRead = appointmentsRead;
         _clinicAppointmentSettings = clinicAppointmentSettings;
+        _clinicWorkingHoursRead = clinicWorkingHoursRead;
         _appointmentsWrite = appointmentsWrite;
     }
 
@@ -114,6 +117,12 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
 
         if (effectiveStatus == AppointmentStatus.Scheduled)
         {
+            var hoursRows = await _clinicWorkingHoursRead.ListAsync(
+                new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
+            var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);
+            if (!workingHours.IsSuccess)
+                return Result<Guid>.Failure(workingHours.Error);
+
             if (!allowClinicOverlap)
             {
                 var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(

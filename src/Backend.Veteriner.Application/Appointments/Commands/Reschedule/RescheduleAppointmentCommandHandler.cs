@@ -16,6 +16,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
     private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Appointment> _appointmentsRead;
     private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
+    private readonly IReadRepository<ClinicWorkingHour> _clinicWorkingHoursRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
 
     public RescheduleAppointmentCommandHandler(
@@ -23,12 +24,14 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         IClinicContext clinicContext,
         IReadRepository<Appointment> appointmentsRead,
         IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
+        IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
         IRepository<Appointment> appointmentsWrite)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _appointmentsRead = appointmentsRead;
         _clinicAppointmentSettings = clinicAppointmentSettings;
+        _clinicWorkingHoursRead = clinicWorkingHoursRead;
         _appointmentsWrite = appointmentsWrite;
     }
 
@@ -63,6 +66,12 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
             return Result.Failure(window.Error);
 
         var endUtc = scheduledUtc.AddMinutes(appointment.DurationMinutes);
+        var hoursRows = await _clinicWorkingHoursRead.ListAsync(
+            new ClinicWorkingHoursByClinicSpec(tenantId, appointment.ClinicId), ct);
+        var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, appointment.DurationMinutes, hoursRows);
+        if (!workingHours.IsSuccess)
+            return Result.Failure(workingHours.Error);
+
         var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
             new ClinicAppointmentSettingsByClinicSpec(tenantId, appointment.ClinicId), ct);
         var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments

@@ -20,6 +20,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
+    private readonly IReadRepository<ClinicWorkingHour> _clinicWorkingHoursRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
 
     public UpdateAppointmentCommandHandler(
@@ -29,6 +30,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
         IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
+        IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
         IRepository<Appointment> appointmentsWrite)
     {
         _tenantContext = tenantContext;
@@ -37,6 +39,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         _clinics = clinics;
         _pets = pets;
         _clinicAppointmentSettings = clinicAppointmentSettings;
+        _clinicWorkingHoursRead = clinicWorkingHoursRead;
         _appointmentsWrite = appointmentsWrite;
     }
 
@@ -82,6 +85,12 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
 
         if (request.Status == AppointmentStatus.Scheduled)
         {
+            var hoursRows = await _clinicWorkingHoursRead.ListAsync(
+                new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
+            var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);
+            if (!workingHours.IsSuccess)
+                return Result.Failure(workingHours.Error);
+
             var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
                 new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
             var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
