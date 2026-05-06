@@ -78,13 +78,14 @@ public sealed class RemindersController : ControllerBase
         [FromQuery] ReminderDispatchStatus? status = null,
         [FromQuery] DateTime? fromUtc = null,
         [FromQuery] DateTime? toUtc = null,
+        [FromQuery] Guid? clinicId = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
         var result = await _mediator.Send(
-            new GetReminderDispatchLogsQuery(page, reminderType, status, fromUtc, toUtc),
+            new GetReminderDispatchLogsQuery(page, reminderType, status, fromUtc, toUtc, clinicId),
             ct);
         return result.ToActionResult(this);
     }

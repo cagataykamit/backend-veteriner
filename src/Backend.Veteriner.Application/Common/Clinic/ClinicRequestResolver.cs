@@ -5,6 +5,7 @@ namespace Backend.Veteriner.Application.Common.Clinic;
 
 /// <summary>
 /// JWT <c>clinic_id</c> ile header <c>X-Clinic-Id</c> / sorgu <c>clinicId</c> birleştirmesi.
+/// GET <c>/reminders/logs</c> için sorgu <c>clinicId</c> resolver’a dahil edilmez (filtre parametresi).
 /// Çakışmada güvenli reddetme için <see cref="Backend.Veteriner.Api.Middleware.ClinicContextMiddleware"/> kullanılır.
 /// </summary>
 public static class ClinicRequestResolver

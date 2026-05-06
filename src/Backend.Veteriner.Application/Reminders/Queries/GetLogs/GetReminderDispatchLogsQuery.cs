@@ -11,5 +11,6 @@ public sealed record GetReminderDispatchLogsQuery(
     ReminderType? ReminderType = null,
     ReminderDispatchStatus? Status = null,
     DateTime? FromUtc = null,
-    DateTime? ToUtc = null)
+    DateTime? ToUtc = null,
+    Guid? ClinicId = null)
     : IRequest<Result<PagedResult<ReminderDispatchLogItemDto>>>;

@@ -20,6 +20,10 @@ public sealed class ClinicContextMiddleware
     {
         var headerRaw = context.Request.Headers[ClinicRequestResolver.HeaderName].FirstOrDefault();
         var queryRaw = context.Request.Query["clinicId"].FirstOrDefault();
+        if (ReminderDispatchLogsClinicContextRules.ShouldIgnoreQueryClinicIdForResolver(
+                context.Request.Method,
+                context.Request.Path.Value))
+            queryRaw = null;
 
         var claims = context.User?.Claims ?? Enumerable.Empty<Claim>();
         var result = ClinicRequestResolver.Resolve(claims, headerRaw, queryRaw);

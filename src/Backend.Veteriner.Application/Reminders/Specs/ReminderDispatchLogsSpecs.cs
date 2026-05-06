@@ -11,10 +11,13 @@ public sealed class ReminderDispatchLogsCountSpec : Specification<ReminderDispat
         ReminderType? reminderType,
         ReminderDispatchStatus? status,
         DateTime? fromUtc,
-        DateTime? toUtc)
+        DateTime? toUtc,
+        Guid? filterBySingleClinicId = null,
+        IReadOnlyCollection<Guid>? filterByClinicIdsAny = null)
     {
         Query.AsNoTracking();
         Query.Where(x => x.TenantId == tenantId);
+        ApplyClinicFilters(filterBySingleClinicId, filterByClinicIdsAny);
         if (reminderType.HasValue)
             Query.Where(x => x.ReminderType == reminderType.Value);
         if (status.HasValue)
@@ -23,6 +26,27 @@ public sealed class ReminderDispatchLogsCountSpec : Specification<ReminderDispat
             Query.Where(x => x.CreatedAtUtc >= fromUtc.Value);
         if (toUtc.HasValue)
             Query.Where(x => x.CreatedAtUtc <= toUtc.Value);
+    }
+
+    private void ApplyClinicFilters(Guid? filterBySingleClinicId, IReadOnlyCollection<Guid>? filterByClinicIdsAny)
+    {
+        if (filterBySingleClinicId.HasValue)
+        {
+            var cid = filterBySingleClinicId.Value;
+            Query.Where(x => x.ClinicId == cid);
+            return;
+        }
+
+        if (filterByClinicIdsAny is null)
+            return;
+
+        if (filterByClinicIdsAny.Count == 0)
+        {
+            Query.Where(x => false);
+            return;
+        }
+
+        Query.Where(x => x.ClinicId != null && filterByClinicIdsAny.Contains(x.ClinicId.Value));
     }
 }
 
@@ -35,10 +59,13 @@ public sealed class ReminderDispatchLogsFilteredPagedSpec : Specification<Remind
         DateTime? fromUtc,
         DateTime? toUtc,
         int page,
-        int pageSize)
+        int pageSize,
+        Guid? filterBySingleClinicId = null,
+        IReadOnlyCollection<Guid>? filterByClinicIdsAny = null)
     {
         Query.AsNoTracking();
         Query.Where(x => x.TenantId == tenantId);
+        ApplyClinicFilters(filterBySingleClinicId, filterByClinicIdsAny);
         if (reminderType.HasValue)
             Query.Where(x => x.ReminderType == reminderType.Value);
         if (status.HasValue)
@@ -66,5 +93,26 @@ public sealed class ReminderDispatchLogsFilteredPagedSpec : Specification<Remind
             x.FailedAtUtc,
             x.LastError,
             x.CreatedAtUtc));
+    }
+
+    private void ApplyClinicFilters(Guid? filterBySingleClinicId, IReadOnlyCollection<Guid>? filterByClinicIdsAny)
+    {
+        if (filterBySingleClinicId.HasValue)
+        {
+            var cid = filterBySingleClinicId.Value;
+            Query.Where(x => x.ClinicId == cid);
+            return;
+        }
+
+        if (filterByClinicIdsAny is null)
+            return;
+
+        if (filterByClinicIdsAny.Count == 0)
+        {
+            Query.Where(x => false);
+            return;
+        }
+
+        Query.Where(x => x.ClinicId != null && filterByClinicIdsAny.Contains(x.ClinicId.Value));
     }
 }
