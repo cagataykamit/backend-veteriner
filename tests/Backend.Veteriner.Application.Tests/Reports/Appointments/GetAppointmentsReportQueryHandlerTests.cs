@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Appointments;
+using Backend.Veteriner.Application.Reports.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Appointments.Queries.GetAppointmentReport;
 using Backend.Veteriner.Application.Reports.Appointments.Specs;
 using Backend.Veteriner.Domain.Appointments;
@@ -21,9 +22,17 @@ public sealed class GetAppointmentsReportQueryHandlerTests
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Clients.Client>> _clients = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
+    private readonly Mock<IAppointmentsReportStatusBreakdownReader> _statusBreakdown = new();
 
     private GetAppointmentsReportQueryHandler CreateHandler()
-        => new(_tenant.Object, _clinic.Object, _appointments.Object, _clients.Object, _pets.Object, _clinics.Object);
+        => new(
+            _tenant.Object,
+            _clinic.Object,
+            _appointments.Object,
+            _clients.Object,
+            _pets.Object,
+            _clinics.Object,
+            _statusBreakdown.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -80,8 +89,21 @@ public sealed class GetAppointmentsReportQueryHandlerTests
         var to = new DateTime(2026, 4, 30, 0, 0, 0, DateTimeKind.Utc);
         var petId = Guid.NewGuid();
 
-        _appointments.Setup(x => x.CountAsync(It.IsAny<AppointmentsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(7);
+        _statusBreakdown
+            .Setup(x => x.GetAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<IReadOnlyList<Guid>?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<string?>(),
+                It.IsAny<Guid[]>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppointmentStatusCountRow>
+            {
+                new(AppointmentStatus.Completed, 7),
+            });
         var ap = new Appointment(tid, clinicId, petId, from.AddHours(2), initialStatus: AppointmentStatus.Completed);
         _appointments
             .Setup(x => x.ListAsync(It.IsAny<AppointmentsReportFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -111,6 +133,69 @@ public sealed class GetAppointmentsReportQueryHandlerTests
         r.Value!.TotalCount.Should().Be(7);
         r.Value.Items.Should().HaveCount(1);
         r.Value.StatusCounts.Completed.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task Handle_Should_SumTotal_When_StatusFilterNull()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns(clinicId);
+        _clinics.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "M"));
+
+        var from = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 4, 30, 0, 0, 0, DateTimeKind.Utc);
+        var petId = Guid.NewGuid();
+
+        _statusBreakdown
+            .Setup(x => x.GetAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<IReadOnlyList<Guid>?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<string?>(),
+                It.IsAny<Guid[]>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppointmentStatusCountRow>
+            {
+                new(AppointmentStatus.Scheduled, 2),
+                new(AppointmentStatus.Completed, 5),
+                new(AppointmentStatus.Cancelled, 1),
+            });
+        var ap = new Appointment(tid, clinicId, petId, from.AddHours(2), initialStatus: AppointmentStatus.Scheduled);
+        _appointments
+            .Setup(x => x.ListAsync(It.IsAny<AppointmentsReportFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Appointment> { ap });
+
+        _pets.Setup(x => x.ListAsync(It.IsAny<PetsByTenantIdsNameClientSpeciesSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PetNameClientSpeciesRow>());
+        _clients.Setup(x => x.ListAsync(It.IsAny<ClientsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClientNameRow>());
+        _clinics.Setup(x => x.ListAsync(It.IsAny<ClinicsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicNameRow>());
+
+        var r = await CreateHandler().Handle(
+            new GetAppointmentsReportQuery(
+                from,
+                to,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1,
+                50),
+            CancellationToken.None);
+
+        r.IsSuccess.Should().BeTrue();
+        r.Value!.TotalCount.Should().Be(8);
+        r.Value.StatusCounts.Scheduled.Should().Be(2);
+        r.Value.StatusCounts.Completed.Should().Be(5);
+        r.Value.StatusCounts.Cancelled.Should().Be(1);
     }
 
     [Fact]

@@ -20,6 +20,7 @@ public sealed class GetAppointmentsReportQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IAppointmentsReportStatusBreakdownReader _statusBreakdown;
 
     public GetAppointmentsReportQueryHandler(
         ITenantContext tenantContext,
@@ -27,7 +28,8 @@ public sealed class GetAppointmentsReportQueryHandler
         IReadRepository<Appointment> appointments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        IAppointmentsReportStatusBreakdownReader statusBreakdown)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -35,6 +37,7 @@ public sealed class GetAppointmentsReportQueryHandler
         _clients = clients;
         _pets = pets;
         _clinics = clinics;
+        _statusBreakdown = statusBreakdown;
     }
 
     public async Task<Result<AppointmentReportResultDto>> Handle(
@@ -78,18 +81,46 @@ public sealed class GetAppointmentsReportQueryHandler
             _pets,
             ct);
 
-        var total = await _appointments.CountAsync(
-            new AppointmentsReportFilteredCountSpec(
-                tenantId,
-                effectiveClinicId,
-                request.PetId,
-                restrictedPetIds,
-                request.Status,
-                fromUtc,
-                toUtc,
-                searchPattern.Pattern,
-                searchPattern.PetIds),
+        var statusRows = await _statusBreakdown.GetAsync(
+            tenantId,
+            effectiveClinicId,
+            request.PetId,
+            restrictedPetIds,
+            fromUtc,
+            toUtc,
+            searchPattern.Pattern,
+            searchPattern.PetIds,
             ct);
+
+        var scheduled = 0;
+        var completed = 0;
+        var cancelled = 0;
+        foreach (var row in statusRows)
+        {
+            switch (row.Status)
+            {
+                case AppointmentStatus.Scheduled:
+                    scheduled = row.Count;
+                    break;
+                case AppointmentStatus.Completed:
+                    completed = row.Count;
+                    break;
+                case AppointmentStatus.Cancelled:
+                    cancelled = row.Count;
+                    break;
+            }
+        }
+
+        var breakdownSum = scheduled + completed + cancelled;
+        var total = request.Status.HasValue
+            ? request.Status.Value switch
+            {
+                AppointmentStatus.Scheduled => scheduled,
+                AppointmentStatus.Completed => completed,
+                AppointmentStatus.Cancelled => cancelled,
+                _ => breakdownSum,
+            }
+            : breakdownSum;
 
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, AppointmentsReportConstants.MaxPageSize);
@@ -110,43 +141,6 @@ public sealed class GetAppointmentsReportQueryHandler
             ct);
 
         var items = await AppointmentsReportItemMapping.MapAsync(tenantId, rows, _clients, _pets, _clinics, ct);
-
-        var scheduled = await _appointments.CountAsync(
-            new AppointmentsReportFilteredCountSpec(
-                tenantId,
-                effectiveClinicId,
-                request.PetId,
-                restrictedPetIds,
-                AppointmentStatus.Scheduled,
-                fromUtc,
-                toUtc,
-                searchPattern.Pattern,
-                searchPattern.PetIds),
-            ct);
-        var completed = await _appointments.CountAsync(
-            new AppointmentsReportFilteredCountSpec(
-                tenantId,
-                effectiveClinicId,
-                request.PetId,
-                restrictedPetIds,
-                AppointmentStatus.Completed,
-                fromUtc,
-                toUtc,
-                searchPattern.Pattern,
-                searchPattern.PetIds),
-            ct);
-        var cancelled = await _appointments.CountAsync(
-            new AppointmentsReportFilteredCountSpec(
-                tenantId,
-                effectiveClinicId,
-                request.PetId,
-                restrictedPetIds,
-                AppointmentStatus.Cancelled,
-                fromUtc,
-                toUtc,
-                searchPattern.Pattern,
-                searchPattern.PetIds),
-            ct);
 
         var statusCounts = new AppointmentReportStatusCountsDto(scheduled, completed, cancelled);
 
