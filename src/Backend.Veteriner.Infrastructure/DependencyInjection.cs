@@ -11,6 +11,7 @@ using Backend.Veteriner.Infrastructure.Outbox;                                  
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;                 // EfRepository, EfReadRepository, UserRepository, RefreshTokenRepository, VerificationTokenRepository
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
+using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
 using Backend.Veteriner.Application.Reports.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaimPermissions;
@@ -86,6 +87,7 @@ public static class DependencyInjection
         services.AddScoped<IUserClinicRepository, UserClinicRepository>();
         services.AddScoped<IDashboardTodayAppointmentStatusCountsReader, DashboardTodayAppointmentStatusCountsReader>();
         services.AddScoped<IDashboardClinicScopedReader, DashboardClinicScopedReader>();
+        services.AddScoped<IDashboardFinancePaymentAggregatesReader, DashboardFinancePaymentAggregatesReader>();
         services.AddScoped<IAppointmentsReportStatusBreakdownReader, AppointmentsReportStatusBreakdownReader>();
         services.AddScoped<IOutbox, EfOutbox>();
 

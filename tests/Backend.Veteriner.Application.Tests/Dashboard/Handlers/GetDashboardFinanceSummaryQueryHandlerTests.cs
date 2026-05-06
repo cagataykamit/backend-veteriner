@@ -2,6 +2,7 @@ using Ardalis.Specification;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Dashboard.Queries.GetFinanceSummary;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -20,12 +21,31 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
     private readonly Mock<IReadRepository<Payment>> _payments = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
+    private readonly Mock<IDashboardFinancePaymentAggregatesReader> _aggregates = new();
 
     private GetDashboardFinanceSummaryQueryHandler CreateHandler()
-        => new(_tenant.Object, _clinic.Object, _payments.Object, _clients.Object, _pets.Object);
+        => new(
+            _tenant.Object,
+            _clinic.Object,
+            _payments.Object,
+            _clients.Object,
+            _pets.Object,
+            _aggregates.Object);
 
     private void SetupEmptyLookups()
     {
+        _aggregates
+            .Setup(r => r.GetTotalsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DashboardFinanceWindowTotals(0, 0, 0, 0, 0, 0));
         _payments
             .Setup(r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<PaymentPaidAtAmountRow>());
@@ -52,6 +72,18 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
         result.Error.Code.Should().Be("Tenants.ContextMissing");
         _payments.Verify(
             r => r.ListAsync(It.IsAny<ISpecification<Payment>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _aggregates.Verify(
+            r => r.GetTotalsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -88,9 +120,9 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
 
         var utcNow = DateTime.UtcNow;
-        var (dayStart, _) = OperationDayBounds.ForUtcNow(utcNow);
-        var (weekStart, _) = OperationPeriodBounds.WeekForUtcNow(utcNow);
-        var (monthStart, _) = OperationPeriodBounds.MonthForUtcNow(utcNow);
+        var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(utcNow);
+        var (weekStart, weekEnd) = OperationPeriodBounds.WeekForUtcNow(utcNow);
+        var (monthStart, monthEnd) = OperationPeriodBounds.MonthForUtcNow(utcNow);
 
         // Bu testin doğru çalışabilmesi için ay içinde en az bir gün gerek. Pratikte her zaman sağlanır.
         // Üç ayrı pencere için deterministik timestamp seçilir; boundary ilişkileri garanti olarak şu şekilde: dayStart >= weekStart >= monthStart.
@@ -109,9 +141,43 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
             new(inMonthNotWeek, 300m),
         };
 
+        DashboardFinanceWindowAggregation.SumBuckets(
+            monthRows,
+            dayStart,
+            dayEnd,
+            weekStart,
+            weekEnd,
+            monthStart,
+            monthEnd,
+            out var expTodayTotal,
+            out var expTodayCount,
+            out var expWeekTotal,
+            out var expWeekCount,
+            out var expMonthTotal,
+            out var expMonthCount);
+
+        _aggregates
+            .Setup(r => r.GetTotalsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DashboardFinanceWindowTotals(
+                expTodayTotal,
+                expTodayCount,
+                expWeekTotal,
+                expWeekCount,
+                expMonthTotal,
+                expMonthCount));
+
         _payments
             .Setup(r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(monthRows);
+            .ReturnsAsync(new List<PaymentPaidAtAmountRow>());
         _payments
             .Setup(r => r.ListAsync(It.IsAny<PaymentsForDashboardRecentSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<DashboardFinancePaymentRow>());
@@ -125,28 +191,12 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         var v = result.Value!;
 
-        // Ay: tümü ayın içinde.
-        v.MonthTotalPaid.Should().Be(650m);
-        v.MonthPaymentsCount.Should().Be(3);
-
-        // Hafta: inToday her zaman haftanın içindedir (dayStart >= weekStart).
-        // inWeekNotToday tanımı gereği haftanın içindedir.
-        // inMonthNotWeek: eğer monthStart >= weekStart ise (ör. 1'i Pazartesi), haftanın içindedir; yoksa dışındadır.
-        var expectedWeekCount = monthStart >= weekStart ? 3 : 2;
-        var expectedWeekTotal = monthStart >= weekStart ? 650m : 350m;
-        v.WeekTotalPaid.Should().Be(expectedWeekTotal);
-        v.WeekPaymentsCount.Should().Be(expectedWeekCount);
-
-        // Bugün: inToday kesin içindedir. inWeekNotToday bazen (weekStart == dayStart) today'e düşer.
-        // inMonthNotWeek pratikte today'e düşmez çünkü ya haftadan önce ya da en geç weekStart; boundary tam today ise zaten sayılır.
-        var inWeekNotToday_InToday = inWeekNotToday >= dayStart;
-        var inMonthNotWeek_InToday = inMonthNotWeek >= dayStart;
-        var expectedTodayCount = 1 + (inWeekNotToday_InToday ? 1 : 0) + (inMonthNotWeek_InToday ? 1 : 0);
-        var expectedTodayTotal = 150m
-            + (inWeekNotToday_InToday ? 200m : 0m)
-            + (inMonthNotWeek_InToday ? 300m : 0m);
-        v.TodayTotalPaid.Should().Be(expectedTodayTotal);
-        v.TodayPaymentsCount.Should().Be(expectedTodayCount);
+        v.MonthTotalPaid.Should().Be(expMonthTotal);
+        v.MonthPaymentsCount.Should().Be(expMonthCount);
+        v.WeekTotalPaid.Should().Be(expWeekTotal);
+        v.WeekPaymentsCount.Should().Be(expWeekCount);
+        v.TodayTotalPaid.Should().Be(expTodayTotal);
+        v.TodayPaymentsCount.Should().Be(expTodayCount);
     }
 
     [Fact]
@@ -163,7 +213,18 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         _clinic.VerifyGet(c => c.ClinicId, Times.AtLeastOnce);
-        // Ay/hafta/gün/trend tek birleşim penceresinde tek çağrı.
+        _aggregates.Verify(
+            r => r.GetTotalsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
         _payments.Verify(
             r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
@@ -180,6 +241,18 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
         _clinic.SetupGet(c => c.ClinicId).Returns(cid);
 
+        _aggregates
+            .Setup(r => r.GetTotalsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DashboardFinanceWindowTotals(0, 0, 0, 0, 0, 0));
         _payments
             .Setup(r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<PaymentPaidAtAmountRow>());
@@ -278,6 +351,18 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
             new(twoDaysAgoBucket.StartUtcInclusive.AddHours(10), 42m),
         };
 
+        _aggregates
+            .Setup(r => r.GetTotalsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DashboardFinanceWindowTotals(0, 0, 0, 0, 0, 0));
         _payments
             .Setup(r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(rows);
@@ -314,6 +399,18 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
         var result = await handler.Handle(new GetDashboardFinanceSummaryQuery(), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
+        _aggregates.Verify(
+            r => r.GetTotalsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
         _payments.Verify(
             r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
@@ -344,6 +441,18 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
             new(lateTodayUtc, 123.45m),
         };
 
+        _aggregates
+            .Setup(r => r.GetTotalsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DashboardFinanceWindowTotals(123.45m, 1, 123.45m, 1, 123.45m, 1));
         _payments
             .Setup(r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(rows);
@@ -373,6 +482,18 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
 
+        _aggregates
+            .Setup(r => r.GetTotalsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DashboardFinanceWindowTotals(0, 0, 0, 0, 0, 0));
         _payments
             .Setup(r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<PaymentPaidAtAmountRow>());

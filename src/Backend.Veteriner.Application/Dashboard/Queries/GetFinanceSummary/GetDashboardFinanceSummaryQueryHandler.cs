@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -23,6 +24,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
+    private readonly IDashboardFinancePaymentAggregatesReader _financeAggregates;
     private readonly ILogger<GetDashboardFinanceSummaryQueryHandler> _logger;
 
     public GetDashboardFinanceSummaryQueryHandler(
@@ -31,6 +33,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         IReadRepository<Payment> payments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
+        IDashboardFinancePaymentAggregatesReader financeAggregates,
         ILogger<GetDashboardFinanceSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -38,6 +41,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         _payments = payments;
         _clients = clients;
         _pets = pets;
+        _financeAggregates = financeAggregates;
         _logger = logger ?? NullLogger<GetDashboardFinanceSummaryQueryHandler>.Instance;
     }
 
@@ -59,13 +63,6 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         var trendBuckets = OperationPeriodBounds.Last7DaysForUtcNow(utcNow);
         var trendStartUtc = trendBuckets[0].StartUtcInclusive;
         var trendEndUtc = trendBuckets[^1].EndUtcExclusive;
-        // Tek DB penceresi: gün + ISO hafta + ay + 7 günlük trend kapsayan birleşim.
-        // Sadece "bu ay" tarayan önceki akış, ay başında önceki ayın günlerindeki (hâlâ geçerli haftada olan)
-        // ödemeleri dışarıda bırakıyordu; week/today 0 görünüp recentPayments dolu kalabiliyordu.
-        var financeWindowStartUtc = new[]
-            { dayStart, weekStart, monthStart, trendStartUtc }.Min();
-        var financeWindowEndUtc = new[]
-            { dayEnd, weekEnd, monthEnd, trendEndUtc }.Max();
         var clinicId = _clinicContext.ClinicId;
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();
@@ -86,30 +83,30 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             stepSw.Restart();
         }
 
-        var financeWindowRows = await _payments.ListAsync(
-            new PaymentsPaidAtAmountInWindowSpec(tenantId, clinicId, financeWindowStartUtc, financeWindowEndUtc), ct);
-        MarkStep("financeWindowScan");
-
-        DashboardFinanceWindowAggregation.SumBuckets(
-            financeWindowRows,
+        var totals = await _financeAggregates.GetTotalsAsync(
+            tenantId,
+            clinicId,
             dayStart,
             dayEnd,
             weekStart,
             weekEnd,
             monthStart,
             monthEnd,
-            out var todayTotalPaid,
-            out var todayPaymentsCount,
-            out var weekTotalPaid,
-            out var weekPaymentsCount,
-            out var monthTotalPaid,
-            out var monthPaymentsCount);
+            ct);
+        MarkStep("financeWindowAggregates");
 
-        var trendRows = financeWindowRows
-            .Where(r => r.PaidAtUtc >= trendStartUtc && r.PaidAtUtc < trendEndUtc)
-            .ToList();
+        var todayTotalPaid = totals.TodayTotalPaid;
+        var todayPaymentsCount = totals.TodayPaymentsCount;
+        var weekTotalPaid = totals.WeekTotalPaid;
+        var weekPaymentsCount = totals.WeekPaymentsCount;
+        var monthTotalPaid = totals.MonthTotalPaid;
+        var monthPaymentsCount = totals.MonthPaymentsCount;
+
+        var trendProjectionRows = await _payments.ListAsync(
+            new PaymentsPaidAtAmountInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc),
+            ct);
         MarkStep("last7DaysPaid");
-        var last7DaysPaid = BuildDailyTotals(trendBuckets, trendRows);
+        var last7DaysPaid = BuildDailyTotals(trendBuckets, trendProjectionRows);
 
         var recentRows = await _payments.ListAsync(
             new PaymentsForDashboardRecentSpec(tenantId, clinicId, DashboardFinanceSummaryConstants.RecentPaymentsTake),
@@ -160,19 +157,19 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             last7DaysPaid);
 
         _logger.LogInformation(
-            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} UtcNow={UtcNow} FinanceWindowUtc={FinanceWindowStartUtc}..{FinanceWindowEndUtc} DayWindowUtc={DayStartUtc}..{DayEndUtc} WeekWindowUtc={WeekStartUtc}..{WeekEndUtc} MonthWindowUtc={MonthStartUtc}..{MonthEndUtc} FinanceWindowRows={FinanceWindowRows} TodayCount={TodayCount} WeekCount={WeekCount} MonthCount={MonthCount} RecentPayments={RecentPayments} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} UtcNow={UtcNow} DayWindowUtc={DayStartUtc}..{DayEndUtc} WeekWindowUtc={WeekStartUtc}..{WeekEndUtc} MonthWindowUtc={MonthStartUtc}..{MonthEndUtc} TrendWindowUtc={TrendStartUtc}..{TrendEndUtc} TrendProjectionRows={TrendProjectionRows} TodayCount={TodayCount} WeekCount={WeekCount} MonthCount={MonthCount} RecentPayments={RecentPayments} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
             tenantId,
             clinicId,
             utcNow,
-            financeWindowStartUtc,
-            financeWindowEndUtc,
             dayStart,
             dayEnd,
             weekStart,
             weekEnd,
             monthStart,
             monthEnd,
-            financeWindowRows.Count,
+            trendStartUtc,
+            trendEndUtc,
+            trendProjectionRows.Count,
             todayPaymentsCount,
             weekPaymentsCount,
             monthPaymentsCount,

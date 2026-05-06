@@ -3,10 +3,8 @@ using Backend.Veteriner.Application.Payments.Specs;
 namespace Backend.Veteriner.Application.Dashboard;
 
 /// <summary>
-/// Dashboard finans özetinde <see cref="PaymentPaidAtAmountInWindowSpec"/> ile yüklenen satırlar üzerinden
-/// gün / hafta / ay toplamlarını hesaplar. Önceki tek-geçiş sadece "ay içi" tarama yaklaşımı,
-/// hafta cuma–pazar veya ay değişiminde eski ayın günlerindeki ödemeleri kaçırdığı için burada
-/// ayrılmıştır (union pencere tek DB sorgusu — bkz. <c>GetDashboardFinanceSummaryQueryHandler</c>).
+/// Bir ödeme satır listesi üzerinden gün / hafta / ay kovalarına göre toplamları hesaplar (unit test ve doğrulama).
+/// Üretim özetinde kart toplamları <see cref="IDashboardFinancePaymentAggregatesReader"/> ile SQL aggregate üzerinden alınır.
 /// </summary>
 internal static class DashboardFinanceWindowAggregation
 {
