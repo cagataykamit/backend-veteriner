@@ -134,7 +134,6 @@ public sealed class GetAppointmentsListQueryHandler
         MarkStep("appointmentsPage");
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
-        var clinicIds = rows.Select(x => x.ClinicId).Distinct().ToArray();
 
         var pets = petIds.Length == 0
             ? []
@@ -151,12 +150,31 @@ public sealed class GetAppointmentsListQueryHandler
             MarkStep("clientsLookup");
         var clientNameById = clients.ToDictionary(x => x.Id, x => x.FullName);
 
-        var clinics = clinicIds.Length == 0
-            ? []
-            : await _clinics.ListAsync(new ClinicsByTenantIdsNameSpec(tenantId, clinicIds), ct);
-        if (clinicIds.Length > 0)
+        // Tek klinik filtresi: sayfadaki tüm satırlar aynı clinicId ise batch distinct yerine tek id ile minimal lookup.
+        Dictionary<Guid, string> clinicNameById;
+        if (rows.Count == 0)
+        {
+            clinicNameById = [];
+        }
+        else if (effectiveClinicId is { } scopedClinicId &&
+                 rows.All(a => a.ClinicId == scopedClinicId))
+        {
+            var scopedClinics = await _clinics.ListAsync(
+                new ClinicsByTenantIdsNameSpec(tenantId, new[] { scopedClinicId }),
+                ct);
             MarkStep("clinicsLookup");
-        var clinicNameById = clinics.ToDictionary(x => x.Id, x => x.Name);
+            clinicNameById = scopedClinics.ToDictionary(x => x.Id, x => x.Name);
+        }
+        else
+        {
+            var distinctClinicIds = rows.Select(x => x.ClinicId).Distinct().ToArray();
+            var clinics = distinctClinicIds.Length == 0
+                ? []
+                : await _clinics.ListAsync(new ClinicsByTenantIdsNameSpec(tenantId, distinctClinicIds), ct);
+            if (distinctClinicIds.Length > 0)
+                MarkStep("clinicsLookup");
+            clinicNameById = clinics.ToDictionary(x => x.Id, x => x.Name);
+        }
 
         var items = rows
             .Select(a =>

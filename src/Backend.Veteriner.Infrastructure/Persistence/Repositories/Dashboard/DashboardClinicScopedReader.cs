@@ -26,17 +26,17 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
 
     public async Task<int> CountClientsAtClinicAsync(Guid tenantId, Guid clinicId, CancellationToken ct = default)
     {
-        // Join: Appointment (ClinicId) -> Pet (ClientId). Distinct ClientId sayısı.
-        var clientIds = _db.Appointments.AsNoTracking()
+        // Önce klinik bazında DISTINCT PetId; sonra Pets üzerinden DISTINCT ClientId (randevu satırı × join patlamasını önler).
+        var petIdsAtClinic = _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && a.ClinicId == clinicId)
-            .Join(
-                _db.Pets.AsNoTracking().Where(p => p.TenantId == tenantId),
-                a => a.PetId,
-                p => p.Id,
-                (a, p) => p.ClientId)
+            .Select(a => a.PetId)
             .Distinct();
 
-        return await clientIds.CountAsync(ct);
+        return await _db.Pets.AsNoTracking()
+            .Where(p => p.TenantId == tenantId && petIdsAtClinic.Contains(p.Id))
+            .Select(p => p.ClientId)
+            .Distinct()
+            .CountAsync(ct);
     }
 
     public async Task<IReadOnlyList<DashboardRecentPetRow>> ListRecentPetsAtClinicAsync(
@@ -97,27 +97,49 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
         if (take <= 0)
             return Array.Empty<DashboardRecentClientRow>();
 
-        // Appointment -> Pet -> Client tek projeksiyon:
-        // önce ClientId bazında son randevuyu bul, sonra aynı sorguda Client alanlarını üret.
-        var rows = await _db.Appointments.AsNoTracking()
+        // Pet bazında daralt (satır sayısı ≈ benzersiz pet), sonra client bazında Max(LastAt); doğrudan appointment→pet satır çarpanından kaçınır.
+        var latestAppointmentByPet = _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && a.ClinicId == clinicId)
+            .GroupBy(a => a.PetId)
+            .Select(g => new
+            {
+                PetId = g.Key,
+                LastAt = g.Max(a => a.ScheduledAtUtc)
+            });
+
+        var latestAppointmentByClient = latestAppointmentByPet
             .Join(
                 _db.Pets.AsNoTracking().Where(p => p.TenantId == tenantId),
-                a => a.PetId,
+                x => x.PetId,
                 p => p.Id,
-                (a, p) => new { p.ClientId, a.ScheduledAtUtc })
+                (x, p) => new
+                {
+                    p.ClientId,
+                    x.LastAt
+                })
             .GroupBy(x => x.ClientId)
-            .Select(g => new { ClientId = g.Key, LastAt = g.Max(x => x.ScheduledAtUtc) })
+            .Select(g => new
+            {
+                ClientId = g.Key,
+                LastAt = g.Max(x => x.LastAt)
+            });
+
+        return await latestAppointmentByClient
             .Join(
                 _db.Clients.AsNoTracking().Where(c => c.TenantId == tenantId),
                 x => x.ClientId,
                 c => c.Id,
-                (x, c) => new { x.LastAt, c.Id, c.FullName, c.Phone })
+                (x, c) => new
+                {
+                    x.LastAt,
+                    c.Id,
+                    c.FullName,
+                    c.Phone
+                })
             .OrderByDescending(x => x.LastAt)
             .ThenBy(x => x.Id)
             .Take(take)
             .Select(x => new DashboardRecentClientRow(x.Id, x.FullName, x.Phone))
             .ToListAsync(ct);
-        return rows;
     }
 }

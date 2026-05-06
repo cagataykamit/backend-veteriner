@@ -1,7 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Dashboard.Contracts;
 using Backend.Veteriner.Domain.Appointments;
-using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
@@ -20,28 +19,50 @@ public sealed class DashboardTodayAppointmentStatusCountsReader : IDashboardToda
         DateTime dayEndUtc,
         CancellationToken ct = default)
     {
-        var q = _db.Appointments.AsNoTracking()
+        var query = _db.Appointments
+            .AsNoTracking()
             .Where(a =>
-                a.TenantId == tenantId
-                && a.ScheduledAtUtc >= dayStartUtc
-                && a.ScheduledAtUtc < dayEndUtc);
+                a.TenantId == tenantId &&
+                a.ScheduledAtUtc >= dayStartUtc &&
+                a.ScheduledAtUtc < dayEndUtc);
 
-        if (clinicId.HasValue)
-            q = q.Where(a => a.ClinicId == clinicId.Value);
+        if (clinicId is { } cid && cid != Guid.Empty)
+            query = query.Where(a => a.ClinicId == cid);
 
-        // Tek tarama: durum bazlı koşullu sayım. Önce anonim tip (EF çevirir), sonra struct map (istemci).
-        var row = await q
-            .GroupBy(_ => 1)
+        var rows = await query
+            .GroupBy(a => a.Status)
             .Select(g => new
             {
-                Scheduled = g.Count(x => x.Status == AppointmentStatus.Scheduled),
-                Completed = g.Count(x => x.Status == AppointmentStatus.Completed),
-                Cancelled = g.Count(x => x.Status == AppointmentStatus.Cancelled)
+                Status = g.Key,
+                Count = g.Count()
             })
-            .SingleOrDefaultAsync(ct);
+            .ToListAsync(ct);
 
-        return row is null
-            ? default
-            : new DashboardTodayAppointmentStatusCounts(row.Scheduled, row.Completed, row.Cancelled);
+        var scheduled = 0;
+        var completed = 0;
+        var cancelled = 0;
+
+        foreach (var row in rows)
+        {
+            switch (row.Status)
+            {
+                case AppointmentStatus.Scheduled:
+                    scheduled = row.Count;
+                    break;
+
+                case AppointmentStatus.Completed:
+                    completed = row.Count;
+                    break;
+
+                case AppointmentStatus.Cancelled:
+                    cancelled = row.Count;
+                    break;
+            }
+        }
+
+        return new DashboardTodayAppointmentStatusCounts(
+            scheduled,
+            completed,
+            cancelled);
     }
 }

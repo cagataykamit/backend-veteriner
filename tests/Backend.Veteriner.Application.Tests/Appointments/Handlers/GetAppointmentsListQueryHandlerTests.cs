@@ -188,4 +188,48 @@ public sealed class GetAppointmentsListQueryHandlerTests
         dto.DurationMinutes.Should().Be(30);
         dto.ScheduledEndUtc.Should().Be(appointment.ScheduledEndUtc);
     }
+
+    [Fact]
+    public async Task Handle_Should_MapClinicName_When_ScopedClinicContextMatchesAllRows()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var appointment = new Appointment(
+            tid,
+            clinicId,
+            petId,
+            DateTime.UtcNow.AddDays(1),
+            30,
+            AppointmentType.Consultation,
+            AppointmentStatus.Scheduled,
+            null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
+        _appointments.Setup(r => r.CountAsync(It.IsAny<AppointmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Appointment> { appointment });
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsNameClientSpeciesSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PetNameClientSpeciesRow>
+            {
+                new(petId, clientId, "Dost", TestSpeciesIds.Cat, "Kedi")
+            });
+        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClientNameRow> { new(clientId, "Veli") });
+        _clinics.Setup(r => r.ListAsync(It.IsAny<ClinicsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicNameRow> { new(clinicId, "Şube A") });
+
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler().Handle(new GetAppointmentsListQuery(page), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Items.Should().ContainSingle()
+            .Which.ClinicName.Should().Be("Şube A");
+        _clinics.Verify(
+            r => r.ListAsync(It.IsAny<ClinicsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }

@@ -16,6 +16,6 @@ public sealed class PetsByTenantIdsNameClientSpeciesSpec : Specification<Pet, Pe
                 p.ClientId,
                 p.Name,
                 p.SpeciesId,
-                p.Species != null ? p.Species.Name : string.Empty));
+                p.Species!.Name));
     }
 }
