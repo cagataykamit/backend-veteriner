@@ -64,7 +64,7 @@ public sealed class PetsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = PermissionCatalog.Pets.Create)]
+    [Authorize(Policy = PermissionCatalog.Pets.Update)]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]

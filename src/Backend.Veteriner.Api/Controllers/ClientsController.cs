@@ -65,7 +65,7 @@ public sealed class ClientsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = PermissionCatalog.Clients.Create)]
+    [Authorize(Policy = PermissionCatalog.Clients.Update)]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]

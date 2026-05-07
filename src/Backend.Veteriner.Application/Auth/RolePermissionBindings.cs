@@ -51,9 +51,11 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Clients.Read,
                 PermissionCatalog.Clients.Create,
+                PermissionCatalog.Clients.Update,
 
                 PermissionCatalog.Pets.Read,
                 PermissionCatalog.Pets.Create,
+                PermissionCatalog.Pets.Update,
 
                 PermissionCatalog.Clinics.Read,
                 PermissionCatalog.Clinics.Update,
