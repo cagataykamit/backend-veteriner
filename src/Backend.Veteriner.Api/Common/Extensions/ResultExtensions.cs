@@ -77,6 +77,14 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Appointments.ClinicTimeConflict / Appointments.PetTimeConflict ve legacy
+        // Appointments.ClinicSlotDuplicate / Appointments.PetSlotDuplicate (Duplicate dalı zaten yakalar)
+        // — overlap/conflict niteliğindeki tüm hatalar 409 Conflict döner; OpenAPI ile uyumlu.
+        if (normalized.Contains("timeconflict") || normalized.Contains("slotduplicate"))
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         if (normalized.Contains("sameplan") || normalized.Contains("notopen"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");

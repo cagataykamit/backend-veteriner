@@ -153,6 +153,33 @@ public sealed class Appointment : AggregateRoot
     }
 
     /// <summary>
+    /// Update/Write akışında istenen durumun mevcut durumdan kabul edilebilir bir geçiş olup olmadığını
+    /// scheduling/working-hours doğrulamalarından <em>önce</em> kontrol etmek için ön-kontrol.
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item><description>Enum tanımsızsa <c>Appointments.Validation</c>.</description></item>
+    /// <item><description>Mevcut durum terminal (Completed/Cancelled) ve istenen durum farklıysa
+    /// <c>Appointments.InvalidStatusTransition</c>.</description></item>
+    /// <item><description>Aksi halde başarı; gerçek mutasyon <see cref="ApplyWriteUpdate"/> içinde yapılır.</description></item>
+    /// </list>
+    /// </remarks>
+    public Result EnsureCanApplyStatus(AppointmentStatus requestedStatus)
+    {
+        if (!Enum.IsDefined(requestedStatus))
+            return Result.Failure("Appointments.Validation", "Randevu durumu geçersiz.");
+
+        if (Status != AppointmentStatus.Scheduled && requestedStatus != Status)
+        {
+            return Result.Failure(
+                "Appointments.InvalidStatusTransition",
+                "Tamamlanmış veya iptal edilmiş randevunun durumu değiştirilemez.");
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>
     /// Create/Update write sözleşmesi: durum + zaman/tür alanları.
     /// Tamamlanmış veya iptal edilmiş kayıtta yalnızca aynı durum (değişiklik yok) kabul edilir.
     /// </summary>

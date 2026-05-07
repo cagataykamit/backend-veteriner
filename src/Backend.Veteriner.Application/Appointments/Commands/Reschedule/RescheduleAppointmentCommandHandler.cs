@@ -66,8 +66,6 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
             return Result.Failure(window.Error);
 
         var endUtc = scheduledUtc.AddMinutes(appointment.DurationMinutes);
-        var hoursRows = await _clinicWorkingHoursRead.ListAsync(
-            new ClinicWorkingHoursByClinicSpec(tenantId, appointment.ClinicId), ct);
         var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
             new ClinicAppointmentSettingsByClinicSpec(tenantId, appointment.ClinicId), ct);
         var slotIntervalMinutes = appointmentSettingsRow?.SlotIntervalMinutes
@@ -75,10 +73,6 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         var slotAlignment = AppointmentSlotIntervalValidation.Validate(scheduledUtc, slotIntervalMinutes);
         if (!slotAlignment.IsSuccess)
             return Result.Failure(slotAlignment.Error);
-
-        var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, appointment.DurationMinutes, hoursRows);
-        if (!workingHours.IsSuccess)
-            return Result.Failure(workingHours.Error);
 
         var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
             ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
@@ -115,6 +109,12 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
                 "Appointments.PetTimeConflict",
                 "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
         }
+
+        var hoursRows = await _clinicWorkingHoursRead.ListAsync(
+            new ClinicWorkingHoursByClinicSpec(tenantId, appointment.ClinicId), ct);
+        var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, appointment.DurationMinutes, hoursRows);
+        if (!workingHours.IsSuccess)
+            return Result.Failure(workingHours.Error);
 
         var domain = appointment.RescheduleTo(scheduledUtc);
         if (!domain.IsSuccess)

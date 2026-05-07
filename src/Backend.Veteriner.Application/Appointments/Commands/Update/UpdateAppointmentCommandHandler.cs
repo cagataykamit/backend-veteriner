@@ -56,6 +56,10 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         if (appointment is null)
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
 
+        var statusGuard = appointment.EnsureCanApplyStatus(request.Status);
+        if (!statusGuard.IsSuccess)
+            return Result.Failure(statusGuard.Error);
+
         var scheduledUtc = NormalizeToUtc(request.ScheduledAtUtc);
         if (request.Status == AppointmentStatus.Scheduled)
         {
