@@ -3,7 +3,6 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Pets.Queries.GetList;
 using Backend.Veteriner.Application.Pets.Specs;
-using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using FluentAssertions;
@@ -42,7 +41,7 @@ public sealed class GetPetsListQueryHandlerTests
         _pets.Setup(r => r.CountAsync(It.IsAny<PetsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Pet>());
+            .ReturnsAsync(new List<PetListProjectionRow>());
 
         var query = new GetPetsListQuery(new PageRequest { Page = 1, PageSize = 20 });
         var result = await CreateHandler().Handle(query, CancellationToken.None);
@@ -61,23 +60,20 @@ public sealed class GetPetsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
-        var species = new Species("CAT", "Kedi");
-        typeof(Species).GetProperty(nameof(Species.Id))!.SetValue(species, TestSpeciesIds.Cat);
 
-        var petNoWeight = new Pet(tid, cid, "A", TestSpeciesIds.Cat, null, null);
-        typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(petNoWeight, Guid.NewGuid());
-        typeof(Pet).GetProperty(nameof(Pet.Species))!.SetValue(petNoWeight, species);
+        var petNoWeightId = Guid.NewGuid();
+        var petWeightedId = Guid.NewGuid();
 
-        var petWeighted = new Pet(tid, cid, "B", TestSpeciesIds.Cat, null, null);
-        typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(petWeighted, Guid.NewGuid());
-        typeof(Pet).GetProperty(nameof(Pet.Species))!.SetValue(petWeighted, species);
-        petWeighted.UpdateDetails("B", TestSpeciesIds.Cat, null, null, null, null, null, 3.25m, null);
+        var rowNoWeight = new PetListProjectionRow(
+            petNoWeightId, tid, cid, "A", TestSpeciesIds.Cat, "Kedi", null, null, null, null);
+        var rowWeighted = new PetListProjectionRow(
+            petWeightedId, tid, cid, "B", TestSpeciesIds.Cat, "Kedi", null, null, null, 3.25m);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _pets.Setup(r => r.CountAsync(It.IsAny<PetsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(2);
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Pet> { petNoWeight, petWeighted });
+            .ReturnsAsync(new List<PetListProjectionRow> { rowNoWeight, rowWeighted });
 
         var result = await CreateHandler().Handle(
             new GetPetsListQuery(new PageRequest { Page = 1, PageSize = 20 }),
@@ -99,7 +95,7 @@ public sealed class GetPetsListQueryHandlerTests
         _pets.Setup(r => r.CountAsync(It.IsAny<PetsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Pet>());
+            .ReturnsAsync(new List<PetListProjectionRow>());
 
         var query = new GetPetsListQuery(new PageRequest { Page = 0, PageSize = 500 });
         var result = await CreateHandler().Handle(query, CancellationToken.None);
@@ -117,7 +113,7 @@ public sealed class GetPetsListQueryHandlerTests
         _pets.Setup(r => r.CountAsync(It.IsAny<PetsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Pet>());
+            .ReturnsAsync(new List<PetListProjectionRow>());
 
         var query = new GetPetsListQuery(new PageRequest { Page = 1, PageSize = 20, Search = "   " });
         var result = await CreateHandler().Handle(query, CancellationToken.None);
@@ -140,7 +136,7 @@ public sealed class GetPetsListQueryHandlerTests
         _pets.Setup(r => r.CountAsync(It.IsAny<PetsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Pet>());
+            .ReturnsAsync(new List<PetListProjectionRow>());
 
         var result = await CreateHandler().Handle(
             new GetPetsListQuery(new PageRequest { Page = 1, PageSize = 10 }, clientId, speciesId),

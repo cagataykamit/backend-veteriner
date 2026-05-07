@@ -8,6 +8,7 @@ public sealed class ClientsByTenantPagedSpec : Specification<Client>
 {
     public ClientsByTenantPagedSpec(Guid tenantId, int page, int pageSize, string? searchContainsLikePattern)
     {
+        Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId);
         if (searchContainsLikePattern is not null)
         {

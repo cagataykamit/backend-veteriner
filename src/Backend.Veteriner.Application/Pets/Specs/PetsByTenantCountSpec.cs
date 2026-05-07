@@ -13,6 +13,7 @@ public sealed class PetsByTenantCountSpec : Specification<Pet>
         string? searchContainsLikePattern,
         Guid[] petIdsMatchingClientTextOrEmpty)
     {
+        Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
         if (clientId.HasValue)
             Query.Where(p => p.ClientId == clientId.Value);

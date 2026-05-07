@@ -1,5 +1,7 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Tenants;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Tenants.Specs;
 
@@ -14,8 +16,12 @@ public sealed class TenantMembersCountSpec : Specification<UserTenant>
     {
         TenantIdFilter = tenantId;
         SearchTermLower = searchTermLower;
+        Query.AsNoTracking();
         Query.Where(ut => ut.TenantId == tenantId);
         if (!string.IsNullOrEmpty(searchTermLower))
-            Query.Where(ut => ut.User != null && ut.User.Email.ToLower().Contains(searchTermLower));
+        {
+            var pat = ListQueryTextSearch.BuildContainsLikePattern(searchTermLower);
+            Query.Where(ut => ut.User != null && EF.Functions.Like(ut.User.Email, pat));
+        }
     }
 }

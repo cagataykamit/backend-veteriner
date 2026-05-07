@@ -74,17 +74,17 @@ public sealed class GetPetsListQueryHandler
             ct);
 
         var items = rows
-            .Select(p => new PetListItemDto(
-                p.Id,
-                p.TenantId,
-                p.ClientId,
-                p.Name,
-                p.SpeciesId,
-                p.Species?.Name ?? "",
-                p.ColorId,
-                p.ColorRef?.Name,
-                p.Breed,
-                p.Weight ?? 0))
+            .Select(r => new PetListItemDto(
+                r.Id,
+                r.TenantId,
+                r.ClientId,
+                r.Name,
+                r.SpeciesId,
+                r.SpeciesName,
+                r.ColorId,
+                r.ColorName,
+                r.Breed,
+                r.Weight ?? 0))
             .ToList();
 
         return Result<PagedResult<PetListItemDto>>.Success(

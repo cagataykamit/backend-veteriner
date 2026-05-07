@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Pets.Specs;
 
-public sealed class PetsByTenantPagedSpec : Specification<Pet>
+public sealed class PetsByTenantPagedSpec : Specification<Pet, PetListProjectionRow>
 {
     public PetsByTenantPagedSpec(
         Guid tenantId,
@@ -15,6 +15,7 @@ public sealed class PetsByTenantPagedSpec : Specification<Pet>
         string? searchContainsLikePattern,
         Guid[] petIdsMatchingClientTextOrEmpty)
     {
+        Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
         if (clientId.HasValue)
             Query.Where(p => p.ClientId == clientId.Value);
@@ -32,13 +33,22 @@ public sealed class PetsByTenantPagedSpec : Specification<Pet>
                 || (ownerPets.Length > 0 && ownerPets.Contains(p.Id)));
         }
 
-        Query.Include(p => p.Species!)
-            .Include(p => p.BreedRef!)
-            .Include(p => p.ColorRef!)
-            .OrderBy(p => p.Name)
+        Query.OrderBy(p => p.Name)
             .ThenBy(p => p.Species!.Name)
             .ThenBy(p => p.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
+
+        Query.Select(p => new PetListProjectionRow(
+            p.Id,
+            p.TenantId,
+            p.ClientId,
+            p.Name,
+            p.SpeciesId,
+            p.Species!.Name,
+            p.ColorId,
+            p.ColorRef != null ? p.ColorRef.Name : null,
+            p.Breed,
+            p.Weight));
     }
 }

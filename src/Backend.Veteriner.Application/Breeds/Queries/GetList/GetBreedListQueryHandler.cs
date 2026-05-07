@@ -28,7 +28,7 @@ public sealed class GetBreedListQueryHandler
             .Select(b => new BreedListItemDto(
                 b.Id,
                 b.SpeciesId,
-                b.Species?.Name ?? "",
+                b.SpeciesName,
                 b.Name,
                 b.IsActive))
             .ToList();

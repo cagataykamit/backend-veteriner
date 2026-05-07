@@ -62,16 +62,12 @@ public sealed class GetTenantMembersQueryHandler
             new TenantMembersPagedSpec(request.TenantId, searchLower, page, pageSize), ct);
 
         var items = rows
-            .Select(ut =>
-            {
-                var u = ut.User!;
-                return new TenantMemberListItemDto(
-                    u.Id,
-                    u.Email,
-                    TenantMemberDisplayName.DeriveFromEmail(u.Email),
-                    u.EmailConfirmed,
-                    u.CreatedAtUtc);
-            })
+            .Select(r => new TenantMemberListItemDto(
+                r.UserId,
+                r.Email,
+                TenantMemberDisplayName.DeriveFromEmail(r.Email),
+                r.EmailConfirmed,
+                r.CreatedAtUtc))
             .ToList();
 
         return Result<PagedResult<TenantMemberListItemDto>>.Success(

@@ -8,6 +8,7 @@ public sealed class ClientsByTenantCountSpec : Specification<Client>
 {
     public ClientsByTenantCountSpec(Guid tenantId, string? searchContainsLikePattern)
     {
+        Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId);
         if (searchContainsLikePattern is not null)
         {

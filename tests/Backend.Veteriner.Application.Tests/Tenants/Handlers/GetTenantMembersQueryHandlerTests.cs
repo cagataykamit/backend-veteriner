@@ -69,7 +69,7 @@ public sealed class GetTenantMembersQueryHandlerTests
         _userTenants.Setup(x => x.CountAsync(It.IsAny<TenantMembersCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _userTenants.Setup(x => x.ListAsync(It.IsAny<TenantMembersPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<UserTenant>());
+            .ReturnsAsync(new List<TenantMemberListProjectionRow>());
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -90,7 +90,7 @@ public sealed class GetTenantMembersQueryHandlerTests
         _userTenants.Setup(x => x.CountAsync(It.IsAny<TenantMembersCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _userTenants.Setup(x => x.ListAsync(It.IsAny<TenantMembersPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<UserTenant>());
+            .ReturnsAsync(new List<TenantMemberListProjectionRow>());
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -110,7 +110,7 @@ public sealed class GetTenantMembersQueryHandlerTests
         _userTenants.Setup(x => x.CountAsync(It.Is<TenantMembersCountSpec>(s => s.SearchTermLower == "a@b.com"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _userTenants.Setup(x => x.ListAsync(It.Is<TenantMembersPagedSpec>(s => s.SearchTermLower == "a@b.com"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<UserTenant>());
+            .ReturnsAsync(new List<TenantMemberListProjectionRow>());
 
         var handler = CreateHandler();
         await handler.Handle(
@@ -132,13 +132,12 @@ public sealed class GetTenantMembersQueryHandlerTests
         typeof(User).GetProperty(nameof(User.Id))!.SetValue(user, uid);
         user.ConfirmEmail();
 
-        var ut = new UserTenant(uid, tid);
-        typeof(UserTenant).GetProperty(nameof(UserTenant.User))!.SetValue(ut, user);
+        var row = new TenantMemberListProjectionRow(uid, "x@y.com", true, user.CreatedAtUtc);
 
         _userTenants.Setup(x => x.CountAsync(It.IsAny<TenantMembersCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _userTenants.Setup(x => x.ListAsync(It.IsAny<TenantMembersPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<UserTenant> { ut });
+            .ReturnsAsync(new List<TenantMemberListProjectionRow> { row });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -160,13 +159,11 @@ public sealed class GetTenantMembersQueryHandlerTests
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
         _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
 
-        var rows = new List<UserTenant>();
+        var rows = new List<TenantMemberListProjectionRow>();
         foreach (var email in new[] { "ali.veli@klinik.com", "MIXED.Case@Example.COM" })
         {
             var u = new User(email, "hash");
-            var ut = new UserTenant(u.Id, tid);
-            typeof(UserTenant).GetProperty(nameof(UserTenant.User))!.SetValue(ut, u);
-            rows.Add(ut);
+            rows.Add(new TenantMemberListProjectionRow(u.Id, email, u.EmailConfirmed, u.CreatedAtUtc));
         }
 
         _userTenants.Setup(x => x.CountAsync(It.IsAny<TenantMembersCountSpec>(), It.IsAny<CancellationToken>()))

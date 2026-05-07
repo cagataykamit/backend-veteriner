@@ -26,7 +26,7 @@ public sealed class GetBreedListQueryHandlerTests
         _read.Setup(r => r.CountAsync(It.IsAny<BreedsCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _read.Setup(r => r.ListAsync(It.IsAny<BreedsPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -57,7 +57,7 @@ public sealed class GetBreedListQueryHandlerTests
                 It.Is<BreedsPagedSpec>(s =>
                     s.IsActiveFilter == null && s.SpeciesIdFilter == null && s.SearchTermLower == null),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -83,7 +83,7 @@ public sealed class GetBreedListQueryHandlerTests
         _read.Setup(r => r.ListAsync(
                 It.Is<BreedsPagedSpec>(s => s.SearchTermLower == null),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -109,7 +109,7 @@ public sealed class GetBreedListQueryHandlerTests
         _read.Setup(r => r.ListAsync(
                 It.Is<BreedsPagedSpec>(s => s.SearchTermLower == "golden"),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -136,7 +136,7 @@ public sealed class GetBreedListQueryHandlerTests
         _read.Setup(r => r.ListAsync(
                 It.Is<BreedsPagedSpec>(s => s.SearchTermLower == "köp"),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -164,7 +164,7 @@ public sealed class GetBreedListQueryHandlerTests
                 It.Is<BreedsPagedSpec>(s =>
                     s.IsActiveFilter == true && s.SpeciesIdFilter == null && s.SearchTermLower == "lab"),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -192,7 +192,7 @@ public sealed class GetBreedListQueryHandlerTests
                 It.Is<BreedsPagedSpec>(s =>
                     s.IsActiveFilter == null && s.SpeciesIdFilter == filterSpeciesId && s.SearchTermLower == "gol"),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -220,7 +220,7 @@ public sealed class GetBreedListQueryHandlerTests
                 It.Is<BreedsPagedSpec>(s =>
                     s.IsActiveFilter == true && s.SpeciesIdFilter == null && s.SearchTermLower == null),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -249,7 +249,7 @@ public sealed class GetBreedListQueryHandlerTests
                 It.Is<BreedsPagedSpec>(s =>
                     s.IsActiveFilter == false && s.SpeciesIdFilter == null && s.SearchTermLower == null),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -278,7 +278,7 @@ public sealed class GetBreedListQueryHandlerTests
                 It.Is<BreedsPagedSpec>(s =>
                     s.IsActiveFilter == null && s.SpeciesIdFilter == filterSpeciesId && s.SearchTermLower == null),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
@@ -307,7 +307,7 @@ public sealed class GetBreedListQueryHandlerTests
                 It.Is<BreedsPagedSpec>(s =>
                     s.IsActiveFilter == true && s.SpeciesIdFilter == filterSpeciesId && s.SearchTermLower == null),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Breed> { b });
+            .ReturnsAsync(new List<BreedListProjectionRow> { new(b.Id, b.SpeciesId, species.Name, b.Name, b.IsActive) });
 
         var handler = CreateHandler();
         var result = await handler.Handle(
