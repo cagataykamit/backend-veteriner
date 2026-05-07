@@ -18,5 +18,10 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
         e.HasIndex(x => x.NextAttemptAtUtc);
         e.HasIndex(x => new { x.ProcessedAtUtc, x.Type });
         e.HasIndex(x => x.DeadLetterAtUtc);
+
+        // OutboxProcessor: pending satırlar (işlenmemiş, dead-letter değil) + CreatedAtUtc sıralı batch
+        e.HasIndex(x => new { x.NextAttemptAtUtc, x.CreatedAtUtc })
+            .HasDatabaseName("IX_OutboxMessages_Pending_NextAttemptAtUtc_CreatedAtUtc")
+            .HasFilter("[ProcessedAtUtc] IS NULL AND [DeadLetterAtUtc] IS NULL");
     }
 }

@@ -33,5 +33,13 @@ public sealed class ReminderDispatchLogConfiguration : IEntityTypeConfiguration<
         b.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ReminderType, x.Status });
         b.HasIndex(x => new { x.TenantId, x.SourceEntityType, x.SourceEntityId });
+
+        // SyncEnqueuedDispatchLogsWithOutboxStatusAsync + legacy reconcile: Status + OutboxMessageId + CreatedAtUtc batch sırası
+        b.HasIndex(x => new { x.Status, x.OutboxMessageId, x.CreatedAtUtc })
+            .HasDatabaseName("IX_ReminderDispatchLogs_Status_OutboxMessageId_CreatedAtUtc");
+
+        // UI log listesi: TenantId + ClinicId (nullable) + CreatedAtUtc sıralı filtre
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.CreatedAtUtc })
+            .HasDatabaseName("IX_ReminderDispatchLogs_TenantId_ClinicId_CreatedAtUtc");
     }
 }
