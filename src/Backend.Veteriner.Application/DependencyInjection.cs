@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<TenantInviteAcceptanceService>();
         services.AddScoped<ISubscriptionCheckoutActivationService, SubscriptionCheckoutActivationService>();
         services.AddScoped<IClinicAssignmentAccessGuard, ClinicAssignmentAccessGuard>();
+        services.AddScoped<IClinicReadScopeResolver, ClinicReadScopeResolver>();
 
         // =========================================================
         // FluentValidation

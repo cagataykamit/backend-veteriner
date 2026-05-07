@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Vaccinations;
 using Backend.Veteriner.Domain.Clients;
@@ -14,6 +15,7 @@ public sealed class ExportVaccinationsReportXlsxQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Vaccination> _vaccinations;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
@@ -22,6 +24,7 @@ public sealed class ExportVaccinationsReportXlsxQueryHandler
     public ExportVaccinationsReportXlsxQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Vaccination> vaccinations,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
@@ -29,6 +32,7 @@ public sealed class ExportVaccinationsReportXlsxQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _vaccinations = vaccinations;
         _clients = clients;
         _pets = pets;
@@ -42,6 +46,7 @@ public sealed class ExportVaccinationsReportXlsxQueryHandler
         var loaded = await VaccinationsReportExportPipeline.LoadAsync(
             _tenantContext,
             _clinicContext,
+            _clinicScopeResolver,
             _vaccinations,
             _clients,
             _pets,

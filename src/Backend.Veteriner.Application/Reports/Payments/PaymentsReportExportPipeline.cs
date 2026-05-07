@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
@@ -17,6 +18,7 @@ internal static class PaymentsReportExportPipeline
     public static async Task<Result<Loaded>> LoadAsync(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver scopeResolver,
         IReadRepository<Payment> payments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
@@ -33,7 +35,7 @@ internal static class PaymentsReportExportPipeline
         var validated = await PaymentsReportQueryValidation.ValidateAsync(
             tenantContext,
             clinicContext,
-            clinics,
+            scopeResolver,
             clinicId,
             fromUtc,
             toUtc,
@@ -41,7 +43,7 @@ internal static class PaymentsReportExportPipeline
         if (!validated.IsSuccess)
             return Result<Loaded>.Failure(validated.Error);
 
-        var (tenantId, effectiveClinicId, validatedFrom, validatedTo) = validated.Value;
+        var (tenantId, effectiveClinicId, accessibleClinicIds, validatedFrom, validatedTo) = validated.Value;
 
         var (searchPattern, searchClientIds, searchPetIds) =
             await PaymentsReportSearchResolution.ResolveSearchAsync(tenantId, search, clients, pets, ct);
@@ -57,7 +59,8 @@ internal static class PaymentsReportExportPipeline
                 validatedTo,
                 searchPattern,
                 searchClientIds,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
 
         if (total > PaymentsReportConstants.MaxExportRows)
@@ -78,7 +81,8 @@ internal static class PaymentsReportExportPipeline
                 validatedTo,
                 searchPattern,
                 searchClientIds,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
 
         var items = await PaymentsReportItemMapping.MapAsync(tenantId, rows, clients, pets, clinics, ct);

@@ -17,12 +17,22 @@ public sealed class ExaminationsReportFilteredPagedSpec : Specification<Examinat
         int page,
         int pageSize,
         string? searchContainsLikePattern,
-        Guid[] searchPetIds)
+        Guid[] searchPetIds,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.AsNoTracking();
         Query.Where(e => e.TenantId == tenantId);
         if (clinicId.HasValue)
+        {
             Query.Where(e => e.ClinicId == clinicId.Value);
+        }
+        else if (accessibleClinicIds is not null)
+        {
+            if (accessibleClinicIds.Count == 0)
+                Query.Where(e => false);
+            else
+                Query.Where(e => accessibleClinicIds.Contains(e.ClinicId));
+        }
         if (petId.HasValue)
             Query.Where(e => e.PetId == petId.Value);
         if (restrictedPetIdsForClient is { Count: > 0 })

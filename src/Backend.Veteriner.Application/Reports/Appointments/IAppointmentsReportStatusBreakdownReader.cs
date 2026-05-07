@@ -16,5 +16,6 @@ public interface IAppointmentsReportStatusBreakdownReader
         DateTime toUtc,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
+        IReadOnlyCollection<Guid>? accessibleClinicIds,
         CancellationToken ct = default);
 }

@@ -24,11 +24,21 @@ public sealed class AppointmentsReportStatusBreakdownReader : IAppointmentsRepor
         DateTime toUtc,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
+        IReadOnlyCollection<Guid>? accessibleClinicIds,
         CancellationToken ct = default)
     {
         var q = _db.Appointments.AsNoTracking().Where(a => a.TenantId == tenantId);
         if (clinicId.HasValue)
+        {
             q = q.Where(a => a.ClinicId == clinicId.Value);
+        }
+        else if (accessibleClinicIds is not null)
+        {
+            if (accessibleClinicIds.Count == 0)
+                q = q.Where(a => false);
+            else
+                q = q.Where(a => accessibleClinicIds.Contains(a.ClinicId));
+        }
         if (petId.HasValue)
             q = q.Where(a => a.PetId == petId.Value);
         if (restrictedPetIdsForClient is { Count: > 0 })

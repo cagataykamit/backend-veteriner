@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -6,6 +7,7 @@ using Backend.Veteriner.Application.Reports.Appointments;
 using Backend.Veteriner.Application.Reports.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Appointments.Queries.GetAppointmentReport;
 using Backend.Veteriner.Application.Reports.Appointments.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
@@ -23,11 +25,13 @@ public sealed class GetAppointmentsReportQueryHandlerTests
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IAppointmentsReportStatusBreakdownReader> _statusBreakdown = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetAppointmentsReportQueryHandler CreateHandler()
         => new(
             _tenant.Object,
             _clinic.Object,
+            _scopeResolver.Object,
             _appointments.Object,
             _clients.Object,
             _pets.Object,
@@ -65,8 +69,7 @@ public sealed class GetAppointmentsReportQueryHandlerTests
         var clinicId = Guid.NewGuid();
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
-        _clinics.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Clinic?)null);
+        _scopeResolver.SetupNotFound();
         var r = await CreateHandler().Handle(
             new GetAppointmentsReportQuery(
                 DateTime.UtcNow.AddDays(-1), DateTime.UtcNow, clinicId, null, null, null, null, 1, 20),
@@ -99,6 +102,7 @@ public sealed class GetAppointmentsReportQueryHandlerTests
                 It.IsAny<DateTime>(),
                 It.IsAny<string?>(),
                 It.IsAny<Guid[]>(),
+                It.IsAny<IReadOnlyCollection<Guid>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<AppointmentStatusCountRow>
             {
@@ -159,6 +163,7 @@ public sealed class GetAppointmentsReportQueryHandlerTests
                 It.IsAny<DateTime>(),
                 It.IsAny<string?>(),
                 It.IsAny<Guid[]>(),
+                It.IsAny<IReadOnlyCollection<Guid>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<AppointmentStatusCountRow>
             {

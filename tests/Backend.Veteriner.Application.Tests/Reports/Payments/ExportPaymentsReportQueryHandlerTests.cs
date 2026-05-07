@@ -1,9 +1,11 @@
 using System.Text;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using FluentAssertions;
@@ -19,9 +21,10 @@ public sealed class ExportPaymentsReportQueryHandlerTests
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Clients.Client>> _clients = new();
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Pets.Pet>> _pets = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private ExportPaymentsReportQueryHandler CreateHandler()
-        => new(_tenant.Object, _clinic.Object, _payments.Object, _clients.Object, _pets.Object, _clinics.Object);
+        => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _payments.Object, _clients.Object, _pets.Object, _clinics.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

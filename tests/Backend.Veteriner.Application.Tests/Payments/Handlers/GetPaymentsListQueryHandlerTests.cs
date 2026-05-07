@@ -1,10 +1,12 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Payments.Queries.GetList;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Payments.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
@@ -20,11 +22,13 @@ public sealed class GetPaymentsListQueryHandlerTests
     private readonly Mock<IReadRepository<Payment>> _payments = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetPaymentsListQueryHandler CreateHandler()
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _payments.Object,
             _pets.Object,
             _clients.Object);
@@ -216,5 +220,62 @@ public sealed class GetPaymentsListQueryHandlerTests
         _payments.Verify(
             r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_ClinicAdmin_Requests_Unassigned_Clinic()
+    {
+        var tid = Guid.NewGuid();
+        var assigned = Guid.NewGuid();
+        var unassigned = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assigned });
+        var handler = new GetPaymentsListQueryHandler(
+            _tenantContext.Object,
+            _clinicContext.Object,
+            caMock.Object,
+            _payments.Object,
+            _pets.Object,
+            _clients.Object);
+
+        var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
+        var result = await handler.Handle(new GetPaymentsListQuery(paging, unassigned), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clinics.AccessDenied");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Filter_By_AccessibleClinics_When_ClinicAdmin_Without_ClinicId()
+    {
+        var tid = Guid.NewGuid();
+        var c1 = Guid.NewGuid();
+        var c2 = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+
+        _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Payment>());
+
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { c1, c2 });
+        var handler = new GetPaymentsListQueryHandler(
+            _tenantContext.Object,
+            _clinicContext.Object,
+            caMock.Object,
+            _payments.Object,
+            _pets.Object,
+            _clients.Object);
+
+        var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
+        var result = await handler.Handle(new GetPaymentsListQuery(paging), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        caMock.Verify(
+            x => x.ResolveAsync(tid, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }

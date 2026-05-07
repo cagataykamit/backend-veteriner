@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
@@ -15,6 +16,7 @@ public sealed class GetPaymentsReportQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
@@ -23,6 +25,7 @@ public sealed class GetPaymentsReportQueryHandler
     public GetPaymentsReportQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Payment> payments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
@@ -30,6 +33,7 @@ public sealed class GetPaymentsReportQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _payments = payments;
         _clients = clients;
         _pets = pets;
@@ -43,7 +47,7 @@ public sealed class GetPaymentsReportQueryHandler
         var validated = await PaymentsReportQueryValidation.ValidateAsync(
             _tenantContext,
             _clinicContext,
-            _clinics,
+            _clinicScopeResolver,
             request.ClinicId,
             request.FromUtc,
             request.ToUtc,
@@ -51,7 +55,7 @@ public sealed class GetPaymentsReportQueryHandler
         if (!validated.IsSuccess)
             return Result<PaymentReportResultDto>.Failure(validated.Error);
 
-        var (tenantId, effectiveClinicId, fromUtc, toUtc) = validated.Value;
+        var (tenantId, effectiveClinicId, accessibleClinicIds, fromUtc, toUtc) = validated.Value;
 
         var (searchPattern, searchClientIds, searchPetIds) =
             await PaymentsReportSearchResolution.ResolveSearchAsync(tenantId, request.Search, _clients, _pets, ct);
@@ -67,7 +71,8 @@ public sealed class GetPaymentsReportQueryHandler
                 toUtc,
                 searchPattern,
                 searchClientIds,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
 
         var amountRows = await _payments.ListAsync(
@@ -81,7 +86,8 @@ public sealed class GetPaymentsReportQueryHandler
                 toUtc,
                 searchPattern,
                 searchClientIds,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
 
         var totalAmount = amountRows.Sum();
@@ -102,7 +108,8 @@ public sealed class GetPaymentsReportQueryHandler
                 pageSize,
                 searchPattern,
                 searchClientIds,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
 
         var items = await PaymentsReportItemMapping.MapAsync(tenantId, rows, _clients, _pets, _clinics, ct);

@@ -19,12 +19,22 @@ public sealed class VaccinationsReportFilteredCountSpec : Specification<Vaccinat
         DateTime fromUtc,
         DateTime toUtc,
         string? searchContainsLikePattern,
-        Guid[] searchPetIds)
+        Guid[] searchPetIds,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId);
         if (clinicId.HasValue)
+        {
             Query.Where(v => v.ClinicId == clinicId.Value);
+        }
+        else if (accessibleClinicIds is not null)
+        {
+            if (accessibleClinicIds.Count == 0)
+                Query.Where(v => false);
+            else
+                Query.Where(v => accessibleClinicIds.Contains(v.ClinicId));
+        }
         if (petId.HasValue)
             Query.Where(v => v.PetId == petId.Value);
         if (restrictedPetIdsForClient is { Count: > 0 })

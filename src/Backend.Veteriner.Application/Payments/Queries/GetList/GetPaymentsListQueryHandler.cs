@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
@@ -18,6 +19,7 @@ public sealed class GetPaymentsListQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -25,12 +27,14 @@ public sealed class GetPaymentsListQueryHandler
     public GetPaymentsListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Payment> payments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _payments = payments;
         _pets = pets;
         _clients = clients;
@@ -49,13 +53,20 @@ public sealed class GetPaymentsListQueryHandler
 
         var page = Math.Max(1, request.Paging.Page);
         var pageSize = Math.Clamp(request.Paging.PageSize, 1, 200);
-        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
             return Result<PagedResult<PaymentListItemDto>>.Failure(
                 "Payments.ClinicContextMismatch",
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
+
+        var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<PagedResult<PaymentListItemDto>>.Failure(scopeResult.Error);
+
+        var effectiveClinicId = scopeResult.Value!.SingleClinicId;
+        var accessibleClinicIds = scopeResult.Value!.AccessibleClinicIds;
 
         string? searchPattern = null;
         Guid[] searchClientIds = [];
@@ -85,7 +96,8 @@ public sealed class GetPaymentsListQueryHandler
                 request.PaidToUtc,
                 searchPattern,
                 searchClientIds,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
 
         var rows = await _payments.ListAsync(
@@ -101,7 +113,8 @@ public sealed class GetPaymentsListQueryHandler
                 pageSize,
                 searchPattern,
                 searchClientIds,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
 
         var clientIds = rows.Select(x => x.ClientId).Distinct().ToArray();

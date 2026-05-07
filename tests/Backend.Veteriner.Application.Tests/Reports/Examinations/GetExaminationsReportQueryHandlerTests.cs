@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -5,6 +6,7 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Examinations;
 using Backend.Veteriner.Application.Reports.Examinations.Queries.GetExaminationReport;
 using Backend.Veteriner.Application.Reports.Examinations.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
@@ -21,9 +23,10 @@ public sealed class GetExaminationsReportQueryHandlerTests
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Clients.Client>> _clients = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetExaminationsReportQueryHandler CreateHandler()
-        => new(_tenant.Object, _clinic.Object, _examinations.Object, _clients.Object, _pets.Object, _clinics.Object);
+        => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _examinations.Object, _clients.Object, _pets.Object, _clinics.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -56,8 +59,7 @@ public sealed class GetExaminationsReportQueryHandlerTests
         var clinicId = Guid.NewGuid();
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
-        _clinics.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Clinic?)null);
+        _scopeResolver.SetupNotFound();
         var r = await CreateHandler().Handle(
             new GetExaminationsReportQuery(
                 DateTime.UtcNow.AddDays(-1), DateTime.UtcNow, clinicId, null, null, null, null, 1, 20),

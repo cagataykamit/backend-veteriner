@@ -1,10 +1,12 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Examinations.Queries.GetList;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
@@ -20,11 +22,13 @@ public sealed class GetExaminationsListQueryHandlerTests
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetExaminationsListQueryHandler CreateHandler()
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _examinations.Object,
             _pets.Object,
             _clients.Object);

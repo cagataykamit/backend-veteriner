@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
@@ -18,6 +19,7 @@ public sealed class GetLabResultsListQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<LabResult> _labResults;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -25,12 +27,14 @@ public sealed class GetLabResultsListQueryHandler
     public GetLabResultsListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<LabResult> labResults,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _labResults = labResults;
         _pets = pets;
         _clients = clients;
@@ -49,13 +53,20 @@ public sealed class GetLabResultsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
-        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
             return Result<PagedResult<LabResultListItemDto>>.Failure(
                 "LabResults.ClinicContextMismatch",
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
+
+        var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<PagedResult<LabResultListItemDto>>.Failure(scopeResult.Error);
+
+        var effectiveClinicId = scopeResult.Value!.SingleClinicId;
+        var accessibleClinicIds = scopeResult.Value!.AccessibleClinicIds;
 
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
@@ -78,7 +89,8 @@ public sealed class GetLabResultsListQueryHandler
                 request.DateFromUtc,
                 request.DateToUtc,
                 searchPattern,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
 
         var rows = await _labResults.ListAsync(
@@ -91,7 +103,8 @@ public sealed class GetLabResultsListQueryHandler
                 page,
                 pageSize,
                 searchPattern,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();

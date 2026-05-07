@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Appointments;
 using Backend.Veteriner.Application.Reports.Appointments.Contracts.Dtos;
@@ -16,6 +17,7 @@ public sealed class GetAppointmentsReportQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
@@ -25,6 +27,7 @@ public sealed class GetAppointmentsReportQueryHandler
     public GetAppointmentsReportQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Appointment> appointments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
@@ -33,6 +36,7 @@ public sealed class GetAppointmentsReportQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _appointments = appointments;
         _clients = clients;
         _pets = pets;
@@ -47,7 +51,7 @@ public sealed class GetAppointmentsReportQueryHandler
         var validated = await AppointmentsReportQueryValidation.ValidateAsync(
             _tenantContext,
             _clinicContext,
-            _clinics,
+            _clinicScopeResolver,
             request.ClinicId,
             request.FromUtc,
             request.ToUtc,
@@ -55,7 +59,7 @@ public sealed class GetAppointmentsReportQueryHandler
         if (!validated.IsSuccess)
             return Result<AppointmentReportResultDto>.Failure(validated.Error);
 
-        var (tenantId, effectiveClinicId, fromUtc, toUtc) = validated.Value!;
+        var (tenantId, effectiveClinicId, accessibleClinicIds, fromUtc, toUtc) = validated.Value!;
 
         var restricted = await AppointmentsReportClientPetFilter.ResolveAsync(
             tenantId,
@@ -90,6 +94,7 @@ public sealed class GetAppointmentsReportQueryHandler
             toUtc,
             searchPattern.Pattern,
             searchPattern.PetIds,
+            accessibleClinicIds,
             ct);
 
         var scheduled = 0;
@@ -137,7 +142,8 @@ public sealed class GetAppointmentsReportQueryHandler
                 page,
                 pageSize,
                 searchPattern.Pattern,
-                searchPattern.PetIds),
+                searchPattern.PetIds,
+                accessibleClinicIds),
             ct);
 
         var items = await AppointmentsReportItemMapping.MapAsync(tenantId, rows, _clients, _pets, _clinics, ct);

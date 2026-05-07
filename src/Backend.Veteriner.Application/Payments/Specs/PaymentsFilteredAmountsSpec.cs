@@ -20,12 +20,22 @@ public sealed class PaymentsFilteredAmountsSpec : Specification<Payment, decimal
         DateTime paidToUtc,
         string? searchContainsLikePattern,
         Guid[] searchMatchClientIds,
-        Guid[] searchMatchPetIds)
+        Guid[] searchMatchPetIds,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
         if (clinicId.HasValue)
+        {
             Query.Where(p => p.ClinicId == clinicId.Value);
+        }
+        else if (accessibleClinicIds is not null)
+        {
+            if (accessibleClinicIds.Count == 0)
+                Query.Where(p => false);
+            else
+                Query.Where(p => accessibleClinicIds.Contains(p.ClinicId));
+        }
         if (clientId.HasValue)
             Query.Where(p => p.ClientId == clientId.Value);
         if (petId.HasValue)

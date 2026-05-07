@@ -15,11 +15,21 @@ public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment>
         int page,
         int pageSize,
         string? searchContainsLikePattern,
-        Guid[] searchPetIds)
+        Guid[] searchPetIds,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.Where(t => t.TenantId == tenantId);
         if (clinicId.HasValue)
+        {
             Query.Where(t => t.ClinicId == clinicId.Value);
+        }
+        else if (accessibleClinicIds is not null)
+        {
+            if (accessibleClinicIds.Count == 0)
+                Query.Where(t => false);
+            else
+                Query.Where(t => accessibleClinicIds.Contains(t.ClinicId));
+        }
         if (petId.HasValue)
             Query.Where(t => t.PetId == petId.Value);
         if (dateFromUtc.HasValue)

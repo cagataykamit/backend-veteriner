@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Vaccinations;
 using Backend.Veteriner.Application.Reports.Vaccinations.Contracts.Dtos;
@@ -16,6 +17,7 @@ public sealed class GetVaccinationsReportQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Vaccination> _vaccinations;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
@@ -24,6 +26,7 @@ public sealed class GetVaccinationsReportQueryHandler
     public GetVaccinationsReportQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Vaccination> vaccinations,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
@@ -31,6 +34,7 @@ public sealed class GetVaccinationsReportQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _vaccinations = vaccinations;
         _clients = clients;
         _pets = pets;
@@ -44,7 +48,7 @@ public sealed class GetVaccinationsReportQueryHandler
         var validated = await VaccinationsReportQueryValidation.ValidateAsync(
             _tenantContext,
             _clinicContext,
-            _clinics,
+            _clinicScopeResolver,
             request.ClinicId,
             request.FromUtc,
             request.ToUtc,
@@ -52,7 +56,7 @@ public sealed class GetVaccinationsReportQueryHandler
         if (!validated.IsSuccess)
             return Result<VaccinationReportResultDto>.Failure(validated.Error);
 
-        var (tenantId, effectiveClinicId, fromUtc, toUtc) = validated.Value!;
+        var (tenantId, effectiveClinicId, accessibleClinicIds, fromUtc, toUtc) = validated.Value!;
 
         var restricted = await VaccinationsReportClientPetFilter.ResolveAsync(
             tenantId,
@@ -84,7 +88,8 @@ public sealed class GetVaccinationsReportQueryHandler
                 fromUtc,
                 toUtc,
                 searchPattern.Pattern,
-                searchPattern.PetIds),
+                searchPattern.PetIds,
+                accessibleClinicIds),
             ct);
 
         var page = Math.Max(1, request.Page);
@@ -102,7 +107,8 @@ public sealed class GetVaccinationsReportQueryHandler
                 page,
                 pageSize,
                 searchPattern.Pattern,
-                searchPattern.PetIds),
+                searchPattern.PetIds,
+                accessibleClinicIds),
             ct);
 
         var items = await VaccinationsReportItemMapping.MapAsync(tenantId, rows, _clients, _pets, _clinics, ct);

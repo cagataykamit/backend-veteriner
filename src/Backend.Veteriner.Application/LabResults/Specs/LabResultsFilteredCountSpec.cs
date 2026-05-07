@@ -13,11 +13,21 @@ public sealed class LabResultsFilteredCountSpec : Specification<LabResult>
         DateTime? dateFromUtc,
         DateTime? dateToUtc,
         string? searchContainsLikePattern,
-        Guid[] searchPetIds)
+        Guid[] searchPetIds,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.Where(x => x.TenantId == tenantId);
         if (clinicId.HasValue)
+        {
             Query.Where(x => x.ClinicId == clinicId.Value);
+        }
+        else if (accessibleClinicIds is not null)
+        {
+            if (accessibleClinicIds.Count == 0)
+                Query.Where(x => false);
+            else
+                Query.Where(x => accessibleClinicIds.Contains(x.ClinicId));
+        }
         if (petId.HasValue)
             Query.Where(x => x.PetId == petId.Value);
         if (dateFromUtc.HasValue)

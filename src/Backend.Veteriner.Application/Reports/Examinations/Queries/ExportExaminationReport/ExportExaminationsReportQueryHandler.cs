@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Examinations;
 using Backend.Veteriner.Domain.Clients;
@@ -14,6 +15,7 @@ public sealed class ExportExaminationsReportQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
@@ -22,6 +24,7 @@ public sealed class ExportExaminationsReportQueryHandler
     public ExportExaminationsReportQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Examination> examinations,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
@@ -29,6 +32,7 @@ public sealed class ExportExaminationsReportQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _examinations = examinations;
         _clients = clients;
         _pets = pets;
@@ -42,6 +46,7 @@ public sealed class ExportExaminationsReportQueryHandler
         var loaded = await ExaminationsReportExportPipeline.LoadAsync(
             _tenantContext,
             _clinicContext,
+            _clinicScopeResolver,
             _examinations,
             _clients,
             _pets,

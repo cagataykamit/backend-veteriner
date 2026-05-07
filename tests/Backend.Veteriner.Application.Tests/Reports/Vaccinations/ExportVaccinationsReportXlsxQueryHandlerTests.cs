@@ -1,9 +1,11 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Vaccinations.Queries.ExportVaccinationReport;
 using Backend.Veteriner.Application.Reports.Vaccinations.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Vaccinations;
 using ClosedXML.Excel;
@@ -20,9 +22,10 @@ public sealed class ExportVaccinationsReportXlsxQueryHandlerTests
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Clients.Client>> _clients = new();
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Pets.Pet>> _pets = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private ExportVaccinationsReportXlsxQueryHandler CreateHandler()
-        => new(_tenant.Object, _clinic.Object, _vaccinations.Object, _clients.Object, _pets.Object, _clinics.Object);
+        => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _vaccinations.Object, _clients.Object, _pets.Object, _clinics.Object);
 
     [Fact]
     public async Task Handle_Should_ReturnXlsx_WithSheetAndHeaders()

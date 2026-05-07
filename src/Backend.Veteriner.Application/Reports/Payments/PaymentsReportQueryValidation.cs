@@ -1,16 +1,15 @@
-using Backend.Veteriner.Application.Clinics.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
-using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Reports.Payments;
 
 internal static class PaymentsReportQueryValidation
 {
-    public static async Task<Result<(Guid TenantId, Guid? EffectiveClinicId, DateTime FromUtc, DateTime ToUtc)>> ValidateAsync(
+    public static async Task<Result<(Guid TenantId, Guid? EffectiveClinicId, IReadOnlyCollection<Guid>? AccessibleClinicIds, DateTime FromUtc, DateTime ToUtc)>> ValidateAsync(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
-        IReadRepository<Clinic> clinics,
+        IClinicReadScopeResolver scopeResolver,
         Guid? requestClinicId,
         DateTime fromUtc,
         DateTime toUtc,
@@ -18,21 +17,21 @@ internal static class PaymentsReportQueryValidation
     {
         if (tenantContext.TenantId is not { } tenantId)
         {
-            return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
+            return Result<(Guid, Guid?, IReadOnlyCollection<Guid>?, DateTime, DateTime)>.Failure(
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         if (fromUtc == default || toUtc == default)
         {
-            return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
+            return Result<(Guid, Guid?, IReadOnlyCollection<Guid>?, DateTime, DateTime)>.Failure(
                 "Payments.ReportDateRangeInvalid",
                 "Rapor için from ve to zorunludur ve geçerli UTC zamanları olmalıdır.");
         }
 
         if (fromUtc > toUtc)
         {
-            return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
+            return Result<(Guid, Guid?, IReadOnlyCollection<Guid>?, DateTime, DateTime)>.Failure(
                 "Payments.ReportDateRangeInvalid",
                 "from değeri to değerinden sonra olamaz.");
         }
@@ -40,31 +39,26 @@ internal static class PaymentsReportQueryValidation
         var spanDays = (toUtc - fromUtc).TotalDays;
         if (spanDays > PaymentsReportConstants.MaxRangeDays)
         {
-            return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
+            return Result<(Guid, Guid?, IReadOnlyCollection<Guid>?, DateTime, DateTime)>.Failure(
                 "Payments.ReportRangeTooLong",
                 $"Tarih aralığı en fazla {PaymentsReportConstants.MaxRangeDays} gün olabilir.");
         }
 
-        var effectiveClinicId = requestClinicId ?? clinicContext.ClinicId;
         if (requestClinicId.HasValue && clinicContext.ClinicId.HasValue
                                       && requestClinicId.Value != clinicContext.ClinicId.Value)
         {
-            return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
+            return Result<(Guid, Guid?, IReadOnlyCollection<Guid>?, DateTime, DateTime)>.Failure(
                 "Payments.ClinicContextMismatch",
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
-        if (effectiveClinicId is { } ecid)
-        {
-            var clinic = await clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, ecid), ct);
-            if (clinic is null)
-            {
-                return Result<(Guid, Guid?, DateTime, DateTime)>.Failure(
-                    "Clinics.NotFound",
-                    "Klinik bulunamadı veya kiracıya ait değil.");
-            }
-        }
+        var requestedClinicId = requestClinicId ?? clinicContext.ClinicId;
+        var scopeResult = await scopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<(Guid, Guid?, IReadOnlyCollection<Guid>?, DateTime, DateTime)>.Failure(scopeResult.Error);
 
-        return Result<(Guid, Guid?, DateTime, DateTime)>.Success((tenantId, effectiveClinicId, fromUtc, toUtc));
+        var scope = scopeResult.Value!;
+        return Result<(Guid, Guid?, IReadOnlyCollection<Guid>?, DateTime, DateTime)>.Success(
+            (tenantId, scope.SingleClinicId, scope.AccessibleClinicIds, fromUtc, toUtc));
     }
 }

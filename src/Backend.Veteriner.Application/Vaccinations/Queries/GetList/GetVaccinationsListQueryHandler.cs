@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Clients.Specs;
@@ -21,6 +22,7 @@ public sealed class GetVaccinationsListQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Vaccination> _vaccinations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -29,6 +31,7 @@ public sealed class GetVaccinationsListQueryHandler
     public GetVaccinationsListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Vaccination> vaccinations,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
@@ -36,6 +39,7 @@ public sealed class GetVaccinationsListQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _vaccinations = vaccinations;
         _pets = pets;
         _clients = clients;
@@ -74,13 +78,20 @@ public sealed class GetVaccinationsListQueryHandler
             stepSw.Restart();
         }
 
-        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
             return Result<PagedResult<VaccinationListItemDto>>.Failure(
                 "Vaccinations.ClinicContextMismatch",
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
+
+        var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<PagedResult<VaccinationListItemDto>>.Failure(scopeResult.Error);
+
+        var effectiveClinicId = scopeResult.Value!.SingleClinicId;
+        var accessibleClinicIds = scopeResult.Value!.AccessibleClinicIds;
 
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
@@ -107,7 +118,8 @@ public sealed class GetVaccinationsListQueryHandler
                 request.AppliedFromUtc,
                 request.AppliedToUtc,
                 searchPattern,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
         MarkStep("vaccinationsCount");
 
@@ -124,7 +136,8 @@ public sealed class GetVaccinationsListQueryHandler
                 page,
                 pageSize,
                 searchPattern,
-                searchPetIds),
+                searchPetIds,
+                accessibleClinicIds),
             ct);
         MarkStep("vaccinationsPage");
 

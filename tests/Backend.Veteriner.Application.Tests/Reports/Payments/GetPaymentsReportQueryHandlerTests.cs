@@ -1,8 +1,10 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Application.Reports.Payments.Queries.GetPaymentReport;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using FluentAssertions;
@@ -18,9 +20,10 @@ public sealed class GetPaymentsReportQueryHandlerTests
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Clients.Client>> _clients = new();
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Pets.Pet>> _pets = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetPaymentsReportQueryHandler CreateHandler()
-        => new(_tenant.Object, _clinic.Object, _payments.Object, _clients.Object, _pets.Object, _clinics.Object);
+        => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _payments.Object, _clients.Object, _pets.Object, _clinics.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -92,8 +95,7 @@ public sealed class GetPaymentsReportQueryHandlerTests
         var cid = Guid.Parse("44444444-4444-4444-4444-444444444444");
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
-        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Clinic?)null);
+        _scopeResolver.SetupNotFound();
 
         var cmd = new GetPaymentsReportQuery(
             DateTime.UtcNow.AddDays(-1),
@@ -262,6 +264,128 @@ public sealed class GetPaymentsReportQueryHandlerTests
 
         r.IsSuccess.Should().BeFalse();
         r.Error.Code.Should().Be("Payments.ClinicContextMismatch");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_ClinicAdmin_Requests_Unassigned_Clinic()
+    {
+        var tid = Guid.NewGuid();
+        var assignedClinicId = Guid.NewGuid();
+        var unassignedClinicId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assignedClinicId });
+        var handler = new GetPaymentsReportQueryHandler(
+            _tenant.Object,
+            _clinic.Object,
+            caMock.Object,
+            _payments.Object,
+            _clients.Object,
+            _pets.Object,
+            _clinics.Object);
+
+        var cmd = new GetPaymentsReportQuery(
+            DateTime.UtcNow.AddDays(-1),
+            DateTime.UtcNow,
+            unassignedClinicId,
+            null,
+            null,
+            null,
+            null,
+            1,
+            20);
+
+        var r = await handler.Handle(cmd, CancellationToken.None);
+
+        r.IsSuccess.Should().BeFalse();
+        r.Error.Code.Should().Be("Clinics.AccessDenied");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Allow_ClinicAdmin_With_Assigned_ClinicId()
+    {
+        var tid = Guid.NewGuid();
+        var assignedClinicId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+
+        _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredAmountsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<decimal>());
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Payment>());
+
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assignedClinicId });
+        var handler = new GetPaymentsReportQueryHandler(
+            _tenant.Object,
+            _clinic.Object,
+            caMock.Object,
+            _payments.Object,
+            _clients.Object,
+            _pets.Object,
+            _clinics.Object);
+
+        var cmd = new GetPaymentsReportQuery(
+            DateTime.UtcNow.AddDays(-1),
+            DateTime.UtcNow,
+            assignedClinicId,
+            null,
+            null,
+            null,
+            null,
+            1,
+            20);
+
+        var r = await handler.Handle(cmd, CancellationToken.None);
+
+        r.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Filter_By_AccessibleClinics_When_ClinicAdmin_Without_ClinicId()
+    {
+        var tid = Guid.NewGuid();
+        var c1 = Guid.NewGuid();
+        var c2 = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+
+        _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredAmountsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<decimal>());
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Payment>());
+
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { c1, c2 });
+        var handler = new GetPaymentsReportQueryHandler(
+            _tenant.Object,
+            _clinic.Object,
+            caMock.Object,
+            _payments.Object,
+            _clients.Object,
+            _pets.Object,
+            _clinics.Object);
+
+        var cmd = new GetPaymentsReportQuery(
+            DateTime.UtcNow.AddDays(-1),
+            DateTime.UtcNow,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1,
+            20);
+
+        var r = await handler.Handle(cmd, CancellationToken.None);
+
+        r.IsSuccess.Should().BeTrue();
+        caMock.Verify(
+            x => x.ResolveAsync(tid, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     private static Payment CreatePaymentEntity(

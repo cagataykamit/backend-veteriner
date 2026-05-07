@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Domain.Clients;
@@ -14,6 +15,7 @@ public sealed class ExportPaymentsReportXlsxQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
@@ -22,6 +24,7 @@ public sealed class ExportPaymentsReportXlsxQueryHandler
     public ExportPaymentsReportXlsxQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Payment> payments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
@@ -29,6 +32,7 @@ public sealed class ExportPaymentsReportXlsxQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _payments = payments;
         _clients = clients;
         _pets = pets;
@@ -42,6 +46,7 @@ public sealed class ExportPaymentsReportXlsxQueryHandler
         var loaded = await PaymentsReportExportPipeline.LoadAsync(
             _tenantContext,
             _clinicContext,
+            _clinicScopeResolver,
             _payments,
             _clients,
             _pets,

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Appointments.Specs;
@@ -16,6 +17,7 @@ internal static class AppointmentsReportExportPipeline
     public static async Task<Result<Loaded>> LoadAsync(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver scopeResolver,
         IReadRepository<Appointment> appointments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
@@ -32,7 +34,7 @@ internal static class AppointmentsReportExportPipeline
         var validated = await AppointmentsReportQueryValidation.ValidateAsync(
             tenantContext,
             clinicContext,
-            clinics,
+            scopeResolver,
             clinicId,
             fromUtc,
             toUtc,
@@ -40,7 +42,7 @@ internal static class AppointmentsReportExportPipeline
         if (!validated.IsSuccess)
             return Result<Loaded>.Failure(validated.Error);
 
-        var (tenantId, effectiveClinicId, validatedFrom, validatedTo) = validated.Value!;
+        var (tenantId, effectiveClinicId, accessibleClinicIds, validatedFrom, validatedTo) = validated.Value!;
 
         var restricted = await AppointmentsReportClientPetFilter.ResolveAsync(
             tenantId,
@@ -72,7 +74,8 @@ internal static class AppointmentsReportExportPipeline
                 validatedFrom,
                 validatedTo,
                 searchCtx.Pattern,
-                searchCtx.PetIds),
+                searchCtx.PetIds,
+                accessibleClinicIds),
             ct);
 
         if (total > AppointmentsReportConstants.MaxExportRows)
@@ -92,7 +95,8 @@ internal static class AppointmentsReportExportPipeline
                 validatedFrom,
                 validatedTo,
                 searchCtx.Pattern,
-                searchCtx.PetIds),
+                searchCtx.PetIds,
+                accessibleClinicIds),
             ct);
 
         var items = await AppointmentsReportItemMapping.MapAsync(tenantId, rows, clients, pets, clinics, ct);
