@@ -206,4 +206,172 @@ public sealed class RolePermissionBindingSeederTests
             .AnyAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == clinicsUpdateId);
         hasClinicsUpdate.Should().BeTrue();
     }
+
+    // ---------- Faz 4B-6: Admin claim whitelist temizliği ----------
+
+    /// <summary>
+    /// Eski AdminClaimSeeder davranışını taklit ederek "Admin" claim'ine sistem permission'larını manuel
+    /// bağlar; ardından <see cref="RolePermissionBindingSeeder"/> çalıştığında bu sistem bağlarının
+    /// whitelist temizliğiyle silindiğini ve <c>Map["Admin"]</c> içindeki permission'ların korunduğunu doğrular.
+    /// </summary>
+    [Fact]
+    public async Task Seed_Should_Cleanup_NonWhitelisted_System_Permissions_From_Admin_Claim()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+
+        var hasher = new StubBcryptPasswordHasher();
+
+        await PermissionSeeder.SeedAsync(db);
+        await DataSeeder.SeedAsync(db, hasher);
+        await AdminClaimSeeder.SeedAsync(db);
+        await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
+
+        var adminClaimId = await GetClaimIdAsync(db, "Admin");
+
+        // Eski davranışı simüle et: tenant Admin claim'ine sistem/whitelist-dışı bağları manuel ekle.
+        var systemPermissionCodes = new[]
+        {
+            PermissionCatalog.Outbox.Read,
+            PermissionCatalog.Outbox.Write,
+            PermissionCatalog.Roles.Write,
+            PermissionCatalog.Permissions.Write,
+            PermissionCatalog.Users.Write,
+            PermissionCatalog.Admin.Diagnostics,
+            PermissionCatalog.Tenants.Create,
+            PermissionCatalog.Subscriptions.Manage,
+        };
+
+        foreach (var code in systemPermissionCodes)
+        {
+            var permId = await GetPermissionIdAsync(db, code);
+            var alreadyLinked = await db.OperationClaimPermissions
+                .AnyAsync(x => x.OperationClaimId == adminClaimId && x.PermissionId == permId);
+            if (!alreadyLinked)
+            {
+                await db.OperationClaimPermissions.AddAsync(new OperationClaimPermission(adminClaimId, permId));
+            }
+        }
+        await db.SaveChangesAsync();
+
+        await RolePermissionBindingSeeder.SeedAsync(db);
+
+        // Whitelist dışı sistem permission'ları temizlenmiş olmalı.
+        foreach (var code in systemPermissionCodes)
+        {
+            var permId = await GetPermissionIdAsync(db, code);
+            var hasLink = await db.OperationClaimPermissions
+                .AnyAsync(x => x.OperationClaimId == adminClaimId && x.PermissionId == permId);
+            hasLink.Should().BeFalse(
+                $"'{code}' Map[\"Admin\"] dışında olduğu için tenant Admin claim'inden temizlenmeli");
+        }
+
+        // Map["Admin"] içindeki permission'lar korunmalı / eklenmiş olmalı.
+        var clinicsUpdateId = await GetPermissionIdAsync(db, PermissionCatalog.Clinics.Update);
+        var remindersReadId = await GetPermissionIdAsync(db, PermissionCatalog.Reminders.Read);
+        var clientsCreateId = await GetPermissionIdAsync(db, PermissionCatalog.Clients.Create);
+        var dashboardReadId = await GetPermissionIdAsync(db, PermissionCatalog.Dashboard.Read);
+
+        (await db.OperationClaimPermissions.AnyAsync(x => x.OperationClaimId == adminClaimId && x.PermissionId == clinicsUpdateId))
+            .Should().BeTrue();
+        (await db.OperationClaimPermissions.AnyAsync(x => x.OperationClaimId == adminClaimId && x.PermissionId == remindersReadId))
+            .Should().BeTrue();
+        (await db.OperationClaimPermissions.AnyAsync(x => x.OperationClaimId == adminClaimId && x.PermissionId == clientsCreateId))
+            .Should().BeTrue();
+        (await db.OperationClaimPermissions.AnyAsync(x => x.OperationClaimId == adminClaimId && x.PermissionId == dashboardReadId))
+            .Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Cleanup yalnız "Admin" claim'i için yapılmalı; ClinicAdmin / Veteriner / Sekreter / Owner
+    /// claim'lerinde manuel olarak eklenen whitelist-dışı bağlar korunmalıdır.
+    /// </summary>
+    [Fact]
+    public async Task Seed_Cleanup_Should_Only_Affect_Admin_Claim_Not_Other_Claims()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+
+        var hasher = new StubBcryptPasswordHasher();
+
+        await PermissionSeeder.SeedAsync(db);
+        await DataSeeder.SeedAsync(db, hasher);
+        await AdminClaimSeeder.SeedAsync(db);
+        await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
+
+        var clinicAdminClaimId = await GetClaimIdAsync(db, "ClinicAdmin");
+        var outboxReadId = await GetPermissionIdAsync(db, PermissionCatalog.Outbox.Read);
+
+        // ClinicAdmin'e manuel olarak Outbox.Read bağı ekle (manual elevation simulation).
+        await db.OperationClaimPermissions.AddAsync(new OperationClaimPermission(clinicAdminClaimId, outboxReadId));
+        await db.SaveChangesAsync();
+
+        await RolePermissionBindingSeeder.SeedAsync(db);
+
+        var stillHasOutboxRead = await db.OperationClaimPermissions
+            .AnyAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == outboxReadId);
+        stillHasOutboxRead.Should().BeTrue(
+            "Cleanup yalnız Admin claim'i içindir; ClinicAdmin manuel atamaları korunmalı");
+    }
+
+    /// <summary>
+    /// admin@example.com kullanıcısı PlatformAdmin claim'ine bağlı olmalı; tenant Admin claim'i
+    /// AdminClaimSeeder tarafından oluşturulmaz, ancak InviteAssignableOperationClaimsSeeder tarafından
+    /// boş şekilde oluşturulur. RolePermissionBindingSeeder ise yalnız Map["Admin"] içeriğini bağlar.
+    /// </summary>
+    [Fact]
+    public async Task Seed_Should_Bind_AdminUser_To_PlatformAdmin_And_Keep_TenantAdmin_Limited_To_Whitelist()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+
+        var hasher = new StubBcryptPasswordHasher();
+
+        await PermissionSeeder.SeedAsync(db);
+        await DataSeeder.SeedAsync(db, hasher);
+        await AdminClaimSeeder.SeedAsync(db);
+        await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
+        await RolePermissionBindingSeeder.SeedAsync(db);
+
+        var adminUser = await db.Users.SingleAsync(u => u.Email == AdminClaimSeeder.PlatformAdminUserEmail);
+        var platformAdminClaimId = await GetClaimIdAsync(db, AdminClaimSeeder.PlatformAdminClaimName);
+        var tenantAdminClaimId = await GetClaimIdAsync(db, "Admin");
+
+        var hasPlatformLink = await db.UserOperationClaims
+            .AnyAsync(x => x.UserId == adminUser.Id && x.OperationClaimId == platformAdminClaimId);
+        hasPlatformLink.Should().BeTrue("admin@example.com PlatformAdmin claim'ine bağlı olmalı");
+
+        // PlatformAdmin tüm catalog permission'larını taşır.
+        var platformAdminPermCount = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == platformAdminClaimId);
+        platformAdminPermCount.Should().Be(PermissionCatalog.All.Length);
+
+        // Tenant Admin claim Map["Admin"] içindeki sayıdan fazla permission almamalı.
+        var tenantAdminPermCount = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == tenantAdminClaimId);
+        var expectedAdminMapSize = RolePermissionBindings.Map["Admin"].Count;
+        tenantAdminPermCount.Should().Be(expectedAdminMapSize,
+            "Tenant Admin claim yalnız RolePermissionBindings.Map[\"Admin\"] içeriğine sahip olmalı");
+
+        // Tenant Admin claim'inde sistem permission'ları olmamalı.
+        var systemCodes = new[]
+        {
+            PermissionCatalog.Outbox.Read,
+            PermissionCatalog.Outbox.Write,
+            PermissionCatalog.Admin.Diagnostics,
+            PermissionCatalog.Roles.Write,
+            PermissionCatalog.Permissions.Write,
+            PermissionCatalog.Users.Write,
+            PermissionCatalog.Tenants.Create,
+            PermissionCatalog.Subscriptions.Manage,
+        };
+        foreach (var code in systemCodes)
+        {
+            var permId = await GetPermissionIdAsync(db, code);
+            var hasSystemLink = await db.OperationClaimPermissions
+                .AnyAsync(x => x.OperationClaimId == tenantAdminClaimId && x.PermissionId == permId);
+            hasSystemLink.Should().BeFalse(
+                $"Tenant Admin claim '{code}' sistem permission'ını içermemeli (Faz 4B-6 ayrımı)");
+        }
+    }
 }

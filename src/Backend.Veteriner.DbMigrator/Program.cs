@@ -73,9 +73,10 @@ static async Task RunSeedPipelineAsync(
     await DataSeeder.SeedAsync(db, hasher, logger, ct);
     await AdminClaimSeeder.SeedAsync(db, ct);
     await InviteAssignableOperationClaimsSeeder.SeedAsync(db, ct);
-    // Invite-assignable rollerin (Admin, ClinicAdmin, ...) minimum permission bağlarını uygular.
-    // AdminClaimSeeder zaten Admin'e tüm permission'ları bağlar; bu seeder idempotent ek bağ atar
-    // ve ClinicAdmin gibi rollerin Clinics.Update gibi spesifik yetkileri almasını sağlar.
+    // Invite-assignable rollerin (Admin, ClinicAdmin, Veteriner, Sekreter, …) minimum permission bağlarını uygular.
+    // Faz 4B-6: AdminClaimSeeder yalnızca PlatformAdmin claim'ine tüm permission'ları bağlar (admin@example.com platform).
+    // RolePermissionBindingSeeder ise Map'teki rolleri seed eder ve "Admin" claim'i için whitelist-dışı (sistem)
+    // permission bağlarını idempotent biçimde temizler — tenant Admin ile platform yöneticisi ayrımını korur.
     await RolePermissionBindingSeeder.SeedAsync(db, logger, ct);
 }
 
