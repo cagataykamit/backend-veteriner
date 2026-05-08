@@ -1,3 +1,4 @@
+using Backend.Veteriner.Api.Auth;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Api.Contracts;
@@ -70,8 +71,14 @@ public sealed class ClinicsController : ControllerBase
     }
 
     /// <summary>Klinik haftalık çalışma saatleri. Kayıt yoksa varsayılan program döner.</summary>
+    /// <remarks>
+    /// Read yetkisi composite "any-of": <c>Clinics.Read</c>, <c>Clinics.Update</c>,
+    /// <c>Appointments.Create</c> veya <c>Appointments.Reschedule</c> permission'larından en az biri.
+    /// Sekreter / Veteriner gibi Clinics.Read'e sahip olmayan ama randevu oluşturan rollerin
+    /// frontend'de gerçek çalışma saatlerini görebilmesi için.
+    /// </remarks>
     [HttpGet("{id:guid}/working-hours")]
-    [Authorize(Policy = PermissionCatalog.Clinics.Read)]
+    [Authorize(Policy = AuthorizationPolicyNames.ClinicsSchedulingRead)]
     [ProducesResponseType(typeof(IReadOnlyList<ClinicWorkingHourDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
@@ -113,8 +120,12 @@ public sealed class ClinicsController : ControllerBase
     }
 
     /// <summary>Klinik randevu varsayılan ayarları. Kayıt yoksa default değerler döner.</summary>
+    /// <remarks>
+    /// Read yetkisi composite "any-of" (working-hours ile aynı): <c>Clinics.Read</c>, <c>Clinics.Update</c>,
+    /// <c>Appointments.Create</c> veya <c>Appointments.Reschedule</c> permission'larından en az biri.
+    /// </remarks>
     [HttpGet("{id:guid}/appointment-settings")]
-    [Authorize(Policy = PermissionCatalog.Clinics.Read)]
+    [Authorize(Policy = AuthorizationPolicyNames.ClinicsSchedulingRead)]
     [ProducesResponseType(typeof(ClinicAppointmentSettingsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
