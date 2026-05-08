@@ -46,8 +46,19 @@ public sealed class CreateAppointmentCommandHandlerTests
             _appointmentsWrite.Object);
     }
 
+    // Faz 4B-7: Hafta sonuna denk gelen ileri tarihler için Pazartesi'ye kaydır.
+    // Default working-hours fallback'inde Pazar kapalı ve Cumartesi sınırlı; testler haftanın gününe bağımlı kalmasın.
+    // Negatif (geçmiş) gün ofsetlerinde mevcut davranış korunur (geçmiş tarih senaryoları working-hours kontrolünden önce dönmeli).
     private static DateTime SlotAlignedUtcPlusDays(int days)
-        => DateTime.UtcNow.Date.AddDays(days).AddHours(9);
+    {
+        var date = DateTime.UtcNow.Date.AddDays(days);
+        if (days >= 0)
+        {
+            while (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday)
+                date = date.AddDays(1);
+        }
+        return date.AddHours(9);
+    }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()

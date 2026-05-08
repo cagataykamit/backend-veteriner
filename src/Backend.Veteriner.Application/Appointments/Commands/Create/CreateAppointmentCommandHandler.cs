@@ -123,12 +123,8 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
             if (!slotAlignment.IsSuccess)
                 return Result<Guid>.Failure(slotAlignment.Error);
 
-            var hoursRows = await _clinicWorkingHoursRead.ListAsync(
-                new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
-            var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);
-            if (!workingHours.IsSuccess)
-                return Result<Guid>.Failure(workingHours.Error);
-
+            // Faz 4B-7: conflict kontrolleri working-hours kontrolünden önce çalışmalı.
+            // Aksi halde working-hours, asıl conflict hatasını gölgeleyebilir (ör. ClinicClosed → ClinicTimeConflict).
             if (!allowClinicOverlap)
             {
                 var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
@@ -149,6 +145,12 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
                     "Appointments.PetTimeConflict",
                     "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
             }
+
+            var hoursRows = await _clinicWorkingHoursRead.ListAsync(
+                new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
+            var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);
+            if (!workingHours.IsSuccess)
+                return Result<Guid>.Failure(workingHours.Error);
         }
 
         var appointment = new Appointment(
