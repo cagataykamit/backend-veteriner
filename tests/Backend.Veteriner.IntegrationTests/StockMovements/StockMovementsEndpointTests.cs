@@ -168,8 +168,299 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         wJson.GetProperty("items")[0].GetProperty("id").GetGuid().Should().Be(ctx.MiddleMovementId);
     }
 
+    [Fact]
+    public async Task Post_Should_Return401_When_TokenMissing()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/v1/stock-movements", new { });
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Post_Should_Return403_When_MissingStockMovementsCreate()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[]
+        {
+            "StockMovements.Read",
+            "Products.Read"
+        });
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var response = await client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicId,
+            productId = ctx.ProductId,
+            movementType = (int)StockMovementType.Initial,
+            quantity = 2m
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Post_Initial_Then_GetProductStocks_Should_ReflectQuantity()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[]
+        {
+            "StockMovements.Create",
+            "StockMovements.Read",
+            "Products.Read"
+        });
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var post = await client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicId,
+            productId = ctx.ProductId,
+            movementType = (int)StockMovementType.Initial,
+            quantity = 11m
+        });
+        post.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var list = await client.GetAsync($"/api/v1/product-stocks?page=1&pageSize=20&productId={ctx.ProductId}");
+        list.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await list.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("items").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("quantityOnHand").GetDecimal().Should().Be(11);
+    }
+
+    [Fact]
+    public async Task Post_In_And_Out_Should_Update_ProductStock()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[]
+        {
+            "StockMovements.Create",
+            "Products.Read"
+        });
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        (await client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicId,
+            productId = ctx.ProductId,
+            movementType = (int)StockMovementType.Initial,
+            quantity = 10m
+        })).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        (await client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicId,
+            productId = ctx.ProductId,
+            movementType = (int)StockMovementType.In,
+            quantity = 5m
+        })).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        (await client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicId,
+            productId = ctx.ProductId,
+            movementType = (int)StockMovementType.Out,
+            quantity = 7m
+        })).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        var verify = await client.GetAsync($"/api/v1/product-stocks?page=1&pageSize=10&productId={ctx.ProductId}");
+        verify.StatusCode.Should().Be(HttpStatusCode.OK);
+        var j = await verify.Content.ReadFromJsonAsync<JsonElement>();
+        j.GetProperty("items")[0].GetProperty("quantityOnHand").GetDecimal().Should().Be(8);
+    }
+
+    [Fact]
+    public async Task Post_Out_Should_ReturnProblem_When_InsufficientStock()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[]
+        {
+            "StockMovements.Create",
+            "Products.Read"
+        });
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        (await client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicId,
+            productId = ctx.ProductId,
+            movementType = (int)StockMovementType.Initial,
+            quantity = 2m
+        })).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var bad = await client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicId,
+            productId = ctx.ProductId,
+            movementType = (int)StockMovementType.Out,
+            quantity = 50m
+        });
+        bad.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(bad)).Should().Be("StockMovements.InsufficientStock");
+    }
+
+    [Fact]
+    public async Task Post_Should_BeBlocked_When_TenantReadOnly()
+    {
+        var (_, token) = await SeedTenantAndIssueTokenAsync(
+            new[] { "StockMovements.Create", "Products.Read" },
+            readOnlyTenant: true);
+
+        var ctx = await SeedTenantClinicProductWithExistingTenantTokenAsync(token);
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var response = await client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicId,
+            productId = ctx.ProductId,
+            movementType = (int)StockMovementType.Initial,
+            quantity = 1m
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await ReadProblemCodeAsync(response)).Should().Be("Subscriptions.TenantReadOnly");
+    }
+
+    [Fact]
+    public async Task Post_Should_Return403_When_ClinicAdmin_UnassignedClinic()
+    {
+        var ctx = await SeedClinicAdminTwoClinicsProductForMutationAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var response = await client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicB,
+            productId = ctx.ProductId,
+            movementType = (int)StockMovementType.Initial,
+            quantity = 1m
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await ReadProblemCodeAsync(response)).Should().Be("Clinics.AccessDenied");
+    }
+
+    private async Task<MutationSeedCtx> SeedTenantClinicProductWithPermissionsAsync(string[] permissions)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+
+        var tenant = new Tenant($"mut-{Guid.NewGuid():N}"[..18]);
+        db.Tenants.Add(tenant);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
+
+        var clinic = new Clinic(tenant.Id, $"Mc-{Guid.NewGuid():N}"[..14], "Y");
+        db.Clinics.Add(clinic);
+
+        var product = new Product(
+            tenant.Id,
+            $"mp-{Guid.NewGuid():N}"[..14],
+            "Adet",
+            2m,
+            "TRY",
+            sku: $"MSK-{Guid.NewGuid():N}"[..14]);
+        db.Products.Add(product);
+
+        await db.SaveChangesAsync();
+
+        var claims = permissions
+            .Select(p => new Claim("permission", p))
+            .Append(new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D")))
+            .ToList();
+
+        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"mut-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+
+        return new MutationSeedCtx(clinic.Id, product.Id, token);
+    }
+
+    private async Task<MutationSeedCtx> SeedTenantClinicProductWithExistingTenantTokenAsync(string token)
+    {
+        var tenantId = ExtractTenantIdFromJwt(token);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var clinic = new Clinic(tenantId, $"Ro-{Guid.NewGuid():N}"[..14], "Z");
+        db.Clinics.Add(clinic);
+        var product = new Product(
+            tenantId,
+            $"rp-{Guid.NewGuid():N}"[..14],
+            "Adet",
+            1m,
+            "TRY",
+            sku: $"RSK-{Guid.NewGuid():N}"[..14]);
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        return new MutationSeedCtx(clinic.Id, product.Id, token);
+    }
+
+    private static Guid ExtractTenantIdFromJwt(string token)
+    {
+        var tokenHandler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+        var jwt = tokenHandler.ReadJwtToken(token);
+        var tid = jwt.Claims.First(c => c.Type == VeterinerClaims.TenantId).Value;
+        return Guid.Parse(tid);
+    }
+
+    private async Task<ClinicAdminMutationSeedCtx> SeedClinicAdminTwoClinicsProductForMutationAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+        var tenant = new Tenant($"cam-{Guid.NewGuid():N}"[..18]);
+        db.Tenants.Add(tenant);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
+
+        var user = new User($"cam-{Guid.NewGuid():N}@example.com", hasher.Hash("pw-cam"));
+        db.Users.Add(user);
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+
+        var clinicAdminClaimId = await db.OperationClaims.Where(c => c.Name == "ClinicAdmin").Select(c => c.Id).FirstAsync();
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, clinicAdminClaimId));
+
+        var clinicA = new Clinic(tenant.Id, $"MA-{Guid.NewGuid():N}"[..12], "City");
+        var clinicB = new Clinic(tenant.Id, $"MB-{Guid.NewGuid():N}"[..12], "City");
+        db.Clinics.AddRange(clinicA, clinicB);
+        await db.SaveChangesAsync();
+
+        db.UserClinics.Add(new UserClinic(user.Id, clinicA.Id));
+
+        var product = new Product(
+            tenant.Id,
+            $"cap-{Guid.NewGuid():N}"[..12],
+            "Adet",
+            1m,
+            "TRY",
+            sku: $"CAS-{Guid.NewGuid():N}"[..12]);
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        var claims = new[]
+        {
+            new Claim("permission", "StockMovements.Create"),
+            new Claim("permission", "StockMovements.Read"),
+            new Claim("permission", "Products.Read"),
+            new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
+        };
+        var (token, _, _) = jwt.Create(user.Id, user.Email, Array.Empty<string>(), claims);
+
+        return new ClinicAdminMutationSeedCtx(clinicA.Id, clinicB.Id, product.Id, token);
+    }
+
+    private sealed record MutationSeedCtx(Guid ClinicId, Guid ProductId, string Token);
+
+    private sealed record ClinicAdminMutationSeedCtx(Guid ClinicA, Guid ClinicB, Guid ProductId, string Token);
+
     private async Task<(Guid TenantId, string AccessToken)> SeedTenantAndIssueTokenAsync(
-        IReadOnlyCollection<string> permissions)
+        IReadOnlyCollection<string> permissions,
+        bool readOnlyTenant = false)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -177,11 +468,11 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
 
         var tenant = new Tenant($"sm-{Guid.NewGuid():N}"[..18]);
         db.Tenants.Add(tenant);
-        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(
-            tenant.Id,
-            SubscriptionPlanCode.Basic,
-            DateTime.UtcNow,
-            14));
+        var now = DateTime.UtcNow;
+        var subscription = readOnlyTenant
+            ? TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now.AddDays(-40), 7)
+            : TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14);
+        db.TenantSubscriptions.Add(subscription);
         await db.SaveChangesAsync();
 
         var claims = permissions

@@ -3,6 +3,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.StockMovements.Commands.Create;
 using Backend.Veteriner.Application.StockMovements.Contracts.Dtos;
 using Backend.Veteriner.Application.StockMovements.Queries.GetList;
 using Backend.Veteriner.Domain.Products;
@@ -59,5 +60,27 @@ public sealed class StockMovementsController : ControllerBase
             ct);
 
         return result.ToActionResult(this);
+    }
+
+    [HttpPost]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Create)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(StockMovementDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Create([FromBody] CreateStockMovementCommand cmd, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(cmd, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        return CreatedAtAction(
+            nameof(GetList),
+            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0" },
+            result.Value);
     }
 }

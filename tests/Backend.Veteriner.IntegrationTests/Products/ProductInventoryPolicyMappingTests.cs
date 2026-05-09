@@ -58,6 +58,8 @@ public sealed class ProductInventoryPolicyMappingTests
     {
         GetPolicy<StockMovementsController>(nameof(StockMovementsController.GetList))
             .Should().Be(PermissionCatalog.StockMovements.Read);
+        GetPolicy<StockMovementsController>(nameof(StockMovementsController.Create))
+            .Should().Be(PermissionCatalog.StockMovements.Create);
     }
 
     private static string? GetPolicy<TController>(string actionName)

@@ -44,4 +44,34 @@ public sealed class ProductStock
         MinimumStockLevel = minimumStockLevel;
         UpdatedAtUtc = DateTime.UtcNow;
     }
+
+    public void IncreaseQuantity(decimal amount)
+    {
+        if (amount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(amount), "Artış miktarı sıfırdan büyük olmalıdır.");
+
+        QuantityOnHand += amount;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void DecreaseQuantity(decimal amount)
+    {
+        if (amount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(amount), "Azalış miktarı sıfırdan büyük olmalıdır.");
+        if (QuantityOnHand < amount)
+            throw new InvalidOperationException("Stok miktarı yetersiz.");
+
+        QuantityOnHand -= amount;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    /// <summary>Sayım düzeltmesi: eldeki miktarı doğrudan ayarlar (<c>&gt;= 0</c>).</summary>
+    public void SetAbsoluteQuantity(decimal targetQuantityOnHand)
+    {
+        if (targetQuantityOnHand < 0)
+            throw new ArgumentOutOfRangeException(nameof(targetQuantityOnHand), "Stok miktarı negatif olamaz.");
+
+        QuantityOnHand = targetQuantityOnHand;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
 }
