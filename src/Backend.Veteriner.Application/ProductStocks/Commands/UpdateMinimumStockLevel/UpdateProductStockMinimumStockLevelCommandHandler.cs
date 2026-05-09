@@ -7,6 +7,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ProductStocks.Commands.UpdateMinimumStockLevel;
 
@@ -76,7 +77,17 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandler
         }
 
         stock.SetMinimumStockLevel(request.MinimumStockLevel);
-        await _productStocksWrite.SaveChangesAsync(ct);
+
+        try
+        {
+            await _productStocksWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<ProductStockDto>.Failure(
+                "ProductStocks.ConcurrencyConflict",
+                "Stok satırı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
+        }
 
         return Result<ProductStockDto>.Success(MapDto(stock, clinic.Name));
     }

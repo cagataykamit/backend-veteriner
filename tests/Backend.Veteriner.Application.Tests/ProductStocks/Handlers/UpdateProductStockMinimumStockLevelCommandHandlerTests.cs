@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.ProductStocks.Handlers;
@@ -207,5 +208,21 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandlerTests
 
         result.Error!.Code.Should().Be("Clinics.NotFound");
         _productStocksWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Map_Concurrency_To_ProductStocks_ConcurrencyConflict()
+    {
+        var (_, _, _, stockId, _, stock, clinic) = SeedTrackedStock(3m, 1m);
+        SetupReads(stock.TenantId, stock, clinic);
+        _productStocksWrite
+            .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new DbUpdateConcurrencyException("Concurrency conflict.", innerException: null));
+
+        var result = await CreateHandler().Handle(
+            new UpdateProductStockMinimumStockLevelCommand(stockId, 9m),
+            CancellationToken.None);
+
+        result.Error!.Code.Should().Be("ProductStocks.ConcurrencyConflict");
     }
 }
