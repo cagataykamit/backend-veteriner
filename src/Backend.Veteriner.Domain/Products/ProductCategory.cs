@@ -34,4 +34,26 @@ public sealed class ProductCategory : AggregateRoot
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Update(string name, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Kategori adı boş olamaz.", nameof(name));
+
+        Name = name.Trim();
+        Description = NormalizeOptional(description);
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void Activate()
+    {
+        IsActive = true;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
 }

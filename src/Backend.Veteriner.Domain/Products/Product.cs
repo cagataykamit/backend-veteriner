@@ -72,4 +72,46 @@ public sealed class Product : AggregateRoot
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Update(
+        Guid? productCategoryId,
+        string name,
+        string unit,
+        decimal unitPrice,
+        string currency,
+        string? sku = null,
+        string? barcode = null,
+        string? description = null)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Ürün adı boş olamaz.", nameof(name));
+        if (string.IsNullOrWhiteSpace(unit))
+            throw new ArgumentException("Birim boş olamaz.", nameof(unit));
+        if (unitPrice < 0)
+            throw new ArgumentOutOfRangeException(nameof(unitPrice), "Birim fiyat negatif olamaz.");
+        if (string.IsNullOrWhiteSpace(currency))
+            throw new ArgumentException("Para birimi boş olamaz.", nameof(currency));
+
+        ProductCategoryId = productCategoryId == Guid.Empty ? null : productCategoryId;
+        Name = name.Trim();
+        Unit = unit.Trim();
+        UnitPrice = unitPrice;
+        Currency = currency.Trim().ToUpperInvariant();
+        Sku = NormalizeOptional(sku);
+        Barcode = NormalizeOptional(barcode);
+        Description = NormalizeOptional(description);
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void Activate()
+    {
+        IsActive = true;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
 }
