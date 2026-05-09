@@ -40,6 +40,15 @@ public sealed class ProductInventoryPolicyMappingTests
             .Should().Be(PermissionCatalog.Products.Update);
         GetPolicy<ProductsController>(nameof(ProductsController.Deactivate))
             .Should().Be(PermissionCatalog.Products.Deactivate);
+        GetPolicy<ProductsController>(nameof(ProductsController.GetStocksByProductId))
+            .Should().Be(PermissionCatalog.Products.Read);
+    }
+
+    [Fact]
+    public void ProductStocksController_Policies_Should_Match_Contract()
+    {
+        GetPolicy<ProductStocksController>(nameof(ProductStocksController.GetList))
+            .Should().Be(PermissionCatalog.Products.Read);
     }
 
     private static string? GetPolicy<TController>(string actionName)

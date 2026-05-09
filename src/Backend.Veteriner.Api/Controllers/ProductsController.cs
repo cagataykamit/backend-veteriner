@@ -8,6 +8,8 @@ using Backend.Veteriner.Application.Products.Commands.Create;
 using Backend.Veteriner.Application.Products.Commands.Deactivate;
 using Backend.Veteriner.Application.Products.Commands.Update;
 using Backend.Veteriner.Application.Products.Contracts.Dtos;
+using Backend.Veteriner.Application.ProductStocks.Contracts.Dtos;
+using Backend.Veteriner.Application.ProductStocks.Queries.GetByProductId;
 using Backend.Veteriner.Application.Products.Queries.GetById;
 using Backend.Veteriner.Application.Products.Queries.GetList;
 using Backend.Veteriner.Domain.Shared;
@@ -61,6 +63,20 @@ public sealed class ProductsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetProductByIdQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpGet("{id:guid}/stocks")]
+    [Authorize(Policy = PermissionCatalog.Products.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<ProductStockDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStocksByProductId([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetProductStocksByProductIdQuery(id), ct);
         return result.ToActionResult(this);
     }
 
