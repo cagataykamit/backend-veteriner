@@ -53,25 +53,8 @@ public static class AdminClaimSeeder
             await db.SaveChangesAsync(ct);
         }
 
-        // 2) Platform admin kullanıcısını bul. DataSeeder/TestDataSeeder henüz çalışmadıysa idempotent skip.
-        var adminUser = await db.Users
-            .FirstOrDefaultAsync(x => x.Email == PlatformAdminUserEmail, ct);
-
-        if (adminUser is null)
-            return;
-
-        // 3) UserOperationClaim (admin user -> PlatformAdmin) yoksa ekle.
-        var existingLink = await db.UserOperationClaims
-            .AnyAsync(x => x.UserId == adminUser.Id && x.OperationClaimId == platformAdminClaim.Id, ct);
-
-        if (!existingLink)
-        {
-            var uoc = new UserOperationClaim(adminUser.Id, platformAdminClaim.Id);
-            await db.UserOperationClaims.AddAsync(uoc, ct);
-            await db.SaveChangesAsync(ct);
-        }
-
-        // 4) Tüm PermissionCatalog permission'larını PlatformAdmin claim'ine bağla (idempotent).
+        // 2) Tüm permission satırlarını PlatformAdmin claim'ine bağla (kullanıcıdan bağımsız; idempotent).
+        // DataSeeder/TestDataSeeder henüz çalışmadığında kullanıcı ataması atlanır; claim ↔ permission kümesi yine kurulur.
         var permissions = await db.Permissions.ToListAsync(ct);
 
         var existingPermIds = await db.OperationClaimPermissions
@@ -87,6 +70,24 @@ public static class AdminClaimSeeder
         if (missingPerms.Count > 0)
         {
             await db.OperationClaimPermissions.AddRangeAsync(missingPerms, ct);
+            await db.SaveChangesAsync(ct);
+        }
+
+        // 3) Platform admin kullanıcısı — DataSeeder/TestDataSeeder henüz çalışmadıysa bağlantı atlanır.
+        var adminUser = await db.Users
+            .FirstOrDefaultAsync(x => x.Email == PlatformAdminUserEmail, ct);
+
+        if (adminUser is null)
+            return;
+
+        // 4) UserOperationClaim (admin user -> PlatformAdmin) yoksa ekle.
+        var existingLink = await db.UserOperationClaims
+            .AnyAsync(x => x.UserId == adminUser.Id && x.OperationClaimId == platformAdminClaim.Id, ct);
+
+        if (!existingLink)
+        {
+            var uoc = new UserOperationClaim(adminUser.Id, platformAdminClaim.Id);
+            await db.UserOperationClaims.AddAsync(uoc, ct);
             await db.SaveChangesAsync(ct);
         }
     }
