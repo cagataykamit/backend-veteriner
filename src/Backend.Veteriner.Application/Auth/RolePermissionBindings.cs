@@ -113,6 +113,19 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
+
+                PermissionCatalog.ProductCategories.Read,
+                PermissionCatalog.ProductCategories.Create,
+                PermissionCatalog.ProductCategories.Update,
+                PermissionCatalog.ProductCategories.Deactivate,
+
+                PermissionCatalog.Products.Read,
+                PermissionCatalog.Products.Create,
+                PermissionCatalog.Products.Update,
+                PermissionCatalog.Products.Deactivate,
+
+                PermissionCatalog.StockMovements.Read,
+                PermissionCatalog.StockMovements.Create,
             ],
 
             // Tenant sahibi: Admin ile aynı operasyonel paket (ürün kararı: Owner ≈ Admin).
@@ -178,6 +191,19 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
+
+                PermissionCatalog.ProductCategories.Read,
+                PermissionCatalog.ProductCategories.Create,
+                PermissionCatalog.ProductCategories.Update,
+                PermissionCatalog.ProductCategories.Deactivate,
+
+                PermissionCatalog.Products.Read,
+                PermissionCatalog.Products.Create,
+                PermissionCatalog.Products.Update,
+                PermissionCatalog.Products.Deactivate,
+
+                PermissionCatalog.StockMovements.Read,
+                PermissionCatalog.StockMovements.Create,
             ],
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini
@@ -237,6 +263,19 @@ public static class RolePermissionBindings
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
 
+                PermissionCatalog.ProductCategories.Read,
+                PermissionCatalog.ProductCategories.Create,
+                PermissionCatalog.ProductCategories.Update,
+                PermissionCatalog.ProductCategories.Deactivate,
+
+                PermissionCatalog.Products.Read,
+                PermissionCatalog.Products.Create,
+                PermissionCatalog.Products.Update,
+                PermissionCatalog.Products.Deactivate,
+
+                PermissionCatalog.StockMovements.Read,
+                PermissionCatalog.StockMovements.Create,
+
                 PermissionCatalog.Reminders.Read,
                 PermissionCatalog.Reminders.Manage,
 
@@ -290,6 +329,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
 
+                PermissionCatalog.ProductCategories.Read,
+                PermissionCatalog.Products.Read,
+                PermissionCatalog.StockMovements.Read,
+
                 PermissionCatalog.Reminders.Read,
             ],
 
@@ -325,6 +368,11 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
+
+                PermissionCatalog.ProductCategories.Read,
+                PermissionCatalog.Products.Read,
+                PermissionCatalog.StockMovements.Read,
+                PermissionCatalog.StockMovements.Create,
 
                 PermissionCatalog.Reminders.Read,
             ],

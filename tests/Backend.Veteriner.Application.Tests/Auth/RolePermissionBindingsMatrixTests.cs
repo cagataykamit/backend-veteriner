@@ -102,6 +102,17 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Tenants.Read },
         new object[] { PermissionCatalog.Tenants.InviteCreate },
         new object[] { PermissionCatalog.Subscriptions.Read },
+
+        new object[] { PermissionCatalog.ProductCategories.Read },
+        new object[] { PermissionCatalog.ProductCategories.Create },
+        new object[] { PermissionCatalog.ProductCategories.Update },
+        new object[] { PermissionCatalog.ProductCategories.Deactivate },
+        new object[] { PermissionCatalog.Products.Read },
+        new object[] { PermissionCatalog.Products.Create },
+        new object[] { PermissionCatalog.Products.Update },
+        new object[] { PermissionCatalog.Products.Deactivate },
+        new object[] { PermissionCatalog.StockMovements.Read },
+        new object[] { PermissionCatalog.StockMovements.Create },
     };
 
     [Theory]
@@ -160,6 +171,17 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Reminders.Read },
         new object[] { PermissionCatalog.Reminders.Manage },
         new object[] { PermissionCatalog.Subscriptions.Read },
+
+        new object[] { PermissionCatalog.ProductCategories.Read },
+        new object[] { PermissionCatalog.ProductCategories.Create },
+        new object[] { PermissionCatalog.ProductCategories.Update },
+        new object[] { PermissionCatalog.ProductCategories.Deactivate },
+        new object[] { PermissionCatalog.Products.Read },
+        new object[] { PermissionCatalog.Products.Create },
+        new object[] { PermissionCatalog.Products.Update },
+        new object[] { PermissionCatalog.Products.Deactivate },
+        new object[] { PermissionCatalog.StockMovements.Read },
+        new object[] { PermissionCatalog.StockMovements.Create },
     };
 
     [Theory]
@@ -199,6 +221,9 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Hospitalizations.Update },
         new object[] { PermissionCatalog.Hospitalizations.Discharge },
         new object[] { PermissionCatalog.Payments.Read },
+        new object[] { PermissionCatalog.ProductCategories.Read },
+        new object[] { PermissionCatalog.Products.Read },
+        new object[] { PermissionCatalog.StockMovements.Read },
         new object[] { PermissionCatalog.Reminders.Read },
     };
 
@@ -231,6 +256,10 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Payments.Read },
         new object[] { PermissionCatalog.Payments.Create },
         new object[] { PermissionCatalog.Payments.Update },
+        new object[] { PermissionCatalog.ProductCategories.Read },
+        new object[] { PermissionCatalog.Products.Read },
+        new object[] { PermissionCatalog.StockMovements.Read },
+        new object[] { PermissionCatalog.StockMovements.Create },
         new object[] { PermissionCatalog.Reminders.Read },
     };
 

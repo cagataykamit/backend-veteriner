@@ -151,6 +151,28 @@ public static class PermissionCatalog
         public const string Discharge = "Hospitalizations.Discharge";
     }
 
+    public static class ProductCategories
+    {
+        public const string Read = "ProductCategories.Read";
+        public const string Create = "ProductCategories.Create";
+        public const string Update = "ProductCategories.Update";
+        public const string Deactivate = "ProductCategories.Deactivate";
+    }
+
+    public static class Products
+    {
+        public const string Read = "Products.Read";
+        public const string Create = "Products.Create";
+        public const string Update = "Products.Update";
+        public const string Deactivate = "Products.Deactivate";
+    }
+
+    public static class StockMovements
+    {
+        public const string Read = "StockMovements.Read";
+        public const string Create = "StockMovements.Create";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -242,6 +264,19 @@ public static class PermissionCatalog
         new(Hospitalizations.Create, "Yatış kaydı oluşturma yetkisi", "Hospitalizations"),
         new(Hospitalizations.Update, "Yatış kaydı güncelleme yetkisi", "Hospitalizations"),
         new(Hospitalizations.Discharge, "Yatış kaydını taburcu etme yetkisi", "Hospitalizations"),
+
+        new(ProductCategories.Read, "Ürün kategorilerini listeleme ve görüntüleme yetkisi", "ProductCategories"),
+        new(ProductCategories.Create, "Ürün kategorisi oluşturma yetkisi", "ProductCategories"),
+        new(ProductCategories.Update, "Ürün kategorisi güncelleme yetkisi", "ProductCategories"),
+        new(ProductCategories.Deactivate, "Ürün kategorisini pasifleştirme yetkisi", "ProductCategories"),
+
+        new(Products.Read, "Ürünleri listeleme ve görüntüleme yetkisi", "Products"),
+        new(Products.Create, "Ürün oluşturma yetkisi", "Products"),
+        new(Products.Update, "Ürün güncelleme yetkisi", "Products"),
+        new(Products.Deactivate, "Ürünü pasifleştirme yetkisi", "Products"),
+
+        new(StockMovements.Read, "Stok hareketlerini listeleme ve görüntüleme yetkisi", "StockMovements"),
+        new(StockMovements.Create, "Stok giriş/çıkış/düzeltme dahil hareket kaydı oluşturma yetkisi", "StockMovements"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 

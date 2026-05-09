@@ -1,5 +1,6 @@
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Seeding;
@@ -34,6 +35,8 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Seeding;
 /// </summary>
 public static class AdminClaimSeeder
 {
+    private const int PlatformAdminPermissionLinksMaxAttempts = 5;
+
     /// <summary>Platform yöneticisi OperationClaim adı; tenant davet whitelist'inde görünmez.</summary>
     public const string PlatformAdminClaimName = "PlatformAdmin";
 
@@ -55,22 +58,40 @@ public static class AdminClaimSeeder
 
         // 2) Tüm permission satırlarını PlatformAdmin claim'ine bağla (kullanıcıdan bağımsız; idempotent).
         // DataSeeder/TestDataSeeder henüz çalışmadığında kullanıcı ataması atlanır; claim ↔ permission kümesi yine kurulur.
-        var permissions = await db.Permissions.ToListAsync(ct);
-
-        var existingPermIds = await db.OperationClaimPermissions
-            .Where(x => x.OperationClaimId == platformAdminClaim.Id)
-            .Select(x => x.PermissionId)
-            .ToListAsync(ct);
-
-        var missingPerms = permissions
-            .Where(p => !existingPermIds.Contains(p.Id))
-            .Select(p => new OperationClaimPermission(platformAdminClaim.Id, p.Id))
-            .ToList();
-
-        if (missingPerms.Count > 0)
+        // Integration test paralel factory'leri aynı DB'de yarışınca IX_OperationClaimPermissions_OperationClaimId_PermissionId
+        // ihlali oluşabilir; PermissionSeeder'daki yaklaşıma paralel yeniden deneme uygulanır.
+        for (var attempt = 1; attempt <= PlatformAdminPermissionLinksMaxAttempts; attempt++)
         {
-            await db.OperationClaimPermissions.AddRangeAsync(missingPerms, ct);
-            await db.SaveChangesAsync(ct);
+            var permissions = await db.Permissions.ToListAsync(ct);
+
+            var existingPermIds = await db.OperationClaimPermissions
+                .Where(x => x.OperationClaimId == platformAdminClaim.Id)
+                .Select(x => x.PermissionId)
+                .ToListAsync(ct);
+
+            var missingPerms = permissions
+                .Where(p => !existingPermIds.Contains(p.Id))
+                .Select(p => new OperationClaimPermission(platformAdminClaim.Id, p.Id))
+                .ToList();
+
+            if (missingPerms.Count == 0)
+                break;
+
+            try
+            {
+                await db.OperationClaimPermissions.AddRangeAsync(missingPerms, ct);
+                await db.SaveChangesAsync(ct);
+                break;
+            }
+            catch (DbUpdateException ex) when (
+                attempt < PlatformAdminPermissionLinksMaxAttempts
+                && IsDuplicateOperationClaimPermissionViolation(ex))
+            {
+                foreach (var entry in db.ChangeTracker.Entries<OperationClaimPermission>()
+                             .Where(e => e.State == EntityState.Added)
+                             .ToList())
+                    entry.State = EntityState.Detached;
+            }
         }
 
         // 3) Platform admin kullanıcısı — DataSeeder/TestDataSeeder henüz çalışmadıysa bağlantı atlanır.
@@ -90,5 +111,23 @@ public static class AdminClaimSeeder
             await db.UserOperationClaims.AddAsync(uoc, ct);
             await db.SaveChangesAsync(ct);
         }
+    }
+
+    private static bool IsDuplicateOperationClaimPermissionViolation(DbUpdateException ex)
+    {
+        for (Exception? e = ex; e != null; e = e.InnerException)
+        {
+            if (e is not SqlException sql)
+                continue;
+
+            if (sql.Number is not (2601 or 2627))
+                continue;
+
+            return sql.Message.Contains("IX_OperationClaimPermissions_OperationClaimId_PermissionId", StringComparison.OrdinalIgnoreCase)
+                   || (sql.Message.Contains("dbo.OperationClaimPermissions", StringComparison.OrdinalIgnoreCase)
+                       && sql.Message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase));
+        }
+
+        return false;
     }
 }
