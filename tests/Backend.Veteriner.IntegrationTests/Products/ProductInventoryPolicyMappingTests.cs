@@ -51,6 +51,8 @@ public sealed class ProductInventoryPolicyMappingTests
     {
         GetPolicy<ProductStocksController>(nameof(ProductStocksController.GetList))
             .Should().Be(PermissionCatalog.Products.Read);
+        GetPolicy<ProductStocksController>(nameof(ProductStocksController.UpdateMinimumStockLevel))
+            .Should().Be(PermissionCatalog.Products.Update);
     }
 
     [Fact]

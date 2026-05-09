@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -137,6 +138,105 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task PutMinimum_Should_Return401_When_TokenMissing()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.PutAsJsonAsync(
+            $"/api/v1/product-stocks/{Guid.NewGuid()}/minimum-stock-level",
+            new { minimumStockLevel = 1m });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task PutMinimum_Should_Return403_When_MissingProductsUpdate()
+    {
+        var ctx = await SeedTenantStockForMutationAsync(new[] { "Products.Read" });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/v1/product-stocks/{ctx.StockId}/minimum-stock-level",
+            new { minimumStockLevel = 1m });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task PutMinimum_Should_Return200_And_GetList_Reflects_IsBelowMinimum()
+    {
+        var ctx = await SeedTenantStockForMutationAsync(new[] { "Products.Update", "Products.Read" });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var put = await client.PutAsJsonAsync(
+            $"/api/v1/product-stocks/{ctx.StockId}/minimum-stock-level",
+            new { minimumStockLevel = 5m });
+        put.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await put.Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("minimumStockLevel").GetDecimal().Should().Be(5m);
+        dto.GetProperty("quantityOnHand").GetDecimal().Should().Be(10m);
+        dto.GetProperty("isBelowMinimum").GetBoolean().Should().BeFalse();
+
+        var list = await client.GetAsync(
+            $"/api/v1/product-stocks?page=1&pageSize=20&clinicId={ctx.ClinicId}&productId={ctx.ProductId}");
+        list.StatusCode.Should().Be(HttpStatusCode.OK);
+        var listJson = await list.Content.ReadFromJsonAsync<JsonElement>();
+        var row = listJson.GetProperty("items").EnumerateArray().Single();
+        row.GetProperty("id").GetGuid().Should().Be(ctx.StockId);
+        row.GetProperty("minimumStockLevel").GetDecimal().Should().Be(5m);
+        row.GetProperty("isBelowMinimum").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PutMinimum_Should_BeBlocked_When_TenantReadOnly()
+    {
+        var (_, token) = await SeedTenantAndIssueTokenAsync(
+            new[] { "Products.Update", "Products.Read" },
+            readOnlyTenant: true);
+        var ctx = await SeedStockUnderTenantFromJwtAsync(token);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/v1/product-stocks/{ctx.StockId}/minimum-stock-level",
+            new { minimumStockLevel = 1m });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await ReadProblemCodeAsync(response)).Should().Be("Subscriptions.TenantReadOnly");
+    }
+
+    [Fact]
+    public async Task PutMinimum_Should_Return403_When_ClinicAdmin_UnassignedClinic()
+    {
+        var ctx = await SeedClinicAdminTwoClinicsAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/v1/product-stocks/{ctx.StockB_Id}/minimum-stock-level",
+            new { minimumStockLevel = 1m });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await ReadProblemCodeAsync(response)).Should().Be("Clinics.AccessDenied");
+    }
+
+    [Fact]
+    public async Task PutMinimum_Should_Return403_When_SecretaryLike_NoProductsUpdate()
+    {
+        var ctx = await SeedTenantStockForMutationAsync(new[] { "Products.Read", "StockMovements.Create" });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/v1/product-stocks/{ctx.StockId}/minimum-stock-level",
+            new { minimumStockLevel = 2m });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task GetList_Should_Filter_IsBelowMinimum_And_Clinic()
     {
         var ctx = await SeedTenantTwoClinicsBelowMinAsync();
@@ -160,7 +260,8 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
     }
 
     private async Task<(Guid TenantId, string AccessToken)> SeedTenantAndIssueTokenAsync(
-        IReadOnlyCollection<string> permissions)
+        IReadOnlyCollection<string> permissions,
+        bool readOnlyTenant = false)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -168,11 +269,12 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
 
         var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
         db.Tenants.Add(tenant);
-        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(
-            tenant.Id,
-            SubscriptionPlanCode.Basic,
-            DateTime.UtcNow,
-            14));
+
+        var now = DateTime.UtcNow;
+        var subscription = readOnlyTenant
+            ? TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now.AddDays(-40), 7)
+            : TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14);
+        db.TenantSubscriptions.Add(subscription);
         await db.SaveChangesAsync();
 
         var claims = permissions
@@ -183,6 +285,82 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         var (accessToken, _, _) = jwt.Create(Guid.NewGuid(), $"it-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
         return (tenant.Id, accessToken);
     }
+
+    private async Task<MinimumMutationSeedCtx> SeedTenantStockForMutationAsync(string[] permissions)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+
+        var tenant = new Tenant($"psm-{Guid.NewGuid():N}"[..18]);
+        db.Tenants.Add(tenant);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(
+            tenant.Id,
+            SubscriptionPlanCode.Basic,
+            DateTime.UtcNow,
+            14));
+        await db.SaveChangesAsync();
+
+        var clinic = new Clinic(tenant.Id, $"Pc-{Guid.NewGuid():N}"[..14], "Izmir");
+        db.Clinics.Add(clinic);
+
+        var product = new Product(
+            tenant.Id,
+            $"pm-{Guid.NewGuid():N}"[..14],
+            "Adet",
+            1m,
+            "TRY",
+            sku: $"SKU-{Guid.NewGuid():N}"[..14]);
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        var stock = new ProductStock(tenant.Id, clinic.Id, product.Id, quantityOnHand: 10m, minimumStockLevel: 50m);
+        db.ProductStocks.Add(stock);
+        await db.SaveChangesAsync();
+
+        var claims = permissions
+            .Select(p => new Claim("permission", p))
+            .Append(new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D")))
+            .ToList();
+
+        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"pm-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+
+        return new MinimumMutationSeedCtx(stock.Id, clinic.Id, product.Id, token);
+    }
+
+    private async Task<MinimumMutationSeedCtx> SeedStockUnderTenantFromJwtAsync(string token)
+    {
+        var tenantId = ExtractTenantIdFromJwt(token);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var clinic = new Clinic(tenantId, $"Ro-{Guid.NewGuid():N}"[..14], "City");
+        db.Clinics.Add(clinic);
+        var product = new Product(
+            tenantId,
+            $"rp-{Guid.NewGuid():N}"[..14],
+            "Adet",
+            1m,
+            "TRY",
+            sku: $"RS-{Guid.NewGuid():N}"[..14]);
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        var stock = new ProductStock(tenantId, clinic.Id, product.Id, 10m, 50m);
+        db.ProductStocks.Add(stock);
+        await db.SaveChangesAsync();
+
+        return new MinimumMutationSeedCtx(stock.Id, clinic.Id, product.Id, token);
+    }
+
+    private static Guid ExtractTenantIdFromJwt(string accessToken)
+    {
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(accessToken);
+        var tid = jwt.Claims.First(c => c.Type == VeterinerClaims.TenantId).Value;
+        return Guid.Parse(tid);
+    }
+
+    private sealed record MinimumMutationSeedCtx(Guid StockId, Guid ClinicId, Guid ProductId, string Token);
 
     private async Task<TenantStockSeedResult> SeedTenantProductAndStocksAsync(
         int clinicCount,
@@ -295,6 +473,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         var claims = new[]
         {
             new Claim("permission", "Products.Read"),
+            new Claim("permission", "Products.Update"),
             new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
         };
         var (token, _, _) = jwt.Create(user.Id, user.Email, Array.Empty<string>(), claims);

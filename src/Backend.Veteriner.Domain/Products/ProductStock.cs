@@ -74,4 +74,14 @@ public sealed class ProductStock
         QuantityOnHand = targetQuantityOnHand;
         UpdatedAtUtc = DateTime.UtcNow;
     }
+
+    /// <summary>Minimum stok eşiği (<c>&gt;= 0</c>); eldeki miktarı değiştirmez.</summary>
+    public void SetMinimumStockLevel(decimal minimumStockLevel)
+    {
+        if (minimumStockLevel < 0)
+            throw new ArgumentOutOfRangeException(nameof(minimumStockLevel), "Minimum seviye negatif olamaz.");
+
+        MinimumStockLevel = minimumStockLevel;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
 }
