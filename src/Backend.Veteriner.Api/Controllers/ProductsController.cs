@@ -10,8 +10,11 @@ using Backend.Veteriner.Application.Products.Commands.Update;
 using Backend.Veteriner.Application.Products.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductStocks.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductStocks.Queries.GetByProductId;
+using Backend.Veteriner.Application.StockMovements.Contracts.Dtos;
+using Backend.Veteriner.Application.StockMovements.Queries.GetByProductId;
 using Backend.Veteriner.Application.Products.Queries.GetById;
 using Backend.Veteriner.Application.Products.Queries.GetList;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -77,6 +80,30 @@ public sealed class ProductsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetProductStocksByProductIdQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    [HttpGet("{id:guid}/stock-movements")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(PagedResult<StockMovementDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStockMovementsByProductId(
+        [FromRoute] Guid id,
+        [FromQuery] PageRequest page,
+        [FromQuery] Guid? clinicId,
+        [FromQuery] StockMovementType? movementType,
+        [FromQuery] DateTime? dateFromUtc,
+        [FromQuery] DateTime? dateToUtc,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new GetStockMovementsByProductIdQuery(id, page, clinicId, movementType, dateFromUtc, dateToUtc),
+            ct);
+
         return result.ToActionResult(this);
     }
 
