@@ -112,7 +112,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.Subscriptions.Read,
 
                 PermissionCatalog.Species.Read,
+                PermissionCatalog.Species.Create,
+                PermissionCatalog.Species.Update,
                 PermissionCatalog.Breeds.Read,
+                PermissionCatalog.Breeds.Create,
+                PermissionCatalog.Breeds.Update,
 
                 PermissionCatalog.ProductCategories.Read,
                 PermissionCatalog.ProductCategories.Create,
@@ -190,7 +194,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.Subscriptions.Read,
 
                 PermissionCatalog.Species.Read,
+                PermissionCatalog.Species.Create,
+                PermissionCatalog.Species.Update,
                 PermissionCatalog.Breeds.Read,
+                PermissionCatalog.Breeds.Create,
+                PermissionCatalog.Breeds.Update,
 
                 PermissionCatalog.ProductCategories.Read,
                 PermissionCatalog.ProductCategories.Create,
@@ -208,8 +216,9 @@ public static class RolePermissionBindings
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini
             // güncelleme yetkisi ürün gereği ClinicAdmin'de tutulur (working hours / break time / vb.).
-            // Tenants.* / Subscriptions.Manage / Users.Roles.Permissions / Outbox / Clinics.Create /
-            // Species-Breeds yazma verilmez (ürün kararı). Subscriptions.Read ek bilgi amacıyla verilir.
+            // Tenants.* / Subscriptions.Manage / Users.Roles.Permissions / Outbox / Clinics.Create verilmez.
+            // Species/Breeds Create/Update tür-ırk kataloğu yönetimi için ClinicAdmin'de verilir (Faz 11B-3).
+            // Subscriptions.Read ek bilgi amacıyla verilir.
             ["ClinicAdmin"] =
             [
                 PermissionCatalog.Dashboard.Read,
@@ -261,7 +270,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.Hospitalizations.Discharge,
 
                 PermissionCatalog.Species.Read,
+                PermissionCatalog.Species.Create,
+                PermissionCatalog.Species.Update,
                 PermissionCatalog.Breeds.Read,
+                PermissionCatalog.Breeds.Create,
+                PermissionCatalog.Breeds.Update,
 
                 PermissionCatalog.ProductCategories.Read,
                 PermissionCatalog.ProductCategories.Create,

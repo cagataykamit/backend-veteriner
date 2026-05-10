@@ -103,6 +103,13 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Tenants.InviteCreate },
         new object[] { PermissionCatalog.Subscriptions.Read },
 
+        new object[] { PermissionCatalog.Species.Read },
+        new object[] { PermissionCatalog.Species.Create },
+        new object[] { PermissionCatalog.Species.Update },
+        new object[] { PermissionCatalog.Breeds.Read },
+        new object[] { PermissionCatalog.Breeds.Create },
+        new object[] { PermissionCatalog.Breeds.Update },
+
         new object[] { PermissionCatalog.ProductCategories.Read },
         new object[] { PermissionCatalog.ProductCategories.Create },
         new object[] { PermissionCatalog.ProductCategories.Update },
@@ -172,6 +179,13 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Reminders.Manage },
         new object[] { PermissionCatalog.Subscriptions.Read },
 
+        new object[] { PermissionCatalog.Species.Read },
+        new object[] { PermissionCatalog.Species.Create },
+        new object[] { PermissionCatalog.Species.Update },
+        new object[] { PermissionCatalog.Breeds.Read },
+        new object[] { PermissionCatalog.Breeds.Create },
+        new object[] { PermissionCatalog.Breeds.Update },
+
         new object[] { PermissionCatalog.ProductCategories.Read },
         new object[] { PermissionCatalog.ProductCategories.Create },
         new object[] { PermissionCatalog.ProductCategories.Update },
@@ -221,6 +235,8 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Hospitalizations.Update },
         new object[] { PermissionCatalog.Hospitalizations.Discharge },
         new object[] { PermissionCatalog.Payments.Read },
+        new object[] { PermissionCatalog.Species.Read },
+        new object[] { PermissionCatalog.Breeds.Read },
         new object[] { PermissionCatalog.ProductCategories.Read },
         new object[] { PermissionCatalog.Products.Read },
         new object[] { PermissionCatalog.StockMovements.Read },
@@ -256,6 +272,8 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Payments.Read },
         new object[] { PermissionCatalog.Payments.Create },
         new object[] { PermissionCatalog.Payments.Update },
+        new object[] { PermissionCatalog.Species.Read },
+        new object[] { PermissionCatalog.Breeds.Read },
         new object[] { PermissionCatalog.ProductCategories.Read },
         new object[] { PermissionCatalog.Products.Read },
         new object[] { PermissionCatalog.StockMovements.Read },
@@ -349,6 +367,16 @@ public sealed class RolePermissionBindingsMatrixTests
     }
 
     [Fact]
+    public void Veteriner_Should_Not_Contain_Species_Or_Breeds_Write_Permissions()
+    {
+        var vet = Perms("Veteriner");
+        vet.Should().NotContain(PermissionCatalog.Species.Create);
+        vet.Should().NotContain(PermissionCatalog.Species.Update);
+        vet.Should().NotContain(PermissionCatalog.Breeds.Create);
+        vet.Should().NotContain(PermissionCatalog.Breeds.Update);
+    }
+
+    [Fact]
     public void Sekreter_Should_Not_Contain_Medical_Write_Permissions()
     {
         var sec = Perms("Sekreter");
@@ -367,6 +395,16 @@ public sealed class RolePermissionBindingsMatrixTests
         sec.Should().NotContain(PermissionCatalog.Hospitalizations.Update);
         sec.Should().NotContain(PermissionCatalog.Hospitalizations.Discharge);
         sec.Should().NotContain(PermissionCatalog.Reminders.Manage, "Reminder yönetimi clinic admin/owner işi");
+    }
+
+    [Fact]
+    public void Sekreter_Should_Not_Contain_Species_Or_Breeds_Write_Permissions()
+    {
+        var sec = Perms("Sekreter");
+        sec.Should().NotContain(PermissionCatalog.Species.Create);
+        sec.Should().NotContain(PermissionCatalog.Species.Update);
+        sec.Should().NotContain(PermissionCatalog.Breeds.Create);
+        sec.Should().NotContain(PermissionCatalog.Breeds.Update);
     }
 
     [Fact]
