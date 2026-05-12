@@ -429,7 +429,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Vaccinations.AppliedTooFarInFuture");
+        result.Error.Code.Should().Be("Vaccinations.AppliedAtMustNotBeFuture");
     }
 
     [Fact]
@@ -482,5 +482,55 @@ public sealed class UpdateVaccinationCommandHandlerTests
         existing.Notes.Should().Be("not");
         _vaccinationsWrite.Verify(r => r.UpdateAsync(existing, It.IsAny<CancellationToken>()), Times.Once);
         _vaccinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_UpdateScheduled_ClearingDue()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var vid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+
+        var due = DateTime.UtcNow.AddDays(5);
+        var existing = new Vaccination(
+            tid,
+            pid,
+            cid,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            due,
+            null);
+        typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vid);
+
+        _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var cmd = new UpdateVaccinationCommand(
+            vid,
+            cid,
+            pid,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            null,
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.ScheduledRequiresDueAt");
+        _vaccinationsWrite.Verify(r => r.UpdateAsync(It.IsAny<Vaccination>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

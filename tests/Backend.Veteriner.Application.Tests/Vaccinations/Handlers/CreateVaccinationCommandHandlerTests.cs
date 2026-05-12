@@ -295,6 +295,31 @@ public sealed class CreateVaccinationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ScheduledWithDueInPast()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(-1),
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.ScheduledDueAtMustNotBePast");
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_ScheduledWithAppliedAt()
     {
         var tid = Guid.NewGuid();
@@ -416,7 +441,32 @@ public sealed class CreateVaccinationCommandHandlerTests
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Vaccinations.AppliedTooFarInFuture");
+        result.Error.Code.Should().Be("Vaccinations.AppliedAtMustNotBeFuture");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_AppliedAtInNearFuture()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            DateTime.UtcNow.AddHours(2),
+            null,
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.AppliedAtMustNotBeFuture");
     }
 
     [Fact]
@@ -441,7 +491,7 @@ public sealed class CreateVaccinationCommandHandlerTests
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Vaccinations.DueTooFarInPast");
+        result.Error.Code.Should().Be("Vaccinations.ScheduledDueAtMustNotBePast");
     }
 
     [Fact]
@@ -503,6 +553,64 @@ public sealed class CreateVaccinationCommandHandlerTests
         captured.AppliedAtUtc.Should().BeNull();
         captured.DueAtUtc.Should().NotBeNull();
         _vaccinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_AppliedWithDueNotAfterAppliedAt()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var applied = DateTime.UtcNow.AddDays(-5);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            applied,
+            applied,
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.DueAtMustBeAfterAppliedAt");
+    }
+
+    [Fact]
+    public async Task Handle_Should_CreateApplied_WithNextDueAfterApplied_When_Valid()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var applied = DateTime.UtcNow.AddDays(-3);
+        var nextDue = applied.AddDays(30);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            applied,
+            nextDue,
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        Vaccination? captured = null;
+        _vaccinationsWrite.Setup(r => r.AddAsync(It.IsAny<Vaccination>(), It.IsAny<CancellationToken>()))
+            .Callback<Vaccination, CancellationToken>((v, _) => captured = v);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.AppliedAtUtc.Should().NotBeNull();
+        captured.DueAtUtc.Should().Be(nextDue);
     }
 
     [Fact]
