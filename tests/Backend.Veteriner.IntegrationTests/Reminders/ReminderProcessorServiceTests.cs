@@ -128,6 +128,230 @@ public sealed class ReminderProcessorServiceTests
     }
 
     [Fact]
+    public async Task ProcessOnce_Should_Enqueue_VaccinationReminder_When_Applied_WithFutureDueAt()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var dueAt = now.AddDays(3);
+        var vaccination = new Vaccination(
+            tenant.Id,
+            pet.Id,
+            clinic.Id,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            now.AddHours(-2),
+            dueAt,
+            null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, 3, true);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(1);
+        var log = await db.ReminderDispatchLogs.SingleAsync();
+        log.ReminderType.Should().Be(ReminderType.Vaccination);
+        log.SourceEntityType.Should().Be(ReminderSourceEntityType.Vaccination);
+        log.SourceEntityId.Should().Be(vaccination.Id);
+        log.Status.Should().Be(ReminderDispatchStatus.Enqueued);
+        log.OutboxMessageId.Should().NotBeNull();
+        (await db.OutboxMessages.CountAsync()).Should().Be(1);
+        email.Enqueued[0].Body.Should().Contain("sonraki uygulama tarihinin");
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_NotEnqueue_VaccinationReminder_When_Applied_WithNullDueAt()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var vaccination = new Vaccination(
+            tenant.Id,
+            pet.Id,
+            clinic.Id,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            now.AddHours(-2),
+            null,
+            null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, 3, true);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(0);
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_NotEnqueue_VaccinationReminder_When_Applied_WithPastDueAt()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var vaccination = new Vaccination(
+            tenant.Id,
+            pet.Id,
+            clinic.Id,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            now.AddDays(-5),
+            now.AddDays(-1),
+            null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, 3, true);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(0);
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_NotEnqueue_VaccinationReminder_When_Cancelled_WithFutureDueAt()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var vaccination = new Vaccination(
+            tenant.Id,
+            pet.Id,
+            clinic.Id,
+            null,
+            "Kuduz",
+            VaccinationStatus.Cancelled,
+            null,
+            now.AddDays(3),
+            null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, 3, true);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(0);
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_NotDuplicate_VaccinationReminder_When_DedupeExists()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var dueAt = now.AddDays(3);
+        var vaccination = new Vaccination(
+            tenant.Id,
+            pet.Id,
+            clinic.Id,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            now.AddHours(-2),
+            dueAt,
+            null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, 3, true);
+        var daysBefore = 3;
+        var dedupe = $"vaccination:{vaccination.Id:D}:days-before:{daysBefore}";
+        var existing = new ReminderDispatchLog(
+            tenant.Id,
+            clinic.Id,
+            ReminderType.Vaccination,
+            ReminderSourceEntityType.Vaccination,
+            vaccination.Id,
+            "ali@example.com",
+            "Ali Veli",
+            dueAt,
+            dueAt.AddDays(-daysBefore),
+            ReminderDispatchStatus.Enqueued,
+            dedupe);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings, existing);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(0);
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_Enqueue_Scheduled_VaccinationReminder_WithPlanlananMetni()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, "Kuduz", VaccinationStatus.Scheduled, null, now.AddDays(3), null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, 3, true);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(1);
+        email.Enqueued[0].Body.Should().Contain("planlandığını");
+    }
+
+    [Fact]
     public async Task ProcessOnce_Should_MarkSkipped_When_EmailMissing()
     {
         await using var db = await CreateDbContextAsync();
@@ -509,12 +733,12 @@ public sealed class ReminderProcessorServiceTests
 
     private sealed class FakeReminderEmailOutboxEnqueuer : IReminderEmailOutboxEnqueuer
     {
-        public List<(Guid Id, string To, string Subject)> Enqueued { get; } = new();
+        public List<(Guid Id, string To, string Subject, string Body)> Enqueued { get; } = new();
 
         public Task<Guid> EnqueueReminderEmailAsync(string to, string subject, string body, bool isHtml, CancellationToken ct)
         {
             var id = Guid.NewGuid();
-            Enqueued.Add((id, to, subject));
+            Enqueued.Add((id, to, subject, body));
             Db.OutboxMessages.Add(new OutboxMessage
             {
                 Id = id,

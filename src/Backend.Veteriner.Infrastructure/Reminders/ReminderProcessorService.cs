@@ -239,13 +239,19 @@ public sealed class ReminderProcessorService
         var candidates = await _db.Vaccinations
             .AsNoTracking()
             .Where(v => v.TenantId == tenantId
-                && v.Status == VaccinationStatus.Scheduled
+                && (v.Status == VaccinationStatus.Scheduled || v.Status == VaccinationStatus.Applied)
                 && v.DueAtUtc.HasValue
                 && v.DueAtUtc.Value > nowUtc
                 && v.DueAtUtc.Value >= minDueUtc
                 && v.DueAtUtc.Value <= maxDueUtc)
             .OrderBy(v => v.DueAtUtc)
-            .Select(v => new VaccinationReminderCandidateRow(v.Id, v.ClinicId, v.PetId, v.DueAtUtc!.Value, v.VaccineName))
+            .Select(v => new VaccinationReminderCandidateRow(
+                v.Id,
+                v.ClinicId,
+                v.PetId,
+                v.DueAtUtc!.Value,
+                v.VaccineName,
+                v.Status))
             .Take(batchSize)
             .ToListAsync(ct);
 
@@ -330,9 +336,11 @@ public sealed class ReminderProcessorService
             try
             {
                 var subject = "Aşı hatırlatması";
-                var body =
-                    $"Sayın {recipientName},\n" +
-                    $"{petName} için {candidate.VaccineName} aşısının {FormatForDisplay(candidate.DueAtUtc)} tarihinde planlandığını hatırlatırız. ({clinicName})";
+                var body = candidate.Status == VaccinationStatus.Applied
+                    ? $"Sayın {recipientName},\n" +
+                      $"{petName} için {candidate.VaccineName} aşısı için sonraki uygulama tarihinin {FormatForDisplay(candidate.DueAtUtc)} olduğunu hatırlatırız. ({clinicName})"
+                    : $"Sayın {recipientName},\n" +
+                      $"{petName} için {candidate.VaccineName} aşısının {FormatForDisplay(candidate.DueAtUtc)} tarihinde planlandığını hatırlatırız. ({clinicName})";
 
                 var outboxMessageId = await _reminderEmailOutboxEnqueuer.EnqueueReminderEmailAsync(
                     recipientEmail,
@@ -497,7 +505,8 @@ public sealed class ReminderProcessorService
         Guid ClinicId,
         Guid PetId,
         DateTime DueAtUtc,
-        string VaccineName);
+        string VaccineName,
+        VaccinationStatus Status);
 
     private sealed record PetClientRow(Guid PetId, Guid ClientId, string Name);
     private sealed record ClientRecipientRow(Guid ClientId, string FullName, string? Email);
