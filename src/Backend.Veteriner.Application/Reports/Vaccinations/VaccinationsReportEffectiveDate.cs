@@ -6,7 +6,8 @@ namespace Backend.Veteriner.Application.Reports.Vaccinations;
 internal static class VaccinationsReportEffectiveDate
 {
     /// <summary>
-    /// Applied → <see cref="Vaccination.AppliedAtUtc"/>; Scheduled ve Cancelled → <see cref="Vaccination.DueAtUtc"/> (ürün dilinde “sonraki/planlanan”).
+    /// Applied → <see cref="Vaccination.AppliedAtUtc"/>; Scheduled → planlanan uygulama <see cref="Vaccination.DueAtUtc"/> (zorunlu);
+    /// Cancelled → <see cref="Vaccination.DueAtUtc"/> (opsiyonel).
     /// </summary>
     public static DateTime? FromEntity(Vaccination v)
         => v.Status switch
