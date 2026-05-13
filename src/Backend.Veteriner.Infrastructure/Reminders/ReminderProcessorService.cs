@@ -36,10 +36,8 @@ public sealed class ReminderProcessorService
             return;
 
         var batchSize = Math.Clamp(_options.BatchSize, 1, 500);
-        var toleranceMinutes = Math.Clamp(_options.WindowToleranceMinutes, 1, 120);
         var legacyReconcileAfterMinutes = Math.Clamp(_options.LegacyEnqueuedReconcileAfterMinutes, 5, 24 * 60);
         var nowUtc = DateTime.UtcNow;
-        var toleranceStartUtc = nowUtc.AddMinutes(-toleranceMinutes);
 
         var settingsRows = await _db.TenantReminderSettings
             .AsNoTracking()
@@ -77,7 +75,6 @@ public sealed class ReminderProcessorService
                     settings.TenantId,
                     settings.AppointmentReminderHoursBefore,
                     nowUtc,
-                    toleranceStartUtc,
                     batchSize,
                     ct);
             }
@@ -88,7 +85,6 @@ public sealed class ReminderProcessorService
                     settings.TenantId,
                     settings.VaccinationReminderDaysBefore,
                     nowUtc,
-                    toleranceStartUtc,
                     batchSize,
                     ct);
             }
@@ -102,11 +98,11 @@ public sealed class ReminderProcessorService
         Guid tenantId,
         int hoursBefore,
         DateTime nowUtc,
-        DateTime toleranceStartUtc,
         int batchSize,
         CancellationToken ct)
     {
-        var minScheduledUtc = toleranceStartUtc.AddHours(hoursBefore);
+        // Reminder due = ScheduledAtUtc - hoursBefore. Include "missed window": reminder time may be in the past
+        // as long as the appointment is still in the future and within the lookahead (ScheduledAtUtc <= now + hoursBefore).
         var maxScheduledUtc = nowUtc.AddHours(hoursBefore);
 
         var candidates = await _db.Appointments
@@ -114,7 +110,6 @@ public sealed class ReminderProcessorService
             .Where(a => a.TenantId == tenantId
                 && a.Status == AppointmentStatus.Scheduled
                 && a.ScheduledAtUtc > nowUtc
-                && a.ScheduledAtUtc >= minScheduledUtc
                 && a.ScheduledAtUtc <= maxScheduledUtc)
             .OrderBy(a => a.ScheduledAtUtc)
             .Select(a => new AppointmentReminderCandidateRow(a.Id, a.ClinicId, a.PetId, a.ScheduledAtUtc, a.AppointmentType))
@@ -229,11 +224,11 @@ public sealed class ReminderProcessorService
         Guid tenantId,
         int daysBefore,
         DateTime nowUtc,
-        DateTime toleranceStartUtc,
         int batchSize,
         CancellationToken ct)
     {
-        var minDueUtc = toleranceStartUtc.AddDays(daysBefore);
+        // Reminder due = DueAtUtc - daysBefore. Include "missed window": reminder time may be in the past
+        // as long as DueAtUtc is still in the future and within the lookahead (DueAtUtc <= now + daysBefore).
         var maxDueUtc = nowUtc.AddDays(daysBefore);
 
         var candidates = await _db.Vaccinations
@@ -242,7 +237,6 @@ public sealed class ReminderProcessorService
                 && (v.Status == VaccinationStatus.Scheduled || v.Status == VaccinationStatus.Applied)
                 && v.DueAtUtc.HasValue
                 && v.DueAtUtc.Value > nowUtc
-                && v.DueAtUtc.Value >= minDueUtc
                 && v.DueAtUtc.Value <= maxDueUtc)
             .OrderBy(v => v.DueAtUtc)
             .Select(v => new VaccinationReminderCandidateRow(

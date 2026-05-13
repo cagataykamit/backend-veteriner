@@ -352,6 +352,233 @@ public sealed class ReminderProcessorServiceTests
     }
 
     [Fact]
+    public async Task ProcessOnce_Should_Enqueue_Applied_Vaccination_When_ReminderDueMissed_But_DueAtStillFuture()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        const int daysBefore = 1;
+        var dueAt = now.AddHours(18);
+        var vaccination = new Vaccination(
+            tenant.Id,
+            pet.Id,
+            clinic.Id,
+            null,
+            "Kuduz",
+            VaccinationStatus.Applied,
+            now.AddHours(-2),
+            dueAt,
+            null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, daysBefore, true);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(1);
+        var log = await db.ReminderDispatchLogs.SingleAsync();
+        log.ReminderDueAtUtc.Should().BeBefore(now);
+        log.ReminderDueAtUtc.Should().Be(dueAt.AddDays(-daysBefore));
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_Enqueue_Scheduled_Vaccination_When_ReminderDueMissed_But_DueAtStillFuture()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        const int daysBefore = 1;
+        var dueAt = now.AddHours(20);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, "Kuduz", VaccinationStatus.Scheduled, null, dueAt, null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, daysBefore, true);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(1);
+        var log = await db.ReminderDispatchLogs.SingleAsync();
+        log.ReminderDueAtUtc.Should().BeBefore(now);
+        email.Enqueued[0].Body.Should().Contain("planlandığını");
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_NotEnqueue_Vaccination_When_DueAtTooFarBeyondLookahead()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, "Kuduz", VaccinationStatus.Scheduled, null, now.AddDays(3), null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, 1, true);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(0);
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_NotDuplicate_MissedWindow_Vaccination_When_DedupeExists()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        const int daysBefore = 1;
+        var dueAt = now.AddHours(18);
+        var vaccination = new Vaccination(
+            tenant.Id,
+            pet.Id,
+            clinic.Id,
+            null,
+            "Kuduz",
+            VaccinationStatus.Scheduled,
+            null,
+            dueAt,
+            null);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, daysBefore, true);
+        var dedupe = $"vaccination:{vaccination.Id:D}:days-before:{daysBefore}";
+        var existing = new ReminderDispatchLog(
+            tenant.Id,
+            clinic.Id,
+            ReminderType.Vaccination,
+            ReminderSourceEntityType.Vaccination,
+            vaccination.Id,
+            "ali@example.com",
+            "Ali Veli",
+            dueAt,
+            dueAt.AddDays(-daysBefore),
+            ReminderDispatchStatus.Enqueued,
+            dedupe);
+
+        db.AddRange(tenant, clinic, client, pet, vaccination, settings, existing);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(0);
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_Enqueue_Appointment_When_ReminderDueMissed_But_ScheduledAtStillFuture()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        const int hoursBefore = 24;
+        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(12), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(true, hoursBefore, false, 3, true);
+
+        db.AddRange(tenant, clinic, client, pet, appt, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(1);
+        var log = await db.ReminderDispatchLogs.SingleAsync();
+        log.ReminderType.Should().Be(ReminderType.Appointment);
+        log.ReminderDueAtUtc.Should().BeBefore(now);
+        log.ReminderDueAtUtc.Should().Be(appt.ScheduledAtUtc.AddHours(-hoursBefore));
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_NotEnqueue_Appointment_When_ScheduledAtInPast()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(-2), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(true, 24, false, 3, true);
+
+        db.AddRange(tenant, clinic, client, pet, appt, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(0);
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_NotEnqueue_Appointment_When_ScheduledAtTooFarBeyondLookahead()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(48), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(true, 24, false, 3, true);
+
+        db.AddRange(tenant, clinic, client, pet, appt, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(0);
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task ProcessOnce_Should_MarkSkipped_When_EmailMissing()
     {
         await using var db = await CreateDbContextAsync();
