@@ -59,6 +59,7 @@ public sealed class GetVaccinationsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
+        var listAsOfUtc = DateTime.UtcNow;
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();
         var querySteps = 0;
@@ -119,7 +120,9 @@ public sealed class GetVaccinationsListQueryHandler
                 request.AppliedToUtc,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                request.OnlyOverdue,
+                listAsOfUtc),
             ct);
         MarkStep("vaccinationsCount");
 
@@ -137,7 +140,9 @@ public sealed class GetVaccinationsListQueryHandler
                 pageSize,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                request.OnlyOverdue,
+                listAsOfUtc),
             ct);
         MarkStep("vaccinationsPage");
 

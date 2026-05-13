@@ -222,4 +222,27 @@ public sealed class GetVaccinationsListQueryHandlerTests
             r => r.CountAsync(It.IsAny<VaccinationsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_When_OnlyOverdue_WithMocks()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _vaccinations.Setup(r => r.CountAsync(It.IsAny<VaccinationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _vaccinations.Setup(r => r.ListAsync(It.IsAny<VaccinationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Vaccination>());
+
+        var result = await CreateHandler().Handle(
+            new GetVaccinationsListQuery(new PageRequest { Page = 1, PageSize = 20 }, OnlyOverdue: true),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _vaccinations.Verify(
+            r => r.CountAsync(It.IsAny<VaccinationsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _vaccinations.Verify(
+            r => r.ListAsync(It.IsAny<VaccinationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }
