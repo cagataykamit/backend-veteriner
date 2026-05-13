@@ -145,14 +145,34 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             prorationRatio = proration.ProrationRatio;
         }
 
-        var open = await _checkoutSessionsRead.FirstOrDefaultAsync(new OpenBillingCheckoutSessionByTenantSpec(request.TenantId, now), ct);
-        if (open is not null)
-        {
-            if (open.TargetPlanCode == targetPlanCode)
-                return Result<SubscriptionCheckoutSessionDto>.Success(Map(open, now, chargeCurrency, proratedChargeMinor, prorationRatio));
+        var existingOpen = await _checkoutSessionsRead.FirstOrDefaultAsync(
+            new OpenBillingCheckoutSessionByTenantSpec(request.TenantId, now), ct);
 
-            open.MarkCancelled(now);
-            await _checkoutSessionsWrite.UpdateAsync(open, ct);
+        // Süresi dolmuş oturumlar DB'de Pending/RedirectReady kalabilir veya spec dışı yarış durumunda
+        // gelirse Iyzico'da "geçersiz token" ile reuse edilmesin: Expired yap, yeni session aç.
+        if (existingOpen is not null
+            && !existingOpen.IsOpen(now)
+            && (existingOpen.Status == BillingCheckoutSessionStatus.Pending
+                || existingOpen.Status == BillingCheckoutSessionStatus.RedirectReady))
+        {
+            existingOpen.MarkExpired(now);
+            await _checkoutSessionsWrite.UpdateAsync(existingOpen, ct);
+            await _checkoutSessionsWrite.SaveChangesAsync(ct);
+            existingOpen = null;
+        }
+
+        if (existingOpen is not null
+            && existingOpen.TargetPlanCode == targetPlanCode
+            && existingOpen.IsOpen(now))
+        {
+            return Result<SubscriptionCheckoutSessionDto>.Success(
+                Map(existingOpen, now, chargeCurrency, proratedChargeMinor, prorationRatio));
+        }
+
+        if (existingOpen is not null)
+        {
+            existingOpen.MarkCancelled(now);
+            await _checkoutSessionsWrite.UpdateAsync(existingOpen, ct);
             await _checkoutSessionsWrite.SaveChangesAsync(ct);
         }
 
