@@ -27,7 +27,9 @@ internal static class TestDataSeeder
         {
             SeedAdminUser(db, hasher);
             EnsureDefaultTenantAndUserTenant(db);
+            DataSeeder.EnsureDefaultTenantSubscriptionByNameAsync(db, logger: null).GetAwaiter().GetResult();
             SeedOutboxPermissionsForAdmin(db);
+            VaccineDefinitionSeeder.SeedAsync(db, logger: null).GetAwaiter().GetResult();
         }
     }
 

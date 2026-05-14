@@ -97,5 +97,58 @@ public static class DataSeeder
             await db.SaveChangesAsync(ct);
             logger?.LogInformation("UserClinic seeded for admin and {Clinic}.", DefaultSeedClinicName);
         }
+
+        await EnsureDefaultTenantSubscriptionAsync(db, tenant.Id, logger, ct);
+
+        await VaccineDefinitionSeeder.SeedAsync(db, logger, ct);
+    }
+
+    /// <summary>
+    /// Varsayılan seed kiracısı için TenantSubscriptions kaydı yoksa idempotent oluşturur.
+    /// Development seed: <see cref="SubscriptionPlanCode.Premium"/>, <see cref="TenantSubscriptionStatus.Active"/>,
+    /// trial penceresi yazma guard ile uyumlu (Active için etkin durum doğrudan Active kalır).
+    /// </summary>
+    public static async Task EnsureDefaultTenantSubscriptionAsync(
+        AppDbContext db,
+        Guid tenantId,
+        ILogger? logger = null,
+        CancellationToken ct = default)
+    {
+        if (tenantId == Guid.Empty)
+            return;
+
+        if (await db.TenantSubscriptions.AsNoTracking().AnyAsync(s => s.TenantId == tenantId, ct))
+            return;
+
+        var now = DateTime.UtcNow;
+        var sub = TenantSubscription.StartTrial(
+            tenantId,
+            SubscriptionPlanCode.Premium,
+            now,
+            trialDays: 400);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Premium, now);
+
+        await db.TenantSubscriptions.AddAsync(sub, ct);
+        await db.SaveChangesAsync(ct);
+        logger?.LogInformation(
+            "Default tenant subscription seeded: tenant {TenantId}, plan {Plan}, status {Status}.",
+            tenantId,
+            SubscriptionPlanCode.Premium,
+            TenantSubscriptionStatus.Active);
+    }
+
+    /// <summary>
+    /// <see cref="DefaultTenantName"/> kiracısı için abonelik yoksa oluşturur (integration test seed vb.).
+    /// </summary>
+    public static async Task EnsureDefaultTenantSubscriptionByNameAsync(
+        AppDbContext db,
+        ILogger? logger = null,
+        CancellationToken ct = default)
+    {
+        var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Name == DefaultTenantName, ct);
+        if (tenant is null)
+            return;
+
+        await EnsureDefaultTenantSubscriptionAsync(db, tenant.Id, logger, ct);
     }
 }
