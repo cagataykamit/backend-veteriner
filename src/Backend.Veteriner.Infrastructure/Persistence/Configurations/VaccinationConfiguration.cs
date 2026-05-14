@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Vaccinations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -17,6 +18,7 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
         b.Property(x => x.ClinicId).IsRequired();
         b.Property(x => x.ExaminationId);
         b.Property(x => x.VaccineName).IsRequired().HasMaxLength(300);
+        b.Property(x => x.VaccineDefinitionId);
         b.Property(x => x.AppliedAtUtc);
         b.Property(x => x.DueAtUtc);
         b.Property(x => x.Status).IsRequired();
@@ -31,5 +33,12 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
         b.HasIndex(x => new { x.TenantId, x.DueAtUtc });
         b.HasIndex(x => new { x.TenantId, x.AppliedAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ExaminationId });
+        b.HasIndex(x => x.VaccineDefinitionId);
+
+        b.HasOne<VaccineDefinition>()
+            .WithMany()
+            .HasForeignKey(x => x.VaccineDefinitionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

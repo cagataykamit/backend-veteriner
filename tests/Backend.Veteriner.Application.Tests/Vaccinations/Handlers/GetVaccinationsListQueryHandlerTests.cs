@@ -133,6 +133,7 @@ public sealed class GetVaccinationsListQueryHandlerTests
         var clientId = Guid.NewGuid();
         var examinationId = Guid.NewGuid();
         var due = DateTime.UtcNow.AddDays(5);
+        var vaccineDefinitionId = Guid.NewGuid();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
 
@@ -141,6 +142,7 @@ public sealed class GetVaccinationsListQueryHandlerTests
             petId,
             clinicId,
             examinationId,
+            vaccineDefinitionId,
             "Kuduz",
             VaccinationStatus.Scheduled,
             null,
@@ -167,6 +169,7 @@ public sealed class GetVaccinationsListQueryHandlerTests
         dto.ClientId.Should().Be(clientId);
         dto.ClientName.Should().Be("Ali Veli");
         dto.ExaminationId.Should().Be(examinationId);
+        dto.VaccineDefinitionId.Should().Be(vaccineDefinitionId);
         dto.VaccineName.Should().Be("Kuduz");
         dto.Status.Should().Be(VaccinationStatus.Scheduled);
         dto.DueAtUtc.Should().Be(due);

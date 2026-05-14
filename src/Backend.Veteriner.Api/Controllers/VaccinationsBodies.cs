@@ -13,7 +13,7 @@ public sealed class UpdateVaccinationBody
     public Guid ClinicId { get; init; }
     public Guid PetId { get; init; }
     public Guid? ExaminationId { get; init; }
-    public string VaccineName { get; init; } = default!;
+    public Guid VaccineDefinitionId { get; init; }
     public VaccinationStatus Status { get; init; }
     public DateTime? AppliedAtUtc { get; init; }
     public DateTime? DueAtUtc { get; init; }

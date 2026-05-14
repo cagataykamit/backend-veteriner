@@ -8,10 +8,7 @@ public sealed class CreateVaccinationCommandValidator : AbstractValidator<Create
     {
         RuleFor(x => x.ClinicId).NotEmpty();
         RuleFor(x => x.PetId).NotEmpty();
-
-        RuleFor(x => x.VaccineName)
-            .NotEmpty()
-            .MaximumLength(300);
+        RuleFor(x => x.VaccineDefinitionId).NotEmpty();
 
         RuleFor(x => x.Status)
             .IsInEnum();

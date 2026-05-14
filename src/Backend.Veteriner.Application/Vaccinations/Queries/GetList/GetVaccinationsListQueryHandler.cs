@@ -174,6 +174,7 @@ public sealed class GetVaccinationsListQueryHandler
 
                 return new VaccinationListItemDto(
                     v.Id,
+                    v.VaccineDefinitionId,
                     v.PetId,
                     petName,
                     clientId,

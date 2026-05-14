@@ -70,6 +70,7 @@ public sealed class GetVaccinationByIdQueryHandler
             clientId,
             v.ClinicId,
             v.ExaminationId,
+            v.VaccineDefinitionId,
             v.VaccineName,
             v.AppliedAtUtc,
             v.DueAtUtc,

@@ -9,7 +9,7 @@ public sealed record UpdateVaccinationCommand(
     Guid ClinicId,
     Guid PetId,
     Guid? ExaminationId,
-    string VaccineName,
+    Guid VaccineDefinitionId,
     VaccinationStatus Status,
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,

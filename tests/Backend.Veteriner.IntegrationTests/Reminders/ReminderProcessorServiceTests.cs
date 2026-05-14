@@ -7,6 +7,7 @@ using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
+using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Reminders;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -107,8 +108,9 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, "Kuduz", VaccinationStatus.Scheduled, null, now.AddDays(3), null);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(3), null);
         var settings = TenantReminderSettings.CreateDefault(tenant.Id);
         settings.Update(false, 24, true, 3, true);
 
@@ -137,6 +139,7 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var dueAt = now.AddDays(3);
         var vaccination = new Vaccination(
@@ -144,7 +147,8 @@ public sealed class ReminderProcessorServiceTests
             pet.Id,
             clinic.Id,
             null,
-            "Kuduz",
+            rabies.Id,
+            rabies.Name,
             VaccinationStatus.Applied,
             now.AddHours(-2),
             dueAt,
@@ -180,13 +184,15 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var vaccination = new Vaccination(
             tenant.Id,
             pet.Id,
             clinic.Id,
             null,
-            "Kuduz",
+            rabies.Id,
+            rabies.Name,
             VaccinationStatus.Applied,
             now.AddHours(-2),
             null,
@@ -215,13 +221,15 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var vaccination = new Vaccination(
             tenant.Id,
             pet.Id,
             clinic.Id,
             null,
-            "Kuduz",
+            rabies.Id,
+            rabies.Name,
             VaccinationStatus.Applied,
             now.AddDays(-5),
             now.AddDays(-1),
@@ -250,13 +258,15 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var vaccination = new Vaccination(
             tenant.Id,
             pet.Id,
             clinic.Id,
             null,
-            "Kuduz",
+            rabies.Id,
+            rabies.Name,
             VaccinationStatus.Cancelled,
             null,
             now.AddDays(3),
@@ -285,6 +295,7 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var dueAt = now.AddDays(3);
         var vaccination = new Vaccination(
@@ -292,7 +303,8 @@ public sealed class ReminderProcessorServiceTests
             pet.Id,
             clinic.Id,
             null,
-            "Kuduz",
+            rabies.Id,
+            rabies.Name,
             VaccinationStatus.Applied,
             now.AddHours(-2),
             dueAt,
@@ -335,8 +347,9 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, "Kuduz", VaccinationStatus.Scheduled, null, now.AddDays(3), null);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(3), null);
         var settings = TenantReminderSettings.CreateDefault(tenant.Id);
         settings.Update(false, 24, true, 3, true);
 
@@ -361,6 +374,7 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         const int daysBefore = 1;
         var dueAt = now.AddHours(18);
@@ -369,7 +383,8 @@ public sealed class ReminderProcessorServiceTests
             pet.Id,
             clinic.Id,
             null,
-            "Kuduz",
+            rabies.Id,
+            rabies.Name,
             VaccinationStatus.Applied,
             now.AddHours(-2),
             dueAt,
@@ -400,10 +415,11 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         const int daysBefore = 1;
         var dueAt = now.AddHours(20);
-        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, "Kuduz", VaccinationStatus.Scheduled, null, dueAt, null);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, dueAt, null);
         var settings = TenantReminderSettings.CreateDefault(tenant.Id);
         settings.Update(false, 24, true, daysBefore, true);
 
@@ -430,8 +446,9 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, "Kuduz", VaccinationStatus.Scheduled, null, now.AddDays(3), null);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(3), null);
         var settings = TenantReminderSettings.CreateDefault(tenant.Id);
         settings.Update(false, 24, true, 1, true);
 
@@ -456,6 +473,7 @@ public sealed class ReminderProcessorServiceTests
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         const int daysBefore = 1;
         var dueAt = now.AddHours(18);
@@ -464,7 +482,8 @@ public sealed class ReminderProcessorServiceTests
             pet.Id,
             clinic.Id,
             null,
-            "Kuduz",
+            rabies.Id,
+            rabies.Name,
             VaccinationStatus.Scheduled,
             null,
             dueAt,
@@ -939,6 +958,16 @@ public sealed class ReminderProcessorServiceTests
             NullLogger<ReminderProcessorService>.Instance);
     }
 
+    private static async Task<(Guid Id, string Name)> GetRabiesVaccineDefinitionAsync(AppDbContext db)
+    {
+        var row = await db.VaccineDefinitions
+            .AsNoTracking()
+            .Where(v => v.TenantId == null && v.Code == "RABIES")
+            .Select(v => new { v.Id, v.Name })
+            .FirstAsync();
+        return (row.Id, row.Name);
+    }
+
     private static async Task<AppDbContext> CreateDbContextAsync()
     {
         var dbName = $"VeterinerDb_ReminderProcessor_{Guid.NewGuid():N}";
@@ -948,6 +977,7 @@ public sealed class ReminderProcessorServiceTests
             .Options;
         var db = new AppDbContext(options);
         await db.Database.MigrateAsync();
+        await VaccineDefinitionSeeder.SeedAsync(db, logger: null);
         return db;
     }
 

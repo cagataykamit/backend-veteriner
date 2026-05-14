@@ -575,12 +575,17 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, "Pet3", speciesId);
 
+        var defs = await db.VaccineDefinitions.AsNoTracking()
+            .Where(v => v.TenantId == null && (v.Code == "RABIES" || v.Code == "MIXED" || v.Code == "LYME"))
+            .ToDictionaryAsync(v => v.Code, v => new { v.Id, v.Name });
+
         var appliedInside = new Vaccination(
             tenant.Id,
             pet.Id,
             clinic.Id,
             null,
-            "Kuduz",
+            defs["RABIES"].Id,
+            defs["RABIES"].Name,
             VaccinationStatus.Applied,
             new DateTime(2026, 5, 12, 14, 0, 0, DateTimeKind.Utc),
             new DateTime(2027, 6, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -591,7 +596,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
             pet.Id,
             clinic.Id,
             null,
-            "Karma",
+            defs["MIXED"].Id,
+            defs["MIXED"].Name,
             VaccinationStatus.Scheduled,
             null,
             new DateTime(2026, 5, 12, 9, 0, 0, DateTimeKind.Utc),
@@ -602,7 +608,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
             pet.Id,
             clinic.Id,
             null,
-            "Lyme",
+            defs["LYME"].Id,
+            defs["LYME"].Name,
             VaccinationStatus.Applied,
             new DateTime(2026, 5, 13, 14, 0, 0, DateTimeKind.Utc),
             null,

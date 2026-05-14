@@ -63,11 +63,13 @@ public sealed class GetVaccinationByIdQueryHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         var petId = Guid.NewGuid();
         var clientId = Guid.NewGuid();
+        var vaccineDefinitionId = Guid.NewGuid();
         var entity = new Vaccination(
             tid,
             petId,
             Guid.NewGuid(),
             null,
+            vaccineDefinitionId,
             "Kuduz",
             VaccinationStatus.Applied,
             DateTime.UtcNow.AddHours(-1),
@@ -89,6 +91,7 @@ public sealed class GetVaccinationByIdQueryHandlerTests
         var result = await CreateHandler().Handle(new GetVaccinationByIdQuery(entity.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
+        result.Value!.VaccineDefinitionId.Should().Be(vaccineDefinitionId);
         result.Value!.VaccineName.Should().Be("Kuduz");
         result.Value.Status.Should().Be(VaccinationStatus.Applied);
         result.Value.PetName.Should().Be("Pamuk");

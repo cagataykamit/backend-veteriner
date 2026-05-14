@@ -115,6 +115,13 @@ public static class PermissionCatalog
         public const string Update = "Vaccinations.Update";
     }
 
+    public static class VaccineDefinitions
+    {
+        public const string Read = "VaccineDefinitions.Read";
+        public const string Create = "VaccineDefinitions.Create";
+        public const string Update = "VaccineDefinitions.Update";
+    }
+
     public static class Payments
     {
         public const string Read = "Payments.Read";
@@ -243,6 +250,10 @@ public static class PermissionCatalog
         new(Vaccinations.Read, "Aşı kayıtlarını listeleme ve görüntüleme yetkisi", "Vaccinations"),
         new(Vaccinations.Create, "Aşı kaydı oluşturma yetkisi", "Vaccinations"),
         new(Vaccinations.Update, "Aşı kaydı güncelleme yetkisi", "Vaccinations"),
+
+        new(VaccineDefinitions.Read, "Aşı kataloğu tanımlarını listeleme ve görüntüleme yetkisi", "VaccineDefinitions"),
+        new(VaccineDefinitions.Create, "Kiracıya özel aşı kataloğu tanımı oluşturma yetkisi", "VaccineDefinitions"),
+        new(VaccineDefinitions.Update, "Kiracıya özel aşı kataloğu tanımını güncelleme ve aktif/pasif yönetimi yetkisi", "VaccineDefinitions"),
 
         new(Payments.Read, "Ödeme kayıtlarını listeleme ve görüntüleme yetkisi", "Payments"),
         new(Payments.Create, "Ödeme kaydı oluşturma yetkisi", "Payments"),

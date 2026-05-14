@@ -4,6 +4,7 @@ namespace Backend.Veteriner.Domain.Vaccinations;
 
 /// <summary>
 /// Pet bazlı aşı kaydı; opsiyonel olarak bir muayene ile ilişkilendirilebilir.
+/// Aşı adı <see cref="VaccineName"/> alanında seçilen <c>VaccineDefinition</c> adının snapshot'ı olarak tutulur.
 /// </summary>
 public sealed class Vaccination : AggregateRoot
 {
@@ -13,7 +14,10 @@ public sealed class Vaccination : AggregateRoot
     public Guid ClinicId { get; private set; }
     public Guid? ExaminationId { get; private set; }
 
-    /// <summary>Serbest metin aşı adı (katalog bu turda yok).</summary>
+    /// <summary>Katalog tanımı kimliği; yeni kayıtlarda dolu olmalı.</summary>
+    public Guid? VaccineDefinitionId { get; private set; }
+
+    /// <summary>Seçilen tanım adının uygulama anı snapshot'ı.</summary>
     public string VaccineName { get; private set; } = default!;
 
     public DateTime? AppliedAtUtc { get; private set; }
@@ -30,7 +34,8 @@ public sealed class Vaccination : AggregateRoot
         Guid petId,
         Guid clinicId,
         Guid? examinationId,
-        string vaccineName,
+        Guid vaccineDefinitionId,
+        string vaccineNameSnapshot,
         VaccinationStatus status,
         DateTime? appliedAtUtc,
         DateTime? dueAtUtc,
@@ -42,14 +47,17 @@ public sealed class Vaccination : AggregateRoot
             throw new ArgumentException("PetId geçersiz.", nameof(petId));
         if (clinicId == Guid.Empty)
             throw new ArgumentException("ClinicId geçersiz.", nameof(clinicId));
-        if (string.IsNullOrWhiteSpace(vaccineName))
-            throw new ArgumentException("Aşı adı boş olamaz.", nameof(vaccineName));
+        if (vaccineDefinitionId == Guid.Empty)
+            throw new ArgumentException("VaccineDefinitionId geçersiz.", nameof(vaccineDefinitionId));
+        if (string.IsNullOrWhiteSpace(vaccineNameSnapshot))
+            throw new ArgumentException("Aşı adı snapshot boş olamaz.", nameof(vaccineNameSnapshot));
 
         TenantId = tenantId;
         PetId = petId;
         ClinicId = clinicId;
         ExaminationId = examinationId;
-        VaccineName = vaccineName.Trim();
+        VaccineDefinitionId = vaccineDefinitionId;
+        VaccineName = vaccineNameSnapshot.Trim();
         Status = status;
         AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
         DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;
@@ -62,7 +70,8 @@ public sealed class Vaccination : AggregateRoot
         Guid petId,
         Guid clinicId,
         Guid? examinationId,
-        string vaccineName,
+        Guid vaccineDefinitionId,
+        string vaccineNameSnapshot,
         VaccinationStatus status,
         DateTime? appliedAtUtc,
         DateTime? dueAtUtc,
@@ -72,13 +81,16 @@ public sealed class Vaccination : AggregateRoot
             return Result.Failure("Vaccinations.Validation", "PetId gecersiz.");
         if (clinicId == Guid.Empty)
             return Result.Failure("Vaccinations.Validation", "ClinicId gecersiz.");
-        if (string.IsNullOrWhiteSpace(vaccineName))
-            return Result.Failure("Vaccinations.Validation", "Asi adi bos olamaz.");
+        if (vaccineDefinitionId == Guid.Empty)
+            return Result.Failure("Vaccinations.Validation", "VaccineDefinitionId gecersiz.");
+        if (string.IsNullOrWhiteSpace(vaccineNameSnapshot))
+            return Result.Failure("Vaccinations.Validation", "Asi adi snapshot bos olamaz.");
 
         PetId = petId;
         ClinicId = clinicId;
         ExaminationId = examinationId;
-        VaccineName = vaccineName.Trim();
+        VaccineDefinitionId = vaccineDefinitionId;
+        VaccineName = vaccineNameSnapshot.Trim();
         Status = status;
         AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
         DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;

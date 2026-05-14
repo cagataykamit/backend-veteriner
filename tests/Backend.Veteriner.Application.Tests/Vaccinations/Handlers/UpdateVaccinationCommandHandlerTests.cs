@@ -4,6 +4,8 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.VaccineDefinitions.Specs;
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Application.Vaccinations.Commands.Update;
 using Backend.Veteriner.Application.Vaccinations.Specs;
 using Backend.Veteriner.Domain.Clinics;
@@ -18,14 +20,23 @@ namespace Backend.Veteriner.Application.Tests.Vaccinations.Handlers;
 
 public sealed class UpdateVaccinationCommandHandlerTests
 {
+    private static readonly VaccineDefinition TestDefinition = VaccineDefinition.CreateGlobal("TSTX", "Karma aşı");
+
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
+    private readonly Mock<IReadRepository<VaccineDefinition>> _definitions = new();
     private readonly Mock<IReadRepository<Vaccination>> _vaccinationsRead = new();
     private readonly Mock<IRepository<Vaccination>> _vaccinationsWrite = new();
+
+    public UpdateVaccinationCommandHandlerTests()
+    {
+        _definitions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccineDefinitionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TestDefinition);
+    }
 
     private UpdateVaccinationCommandHandler CreateHandler()
         => new(
@@ -35,6 +46,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             _clinics.Object,
             _pets.Object,
             _examinations.Object,
+            _definitions.Object,
             _vaccinationsRead.Object,
             _vaccinationsWrite.Object);
 
@@ -47,7 +59,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(3),
@@ -77,7 +89,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(3),
@@ -106,7 +118,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(3),
@@ -131,7 +143,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(3),
@@ -163,7 +175,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             petId,
             clinicId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
+            TestDefinition.Name,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
@@ -179,7 +192,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             clinicId,
             petId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -208,7 +221,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             petId,
             clinicId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
+            TestDefinition.Name,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
@@ -226,7 +240,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             clinicId,
             petId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -255,7 +269,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             petId,
             clinicId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
+            TestDefinition.Name,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
@@ -275,7 +290,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             clinicId,
             petId,
             Guid.NewGuid(),
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -305,7 +320,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             petId,
             clinicId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
+            TestDefinition.Name,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
@@ -334,7 +350,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             clinicId,
             petId,
             examinationId,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -363,7 +379,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             petId,
             clinicId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
+            TestDefinition.Name,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
@@ -377,7 +394,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             clinicId,
             petId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             DateTime.UtcNow.AddHours(-2),
             DateTime.UtcNow.AddDays(7),
@@ -406,7 +423,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             petId,
             clinicId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
+            TestDefinition.Name,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
@@ -420,7 +438,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             clinicId,
             petId,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Applied,
             DateTime.UtcNow.AddYears(3),
             null,
@@ -449,11 +467,13 @@ public sealed class UpdateVaccinationCommandHandlerTests
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
         var due = DateTime.UtcNow.AddDays(5);
+        var oldDefinitionId = Guid.NewGuid();
         var existing = new Vaccination(
             tid,
             pid,
             cid,
             null,
+            oldDefinitionId,
             "Eski",
             VaccinationStatus.Scheduled,
             null,
@@ -469,7 +489,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Karma aşı",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             due,
@@ -478,7 +498,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        existing.VaccineName.Should().Be("Karma aşı");
+        existing.VaccineName.Should().Be(TestDefinition.Name);
         existing.Notes.Should().Be("not");
         _vaccinationsWrite.Verify(r => r.UpdateAsync(existing, It.IsAny<CancellationToken>()), Times.Once);
         _vaccinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -506,7 +526,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             pid,
             cid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
+            TestDefinition.Name,
             VaccinationStatus.Scheduled,
             null,
             due,
@@ -521,7 +542,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             null,

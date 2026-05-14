@@ -1,10 +1,12 @@
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Clinics.Specs;
+using Backend.Veteriner.Application.Vaccinations.Commands.Create;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
-using Backend.Veteriner.Application.Vaccinations.Commands.Create;
+using Backend.Veteriner.Application.VaccineDefinitions.Specs;
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
@@ -17,13 +19,22 @@ namespace Backend.Veteriner.Application.Tests.Vaccinations.Handlers;
 
 public sealed class CreateVaccinationCommandHandlerTests
 {
+    private static readonly VaccineDefinition TestDefinition = VaccineDefinition.CreateGlobal("TSTX", "Karma aşı");
+
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
+    private readonly Mock<IReadRepository<VaccineDefinition>> _definitions = new();
     private readonly Mock<IRepository<Vaccination>> _vaccinationsWrite = new();
+
+    public CreateVaccinationCommandHandlerTests()
+    {
+        _definitions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccineDefinitionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TestDefinition);
+    }
 
     private CreateVaccinationCommandHandler CreateHandler()
         => new(
@@ -33,6 +44,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             _clinics.Object,
             _pets.Object,
             _examinations.Object,
+            _definitions.Object,
             _vaccinationsWrite.Object);
 
     [Fact]
@@ -43,7 +55,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -64,7 +76,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -96,7 +108,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -122,7 +134,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -145,7 +157,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             Guid.NewGuid(),
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -176,7 +188,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             eid,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -205,7 +217,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             eid,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -243,7 +255,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             eid,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
@@ -280,7 +292,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             null,
@@ -305,7 +317,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(-1),
@@ -330,7 +342,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             DateTime.UtcNow.AddHours(-1),
             DateTime.UtcNow.AddDays(7),
@@ -355,7 +367,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Applied,
             null,
             null,
@@ -380,7 +392,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Cancelled,
             DateTime.UtcNow.AddHours(-1),
             null,
@@ -405,7 +417,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Applied,
             DateTime.UtcNow.AddDays(-30),
             null,
@@ -430,7 +442,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Applied,
             DateTime.UtcNow.AddYears(3),
             null,
@@ -455,7 +467,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Applied,
             DateTime.UtcNow.AddHours(2),
             null,
@@ -480,7 +492,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddYears(-11),
@@ -505,7 +517,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddYears(6),
@@ -531,7 +543,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            " Karma aşı ",
+            TestDefinition.Id,
             VaccinationStatus.Scheduled,
             null,
             due,
@@ -567,7 +579,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Applied,
             applied,
             applied,
@@ -594,7 +606,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             null,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Applied,
             applied,
             nextDue,
@@ -626,7 +638,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             cid,
             pid,
             eid,
-            "Kuduz",
+            TestDefinition.Id,
             VaccinationStatus.Applied,
             applied,
             null,
@@ -655,6 +667,122 @@ public sealed class CreateVaccinationCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         captured!.ExaminationId.Should().Be(eid, "komutta verilen muayene kimliği saklanır");
         captured.Status.Should().Be(VaccinationStatus.Applied);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_VaccineDefinitionNotFound()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _definitions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccineDefinitionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((VaccineDefinition?)null);
+
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            TestDefinition.Id,
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("VaccineDefinitions.NotFound");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_VaccineDefinitionInactive()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var inactive = VaccineDefinition.CreateGlobal("INACT", "Pasif");
+        inactive.Deactivate();
+        _definitions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccineDefinitionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(inactive);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            inactive.Id,
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("VaccineDefinitions.Inactive");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_VaccineDefinitionWrongTenant()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var otherTenantDef = VaccineDefinition.CreateTenant(Guid.NewGuid(), "OT", "Başka kiracı");
+        _definitions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccineDefinitionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(otherTenantDef);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            otherTenantDef.Id,
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("VaccineDefinitions.NotFound");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_VaccineDefinitionSpeciesMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var dogOnly = VaccineDefinition.CreateTenant(tid, "DOGONLY", "Köpek aşısı", speciesId: TestSpeciesIds.Dog);
+        _definitions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccineDefinitionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(dogOnly);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            null,
+            dogOnly.Id,
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("VaccineDefinitions.InvalidSpecies");
     }
 
     private void SetupTenantClinicPet(Guid tid, Guid cid, Guid pid)

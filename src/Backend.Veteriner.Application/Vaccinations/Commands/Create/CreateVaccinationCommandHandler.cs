@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
@@ -21,6 +22,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Examination> _examinations;
+    private readonly IReadRepository<VaccineDefinition> _vaccineDefinitions;
     private readonly IRepository<Vaccination> _vaccinationsWrite;
 
     public CreateVaccinationCommandHandler(
@@ -30,6 +32,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
+        IReadRepository<VaccineDefinition> vaccineDefinitions,
         IRepository<Vaccination> vaccinationsWrite)
     {
         _tenantContext = tenantContext;
@@ -38,6 +41,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         _clinics = clinics;
         _pets = pets;
         _examinations = examinations;
+        _vaccineDefinitions = vaccineDefinitions;
         _vaccinationsWrite = vaccinationsWrite;
     }
 
@@ -105,6 +109,17 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         if (pet is null)
             return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        var defResult = await VaccinationCatalogResolver.ResolveActiveForPetAsync(
+            tenantId,
+            request.VaccineDefinitionId,
+            pet,
+            _vaccineDefinitions,
+            ct);
+        if (!defResult.IsSuccess)
+            return Result<Guid>.Failure(defResult.Error);
+
+        var definition = defResult.Value!;
+
         if (request.ExaminationId is { } eid)
         {
             var exam = await _examinations.FirstOrDefaultAsync(
@@ -129,7 +144,8 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
             request.PetId,
             effectiveClinicId,
             request.ExaminationId,
-            request.VaccineName,
+            definition.Id,
+            definition.Name,
             request.Status,
             appliedUtc,
             dueUtc,

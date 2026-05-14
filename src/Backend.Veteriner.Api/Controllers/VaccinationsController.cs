@@ -78,7 +78,7 @@ public sealed class VaccinationsController : ControllerBase
             body.ClinicId,
             body.PetId,
             body.ExaminationId,
-            body.VaccineName,
+            body.VaccineDefinitionId,
             body.Status,
             body.AppliedAtUtc,
             body.DueAtUtc,

@@ -11,6 +11,7 @@ public sealed record VaccinationDetailDto(
     Guid ClientId,
     Guid ClinicId,
     Guid? ExaminationId,
+    Guid? VaccineDefinitionId,
     string VaccineName,
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,

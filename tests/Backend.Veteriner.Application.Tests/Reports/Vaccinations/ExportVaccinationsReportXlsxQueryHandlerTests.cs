@@ -46,6 +46,7 @@ public sealed class ExportVaccinationsReportXlsxQueryHandlerTests
             petId,
             clinicId,
             null,
+            Guid.NewGuid(),
             "DHPPi",
             VaccinationStatus.Applied,
             applied,

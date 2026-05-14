@@ -119,12 +119,18 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, "PetVac", speciesId);
 
+        var catalogVaccine = await db.VaccineDefinitions.AsNoTracking()
+            .Where(v => v.TenantId == null && v.Code == "RABIES")
+            .Select(v => new { v.Id, v.Name })
+            .FirstAsync();
+
         var now = DateTime.UtcNow;
         var overdue = new Vaccination(
             tenant.Id,
             pet.Id,
             clinic.Id,
             null,
+            catalogVaccine.Id,
             "OverdueCase",
             VaccinationStatus.Scheduled,
             null,
@@ -136,6 +142,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             pet.Id,
             clinic.Id,
             null,
+            catalogVaccine.Id,
             "FutureCase",
             VaccinationStatus.Scheduled,
             null,
@@ -147,6 +154,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             pet.Id,
             clinic.Id,
             null,
+            catalogVaccine.Id,
             "NullDueCase",
             VaccinationStatus.Scheduled,
             null,
@@ -158,6 +166,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             pet.Id,
             clinic.Id,
             null,
+            catalogVaccine.Id,
             "AppliedPastCase",
             VaccinationStatus.Applied,
             now.AddDays(-20),
@@ -169,6 +178,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             pet.Id,
             clinic.Id,
             null,
+            catalogVaccine.Id,
             "CancelledPastCase",
             VaccinationStatus.Cancelled,
             null,

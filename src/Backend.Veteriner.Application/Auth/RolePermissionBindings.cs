@@ -79,6 +79,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Vaccinations.Create,
                 PermissionCatalog.Vaccinations.Update,
 
+                PermissionCatalog.VaccineDefinitions.Read,
+                PermissionCatalog.VaccineDefinitions.Create,
+                PermissionCatalog.VaccineDefinitions.Update,
+
                 PermissionCatalog.Payments.Read,
                 PermissionCatalog.Payments.Create,
                 PermissionCatalog.Payments.Update,
@@ -160,6 +164,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Vaccinations.Read,
                 PermissionCatalog.Vaccinations.Create,
                 PermissionCatalog.Vaccinations.Update,
+
+                PermissionCatalog.VaccineDefinitions.Read,
+                PermissionCatalog.VaccineDefinitions.Create,
+                PermissionCatalog.VaccineDefinitions.Update,
 
                 PermissionCatalog.Payments.Read,
                 PermissionCatalog.Payments.Create,
@@ -248,6 +256,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Vaccinations.Create,
                 PermissionCatalog.Vaccinations.Update,
 
+                PermissionCatalog.VaccineDefinitions.Read,
+                PermissionCatalog.VaccineDefinitions.Create,
+                PermissionCatalog.VaccineDefinitions.Update,
+
                 PermissionCatalog.Payments.Read,
                 PermissionCatalog.Payments.Create,
                 PermissionCatalog.Payments.Update,
@@ -320,6 +332,8 @@ public static class RolePermissionBindings
                 PermissionCatalog.Vaccinations.Create,
                 PermissionCatalog.Vaccinations.Update,
 
+                PermissionCatalog.VaccineDefinitions.Read,
+
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
                 PermissionCatalog.Treatments.Update,
@@ -370,6 +384,7 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Examinations.Read,
                 PermissionCatalog.Vaccinations.Read,
+                PermissionCatalog.VaccineDefinitions.Read,
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Prescriptions.Read,
                 PermissionCatalog.LabResults.Read,

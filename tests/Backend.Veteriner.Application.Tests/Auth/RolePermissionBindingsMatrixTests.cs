@@ -79,6 +79,9 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Vaccinations.Read },
         new object[] { PermissionCatalog.Vaccinations.Create },
         new object[] { PermissionCatalog.Vaccinations.Update },
+        new object[] { PermissionCatalog.VaccineDefinitions.Read },
+        new object[] { PermissionCatalog.VaccineDefinitions.Create },
+        new object[] { PermissionCatalog.VaccineDefinitions.Update },
         new object[] { PermissionCatalog.Payments.Read },
         new object[] { PermissionCatalog.Payments.Create },
         new object[] { PermissionCatalog.Payments.Update },
@@ -157,6 +160,9 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Vaccinations.Read },
         new object[] { PermissionCatalog.Vaccinations.Create },
         new object[] { PermissionCatalog.Vaccinations.Update },
+        new object[] { PermissionCatalog.VaccineDefinitions.Read },
+        new object[] { PermissionCatalog.VaccineDefinitions.Create },
+        new object[] { PermissionCatalog.VaccineDefinitions.Update },
         new object[] { PermissionCatalog.Payments.Read },
         new object[] { PermissionCatalog.Payments.Create },
         new object[] { PermissionCatalog.Payments.Update },
@@ -221,6 +227,7 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Vaccinations.Read },
         new object[] { PermissionCatalog.Vaccinations.Create },
         new object[] { PermissionCatalog.Vaccinations.Update },
+        new object[] { PermissionCatalog.VaccineDefinitions.Read },
         new object[] { PermissionCatalog.Treatments.Read },
         new object[] { PermissionCatalog.Treatments.Create },
         new object[] { PermissionCatalog.Treatments.Update },
@@ -265,6 +272,7 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Appointments.Reschedule },
         new object[] { PermissionCatalog.Examinations.Read },
         new object[] { PermissionCatalog.Vaccinations.Read },
+        new object[] { PermissionCatalog.VaccineDefinitions.Read },
         new object[] { PermissionCatalog.Treatments.Read },
         new object[] { PermissionCatalog.Prescriptions.Read },
         new object[] { PermissionCatalog.LabResults.Read },
@@ -364,6 +372,8 @@ public sealed class RolePermissionBindingsMatrixTests
         vet.Should().NotContain(PermissionCatalog.Payments.Update, "Veteriner ödeme güncellemez");
         vet.Should().NotContain(PermissionCatalog.Appointments.Cancel, "Randevu iptali resepsiyon/clinic admin işi");
         vet.Should().NotContain(PermissionCatalog.Clinics.Update, "Veteriner klinik profil güncellemez");
+        vet.Should().NotContain(PermissionCatalog.VaccineDefinitions.Create);
+        vet.Should().NotContain(PermissionCatalog.VaccineDefinitions.Update);
     }
 
     [Fact]
@@ -385,6 +395,8 @@ public sealed class RolePermissionBindingsMatrixTests
         sec.Should().NotContain(PermissionCatalog.Examinations.Update);
         sec.Should().NotContain(PermissionCatalog.Vaccinations.Create);
         sec.Should().NotContain(PermissionCatalog.Vaccinations.Update);
+        sec.Should().NotContain(PermissionCatalog.VaccineDefinitions.Create);
+        sec.Should().NotContain(PermissionCatalog.VaccineDefinitions.Update);
         sec.Should().NotContain(PermissionCatalog.Treatments.Create);
         sec.Should().NotContain(PermissionCatalog.Treatments.Update);
         sec.Should().NotContain(PermissionCatalog.Prescriptions.Create);
