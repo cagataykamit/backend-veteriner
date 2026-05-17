@@ -25,6 +25,7 @@ internal static class TestDataSeeder
     {
         lock (SeedSync)
         {
+            SpeciesAndBreedCatalogSeeder.SeedAsync(db, logger: null).GetAwaiter().GetResult();
             SeedAdminUser(db, hasher);
             EnsureDefaultTenantAndUserTenant(db);
             DataSeeder.EnsureDefaultTenantSubscriptionByNameAsync(db, logger: null).GetAwaiter().GetResult();

@@ -22,6 +22,7 @@ public static class DataSeeder
         CancellationToken ct = default)
     {
         await PermissionSeeder.SeedAsync(db, logger, ct);
+        await SpeciesAndBreedCatalogSeeder.SeedAsync(db, logger, ct);
 
         var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Name == DefaultTenantName, ct);
         if (tenant is null)
