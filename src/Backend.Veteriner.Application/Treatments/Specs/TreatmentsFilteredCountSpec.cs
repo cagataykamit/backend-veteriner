@@ -16,6 +16,7 @@ public sealed class TreatmentsFilteredCountSpec : Specification<Treatment>
         Guid[] searchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
+        Query.AsNoTracking();
         Query.Where(t => t.TenantId == tenantId);
         if (clinicId.HasValue)
         {

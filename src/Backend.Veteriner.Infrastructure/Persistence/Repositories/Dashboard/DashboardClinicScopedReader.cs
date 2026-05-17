@@ -16,28 +16,21 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
     public DashboardClinicScopedReader(AppDbContext db) => _db = db;
 
     public Task<int> CountPetsAtClinicAsync(Guid tenantId, Guid clinicId, CancellationToken ct = default)
-    {
-        return _db.Appointments.AsNoTracking()
+        => _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && a.ClinicId == clinicId)
             .Select(a => a.PetId)
             .Distinct()
             .CountAsync(ct);
-    }
 
-    public async Task<int> CountClientsAtClinicAsync(Guid tenantId, Guid clinicId, CancellationToken ct = default)
-    {
-        // Önce klinik bazında DISTINCT PetId; sonra Pets üzerinden DISTINCT ClientId (randevu satırı × join patlamasını önler).
-        var petIdsAtClinic = _db.Appointments.AsNoTracking()
-            .Where(a => a.TenantId == tenantId && a.ClinicId == clinicId)
-            .Select(a => a.PetId)
-            .Distinct();
-
-        return await _db.Pets.AsNoTracking()
-            .Where(p => p.TenantId == tenantId && petIdsAtClinic.Contains(p.Id))
-            .Select(p => p.ClientId)
-            .Distinct()
-            .CountAsync(ct);
-    }
+    public Task<int> CountClientsAtClinicAsync(Guid tenantId, Guid clinicId, CancellationToken ct = default)
+        => (
+            from a in _db.Appointments.AsNoTracking()
+            join p in _db.Pets.AsNoTracking() on a.PetId equals p.Id
+            where a.TenantId == tenantId
+                  && a.ClinicId == clinicId
+                  && p.TenantId == tenantId
+            select p.ClientId
+        ).Distinct().CountAsync(ct);
 
     public async Task<IReadOnlyList<DashboardRecentPetRow>> ListRecentPetsAtClinicAsync(
         Guid tenantId,

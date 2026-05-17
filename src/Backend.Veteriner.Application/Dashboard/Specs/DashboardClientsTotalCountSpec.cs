@@ -7,6 +7,7 @@ public sealed class DashboardClientsTotalCountSpec : Specification<Client>
 {
     public DashboardClientsTotalCountSpec(Guid tenantId)
     {
+        Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId);
     }
 }

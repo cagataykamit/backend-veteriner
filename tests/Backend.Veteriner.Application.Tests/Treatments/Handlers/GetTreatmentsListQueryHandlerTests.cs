@@ -75,7 +75,7 @@ public sealed class GetTreatmentsListQueryHandlerTests
         _treatments.Setup(r => r.CountAsync(It.IsAny<TreatmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _treatments.Setup(r => r.ListAsync(It.IsAny<TreatmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Treatment>());
+            .ReturnsAsync(new List<TreatmentListRow>());
         var paging = new PageRequest { Page = 1, PageSize = 20, Search = "   " };
 
         var result = await CreateHandler().Handle(new GetTreatmentsListQuery(paging), CancellationToken.None);
@@ -101,7 +101,7 @@ public sealed class GetTreatmentsListQueryHandlerTests
         _treatments.Setup(r => r.CountAsync(It.IsAny<TreatmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _treatments.Setup(r => r.ListAsync(It.IsAny<TreatmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Treatment>());
+            .ReturnsAsync(new List<TreatmentListRow>());
         var paging = new PageRequest { Page = 1, PageSize = 20, Search = "  ada  " };
 
         var result = await CreateHandler().Handle(new GetTreatmentsListQuery(paging), CancellationToken.None);
@@ -123,7 +123,7 @@ public sealed class GetTreatmentsListQueryHandlerTests
         _treatments.Setup(r => r.CountAsync(It.IsAny<TreatmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _treatments.Setup(r => r.ListAsync(It.IsAny<TreatmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Treatment>());
+            .ReturnsAsync(new List<TreatmentListRow>());
         var paging = new PageRequest { Page = 1, PageSize = 20 };
 
         var result = await CreateHandler().Handle(new GetTreatmentsListQuery(paging), CancellationToken.None);
@@ -146,49 +146,46 @@ public sealed class GetTreatmentsListQueryHandlerTests
         var clientId = Guid.NewGuid();
         var petId = Guid.NewGuid();
         var examId = Guid.NewGuid();
+        var treatmentId = Guid.NewGuid();
+        var treatmentDate = DateTime.UtcNow.AddDays(-1);
+        var followUp = DateTime.UtcNow.AddDays(14);
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
 
-        var tr = new Treatment(
-            tid,
+        var row = new TreatmentListRow(
+            treatmentId,
             clinicId,
             petId,
-            examId,
-            DateTime.UtcNow.AddDays(-1),
+            treatmentDate,
             "Fizyoterapi",
-            "Seans açıklaması",
-            null,
-            DateTime.UtcNow.AddDays(14));
+            examId,
+            followUp);
 
         _treatments.Setup(r => r.CountAsync(It.IsAny<TreatmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _treatments.Setup(r => r.ListAsync(It.IsAny<TreatmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Treatment> { tr });
+            .ReturnsAsync(new List<TreatmentListRow> { row });
 
-        var client = new Client(tid, "Ali Veli");
-        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
-        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Client> { client });
+        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClientNameRow> { new(clientId, "Ali Veli") });
 
-        var pet = new Pet(tid, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
-        typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
-        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Pet> { pet });
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsNameClientSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PetNameClientRow> { new(petId, clientId, "Pamuk") });
 
         var paging = new PageRequest { Page = 1, PageSize = 20 };
         var result = await CreateHandler().Handle(new GetTreatmentsListQuery(paging), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         var item = result.Value!.Items.Should().ContainSingle().Subject;
-        item.Id.Should().Be(tr.Id);
+        item.Id.Should().Be(treatmentId);
         item.ClinicId.Should().Be(clinicId);
         item.PetId.Should().Be(petId);
         item.PetName.Should().Be("Pamuk");
         item.ClientId.Should().Be(clientId);
         item.ClientName.Should().Be("Ali Veli");
         item.Title.Should().Be("Fizyoterapi");
-        item.TreatmentDateUtc.Should().Be(tr.TreatmentDateUtc);
+        item.TreatmentDateUtc.Should().Be(treatmentDate);
         item.ExaminationId.Should().Be(examId);
-        item.FollowUpDateUtc.Should().Be(tr.FollowUpDateUtc);
+        item.FollowUpDateUtc.Should().Be(followUp);
     }
 
     [Fact]
@@ -204,7 +201,7 @@ public sealed class GetTreatmentsListQueryHandlerTests
         _treatments.Setup(r => r.CountAsync(It.IsAny<TreatmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _treatments.Setup(r => r.ListAsync(It.IsAny<TreatmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Treatment>());
+            .ReturnsAsync(new List<TreatmentListRow>());
 
         var paging = new PageRequest { Page = 0, PageSize = 500 };
         var result = await CreateHandler().Handle(

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Treatments.Specs;
 
-public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment>
+public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment, TreatmentListRow>
 {
     public TreatmentsFilteredPagedSpec(
         Guid tenantId,
@@ -18,6 +18,7 @@ public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment>
         Guid[] searchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
+        Query.AsNoTracking();
         Query.Where(t => t.TenantId == tenantId);
         if (clinicId.HasValue)
         {
@@ -48,9 +49,19 @@ public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment>
                 || (pids.Length > 0 && pids.Contains(t.PetId)));
         }
 
-        Query.OrderByDescending(t => t.TreatmentDateUtc)
+        Query
+            .OrderByDescending(t => t.TreatmentDateUtc)
             .ThenByDescending(t => t.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
+
+        Query.Select(t => new TreatmentListRow(
+            t.Id,
+            t.ClinicId,
+            t.PetId,
+            t.TreatmentDateUtc,
+            t.Title,
+            t.ExaminationId,
+            t.FollowUpDateUtc));
     }
 }

@@ -7,6 +7,7 @@ public sealed class DashboardPetsTotalCountSpec : Specification<Pet>
 {
     public DashboardPetsTotalCountSpec(Guid tenantId)
     {
+        Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
     }
 }

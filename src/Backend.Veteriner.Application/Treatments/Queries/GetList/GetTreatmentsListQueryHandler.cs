@@ -11,6 +11,9 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Treatments.Queries.GetList;
 
@@ -23,6 +26,7 @@ public sealed class GetTreatmentsListQueryHandler
     private readonly IReadRepository<Treatment> _treatments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly ILogger<GetTreatmentsListQueryHandler> _logger;
 
     public GetTreatmentsListQueryHandler(
         ITenantContext tenantContext,
@@ -30,7 +34,8 @@ public sealed class GetTreatmentsListQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Treatment> treatments,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        ILogger<GetTreatmentsListQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -38,6 +43,7 @@ public sealed class GetTreatmentsListQueryHandler
         _treatments = treatments;
         _pets = pets;
         _clients = clients;
+        _logger = logger ?? NullLogger<GetTreatmentsListQueryHandler>.Instance;
     }
 
     public async Task<Result<PagedResult<TreatmentListItemDto>>> Handle(
@@ -53,6 +59,25 @@ public sealed class GetTreatmentsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
+        var totalSw = Stopwatch.StartNew();
+        var stepSw = Stopwatch.StartNew();
+        var querySteps = 0;
+        var slowestStep = string.Empty;
+        long slowestMs = 0;
+
+        void MarkStep(string name)
+        {
+            querySteps++;
+            var elapsed = stepSw.ElapsedMilliseconds;
+            if (elapsed > slowestMs)
+            {
+                slowestMs = elapsed;
+                slowestStep = name;
+            }
+
+            stepSw.Restart();
+        }
+
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
             return Result<PagedResult<TreatmentListItemDto>>.Failure(
@@ -64,6 +89,7 @@ public sealed class GetTreatmentsListQueryHandler
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
         if (!scopeResult.IsSuccess)
             return Result<PagedResult<TreatmentListItemDto>>.Failure(scopeResult.Error);
+        MarkStep("scopeResolve");
 
         var effectiveClinicId = scopeResult.Value!.SingleClinicId;
         var accessibleClinicIds = scopeResult.Value!.AccessibleClinicIds;
@@ -92,6 +118,7 @@ public sealed class GetTreatmentsListQueryHandler
                 searchPetIds,
                 accessibleClinicIds),
             ct);
+        MarkStep("treatmentsCount");
 
         var rows = await _treatments.ListAsync(
             new TreatmentsFilteredPagedSpec(
@@ -106,17 +133,22 @@ public sealed class GetTreatmentsListQueryHandler
                 searchPetIds,
                 accessibleClinicIds),
             ct);
+        MarkStep("treatmentsPage");
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
         var pets = petIds.Length == 0
             ? []
-            : await _pets.ListAsync(new PetsByTenantIdsSpec(tenantId, petIds), ct);
+            : await _pets.ListAsync(new PetsByTenantIdsNameClientSpec(tenantId, petIds), ct);
+        if (petIds.Length > 0)
+            MarkStep("petsLookup");
         var petById = pets.ToDictionary(x => x.Id);
 
         var clientIds = pets.Select(x => x.ClientId).Distinct().ToArray();
         var clients = clientIds.Length == 0
             ? []
-            : await _clients.ListAsync(new ClientsByTenantIdsSpec(tenantId, clientIds), ct);
+            : await _clients.ListAsync(new ClientsByTenantIdsNameSpec(tenantId, clientIds), ct);
+        if (clientIds.Length > 0)
+            MarkStep("clientsLookup");
         var clientNameById = clients.ToDictionary(x => x.Id, x => x.FullName);
 
         var items = rows
@@ -142,6 +174,17 @@ public sealed class GetTreatmentsListQueryHandler
                     t.FollowUpDateUtc);
             })
             .ToList();
+
+        _logger.LogInformation(
+            "Treatments list generated. TenantId={TenantId} ClinicId={ClinicId} Page={Page} PageSize={PageSize} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            tenantId,
+            effectiveClinicId,
+            page,
+            pageSize,
+            querySteps,
+            slowestStep,
+            slowestMs,
+            totalSw.ElapsedMilliseconds);
 
         return Result<PagedResult<TreatmentListItemDto>>.Success(
             PagedResult<TreatmentListItemDto>.Create(items, total, page, pageSize));

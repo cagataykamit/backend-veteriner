@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetList;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -39,7 +40,7 @@ public sealed class GetClientsListQueryHandlerTests
         _clients.Setup(r => r.CountAsync(It.IsAny<ClientsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Client>());
+            .ReturnsAsync(new List<ClientListItemDto>());
 
         var query = new GetClientsListQuery(new PageRequest { Page = 1, PageSize = 20 });
         var result = await CreateHandler().Handle(query, CancellationToken.None);
@@ -57,16 +58,20 @@ public sealed class GetClientsListQueryHandlerTests
     public async Task Handle_Should_MapListItems_When_ClientsExist()
     {
         var tid = Guid.NewGuid();
-        var c1 = new Client(tid, "B", null, null);
-        var c2 = new Client(tid, "A", "05321111111", "a@b.com");
-        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(c1, Guid.NewGuid());
-        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(c2, Guid.NewGuid());
+        var id1 = Guid.NewGuid();
+        var id2 = Guid.NewGuid();
+        var created = DateTime.UtcNow;
+        var rows = new List<ClientListItemDto>
+        {
+            new(id1, tid, created, "B", null, null),
+            new(id2, tid, created, "A", "a@b.com", "05321111111")
+        };
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clients.Setup(r => r.CountAsync(It.IsAny<ClientsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(2);
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Client> { c1, c2 });
+            .ReturnsAsync(rows);
 
         var query = new GetClientsListQuery(new PageRequest { Page = 1, PageSize = 20 });
         var result = await CreateHandler().Handle(query, CancellationToken.None);
@@ -88,7 +93,7 @@ public sealed class GetClientsListQueryHandlerTests
         _clients.Setup(r => r.CountAsync(It.IsAny<ClientsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Client>());
+            .ReturnsAsync(new List<ClientListItemDto>());
 
         var query = new GetClientsListQuery(new PageRequest { Page = 0, PageSize = 500 });
         var result = await CreateHandler().Handle(query, CancellationToken.None);
@@ -106,7 +111,7 @@ public sealed class GetClientsListQueryHandlerTests
         _clients.Setup(r => r.CountAsync(It.IsAny<ClientsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Client>());
+            .ReturnsAsync(new List<ClientListItemDto>());
 
         var query = new GetClientsListQuery(new PageRequest { Page = 1, PageSize = 20, Search = "   " });
         var result = await CreateHandler().Handle(query, CancellationToken.None);

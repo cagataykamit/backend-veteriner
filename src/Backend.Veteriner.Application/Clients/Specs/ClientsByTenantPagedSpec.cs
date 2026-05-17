@@ -1,10 +1,11 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Domain.Clients;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Clients.Specs;
 
-public sealed class ClientsByTenantPagedSpec : Specification<Client>
+public sealed class ClientsByTenantPagedSpec : Specification<Client, ClientListItemDto>
 {
     public ClientsByTenantPagedSpec(Guid tenantId, int page, int pageSize, string? searchContainsLikePattern)
     {
@@ -20,9 +21,18 @@ public sealed class ClientsByTenantPagedSpec : Specification<Client>
                 || (c.PhoneNormalized != null && EF.Functions.Like(c.PhoneNormalized, p)));
         }
 
-        Query.OrderBy(c => c.FullName)
+        Query
+            .OrderBy(c => c.FullName)
             .ThenBy(c => c.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
+
+        Query.Select(c => new ClientListItemDto(
+            c.Id,
+            c.TenantId,
+            c.CreatedAtUtc,
+            c.FullName,
+            c.Email,
+            c.Phone));
     }
 }
