@@ -1,3 +1,4 @@
+using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Models;
@@ -82,7 +83,8 @@ public sealed class SpeciesController : ControllerBase
     [ProducesResponseType(typeof(PagedResult<SpeciesListItemDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetList([FromQuery] PageRequest page, [FromQuery] bool? isActive, CancellationToken ct)
     {
-        var result = await _mediator.Send(new GetSpeciesListQuery(page, isActive), ct);
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
+        var result = await _mediator.Send(new GetSpeciesListQuery(paging, isActive), ct);
         return result.ToActionResult(this);
     }
 }

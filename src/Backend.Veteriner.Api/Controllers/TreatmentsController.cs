@@ -123,9 +123,10 @@ public sealed class TreatmentsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(
             new GetTreatmentsListQuery(
-                PageRequestQuery.WithMergedSearch(page, search),
+                PageRequestQuery.WithMergedSearch(paging, search),
                 clinicId,
                 petId,
                 dateFromUtc,

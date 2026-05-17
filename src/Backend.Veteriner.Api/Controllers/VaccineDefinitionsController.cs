@@ -47,14 +47,8 @@ public sealed class VaccineDefinitionsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var merged = new PageRequest
-        {
-            Page = page.Page,
-            PageSize = page.PageSize,
-            Sort = page.Sort,
-            Order = page.Order,
-            Search = search ?? page.Search,
-        };
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
+        var merged = PageRequestQuery.WithMergedSearch(paging, search);
 
         var result = await _mediator.Send(new GetVaccineDefinitionsListQuery(merged, speciesId, includeInactive), ct);
         return result.ToActionResult(this);

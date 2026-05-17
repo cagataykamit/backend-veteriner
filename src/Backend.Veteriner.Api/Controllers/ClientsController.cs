@@ -146,7 +146,8 @@ public sealed class ClientsController : ControllerBase
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
-        var result = await _mediator.Send(new GetClientsListQuery(PageRequestQuery.WithMergedSearch(page, search)), ct);
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
+        var result = await _mediator.Send(new GetClientsListQuery(PageRequestQuery.WithMergedSearch(paging, search)), ct);
         return result.ToActionResult(this);
     }
 }

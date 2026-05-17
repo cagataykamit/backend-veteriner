@@ -195,7 +195,8 @@ public sealed class ClinicsController : ControllerBase
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
-        var result = await _mediator.Send(new GetClinicsListQuery(page), ct);
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
+        var result = await _mediator.Send(new GetClinicsListQuery(paging), ct);
         return result.ToActionResult(this);
     }
 

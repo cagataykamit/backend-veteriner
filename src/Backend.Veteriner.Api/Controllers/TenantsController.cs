@@ -138,7 +138,8 @@ public sealed class TenantsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new GetTenantMembersQuery(tenantId, req), ct);
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, req);
+        var result = await _mediator.Send(new GetTenantMembersQuery(tenantId, paging), ct);
         return result.ToActionResult(this);
     }
 
@@ -310,7 +311,8 @@ public sealed class TenantsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new GetTenantInvitesQuery(tenantId, req, status), ct);
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, req);
+        var result = await _mediator.Send(new GetTenantInvitesQuery(tenantId, paging, status), ct);
         return result.ToActionResult(this);
     }
 
@@ -630,7 +632,8 @@ public sealed class TenantsController : ControllerBase
     [ProducesResponseType(typeof(PagedResult<TenantListItemDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetList([FromQuery] PageRequest req, CancellationToken ct)
     {
-        var result = await _mediator.Send(new GetTenantsListQuery(req), ct);
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, req);
+        var result = await _mediator.Send(new GetTenantsListQuery(paging), ct);
         return result.ToActionResult(this);
     }
 }

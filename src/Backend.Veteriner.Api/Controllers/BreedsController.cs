@@ -1,3 +1,4 @@
+using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.BreedsReference.Commands.Create;
@@ -90,7 +91,8 @@ public sealed class BreedsController : ControllerBase
         [FromQuery] Guid? speciesId,
         CancellationToken ct)
     {
-        var result = await _mediator.Send(new GetBreedListQuery(page, isActive, speciesId, page.Search), ct);
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
+        var result = await _mediator.Send(new GetBreedListQuery(paging, isActive, speciesId, paging.Search), ct);
         return result.ToActionResult(this);
     }
 }

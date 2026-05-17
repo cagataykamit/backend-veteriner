@@ -142,9 +142,10 @@ public sealed class HospitalizationsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(
             new GetHospitalizationsListQuery(
-                PageRequestQuery.WithMergedSearch(page, search),
+                PageRequestQuery.WithMergedSearch(paging, search),
                 clinicId,
                 petId,
                 activeOnly,

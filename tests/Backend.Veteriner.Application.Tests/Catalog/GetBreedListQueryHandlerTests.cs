@@ -15,6 +15,26 @@ public sealed class GetBreedListQueryHandlerTests
     private GetBreedListQueryHandler CreateHandler() => new(_read.Object);
 
     [Fact]
+    public async Task Handle_Should_SetResponsePage_From_RequestPage()
+    {
+        _read.Setup(r => r.CountAsync(It.IsAny<BreedsCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(171);
+        _read.Setup(r => r.ListAsync(It.IsAny<BreedsPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<BreedListProjectionRow>());
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(
+            new GetBreedListQuery(new PageRequest { Page = 2, PageSize = 20 }, null, null, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Page.Should().Be(2);
+        result.Value.PageSize.Should().Be(20);
+        result.Value.TotalItems.Should().Be(171);
+        result.Value.TotalPages.Should().Be(9);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnPaged_When_DataExists()
     {
         var sid = Guid.NewGuid();

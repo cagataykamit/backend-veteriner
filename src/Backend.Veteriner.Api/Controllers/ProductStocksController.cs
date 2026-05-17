@@ -47,8 +47,9 @@ public sealed class ProductStocksController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(
-            new GetProductStocksListQuery(page, clinicId, productCategoryId, productId, isBelowMinimum, isActiveProduct),
+            new GetProductStocksListQuery(paging, clinicId, productCategoryId, productId, isBelowMinimum, isActiveProduct),
             ct);
 
         return result.ToActionResult(this);

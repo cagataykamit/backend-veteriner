@@ -51,7 +51,8 @@ public sealed class ProductsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new GetProductsListQuery(page, productCategoryId, isActive), ct);
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
+        var result = await _mediator.Send(new GetProductsListQuery(paging, productCategoryId, isActive), ct);
         return result.ToActionResult(this);
     }
 
@@ -100,8 +101,9 @@ public sealed class ProductsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(
-            new GetStockMovementsByProductIdQuery(id, page, clinicId, movementType, dateFromUtc, dateToUtc),
+            new GetStockMovementsByProductIdQuery(id, paging, clinicId, movementType, dateFromUtc, dateToUtc),
             ct);
 
         return result.ToActionResult(this);

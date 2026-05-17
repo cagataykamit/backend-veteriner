@@ -42,7 +42,8 @@ public sealed class ProductCategoriesController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new GetProductCategoriesListQuery(page, isActive), ct);
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
+        var result = await _mediator.Send(new GetProductCategoriesListQuery(paging, isActive), ct);
         return result.ToActionResult(this);
     }
 

@@ -48,9 +48,10 @@ public sealed class StockMovementsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(
             new GetStockMovementsListQuery(
-                page,
+                paging,
                 clinicId,
                 productId,
                 productCategoryId,

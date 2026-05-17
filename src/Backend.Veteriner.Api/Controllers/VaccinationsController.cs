@@ -123,9 +123,10 @@ public sealed class VaccinationsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(
             new GetVaccinationsListQuery(
-                PageRequestQuery.WithMergedSearch(page, search),
+                PageRequestQuery.WithMergedSearch(paging, search),
                 clinicId,
                 petId,
                 status,

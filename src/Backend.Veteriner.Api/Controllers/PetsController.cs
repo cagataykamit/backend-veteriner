@@ -134,8 +134,9 @@ public sealed class PetsController : ControllerBase
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(
-            new GetPetsListQuery(PageRequestQuery.WithMergedSearch(page, search), clientId, speciesId),
+            new GetPetsListQuery(PageRequestQuery.WithMergedSearch(paging, search), clientId, speciesId),
             ct);
         return result.ToActionResult(this);
     }

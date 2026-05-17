@@ -84,8 +84,9 @@ public sealed class RemindersController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(
-            new GetReminderDispatchLogsQuery(page, reminderType, status, fromUtc, toUtc, clinicId),
+            new GetReminderDispatchLogsQuery(paging, reminderType, status, fromUtc, toUtc, clinicId),
             ct);
         return result.ToActionResult(this);
     }
