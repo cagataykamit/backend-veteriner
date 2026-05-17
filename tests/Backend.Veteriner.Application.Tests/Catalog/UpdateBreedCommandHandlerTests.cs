@@ -11,8 +11,9 @@ public sealed class UpdateBreedCommandHandlerTests
 {
     private readonly Mock<IReadRepository<Breed>> _read = new();
     private readonly Mock<IRepository<Breed>> _write = new();
+    private readonly Mock<ICatalogCacheInvalidator> _catalogCache = new();
 
-    private UpdateBreedCommandHandler CreateHandler() => new(_read.Object, _write.Object);
+    private UpdateBreedCommandHandler CreateHandler() => new(_read.Object, _write.Object, _catalogCache.Object);
 
     private static Breed CreateBreedWithId(Guid id, Guid speciesId, string name)
     {
@@ -82,5 +83,6 @@ public sealed class UpdateBreedCommandHandlerTests
         updated.IsActive.Should().BeFalse();
         updated.SpeciesId.Should().Be(speciesId);
         _write.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _catalogCache.Verify(c => c.InvalidateBreeds(), Times.Once);
     }
 }

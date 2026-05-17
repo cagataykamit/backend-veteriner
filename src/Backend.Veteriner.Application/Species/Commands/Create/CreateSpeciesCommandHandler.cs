@@ -13,17 +13,20 @@ public sealed class CreateSpeciesCommandHandler : IRequestHandler<CreateSpeciesC
     private readonly TenantSubscriptionEffectiveWriteEvaluator _writeEvaluator;
     private readonly IReadRepository<Species> _speciesRead;
     private readonly IRepository<Species> _speciesWrite;
+    private readonly ICatalogCacheInvalidator _catalogCache;
 
     public CreateSpeciesCommandHandler(
         ITenantContext tenantContext,
         TenantSubscriptionEffectiveWriteEvaluator writeEvaluator,
         IReadRepository<Species> speciesRead,
-        IRepository<Species> speciesWrite)
+        IRepository<Species> speciesWrite,
+        ICatalogCacheInvalidator catalogCache)
     {
         _tenantContext = tenantContext;
         _writeEvaluator = writeEvaluator;
         _speciesRead = speciesRead;
         _speciesWrite = speciesWrite;
+        _catalogCache = catalogCache;
     }
 
     public async Task<Result<Guid>> Handle(CreateSpeciesCommand request, CancellationToken ct)
@@ -57,6 +60,7 @@ public sealed class CreateSpeciesCommandHandler : IRequestHandler<CreateSpeciesC
         var entity = new Species(request.Code, request.Name, request.DisplayOrder);
         await _speciesWrite.AddAsync(entity, ct);
         await _speciesWrite.SaveChangesAsync(ct);
+        _catalogCache.InvalidateSpecies();
         return Result<Guid>.Success(entity.Id);
     }
 }

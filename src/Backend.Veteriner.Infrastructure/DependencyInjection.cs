@@ -127,6 +127,11 @@ public static class DependencyInjection
         // Permission cache invalidation (rol/permission değişince cache düşürmek için)
         services.AddScoped<IPermissionCacheInvalidator, PermissionCacheInvalidator>();
 
+        // Global species/breed katalog liste cache
+        services.AddSingleton<CatalogListCache>();
+        services.AddSingleton<ICatalogListCache>(sp => sp.GetRequiredService<CatalogListCache>());
+        services.AddSingleton<ICatalogCacheInvalidator>(sp => sp.GetRequiredService<CatalogListCache>());
+
         // ===== Outbox background worker =====
         services.AddHostedService<OutboxProcessor>();
 

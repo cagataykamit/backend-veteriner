@@ -11,6 +11,7 @@ public sealed class SpeciesCountSpec : Specification<Species>
     public SpeciesCountSpec(bool? isActive)
     {
         IsActiveFilter = isActive;
+        Query.AsNoTracking();
         if (isActive.HasValue)
             Query.Where(s => s.IsActive == isActive.Value);
     }

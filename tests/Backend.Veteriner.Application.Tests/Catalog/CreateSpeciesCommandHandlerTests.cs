@@ -17,6 +17,7 @@ public sealed class CreateSpeciesCommandHandlerTests
     private readonly Mock<IReadRepository<TenantSubscription>> _subscriptions = new();
     private readonly Mock<IReadRepository<Species>> _read = new();
     private readonly Mock<IRepository<Species>> _write = new();
+    private readonly Mock<ICatalogCacheInvalidator> _catalogCache = new();
 
     private CreateSpeciesCommandHandler CreateHandler()
     {
@@ -32,7 +33,7 @@ public sealed class CreateSpeciesCommandHandlerTests
             .ReturnsAsync(sub);
 
         var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
-        return new(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object);
+        return new(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object, _catalogCache.Object);
     }
 
     [Fact]
@@ -92,6 +93,7 @@ public sealed class CreateSpeciesCommandHandlerTests
         captured.Name.Should().Be("Köpek");
         captured.DisplayOrder.Should().Be(5);
         _write.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _catalogCache.Verify(c => c.InvalidateSpecies(), Times.Once);
     }
 
     [Fact]
@@ -99,7 +101,7 @@ public sealed class CreateSpeciesCommandHandlerTests
     {
         _tenantContext.SetupGet(x => x.TenantId).Returns((Guid?)null);
         var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
-        var handler = new CreateSpeciesCommandHandler(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object);
+        var handler = new CreateSpeciesCommandHandler(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object, _catalogCache.Object);
 
         var result = await handler.Handle(new CreateSpeciesCommand("DOG", "Köpek", 0), CancellationToken.None);
 
@@ -127,7 +129,7 @@ public sealed class CreateSpeciesCommandHandlerTests
             .ReturnsAsync(sub);
 
         var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
-        var handler = new CreateSpeciesCommandHandler(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object);
+        var handler = new CreateSpeciesCommandHandler(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object, _catalogCache.Object);
 
         var result = await handler.Handle(new CreateSpeciesCommand("DOG", "Köpek", 0), CancellationToken.None);
 

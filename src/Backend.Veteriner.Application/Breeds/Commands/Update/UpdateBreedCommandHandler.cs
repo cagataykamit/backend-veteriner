@@ -10,11 +10,16 @@ public sealed class UpdateBreedCommandHandler : IRequestHandler<UpdateBreedComma
 {
     private readonly IReadRepository<Breed> _breedsRead;
     private readonly IRepository<Breed> _breedsWrite;
+    private readonly ICatalogCacheInvalidator _catalogCache;
 
-    public UpdateBreedCommandHandler(IReadRepository<Breed> breedsRead, IRepository<Breed> breedsWrite)
+    public UpdateBreedCommandHandler(
+        IReadRepository<Breed> breedsRead,
+        IRepository<Breed> breedsWrite,
+        ICatalogCacheInvalidator catalogCache)
     {
         _breedsRead = breedsRead;
         _breedsWrite = breedsWrite;
+        _catalogCache = catalogCache;
     }
 
     public async Task<Result> Handle(UpdateBreedCommand request, CancellationToken ct)
@@ -34,6 +39,7 @@ public sealed class UpdateBreedCommandHandler : IRequestHandler<UpdateBreedComma
         entity.Update(request.Name, request.IsActive);
         await _breedsWrite.UpdateAsync(entity, ct);
         await _breedsWrite.SaveChangesAsync(ct);
+        _catalogCache.InvalidateBreeds();
         return Result.Success();
     }
 }

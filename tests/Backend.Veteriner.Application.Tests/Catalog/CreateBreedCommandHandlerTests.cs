@@ -18,6 +18,7 @@ public sealed class CreateBreedCommandHandlerTests
     private readonly Mock<IReadRepository<Species>> _speciesRead = new();
     private readonly Mock<IReadRepository<Breed>> _breedsRead = new();
     private readonly Mock<IRepository<Breed>> _breedsWrite = new();
+    private readonly Mock<ICatalogCacheInvalidator> _catalogCache = new();
 
     private CreateBreedCommandHandler CreateHandler()
     {
@@ -33,7 +34,7 @@ public sealed class CreateBreedCommandHandlerTests
             .ReturnsAsync(sub);
 
         var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
-        return new(_tenantContext.Object, writeEvaluator, _speciesRead.Object, _breedsRead.Object, _breedsWrite.Object);
+        return new(_tenantContext.Object, writeEvaluator, _speciesRead.Object, _breedsRead.Object, _breedsWrite.Object, _catalogCache.Object);
     }
 
     [Fact]
@@ -95,6 +96,7 @@ public sealed class CreateBreedCommandHandlerTests
         captured!.SpeciesId.Should().Be(sid);
         captured.Name.Should().Be("Golden Retriever");
         _breedsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _catalogCache.Verify(c => c.InvalidateBreeds(), Times.Once);
     }
 
     [Fact]
@@ -107,7 +109,8 @@ public sealed class CreateBreedCommandHandlerTests
             writeEvaluator,
             _speciesRead.Object,
             _breedsRead.Object,
-            _breedsWrite.Object);
+            _breedsWrite.Object,
+            _catalogCache.Object);
 
         var result = await handler.Handle(new CreateBreedCommand(Guid.NewGuid(), "Golden"), CancellationToken.None);
 
@@ -140,7 +143,8 @@ public sealed class CreateBreedCommandHandlerTests
             writeEvaluator,
             _speciesRead.Object,
             _breedsRead.Object,
-            _breedsWrite.Object);
+            _breedsWrite.Object,
+            _catalogCache.Object);
 
         var result = await handler.Handle(new CreateBreedCommand(Guid.NewGuid(), "Golden"), CancellationToken.None);
 

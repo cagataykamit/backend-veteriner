@@ -11,8 +11,9 @@ public sealed class UpdateSpeciesCommandHandlerTests
 {
     private readonly Mock<IReadRepository<Species>> _read = new();
     private readonly Mock<IRepository<Species>> _write = new();
+    private readonly Mock<ICatalogCacheInvalidator> _catalogCache = new();
 
-    private UpdateSpeciesCommandHandler CreateHandler() => new(_read.Object, _write.Object);
+    private UpdateSpeciesCommandHandler CreateHandler() => new(_read.Object, _write.Object, _catalogCache.Object);
 
     private static Species CreateSpeciesWithId(Guid id, string code, string name, int displayOrder, bool isActive = true)
     {
@@ -114,5 +115,6 @@ public sealed class UpdateSpeciesCommandHandlerTests
         updated.DisplayOrder.Should().Be(3);
         updated.IsActive.Should().BeFalse();
         _write.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _catalogCache.Verify(c => c.InvalidateSpecies(), Times.Once);
     }
 }

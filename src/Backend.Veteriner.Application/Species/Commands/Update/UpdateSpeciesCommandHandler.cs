@@ -10,11 +10,16 @@ public sealed class UpdateSpeciesCommandHandler : IRequestHandler<UpdateSpeciesC
 {
     private readonly IReadRepository<Species> _speciesRead;
     private readonly IRepository<Species> _speciesWrite;
+    private readonly ICatalogCacheInvalidator _catalogCache;
 
-    public UpdateSpeciesCommandHandler(IReadRepository<Species> speciesRead, IRepository<Species> speciesWrite)
+    public UpdateSpeciesCommandHandler(
+        IReadRepository<Species> speciesRead,
+        IRepository<Species> speciesWrite,
+        ICatalogCacheInvalidator catalogCache)
     {
         _speciesRead = speciesRead;
         _speciesWrite = speciesWrite;
+        _catalogCache = catalogCache;
     }
 
     public async Task<Result> Handle(UpdateSpeciesCommand request, CancellationToken ct)
@@ -41,6 +46,7 @@ public sealed class UpdateSpeciesCommandHandler : IRequestHandler<UpdateSpeciesC
         entity.Update(request.Code, request.Name, request.DisplayOrder, request.IsActive);
         await _speciesWrite.UpdateAsync(entity, ct);
         await _speciesWrite.SaveChangesAsync(ct);
+        _catalogCache.InvalidateSpecies();
         return Result.Success();
     }
 }

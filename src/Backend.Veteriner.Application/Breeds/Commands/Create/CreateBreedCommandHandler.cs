@@ -15,19 +15,22 @@ public sealed class CreateBreedCommandHandler : IRequestHandler<CreateBreedComma
     private readonly IReadRepository<Species> _speciesRead;
     private readonly IReadRepository<Breed> _breedsRead;
     private readonly IRepository<Breed> _breedsWrite;
+    private readonly ICatalogCacheInvalidator _catalogCache;
 
     public CreateBreedCommandHandler(
         ITenantContext tenantContext,
         TenantSubscriptionEffectiveWriteEvaluator writeEvaluator,
         IReadRepository<Species> speciesRead,
         IReadRepository<Breed> breedsRead,
-        IRepository<Breed> breedsWrite)
+        IRepository<Breed> breedsWrite,
+        ICatalogCacheInvalidator catalogCache)
     {
         _tenantContext = tenantContext;
         _writeEvaluator = writeEvaluator;
         _speciesRead = speciesRead;
         _breedsRead = breedsRead;
         _breedsWrite = breedsWrite;
+        _catalogCache = catalogCache;
     }
 
     public async Task<Result<Guid>> Handle(CreateBreedCommand request, CancellationToken ct)
@@ -58,6 +61,7 @@ public sealed class CreateBreedCommandHandler : IRequestHandler<CreateBreedComma
         var entity = new Breed(request.SpeciesId, request.Name);
         await _breedsWrite.AddAsync(entity, ct);
         await _breedsWrite.SaveChangesAsync(ct);
+        _catalogCache.InvalidateBreeds();
         return Result<Guid>.Success(entity.Id);
     }
 }

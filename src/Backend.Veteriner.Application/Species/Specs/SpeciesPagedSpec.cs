@@ -11,6 +11,7 @@ public sealed class SpeciesPagedSpec : Specification<Species>
     public SpeciesPagedSpec(int page, int pageSize, bool? isActive)
     {
         IsActiveFilter = isActive;
+        Query.AsNoTracking();
         if (isActive.HasValue)
             Query.Where(s => s.IsActive == isActive.Value);
 
