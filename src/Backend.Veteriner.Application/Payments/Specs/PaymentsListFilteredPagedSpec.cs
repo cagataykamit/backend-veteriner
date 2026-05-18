@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Payments.Specs;
 
-public sealed class PaymentsFilteredPagedSpec : Specification<Payment>
+public sealed class PaymentsListFilteredPagedSpec : Specification<Payment, PaymentListRow>
 {
-    public PaymentsFilteredPagedSpec(
+    public PaymentsListFilteredPagedSpec(
         Guid tenantId,
         Guid? clinicId,
         Guid? clientId,
@@ -57,9 +57,20 @@ public sealed class PaymentsFilteredPagedSpec : Specification<Payment>
                 (p.PetId != null && pids.Length > 0 && pids.Contains(p.PetId.Value)));
         }
 
-        Query.OrderByDescending(p => p.PaidAtUtc)
+        Query
+            .OrderByDescending(p => p.PaidAtUtc)
             .ThenByDescending(p => p.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
+
+        Query.Select(p => new PaymentListRow(
+            p.Id,
+            p.ClinicId,
+            p.ClientId,
+            p.PetId,
+            p.Amount,
+            p.Currency,
+            p.Method,
+            p.PaidAtUtc));
     }
 }

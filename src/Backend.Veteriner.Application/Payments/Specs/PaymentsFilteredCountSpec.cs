@@ -19,6 +19,7 @@ public sealed class PaymentsFilteredCountSpec : Specification<Payment>
         Guid[] searchMatchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
+        Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
         if (clinicId.HasValue)
         {

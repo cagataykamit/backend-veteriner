@@ -11,6 +11,9 @@ using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Payments.Queries.GetList;
 
@@ -23,6 +26,7 @@ public sealed class GetPaymentsListQueryHandler
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly ILogger<GetPaymentsListQueryHandler> _logger;
 
     public GetPaymentsListQueryHandler(
         ITenantContext tenantContext,
@@ -30,7 +34,8 @@ public sealed class GetPaymentsListQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Payment> payments,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        ILogger<GetPaymentsListQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -38,6 +43,7 @@ public sealed class GetPaymentsListQueryHandler
         _payments = payments;
         _pets = pets;
         _clients = clients;
+        _logger = logger ?? NullLogger<GetPaymentsListQueryHandler>.Instance;
     }
 
     public async Task<Result<PagedResult<PaymentListItemDto>>> Handle(
@@ -53,6 +59,25 @@ public sealed class GetPaymentsListQueryHandler
 
         var page = Math.Max(1, request.Paging.Page);
         var pageSize = Math.Clamp(request.Paging.PageSize, 1, 200);
+        var totalSw = Stopwatch.StartNew();
+        var stepSw = Stopwatch.StartNew();
+        var querySteps = 0;
+        var slowestStep = string.Empty;
+        long slowestMs = 0;
+
+        void MarkStep(string name)
+        {
+            querySteps++;
+            var elapsed = stepSw.ElapsedMilliseconds;
+            if (elapsed > slowestMs)
+            {
+                slowestMs = elapsed;
+                slowestStep = name;
+            }
+
+            stepSw.Restart();
+        }
+
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
             return Result<PagedResult<PaymentListItemDto>>.Failure(
@@ -64,6 +89,7 @@ public sealed class GetPaymentsListQueryHandler
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
         if (!scopeResult.IsSuccess)
             return Result<PagedResult<PaymentListItemDto>>.Failure(scopeResult.Error);
+        MarkStep("scopeResolve");
 
         var effectiveClinicId = scopeResult.Value!.SingleClinicId;
         var accessibleClinicIds = scopeResult.Value!.AccessibleClinicIds;
@@ -83,6 +109,7 @@ public sealed class GetPaymentsListQueryHandler
                 new PetsByTenantTextFieldsSearchSpec(tenantId, searchPattern),
                 ct);
             searchPetIds = petsMatchingText.Select(p => p.Id).Distinct().ToArray();
+            MarkStep("searchLookup");
         }
 
         var total = await _payments.CountAsync(
@@ -99,9 +126,10 @@ public sealed class GetPaymentsListQueryHandler
                 searchPetIds,
                 accessibleClinicIds),
             ct);
+        MarkStep("paymentsCount");
 
         var rows = await _payments.ListAsync(
-            new PaymentsFilteredPagedSpec(
+            new PaymentsListFilteredPagedSpec(
                 tenantId,
                 effectiveClinicId,
                 request.ClientId,
@@ -116,26 +144,31 @@ public sealed class GetPaymentsListQueryHandler
                 searchPetIds,
                 accessibleClinicIds),
             ct);
+        MarkStep("paymentsPage");
 
         var clientIds = rows.Select(x => x.ClientId).Distinct().ToArray();
         var clients = clientIds.Length == 0
             ? []
-            : await _clients.ListAsync(new ClientsByTenantIdsSpec(tenantId, clientIds), ct);
+            : await _clients.ListAsync(new ClientsByTenantIdsNameSpec(tenantId, clientIds), ct);
+        if (clientIds.Length > 0)
+            MarkStep("clientsLookup");
+
         var clientNameById = clients.ToDictionary(x => x.Id, x => x.FullName);
 
         var petIds = rows.Where(x => x.PetId.HasValue).Select(x => x.PetId!.Value).Distinct().ToArray();
         var pets = petIds.Length == 0
             ? []
-            : await _pets.ListAsync(new PetsByTenantIdsSpec(tenantId, petIds), ct);
-        var petById = pets.ToDictionary(x => x.Id);
+            : await _pets.ListAsync(new PetsByTenantIdsNameClientSpec(tenantId, petIds), ct);
+        if (petIds.Length > 0)
+            MarkStep("petsLookup");
+
+        var petNameById = pets.ToDictionary(x => x.Id, x => x.Name);
 
         var items = rows
             .Select(p =>
             {
                 var clientName = clientNameById.TryGetValue(p.ClientId, out var cn) ? cn : string.Empty;
-                string petName = string.Empty;
-                if (p.PetId is { } pid && petById.TryGetValue(pid, out var pet))
-                    petName = pet.Name;
+                var petName = p.PetId is { } pid && petNameById.TryGetValue(pid, out var pn) ? pn : string.Empty;
 
                 return new PaymentListItemDto(
                     p.Id,
@@ -150,6 +183,17 @@ public sealed class GetPaymentsListQueryHandler
                     p.PaidAtUtc);
             })
             .ToList();
+
+        _logger.LogInformation(
+            "Payments list generated. TenantId={TenantId} ClinicId={ClinicId} Page={Page} PageSize={PageSize} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            tenantId,
+            effectiveClinicId,
+            page,
+            pageSize,
+            querySteps,
+            slowestStep,
+            slowestMs,
+            totalSw.ElapsedMilliseconds);
 
         return Result<PagedResult<PaymentListItemDto>>.Success(
             PagedResult<PaymentListItemDto>.Create(items, total, page, pageSize));

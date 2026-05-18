@@ -17,13 +17,13 @@ public sealed class ClinicAssignmentAccessGuard : IClinicAssignmentAccessGuard
 
     public async Task<bool> MustApplyAssignedClinicScopeAsync(Guid userId, CancellationToken ct)
     {
-        var details = await _userOperationClaims.GetDetailsByUserIdAsync(userId, ct);
-        var hasTenantAdmin = details.Any(d =>
-            string.Equals(d.OperationClaimName, TenantAdminClaimName, StringComparison.OrdinalIgnoreCase));
+        var claimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId, ct);
+        var hasTenantAdmin = claimNames.Any(name =>
+            string.Equals(name, TenantAdminClaimName, StringComparison.OrdinalIgnoreCase));
         if (hasTenantAdmin)
             return false;
 
-        return details.Any(d =>
-            string.Equals(d.OperationClaimName, ClinicAdminClaimName, StringComparison.OrdinalIgnoreCase));
+        return claimNames.Any(name =>
+            string.Equals(name, ClinicAdminClaimName, StringComparison.OrdinalIgnoreCase));
     }
 }

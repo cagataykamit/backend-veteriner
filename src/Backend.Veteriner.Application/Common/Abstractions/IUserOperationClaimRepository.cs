@@ -19,4 +19,7 @@ public interface IUserOperationClaimRepository
     Task<IReadOnlyList<UserOperationClaim>> GetByUserIdAsync(Guid userId, CancellationToken ct);
 
     Task<IReadOnlyList<UserOperationClaimDetailDto>> GetDetailsByUserIdAsync(Guid userId, CancellationToken ct);
+
+    /// <summary>Kullanıcının operation claim adları (rol kontrolü; Users join yok).</summary>
+    Task<IReadOnlyList<string>> GetOperationClaimNamesByUserIdAsync(Guid userId, CancellationToken ct);
 }

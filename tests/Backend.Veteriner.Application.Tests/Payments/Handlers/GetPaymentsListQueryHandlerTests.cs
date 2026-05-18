@@ -55,8 +55,8 @@ public sealed class GetPaymentsListQueryHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
-        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Payment>());
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PaymentListRow>());
         var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
 
         var result = await CreateHandler().Handle(new GetPaymentsListQuery(paging, Search: "   "), CancellationToken.None);
@@ -81,8 +81,8 @@ public sealed class GetPaymentsListQueryHandlerTests
             .ReturnsAsync(new List<Pet>());
         _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
-        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Payment>());
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PaymentListRow>());
         var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
 
         var result = await CreateHandler().Handle(new GetPaymentsListQuery(paging, Search: "  ada  "), CancellationToken.None);
@@ -103,8 +103,8 @@ public sealed class GetPaymentsListQueryHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
-        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Payment>());
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PaymentListRow>());
         var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
 
         var result = await CreateHandler().Handle(new GetPaymentsListQuery(paging), CancellationToken.None);
@@ -115,7 +115,7 @@ public sealed class GetPaymentsListQueryHandlerTests
             r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _payments.Verify(
-            r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -128,33 +128,27 @@ public sealed class GetPaymentsListQueryHandlerTests
         var petId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
 
-        var payment = new Payment(
-            tid,
+        var paidAt = DateTime.UtcNow.AddHours(-2);
+        var payment = new PaymentListRow(
+            Guid.NewGuid(),
             clinicId,
             clientId,
             petId,
-            null,
-            null,
             250m,
             "TRY",
             PaymentMethod.Card,
-            DateTime.UtcNow.AddHours(-2),
-            "Not");
+            paidAt);
 
         _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
-        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Payment> { payment });
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PaymentListRow> { payment });
 
-        var client = new Client(tid, "Ali Veli");
-        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
-        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Client> { client });
+        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClientNameRow> { new(clientId, "Ali Veli") });
 
-        var pet = new Pet(tid, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
-        typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
-        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Pet> { pet });
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsNameClientSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PetNameClientRow> { new(petId, clientId, "Pamuk") });
 
         var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
         var result = await CreateHandler().Handle(new GetPaymentsListQuery(paging), CancellationToken.None);
@@ -162,6 +156,7 @@ public sealed class GetPaymentsListQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         var item = result.Value!.Items.Should().ContainSingle().Subject;
         item.Id.Should().Be(payment.Id);
+        item.PaidAtUtc.Should().Be(paidAt);
         item.ClinicId.Should().Be(clinicId);
         item.ClientId.Should().Be(clientId);
         item.ClientName.Should().Be("Ali Veli");
@@ -185,8 +180,8 @@ public sealed class GetPaymentsListQueryHandlerTests
 
         _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
-        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Payment>());
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PaymentListRow>());
 
         var paging = new PaymentListPagingRequest { Page = 0, PageSize = 500 };
         var result = await CreateHandler().Handle(
@@ -200,7 +195,7 @@ public sealed class GetPaymentsListQueryHandlerTests
             r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _payments.Verify(
-            r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -258,8 +253,8 @@ public sealed class GetPaymentsListQueryHandlerTests
 
         _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
-        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Payment>());
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PaymentListRow>());
 
         var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { c1, c2 });
         var handler = new GetPaymentsListQueryHandler(

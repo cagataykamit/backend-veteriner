@@ -58,9 +58,9 @@ public sealed class UserOperationClaimRepository : IUserOperationClaimRepository
     {
         // UserEmail + ClaimName join
         return await (
-            from uoc in _db.UserOperationClaims
-            join u in _db.Users on uoc.UserId equals u.Id
-            join oc in _db.OperationClaims on uoc.OperationClaimId equals oc.Id
+            from uoc in _db.UserOperationClaims.AsNoTracking()
+            join u in _db.Users.AsNoTracking() on uoc.UserId equals u.Id
+            join oc in _db.OperationClaims.AsNoTracking() on uoc.OperationClaimId equals oc.Id
             where uoc.UserId == userId
             orderby oc.Name
             select new UserOperationClaimDetailDto(
@@ -70,6 +70,17 @@ public sealed class UserOperationClaimRepository : IUserOperationClaimRepository
                 uoc.OperationClaimId,
                 oc.Name
             )
+        ).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<string>> GetOperationClaimNamesByUserIdAsync(Guid userId, CancellationToken ct)
+    {
+        return await (
+            from uoc in _db.UserOperationClaims.AsNoTracking()
+            join oc in _db.OperationClaims.AsNoTracking() on uoc.OperationClaimId equals oc.Id
+            where uoc.UserId == userId
+            orderby oc.Name
+            select oc.Name
         ).ToListAsync(ct);
     }
 }

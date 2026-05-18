@@ -1,4 +1,3 @@
-using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using FluentAssertions;
@@ -16,11 +15,8 @@ public sealed class ClinicAssignmentAccessGuardTests
     public async Task MustApply_Should_BeFalse_When_UserHasTenantAdminClaim()
     {
         var userId = Guid.NewGuid();
-        _claims.Setup(x => x.GetDetailsByUserIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[]
-            {
-                new UserOperationClaimDetailDto(Guid.NewGuid(), userId, "a@b.c", Guid.NewGuid(), "Admin"),
-            });
+        _claims.Setup(x => x.GetOperationClaimNamesByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { "Admin" });
 
         var result = await CreateSut().MustApplyAssignedClinicScopeAsync(userId, CancellationToken.None);
 
@@ -31,11 +27,8 @@ public sealed class ClinicAssignmentAccessGuardTests
     public async Task MustApply_Should_BeFalse_When_UserHasTenantAdminCaseInsensitive()
     {
         var userId = Guid.NewGuid();
-        _claims.Setup(x => x.GetDetailsByUserIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[]
-            {
-                new UserOperationClaimDetailDto(Guid.NewGuid(), userId, "a@b.c", Guid.NewGuid(), "ADMIN"),
-            });
+        _claims.Setup(x => x.GetOperationClaimNamesByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { "ADMIN" });
 
         var result = await CreateSut().MustApplyAssignedClinicScopeAsync(userId, CancellationToken.None);
 
@@ -46,12 +39,8 @@ public sealed class ClinicAssignmentAccessGuardTests
     public async Task MustApply_Should_BeFalse_When_UserHasAdminAndClinicAdmin_Claim()
     {
         var userId = Guid.NewGuid();
-        _claims.Setup(x => x.GetDetailsByUserIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[]
-            {
-                new UserOperationClaimDetailDto(Guid.NewGuid(), userId, "a@b.c", Guid.NewGuid(), "ClinicAdmin"),
-                new UserOperationClaimDetailDto(Guid.NewGuid(), userId, "a@b.c", Guid.NewGuid(), "Admin"),
-            });
+        _claims.Setup(x => x.GetOperationClaimNamesByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { "ClinicAdmin", "Admin" });
 
         var result = await CreateSut().MustApplyAssignedClinicScopeAsync(userId, CancellationToken.None);
 
@@ -62,11 +51,8 @@ public sealed class ClinicAssignmentAccessGuardTests
     public async Task MustApply_Should_BeTrue_When_OnlyClinicAdminClaim()
     {
         var userId = Guid.NewGuid();
-        _claims.Setup(x => x.GetDetailsByUserIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[]
-            {
-                new UserOperationClaimDetailDto(Guid.NewGuid(), userId, "a@b.c", Guid.NewGuid(), "ClinicAdmin"),
-            });
+        _claims.Setup(x => x.GetOperationClaimNamesByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { "ClinicAdmin" });
 
         var result = await CreateSut().MustApplyAssignedClinicScopeAsync(userId, CancellationToken.None);
 
@@ -77,11 +63,8 @@ public sealed class ClinicAssignmentAccessGuardTests
     public async Task MustApply_Should_BeFalse_When_NoClinicAdminClaim()
     {
         var userId = Guid.NewGuid();
-        _claims.Setup(x => x.GetDetailsByUserIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[]
-            {
-                new UserOperationClaimDetailDto(Guid.NewGuid(), userId, "a@b.c", Guid.NewGuid(), "Veteriner"),
-            });
+        _claims.Setup(x => x.GetOperationClaimNamesByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { "Veteriner" });
 
         var result = await CreateSut().MustApplyAssignedClinicScopeAsync(userId, CancellationToken.None);
 
