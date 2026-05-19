@@ -1,5 +1,7 @@
-using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
+using Backend.Veteriner.Application.Clinics.Specs;
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
@@ -15,19 +17,25 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
     private readonly IUserClinicRepository _userClinics;
+    private readonly IReadRepository<Clinic> _clinicsRead;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
 
     public GetMyClinicsQueryHandler(
         ITenantContext tenantContext,
         IClientContext client,
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
-        IUserClinicRepository userClinics)
+        IUserClinicRepository userClinics,
+        IReadRepository<Clinic> clinicsRead,
+        IUserOperationClaimRepository userOperationClaims)
     {
         _tenantContext = tenantContext;
         _client = client;
         _tenants = tenants;
         _userTenants = userTenants;
         _userClinics = userClinics;
+        _clinicsRead = clinicsRead;
+        _userOperationClaims = userOperationClaims;
     }
 
     public async Task<Result<IReadOnlyList<ClinicListItemDto>>> Handle(GetMyClinicsQuery request, CancellationToken ct)
@@ -60,13 +68,28 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
                 "Bu kiracıda üyeliğiniz yok.");
         }
 
-        var rows = await _userClinics.ListAccessibleClinicsAsync(userId.Value, tenantId, request.IsActive, ct);
+        // Tenant-wide rol whitelist: Admin / Owner / PlatformAdmin → UserClinic atamasını bypass et.
+        // Diğer roller (ClinicAdmin, Veteriner, Sekreter, vb.) mevcut assignment kuralına tabi kalır.
+        // ClinicAssignmentAccessGuard burada kasten kullanılmıyor: guard claim'i olmayan kullanıcıları da
+        // tenant-wide saydığı için switcher davranışı için yanıltıcıdır.
+        var claimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId.Value, ct);
+        var isTenantWide = TenantWideClaimNames.IsTenantWide(claimNames);
 
-        var dtos = rows
+        IReadOnlyList<Clinic> clinics;
+        if (isTenantWide)
+        {
+            clinics = await _clinicsRead.ListAsync(
+                new ClinicsByTenantFilteredSpec(tenantId, request.IsActive), ct);
+        }
+        else
+        {
+            clinics = await _userClinics.ListAccessibleClinicsAsync(userId.Value, tenantId, request.IsActive, ct);
+        }
+
+        var dtos = clinics
             .Select(c => new ClinicListItemDto(c.Id, c.TenantId, c.Name, c.City, c.IsActive, c.Phone, c.Email))
             .ToArray();
 
         return Result<IReadOnlyList<ClinicListItemDto>>.Success(dtos);
     }
 }
-

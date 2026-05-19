@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Auth.Commands.Login;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -26,6 +27,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
     private readonly IUserTenantRepository _userTenants;
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
     private readonly ILogger<SelectClinicCommandHandler> _logger;
 
     public SelectClinicCommandHandler(
@@ -38,6 +40,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         IUserTenantRepository userTenants,
         IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinics,
+        IUserOperationClaimRepository userOperationClaims,
         ILogger<SelectClinicCommandHandler>? logger = null)
     {
         _refreshRepo = refreshRepo;
@@ -49,6 +52,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         _userTenants = userTenants;
         _userClinics = userClinics;
         _clinics = clinics;
+        _userOperationClaims = userOperationClaims;
         _logger = logger ?? NullLogger<SelectClinicCommandHandler>.Instance;
     }
 
@@ -139,23 +143,46 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         }
         MarkStep("userTenantMembership");
 
-        var clinicAssignedAndActive = await _userClinics.ExistsActiveInTenantAsync(
-            user.Id, sessionTenantId, request.ClinicId, ct);
-        MarkStep("clinicAssignmentAndActive");
-        if (!clinicAssignedAndActive)
+        // Tenant-wide rol whitelist: Admin / Owner / PlatformAdmin → UserClinic atamasını bypass et.
+        // ClinicAdmin / Veteriner / Sekreter ve claim'i olmayan kullanıcılar için mevcut assignment kuralı korunur.
+        // ClinicAssignmentAccessGuard burada kasten kullanılmıyor: guard claim'i olmayan kullanıcıyı da
+        // tenant-wide saydığı için bu uçta güvenlik gevşemesi yaratır.
+        var claimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(user.Id, ct);
+        var isTenantWide = TenantWideClaimNames.IsTenantWide(claimNames);
+        MarkStep("tenantWideRoleCheck");
+
+        if (isTenantWide)
         {
-            var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(sessionTenantId, request.ClinicId), ct);
-            MarkStep("clinicExistenceFallback");
+            var clinic = await _clinics.FirstOrDefaultAsync(
+                new ClinicByIdSpec(sessionTenantId, request.ClinicId), ct);
+            MarkStep("clinicTenantWideLookup");
             if (clinic is null || !clinic.IsActive)
             {
                 return Result<LoginResultDto>.Failure(
                     "Auth.ClinicNotFound",
                     "Klinik bulunamadı, pasif veya kiracıya ait değil.");
             }
+        }
+        else
+        {
+            var clinicAssignedAndActive = await _userClinics.ExistsActiveInTenantAsync(
+                user.Id, sessionTenantId, request.ClinicId, ct);
+            MarkStep("clinicAssignmentAndActive");
+            if (!clinicAssignedAndActive)
+            {
+                var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(sessionTenantId, request.ClinicId), ct);
+                MarkStep("clinicExistenceFallback");
+                if (clinic is null || !clinic.IsActive)
+                {
+                    return Result<LoginResultDto>.Failure(
+                        "Auth.ClinicNotFound",
+                        "Klinik bulunamadı, pasif veya kiracıya ait değil.");
+                }
 
-            return Result<LoginResultDto>.Failure(
-                "Auth.UserClinicNotAssigned",
-                "Bu kliniğe erişim yetkiniz yok; yöneticinizden atama isteyin.");
+                return Result<LoginResultDto>.Failure(
+                    "Auth.UserClinicNotAssigned",
+                    "Bu kliniğe erişim yetkiniz yok; yöneticinizden atama isteyin.");
+            }
         }
 
         // Claims: permissions + tenant_id + clinic_id (+ platform_admin)
