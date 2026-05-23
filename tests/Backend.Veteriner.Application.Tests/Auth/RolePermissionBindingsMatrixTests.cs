@@ -99,6 +99,7 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Hospitalizations.Update },
         new object[] { PermissionCatalog.Hospitalizations.Discharge },
         new object[] { PermissionCatalog.Clinics.Read },
+        new object[] { PermissionCatalog.Clinics.Create },
         new object[] { PermissionCatalog.Clinics.Update },
         new object[] { PermissionCatalog.Reminders.Read },
         new object[] { PermissionCatalog.Reminders.Manage },
@@ -420,10 +421,34 @@ public sealed class RolePermissionBindingsMatrixTests
     }
 
     [Fact]
+    public void Admin_Should_Contain_Clinics_Create()
+    {
+        Perms("Admin").Should().Contain(PermissionCatalog.Clinics.Create);
+    }
+
+    [Fact]
+    public void Owner_Should_Contain_Clinics_Create()
+    {
+        Perms("Owner").Should().Contain(PermissionCatalog.Clinics.Create);
+    }
+
+    [Fact]
+    public void Veteriner_Should_Not_Contain_Clinics_Create()
+    {
+        Perms("Veteriner").Should().NotContain(PermissionCatalog.Clinics.Create);
+    }
+
+    [Fact]
+    public void Sekreter_Should_Not_Contain_Clinics_Create()
+    {
+        Perms("Sekreter").Should().NotContain(PermissionCatalog.Clinics.Create);
+    }
+
+    [Fact]
     public void ClinicAdmin_Should_Not_Contain_Tenant_Or_Clinic_Create_Or_Subscriptions_Manage()
     {
         var ca = Perms("ClinicAdmin");
-        ca.Should().NotContain(PermissionCatalog.Clinics.Create, "Yeni klinik açma tenant Admin/Owner işi");
+        ca.Should().NotContain(PermissionCatalog.Clinics.Create, "Yeni klinik açma yalnız tenant Admin/Owner");
         ca.Should().NotContain(PermissionCatalog.Tenants.InviteCreate, "Üye davet tenant Admin/Owner işi");
         ca.Should().NotContain(PermissionCatalog.Tenants.Read);
         ca.Should().NotContain(PermissionCatalog.Tenants.Create);

@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Application.Auth;
 /// Kapsam (Faz 4B-5):
 /// <list type="bullet">
 ///   <item><c>Admin</c>: tenant içi yönetici. Tüm klinik operasyon modüllerinin Read/Create/Update,
-///   randevu lifecycle, klinik profili (Read/Update), reminder yönetimi, tenant okuma + üye davet,
+///   randevu lifecycle, klinik yönetimi (Read/Create/Update), reminder yönetimi, tenant okuma + üye davet,
 ///   abonelik bilgisini okuma. <b>Sistem yetkileri</b> (Permissions/Roles/Users yazma, Outbox, Diagnostics)
 ///   <b>verilmez</b>; bu yetkiler platform yöneticisine aittir ve platform Admin claim'i için
 ///   <c>AdminClaimSeeder</c> tarafından tüm permission'lar zaten otomatik bağlanır.</item>
@@ -17,7 +17,7 @@ namespace Backend.Veteriner.Application.Auth;
 ///   yoksa <c>RolePermissionBindingSeeder</c> skip eder; mevcut idempotent davranış korunur.)</item>
 ///   <item><c>ClinicAdmin</c>: klinik operasyon yöneticisi. Tüm klinik modüllerinin Read/Create/Update,
 ///   randevu lifecycle, klinik okuma + güncelleme (klinik profili/working hours), reminder yönetimi.
-///   <b>Verilmez:</b> <c>Clinics.Create</c> (yeni klinik açma tenant Admin/Owner işi),
+///   <b>Verilmez:</b> <c>Clinics.Create</c> (yeni klinik açma yalnız tenant Admin/Owner),
 ///   <c>Tenants.*</c> / <c>Subscriptions.Manage</c> / <c>Roles.*</c> / <c>Permissions.*</c> / <c>Users.*</c>
 ///   / <c>Outbox.*</c> / <c>Admin.Diagnostics</c>.</item>
 ///   <item><c>Veteriner</c>: tıbbi operasyon rolü. Klinik kayıtlarının (muayene, aşı, tedavi, reçete, lab,
@@ -105,6 +105,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Hospitalizations.Discharge,
 
                 PermissionCatalog.Clinics.Read,
+                PermissionCatalog.Clinics.Create,
                 PermissionCatalog.Clinics.Update,
 
                 PermissionCatalog.Reminders.Read,
@@ -191,6 +192,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Hospitalizations.Discharge,
 
                 PermissionCatalog.Clinics.Read,
+                PermissionCatalog.Clinics.Create,
                 PermissionCatalog.Clinics.Update,
 
                 PermissionCatalog.Reminders.Read,
@@ -224,7 +226,7 @@ public static class RolePermissionBindings
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini
             // güncelleme yetkisi ürün gereği ClinicAdmin'de tutulur (working hours / break time / vb.).
-            // Tenants.* / Subscriptions.Manage / Users.Roles.Permissions / Outbox / Clinics.Create verilmez.
+            // Tenants.* / Subscriptions.Manage / Users.Roles.Permissions / Outbox / Clinics.Create verilmez (Create: Admin/Owner).
             // Species/Breeds Create/Update tür-ırk kataloğu yönetimi için ClinicAdmin'de verilir (Faz 11B-3).
             // Subscriptions.Read ek bilgi amacıyla verilir.
             ["ClinicAdmin"] =

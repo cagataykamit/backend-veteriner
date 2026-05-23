@@ -12,7 +12,7 @@ namespace Backend.IntegrationTests.Seeding;
 
 /// <summary>
 /// <see cref="RolePermissionBindingSeeder"/> idempotent bağ ekleme garantilerini doğrular:
-/// - Admin ve ClinicAdmin rolleri <c>Clinics.Update</c> bağını alır; ClinicAdmin ayrıca operasyonel permission’lardan
+/// - Admin ve Owner <c>Clinics.Create</c> bağını alır; Admin ve ClinicAdmin <c>Clinics.Update</c> bağını alır; ClinicAdmin ayrıca operasyonel permission’lardan
 ///   örnek olarak <c>Dashboard.Read</c> alır.
 /// - Mevcut bağlar korunur, duplicate satır oluşmaz.
 /// - Tekrar çalıştırma toplam satır sayısını değiştirmez.
@@ -71,9 +71,23 @@ public sealed class RolePermissionBindingSeederTests
         await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
         await RolePermissionBindingSeeder.SeedAsync(db);
 
+        var clinicsCreateId = await GetPermissionIdAsync(db, PermissionCatalog.Clinics.Create);
         var clinicsUpdateId = await GetPermissionIdAsync(db, PermissionCatalog.Clinics.Update);
         var adminClaimId = await GetClaimIdAsync(db, "Admin");
+        var ownerClaimId = await GetClaimIdAsync(db, "Owner");
         var clinicAdminClaimId = await GetClaimIdAsync(db, "ClinicAdmin");
+
+        var adminCreateLinks = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == adminClaimId && x.PermissionId == clinicsCreateId);
+        adminCreateLinks.Should().Be(1, "Admin rolü Clinics.Create bağını tam olarak bir kez almalı");
+
+        var ownerCreateLinks = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == ownerClaimId && x.PermissionId == clinicsCreateId);
+        ownerCreateLinks.Should().Be(1, "Owner rolü Clinics.Create bağını tam olarak bir kez almalı");
+
+        var clinicAdminCreateLinks = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == clinicsCreateId);
+        clinicAdminCreateLinks.Should().Be(0, "ClinicAdmin rolü Clinics.Create bağını almamalı");
 
         var adminLinks = await db.OperationClaimPermissions
             .CountAsync(x => x.OperationClaimId == adminClaimId && x.PermissionId == clinicsUpdateId);
