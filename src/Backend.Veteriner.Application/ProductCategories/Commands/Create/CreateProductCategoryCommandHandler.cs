@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ProductCategories.Commands.Create;
 
@@ -31,9 +32,9 @@ public sealed class CreateProductCategoryCommandHandler
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
 
-        var normalizedName = request.Name.Trim().ToLowerInvariant();
+        var trimmedName = request.Name.Trim();
         var duplicate = await _categoriesRead.FirstOrDefaultAsync(
-            new ProductCategoryByTenantAndNameSpec(tenantId, normalizedName),
+            new ProductCategoryByTenantAndNameSpec(tenantId, trimmedName),
             ct);
 
         if (duplicate is not null)
@@ -41,11 +42,34 @@ public sealed class CreateProductCategoryCommandHandler
                 "ProductCategories.NameAlreadyExists",
                 "Bu kiracı için aynı kategori adı zaten mevcut.");
 
-        var category = new ProductCategory(tenantId, request.Name, request.Description);
-        await _categoriesWrite.AddAsync(category, ct);
-        await _categoriesWrite.SaveChangesAsync(ct);
+        var category = new ProductCategory(tenantId, trimmedName, request.Description);
+        try
+        {
+            await _categoriesWrite.AddAsync(category, ct);
+            await _categoriesWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateTenantNameViolation(ex))
+        {
+            return Result<ProductCategoryDto>.Failure(
+                "ProductCategories.NameAlreadyExists",
+                "Bu kiracı için aynı kategori adı zaten mevcut.");
+        }
 
         return Result<ProductCategoryDto>.Success(
             new ProductCategoryDto(category.Id, category.Name, category.Description, category.IsActive));
+    }
+
+    private static bool IsDuplicateTenantNameViolation(DbUpdateException ex)
+    {
+        for (var e = ex.InnerException; e is not null; e = e.InnerException)
+        {
+            if (e.Message.Contains("IX_ProductCategories_TenantId_Name", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (e.Message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase)
+                && e.Message.Contains("ProductCategories", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 }

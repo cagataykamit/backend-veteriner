@@ -33,9 +33,9 @@ public sealed class UpdateProductCategoryCommandHandler : IRequestHandler<Update
         if (category is null)
             return Result.Failure("ProductCategories.NotFound", "Kategori bulunamadı veya kiracıya ait değil.");
 
-        var normalizedName = request.Name.Trim().ToLowerInvariant();
+        var trimmedName = request.Name.Trim();
         var duplicate = await _categoriesRead.FirstOrDefaultAsync(
-            new ProductCategoryByTenantAndNameSpec(tenantId, normalizedName, request.Id),
+            new ProductCategoryByTenantAndNameSpec(tenantId, trimmedName, request.Id),
             ct);
 
         if (duplicate is not null)

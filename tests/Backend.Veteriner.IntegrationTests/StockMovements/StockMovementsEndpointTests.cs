@@ -99,7 +99,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
 
         nested.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var list = await client.GetAsync("/api/v1/stock-movements?page=1&pageSize=500");
+        var list = await client.GetAsync("/api/v1/stock-movements?page=1&pageSize=200");
         list.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await list.Content.ReadFromJsonAsync<JsonElement>();
         foreach (var row in json.GetProperty("items").EnumerateArray())
