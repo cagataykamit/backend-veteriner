@@ -1,3 +1,4 @@
+using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Infrastructure.Persistence;
@@ -36,11 +37,8 @@ public sealed class AdminSeedingOrchestrationTests
             .Options;
     }
 
-    private static async Task ResetDatabaseAsync(AppDbContext db)
-    {
-        await db.Database.EnsureDeletedAsync();
-        await db.Database.MigrateAsync();
-    }
+    private static Task ResetDatabaseAsync(AppDbContext db)
+        => IntegrationTestDatabaseReset.ResetAndMigrateAsync(db);
 
     /// <summary>
     /// Bcrypt formatında hash üretir; DataSeeder'ın format kontrolünü geçer.

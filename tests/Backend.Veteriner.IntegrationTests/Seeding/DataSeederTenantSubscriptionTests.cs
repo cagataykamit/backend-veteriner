@@ -1,3 +1,4 @@
+using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Tenants;
@@ -29,11 +30,8 @@ public sealed class DataSeederTenantSubscriptionTests
                 .Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
-    private static async Task ResetDatabaseAsync(AppDbContext db)
-    {
-        await db.Database.EnsureDeletedAsync();
-        await db.Database.MigrateAsync();
-    }
+    private static Task ResetDatabaseAsync(AppDbContext db)
+        => IntegrationTestDatabaseReset.ResetAndMigrateAsync(db);
 
     private sealed class StubBcryptPasswordHasher : IPasswordHasher
     {

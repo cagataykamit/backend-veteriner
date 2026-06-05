@@ -1,3 +1,4 @@
+using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Auth;
@@ -37,11 +38,8 @@ public sealed class RolePermissionBindingSeederTests
             .Options;
     }
 
-    private static async Task ResetDatabaseAsync(AppDbContext db)
-    {
-        await db.Database.EnsureDeletedAsync();
-        await db.Database.MigrateAsync();
-    }
+    private static Task ResetDatabaseAsync(AppDbContext db)
+        => IntegrationTestDatabaseReset.ResetAndMigrateAsync(db);
 
     private sealed class StubBcryptPasswordHasher : IPasswordHasher
     {
@@ -57,6 +55,18 @@ public sealed class RolePermissionBindingSeederTests
     private static async Task<Guid> GetClaimIdAsync(AppDbContext db, string name) =>
         (await db.Set<OperationClaim>().SingleAsync(c => c.Name == name)).Id;
 
+    /// <summary>
+    /// Owner claim seed pipeline'da otomatik oluşmaz; Owner bağ testleri için test-only oluşturma.
+    /// </summary>
+    private static async Task EnsureOwnerClaimAsync(AppDbContext db)
+    {
+        if (await db.OperationClaims.AnyAsync(x => x.Name == "Owner"))
+            return;
+
+        await db.OperationClaims.AddAsync(new OperationClaim("Owner"));
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task Seed_Should_Bind_ClinicsUpdate_To_Admin_And_ClinicAdmin_WithoutDuplicates()
     {
@@ -69,6 +79,7 @@ public sealed class RolePermissionBindingSeederTests
         await DataSeeder.SeedAsync(db, hasher);
         await AdminClaimSeeder.SeedAsync(db);
         await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
+        await EnsureOwnerClaimAsync(db);
         await RolePermissionBindingSeeder.SeedAsync(db);
 
         var clinicsCreateId = await GetPermissionIdAsync(db, PermissionCatalog.Clinics.Create);
