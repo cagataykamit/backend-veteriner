@@ -9,8 +9,10 @@ using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
@@ -52,6 +54,34 @@ internal static class IntegrationTestAuthHelper
             .SingleAsync();
 
         return new IntegrationLoginTokens(accessToken, refreshToken, userId, tenantId);
+    }
+
+    /// <summary>
+    /// Login rate-limit'ine takılmadan, DB'deki kullanıcı için access token üretir (IDOR integration testleri).
+    /// OperationClaim/permission kontrolleri handler tarafında DB'den okunmaya devam eder.
+    /// </summary>
+    public static async Task<string> IssueUserAccessTokenAsync(
+        IServiceProvider services,
+        string email,
+        IReadOnlyCollection<string> permissions)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+
+        var user = await db.Users.SingleAsync(u => u.Email == email);
+        var tenantId = await db.UserTenants
+            .Where(ut => ut.UserId == user.Id)
+            .Select(ut => ut.TenantId)
+            .SingleAsync();
+
+        var claims = permissions
+            .Select(p => new Claim("permission", p))
+            .Append(new Claim(VeterinerClaims.TenantId, tenantId.ToString("D")))
+            .ToList();
+
+        var (accessToken, _, _) = jwt.Create(user.Id, user.Email, Array.Empty<string>(), claims);
+        return accessToken;
     }
 
     /// <summary>
@@ -229,6 +259,99 @@ internal static class IntegrationTestAuthHelper
     }
 
     /// <summary>
+    /// Tenant-wide olmayan kullanıcı: <c>Examinations.Read</c> iznine sahip, Admin / Owner / PlatformAdmin /
+    /// ClinicAdmin claim'i yok. Yalnız atandığı kliniğin muayene detayını okuyabilmeli.
+    /// </summary>
+    public static async Task<(string Email, string Password, Guid AssignedClinicId, Guid UnassignedClinicId)>
+        SeedExaminationReaderUserAsync(IServiceProvider services, IPasswordHasher hasher)
+    {
+        await EnsureRolePermissionBindingsAsync(services);
+
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+        var assignedClinic = await db.Clinics.SingleAsync(c =>
+            c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+
+        var unassignedClinic = new Clinic(tenant.Id, $"ExamReader-{Guid.NewGuid():N}"[..14], "Konya");
+        db.Clinics.Add(unassignedClinic);
+        await db.SaveChangesAsync();
+
+        var claim = await EnsureExaminationsReadClaimAsync(db);
+
+        var email = $"exam-reader-{Guid.NewGuid():N}@example.com";
+        const string password = "123456";
+        var user = new User(email, hasher.Hash(password));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        await db.SaveChangesAsync();
+
+        return (email, password, assignedClinic.Id, unassignedClinic.Id);
+    }
+
+    /// <summary>Belirtilen klinikte tek muayene oluşturur; isteğe bağlı bağlı tedavi kaydı ekler.</summary>
+    public static async Task<ExaminationSeedResult> SeedExaminationInClinicAsync(
+        IServiceProvider services,
+        Guid clinicId,
+        bool includeRelatedTreatment = false,
+        TimeSpan? examinedOffsetFromUtcNow = null)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
+        var client = new Client(clinic.TenantId, $"ExamClient-{Guid.NewGuid():N}"[..14], "905551110088");
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+        var pet = new Pet(clinic.TenantId, client.Id, $"ExamPet-{Guid.NewGuid():N}"[..12], speciesId);
+        db.Pets.Add(pet);
+        await db.SaveChangesAsync();
+
+        var examinedAt = DateTime.UtcNow.Add(examinedOffsetFromUtcNow ?? TimeSpan.FromHours(-3));
+        var examination = new Examination(
+            clinic.TenantId,
+            clinic.Id,
+            pet.Id,
+            appointmentId: null,
+            examinedAt,
+            "Kontrol",
+            "Bulgu",
+            null,
+            null);
+        db.Examinations.Add(examination);
+        await db.SaveChangesAsync();
+
+        Guid? treatmentId = null;
+        if (includeRelatedTreatment)
+        {
+            var treatment = new Treatment(
+                clinic.TenantId,
+                clinic.Id,
+                pet.Id,
+                examination.Id,
+                examinedAt.AddMinutes(15),
+                "İlgili Tedavi",
+                "Tedavi açıklaması",
+                null,
+                null);
+            db.Treatments.Add(treatment);
+            await db.SaveChangesAsync();
+            treatmentId = treatment.Id;
+        }
+
+        return new ExaminationSeedResult(examination.Id, treatmentId);
+    }
+
+    internal sealed record ExaminationSeedResult(Guid ExaminationId, Guid? RelatedTreatmentId);
+
+    /// <summary>
     /// Operation claim'i olmayan düz tenant üyesi: hiçbir permission taşımaz, dolayısıyla
     /// <c>Clinics.Read</c> policy'si authorization katmanında 403 ile engellenir.
     /// </summary>
@@ -319,6 +442,37 @@ internal static class IntegrationTestAuthHelper
         if (perm is null)
         {
             perm = new Permission(code, code, "Appointments");
+            db.Permissions.Add(perm);
+            await db.SaveChangesAsync();
+        }
+
+        var linked = await db.OperationClaimPermissions
+            .AnyAsync(x => x.OperationClaimId == claim.Id && x.PermissionId == perm.Id);
+        if (!linked)
+        {
+            db.OperationClaimPermissions.Add(new OperationClaimPermission(claim.Id, perm.Id));
+            await db.SaveChangesAsync();
+        }
+
+        return claim;
+    }
+
+    private static async Task<OperationClaim> EnsureExaminationsReadClaimAsync(AppDbContext db)
+    {
+        const string claimName = "IntegrationExaminationReader";
+        var claim = await db.OperationClaims.FirstOrDefaultAsync(c => c.Name == claimName);
+        if (claim is null)
+        {
+            claim = new OperationClaim(claimName);
+            db.OperationClaims.Add(claim);
+            await db.SaveChangesAsync();
+        }
+
+        var code = PermissionCatalog.Examinations.Read;
+        var perm = await db.Permissions.FirstOrDefaultAsync(p => p.Code == code);
+        if (perm is null)
+        {
+            perm = new Permission(code, code, "Examinations");
             db.Permissions.Add(perm);
             await db.SaveChangesAsync();
         }

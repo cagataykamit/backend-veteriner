@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
@@ -23,6 +24,9 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClientContext _clientContext;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -36,6 +40,9 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
     public GetExaminationRelatedSummaryQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClientContext clientContext,
+        IUserOperationClaimRepository userOperationClaims,
+        IUserClinicRepository userClinics,
         IReadRepository<Examination> examinations,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
@@ -48,6 +55,9 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clientContext = clientContext;
+        _userOperationClaims = userOperationClaims;
+        _userClinics = userClinics;
         _examinations = examinations;
         _pets = pets;
         _clients = clients;
@@ -70,12 +80,30 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
+        if (_clientContext.UserId is not { } userId)
+        {
+            return Result<ExaminationRelatedSummaryDto>.Failure(
+                "Auth.Unauthorized.UserContextMissing",
+                "Kullanıcı bağlamı yok.");
+        }
+
         var examinationId = request.Id;
         var e = await _examinations.FirstOrDefaultAsync(new ExaminationByIdSpec(tenantId, examinationId), ct);
         if (e is null)
             return Result<ExaminationRelatedSummaryDto>.Failure("Examinations.NotFound", "Muayene kaydı bulunamadı.");
         if (_clinicContext.ClinicId is { } activeClinicId && e.ClinicId != activeClinicId)
             return Result<ExaminationRelatedSummaryDto>.Failure("Examinations.NotFound", "Muayene kaydı bulunamadı.");
+
+        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId, ct);
+        if (!TenantWideClaimNames.IsTenantWide(operationClaimNames))
+        {
+            if (!await _userClinics.ExistsAsync(userId, e.ClinicId, ct))
+            {
+                return Result<ExaminationRelatedSummaryDto>.Failure(
+                    "Examinations.NotFound",
+                    "Muayene kaydı bulunamadı.");
+            }
+        }
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, e.PetId), ct);
         var petName = pet?.Name ?? string.Empty;
