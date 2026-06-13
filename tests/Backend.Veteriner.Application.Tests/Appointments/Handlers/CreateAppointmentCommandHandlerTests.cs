@@ -60,6 +60,19 @@ public sealed class CreateAppointmentCommandHandlerTests
         return date.AddHours(9);
     }
 
+    // Working-hours / slot / break senaryoları sabit 2026-06-01 (yerel Pazartesi) tarihine bağlıydı;
+    // güncel tarihe göre geçmişte kaldığında handler önce ScheduledTooFarInPast döndüğü için testler kırılıyordu.
+    // Aynı "yerel Pazartesi + sabit UTC saat" semantiğini koruyarak GELECEKTEKİ Pazartesi'yi üretir.
+    private static DateTime MondayUtc(int hour, int minute, int second = 0)
+    {
+        var today = DateTime.UtcNow.Date;
+        var daysUntilMonday = ((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7;
+        if (daysUntilMonday == 0)
+            daysUntilMonday = 7;
+        var monday = today.AddDays(daysUntilMonday);
+        return new DateTime(monday.Year, monday.Month, monday.Day, hour, minute, second, DateTimeKind.Utc);
+    }
+
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
     {
@@ -547,7 +560,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc);
+        var when = MondayUtc(9, 0);
         var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
         var settings = ClinicAppointmentSettingsEntity.Create(tid, cid, 30, 15, allowOverlappingAppointments: true);
 
@@ -578,7 +591,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var when = new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc);
+        var when = MondayUtc(9, 0);
         var cmd = new CreateAppointmentCommand(cid, pid, when, AppointmentType.Examination);
         var settings = ClinicAppointmentSettingsEntity.Create(tid, cid, 30, 15, allowOverlappingAppointments: true);
         var blockingPetAppt = new Appointment(tid, cid, pid, when.AddMinutes(15), 30, AppointmentType.Other, null, null);
@@ -609,7 +622,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 6, 0, 0, DateTimeKind.Utc); // 09:00 local
+        var scheduledUtc = MondayUtc(6, 0); // 09:00 local
         var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -635,7 +648,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 5, 30, 0, DateTimeKind.Utc); // 08:30 local
+        var scheduledUtc = MondayUtc(5, 30); // 08:30 local
         var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -661,7 +674,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 9, 15, 0, DateTimeKind.Utc); // 12:15 local
+        var scheduledUtc = MondayUtc(9, 15); // 12:15 local
         var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -687,7 +700,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 10, 0, 0, DateTimeKind.Utc); // 13:00 local
+        var scheduledUtc = MondayUtc(10, 0); // 13:00 local
         var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -714,7 +727,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 14, 45, 0, DateTimeKind.Utc); // 17:45 local
+        var scheduledUtc = MondayUtc(14, 45); // 17:45 local
         var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -740,7 +753,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 20, 30, 0, DateTimeKind.Utc); // 23:30 local
+        var scheduledUtc = MondayUtc(20, 30); // 23:30 local
         var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 60);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -766,7 +779,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 6, 10, 0, DateTimeKind.Utc); // 09:10 local
+        var scheduledUtc = MondayUtc(6, 10); // 09:10 local
         var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -789,8 +802,8 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var okCmd = new CreateAppointmentCommand(cid, pid, new DateTime(2026, 6, 1, 6, 20, 0, DateTimeKind.Utc), AppointmentType.Examination, null, null, DurationMinutes: 30); // 09:20 local
-        var badCmd = okCmd with { ScheduledAtUtc = new DateTime(2026, 6, 1, 6, 30, 0, DateTimeKind.Utc) }; // 09:30 local
+        var okCmd = new CreateAppointmentCommand(cid, pid, MondayUtc(6, 20), AppointmentType.Examination, null, null, DurationMinutes: 30); // 09:20 local
+        var badCmd = okCmd with { ScheduledAtUtc = MondayUtc(6, 30) }; // 09:30 local
         var settings = ClinicAppointmentSettingsEntity.Create(tid, cid, 30, 20, false);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -817,7 +830,7 @@ public sealed class CreateAppointmentCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 6, 15, 1, DateTimeKind.Utc).AddMilliseconds(1);
+        var scheduledUtc = MondayUtc(6, 15, 1).AddMilliseconds(1);
         var cmd = new CreateAppointmentCommand(cid, pid, scheduledUtc, AppointmentType.Examination, null, null, DurationMinutes: 30);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);

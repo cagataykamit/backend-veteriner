@@ -42,6 +42,19 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         return date.AddHours(9);
     }
 
+    // Reschedule working-hours / slot senaryoları sabit 2026-06-01 (yerel Pazartesi) tarihine bağlıydı;
+    // güncel tarihe göre geçmişte kaldığında handler önce ScheduledTooFarInPast döndüğü için testler kırılıyordu.
+    // Aynı "yerel Pazartesi + sabit UTC saat" semantiğini koruyarak GELECEKTEKİ Pazartesi'yi üretir.
+    private static DateTime MondayUtc(int hour, int minute, int second = 0)
+    {
+        var today = DateTime.UtcNow.Date;
+        var daysUntilMonday = ((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7;
+        if (daysUntilMonday == 0)
+            daysUntilMonday = 7;
+        var monday = today.AddDays(daysUntilMonday);
+        return new DateTime(monday.Year, monday.Month, monday.Day, hour, minute, second, DateTimeKind.Utc);
+    }
+
     [Fact]
     public async Task Cancel_Should_Fail_When_ContextMissing()
     {
@@ -177,7 +190,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
-        var when = new DateTime(2026, 6, 1, 6, 0, 0, DateTimeKind.Utc); // 09:00 local
+        var when = MondayUtc(6, 0); // 09:00 local
         var appt = new Appointment(tid, cid, Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -253,7 +266,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
-        var when = new DateTime(2026, 6, 1, 15, 30, 0, DateTimeKind.Utc); // 18:30 local
+        var when = MondayUtc(15, 30); // 18:30 local
         var appt = new Appointment(tid, cid, Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -279,7 +292,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
-        var when = new DateTime(2026, 6, 1, 6, 10, 0, DateTimeKind.Utc); // 09:10 local
+        var when = MondayUtc(6, 10); // 09:10 local
         var appt = new Appointment(tid, cid, Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);

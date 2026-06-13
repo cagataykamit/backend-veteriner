@@ -55,6 +55,19 @@ public sealed class UpdateAppointmentCommandHandlerTests
         return date.AddHours(9);
     }
 
+    // Working-hours / slot senaryoları sabit 2026-06-01 (yerel Pazartesi) tarihine bağlıydı;
+    // güncel tarihe göre geçmişte kaldığında handler önce ScheduledTooFarInPast döndüğü için testler kırılıyordu.
+    // Aynı "yerel Pazartesi + sabit UTC saat" semantiğini koruyarak GELECEKTEKİ Pazartesi'yi üretir.
+    private static DateTime MondayUtc(int hour, int minute, int second = 0)
+    {
+        var today = DateTime.UtcNow.Date;
+        var daysUntilMonday = ((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7;
+        if (daysUntilMonday == 0)
+            daysUntilMonday = 7;
+        var monday = today.AddDays(daysUntilMonday);
+        return new DateTime(monday.Year, monday.Month, monday.Day, hour, minute, second, DateTimeKind.Utc);
+    }
+
     [Fact]
     public async Task Handle_Should_Update_AppointmentType_When_Scheduled()
     {
@@ -276,7 +289,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var aid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 15, 30, 0, DateTimeKind.Utc); // 18:30 local
+        var scheduledUtc = MondayUtc(15, 30); // 18:30 local
 
         var appt = new Appointment(tid, cid, pid, SlotAlignedUtcPlusDays(1), 30, AppointmentType.Examination, null, null);
         typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
@@ -306,7 +319,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
         var aid = Guid.NewGuid();
-        var scheduledUtc = new DateTime(2026, 6, 1, 6, 10, 0, DateTimeKind.Utc); // 09:10 local
+        var scheduledUtc = MondayUtc(6, 10); // 09:10 local
 
         var appt = new Appointment(tid, cid, pid, SlotAlignedUtcPlusDays(1), 30, AppointmentType.Examination, null, null);
         typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
