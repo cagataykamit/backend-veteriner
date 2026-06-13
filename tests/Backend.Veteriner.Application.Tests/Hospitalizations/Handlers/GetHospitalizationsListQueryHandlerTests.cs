@@ -68,10 +68,52 @@ public sealed class GetHospitalizationsListQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        var paging = new PageRequest { Page = 1, PageSize = 20 };
+
+        var result = await CreateHandler().Handle(new GetHospitalizationsListQuery(paging), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Hospitalizations.ClinicScopeRequired");
+        _hospitalizations.Verify(
+            r => r.CountAsync(It.IsAny<HospitalizationsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _hospitalizations.Verify(
+            r => r.ListAsync(It.IsAny<HospitalizationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseRequestClinicId_When_NoActiveContext()
+    {
+        var tid = Guid.NewGuid();
+        var requestClinicId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _hospitalizations.Setup(r => r.CountAsync(It.IsAny<HospitalizationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _hospitalizations.Setup(r => r.ListAsync(It.IsAny<HospitalizationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Hospitalization>());
+
+        var paging = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler().Handle(new GetHospitalizationsListQuery(paging, requestClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _hospitalizations.Verify(
+            r => r.CountAsync(It.IsAny<HospitalizationsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_Should_NotQueryClientsOrPetsForSearch_When_SearchIsWhitespace()
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _hospitalizations.Setup(r => r.CountAsync(It.IsAny<HospitalizationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _hospitalizations.Setup(r => r.ListAsync(It.IsAny<HospitalizationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -94,6 +136,7 @@ public sealed class GetHospitalizationsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client>());
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
@@ -120,6 +163,7 @@ public sealed class GetHospitalizationsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _hospitalizations.Setup(r => r.CountAsync(It.IsAny<HospitalizationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _hospitalizations.Setup(r => r.ListAsync(It.IsAny<HospitalizationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -140,6 +184,7 @@ public sealed class GetHospitalizationsListQueryHandlerTests
         var petId = Guid.NewGuid();
         var examId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
 
         var h = new Hospitalization(
             tid,

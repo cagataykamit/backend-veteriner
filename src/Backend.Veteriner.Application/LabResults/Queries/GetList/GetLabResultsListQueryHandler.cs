@@ -61,6 +61,16 @@ public sealed class GetLabResultsListQueryHandler
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+
+        // Güvenlik: açık bir klinik kapsamı (request.ClinicId veya aktif clinic context) yoksa
+        // tüm kiracı laboratuvar sonuçlarını DÖNDÜRME. Tenant-wide kullanıcılar dahil, kapsamsız list/okuma engellenir.
+        if (requestedClinicId is null)
+        {
+            return Result<PagedResult<LabResultListItemDto>>.Failure(
+                "LabResults.ClinicScopeRequired",
+                "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Laboratuvar sonuçları klinik kapsamı olmadan listelenemez.");
+        }
+
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
         if (!scopeResult.IsSuccess)
             return Result<PagedResult<LabResultListItemDto>>.Failure(scopeResult.Error);

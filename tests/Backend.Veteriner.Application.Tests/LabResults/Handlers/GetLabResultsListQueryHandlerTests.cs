@@ -68,10 +68,52 @@ public sealed class GetLabResultsListQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        var paging = new PageRequest { Page = 1, PageSize = 20 };
+
+        var result = await CreateHandler().Handle(new GetLabResultsListQuery(paging), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("LabResults.ClinicScopeRequired");
+        _labResults.Verify(
+            r => r.CountAsync(It.IsAny<LabResultsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _labResults.Verify(
+            r => r.ListAsync(It.IsAny<LabResultsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseRequestClinicId_When_NoActiveContext()
+    {
+        var tid = Guid.NewGuid();
+        var requestClinicId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _labResults.Setup(r => r.CountAsync(It.IsAny<LabResultsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _labResults.Setup(r => r.ListAsync(It.IsAny<LabResultsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<LabResult>());
+
+        var paging = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler().Handle(new GetLabResultsListQuery(paging, requestClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _labResults.Verify(
+            r => r.CountAsync(It.IsAny<LabResultsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_Should_NotQueryClientsOrPetsForSearch_When_SearchIsWhitespace()
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _labResults.Setup(r => r.CountAsync(It.IsAny<LabResultsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _labResults.Setup(r => r.ListAsync(It.IsAny<LabResultsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -94,6 +136,7 @@ public sealed class GetLabResultsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client>());
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
@@ -120,6 +163,7 @@ public sealed class GetLabResultsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _labResults.Setup(r => r.CountAsync(It.IsAny<LabResultsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _labResults.Setup(r => r.ListAsync(It.IsAny<LabResultsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -147,6 +191,7 @@ public sealed class GetLabResultsListQueryHandlerTests
         var petId = Guid.NewGuid();
         var examId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
 
         var lr = new LabResult(
             tid,

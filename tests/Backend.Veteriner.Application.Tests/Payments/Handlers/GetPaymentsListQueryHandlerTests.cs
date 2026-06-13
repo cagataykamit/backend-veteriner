@@ -49,10 +49,52 @@ public sealed class GetPaymentsListQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
+
+        var result = await CreateHandler().Handle(new GetPaymentsListQuery(paging), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.ClinicScopeRequired");
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _payments.Verify(
+            r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseRequestClinicId_When_NoActiveContext()
+    {
+        var tid = Guid.NewGuid();
+        var requestClinicId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PaymentListRow>());
+
+        var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler().Handle(new GetPaymentsListQuery(paging, requestClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_Should_NotQueryClientsOrPetsForSearch_When_SearchIsWhitespace()
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -75,6 +117,7 @@ public sealed class GetPaymentsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client>());
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
@@ -101,6 +144,7 @@ public sealed class GetPaymentsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -127,6 +171,7 @@ public sealed class GetPaymentsListQueryHandlerTests
         var clientId = Guid.NewGuid();
         var petId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
 
         var paidAt = DateTime.UtcNow.AddHours(-2);
         var payment = new PaymentListRow(
@@ -243,20 +288,15 @@ public sealed class GetPaymentsListQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_Filter_By_AccessibleClinics_When_ClinicAdmin_Without_ClinicId()
+    public async Task Handle_Should_Fail_When_ClinicAdmin_Without_ClinicScope()
     {
         var tid = Guid.NewGuid();
-        var c1 = Guid.NewGuid();
+        var assigned = Guid.NewGuid();
         var c2 = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
 
-        _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
-        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<PaymentListRow>());
-
-        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { c1, c2 });
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assigned, c2 });
         var handler = new GetPaymentsListQueryHandler(
             _tenantContext.Object,
             _clinicContext.Object,
@@ -268,9 +308,13 @@ public sealed class GetPaymentsListQueryHandlerTests
         var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
         var result = await handler.Handle(new GetPaymentsListQuery(paging), CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.ClinicScopeRequired");
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         caMock.Verify(
-            x => x.ResolveAsync(tid, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+            x => x.ResolveAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

@@ -86,6 +86,16 @@ public sealed class GetPaymentsListQueryHandler
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+
+        // Güvenlik: açık bir klinik kapsamı (request.ClinicId veya aktif clinic context) yoksa
+        // tüm kiracı ödeme kayıtlarını DÖNDÜRME. Tenant-wide kullanıcılar dahil, kapsamsız list/okuma engellenir.
+        if (requestedClinicId is null)
+        {
+            return Result<PagedResult<PaymentListItemDto>>.Failure(
+                "Payments.ClinicScopeRequired",
+                "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Ödemeler klinik kapsamı olmadan listelenemez.");
+        }
+
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
         if (!scopeResult.IsSuccess)
             return Result<PagedResult<PaymentListItemDto>>.Failure(scopeResult.Error);
