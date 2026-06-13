@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -20,6 +21,9 @@ public sealed class GetAppointmentByIdQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClientContext _clientContext;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -29,6 +33,9 @@ public sealed class GetAppointmentByIdQueryHandler
     public GetAppointmentByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClientContext clientContext,
+        IUserOperationClaimRepository userOperationClaims,
+        IUserClinicRepository userClinics,
         IReadRepository<Appointment> appointments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
@@ -37,6 +44,9 @@ public sealed class GetAppointmentByIdQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clientContext = clientContext;
+        _userOperationClaims = userOperationClaims;
+        _userClinics = userClinics;
         _appointments = appointments;
         _pets = pets;
         _clients = clients;
@@ -53,12 +63,34 @@ public sealed class GetAppointmentByIdQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
+        if (_clientContext.UserId is not { } userId)
+        {
+            return Result<AppointmentDetailDto>.Failure(
+                "Auth.Unauthorized.UserContextMissing",
+                "Kullanıcı bağlamı yok.");
+        }
+
         var a = await _appointments.FirstOrDefaultAsync(
             new AppointmentByIdSpec(tenantId, request.Id), ct);
         if (a is null)
             return Result<AppointmentDetailDto>.Failure("Appointments.NotFound", "Randevu bulunamadı.");
+
         if (_clinicContext.ClinicId is { } clinicId && a.ClinicId != clinicId)
             return Result<AppointmentDetailDto>.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
+
+        // Tenant-wide roller (Admin / Owner / PlatformAdmin) aynı tenant içindeki randevuyu
+        // UserClinic ataması olmadan okuyabilir. Diğer kullanıcılar yalnız atandıkları kliniğin
+        // randevu detayını okuyabilir; aksi halde kaynak varlığı gizlenir (NotFound).
+        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId, ct);
+        if (!TenantWideClaimNames.IsTenantWide(operationClaimNames))
+        {
+            if (!await _userClinics.ExistsAsync(userId, a.ClinicId, ct))
+            {
+                return Result<AppointmentDetailDto>.Failure(
+                    "Appointments.NotFound",
+                    "Randevu bulunamadı.");
+            }
+        }
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, a.PetId), ct);
         var clientId = pet?.ClientId ?? Guid.Empty;
