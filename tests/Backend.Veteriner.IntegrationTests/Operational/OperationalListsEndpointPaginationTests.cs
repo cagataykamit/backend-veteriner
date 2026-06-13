@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
@@ -118,6 +119,21 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var page1Ids = page1.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToHashSet();
         var page2Ids = page2.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToHashSet();
         page2Ids.Overlaps(page1Ids).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Examinations_GetList_Without_ClinicScope_Should_Return400_ClinicScopeRequired()
+    {
+        var ctx = await SeedExaminationsScenarioAsync(5);
+        var client = CreateClient(ctx.Token);
+
+        // Aktif clinic context yok (token clinic claim taşımıyor) ve clinicId verilmedi:
+        // tüm kiracı muayeneleri DÖNMEMELİ; güvenli application error beklenir.
+        var response = await client.GetAsync("/api/v1/examinations?Page=1&PageSize=25");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().Should().Be("Examinations.ClinicScopeRequired");
     }
 
     [Fact]
@@ -287,6 +303,44 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         await db.SaveChangesAsync();
 
         var token = IssueToken(jwt, tenant.Id, "Appointments.Read");
+        return new TenantTokenCtx(token, tenant.Id, clinic.Id);
+    }
+
+    private async Task<TenantTokenCtx> SeedExaminationsScenarioAsync(int count)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+
+        var tenant = new Tenant($"ExamPg-{Guid.NewGuid():N}"[..16]);
+        var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
+        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110003", "exampg@example.com");
+        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+        var pet = new Pet(tenant.Id, clientEntity.Id, "PetExam", speciesId);
+
+        var baseTime = DateTime.UtcNow.AddHours(-1);
+        var examinations = Enumerable.Range(0, count)
+            .Select(i => new Examination(
+                tenant.Id,
+                clinic.Id,
+                pet.Id,
+                appointmentId: null,
+                baseTime.AddHours(-i),
+                $"Kontrol-{i}",
+                "Bulgu",
+                null,
+                null))
+            .ToList();
+
+        db.Add(tenant);
+        db.Add(clinic);
+        db.Add(clientEntity);
+        db.Add(pet);
+        db.AddRange(examinations);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
+        await db.SaveChangesAsync();
+
+        var token = IssueToken(jwt, tenant.Id, "Examinations.Read");
         return new TenantTokenCtx(token, tenant.Id, clinic.Id);
     }
 

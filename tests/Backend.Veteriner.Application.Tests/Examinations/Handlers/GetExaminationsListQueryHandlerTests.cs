@@ -49,10 +49,52 @@ public sealed class GetExaminationsListQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+
+        var result = await CreateHandler().Handle(new GetExaminationsListQuery(page), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.ClinicScopeRequired");
+        _examinations.Verify(
+            r => r.CountAsync(It.IsAny<ExaminationsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _examinations.Verify(
+            r => r.ListAsync(It.IsAny<ExaminationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseRequestClinicId_When_NoActiveContext()
+    {
+        var tid = Guid.NewGuid();
+        var requestClinicId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _examinations.Setup(r => r.CountAsync(It.IsAny<ExaminationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _examinations.Setup(r => r.ListAsync(It.IsAny<ExaminationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ExaminationListRow>());
+
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler().Handle(new GetExaminationsListQuery(page, requestClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _examinations.Verify(
+            r => r.CountAsync(It.IsAny<ExaminationsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_Should_QueryWithTenantScopedSpecs_When_ContextPresent()
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _examinations.Setup(r => r.CountAsync(It.IsAny<ExaminationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _examinations.Setup(r => r.ListAsync(It.IsAny<ExaminationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -77,6 +119,7 @@ public sealed class GetExaminationsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _examinations.Setup(r => r.CountAsync(It.IsAny<ExaminationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _examinations.Setup(r => r.ListAsync(It.IsAny<ExaminationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -102,6 +145,7 @@ public sealed class GetExaminationsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client>());
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
@@ -137,6 +181,7 @@ public sealed class GetExaminationsListQueryHandlerTests
         var examined = DateTime.UtcNow;
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _examinations.Setup(r => r.CountAsync(It.IsAny<ExaminationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _examinations.Setup(r => r.ListAsync(It.IsAny<ExaminationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
