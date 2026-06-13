@@ -75,6 +75,21 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
     }
 
     [Fact]
+    public async Task Appointments_GetList_Without_ClinicScope_Should_Return400_ClinicScopeRequired()
+    {
+        var ctx = await SeedAppointmentsScenarioAsync(5);
+        var client = CreateClient(ctx.Token);
+
+        // Aktif clinic context yok (token clinic claim taşımıyor) ve clinicId verilmedi:
+        // tüm kiracı randevuları DÖNMEMELİ; güvenli application error beklenir.
+        var response = await client.GetAsync("/api/v1/appointments?Page=1&PageSize=25");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().Should().Be("Appointments.ClinicScopeRequired");
+    }
+
+    [Fact]
     public async Task Clients_GetList_Page1_PageSize25_Should_ReturnRequestedPageSize()
     {
         var ctx = await SeedClientsScenarioAsync(30);

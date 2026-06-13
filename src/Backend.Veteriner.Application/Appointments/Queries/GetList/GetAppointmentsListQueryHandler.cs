@@ -88,6 +88,15 @@ public sealed class GetAppointmentsListQueryHandler
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
+        // Güvenlik: açık bir klinik kapsamı (request.ClinicId veya aktif clinic context) yoksa
+        // tüm kiracı randevularını DÖNDÜRME. Tenant-wide kullanıcılar dahil, kapsamsız list/okuma engellenir.
+        if (effectiveClinicId is null)
+        {
+            return Result<PagedResult<AppointmentListItemDto>>.Failure(
+                "Appointments.ClinicScopeRequired",
+                "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Randevular klinik kapsamı olmadan listelenemez.");
+        }
+
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
         Guid[] searchPetIds = [];

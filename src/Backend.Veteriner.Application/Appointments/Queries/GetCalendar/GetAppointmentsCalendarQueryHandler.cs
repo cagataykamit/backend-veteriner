@@ -76,6 +76,15 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
+        // Güvenlik: açık bir klinik kapsamı (request.ClinicId veya aktif clinic context) yoksa
+        // tüm kiracı randevularını DÖNDÜRME. Tenant-wide kullanıcılar dahil, kapsamsız okuma engellenir.
+        if (effectiveClinicId is null)
+        {
+            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(
+                "Appointments.ClinicScopeRequired",
+                "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Takvim klinik kapsamı olmadan listelenemez.");
+        }
+
         var rows = await _appointments.ListAsync(
             new AppointmentsCalendarSpec(
                 tenantId,

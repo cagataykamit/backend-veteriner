@@ -90,9 +90,45 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
+    {
+        _tenantContext.SetupGet(t => t.TenantId).Returns(Guid.NewGuid());
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+
+        var result = await CreateHandler().Handle(
+            new GetAppointmentsCalendarQuery(DateTime.UtcNow, DateTime.UtcNow.AddDays(1)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.ClinicScopeRequired");
+        _appointments.Verify(
+            r => r.ListAsync(It.IsAny<AppointmentsCalendarSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseRequestClinicId_When_NoActiveContext()
+    {
+        _tenantContext.SetupGet(t => t.TenantId).Returns(Guid.NewGuid());
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsCalendarSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppointmentCalendarRow>());
+
+        var result = await CreateHandler().Handle(
+            new GetAppointmentsCalendarQuery(DateTime.UtcNow, DateTime.UtcNow.AddDays(1), ClinicId: Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _appointments.Verify(
+            r => r.ListAsync(It.IsAny<AppointmentsCalendarSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnEmpty_When_NoRows()
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(Guid.NewGuid());
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsCalendarSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<AppointmentCalendarRow>());
 
@@ -112,6 +148,7 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
         var petId = Guid.NewGuid();
         var clientId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
 
         var rows = new List<AppointmentCalendarRow>
         {
