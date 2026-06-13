@@ -48,15 +48,28 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
     [Fact]
     public async Task GetList_Should_Return200_When_ProductsRead()
     {
+        var seed = await SeedTenantProductAndStocksAsync(1, forceBelowMinimum: false);
         var client = _factory.CreateClient();
-        var (_, token) = await SeedTenantAndIssueTokenAsync(new[] { "Products.Read" });
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", seed.Token);
 
-        var response = await client.GetAsync("/api/v1/product-stocks?page=1&pageSize=20");
+        var response = await client.GetAsync($"/api/v1/product-stocks?page=1&pageSize=20&clinicId={seed.ClinicId:D}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         json.TryGetProperty("items", out var items).Should().BeTrue();
         items.ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
+    public async Task GetList_Without_ClinicScope_Should_Return400_ClinicScopeRequired()
+    {
+        var seed = await SeedTenantProductAndStocksAsync(1, forceBelowMinimum: false, includeClinicClaimInToken: false);
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", seed.Token);
+
+        var response = await client.GetAsync("/api/v1/product-stocks?page=1&pageSize=20");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(response)).Should().Be("ProductStocks.ClinicScopeRequired");
     }
 
     [Fact]
@@ -101,7 +114,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         var stocksProbe = await client.GetAsync($"/api/v1/products/{b.ProductId}/stocks");
         stocksProbe.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var list = await client.GetAsync("/api/v1/product-stocks?page=1&pageSize=100");
+        var list = await client.GetAsync($"/api/v1/product-stocks?page=1&pageSize=100&clinicId={a.ClinicId:D}");
         list.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await list.Content.ReadFromJsonAsync<JsonElement>();
         foreach (var row in json.GetProperty("items").EnumerateArray())
@@ -118,7 +131,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
 
-        var list = await client.GetAsync("/api/v1/product-stocks?page=1&pageSize=50");
+        var list = await client.GetAsync($"/api/v1/product-stocks?page=1&pageSize=50&clinicId={ctx.ClinicA:D}");
         list.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await list.Content.ReadFromJsonAsync<JsonElement>();
         var ids = json.GetProperty("items").EnumerateArray()
@@ -130,7 +143,15 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         denied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await ReadProblemCodeAsync(denied)).Should().Be("Clinics.AccessDenied");
 
-        var nested = await client.GetAsync($"/api/v1/products/{ctx.ProductId}/stocks");
+        var nestedToken = await IssueTokenWithClinicContextAsync(
+            ctx.TenantId,
+            ctx.UserId,
+            ctx.ClinicA,
+            new[] { "Products.Read" });
+        var nestedClient = _factory.CreateClient();
+        nestedClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", nestedToken);
+
+        var nested = await nestedClient.GetAsync($"/api/v1/products/{ctx.ProductId}/stocks");
         nested.StatusCode.Should().Be(HttpStatusCode.OK);
         var arr = await nested.Content.ReadFromJsonAsync<JsonElement>();
         arr.GetArrayLength().Should().Be(1);
@@ -364,7 +385,8 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<TenantStockSeedResult> SeedTenantProductAndStocksAsync(
         int clinicCount,
-        bool forceBelowMinimum)
+        bool forceBelowMinimum,
+        bool includeClinicClaimInToken = true)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -410,11 +432,16 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
 
         await db.SaveChangesAsync();
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim("permission", "Products.Read"),
-            new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
+            new("permission", "Products.Read"),
+            new(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
         };
+        if (includeClinicClaimInToken)
+        {
+            claims.Add(new Claim(VeterinerClaims.ClinicId, clinics.First().Id.ToString("D")));
+        }
+
         var (token, _, _) = jwt.Create(Guid.NewGuid(), $"ro-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
 
         return new TenantStockSeedResult(tenant.Id, product.Id, clinics.First().Id, token);
@@ -542,6 +569,25 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
     }
 
     private sealed record TwoClinicMinSeedResult(Guid ClinicLow, Guid ClinicOk, string Token);
+
+    private async Task<string> IssueTokenWithClinicContextAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid clinicId,
+        IReadOnlyCollection<string> permissions)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+
+        var claims = permissions
+            .Select(p => new Claim("permission", p))
+            .Append(new Claim(VeterinerClaims.TenantId, tenantId.ToString("D")))
+            .Append(new Claim(VeterinerClaims.ClinicId, clinicId.ToString("D")))
+            .ToList();
+
+        var (token, _, _) = jwt.Create(userId, $"clinic-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        return token;
+    }
 
     private static async Task<string?> ReadProblemCodeAsync(HttpResponseMessage response)
     {

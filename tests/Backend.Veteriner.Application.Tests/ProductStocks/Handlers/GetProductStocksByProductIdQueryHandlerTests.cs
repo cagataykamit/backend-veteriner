@@ -48,6 +48,29 @@ public sealed class GetProductStocksByProductIdQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
+    {
+        var tid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var product = new Product(tid, "Serum", "Adet", 3m, "TRY");
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _products.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Product>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(product);
+
+        var result = await CreateHandler().Handle(new GetProductStocksByProductIdQuery(pid), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("ProductStocks.ClinicScopeRequired");
+        _productStocks.Verify(
+            r => r.ListAsync(It.IsAny<ProductStocksForProductReadSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _scopeResolver.Verify(
+            x => x.ResolveAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnProductsNotFound_When_ProductMissing()
     {
         var tid = Guid.NewGuid();
@@ -75,6 +98,7 @@ public sealed class GetProductStocksByProductIdQueryHandlerTests
         typeof(ProductStock).GetProperty(nameof(ProductStock.Product))!.SetValue(stock, product);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
         _products.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Product>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(product);
         _categories.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductCategory>>(), It.IsAny<CancellationToken>()))

@@ -58,6 +58,14 @@ public sealed class GetStockMovementsListQueryHandler
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+
+        if (requestedClinicId is null)
+        {
+            return Result<PagedResult<StockMovementDto>>.Failure(
+                "StockMovements.ClinicScopeRequired",
+                "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Stok hareketleri klinik kapsamı olmadan listelenemez.");
+        }
+
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
         if (!scopeResult.IsSuccess)
             return Result<PagedResult<StockMovementDto>>.Failure(scopeResult.Error);

@@ -69,6 +69,59 @@ public sealed class StockMovementByProductIdQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
+    {
+        var tid = Guid.NewGuid();
+        var product = new Product(tid, "P", "Adet", 1m, "TRY");
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _products.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Product>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(product);
+
+        var result = await CreateHandler().Handle(
+            new GetStockMovementsByProductIdQuery(product.Id, page),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("StockMovements.ClinicScopeRequired");
+        _stockMovements.Verify(
+            r => r.CountAsync(It.IsAny<StockMovementsForProductFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _stockMovements.Verify(
+            r => r.ListAsync(It.IsAny<StockMovementsForProductFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseRequestClinicId_When_NoActiveContext()
+    {
+        var tid = Guid.NewGuid();
+        var requestClinicId = Guid.NewGuid();
+        var product = new Product(tid, "P", "Adet", 1m, "TRY");
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _products.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Product>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(product);
+        _categories.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductCategory>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProductCategory?)null);
+        _stockMovements.Setup(r => r.CountAsync(It.IsAny<StockMovementsForProductFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _stockMovements.Setup(r => r.ListAsync(It.IsAny<StockMovementsForProductFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<StockMovement>());
+
+        var result = await CreateHandler().Handle(
+            new GetStockMovementsByProductIdQuery(product.Id, page, ClinicId: requestClinicId),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _stockMovements.Verify(
+            r => r.CountAsync(It.IsAny<StockMovementsForProductFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_Should_Fail_When_ClinicContextMismatch()
     {
         var tid = Guid.NewGuid();
@@ -104,6 +157,7 @@ public sealed class StockMovementByProductIdQueryHandlerTests
             occurred);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
         _products.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Product>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(product);
         _categories.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductCategory>>(), It.IsAny<CancellationToken>()))

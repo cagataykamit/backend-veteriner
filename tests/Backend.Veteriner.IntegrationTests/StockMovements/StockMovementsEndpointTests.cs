@@ -47,12 +47,25 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
     [Fact]
     public async Task GetList_Should_Return200_When_StockMovementsRead()
     {
+        var seed = await SeedTenantWithMovementsAsync(movementsPerClinic: 1);
         var client = _factory.CreateClient();
-        var (_, token) = await SeedTenantAndIssueTokenAsync(new[] { "StockMovements.Read" });
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", seed.Token);
+
+        var response = await client.GetAsync($"/api/v1/stock-movements?page=1&pageSize=20&clinicId={seed.ClinicId:D}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task GetList_Without_ClinicScope_Should_Return400_ClinicScopeRequired()
+    {
+        var seed = await SeedTenantWithMovementsAsync(movementsPerClinic: 1);
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", seed.Token);
 
         var response = await client.GetAsync("/api/v1/stock-movements?page=1&pageSize=20");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(response)).Should().Be("StockMovements.ClinicScopeRequired");
     }
 
     [Fact]
@@ -63,7 +76,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", seed.Token);
 
         var response = await client.GetAsync(
-            $"/api/v1/products/{seed.ProductId}/stock-movements?page=1&pageSize=20");
+            $"/api/v1/products/{seed.ProductId}/stock-movements?page=1&pageSize=20&clinicId={seed.ClinicId:D}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -95,11 +108,11 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", a.Token);
 
         var nested = await client.GetAsync(
-            $"/api/v1/products/{b.ProductId}/stock-movements?page=1&pageSize=50");
+            $"/api/v1/products/{b.ProductId}/stock-movements?page=1&pageSize=50&clinicId={a.ClinicId:D}");
 
         nested.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var list = await client.GetAsync("/api/v1/stock-movements?page=1&pageSize=200");
+        var list = await client.GetAsync($"/api/v1/stock-movements?page=1&pageSize=200&clinicId={a.ClinicId:D}");
         list.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await list.Content.ReadFromJsonAsync<JsonElement>();
         foreach (var row in json.GetProperty("items").EnumerateArray())
@@ -116,7 +129,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
 
-        var list = await client.GetAsync("/api/v1/stock-movements?page=1&pageSize=50");
+        var list = await client.GetAsync($"/api/v1/stock-movements?page=1&pageSize=50&clinicId={ctx.ClinicA:D}");
         list.StatusCode.Should().Be(HttpStatusCode.OK);
         var ids = (await list.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("items").EnumerateArray()
@@ -130,7 +143,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         (await ReadProblemCodeAsync(denied)).Should().Be("Clinics.AccessDenied");
 
         var nested = await client.GetAsync(
-            $"/api/v1/products/{ctx.ProductId}/stock-movements?page=1&pageSize=50");
+            $"/api/v1/products/{ctx.ProductId}/stock-movements?page=1&pageSize=50&clinicId={ctx.ClinicA:D}");
 
         nested.StatusCode.Should().Be(HttpStatusCode.OK);
         var arr = (await nested.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("items").EnumerateArray().ToArray();
@@ -147,7 +160,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
 
         var onlyIn = await client.GetAsync(
-            $"/api/v1/stock-movements?page=1&pageSize=50&productId={ctx.ProductId}&movementType=In");
+            $"/api/v1/stock-movements?page=1&pageSize=50&clinicId={ctx.ClinicId:D}&productId={ctx.ProductId}&movementType=In");
 
         onlyIn.StatusCode.Should().Be(HttpStatusCode.OK);
         var inJson = await onlyIn.Content.ReadFromJsonAsync<JsonElement>();
@@ -158,7 +171,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         var fromStr = Uri.EscapeDataString(midWindow.AddMinutes(-30).ToUniversalTime().ToString("o"));
         var toStr = Uri.EscapeDataString(midWindow.AddMinutes(30).ToUniversalTime().ToString("o"));
         var url =
-            $"/api/v1/stock-movements?page=1&pageSize=50&productId={ctx.ProductId}" +
+            $"/api/v1/stock-movements?page=1&pageSize=50&clinicId={ctx.ClinicId:D}&productId={ctx.ProductId}" +
             $"&dateFromUtc={fromStr}&dateToUtc={toStr}";
 
         var windowed = await client.GetAsync(url);
@@ -221,7 +234,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         });
         post.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var list = await client.GetAsync($"/api/v1/product-stocks?page=1&pageSize=20&productId={ctx.ProductId}");
+        var list = await client.GetAsync($"/api/v1/product-stocks?page=1&pageSize=20&clinicId={ctx.ClinicId:D}&productId={ctx.ProductId}");
         list.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await list.Content.ReadFromJsonAsync<JsonElement>();
         json.GetProperty("items").EnumerateArray().Should().ContainSingle()
@@ -265,7 +278,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         })).StatusCode.Should().Be(HttpStatusCode.Created);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
-        var verify = await client.GetAsync($"/api/v1/product-stocks?page=1&pageSize=10&productId={ctx.ProductId}");
+        var verify = await client.GetAsync($"/api/v1/product-stocks?page=1&pageSize=10&clinicId={ctx.ClinicId:D}&productId={ctx.ProductId}");
         verify.StatusCode.Should().Be(HttpStatusCode.OK);
         var j = await verify.Content.ReadFromJsonAsync<JsonElement>();
         j.GetProperty("items")[0].GetProperty("quantityOnHand").GetDecimal().Should().Be(8);
@@ -691,10 +704,10 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         };
         var (token, _, _) = jwt.Create(Guid.NewGuid(), $"dv-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
 
-        return new DateFilterSeedResult(product.Id, mvMiddle.Id, mvMiddle.OccurredAtUtc, token);
+        return new DateFilterSeedResult(product.Id, clinic.Id, mvMiddle.Id, mvMiddle.OccurredAtUtc, token);
     }
 
-    private sealed record DateFilterSeedResult(Guid ProductId, Guid MiddleMovementId, DateTime MiddleOccurredUtc, string Token);
+    private sealed record DateFilterSeedResult(Guid ProductId, Guid ClinicId, Guid MiddleMovementId, DateTime MiddleOccurredUtc, string Token);
 
     private static async Task<string?> ReadProblemCodeAsync(HttpResponseMessage response)
     {

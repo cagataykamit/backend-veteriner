@@ -44,6 +44,49 @@ public sealed class StockMovementListQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+
+        var result = await CreateHandler().Handle(new GetStockMovementsListQuery(page), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("StockMovements.ClinicScopeRequired");
+        _stockMovements.Verify(
+            r => r.CountAsync(It.IsAny<StockMovementsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _stockMovements.Verify(
+            r => r.ListAsync(It.IsAny<StockMovementsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseRequestClinicId_When_NoActiveContext()
+    {
+        var tid = Guid.NewGuid();
+        var requestClinicId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _stockMovements.Setup(r => r.CountAsync(It.IsAny<StockMovementsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _stockMovements.Setup(r => r.ListAsync(It.IsAny<StockMovementsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<StockMovement>());
+
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler().Handle(
+            new GetStockMovementsListQuery(page, ClinicId: requestClinicId),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _stockMovements.Verify(
+            r => r.CountAsync(It.IsAny<StockMovementsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_Should_Fail_When_RequestClinic_Does_Not_Match_ActiveClinicContext()
     {
         var tid = Guid.NewGuid();
@@ -80,16 +123,15 @@ public sealed class StockMovementListQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnEmptyPaged_When_ClinicAdmin_Has_No_AccessibleClinics()
+    public async Task Handle_Should_Fail_When_ClinicAdmin_Without_ClinicScope()
     {
         var tid = Guid.NewGuid();
+        var assigned = Guid.NewGuid();
+        var c2 = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
-        var resolver = ClinicReadScopeResolverMock.ForClinicAdmin(Array.Empty<Guid>());
-        _stockMovements.Setup(r => r.CountAsync(It.IsAny<StockMovementsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
-        _stockMovements.Setup(r => r.ListAsync(It.IsAny<StockMovementsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<StockMovement>());
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
 
+        var resolver = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assigned, c2 });
         var handler = new GetStockMovementsListQueryHandler(
             _tenantContext.Object,
             _clinicContext.Object,
@@ -100,9 +142,14 @@ public sealed class StockMovementListQueryHandlerTests
         var page = new PageRequest { Page = 1, PageSize = 20 };
         var result = await handler.Handle(new GetStockMovementsListQuery(page), CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.Items.Should().BeEmpty();
-        result.Value.TotalItems.Should().Be(0);
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("StockMovements.ClinicScopeRequired");
+        _stockMovements.Verify(
+            r => r.CountAsync(It.IsAny<StockMovementsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        resolver.Verify(
+            x => x.ResolveAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -128,6 +175,7 @@ public sealed class StockMovementListQueryHandlerTests
         typeof(StockMovement).GetProperty(nameof(StockMovement.Product))!.SetValue(movement, product);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
         _stockMovements.Setup(r => r.CountAsync(It.IsAny<StockMovementsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _stockMovements.Setup(r => r.ListAsync(It.IsAny<StockMovementsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))

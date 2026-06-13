@@ -61,6 +61,14 @@ public sealed class GetProductStocksByProductIdQueryHandler
         }
 
         var requestedClinicId = _clinicContext.ClinicId;
+
+        if (requestedClinicId is null)
+        {
+            return Result<IReadOnlyList<ProductStockDto>>.Failure(
+                "ProductStocks.ClinicScopeRequired",
+                "Klinik kapsamı gerekli: aktif klinik bağlamı yok. Ürün stokları klinik kapsamı olmadan listelenemez.");
+        }
+
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
         if (!scopeResult.IsSuccess)
             return Result<IReadOnlyList<ProductStockDto>>.Failure(scopeResult.Error);
