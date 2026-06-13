@@ -1,3 +1,4 @@
+using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
@@ -10,15 +11,70 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.IntegrationTests.Dashboard;
 
-public sealed class DashboardTodayAppointmentStatusCountsReaderTests
+public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLifetime
 {
+    /// <summary>İzin verilen TEK prefix. Development (VetinityDb) ve diğer test DB'leri guard tarafından reddedilir.</summary>
+    private const string DatabasePrefix = "VetinityDb_TodayCounts_";
+
     private static readonly DateTime DayStart = new(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime DayEnd = new(2026, 8, 11, 0, 0, 0, DateTimeKind.Utc);
+
+    private string _connectionString = string.Empty;
+    private AppDbContext _db = null!;
+
+    /// <summary>
+    /// Test başına izole, run-specific LocalDB oluşturur ve migrate eder.
+    /// DB açılmadan ÖNCE guard çalışır; migrate aşamasında hata olursa DB hemen drop edilir.
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        var dbName = $"{DatabasePrefix}{Guid.NewGuid():N}";
+        var connectionString =
+            $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
+
+        // Güvenlik kapısı: yalnız VetinityDb_TodayCounts_ prefix'i kabul edilir.
+        // VetinityDb / VeterinerDb / VetinityDb_IntegrationTests / Development-Production / boş ad reddedilir.
+        IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: DatabasePrefix);
+
+        _connectionString = connectionString;
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlServer(connectionString)
+            .Options;
+
+        var db = new AppDbContext(options);
+        try
+        {
+            await db.Database.MigrateAsync();
+        }
+        catch
+        {
+            await db.DisposeAsync();
+            await IntegrationTestDatabaseReset.EnsureDroppedAsync(connectionString);
+            throw;
+        }
+
+        _db = db;
+    }
+
+    /// <summary>
+    /// Test başarılı, başarısız veya exception ile bitse de çalışır.
+    /// Önce DbContext (ve connection) dispose edilir, ardından DB güvenli force-drop ile silinir;
+    /// böylece C:\Users\&lt;user&gt; altında kalıcı .mdf/.ldf dosyası kalmaz.
+    /// </summary>
+    public async Task DisposeAsync()
+    {
+        if (_db is not null)
+            await _db.DisposeAsync();
+
+        if (!string.IsNullOrEmpty(_connectionString))
+            await IntegrationTestDatabaseReset.EnsureDroppedAsync(_connectionString);
+    }
 
     [Fact]
     public async Task GetAsync_When_NoAppointments_ReturnsZeros()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         db.AddRange(tenant, clinic);
@@ -35,7 +91,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests
     [Fact]
     public async Task GetAsync_Counts_Statuses_ForDayRange_And_Clinic()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         var client = new Client(tenant.Id, "Ali", "905551112233", "a@x.com");
@@ -62,7 +118,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests
     [Fact]
     public async Task GetAsync_Excludes_OtherClinic()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinicA = new Clinic(tenant.Id, "A", "Istanbul");
         var clinicB = new Clinic(tenant.Id, "B", "Ankara");
@@ -85,7 +141,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests
     [Fact]
     public async Task GetAsync_TenantIsolation()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var t1 = new Tenant("T1");
         var t2 = new Tenant("T2");
         var c1 = new Clinic(t1.Id, "C1", "Istanbul");
@@ -107,7 +163,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests
     [Fact]
     public async Task GetAsync_When_ClinicIdNull_Counts_AllClinics_ForTenant_InRange()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinicA = new Clinic(tenant.Id, "A", "Istanbul");
         var clinicB = new Clinic(tenant.Id, "B", "Ankara");
@@ -125,18 +181,6 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests
         var counts = await reader.GetAsync(tenant.Id, null, DayStart, DayEnd, CancellationToken.None);
 
         counts.Scheduled.Should().Be(2);
-    }
-
-    private static async Task<AppDbContext> CreateDbContextAsync()
-    {
-        var dbName = $"VeterinerDb_TodayCounts_{Guid.NewGuid():N}";
-        var connectionString = $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlServer(connectionString)
-            .Options;
-        var db = new AppDbContext(options);
-        await db.Database.MigrateAsync();
-        return db;
     }
 
     private static async Task<Guid> GetAnySpeciesIdAsync(AppDbContext db)

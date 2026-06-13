@@ -1,3 +1,4 @@
+using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -10,12 +11,67 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.IntegrationTests.Dashboard;
 
-public sealed class DashboardClinicScopedReaderTests
+public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
 {
+    /// <summary>İzin verilen TEK prefix. Development (VetinityDb) ve diğer test DB'leri guard tarafından reddedilir.</summary>
+    private const string DatabasePrefix = "VetinityDb_DashboardReader_";
+
+    private string _connectionString = string.Empty;
+    private AppDbContext _db = null!;
+
+    /// <summary>
+    /// Test başına izole, run-specific LocalDB oluşturur ve migrate eder.
+    /// DB açılmadan ÖNCE guard çalışır; migrate aşamasında hata olursa DB hemen drop edilir.
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        var dbName = $"{DatabasePrefix}{Guid.NewGuid():N}";
+        var connectionString =
+            $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
+
+        // Güvenlik kapısı: yalnız VetinityDb_DashboardReader_ prefix'i kabul edilir.
+        // VetinityDb / VeterinerDb / VetinityDb_IntegrationTests / VetinityDb_OutboxProcessorTests / Development-Production / boş ad reddedilir.
+        IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: DatabasePrefix);
+
+        _connectionString = connectionString;
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlServer(connectionString)
+            .Options;
+
+        var db = new AppDbContext(options);
+        try
+        {
+            await db.Database.MigrateAsync();
+        }
+        catch
+        {
+            await db.DisposeAsync();
+            await IntegrationTestDatabaseReset.EnsureDroppedAsync(connectionString);
+            throw;
+        }
+
+        _db = db;
+    }
+
+    /// <summary>
+    /// Test başarılı, başarısız veya exception ile bitse de çalışır.
+    /// Önce DbContext (ve connection) dispose edilir, ardından DB güvenli force-drop ile silinir;
+    /// böylece C:\Users\&lt;user&gt; altında kalıcı .mdf/.ldf dosyası kalmaz.
+    /// </summary>
+    public async Task DisposeAsync()
+    {
+        if (_db is not null)
+            await _db.DisposeAsync();
+
+        if (!string.IsNullOrEmpty(_connectionString))
+            await IntegrationTestDatabaseReset.EnsureDroppedAsync(_connectionString);
+    }
+
     [Fact]
     public async Task ListRecentClients_When_TakeNonPositive_ReturnsEmpty()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var reader = new DashboardClinicScopedReader(db);
 
         var r0 = await reader.ListRecentClientsAtClinicAsync(Guid.NewGuid(), Guid.NewGuid(), 0, CancellationToken.None);
@@ -28,7 +84,7 @@ public sealed class DashboardClinicScopedReaderTests
     [Fact]
     public async Task ListRecentClients_When_NoAppointments_ReturnsEmpty()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         db.AddRange(tenant, clinic);
@@ -43,7 +99,7 @@ public sealed class DashboardClinicScopedReaderTests
     [Fact]
     public async Task ListRecentClients_OneClient_MultipleAppointmentsSamePet_SingleRow_WithLatestScheduledAt()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         var client = new Client(tenant.Id, "Ali", "905551112233", "ali@x.com");
@@ -67,7 +123,7 @@ public sealed class DashboardClinicScopedReaderTests
     [Fact]
     public async Task ListRecentClients_OneClient_TwoPets_UsesMaxLastAtAcrossPets()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         var client = new Client(tenant.Id, "Veli", "905559998877", "veli@x.com");
@@ -91,7 +147,7 @@ public sealed class DashboardClinicScopedReaderTests
     [Fact]
     public async Task ListRecentClients_ExcludesOtherClinic()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinicA = new Clinic(tenant.Id, "A", "Istanbul");
         var clinicB = new Clinic(tenant.Id, "B", "Ankara");
@@ -114,7 +170,7 @@ public sealed class DashboardClinicScopedReaderTests
     [Fact]
     public async Task ListRecentClients_OrderByLastAtDesc_ThenTake()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         var speciesId = await GetAnySpeciesIdAsync(db);
@@ -140,7 +196,7 @@ public sealed class DashboardClinicScopedReaderTests
     [Fact]
     public async Task CountClientsAtClinic_MatchesDistinctClients_WithDuplicateAppointments()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var tenant = new Tenant("T");
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         var client = new Client(tenant.Id, "X", "905553030303", "x@x.com");
@@ -161,7 +217,7 @@ public sealed class DashboardClinicScopedReaderTests
     [Fact]
     public async Task ListRecentClients_QueryTenant_Isolates_FromOtherTenant()
     {
-        await using var db = await CreateDbContextAsync();
+        var db = _db;
         var t1 = new Tenant("T1");
         var t2 = new Tenant("T2");
         var c1 = new Clinic(t1.Id, "C1", "Istanbul");
@@ -177,18 +233,6 @@ public sealed class DashboardClinicScopedReaderTests
         var rows = await reader.ListRecentClientsAtClinicAsync(t1.Id, c1.Id, 10, CancellationToken.None);
 
         rows.Should().BeEmpty();
-    }
-
-    private static async Task<AppDbContext> CreateDbContextAsync()
-    {
-        var dbName = $"VeterinerDb_DashboardReader_{Guid.NewGuid():N}";
-        var connectionString = $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlServer(connectionString)
-            .Options;
-        var db = new AppDbContext(options);
-        await db.Database.MigrateAsync();
-        return db;
     }
 
     private static async Task<Guid> GetAnySpeciesIdAsync(AppDbContext db)

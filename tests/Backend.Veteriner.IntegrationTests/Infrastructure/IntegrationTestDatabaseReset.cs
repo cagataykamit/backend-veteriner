@@ -71,6 +71,51 @@ internal static class IntegrationTestDatabaseReset
         }
     }
 
+    /// <summary>
+    /// Verilen connection string'in işaret ettiği test veritabanını güvenli biçimde DROP eder.
+    /// DbContext gerektirmez; <see cref="ResetAndMigrateAsync"/> ile aynı KILL + DROP (gerekirse EMERGENCY)
+    /// force-drop yolunu yeniden kullanır. Bağımsız (factory dışı) testlerin <c>finally</c> bloğunda,
+    /// test başarılı/başarısız/exception fark etmeksizin LocalDB dosyalarının kalmamasını garanti eder.
+    /// </summary>
+    public static async Task EnsureDroppedAsync(string connectionString, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("Integration test connection string is missing.");
+
+        var databaseName = new SqlConnectionStringBuilder(connectionString).InitialCatalog;
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new InvalidOperationException("Integration test connection string must include Initial Catalog.");
+
+        var gate = GetGate(databaseName);
+        await gate.WaitAsync(ct);
+        try
+        {
+            for (var attempt = 1; attempt <= MaxDeleteAttempts; attempt++)
+            {
+                if (!await DatabaseExistsAsync(connectionString, databaseName, ct))
+                    return;
+
+                await ForceDropDatabaseAsync(connectionString, databaseName, ct);
+
+                if (!await DatabaseExistsAsync(connectionString, databaseName, ct))
+                    return;
+
+                if (attempt < MaxDeleteAttempts)
+                    await Task.Delay(RetryDelay, ct);
+            }
+
+            if (await DatabaseExistsAsync(connectionString, databaseName, ct))
+            {
+                throw new InvalidOperationException(
+                    $"Integration test database '{databaseName}' could not be dropped after {MaxDeleteAttempts} attempts.");
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     private static SemaphoreSlim GetGate(string databaseName)
     {
         lock (GateLock)

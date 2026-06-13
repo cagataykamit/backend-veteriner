@@ -58,7 +58,7 @@ dotnet test Veteriner.sln -c Debug
 ```
 
 - **Birim / uygulama testleri:** `tests/Backend.Veteriner.Application.Tests`, `tests/Backend.Veteriner.Domain.Tests`
-- **Entegrasyon testleri:** `tests/Backend.Veteriner.IntegrationTests` (`appsettings.IntegrationTests.json` → LocalDB, varsayılan DB adı **`VeterinerDb_IntegrationTests`**)
+- **Entegrasyon testleri:** `tests/Backend.Veteriner.IntegrationTests` (`appsettings.IntegrationTests.json` → LocalDB, varsayılan DB adı **`VetinityDb_IntegrationTests`**)
 
 ## Ürün modülü ekleme (özet)
 
