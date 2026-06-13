@@ -68,10 +68,52 @@ public sealed class GetPrescriptionsListQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        var paging = new PageRequest { Page = 1, PageSize = 20 };
+
+        var result = await CreateHandler().Handle(new GetPrescriptionsListQuery(paging), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Prescriptions.ClinicScopeRequired");
+        _prescriptions.Verify(
+            r => r.CountAsync(It.IsAny<PrescriptionsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _prescriptions.Verify(
+            r => r.ListAsync(It.IsAny<PrescriptionsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseRequestClinicId_When_NoActiveContext()
+    {
+        var tid = Guid.NewGuid();
+        var requestClinicId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _prescriptions.Setup(r => r.CountAsync(It.IsAny<PrescriptionsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _prescriptions.Setup(r => r.ListAsync(It.IsAny<PrescriptionsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Prescription>());
+
+        var paging = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler().Handle(new GetPrescriptionsListQuery(paging, requestClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _prescriptions.Verify(
+            r => r.CountAsync(It.IsAny<PrescriptionsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_Should_NotQueryClientsOrPetsForSearch_When_SearchIsWhitespace()
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _prescriptions.Setup(r => r.CountAsync(It.IsAny<PrescriptionsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _prescriptions.Setup(r => r.ListAsync(It.IsAny<PrescriptionsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -94,6 +136,7 @@ public sealed class GetPrescriptionsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client>());
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
@@ -120,6 +163,7 @@ public sealed class GetPrescriptionsListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _prescriptions.Setup(r => r.CountAsync(It.IsAny<PrescriptionsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
         _prescriptions.Setup(r => r.ListAsync(It.IsAny<PrescriptionsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
@@ -146,6 +190,7 @@ public sealed class GetPrescriptionsListQueryHandlerTests
         var clientId = Guid.NewGuid();
         var petId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
 
         var pr = new Prescription(
             tid,

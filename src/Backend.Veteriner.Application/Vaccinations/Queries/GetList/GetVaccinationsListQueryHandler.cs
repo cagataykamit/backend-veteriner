@@ -87,6 +87,16 @@ public sealed class GetVaccinationsListQueryHandler
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+
+        // Güvenlik: açık bir klinik kapsamı (request.ClinicId veya aktif clinic context) yoksa
+        // tüm kiracı aşı kayıtlarını DÖNDÜRME. Tenant-wide kullanıcılar dahil, kapsamsız list/okuma engellenir.
+        if (requestedClinicId is null)
+        {
+            return Result<PagedResult<VaccinationListItemDto>>.Failure(
+                "Vaccinations.ClinicScopeRequired",
+                "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Aşılar klinik kapsamı olmadan listelenemez.");
+        }
+
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
         if (!scopeResult.IsSuccess)
             return Result<PagedResult<VaccinationListItemDto>>.Failure(scopeResult.Error);
