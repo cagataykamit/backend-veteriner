@@ -1,18 +1,26 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.Common.Options;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.Veteriner.Api.Middleware;
 
 public static class RateLimitingExtensions
 {
-    public static IServiceCollection AddAppRateLimiting(this IServiceCollection services)
+    public static IServiceCollection AddAppRateLimiting(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
+        var globalPermitLimit = RateLimitingOptions
+            .FromConfiguration(configuration)
+            .GetEffectiveGlobalPermitLimit();
+
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -60,7 +68,7 @@ public static class RateLimitingExtensions
                     key,
                     _ => new SlidingWindowRateLimiterOptions
                     {
-                        PermitLimit = 200,
+                        PermitLimit = globalPermitLimit,
                         Window = TimeSpan.FromMinutes(1),
                         SegmentsPerWindow = 6,
                         QueueLimit = 0,

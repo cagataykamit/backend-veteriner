@@ -188,7 +188,7 @@ public static class WebApplicationBuilderExtensions
 
         builder.Services.AddPermissionAuthorization();
 
-        builder.Services.AddAppRateLimiting();
+        builder.Services.AddAppRateLimiting(builder.Configuration);
 
         builder.Services.AddOpenTelemetry()
             .ConfigureResource(rb => rb
