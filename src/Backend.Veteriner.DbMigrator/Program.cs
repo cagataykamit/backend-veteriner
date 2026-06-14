@@ -48,6 +48,26 @@ try
             await RunSeedPipelineAsync(db, hasher, logger, CancellationToken.None);
             logger.LogInformation("Migrate + seed pipeline completed.");
             break;
+        case "loadtest-seed":
+            if (args.Length < 2)
+            {
+                Console.Error.WriteLine("loadtest-seed requires a profile argument (e.g. 'small').");
+                PrintHelp();
+                return 1;
+            }
+
+            var profile = args[1].Trim().ToLowerInvariant();
+            if (profile != "small")
+            {
+                Console.Error.WriteLine(
+                    $"Unknown load test profile: '{args[1]}'. Supported profiles: small");
+                PrintHelp();
+                return 1;
+            }
+
+            await LoadTestDataSeeder.SeedSmallAsync(db, logger, CancellationToken.None);
+            logger.LogInformation("Load test seed ({Profile}) completed.", profile);
+            break;
         default:
             Console.Error.WriteLine($"Unknown command: {args[0]}");
             PrintHelp();
@@ -90,9 +110,13 @@ static void PrintHelp()
           dotnet run --project src/Backend.Veteriner.DbMigrator -- <komut>
 
         Komutlar:
-          migrate   — EF Core MigrateAsync (bekleyen migrationları uygular)
-          seed      — Permission/Data/AdminClaim/InviteAssignable seed zinciri
-          all       — önce migrate, sonra seed
+          migrate        — EF Core MigrateAsync (bekleyen migrationları uygular)
+          seed           — Permission/Data/AdminClaim/InviteAssignable seed zinciri
+          all            — önce migrate, sonra seed
+          loadtest-seed  — yük testi sentetik veri (yalnızca VetinityLoadTestDb; profil: small)
+
+        Örnek:
+          dotnet run --project src/Backend.Veteriner.DbMigrator -- loadtest-seed small
 
         Bağlantı: ConnectionStrings:DefaultConnection (API ile aynı UserSecretsId kullanılabilir).
         Şema için alternatif: dotnet ef database update --project src/Backend.Veteriner.Infrastructure --startup-project src/Backend.Veteriner.Api
