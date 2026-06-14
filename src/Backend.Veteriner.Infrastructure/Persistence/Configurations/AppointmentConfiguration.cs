@@ -45,5 +45,8 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         // Bugünkü durum sayımları (GROUP BY Status) ve klinik + tarih aralığı; Status son kolonda kapsayıcı tarama.
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.ScheduledAtUtc, x.Status });
         b.HasIndex(x => new { x.TenantId, x.PetId });
+        // Dashboard clinic-scope: TenantId+ClinicId seek, PetId DISTINCT/GROUP BY, ScheduledAtUtc MAX (covering).
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.PetId })
+            .IncludeProperties(x => x.ScheduledAtUtc);
     }
 }
