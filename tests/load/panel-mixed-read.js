@@ -1,6 +1,7 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { Trend, Counter } from "k6/metrics";
+import encoding from "k6/encoding";
 
 const dashboardDuration = new Trend("dashboard_duration", true);
 const appointmentListDuration = new Trend("appointment_list_duration", true);
@@ -19,7 +20,9 @@ const status403 = new Counter("status_403");
 const status429 = new Counter("status_429");
 const unexpectedStatus = new Counter("unexpected_status");
 const endpointCheckFailures = new Counter("endpoint_check_failures");
+const clinicSlotRequests = new Counter("clinic_slot_requests");
 
+const CLINIC_CLAIM = "clinic_id";
 const LIST_PAGE_SIZE = 20;
 
 const SCENARIOS = [
@@ -60,41 +63,204 @@ const SCENARIOS = [
     },
 ];
 
-function validateRequiredEnv() {
-    const rawUrl = __ENV.VETINITY_URL;
-    const token = __ENV.VETINITY_TOKEN;
+const PREFLIGHT_CHECKS = [
+    {
+        endpoint: "dashboard",
+        buildUrl: (baseUrl) => buildDashboardUrl(baseUrl),
+        validate: validateDashboardShape,
+    },
+    {
+        endpoint: "appointment_list",
+        buildUrl: (baseUrl) => buildAppointmentListUrl(baseUrl, 1),
+        validate: validatePagedShape,
+    },
+    {
+        endpoint: "appointment_calendar",
+        buildUrl: (baseUrl, calendarRange) =>
+            buildAppointmentCalendarUrl(
+                baseUrl,
+                calendarRange.dateFromUtc,
+                calendarRange.dateToUtc
+            ),
+        validate: validateCalendarShape,
+    },
+    {
+        endpoint: "client_list",
+        buildUrl: (baseUrl) => buildClientListUrl(baseUrl, 1),
+        validate: validatePagedShape,
+    },
+    {
+        endpoint: "pet_list",
+        buildUrl: (baseUrl) => buildPetListUrl(baseUrl, 1),
+        validate: validatePagedShape,
+    },
+];
 
+function resolveBaseUrl() {
+    const rawUrl = __ENV.VETINITY_URL;
     if (!rawUrl || String(rawUrl).trim() === "") {
         throw new Error(
             "VETINITY_URL ortam degiskeni zorunludur. Ornek: VETINITY_URL=https://localhost:7001"
         );
     }
-
-    if (!token || String(token).trim() === "") {
-        throw new Error("VETINITY_TOKEN ortam degiskeni zorunludur.");
-    }
-
-    return {
-        baseUrl: String(rawUrl).replace(/\/$/, ""),
-        token: String(token).trim(),
-    };
+    return String(rawUrl).replace(/\/$/, "");
 }
 
-const ENV = validateRequiredEnv();
+function readTokenSourceJson() {
+    const tokensFile = String(__ENV.VETINITY_TOKENS_FILE || "").trim();
+    if (tokensFile) {
+        try {
+            return { raw: open(tokensFile), sourceLabel: "VETINITY_TOKENS_FILE" };
+        } catch (_error) {
+            throw new Error(`VETINITY_TOKENS_FILE okunamadi: ${tokensFile}`);
+        }
+    }
 
-const vus = Number.parseInt(__ENV.VUS || "1", 10);
+    const tokensJson = String(__ENV.VETINITY_TOKENS_JSON || "").trim();
+    if (tokensJson) {
+        return { raw: tokensJson, sourceLabel: "VETINITY_TOKENS_JSON" };
+    }
+
+    const singleToken = String(__ENV.VETINITY_TOKEN || "").trim();
+    if (singleToken) {
+        return {
+            raw: JSON.stringify([{ slot: "01", accessToken: singleToken }]),
+            sourceLabel: "VETINITY_TOKEN",
+        };
+    }
+
+    throw new Error(
+        "Token kaynagi bulunamadi. VETINITY_TOKENS_FILE, VETINITY_TOKENS_JSON veya VETINITY_TOKEN tanimlayin."
+    );
+}
+
+function decodeJwtPayload(accessToken) {
+    const parts = String(accessToken).split(".");
+    if (parts.length < 2 || !parts[1]) {
+        throw new Error("JWT payload cozulemedi.");
+    }
+
+    try {
+        const json = encoding.b64decode(parts[1], "rawurl", "s");
+        return JSON.parse(json);
+    } catch (_error) {
+        throw new Error("JWT payload cozulemedi.");
+    }
+}
+
+function extractClinicIdFromPayload(payload, sourceLabel, slot) {
+    const clinicId = payload[CLINIC_CLAIM];
+    if (clinicId === null || clinicId === undefined || String(clinicId).trim() === "") {
+        throw new Error(
+            `${sourceLabel}: slot ${slot} icin JWT payload ${CLINIC_CLAIM} claim eksik.`
+        );
+    }
+    return String(clinicId).trim();
+}
+
+function normalizeSessions(raw, sourceLabel) {
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (_error) {
+        throw new Error(`${sourceLabel}: JSON parse edilemedi.`);
+    }
+
+    if (!Array.isArray(parsed)) {
+        throw new Error(`${sourceLabel}: JSON bir dizi olmalidir.`);
+    }
+
+    if (parsed.length === 0) {
+        throw new Error(`${sourceLabel}: token dizisi bos.`);
+    }
+
+    const slotsSeen = new Set();
+    const tokensSeen = new Set();
+    const clinicIdsSeen = new Set();
+    const sessions = [];
+
+    for (let index = 0; index < parsed.length; index++) {
+        const entry = parsed[index];
+        const slot = entry && entry.slot !== undefined ? String(entry.slot).trim() : "";
+        const accessToken =
+            entry && entry.accessToken !== undefined ? String(entry.accessToken).trim() : "";
+
+        if (!slot) {
+            throw new Error(`${sourceLabel}: slot bos (index ${index}).`);
+        }
+        if (!accessToken) {
+            throw new Error(`${sourceLabel}: accessToken bos (slot ${slot}).`);
+        }
+        if (slotsSeen.has(slot)) {
+            throw new Error(`${sourceLabel}: duplicate slot (${slot}).`);
+        }
+        if (tokensSeen.has(accessToken)) {
+            throw new Error(`${sourceLabel}: duplicate accessToken (slot ${slot}).`);
+        }
+
+        const payload = decodeJwtPayload(accessToken);
+        const clinicId = extractClinicIdFromPayload(payload, sourceLabel, slot);
+        if (clinicIdsSeen.has(clinicId)) {
+            throw new Error(`${sourceLabel}: duplicate ${CLINIC_CLAIM} (slot ${slot}).`);
+        }
+
+        slotsSeen.add(slot);
+        tokensSeen.add(accessToken);
+        clinicIdsSeen.add(clinicId);
+        sessions.push({ slot, accessToken, clinicId });
+    }
+
+    return sessions;
+}
+
+function loadSessions() {
+    const { raw, sourceLabel } = readTokenSourceJson();
+    return normalizeSessions(raw, sourceLabel);
+}
+
+function buildRuntimeConfig() {
+    const baseUrl = resolveBaseUrl();
+    const sessions = loadSessions();
+    const vus = Number.parseInt(__ENV.VUS || "1", 10);
+
+    if (!Number.isFinite(vus) || vus < 1) {
+        throw new Error("VUS gecerli bir pozitif tamsayi olmalidir.");
+    }
+
+    if (vus % sessions.length !== 0) {
+        throw new Error(
+            `VUS (${vus}) token sayisi (${sessions.length}) ile tam bolunmelidir.`
+        );
+    }
+
+    return { baseUrl, sessions, vus };
+}
+
+const CONFIG = buildRuntimeConfig();
+const SESSIONS = CONFIG.sessions;
+
 const duration = __ENV.DURATION || "30s";
 const thinkTimeMin = Number.parseFloat(__ENV.THINK_TIME_MIN || "0.5");
 const thinkTimeMax = Number.parseFloat(__ENV.THINK_TIME_MAX || "1.5");
 
+function buildClinicSlotThresholds(sessions) {
+    const thresholds = {};
+
+    for (const session of sessions) {
+        thresholds[`clinic_slot_requests{clinic_slot:${session.slot}}`] = ["count>0"];
+    }
+
+    return thresholds;
+}
+
 export const options = {
     insecureSkipTLSVerify: true,
-    vus,
+    vus: CONFIG.vus,
     duration,
     thresholds: {
         http_req_failed: ["rate<0.01"],
         checks: ["rate>0.99"],
-        http_req_duration: ["p(95)<1000", "p(99)<2000"],
+        "http_req_duration{phase:load}": ["p(95)<1000", "p(99)<2000"],
         "http_req_duration{endpoint:dashboard,phase:load}": ["p(95)<1000"],
         "http_req_duration{endpoint:appointment_list,phase:load}": ["p(95)<1000"],
         "http_req_duration{endpoint:appointment_calendar,phase:load}": ["p(95)<1000"],
@@ -105,12 +271,18 @@ export const options = {
         appointment_calendar_duration: ["p(95)<1000"],
         client_list_duration: ["p(95)<1000"],
         pet_list_duration: ["p(95)<1000"],
+        ...buildClinicSlotThresholds(SESSIONS),
     },
 };
 
-function buildHeaders(token) {
+function resolveSessionForVu() {
+    const sessionIndex = (__VU - 1) % SESSIONS.length;
+    return SESSIONS[sessionIndex];
+}
+
+function buildHeaders(accessToken) {
     return {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${accessToken}`,
         Accept: "application/json",
     };
 }
@@ -170,9 +342,9 @@ function utf8ByteLength(value) {
     return bytes;
 }
 
-function sendGet({ url, token, tags, trend, responseBytesTrend, recordTrend = true }) {
+function sendGet({ url, accessToken, tags, trend, responseBytesTrend, recordTrend = true }) {
     const response = http.get(url, {
-        headers: buildHeaders(token),
+        headers: buildHeaders(accessToken),
         tags,
     });
 
@@ -318,44 +490,48 @@ function validateCalendarShape(body) {
     return null;
 }
 
-function assertPreflightStatus(endpoint, response) {
+function assertPreflightStatus(slot, endpoint, response) {
     if (response.status === 401) {
-        throw new Error(`Preflight ${endpoint}: 401 Unauthorized`);
+        throw new Error(`Preflight slot ${slot} / ${endpoint}: 401 Unauthorized`);
     }
     if (response.status === 403) {
-        throw new Error(`Preflight ${endpoint}: 403 Forbidden`);
+        throw new Error(`Preflight slot ${slot} / ${endpoint}: 403 Forbidden`);
     }
     if (response.status === 404) {
-        throw new Error(`Preflight ${endpoint}: 404 Not Found`);
+        throw new Error(`Preflight slot ${slot} / ${endpoint}: 404 Not Found`);
     }
     if (response.status === 429) {
-        throw new Error(`Preflight ${endpoint}: 429 Too Many Requests`);
+        throw new Error(`Preflight slot ${slot} / ${endpoint}: 429 Too Many Requests`);
     }
     if (response.status !== 200) {
-        throw new Error(`Preflight ${endpoint}: beklenmeyen status ${response.status}`);
+        throw new Error(
+            `Preflight slot ${slot} / ${endpoint}: beklenmeyen status ${response.status}`
+        );
     }
 }
 
-function preflightEndpoint(endpoint, url, token, shapeValidator) {
+function preflightEndpoint(session, endpoint, url, shapeValidator) {
     const response = sendGet({
         url,
-        token,
-        tags: { endpoint, phase: "preflight" },
+        accessToken: session.accessToken,
+        tags: { endpoint, phase: "preflight", clinic_slot: session.slot },
         recordTrend: false,
     });
 
-    assertPreflightStatus(endpoint, response);
+    assertPreflightStatus(session.slot, endpoint, response);
 
     let body;
     try {
         body = response.json();
     } catch (_error) {
-        throw new Error(`Preflight ${endpoint}: JSON parse edilemedi`);
+        throw new Error(`Preflight slot ${session.slot} / ${endpoint}: JSON parse edilemedi`);
     }
 
     const shapeError = shapeValidator(body);
     if (shapeError) {
-        throw new Error(`Preflight ${endpoint}: response shape uyumsuz (${shapeError})`);
+        throw new Error(
+            `Preflight slot ${session.slot} / ${endpoint}: response shape uyumsuz (${shapeError})`
+        );
     }
 }
 
@@ -364,19 +540,19 @@ function buildScenarioUrl(scenarioKey, calendarRange) {
 
     switch (scenarioKey) {
         case "dashboard":
-            return buildDashboardUrl(ENV.baseUrl);
+            return buildDashboardUrl(CONFIG.baseUrl);
         case "appointment_list":
-            return buildAppointmentListUrl(ENV.baseUrl, page);
+            return buildAppointmentListUrl(CONFIG.baseUrl, page);
         case "appointment_calendar":
             return buildAppointmentCalendarUrl(
-                ENV.baseUrl,
+                CONFIG.baseUrl,
                 calendarRange.dateFromUtc,
                 calendarRange.dateToUtc
             );
         case "client_list":
-            return buildClientListUrl(ENV.baseUrl, page);
+            return buildClientListUrl(CONFIG.baseUrl, page);
         case "pet_list":
-            return buildPetListUrl(ENV.baseUrl, page);
+            return buildPetListUrl(CONFIG.baseUrl, page);
         default:
             throw new Error(`Bilinmeyen senaryo: ${scenarioKey}`);
     }
@@ -393,52 +569,35 @@ function randomThinkTimeSeconds() {
 export function setup() {
     const calendarRange = buildCalendarRange();
 
-    preflightEndpoint(
-        "dashboard",
-        buildDashboardUrl(ENV.baseUrl),
-        ENV.token,
-        validateDashboardShape
-    );
-    preflightEndpoint(
-        "appointment_list",
-        buildAppointmentListUrl(ENV.baseUrl, 1),
-        ENV.token,
-        validatePagedShape
-    );
-    preflightEndpoint(
-        "appointment_calendar",
-        buildAppointmentCalendarUrl(
-            ENV.baseUrl,
-            calendarRange.dateFromUtc,
-            calendarRange.dateToUtc
-        ),
-        ENV.token,
-        validateCalendarShape
-    );
-    preflightEndpoint(
-        "client_list",
-        buildClientListUrl(ENV.baseUrl, 1),
-        ENV.token,
-        validatePagedShape
-    );
-    preflightEndpoint(
-        "pet_list",
-        buildPetListUrl(ENV.baseUrl, 1),
-        ENV.token,
-        validatePagedShape
-    );
+    for (const session of SESSIONS) {
+        for (const checkDef of PREFLIGHT_CHECKS) {
+            preflightEndpoint(
+                session,
+                checkDef.endpoint,
+                checkDef.buildUrl(CONFIG.baseUrl, calendarRange),
+                checkDef.validate
+            );
+        }
+    }
 
     return { calendarRange };
 }
 
 export default function (data) {
+    const session = resolveSessionForVu();
     const scenario = pickWeightedScenario();
     const url = buildScenarioUrl(scenario.key, data.calendarRange);
 
+    clinicSlotRequests.add(1, { clinic_slot: session.slot });
+
     const response = sendGet({
         url,
-        token: ENV.token,
-        tags: { endpoint: scenario.tag, phase: "load" },
+        accessToken: session.accessToken,
+        tags: {
+            endpoint: scenario.tag,
+            phase: "load",
+            clinic_slot: session.slot,
+        },
         trend: scenario.trend,
         responseBytesTrend: scenario.responseBytes,
     });
