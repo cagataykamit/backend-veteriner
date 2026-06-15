@@ -757,16 +757,28 @@ public static class LoadTestDataSeeder
         DateTime now,
         DateTime todayStart)
     {
-        if (index < (int)(AppointmentCount * 0.75))
+        // Panel/calendar yük testi: derin geçmiş (31–730 gün), yakın geçmiş (1–30 gün),
+        // yakın gelecek (1–60 gün), bugün minimal (50 kayıt).
+        const int deepPastCount = 44_000;
+        const int recentPastCount = 3_000;
+        const int nearFutureCount = 2_950;
+
+        if (index < deepPastCount)
         {
-            var daysAgo = random.Next(1, 181);
-            return now.AddDays(-daysAgo).AddHours(random.Next(8, 19)).AddMinutes(random.Next(0, 60));
+            var daysAgo = random.Next(31, 731);
+            return todayStart.AddDays(-daysAgo).AddHours(random.Next(8, 19)).AddMinutes(random.Next(0, 60));
         }
 
-        if (index < (int)(AppointmentCount * 0.95))
+        if (index < deepPastCount + recentPastCount)
         {
-            var daysAhead = random.Next(1, 31);
-            return now.AddDays(daysAhead).AddHours(random.Next(8, 19)).AddMinutes(random.Next(0, 60));
+            var daysAgo = random.Next(1, 31);
+            return todayStart.AddDays(-daysAgo).AddHours(random.Next(8, 19)).AddMinutes(random.Next(0, 60));
+        }
+
+        if (index < deepPastCount + recentPastCount + nearFutureCount)
+        {
+            var daysAhead = random.Next(1, 61);
+            return todayStart.AddDays(daysAhead).AddHours(random.Next(8, 19)).AddMinutes(random.Next(0, 60));
         }
 
         return todayStart.AddHours(random.Next(8, 19)).AddMinutes(random.Next(0, 60));
