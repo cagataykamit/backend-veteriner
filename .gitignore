@@ -363,3 +363,5 @@ MigrationBackup/
 FodyWeavers.xsd
 _local_backup/
 
+tests/load/.tokens/
+
