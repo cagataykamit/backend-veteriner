@@ -48,6 +48,7 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
 
             using var scope = services.BuildServiceProvider().CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
             // EnsureCreated'den önce efektif veritabanı adını doğrula (VeterinerDb/Development/Production engeli).
@@ -63,6 +64,11 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
 
             db.Database.EnsureCreated();
             TestDataSeeder.Seed(db, hasher);
+
+            IntegrationTestDatabaseGuard.EnsureSafeDatabase(
+                queryDb.Database.GetConnectionString(),
+                allowedPrefix: "VetinityQueryDb_OutboxProcessorTests");
+            IntegrationTestDatabaseReset.ResetAndMigrateAsync(queryDb).GetAwaiter().GetResult();
         });
 
         builder.ConfigureServices(services =>
@@ -83,12 +89,16 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
     {
         await base.DisposeAsync();
         await IntegrationTestDatabaseReset.EnsureDroppedAsync(ProcessorTestConnection);
+        await IntegrationTestDatabaseReset.EnsureDroppedAsync(ProcessorTestQueryConnection);
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         if (disposing)
+        {
             IntegrationTestDatabaseReset.EnsureDroppedAsync(ProcessorTestConnection).GetAwaiter().GetResult();
+            IntegrationTestDatabaseReset.EnsureDroppedAsync(ProcessorTestQueryConnection).GetAwaiter().GetResult();
+        }
     }
 }

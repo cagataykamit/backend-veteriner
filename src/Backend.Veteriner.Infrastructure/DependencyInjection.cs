@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.Common.Auditing;                            
 using Backend.Veteriner.Infrastructure.Caching;                                  // PermissionReader
 using Backend.Veteriner.Infrastructure.Mailing;                                   // MailKitEmailSender, TransactionalEmailSender, SmtpOptions
 using Backend.Veteriner.Infrastructure.Outbox;                                    // EfOutbox, OutboxProcessor, OutboxOptions, OutboxBuffer, OutboxSaveChangesInterceptor
+using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;                 // EfRepository, EfReadRepository, UserRepository, RefreshTokenRepository, VerificationTokenRepository
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
@@ -57,6 +58,8 @@ public static class DependencyInjection
 
         // ===== Outbox =====
         services.Configure<OutboxOptions>(configuration.GetSection("Outbox"));
+        services.Configure<AppointmentProjectionOptions>(
+            configuration.GetSection(AppointmentProjectionOptions.SectionName));
         services.Configure<PerformanceDiagnosticsOptions>(
             configuration.GetSection(PerformanceDiagnosticsOptions.SectionName));
 
@@ -144,6 +147,9 @@ public static class DependencyInjection
 
         // ===== Outbox background worker =====
         services.AddHostedService<OutboxProcessor>();
+
+        services.AddScoped<IAppointmentProjectionProcessor, AppointmentProjectionProcessor>();
+        services.AddHostedService<AppointmentProjectionHostedService>();
 
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));

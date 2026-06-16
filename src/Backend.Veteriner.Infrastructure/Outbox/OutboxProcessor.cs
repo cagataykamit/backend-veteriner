@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Outbox;
 using Backend.Veteriner.Domain.Shared;
@@ -58,14 +59,18 @@ public sealed class OutboxProcessor : BackgroundService
 
                 var now = DateTime.UtcNow;
 
-                // Haz�r, i�lenmemi�, dead-letter olmayan mesajlar
-                var batch = await db.OutboxMessages
+                // Hazir, islenmemis, dead-letter olmayan mesajlar (appointment integration eventleri SQL'de haric).
+                var batch = await OutboxMessageQueryFilters
+                    .ExcludingAppointmentIntegrationEvents(db.OutboxMessages)
                     .Where(m => m.ProcessedAtUtc == null
                              && m.DeadLetterAtUtc == null
                              && (m.NextAttemptAtUtc == null || m.NextAttemptAtUtc <= now))
                     .OrderBy(m => m.CreatedAtUtc)
+                    .ThenBy(m => m.Id)
                     .Take(Math.Max(1, _opt.BatchSize))
                     .ToListAsync(stoppingToken);
+
+                batch = batch.Where(m => !AppointmentIntegrationEventTypes.IsKnown(m.Type)).ToList();
 
                 if (batch.Count == 0)
                     continue;
@@ -76,30 +81,21 @@ public sealed class OutboxProcessor : BackgroundService
                     {
                         await ProcessMessageAsync(msg, scope.ServiceProvider, stoppingToken);
 
-                        msg.ProcessedAtUtc = DateTime.UtcNow;
-                        msg.LastError = null;
-                        msg.Error = null;
-                        msg.NextAttemptAtUtc = null;
+                        OutboxRetryHelper.ApplySuccess(msg);
                     }
                     catch (Exception ex)
                     {
-                        msg.RetryCount++;
-                        msg.LastError = ex.Message;
-                        msg.Error = ex.ToString();
+                        OutboxRetryHelper.ApplyFailure(msg, _opt, ex);
 
-                        if (msg.RetryCount >= _opt.MaxRetryCount)
+                        if (msg.DeadLetterAtUtc is not null)
                         {
-                            msg.DeadLetterAtUtc = DateTime.UtcNow;
-
                             Log.Error(ex,
                                 "Outbox dead-letter. Type={Type} Id={Id} Retry={Retry}",
                                 msg.Type, msg.Id, msg.RetryCount);
                         }
                         else
                         {
-                            var backoff = ComputeBackoff(_opt.BaseDelaySeconds, msg.RetryCount);
-                            msg.NextAttemptAtUtc = DateTime.UtcNow.Add(backoff);
-
+                            var backoff = OutboxRetryHelper.ComputeBackoff(_opt.BaseDelaySeconds, msg.RetryCount);
                             Log.Warning(ex,
                                 "Outbox retry in {DelaySeconds}s. Type={Type} Id={Id} Retry={Retry}",
                                 (int)backoff.TotalSeconds, msg.Type, msg.Id, msg.RetryCount);
@@ -118,19 +114,6 @@ public sealed class OutboxProcessor : BackgroundService
                 Log.Error(ex, "Outbox loop error");
             }
         }
-    }
-
-    private static TimeSpan ComputeBackoff(int baseDelaySec, int retry)
-    {
-        // exponential backoff: base * 2^(retry-1), max ~10 dk
-        var baseDelay = Math.Max(1, baseDelaySec);
-        var seconds = Math.Min(baseDelay * (int)Math.Pow(2, retry - 1), 600);
-
-        // jitter �20%
-        var jitterFactor = (Random.Shared.NextDouble() * 0.4) - 0.2;
-        var withJitter = seconds + seconds * jitterFactor;
-
-        return TimeSpan.FromSeconds(Math.Max(1, (int)withJitter));
     }
 
     private static async Task ProcessMessageAsync(OutboxMessage msg, IServiceProvider sp, CancellationToken ct)
