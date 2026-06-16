@@ -40,7 +40,7 @@ public sealed class AppointmentProjectionWebApplicationFactory : WebApplicationF
                 ["ConnectionStrings:QueryConnection"] = QueryConnection,
                 ["Outbox:Enabled"] = "false",
                 ["AppointmentProjection:Enabled"] = "false"
-            });
+            }.Concat(IntegrationTestAppConfiguration.RateLimitingDisabled));
         });
 
         builder.ConfigureServices(services =>

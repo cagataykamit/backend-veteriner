@@ -200,8 +200,15 @@ public static class RateLimitingExtensions
         return services;
     }
 
-    public static IApplicationBuilder UseAppRateLimiting(this IApplicationBuilder app)
-        => app.UseRateLimiter();
+    public static IApplicationBuilder UseAppRateLimiting(
+        this IApplicationBuilder app,
+        IConfiguration configuration)
+    {
+        if (!RateLimitingOptions.FromConfiguration(configuration).Enabled)
+            return app;
+
+        return app.UseRateLimiter();
+    }
 
     private static string GetClientIp(HttpContext ctx)
         => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";

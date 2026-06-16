@@ -7,6 +7,27 @@ namespace Backend.Veteriner.Application.Tests.RateLimiting;
 public sealed class RateLimitingOptionsTests
 {
     [Fact]
+    public void FromConfiguration_WhenEnabledFalse_DisablesRateLimiting()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["RateLimiting:Enabled"] = "false",
+            })
+            .Build();
+
+        RateLimitingOptions.FromConfiguration(configuration).Enabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void FromConfiguration_WhenSectionMissing_EnabledDefaultsTrue()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+
+        RateLimitingOptions.FromConfiguration(configuration).Enabled.Should().BeTrue();
+    }
+
+    [Fact]
     public void FromConfiguration_WhenSectionMissing_UsesDefault200()
     {
         var configuration = new ConfigurationBuilder().Build();

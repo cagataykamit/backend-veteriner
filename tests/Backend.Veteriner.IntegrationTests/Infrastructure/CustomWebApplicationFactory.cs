@@ -28,7 +28,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
                 ["ConnectionStrings:DefaultConnection"] = IntegrationTestDatabaseGuard.DedicatedConnectionString,
                 ["ConnectionStrings:SqlServer"] = IntegrationTestDatabaseGuard.DedicatedConnectionString,
                 ["ConnectionStrings:QueryConnection"] = IntegrationTestDatabaseGuard.DedicatedQueryConnectionString
-            });
+            }.Concat(IntegrationTestAppConfiguration.RateLimitingDisabled));
         });
 
         builder.ConfigureServices(services =>

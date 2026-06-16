@@ -13,6 +13,9 @@ public sealed class RateLimitingOptions
     public const int MinGlobalPermitLimit = 1;
     public const int MaxGlobalPermitLimit = 100_000;
 
+    /// <summary>False iken API pipeline rate limiter middleware'i kaydedilmez (IntegrationTests).</summary>
+    public bool Enabled { get; set; } = true;
+
     /// <summary>Global sliding-window <c>PermitLimit</c> (IP başına, 1 dakika pencere).</summary>
     public int GlobalPermitLimit { get; set; } = DefaultGlobalPermitLimit;
 
@@ -30,12 +33,16 @@ public sealed class RateLimitingOptions
     public static RateLimitingOptions FromConfiguration(IConfiguration configuration)
     {
         var options = new RateLimitingOptions();
-        var raw = configuration.GetSection(SectionName)["GlobalPermitLimit"];
+        var section = configuration.GetSection(SectionName);
+        var raw = section["GlobalPermitLimit"];
         if (raw is not null
             && int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
         {
             options.GlobalPermitLimit = parsed;
         }
+
+        if (bool.TryParse(section["Enabled"], out var enabled))
+            options.Enabled = enabled;
 
         return options;
     }

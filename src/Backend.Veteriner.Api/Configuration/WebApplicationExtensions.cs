@@ -59,7 +59,7 @@ public static class WebApplicationExtensions
         app.UseRouting();
 
         app.UseCors("AllowFrontend");
-        app.UseAppRateLimiting();
+        app.UseAppRateLimiting(app.Configuration);
 
         app.UseAuthentication();
         app.UseMiddleware<TenantContextMiddleware>();

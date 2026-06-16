@@ -37,7 +37,7 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
                 ["ConnectionStrings:DefaultConnection"] = ProcessorTestConnection,
                 ["ConnectionStrings:SqlServer"] = ProcessorTestConnection,
                 ["ConnectionStrings:QueryConnection"] = ProcessorTestQueryConnection
-            });
+            }.Concat(IntegrationTestAppConfiguration.RateLimitingDisabled));
         });
 
         builder.ConfigureServices(services =>
