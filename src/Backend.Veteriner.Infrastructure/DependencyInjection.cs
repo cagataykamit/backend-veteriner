@@ -150,6 +150,7 @@ public static class DependencyInjection
 
         services.AddScoped<IAppointmentProjectionSnapshotFactory, AppointmentProjectionSnapshotFactory>();
         services.AddScoped<IAppointmentProjectionProcessor, AppointmentProjectionProcessor>();
+        services.AddScoped<IAppointmentProjectionRebuildService, AppointmentProjectionRebuildService>();
         services.AddHostedService<AppointmentProjectionHostedService>();
 
         // ===== RefreshToken cleanup background worker =====

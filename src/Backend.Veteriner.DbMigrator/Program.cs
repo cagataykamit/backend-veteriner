@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Infrastructure;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
+using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -75,6 +76,39 @@ try
             await LoadTestDataSeeder.SeedSmallAsync(db, logger, CancellationToken.None);
             logger.LogInformation("Load test seed ({Profile}) completed.", profile);
             break;
+        case "rebuild-appointment-projections":
+            {
+                var batchSize = AppointmentProjectionRebuildService.DefaultBatchSize;
+                for (var i = 1; i < args.Length; i++)
+                {
+                    if (args[i] == "--batch-size"
+                        && i + 1 < args.Length
+                        && int.TryParse(args[i + 1], out var parsedBatchSize))
+                    {
+                        batchSize = Math.Max(1, parsedBatchSize);
+                        i++;
+                    }
+                }
+
+                var rebuild = sp.GetRequiredService<IAppointmentProjectionRebuildService>();
+                var result = await rebuild.RebuildAsync(batchSize, CancellationToken.None);
+
+                Console.WriteLine("Appointment projection rebuild completed successfully.");
+                Console.WriteLine($"  Command appointments : {result.CommandAppointmentCount}");
+                Console.WriteLine($"  Query appointments   : {result.QueryAppointmentCount}");
+                Console.WriteLine($"  Pet activity rows    : {result.PetActivityCount}");
+                Console.WriteLine($"  Client activity rows : {result.ClientActivityCount}");
+                Console.WriteLine($"  Daily stats rows     : {result.DailyStatsCount}");
+                Console.WriteLine($"  Pending outbox       : {result.PendingAppointmentOutboxCount}");
+                Console.WriteLine($"  Dead-letter outbox   : {result.DeadLetterAppointmentOutboxCount}");
+                Console.WriteLine($"  Duration             : {result.Duration.TotalSeconds:F2}s");
+                logger.LogInformation(
+                    "Appointment projection rebuild completed. Command={Command} Query={Query} DurationSec={DurationSec}",
+                    result.CommandAppointmentCount,
+                    result.QueryAppointmentCount,
+                    result.Duration.TotalSeconds);
+                break;
+            }
         default:
             Console.Error.WriteLine($"Unknown command: {args[0]}");
             PrintHelp();
@@ -122,10 +156,13 @@ static void PrintHelp()
           seed           — Permission/Data/AdminClaim/InviteAssignable seed zinciri
           all            — önce migrate, sonra seed
           loadtest-seed  — yük testi sentetik veri (yalnızca VetinityLoadTestDb; profil: small)
+          rebuild-appointment-projections — Command DB randevularından Query read-model yeniden oluştur
+                                            (--batch-size 1000 opsiyonel)
 
         Örnek:
           dotnet run --project src/Backend.Veteriner.DbMigrator -- migrate-query
           dotnet run --project src/Backend.Veteriner.DbMigrator -- loadtest-seed small
+          dotnet run --project src/Backend.Veteriner.DbMigrator -- rebuild-appointment-projections --batch-size 1000
 
         Bağlantı: ConnectionStrings:DefaultConnection (command), ConnectionStrings:QueryConnection (query).
         Şema için alternatif: dotnet ef database update --project src/Backend.Veteriner.Infrastructure --startup-project src/Backend.Veteriner.Api
