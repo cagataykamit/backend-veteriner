@@ -55,7 +55,11 @@ internal static class AppointmentProjectionTestSupport
         int durationMinutes = 30,
         string clinicName = "Test Klinik",
         string petName = "Boncuk",
-        string clientName = "Test Musteri")
+        string clientName = "Test Musteri",
+        string? petBreed = null,
+        string? petBreedRefName = null,
+        string? clientEmail = null,
+        string? clientPhoneNormalized = "+905551112233")
         => new(
             appointmentId,
             tenantId,
@@ -72,7 +76,11 @@ internal static class AppointmentProjectionTestSupport
             durationMinutes,
             0,
             status,
-            "Test notu");
+            "Test notu",
+            petBreed,
+            petBreedRefName,
+            clientEmail,
+            clientPhoneNormalized);
 
     public static AppointmentProjectionSnapshot WithClinic(
         AppointmentProjectionSnapshot source,

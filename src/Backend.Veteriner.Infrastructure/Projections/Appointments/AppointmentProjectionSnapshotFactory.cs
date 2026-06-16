@@ -24,15 +24,21 @@ public sealed class AppointmentProjectionSnapshotFactory : IAppointmentProjectio
                 join cl in _db.Clients.AsNoTracking()
                     on new { p.TenantId, p.ClientId }
                     equals new { cl.TenantId, ClientId = cl.Id }
+                join br in _db.Breeds.AsNoTracking() on p.BreedId equals br.Id into breedJoin
+                from br in breedJoin.DefaultIfEmpty()
                 where p.TenantId == appointment.TenantId && p.Id == appointment.PetId
                 select new DisplayRow(
                     c.Name,
                     p.Name,
                     p.SpeciesId,
                     s.Name,
+                    p.Breed,
+                    br != null ? br.Name : null,
                     p.ClientId,
                     cl.FullName,
-                    cl.Phone))
+                    cl.Phone,
+                    cl.Email,
+                    cl.PhoneNormalized))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (display is null)
@@ -78,14 +84,22 @@ public sealed class AppointmentProjectionSnapshotFactory : IAppointmentProjectio
             appointment.DurationMinutes,
             (int)appointment.AppointmentType,
             (int)appointment.Status,
-            appointment.Notes);
+            appointment.Notes,
+            display.PetBreed,
+            display.PetBreedRefName,
+            display.ClientEmail,
+            display.ClientPhoneNormalized);
 
     private sealed record DisplayRow(
         string ClinicName,
         string PetName,
         Guid SpeciesId,
         string SpeciesName,
+        string? PetBreed,
+        string? PetBreedRefName,
         Guid ClientId,
         string ClientName,
-        string? ClientPhone);
+        string? ClientPhone,
+        string? ClientEmail,
+        string? ClientPhoneNormalized);
 }

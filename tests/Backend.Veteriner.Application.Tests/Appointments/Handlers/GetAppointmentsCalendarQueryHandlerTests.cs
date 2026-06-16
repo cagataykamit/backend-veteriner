@@ -1,12 +1,16 @@
+using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.Queries.GetCalendar;
+using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Appointments.Handlers;
@@ -18,14 +22,17 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IAppointmentReadModelReader> _readModelReader = new();
 
-    private GetAppointmentsCalendarQueryHandler CreateHandler()
+    private GetAppointmentsCalendarQueryHandler CreateHandler(bool appointmentsQueryEnabled = false)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
             _appointments.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            _readModelReader.Object,
+            Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = appointmentsQueryEnabled }));
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

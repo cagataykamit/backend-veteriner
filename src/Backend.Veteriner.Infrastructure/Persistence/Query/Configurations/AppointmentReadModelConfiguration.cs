@@ -16,6 +16,10 @@ public sealed class AppointmentReadModelConfiguration : IEntityTypeConfiguration
         b.Property(x => x.SpeciesName).IsRequired().HasMaxLength(QueryReadModelConstraints.SpeciesName);
         b.Property(x => x.ClientName).IsRequired().HasMaxLength(QueryReadModelConstraints.ClientName);
         b.Property(x => x.ClientPhone).HasMaxLength(QueryReadModelConstraints.ClientPhone);
+        b.Property(x => x.ClientPhoneNormalized).HasMaxLength(QueryReadModelConstraints.ClientPhoneNormalized);
+        b.Property(x => x.ClientEmail).HasMaxLength(QueryReadModelConstraints.ClientEmail);
+        b.Property(x => x.PetBreed).HasMaxLength(QueryReadModelConstraints.PetBreed);
+        b.Property(x => x.PetBreedRefName).HasMaxLength(QueryReadModelConstraints.PetBreedRefName);
         b.Property(x => x.Notes).HasMaxLength(QueryReadModelConstraints.Notes);
         b.Property(x => x.ScheduledAtUtc).IsRequired();
         b.Property(x => x.ScheduledEndUtc).IsRequired();

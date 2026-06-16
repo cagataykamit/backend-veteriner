@@ -249,6 +249,10 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
             ClientId = snap.ClientId,
             ClientName = snap.ClientName,
             ClientPhone = snap.ClientPhone,
+            ClientPhoneNormalized = snap.ClientPhoneNormalized,
+            ClientEmail = snap.ClientEmail,
+            PetBreed = snap.PetBreed,
+            PetBreedRefName = snap.PetBreedRefName,
             ScheduledAtUtc = snap.ScheduledAtUtc,
             ScheduledEndUtc = scheduledEndUtc,
             DurationMinutes = snap.DurationMinutes,
@@ -276,6 +280,10 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         existing.ClientId = snap.ClientId;
         existing.ClientName = snap.ClientName;
         existing.ClientPhone = snap.ClientPhone;
+        existing.ClientPhoneNormalized = snap.ClientPhoneNormalized;
+        existing.ClientEmail = snap.ClientEmail;
+        existing.PetBreed = snap.PetBreed;
+        existing.PetBreedRefName = snap.PetBreedRefName;
         existing.ScheduledAtUtc = snap.ScheduledAtUtc;
         existing.ScheduledEndUtc = scheduledEndUtc;
         existing.DurationMinutes = snap.DurationMinutes;

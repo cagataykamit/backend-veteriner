@@ -15,4 +15,13 @@ internal static class IntegrationTestAppConfiguration
         {
             ["RateLimiting:Enabled"] = "false"
         };
+
+    /// <summary>
+    /// Query read-model list/calendar handler'larının Query DB yolunu test etmek için.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string?> AppointmentsQueryReadEnabled { get; } =
+        new Dictionary<string, string?>
+        {
+            ["QueryReadModels:AppointmentsEnabled"] = "true"
+        };
 }

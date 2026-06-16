@@ -186,6 +186,8 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
             join cl in _commandDb.Clients.AsNoTracking()
                 on new { p.TenantId, p.ClientId }
                 equals new { cl.TenantId, ClientId = cl.Id }
+            join br in _commandDb.Breeds.AsNoTracking() on p.BreedId equals br.Id into breedJoin
+            from br in breedJoin.DefaultIfEmpty()
             orderby a.TenantId, a.Id
             select new RebuildAppointmentRow(
                 a.Id,
@@ -196,9 +198,13 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
                 p.Name,
                 p.SpeciesId,
                 s.Name,
+                p.Breed,
+                br != null ? br.Name : null,
                 p.ClientId,
                 cl.FullName,
                 cl.Phone,
+                cl.Email,
+                cl.PhoneNormalized,
                 a.ScheduledAtUtc,
                 a.DurationMinutes,
                 (int)a.AppointmentType,
@@ -258,6 +264,10 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
             ClientId = row.ClientId,
             ClientName = row.ClientName,
             ClientPhone = row.ClientPhone,
+            ClientPhoneNormalized = row.ClientPhoneNormalized,
+            ClientEmail = row.ClientEmail,
+            PetBreed = row.PetBreed,
+            PetBreedRefName = row.PetBreedRefName,
             ScheduledAtUtc = row.ScheduledAtUtc,
             ScheduledEndUtc = row.ScheduledAtUtc.AddMinutes(row.DurationMinutes),
             DurationMinutes = row.DurationMinutes,
@@ -390,9 +400,13 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
         string PetName,
         Guid SpeciesId,
         string SpeciesName,
+        string? PetBreed,
+        string? PetBreedRefName,
         Guid ClientId,
         string ClientName,
         string? ClientPhone,
+        string? ClientEmail,
+        string? ClientPhoneNormalized,
         DateTime ScheduledAtUtc,
         int DurationMinutes,
         int AppointmentType,

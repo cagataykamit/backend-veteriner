@@ -115,6 +115,50 @@ public sealed class AppointmentProjectionIntegrationTests : IClassFixture<Appoin
     }
 
     [Fact]
+    public async Task CreatedEvent_WithSearchFields_Should_ProjectBreedAndEmail()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
+
+        await AppointmentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var appointmentId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var scheduledAtUtc = new DateTime(2026, 6, 16, 10, 0, 0, DateTimeKind.Utc);
+        var eventId = Guid.NewGuid();
+
+        var snapshot = AppointmentProjectionTestSupport.CreateSnapshot(
+            appointmentId,
+            tenantId,
+            clinicId,
+            petId,
+            clientId,
+            scheduledAtUtc,
+            petBreed: "Van Kedisi",
+            petBreedRefName: "British Shorthair",
+            clientEmail: "search@example.com",
+            clientPhoneNormalized: "905551112233");
+
+        var integrationEvent = new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, snapshot);
+        await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, AppointmentIntegrationEventTypes.Created, integrationEvent);
+
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        var readModel = await queryDb.AppointmentReadModels.SingleAsync(x => x.AppointmentId == appointmentId);
+        readModel.PetBreed.Should().Be("Van Kedisi");
+        readModel.PetBreedRefName.Should().Be("British Shorthair");
+        readModel.ClientEmail.Should().Be("search@example.com");
+        readModel.ClientPhoneNormalized.Should().Be("905551112233");
+    }
+
+    [Fact]
     public async Task QueryAlreadyProcessed_CommandOutboxUnprocessed_Should_OnlyMarkOutbox()
     {
         await using var scope = _factory.Services.CreateAsyncScope();

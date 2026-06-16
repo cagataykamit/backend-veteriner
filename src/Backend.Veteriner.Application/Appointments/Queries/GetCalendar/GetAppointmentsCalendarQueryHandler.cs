@@ -1,13 +1,16 @@
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
+using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Appointments.Queries.GetCalendar;
 
@@ -21,19 +24,25 @@ public sealed class GetAppointmentsCalendarQueryHandler
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IAppointmentReadModelReader _readModelReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
 
     public GetAppointmentsCalendarQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IReadRepository<Appointment> appointments,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IAppointmentReadModelReader readModelReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _appointments = appointments;
         _pets = pets;
         _clients = clients;
+        _readModelReader = readModelReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
     }
 
     public async Task<Result<IReadOnlyList<AppointmentCalendarItemDto>>> Handle(GetAppointmentsCalendarQuery request, CancellationToken ct)
@@ -76,8 +85,6 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
-        // Güvenlik: açık bir klinik kapsamı (request.ClinicId veya aktif clinic context) yoksa
-        // tüm kiracı randevularını DÖNDÜRME. Tenant-wide kullanıcılar dahil, kapsamsız okuma engellenir.
         if (effectiveClinicId is null)
         {
             return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(
@@ -85,13 +92,43 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Takvim klinik kapsamı olmadan listelenemez.");
         }
 
+        if (_queryReadModelsOptions.AppointmentsEnabled)
+        {
+            var items = await _readModelReader.GetCalendarAsync(
+                new AppointmentCalendarReadRequest(
+                    new AppointmentReadScope(tenantId, effectiveClinicId.Value),
+                    dateFromUtc,
+                    dateToUtc,
+                    request.Status),
+                ct);
+
+            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(items);
+        }
+
+        return await HandleFromCommandDbAsync(
+            tenantId,
+            effectiveClinicId,
+            dateFromUtc,
+            dateToUtc,
+            request.Status,
+            ct);
+    }
+
+    private async Task<Result<IReadOnlyList<AppointmentCalendarItemDto>>> HandleFromCommandDbAsync(
+        Guid tenantId,
+        Guid? effectiveClinicId,
+        DateTime dateFromUtc,
+        DateTime dateToUtc,
+        AppointmentStatus? status,
+        CancellationToken ct)
+    {
         var rows = await _appointments.ListAsync(
             new AppointmentsCalendarSpec(
                 tenantId,
                 effectiveClinicId,
                 dateFromUtc,
                 dateToUtc,
-                request.Status),
+                status),
             ct);
 
         if (rows.Count == 0)

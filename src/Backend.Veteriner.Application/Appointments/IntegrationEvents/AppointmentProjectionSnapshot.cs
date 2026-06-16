@@ -20,4 +20,8 @@ public sealed record AppointmentProjectionSnapshot(
     int DurationMinutes,
     int AppointmentType,
     int Status,
-    string? Notes);
+    string? Notes,
+    string? PetBreed = null,
+    string? PetBreedRefName = null,
+    string? ClientEmail = null,
+    string? ClientPhoneNormalized = null);

@@ -80,6 +80,33 @@ public sealed class AppointmentProjectionRebuildIntegrationTests : IClassFixture
     }
 
     [Fact]
+    public async Task Rebuild_Should_PopulateSearchParityFields()
+    {
+        await ResetCommandAppointmentsAsync();
+        var context = await GetDefaultTenantContextAsync();
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var client = await db.Clients.SingleAsync(c => c.Id == context.ClientId);
+            client.UpdateDetails(client.FullName, "rebuild.search@example.com", client.Phone, client.Address);
+            var pet = await db.Pets.SingleAsync(p => p.Id == context.PetId);
+            pet.UpdateDetails(pet.Name, pet.SpeciesId, "RebuildBreedFreeText", pet.BirthDate, pet.BreedId, pet.Gender, pet.ColorId, pet.Weight, pet.Notes);
+            await db.SaveChangesAsync();
+        }
+
+        await SeedAppointmentAsync(context, context.PetId, SlotAlignedUtcPlusDays(2), AppointmentStatus.Scheduled);
+        await RunRebuildAsync();
+
+        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        var queryDb = verifyScope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var row = await queryDb.AppointmentReadModels.AsNoTracking().SingleAsync();
+        row.PetBreed.Should().Be("RebuildBreedFreeText");
+        row.ClientEmail.Should().Be("rebuild.search@example.com");
+        row.ClientPhoneNormalized.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Rebuild_Should_BucketDailyStatsByIstanbulLocalDate()
     {
         await ResetCommandAppointmentsAsync();

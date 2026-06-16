@@ -1,11 +1,13 @@
 using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
+using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
@@ -15,6 +17,7 @@ using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Appointments.Queries.GetList;
@@ -28,6 +31,8 @@ public sealed class GetAppointmentsListQueryHandler
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IAppointmentReadModelReader _readModelReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetAppointmentsListQueryHandler> _logger;
 
     public GetAppointmentsListQueryHandler(
@@ -37,6 +42,8 @@ public sealed class GetAppointmentsListQueryHandler
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
         IReadRepository<Clinic> clinics,
+        IAppointmentReadModelReader readModelReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetAppointmentsListQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -45,6 +52,8 @@ public sealed class GetAppointmentsListQueryHandler
         _pets = pets;
         _clients = clients;
         _clinics = clinics;
+        _readModelReader = readModelReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetAppointmentsListQueryHandler>.Instance;
     }
 
@@ -61,6 +70,87 @@ public sealed class GetAppointmentsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
+
+        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        {
+            return Result<PagedResult<AppointmentListItemDto>>.Failure(
+                "Appointments.ClinicContextMismatch",
+                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+        }
+
+        if (effectiveClinicId is null)
+        {
+            return Result<PagedResult<AppointmentListItemDto>>.Failure(
+                "Appointments.ClinicScopeRequired",
+                "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Randevular klinik kapsamı olmadan listelenemez.");
+        }
+
+        if (_queryReadModelsOptions.AppointmentsEnabled)
+        {
+            return await HandleFromQueryReadModelAsync(
+                request,
+                tenantId,
+                effectiveClinicId.Value,
+                page,
+                pageSize,
+                ct);
+        }
+
+        return await HandleFromCommandDbAsync(
+            request,
+            tenantId,
+            effectiveClinicId,
+            page,
+            pageSize,
+            ct);
+    }
+
+    private async Task<Result<PagedResult<AppointmentListItemDto>>> HandleFromQueryReadModelAsync(
+        GetAppointmentsListQuery request,
+        Guid tenantId,
+        Guid clinicId,
+        int page,
+        int pageSize,
+        CancellationToken ct)
+    {
+        var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
+        string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
+        var scheduledAtDescending = AppointmentListSort.ResolveScheduledAtDescending(request.PageRequest);
+
+        var readResult = await _readModelReader.GetListAsync(
+            new AppointmentListReadRequest(
+                new AppointmentReadScope(tenantId, clinicId),
+                request.PetId,
+                request.Status,
+                request.DateFromUtc,
+                request.DateToUtc,
+                page,
+                pageSize,
+                searchPattern,
+                scheduledAtDescending),
+            ct);
+
+        _logger.LogInformation(
+            "Appointments list generated from query read-model. TenantId={TenantId} ClinicId={ClinicId} Page={Page} PageSize={PageSize} TotalItems={TotalItems}",
+            tenantId,
+            clinicId,
+            page,
+            pageSize,
+            readResult.TotalCount);
+
+        return Result<PagedResult<AppointmentListItemDto>>.Success(
+            PagedResult<AppointmentListItemDto>.Create(readResult.Items, readResult.TotalCount, page, pageSize));
+    }
+
+    private async Task<Result<PagedResult<AppointmentListItemDto>>> HandleFromCommandDbAsync(
+        GetAppointmentsListQuery request,
+        Guid tenantId,
+        Guid? effectiveClinicId,
+        int page,
+        int pageSize,
+        CancellationToken ct)
+    {
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();
         var querySteps = 0;
@@ -78,23 +168,6 @@ public sealed class GetAppointmentsListQueryHandler
             }
 
             stepSw.Restart();
-        }
-
-        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
-        {
-            return Result<PagedResult<AppointmentListItemDto>>.Failure(
-                "Appointments.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
-        }
-
-        // Güvenlik: açık bir klinik kapsamı (request.ClinicId veya aktif clinic context) yoksa
-        // tüm kiracı randevularını DÖNDÜRME. Tenant-wide kullanıcılar dahil, kapsamsız list/okuma engellenir.
-        if (effectiveClinicId is null)
-        {
-            return Result<PagedResult<AppointmentListItemDto>>.Failure(
-                "Appointments.ClinicScopeRequired",
-                "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Randevular klinik kapsamı olmadan listelenemez.");
         }
 
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
@@ -159,7 +232,6 @@ public sealed class GetAppointmentsListQueryHandler
             MarkStep("clientsLookup");
         var clientNameById = clients.ToDictionary(x => x.Id, x => x.FullName);
 
-        // Tek klinik filtresi: sayfadaki tüm satırlar aynı clinicId ise batch distinct yerine tek id ile minimal lookup.
         Dictionary<Guid, string> clinicNameById;
         if (rows.Count == 0)
         {

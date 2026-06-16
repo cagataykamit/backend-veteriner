@@ -13,6 +13,10 @@ public sealed class AppointmentReadModel
     public Guid ClientId { get; set; }
     public string ClientName { get; set; } = default!;
     public string? ClientPhone { get; set; }
+    public string? ClientPhoneNormalized { get; set; }
+    public string? ClientEmail { get; set; }
+    public string? PetBreed { get; set; }
+    public string? PetBreedRefName { get; set; }
     public DateTime ScheduledAtUtc { get; set; }
     public DateTime ScheduledEndUtc { get; set; }
     public int DurationMinutes { get; set; }

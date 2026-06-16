@@ -86,6 +86,57 @@ public sealed class AppointmentIntegrationEventSerializationTests
         restored.Current.DurationMinutes.Should().Be(45);
     }
 
+    [Fact]
+    public void LegacyV1SnapshotJson_WithoutSearchFields_Should_DeserializeWithNullDefaults()
+    {
+        const string legacyJson = """
+            {
+              "appointmentId":"11111111-2222-3333-4444-555555555555",
+              "tenantId":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "clinicId":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+              "clinicName":"Varsayilan Klinik",
+              "petId":"cccccccc-cccc-cccc-cccc-cccccccccccc",
+              "petName":"Pamuk",
+              "speciesId":"dddddddd-dddd-dddd-dddd-dddddddddddd",
+              "speciesName":"Kedi",
+              "clientId":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+              "clientName":"Ayse Yilmaz",
+              "clientPhone":"+905551234567",
+              "scheduledAtUtc":"2026-06-16T12:00:00Z",
+              "durationMinutes":30,
+              "appointmentType":0,
+              "status":0,
+              "notes":"not"
+            }
+            """;
+
+        var restored = JsonSerializer.Deserialize<AppointmentProjectionSnapshot>(legacyJson, JsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.PetBreed.Should().BeNull();
+        restored.PetBreedRefName.Should().BeNull();
+        restored.ClientEmail.Should().BeNull();
+        restored.ClientPhoneNormalized.Should().BeNull();
+    }
+
+    [Fact]
+    public void Snapshot_WithSearchFields_Should_RoundTrip_Through_Json()
+    {
+        var original = CreateSnapshot(
+            appointmentId: Guid.Parse("11111111-2222-3333-4444-555555555555"),
+            petBreed: "Golden Retriever",
+            petBreedRefName: "Labrador",
+            clientEmail: "owner@example.com",
+            clientPhoneNormalized: "905551112233");
+
+        var json = JsonSerializer.Serialize(original, JsonOptions);
+        var restored = JsonSerializer.Deserialize<AppointmentProjectionSnapshot>(json, JsonOptions);
+
+        restored.Should().BeEquivalentTo(original);
+        restored!.PetBreed.Should().Be("Golden Retriever");
+        restored.ClientEmail.Should().Be("owner@example.com");
+    }
+
     private static AppointmentProjectionSnapshot CreateSnapshot(
         Guid appointmentId,
         DateTime? scheduledAtUtc = null,
@@ -93,7 +144,11 @@ public sealed class AppointmentIntegrationEventSerializationTests
         int appointmentType = 0,
         int status = 0,
         string? notes = "not",
-        string? clientPhone = "+905551234567")
+        string? clientPhone = "+905551234567",
+        string? petBreed = null,
+        string? petBreedRefName = null,
+        string? clientEmail = null,
+        string? clientPhoneNormalized = null)
     {
         return new AppointmentProjectionSnapshot(
             appointmentId,
@@ -111,6 +166,10 @@ public sealed class AppointmentIntegrationEventSerializationTests
             durationMinutes,
             appointmentType,
             status,
-            notes);
+            notes,
+            petBreed,
+            petBreedRefName,
+            clientEmail,
+            clientPhoneNormalized);
     }
 }

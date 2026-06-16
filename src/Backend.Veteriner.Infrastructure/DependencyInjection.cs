@@ -1,5 +1,6 @@
 // src/Backend.Veteriner.Infrastructure/DependencyInjection.cs
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
+using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Auth.Contracts;                              // IPermissionReader
 using Backend.Veteriner.Application.Common.Abstractions;                        // IPasswordHasher, IJwtTokenService, ITokenHashService, IClientContext, IUser..., IRefreshTokenRepository, IVerificationTokenRepository, IEmailSender, IEmailSenderImmediate, IAppUrlProvider
 using Backend.Veteriner.Application.Common.Behaviors;
@@ -10,6 +11,7 @@ using Backend.Veteriner.Infrastructure.Caching;                                 
 using Backend.Veteriner.Infrastructure.Mailing;                                   // MailKitEmailSender, TransactionalEmailSender, SmtpOptions
 using Backend.Veteriner.Infrastructure.Outbox;                                    // EfOutbox, OutboxProcessor, OutboxOptions, OutboxBuffer, OutboxSaveChangesInterceptor
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
+using Backend.Veteriner.Infrastructure.Query.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;                 // EfRepository, EfReadRepository, UserRepository, RefreshTokenRepository, VerificationTokenRepository
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
@@ -60,6 +62,8 @@ public static class DependencyInjection
         services.Configure<OutboxOptions>(configuration.GetSection("Outbox"));
         services.Configure<AppointmentProjectionOptions>(
             configuration.GetSection(AppointmentProjectionOptions.SectionName));
+        services.Configure<QueryReadModelsOptions>(
+            configuration.GetSection(QueryReadModelsOptions.SectionName));
         services.Configure<PerformanceDiagnosticsOptions>(
             configuration.GetSection(PerformanceDiagnosticsOptions.SectionName));
 
@@ -151,6 +155,7 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentProjectionSnapshotFactory, AppointmentProjectionSnapshotFactory>();
         services.AddScoped<IAppointmentProjectionProcessor, AppointmentProjectionProcessor>();
         services.AddScoped<IAppointmentProjectionRebuildService, AppointmentProjectionRebuildService>();
+        services.AddScoped<IAppointmentReadModelReader, AppointmentReadModelReader>();
         services.AddHostedService<AppointmentProjectionHostedService>();
 
         // ===== RefreshToken cleanup background worker =====

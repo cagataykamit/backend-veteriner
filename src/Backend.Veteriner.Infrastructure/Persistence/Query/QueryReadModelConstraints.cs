@@ -10,6 +10,10 @@ internal static class QueryReadModelConstraints
     public const int SpeciesName = 200;
     public const int ClientName = 300;
     public const int ClientPhone = 50;
+    public const int ClientPhoneNormalized = 50;
+    public const int ClientEmail = 320;
+    public const int PetBreed = 150;
+    public const int PetBreedRefName = 200;
     public const int Notes = 2000;
     public const int ProjectionConsumerName = 128;
 }
