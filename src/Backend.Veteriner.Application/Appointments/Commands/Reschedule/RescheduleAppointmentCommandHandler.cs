@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Appointments;
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.AppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -18,6 +19,8 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
     private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
     private readonly IReadRepository<ClinicWorkingHour> _clinicWorkingHoursRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
+    private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
+    private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
 
     public RescheduleAppointmentCommandHandler(
         ITenantContext tenantContext,
@@ -25,7 +28,9 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         IReadRepository<Appointment> appointmentsRead,
         IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
         IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
-        IRepository<Appointment> appointmentsWrite)
+        IRepository<Appointment> appointmentsWrite,
+        IAppointmentProjectionSnapshotFactory snapshotFactory,
+        IAppointmentIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -33,6 +38,8 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         _clinicAppointmentSettings = clinicAppointmentSettings;
         _clinicWorkingHoursRead = clinicWorkingHoursRead;
         _appointmentsWrite = appointmentsWrite;
+        _snapshotFactory = snapshotFactory;
+        _eventOutbox = eventOutbox;
     }
 
     public async Task<Result> Handle(RescheduleAppointmentCommand request, CancellationToken ct)
@@ -116,9 +123,17 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         if (!workingHours.IsSuccess)
             return Result.Failure(workingHours.Error);
 
+        var previous = await _snapshotFactory.CreateAsync(appointment, ct);
+
         var domain = appointment.RescheduleTo(scheduledUtc);
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
+
+        var current = _snapshotFactory.CreateScalarsFromPrevious(appointment, previous);
+        await _eventOutbox.EnqueueAsync(
+            AppointmentIntegrationEventTypes.Rescheduled,
+            new AppointmentRescheduledIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current),
+            ct);
 
         await _appointmentsWrite.SaveChangesAsync(ct);
         return Result.Success();

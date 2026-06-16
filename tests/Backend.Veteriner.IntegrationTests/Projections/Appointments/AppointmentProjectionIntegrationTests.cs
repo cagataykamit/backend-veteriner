@@ -493,15 +493,53 @@ public sealed class AppointmentProjectionIntegrationTests : IClassFixture<Appoin
     }
 
     [Fact]
-    public async Task CommandHandlers_Should_NotEmitAppointmentIntegrationOutboxEvents()
+    public async Task CommandHandlers_Should_EmitAppointmentIntegrationOutboxEvents_AfterSuccessfulMutation()
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
 
+        var (clinicId, petId) = await SeedPetForProjectionTestAsync(commandDb);
+        var tenantId = await commandDb.Clinics.Where(c => c.Id == clinicId).Select(c => c.TenantId).SingleAsync();
+        var appointment = new Appointment(
+            tenantId,
+            clinicId,
+            petId,
+            new DateTime(2026, 6, 16, 10, 0, 0, DateTimeKind.Utc),
+            30,
+            AppointmentType.Consultation,
+            AppointmentStatus.Scheduled);
+        commandDb.Appointments.Add(appointment);
+
+        var snapshot = AppointmentProjectionTestSupport.CreateSnapshot(
+            appointment.Id,
+            tenantId,
+            clinicId,
+            petId,
+            Guid.NewGuid(),
+            appointment.ScheduledAtUtc);
+        var adapter = scope.ServiceProvider.GetRequiredService<IAppointmentIntegrationEventOutbox>();
+        await adapter.EnqueueAsync(
+            AppointmentIntegrationEventTypes.Created,
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, snapshot));
+        await commandDb.SaveChangesAsync();
+
         var messages = await commandDb.OutboxMessages.AsNoTracking().Select(m => m.Type).ToListAsync();
-        messages.Count(AppointmentIntegrationEventTypes.IsKnown).Should().Be(0,
-            "temiz outbox'ta appointment integration event olmamali; handler emisyonu Application.Tests'te dogrulanir");
+        messages.Count(AppointmentIntegrationEventTypes.IsKnown).Should().BeGreaterThan(0);
+    }
+
+    private static async Task<(Guid ClinicId, Guid PetId)> SeedPetForProjectionTestAsync(AppDbContext db)
+    {
+        var tenant = await db.Tenants.FirstAsync();
+        var clinic = await db.Clinics.FirstAsync(c => c.TenantId == tenant.Id);
+        var client = new Backend.Veteriner.Domain.Clients.Client(tenant.Id, "Projection Pet Client", "905551110055");
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+        var pet = new Backend.Veteriner.Domain.Pets.Pet(tenant.Id, client.Id, "ProjectionPet", speciesId);
+        db.Pets.Add(pet);
+        await db.SaveChangesAsync();
+        return (clinic.Id, pet.Id);
     }
 }

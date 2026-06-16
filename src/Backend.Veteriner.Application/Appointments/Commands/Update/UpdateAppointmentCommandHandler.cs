@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Appointments;
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.AppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -22,6 +23,8 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
     private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
     private readonly IReadRepository<ClinicWorkingHour> _clinicWorkingHoursRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
+    private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
+    private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
 
     public UpdateAppointmentCommandHandler(
         ITenantContext tenantContext,
@@ -31,7 +34,9 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         IReadRepository<Pet> pets,
         IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
         IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
-        IRepository<Appointment> appointmentsWrite)
+        IRepository<Appointment> appointmentsWrite,
+        IAppointmentProjectionSnapshotFactory snapshotFactory,
+        IAppointmentIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -41,6 +46,8 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         _clinicAppointmentSettings = clinicAppointmentSettings;
         _clinicWorkingHoursRead = clinicWorkingHoursRead;
         _appointmentsWrite = appointmentsWrite;
+        _snapshotFactory = snapshotFactory;
+        _eventOutbox = eventOutbox;
     }
 
     public async Task<Result> Handle(UpdateAppointmentCommand request, CancellationToken ct)
@@ -130,6 +137,8 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
                 return Result.Failure(workingHours.Error);
         }
 
+        var previous = await _snapshotFactory.CreateAsync(appointment, ct);
+
         var domain = appointment.ApplyWriteUpdate(
             request.Status,
             clinicId,
@@ -140,6 +149,16 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
             request.Notes);
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
+
+        var referencesChanged = previous.ClinicId != clinicId || previous.PetId != request.PetId;
+        var current = referencesChanged
+            ? await _snapshotFactory.CreateAsync(appointment, ct)
+            : _snapshotFactory.CreateScalarsFromPrevious(appointment, previous);
+
+        await _eventOutbox.EnqueueAsync(
+            AppointmentIntegrationEventTypes.Updated,
+            new AppointmentUpdatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current),
+            ct);
 
         await _appointmentsWrite.SaveChangesAsync(ct);
         return Result.Success();

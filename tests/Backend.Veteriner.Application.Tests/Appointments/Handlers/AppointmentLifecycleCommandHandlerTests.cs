@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Appointments.Commands.Cancel;
 using Backend.Veteriner.Application.Appointments.Commands.Complete;
 using Backend.Veteriner.Application.Appointments.Commands.Reschedule;
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -20,13 +21,34 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     private readonly Mock<IReadRepository<ClinicAppointmentSettings>> _clinicAppointmentSettings = new();
     private readonly Mock<IReadRepository<ClinicWorkingHour>> _clinicWorkingHoursRead = new();
     private readonly Mock<IRepository<Appointment>> _write = new();
+    private readonly Mock<IAppointmentProjectionSnapshotFactory> _snapshotFactory = new();
+    private readonly Mock<IAppointmentIntegrationEventOutbox> _eventOutbox = new();
 
     public AppointmentLifecycleCommandHandlerTests()
     {
         _clinicWorkingHoursRead
             .Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ClinicWorkingHour>());
+
+        AppointmentHandlerOutboxTestSupport.SetupDefaultOutboxMocks(_snapshotFactory, _eventOutbox);
     }
+
+    private CancelAppointmentCommandHandler CreateCancelHandler()
+        => new(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object, _snapshotFactory.Object, _eventOutbox.Object);
+
+    private CompleteAppointmentCommandHandler CreateCompleteHandler()
+        => new(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object, _snapshotFactory.Object, _eventOutbox.Object);
+
+    private RescheduleAppointmentCommandHandler CreateRescheduleHandler()
+        => new(
+            _tenantContext.Object,
+            _clinicContext.Object,
+            _read.Object,
+            _clinicAppointmentSettings.Object,
+            _clinicWorkingHoursRead.Object,
+            _write.Object,
+            _snapshotFactory.Object,
+            _eventOutbox.Object);
 
     // Faz 4B-7: Hafta sonuna denk gelen ileri tarihler için Pazartesi'ye kaydır.
     // Default working-hours fallback'inde Pazar kapalı ve Cumartesi sınırlı; testler haftanın gününe bağımlı kalmasın.
@@ -58,7 +80,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Cancel_Should_Fail_When_ContextMissing()
     {
-        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = CreateCancelHandler();
         _tenantContext.SetupGet(t => t.TenantId).Returns((Guid?)null);
 
         var result = await handler.Handle(new CancelAppointmentCommand(Guid.NewGuid()), CancellationToken.None);
@@ -70,7 +92,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Cancel_Should_Fail_When_NotFound()
     {
-        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = CreateCancelHandler();
         var tid = Guid.NewGuid();
         var aid = Guid.NewGuid();
 
@@ -88,7 +110,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Cancel_Should_Fail_When_NotScheduled()
     {
-        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = CreateCancelHandler();
         var tid = Guid.NewGuid();
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
         _ = appt.Complete();
@@ -107,7 +129,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Cancel_Should_Succeed_When_Scheduled()
     {
-        var handler = new CancelAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = CreateCancelHandler();
         var tid = Guid.NewGuid();
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
 
@@ -126,7 +148,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Complete_Should_Fail_When_NotScheduled()
     {
-        var handler = new CompleteAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = CreateCompleteHandler();
         var tid = Guid.NewGuid();
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
         _ = appt.Cancel();
@@ -144,7 +166,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Complete_Should_Succeed_When_Scheduled()
     {
-        var handler = new CompleteAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _write.Object);
+        var handler = CreateCompleteHandler();
         var tid = Guid.NewGuid();
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
 
@@ -162,7 +184,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_ClinicSlotDuplicate()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
+        var handler = CreateRescheduleHandler();
         var tid = Guid.NewGuid();
         var when = SlotAlignedUtcPlusDays(3);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
@@ -187,7 +209,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Succeed_When_NoConflict()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
+        var handler = CreateRescheduleHandler();
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var when = MondayUtc(6, 0); // 09:00 local
@@ -221,7 +243,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_NotScheduled()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
+        var handler = CreateRescheduleHandler();
         var tid = Guid.NewGuid();
         var when = SlotAlignedUtcPlusDays(3);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
@@ -243,7 +265,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_TooFarInPast()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
+        var handler = CreateRescheduleHandler();
         var tid = Guid.NewGuid();
         var past = DateTime.UtcNow.AddDays(-30);
         var appt = new Appointment(tid, Guid.NewGuid(), Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
@@ -263,7 +285,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_OutsideWorkingHours()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
+        var handler = CreateRescheduleHandler();
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var when = MondayUtc(15, 30); // 18:30 local
@@ -289,7 +311,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     [Fact]
     public async Task Reschedule_Should_Fail_When_NotAlignedToSlotInterval()
     {
-        var handler = new RescheduleAppointmentCommandHandler(_tenantContext.Object, _clinicContext.Object, _read.Object, _clinicAppointmentSettings.Object, _clinicWorkingHoursRead.Object, _write.Object);
+        var handler = CreateRescheduleHandler();
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var when = MondayUtc(6, 10); // 09:10 local

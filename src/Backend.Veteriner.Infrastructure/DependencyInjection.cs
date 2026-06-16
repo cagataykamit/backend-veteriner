@@ -148,6 +148,7 @@ public static class DependencyInjection
         // ===== Outbox background worker =====
         services.AddHostedService<OutboxProcessor>();
 
+        services.AddScoped<IAppointmentProjectionSnapshotFactory, AppointmentProjectionSnapshotFactory>();
         services.AddScoped<IAppointmentProjectionProcessor, AppointmentProjectionProcessor>();
         services.AddHostedService<AppointmentProjectionHostedService>();
 

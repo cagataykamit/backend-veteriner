@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Appointments;
@@ -12,17 +13,23 @@ public sealed class CompleteAppointmentCommandHandler : IRequestHandler<Complete
     private readonly IClinicContext _clinicContext;
     private readonly IReadRepository<Appointment> _appointmentsRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
+    private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
+    private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
 
     public CompleteAppointmentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IReadRepository<Appointment> appointmentsRead,
-        IRepository<Appointment> appointmentsWrite)
+        IRepository<Appointment> appointmentsWrite,
+        IAppointmentProjectionSnapshotFactory snapshotFactory,
+        IAppointmentIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _appointmentsRead = appointmentsRead;
         _appointmentsWrite = appointmentsWrite;
+        _snapshotFactory = snapshotFactory;
+        _eventOutbox = eventOutbox;
     }
 
     public async Task<Result> Handle(CompleteAppointmentCommand request, CancellationToken ct)
@@ -42,9 +49,17 @@ public sealed class CompleteAppointmentCommandHandler : IRequestHandler<Complete
         if (_clinicContext.ClinicId is { } clinicId && appointment.ClinicId != clinicId)
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
 
+        var previous = await _snapshotFactory.CreateAsync(appointment, ct);
+
         var domain = appointment.Complete();
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
+
+        var current = _snapshotFactory.CreateScalarsFromPrevious(appointment, previous);
+        await _eventOutbox.EnqueueAsync(
+            AppointmentIntegrationEventTypes.Completed,
+            new AppointmentCompletedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current),
+            ct);
 
         await _appointmentsWrite.SaveChangesAsync(ct);
         return Result.Success();

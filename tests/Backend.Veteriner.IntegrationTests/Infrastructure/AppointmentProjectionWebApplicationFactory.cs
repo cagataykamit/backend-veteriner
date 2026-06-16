@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -62,6 +63,10 @@ public sealed class AppointmentProjectionWebApplicationFactory : WebApplicationF
             IntegrationTestDatabaseReset.EnsureDroppedAsync(CommandConnection).GetAwaiter().GetResult();
             commandDb.Database.EnsureCreated();
             TestDataSeeder.Seed(commandDb, hasher);
+            PermissionSeeder.SeedAsync(commandDb).GetAwaiter().GetResult();
+            AdminClaimSeeder.SeedAsync(commandDb).GetAwaiter().GetResult();
+            InviteAssignableOperationClaimsSeeder.SeedAsync(commandDb).GetAwaiter().GetResult();
+            RolePermissionBindingSeeder.SeedAsync(commandDb).GetAwaiter().GetResult();
 
             IntegrationTestDatabaseReset.ResetAndMigrateAsync(queryDb).GetAwaiter().GetResult();
         });

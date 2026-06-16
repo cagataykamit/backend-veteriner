@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -27,12 +28,16 @@ public sealed class CreateAppointmentCommandHandlerTests
     private readonly Mock<IReadRepository<ClinicAppointmentSettingsEntity>> _clinicAppointmentSettings = new();
     private readonly Mock<IReadRepository<ClinicWorkingHour>> _clinicWorkingHoursRead = new();
     private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
+    private readonly Mock<IAppointmentProjectionSnapshotFactory> _snapshotFactory = new();
+    private readonly Mock<IAppointmentIntegrationEventOutbox> _eventOutbox = new();
 
     private CreateAppointmentCommandHandler CreateHandler()
     {
         _clinicWorkingHoursRead
             .Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ClinicWorkingHour>());
+
+        AppointmentHandlerOutboxTestSupport.SetupDefaultOutboxMocks(_snapshotFactory, _eventOutbox);
 
         return new(
             _tenantContext.Object,
@@ -43,7 +48,9 @@ public sealed class CreateAppointmentCommandHandlerTests
             _appointmentsRead.Object,
             _clinicAppointmentSettings.Object,
             _clinicWorkingHoursRead.Object,
-            _appointmentsWrite.Object);
+            _appointmentsWrite.Object,
+            _snapshotFactory.Object,
+            _eventOutbox.Object);
     }
 
     // Faz 4B-7: Hafta sonuna denk gelen ileri tarihler için Pazartesi'ye kaydır.

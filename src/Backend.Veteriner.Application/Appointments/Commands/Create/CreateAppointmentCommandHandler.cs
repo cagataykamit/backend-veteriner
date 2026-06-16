@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Appointments;
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.AppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -25,6 +26,8 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
     private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
     private readonly IReadRepository<ClinicWorkingHour> _clinicWorkingHoursRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
+    private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
+    private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
 
     public CreateAppointmentCommandHandler(
         ITenantContext tenantContext,
@@ -35,7 +38,9 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         IReadRepository<Appointment> appointmentsRead,
         IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
         IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
-        IRepository<Appointment> appointmentsWrite)
+        IRepository<Appointment> appointmentsWrite,
+        IAppointmentProjectionSnapshotFactory snapshotFactory,
+        IAppointmentIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -46,6 +51,8 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         _clinicAppointmentSettings = clinicAppointmentSettings;
         _clinicWorkingHoursRead = clinicWorkingHoursRead;
         _appointmentsWrite = appointmentsWrite;
+        _snapshotFactory = snapshotFactory;
+        _eventOutbox = eventOutbox;
     }
 
     public async Task<Result<Guid>> Handle(CreateAppointmentCommand request, CancellationToken ct)
@@ -164,6 +171,13 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
             request.Notes);
 
         await _appointmentsWrite.AddAsync(appointment, ct);
+
+        var current = await _snapshotFactory.CreateAsync(appointment, ct);
+        await _eventOutbox.EnqueueAsync(
+            AppointmentIntegrationEventTypes.Created,
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, current),
+            ct);
+
         await _appointmentsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(appointment.Id);
     }
