@@ -26,7 +26,8 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:DefaultConnection"] = IntegrationTestDatabaseGuard.DedicatedConnectionString,
-                ["ConnectionStrings:SqlServer"] = IntegrationTestDatabaseGuard.DedicatedConnectionString
+                ["ConnectionStrings:SqlServer"] = IntegrationTestDatabaseGuard.DedicatedConnectionString,
+                ["ConnectionStrings:QueryConnection"] = IntegrationTestDatabaseGuard.DedicatedQueryConnectionString
             });
         });
 
@@ -36,6 +37,9 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
             // yeniden bağla (env var override edilemese dahi).
             IntegrationTestDbContextOverride.UseDedicatedDatabase(
                 services, IntegrationTestDatabaseGuard.DedicatedConnectionString);
+
+            IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(
+                services, IntegrationTestDatabaseGuard.DedicatedQueryConnectionString);
 
             using var scope = services.BuildServiceProvider().CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

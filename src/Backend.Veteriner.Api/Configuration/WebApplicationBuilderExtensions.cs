@@ -161,6 +161,9 @@ public static class WebApplicationBuilderExtensions
             if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("DefaultConnection")))
                 throw new InvalidOperationException("ConnectionStrings:DefaultConnection bo\uFFFD. User-Secrets \uFFFDzerinden set edilmelidir.");
 
+            if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("QueryConnection")))
+                throw new InvalidOperationException("ConnectionStrings:QueryConnection bo\uFFFD. User-Secrets \uFFFDzerinden set edilmelidir.");
+
             if (string.IsNullOrWhiteSpace(builder.Configuration["Smtp:Pass"]))
                 throw new InvalidOperationException("Smtp:Pass bo\uFFFD. User-Secrets \uFFFDzerinden set edilmelidir.");
         }

@@ -22,6 +22,13 @@ internal static class IntegrationTestDatabaseGuard
     public const string DedicatedConnectionString =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityDb_IntegrationTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
+    /// <summary>İzin verilen query-side integration test veritabanı adı (prefix de kabul edilir).</summary>
+    public const string IntegrationTestsQueryDatabaseName = "VetinityQueryDb_IntegrationTests";
+
+    /// <summary>Source-controlled, dedicated query test connection string (LocalDB).</summary>
+    public const string DedicatedQueryConnectionString =
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_IntegrationTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+
     /// <summary>Her koşulda yasak veritabanı adları (tam eşleşme, case-insensitive).</summary>
     private static readonly string[] ForbiddenExactNames =
     {

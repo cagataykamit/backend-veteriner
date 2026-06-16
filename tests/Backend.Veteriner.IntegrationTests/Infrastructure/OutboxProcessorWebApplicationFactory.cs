@@ -21,6 +21,9 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
     private const string ProcessorTestConnection =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
+    private const string ProcessorTestQueryConnection =
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("IntegrationTests");
@@ -32,7 +35,8 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:DefaultConnection"] = ProcessorTestConnection,
-                ["ConnectionStrings:SqlServer"] = ProcessorTestConnection
+                ["ConnectionStrings:SqlServer"] = ProcessorTestConnection,
+                ["ConnectionStrings:QueryConnection"] = ProcessorTestQueryConnection
             });
         });
 
@@ -40,6 +44,7 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
         {
             // Servis seviyesi yeniden kayıt (config önceliğinden bağımsız, env var override edilemese dahi).
             IntegrationTestDbContextOverride.UseDedicatedDatabase(services, ProcessorTestConnection);
+            IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(services, ProcessorTestQueryConnection);
 
             using var scope = services.BuildServiceProvider().CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

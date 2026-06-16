@@ -49,6 +49,11 @@ public static class DependencyInjection
             throw new InvalidOperationException(
                 "Connection string bulunamadı. 'ConnectionStrings:DefaultConnection' (önerilen) veya 'ConnectionStrings:SqlServer' tanımlayın.");
 
+        var queryConnStr = configuration.GetConnectionString("QueryConnection");
+        if (string.IsNullOrWhiteSpace(queryConnStr))
+            throw new InvalidOperationException(
+                "Connection string bulunamadı. 'ConnectionStrings:QueryConnection' tanımlayın.");
+
         // ===== Outbox =====
         services.Configure<OutboxOptions>(configuration.GetSection("Outbox"));
         services.Configure<PerformanceDiagnosticsOptions>(
@@ -62,7 +67,7 @@ public static class DependencyInjection
         services.AddScoped<DomainEventOutboxInterceptor>();
         services.AddSingleton<DomainEventTypeRegistry>();
 
-        // ===== DbContext (TEK KAYIT) =====
+        // ===== DbContext (command) =====
         services.AddDbContext<AppDbContext>((sp, opt) =>
         {
             opt.UseSqlServer(connStr);
@@ -71,6 +76,9 @@ public static class DependencyInjection
                 sp.GetRequiredService<SlowQueryLoggingInterceptor>(),
                 sp.GetRequiredService<DbConnectionSlowOpenInterceptor>());
         });
+
+        // ===== DbContext (query — projection read-model; interceptor yok) =====
+        services.AddDbContext<QueryDbContext>(opt => opt.UseSqlServer(queryConnStr));
 
         // ===== Repositories =====
         services.AddScoped(typeof(IReadRepository<>), typeof(EfReadRepository<>));
