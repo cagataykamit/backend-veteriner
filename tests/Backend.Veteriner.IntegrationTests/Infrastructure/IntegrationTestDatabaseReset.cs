@@ -17,6 +17,12 @@ internal static class IntegrationTestDatabaseReset
     private static readonly Lock GateLock = new();
 
     public static async Task ResetAndMigrateAsync(AppDbContext db, CancellationToken ct = default)
+        => await ResetAndMigrateAsync((DbContext)db, ct);
+
+    public static async Task ResetAndMigrateAsync(QueryDbContext db, CancellationToken ct = default)
+        => await ResetAndMigrateAsync((DbContext)db, ct);
+
+    private static async Task ResetAndMigrateAsync(DbContext db, CancellationToken ct = default)
     {
         var connectionString = db.Database.GetConnectionString()
             ?? throw new InvalidOperationException("Integration test DbContext connection string is missing.");

@@ -39,6 +39,13 @@ try
             await db.Database.MigrateAsync();
             logger.LogInformation("EF Core MigrateAsync completed.");
             break;
+        case "migrate-query":
+            {
+                var queryDb = sp.GetRequiredService<QueryDbContext>();
+                await queryDb.Database.MigrateAsync();
+                logger.LogInformation("Query DB MigrateAsync completed.");
+                break;
+            }
         case "seed":
             await RunSeedPipelineAsync(db, hasher, logger, CancellationToken.None);
             logger.LogInformation("Seed pipeline completed.");
@@ -110,15 +117,17 @@ static void PrintHelp()
           dotnet run --project src/Backend.Veteriner.DbMigrator -- <komut>
 
         Komutlar:
-          migrate        — EF Core MigrateAsync (bekleyen migrationları uygular)
+          migrate        — EF Core MigrateAsync (command DB; bekleyen migrationları uygular)
+          migrate-query  — QueryDbContext MigrateAsync (QueryConnection)
           seed           — Permission/Data/AdminClaim/InviteAssignable seed zinciri
           all            — önce migrate, sonra seed
           loadtest-seed  — yük testi sentetik veri (yalnızca VetinityLoadTestDb; profil: small)
 
         Örnek:
+          dotnet run --project src/Backend.Veteriner.DbMigrator -- migrate-query
           dotnet run --project src/Backend.Veteriner.DbMigrator -- loadtest-seed small
 
-        Bağlantı: ConnectionStrings:DefaultConnection (API ile aynı UserSecretsId kullanılabilir).
+        Bağlantı: ConnectionStrings:DefaultConnection (command), ConnectionStrings:QueryConnection (query).
         Şema için alternatif: dotnet ef database update --project src/Backend.Veteriner.Infrastructure --startup-project src/Backend.Veteriner.Api
         """);
 }

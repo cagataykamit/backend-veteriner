@@ -146,6 +146,7 @@ public static class WebApplicationBuilderExtensions
 
         builder.Services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("sql")
+            .AddCheck<QueryDatabaseHealthCheck>("query-sql")
             .AddCheck<OutboxHealthCheck>("outbox");
 
         builder.Services.AddInfrastructure(builder.Configuration);
