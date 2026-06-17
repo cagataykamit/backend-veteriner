@@ -14,7 +14,7 @@ namespace Backend.Veteriner.IntegrationTests.Dashboard;
 public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
 {
     /// <summary>İzin verilen TEK prefix. Development (VetinityCommandDb) ve diğer test DB'leri guard tarafından reddedilir.</summary>
-    private const string DatabasePrefix = "VetinityCommandDb_DashboardReader_";
+    private const string CommandDatabasePrefix = "VetinityCommandDb_DashboardReader_";
 
     private string _connectionString = string.Empty;
     private AppDbContext _db = null!;
@@ -25,13 +25,13 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     /// </summary>
     public async Task InitializeAsync()
     {
-        var dbName = $"{DatabasePrefix}{Guid.NewGuid():N}";
+        var commandDbName = $"{CommandDatabasePrefix}{Guid.NewGuid():N}";
         var connectionString =
-            $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
+            $"Server=(localdb)\\mssqllocaldb;Database={commandDbName};Trusted_Connection=True;MultipleActiveResultSets=true";
 
         // Güvenlik kapısı: yalnız VetinityCommandDb_DashboardReader_ prefix'i kabul edilir.
-        // VetinityCommandDb / VetinityDb / VeterinerDb / VetinityCommandDb_IntegrationTests / VetinityCommandDb_OutboxProcessorTests / Development-Production / boş ad reddedilir.
-        IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: DatabasePrefix);
+        // Reddedilen örnekler: development command DB, legacy isimler, paylaşılan integration/outbox scope DB'leri, Development-Production suffix'leri, boş ad.
+        IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: CommandDatabasePrefix);
 
         _connectionString = connectionString;
 

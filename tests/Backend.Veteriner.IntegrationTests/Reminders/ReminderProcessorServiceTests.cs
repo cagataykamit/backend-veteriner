@@ -970,8 +970,8 @@ public sealed class ReminderProcessorServiceTests
 
     private static async Task<AppDbContext> CreateDbContextAsync()
     {
-        var dbName = $"VetinityCommandDb_ReminderProcessor_{Guid.NewGuid():N}";
-        var connectionString = $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
+        var commandDbName = $"VetinityCommandDb_ReminderProcessor_{Guid.NewGuid():N}";
+        var connectionString = $"Server=(localdb)\\mssqllocaldb;Database={commandDbName};Trusted_Connection=True;MultipleActiveResultSets=true";
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlServer(connectionString)
             .Options;

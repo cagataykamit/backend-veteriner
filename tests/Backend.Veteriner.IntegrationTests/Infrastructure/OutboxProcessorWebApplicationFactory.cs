@@ -16,12 +16,13 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    private const string ProcessorTestDatabaseName = "VetinityCommandDb_OutboxProcessorTests";
+    private const string OutboxProcessorCommandDatabaseName = "VetinityCommandDb_OutboxProcessorTests";
+    private const string OutboxProcessorQueryDatabaseName = "VetinityQueryDb_OutboxProcessorTests";
 
-    private const string ProcessorTestConnection =
+    private const string OutboxProcessorCommandConnection =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
-    private const string ProcessorTestQueryConnection =
+    private const string OutboxProcessorQueryConnection =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -34,17 +35,17 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:DefaultConnection"] = ProcessorTestConnection,
-                ["ConnectionStrings:SqlServer"] = ProcessorTestConnection,
-                ["ConnectionStrings:QueryConnection"] = ProcessorTestQueryConnection
+                ["ConnectionStrings:DefaultConnection"] = OutboxProcessorCommandConnection,
+                ["ConnectionStrings:SqlServer"] = OutboxProcessorCommandConnection,
+                ["ConnectionStrings:QueryConnection"] = OutboxProcessorQueryConnection
             }.Concat(IntegrationTestAppConfiguration.RateLimitingDisabled));
         });
 
         builder.ConfigureServices(services =>
         {
             // Servis seviyesi yeniden kayıt (config önceliğinden bağımsız, env var override edilemese dahi).
-            IntegrationTestDbContextOverride.UseDedicatedDatabase(services, ProcessorTestConnection);
-            IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(services, ProcessorTestQueryConnection);
+            IntegrationTestDbContextOverride.UseDedicatedDatabase(services, OutboxProcessorCommandConnection);
+            IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(services, OutboxProcessorQueryConnection);
 
             using var scope = services.BuildServiceProvider().CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -54,20 +55,20 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
             // EnsureCreated'den önce efektif veritabanı adını doğrula (VetinityCommandDb/Development/Production engeli).
             IntegrationTestDatabaseGuard.EnsureSafeDatabase(
                 db.Database.GetConnectionString(),
-                allowedPrefix: ProcessorTestDatabaseName);
+                allowedPrefix: OutboxProcessorCommandDatabaseName);
 
             // Deterministik kırılganlık düzeltmesi: EnsureCreated() LocalDB auto-close/stale durumda
             // "already exists" üretebiliyor. Hosted OutboxProcessor ve gerçek DbContext bağlantıları
             // açılmadan ÖNCE (host build aşaması) mevcut güvenli reset ile stale DB'yi drop et,
             // ardından şemayı temiz biçimde yeniden oluştur. Yeni SQL drop implementasyonu yazılmadı.
-            IntegrationTestDatabaseReset.EnsureDroppedAsync(ProcessorTestConnection).GetAwaiter().GetResult();
+            IntegrationTestDatabaseReset.EnsureDroppedAsync(OutboxProcessorCommandConnection).GetAwaiter().GetResult();
 
             db.Database.EnsureCreated();
             TestDataSeeder.Seed(db, hasher);
 
             IntegrationTestDatabaseGuard.EnsureSafeDatabase(
                 queryDb.Database.GetConnectionString(),
-                allowedPrefix: "VetinityQueryDb_OutboxProcessorTests");
+                allowedPrefix: OutboxProcessorQueryDatabaseName);
             IntegrationTestDatabaseReset.ResetAndMigrateAsync(queryDb).GetAwaiter().GetResult();
         });
 
@@ -88,8 +89,8 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
-        await IntegrationTestDatabaseReset.EnsureDroppedAsync(ProcessorTestConnection);
-        await IntegrationTestDatabaseReset.EnsureDroppedAsync(ProcessorTestQueryConnection);
+        await IntegrationTestDatabaseReset.EnsureDroppedAsync(OutboxProcessorCommandConnection);
+        await IntegrationTestDatabaseReset.EnsureDroppedAsync(OutboxProcessorQueryConnection);
     }
 
     protected override void Dispose(bool disposing)
@@ -97,8 +98,8 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
         base.Dispose(disposing);
         if (disposing)
         {
-            IntegrationTestDatabaseReset.EnsureDroppedAsync(ProcessorTestConnection).GetAwaiter().GetResult();
-            IntegrationTestDatabaseReset.EnsureDroppedAsync(ProcessorTestQueryConnection).GetAwaiter().GetResult();
+            IntegrationTestDatabaseReset.EnsureDroppedAsync(OutboxProcessorCommandConnection).GetAwaiter().GetResult();
+            IntegrationTestDatabaseReset.EnsureDroppedAsync(OutboxProcessorQueryConnection).GetAwaiter().GetResult();
         }
     }
 }

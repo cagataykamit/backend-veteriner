@@ -32,18 +32,18 @@ public sealed class QueryDbContextRegistrationTests : IClassFixture<CustomWebApp
     }
 
     [Fact]
-    public void Command_And_Query_Contexts_Should_Use_Different_Databases()
+    public void CommandAndQueryIntegrationDatabaseNames_Should_UseDifferentCatalogs()
     {
         using var scope = _factory.Services.CreateScope();
         var appDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
-        var appCatalog = new SqlConnectionStringBuilder(appDb.Database.GetConnectionString()!).InitialCatalog;
-        var queryCatalog = new SqlConnectionStringBuilder(queryDb.Database.GetConnectionString()!).InitialCatalog;
+        var commandDatabaseName = new SqlConnectionStringBuilder(appDb.Database.GetConnectionString()!).InitialCatalog;
+        var queryDatabaseName = new SqlConnectionStringBuilder(queryDb.Database.GetConnectionString()!).InitialCatalog;
 
-        appCatalog.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsDatabaseName);
-        queryCatalog.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName);
-        appCatalog.Should().NotBe(queryCatalog);
+        commandDatabaseName.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsCommandDatabaseName);
+        queryDatabaseName.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName);
+        commandDatabaseName.Should().NotBe(queryDatabaseName);
     }
 
     [Fact]

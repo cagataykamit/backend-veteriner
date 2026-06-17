@@ -16,7 +16,7 @@ namespace Backend.IntegrationTests.Infrastructure;
 internal static class IntegrationTestDatabaseGuard
 {
     /// <summary>İzin verilen command-side integration test veritabanı adı (prefix de kabul edilir).</summary>
-    public const string IntegrationTestsDatabaseName = "VetinityCommandDb_IntegrationTests";
+    public const string IntegrationTestsCommandDatabaseName = "VetinityCommandDb_IntegrationTests";
 
     /// <summary>Source-controlled, dedicated command test connection string (LocalDB).</summary>
     public const string DedicatedConnectionString =
@@ -29,7 +29,7 @@ internal static class IntegrationTestDatabaseGuard
     public const string DedicatedQueryConnectionString =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_IntegrationTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
-    /// <summary>Her koşulda yasak veritabanı adları (tam eşleşme, case-insensitive).</summary>
+    /// <summary>Her koşulda yasak veritabanı adları (tam eşleşme, case-insensitive). Legacy isimler test güvenliği için korunur.</summary>
     private static readonly string[] ForbiddenExactNames =
     {
         "VeterinerDb",
@@ -57,7 +57,7 @@ internal static class IntegrationTestDatabaseGuard
     /// <returns>Doğrulanmış (güvenli) veritabanı adı.</returns>
     public static string EnsureSafeDatabase(
         string? connectionString,
-        string allowedPrefix = IntegrationTestsDatabaseName)
+        string allowedPrefix = IntegrationTestsCommandDatabaseName)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {

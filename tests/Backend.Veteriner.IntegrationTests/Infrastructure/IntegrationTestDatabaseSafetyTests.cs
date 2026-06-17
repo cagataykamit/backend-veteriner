@@ -15,21 +15,21 @@ public sealed class IntegrationTestDatabaseGuardTests
         => $"Server=DESKTOP-2U2UUHO;Database={database};Trusted_Connection=True;TrustServerCertificate=True";
 
     [Fact]
-    public void EnsureSafeDatabase_Should_Allow_DedicatedIntegrationTestsDatabase()
+    public void CommandIntegrationTestsDatabaseName_Should_BeAllowed()
     {
-        var db = IntegrationTestDatabaseGuard.EnsureSafeDatabase(
+        var commandDatabaseName = IntegrationTestDatabaseGuard.EnsureSafeDatabase(
             IntegrationTestDatabaseGuard.DedicatedConnectionString);
 
-        db.Should().Be("VetinityCommandDb_IntegrationTests");
+        commandDatabaseName.Should().Be("VetinityCommandDb_IntegrationTests");
     }
 
     [Fact]
-    public void EnsureSafeDatabase_Should_Allow_RunSpecificPrefixedName()
+    public void CommandIntegrationTestsDatabaseRunPrefix_Should_BeAllowed()
     {
-        var db = IntegrationTestDatabaseGuard.EnsureSafeDatabase(
+        var commandDatabaseName = IntegrationTestDatabaseGuard.EnsureSafeDatabase(
             Conn("VetinityCommandDb_IntegrationTests_Run42"));
 
-        db.Should().Be("VetinityCommandDb_IntegrationTests_Run42");
+        commandDatabaseName.Should().Be("VetinityCommandDb_IntegrationTests_Run42");
     }
 
     [Theory]
@@ -37,25 +37,35 @@ public sealed class IntegrationTestDatabaseGuardTests
     [InlineData("VeterinerDb_IntegrationTests")]
     [InlineData("VetinityDb")]
     [InlineData("VetinityDb_IntegrationTests")]
+    [InlineData("VetinityLoadTestDb")]
+    [InlineData("VetinityQueryLoadTestDb")]
+    public void LegacyDatabaseNames_Should_BeRejected(string legacyDatabaseName)
+    {
+        var act = () => IntegrationTestDatabaseGuard.EnsureSafeDatabase(Conn(legacyDatabaseName));
+
+        act.Should().Throw<IntegrationTestDatabaseSafetyException>();
+    }
+
+    [Theory]
     [InlineData("VetinityCommandDb")]
     [InlineData("VetinityQueryDb")]
-    [InlineData("VetinityLoadTestDb")]
     [InlineData("VetinityCommandDb_LoadTest")]
+    [InlineData("VetinityQueryDb_LoadTest")]
     [InlineData("VeterinerDb_Development")]
     [InlineData("VeterinerDb_Production")]
     [InlineData("VeterinerProd")]
     [InlineData("SomeOtherDb")]
-    public void EnsureSafeDatabase_Should_Throw_For_ForbiddenOrNonAllowlistedNames(string database)
+    public void NonIntegrationCommandDatabaseNames_Should_BeRejected(string databaseName)
     {
-        var act = () => IntegrationTestDatabaseGuard.EnsureSafeDatabase(Conn(database));
+        var act = () => IntegrationTestDatabaseGuard.EnsureSafeDatabase(Conn(databaseName));
 
         act.Should().Throw<IntegrationTestDatabaseSafetyException>();
     }
 
     [Fact]
-    public void EnsureSafeDatabase_Should_Throw_For_VeterinerDb_Deliberately()
+    public void LegacyVeterinerDbName_Should_BeRejected()
     {
-        // Doğrulama senaryosu #2: bilerek VeterinerDb verildiğinde startup güvenlik exception'ı.
+        // Doğrulama senaryosu #2: bilerek legacy VeterinerDb verildiğinde startup güvenlik exception'ı.
         var act = () => IntegrationTestDatabaseGuard.EnsureSafeDatabase(
             "Server=DESKTOP-2U2UUHO;Database=VeterinerDb;Trusted_Connection=True;TrustServerCertificate=True");
 
@@ -72,7 +82,7 @@ public sealed class IntegrationTestDatabaseGuardTests
     }
 
     [Fact]
-    public void EnsureSafeDatabase_Should_Throw_For_EmptyDatabaseName()
+    public void EnsureSafeDatabase_Should_Throw_For_EmptyCommandDatabaseName()
     {
         var act = () => IntegrationTestDatabaseGuard.EnsureSafeDatabase(
             "Server=(localdb)\\mssqllocaldb;Trusted_Connection=True");
@@ -82,17 +92,17 @@ public sealed class IntegrationTestDatabaseGuardTests
 }
 
 /// <summary>
-/// Doğrulama senaryosu #1: host'un efektif veritabanı adı VetinityCommandDb_IntegrationTests olmalı.
+/// Doğrulama senaryosu #1: host'un efektif command veritabanı adı VetinityCommandDb_IntegrationTests olmalı.
 /// </summary>
 [Collection("pilot-smoke-api")]
-public sealed class IntegrationTestEffectiveDatabaseTests : IClassFixture<CustomWebApplicationFactory>
+public sealed class IntegrationTestEffectiveCommandDatabaseTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly CustomWebApplicationFactory _factory;
 
-    public IntegrationTestEffectiveDatabaseTests(CustomWebApplicationFactory factory) => _factory = factory;
+    public IntegrationTestEffectiveCommandDatabaseTests(CustomWebApplicationFactory factory) => _factory = factory;
 
     [Fact]
-    public void EffectiveDatabase_Should_Be_IntegrationTestsDatabase()
+    public void EffectiveCommandDatabaseName_Should_Be_VetinityCommandDbIntegrationTests()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -100,7 +110,7 @@ public sealed class IntegrationTestEffectiveDatabaseTests : IClassFixture<Custom
         var connectionString = db.Database.GetConnectionString();
         connectionString.Should().NotBeNullOrWhiteSpace();
 
-        var databaseName = new SqlConnectionStringBuilder(connectionString!).InitialCatalog;
-        databaseName.Should().Be("VetinityCommandDb_IntegrationTests");
+        var commandDatabaseName = new SqlConnectionStringBuilder(connectionString!).InitialCatalog;
+        commandDatabaseName.Should().Be("VetinityCommandDb_IntegrationTests");
     }
 }

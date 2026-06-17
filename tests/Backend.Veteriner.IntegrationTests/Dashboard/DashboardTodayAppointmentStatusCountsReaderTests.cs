@@ -14,7 +14,7 @@ namespace Backend.Veteriner.IntegrationTests.Dashboard;
 public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLifetime
 {
     /// <summary>İzin verilen TEK prefix. Development (VetinityCommandDb) ve diğer test DB'leri guard tarafından reddedilir.</summary>
-    private const string DatabasePrefix = "VetinityCommandDb_TodayCounts_";
+    private const string CommandDatabasePrefix = "VetinityCommandDb_TodayCounts_";
 
     private static readonly DateTime DayStart = new(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime DayEnd = new(2026, 8, 11, 0, 0, 0, DateTimeKind.Utc);
@@ -28,13 +28,13 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
     /// </summary>
     public async Task InitializeAsync()
     {
-        var dbName = $"{DatabasePrefix}{Guid.NewGuid():N}";
+        var commandDbName = $"{CommandDatabasePrefix}{Guid.NewGuid():N}";
         var connectionString =
-            $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
+            $"Server=(localdb)\\mssqllocaldb;Database={commandDbName};Trusted_Connection=True;MultipleActiveResultSets=true";
 
         // Güvenlik kapısı: yalnız VetinityCommandDb_TodayCounts_ prefix'i kabul edilir.
-        // VetinityCommandDb / VetinityDb / VeterinerDb / VetinityCommandDb_IntegrationTests / Development-Production / boş ad reddedilir.
-        IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: DatabasePrefix);
+        // Reddedilen örnekler: development command DB, legacy isimler, paylaşılan integration scope DB'leri, Development-Production suffix'leri, boş ad.
+        IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: CommandDatabasePrefix);
 
         _connectionString = connectionString;
 

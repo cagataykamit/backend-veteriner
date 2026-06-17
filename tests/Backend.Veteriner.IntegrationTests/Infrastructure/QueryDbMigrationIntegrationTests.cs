@@ -160,18 +160,18 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
     }
 
     [Fact]
-    public void Command_And_Query_Databases_Should_Use_Different_Names()
+    public void CommandAndQueryIntegrationDatabaseNames_Should_MatchExpectedCatalogs()
     {
         using var scope = _factory.Services.CreateScope();
         var appDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
-        var commandCatalog = new SqlConnectionStringBuilder(appDb.Database.GetConnectionString()!).InitialCatalog;
-        var queryCatalog = new SqlConnectionStringBuilder(queryDb.Database.GetConnectionString()!).InitialCatalog;
+        var commandDatabaseName = new SqlConnectionStringBuilder(appDb.Database.GetConnectionString()!).InitialCatalog;
+        var queryDatabaseName = new SqlConnectionStringBuilder(queryDb.Database.GetConnectionString()!).InitialCatalog;
 
-        commandCatalog.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsDatabaseName);
-        queryCatalog.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName);
-        commandCatalog.Should().NotBe(queryCatalog);
+        commandDatabaseName.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsCommandDatabaseName);
+        queryDatabaseName.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName);
+        commandDatabaseName.Should().NotBe(queryDatabaseName);
     }
 
     private static async Task<bool> TableExistsAsync(DbContext db, string tableName)

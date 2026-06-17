@@ -47,10 +47,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
 
             // GÜVENLİK KONTROLÜ: EnsureDeleted/Migrate/Seed'den ÖNCE efektif veritabanı adını doğrula.
             // VetinityCommandDb / Development / Production / boş ad görülürse DB bağlantısı açılmadan durur.
-            var databaseName = IntegrationTestDatabaseGuard.EnsureSafeDatabase(db.Database.GetConnectionString());
+            var commandDatabaseName = IntegrationTestDatabaseGuard.EnsureSafeDatabase(db.Database.GetConnectionString());
 
             // Suite başında bir kere: EnsureDeleted + Migrate + Seed (sonraki sınıflar tekrar etmez).
-            IntegrationTestDatabaseInitializer.EnsureResetMigratedAndSeeded(db, hasher, databaseName);
+            IntegrationTestDatabaseInitializer.EnsureResetMigratedAndSeeded(db, hasher, commandDatabaseName);
         });
     }
 }
