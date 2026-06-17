@@ -13,7 +13,7 @@ public sealed class QueryDbContextFactory : IDesignTimeDbContextFactory<QueryDbC
     {
         var optionsBuilder = new DbContextOptionsBuilder<QueryDbContext>();
         optionsBuilder.UseSqlServer(
-            "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryEfDesign;Trusted_Connection=True;TrustServerCertificate=True;");
+            "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_EfDesign;Trusted_Connection=True;TrustServerCertificate=True;");
         return new QueryDbContext(optionsBuilder.Options);
     }
 }

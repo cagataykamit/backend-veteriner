@@ -49,7 +49,11 @@ dotnet build Veteriner.sln -c Debug
 ```
 
 API giriş projesi: `src/Backend.Veteriner.Api`  
-Yerel geliştirmede varsayılan SQL veritabanı adı **`VeterinerDb`** (`appsettings.Development.json` içindeki `ConnectionStrings:DefaultConnection`). İsterseniz **User Secrets** veya ortam değişkenleri ile üzerine yazın; JWT anahtarı için de User Secrets kullanın.
+Yerel geliştirmede varsayılan SQL veritabanı adları **`VetinityCommandDb`** (command) ve **`VetinityQueryDb`** (query) — `appsettings.Development.json` içindeki `ConnectionStrings`. İsterseniz **User Secrets** veya ortam değişkenleri ile üzerine yazın; JWT anahtarı için de User Secrets kullanın.
+
+Production şablonu (`appsettings.Production.json`): **`VetinityCommandDb`** / **`VetinityQueryDb`** — parola ve sunucu ortamda doldurulur.
+
+Yük testi ortamı (`DOTNET_ENVIRONMENT=LoadTest`, `appsettings.LoadTest.json`): **`VetinityCommandDb_LoadTest`** / **`VetinityQueryDb_LoadTest`**. DbMigrator akışı: [`docs/cqrs/load-test-database-setup.md`](docs/cqrs/load-test-database-setup.md).
 
 ## Test çalıştırma
 
@@ -58,7 +62,7 @@ dotnet test Veteriner.sln -c Debug
 ```
 
 - **Birim / uygulama testleri:** `tests/Backend.Veteriner.Application.Tests`, `tests/Backend.Veteriner.Domain.Tests`
-- **Entegrasyon testleri:** `tests/Backend.Veteriner.IntegrationTests` (`appsettings.IntegrationTests.json` → LocalDB, varsayılan DB adı **`VetinityDb_IntegrationTests`**)
+- **Entegrasyon testleri:** `tests/Backend.Veteriner.IntegrationTests` (`appsettings.IntegrationTests.json` → LocalDB, varsayılan DB adları **`VetinityCommandDb_IntegrationTests`** / **`VetinityQueryDb_IntegrationTests`**)
 
 ## Ürün modülü ekleme (özet)
 

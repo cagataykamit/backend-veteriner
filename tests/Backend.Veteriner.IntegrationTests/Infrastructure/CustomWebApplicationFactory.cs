@@ -17,7 +17,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
         // KÖK NEDEN DÜZELTMESİ (config seviyesi — savunma katmanı):
         // AddBackendAppConfiguration JSON kaynaklarından sonra AddEnvironmentVariables() çağırır;
         // makinedeki ConnectionStrings__DefaultConnection ortam değişkeni appsettings.IntegrationTests.json
-        // değerini ezip host'u VeterinerDb'ye yönlendiriyordu. Her iki connection anahtarını da
+        // değerini ezip host'u VetinityCommandDb'ye yönlendiriyordu. Her iki connection anahtarını da
         // dedicated test string'ine sabitliyoruz. (Minimal hosting'de bu kaynak env var'dan düşük
         // öncelikli kalabildiği için tek başına yeterli değildir; asıl garanti aşağıdaki servis
         // seviyesi yeniden kayıt ile sağlanır.)
@@ -46,7 +46,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
             var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
             // GÜVENLİK KONTROLÜ: EnsureDeleted/Migrate/Seed'den ÖNCE efektif veritabanı adını doğrula.
-            // VeterinerDb / Development / Production / boş ad görülürse DB bağlantısı açılmadan durur.
+            // VetinityCommandDb / Development / Production / boş ad görülürse DB bağlantısı açılmadan durur.
             var databaseName = IntegrationTestDatabaseGuard.EnsureSafeDatabase(db.Database.GetConnectionString());
 
             // Suite başında bir kere: EnsureDeleted + Migrate + Seed (sonraki sınıflar tekrar etmez).

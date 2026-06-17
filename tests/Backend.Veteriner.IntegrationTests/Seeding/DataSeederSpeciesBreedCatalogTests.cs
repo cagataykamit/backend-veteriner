@@ -15,7 +15,7 @@ public sealed class DataSeederSpeciesBreedCatalogSeedCollection;
 public sealed class DataSeederSpeciesBreedCatalogTests
 {
     private const string ConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VeterinerDb_DataSeederSpeciesBreed;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_DataSeederSpeciesBreed;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     private static DbContextOptions<AppDbContext> CreateOptions() =>
         new DbContextOptionsBuilder<AppDbContext>()

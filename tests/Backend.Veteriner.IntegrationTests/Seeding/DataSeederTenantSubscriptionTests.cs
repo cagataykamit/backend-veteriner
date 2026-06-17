@@ -20,7 +20,7 @@ public sealed class DataSeederTenantSubscriptionSeedCollection;
 public sealed class DataSeederTenantSubscriptionTests
 {
     private const string ConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VeterinerDb_DataSeederTenantSubscription;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_DataSeederTenantSubscription;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     private static DbContextOptions<AppDbContext> CreateOptions() =>
         new DbContextOptionsBuilder<AppDbContext>()

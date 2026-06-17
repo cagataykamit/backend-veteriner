@@ -12,10 +12,10 @@
   No application code changes; run manually during a slow UI burst.
 
 .EXAMPLE
-  .\sql-freeze-delta-watch.ps1 -ServerInstance "localhost" -Database "VeterinerDb"
+  .\sql-freeze-delta-watch.ps1 -ServerInstance "localhost" -Database "VetinityCommandDb"
 
 .EXAMPLE
-  .\sql-freeze-delta-watch.ps1 -ConnectionString "Server=.\SQLEXPRESS;Database=Veteriner;Trusted_Connection=True;TrustServerCertificate=True"
+  .\sql-freeze-delta-watch.ps1 -ConnectionString "Server=.\SQLEXPRESS;Database=VetinityCommandDb;Trusted_Connection=True;TrustServerCertificate=True"
 #>
 [CmdletBinding()]
 param(

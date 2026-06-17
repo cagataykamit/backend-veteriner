@@ -4,23 +4,23 @@ namespace Backend.IntegrationTests.Infrastructure;
 
 /// <summary>
 /// Integration test host'unun yanlışlıkla Development / Production veritabanına (özellikle
-/// <c>VeterinerDb</c>) bağlanmasını engelleyen güvenlik kontrolü.
+/// <c>VetinityCommandDb</c>) bağlanmasını engelleyen güvenlik kontrolü.
 ///
 /// Kök neden: <c>AddBackendAppConfiguration</c> içinde JSON kaynaklarından sonra
 /// <c>AddEnvironmentVariables()</c> çağrılır. Makinede tanımlı
 /// <c>ConnectionStrings__DefaultConnection</c> ortam değişkeni, <c>appsettings.IntegrationTests.json</c>
-/// değerini ezerek host'u <c>VeterinerDb</c>'ye yönlendirir. Bu guard, EnsureDeleted / Migrate / Seed
+/// değerini ezerek host'u geliştirme veritabanına yönlendirir. Bu guard, EnsureDeleted / Migrate / Seed
 /// işlemlerinden ÖNCE çalışıp efektif <see cref="SqlConnectionStringBuilder.InitialCatalog"/> adını
 /// zorunlu olarak doğrular.
 /// </summary>
 internal static class IntegrationTestDatabaseGuard
 {
-    /// <summary>İzin verilen tek/temel test veritabanı adı (prefix de kabul edilir).</summary>
-    public const string IntegrationTestsDatabaseName = "VetinityDb_IntegrationTests";
+    /// <summary>İzin verilen command-side integration test veritabanı adı (prefix de kabul edilir).</summary>
+    public const string IntegrationTestsDatabaseName = "VetinityCommandDb_IntegrationTests";
 
-    /// <summary>Source-controlled, dedicated test connection string (LocalDB).</summary>
+    /// <summary>Source-controlled, dedicated command test connection string (LocalDB).</summary>
     public const string DedicatedConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityDb_IntegrationTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_IntegrationTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     /// <summary>İzin verilen query-side integration test veritabanı adı (prefix de kabul edilir).</summary>
     public const string IntegrationTestsQueryDatabaseName = "VetinityQueryDb_IntegrationTests";
@@ -35,6 +35,15 @@ internal static class IntegrationTestDatabaseGuard
         "VeterinerDb",
         "VeterinerDb_IntegrationTests",
         "VetinityDb",
+        "VetinityDb_IntegrationTests",
+        "VetinityLoadTestDb",
+        "VetinityQueryLoadTestDb",
+        "VetinityCommandDb",
+        "VetinityQueryDb",
+        "VetinityCommandDb_LoadTest",
+        "VetinityQueryDb_LoadTest",
+        "VeterinerEfDesign",
+        "VetinityQueryEfDesign",
         "master",
         "model",
         "msdb",

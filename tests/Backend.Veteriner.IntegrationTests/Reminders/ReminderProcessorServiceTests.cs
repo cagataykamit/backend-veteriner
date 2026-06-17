@@ -970,7 +970,7 @@ public sealed class ReminderProcessorServiceTests
 
     private static async Task<AppDbContext> CreateDbContextAsync()
     {
-        var dbName = $"VeterinerDb_ReminderProcessor_{Guid.NewGuid():N}";
+        var dbName = $"VetinityCommandDb_ReminderProcessor_{Guid.NewGuid():N}";
         var connectionString = $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlServer(connectionString)

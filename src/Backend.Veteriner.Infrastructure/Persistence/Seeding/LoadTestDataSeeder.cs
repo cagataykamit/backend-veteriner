@@ -13,12 +13,15 @@ using Microsoft.Extensions.Logging;
 namespace Backend.Veteriner.Infrastructure.Persistence.Seeding;
 
 /// <summary>
-/// Yük testi veritabanı (<c>VetinityLoadTestDb</c>) için güvenli sentetik operasyon verisi üretir.
+/// Yük testi veritabanı (<c>VetinityCommandDb_LoadTest</c>) için güvenli sentetik operasyon verisi üretir.
 /// Kısmi seed durumunda eksik aşamaları tamamlar; tam veri varsa atlar.
 /// </summary>
 public static class LoadTestDataSeeder
 {
-    public const string RequiredDatabaseName = "VetinityLoadTestDb";
+    public const string RequiredDatabaseName = "VetinityCommandDb_LoadTest";
+
+    /// <summary>Load-test Query DB adı (migrate-query / rebuild için; seeder yalnızca command DB'ye yazar).</summary>
+    public const string QueryDatabaseName = "VetinityQueryDb_LoadTest";
     private const string LoadTestEmailDomain = "@loadtest.vetinity.invalid";
     private const string LoadTestMarker = "[LOADTEST]";
     private const int DeterministicSeed = 20260614;
@@ -240,7 +243,7 @@ public static class LoadTestDataSeeder
         {
             throw new InvalidOperationException(
                 $"Load test seed {LoadTestClinicCount} klinik bekliyor; bulunan: {context.ClinicIds.Count}. " +
-                "VetinityLoadTestDb reset ve yeniden seed edilmeli.");
+                "VetinityCommandDb_LoadTest reset ve yeniden seed edilmeli.");
         }
 
         if (counts.Appointments == 0
@@ -293,7 +296,7 @@ public static class LoadTestDataSeeder
     private static InvalidOperationException CreateLegacyDistributionException()
         => new(
             "Mevcut load test verisi eski tek-klinik veya uyumsuz klinik dağılımına sahip. " +
-            "VetinityLoadTestDb reset ve yeniden seed edilmeli.");
+            "VetinityCommandDb_LoadTest reset ve yeniden seed edilmeli.");
 
     private static void VerifyTargetsOrThrow(LoadTestTableCounts counts)
     {

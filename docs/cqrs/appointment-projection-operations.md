@@ -33,9 +33,11 @@ Use Command DB `OutboxMessages` filtered by known types in `AppointmentIntegrati
 ## Rebuild
 
 1. Stop API instances that run the projector (or set `AppointmentProjection:Enabled=false` on all).
-2. Run `IAppointmentProjectionRebuildService.RebuildAsync` (DbMigrator/maintenance job).
+2. Run `IAppointmentProjectionRebuildService.RebuildAsync` (DbMigrator `rebuild-appointment-projections` command).
 3. Confirm Query read-model counts match Command appointments for the tenant scope.
 4. Restart single projector instance; process live outbox tail.
+
+Load test ortamında rebuild **Command** `VetinityCommandDb_LoadTest` → **Query** `VetinityQueryDb_LoadTest` yazar. Ayrıntılı adımlar: [`load-test-database-setup.md`](load-test-database-setup.md).
 
 Rebuild clears `ProcessedProjectionEvents`; live events after rebuild append normally.
 

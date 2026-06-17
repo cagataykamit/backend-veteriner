@@ -11,15 +11,15 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Backend.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Paylaşılan VetinityDb_IntegrationTests veritabanında OutboxProcessor çakışmasını önlemek için
+/// Paylaşılan VetinityCommandDb_IntegrationTests veritabanında OutboxProcessor çakışmasını önlemek için
 /// ayrı LocalDB veritabanı ve hızlı döngü/no-op SMTP kullanır.
 /// </summary>
 public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    private const string ProcessorTestDatabaseName = "VetinityDb_OutboxProcessorTests";
+    private const string ProcessorTestDatabaseName = "VetinityCommandDb_OutboxProcessorTests";
 
     private const string ProcessorTestConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     private const string ProcessorTestQueryConnection =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
@@ -51,7 +51,7 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-            // EnsureCreated'den önce efektif veritabanı adını doğrula (VeterinerDb/Development/Production engeli).
+            // EnsureCreated'den önce efektif veritabanı adını doğrula (VetinityCommandDb/Development/Production engeli).
             IntegrationTestDatabaseGuard.EnsureSafeDatabase(
                 db.Database.GetConnectionString(),
                 allowedPrefix: ProcessorTestDatabaseName);

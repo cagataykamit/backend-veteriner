@@ -9,7 +9,7 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
     public AppDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=VeterinerEfDesign;Trusted_Connection=True;TrustServerCertificate=True;");
+        optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_EfDesign;Trusted_Connection=True;TrustServerCertificate=True;");
         return new AppDbContext(optionsBuilder.Options);
     }
 }

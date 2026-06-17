@@ -17,11 +17,11 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class AppointmentProjectionHostedWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    public const string CommandDatabaseName = "VetinityDb_AppointmentProjectionHostedTests";
+    public const string CommandDatabaseName = "VetinityCommandDb_AppointmentProjectionHostedTests";
     public const string QueryDatabaseName = "VetinityQueryDb_AppointmentProjectionHostedTests";
 
     public const string CommandConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityDb_AppointmentProjectionHostedTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_AppointmentProjectionHostedTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     public const string QueryConnection =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_AppointmentProjectionHostedTests;Trusted_Connection=True;MultipleActiveResultSets=true";

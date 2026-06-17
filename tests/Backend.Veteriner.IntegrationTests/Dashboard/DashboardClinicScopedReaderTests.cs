@@ -13,8 +13,8 @@ namespace Backend.Veteriner.IntegrationTests.Dashboard;
 
 public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
 {
-    /// <summary>İzin verilen TEK prefix. Development (VetinityDb) ve diğer test DB'leri guard tarafından reddedilir.</summary>
-    private const string DatabasePrefix = "VetinityDb_DashboardReader_";
+    /// <summary>İzin verilen TEK prefix. Development (VetinityCommandDb) ve diğer test DB'leri guard tarafından reddedilir.</summary>
+    private const string DatabasePrefix = "VetinityCommandDb_DashboardReader_";
 
     private string _connectionString = string.Empty;
     private AppDbContext _db = null!;
@@ -29,8 +29,8 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
         var connectionString =
             $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
 
-        // Güvenlik kapısı: yalnız VetinityDb_DashboardReader_ prefix'i kabul edilir.
-        // VetinityDb / VeterinerDb / VetinityDb_IntegrationTests / VetinityDb_OutboxProcessorTests / Development-Production / boş ad reddedilir.
+        // Güvenlik kapısı: yalnız VetinityCommandDb_DashboardReader_ prefix'i kabul edilir.
+        // VetinityCommandDb / VetinityDb / VeterinerDb / VetinityCommandDb_IntegrationTests / VetinityCommandDb_OutboxProcessorTests / Development-Production / boş ad reddedilir.
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: DatabasePrefix);
 
         _connectionString = connectionString;

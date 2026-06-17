@@ -13,8 +13,8 @@ namespace Backend.Veteriner.IntegrationTests.Dashboard;
 
 public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLifetime
 {
-    /// <summary>İzin verilen TEK prefix. Development (VetinityDb) ve diğer test DB'leri guard tarafından reddedilir.</summary>
-    private const string DatabasePrefix = "VetinityDb_TodayCounts_";
+    /// <summary>İzin verilen TEK prefix. Development (VetinityCommandDb) ve diğer test DB'leri guard tarafından reddedilir.</summary>
+    private const string DatabasePrefix = "VetinityCommandDb_TodayCounts_";
 
     private static readonly DateTime DayStart = new(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime DayEnd = new(2026, 8, 11, 0, 0, 0, DateTimeKind.Utc);
@@ -32,8 +32,8 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
         var connectionString =
             $"Server=(localdb)\\mssqllocaldb;Database={dbName};Trusted_Connection=True;MultipleActiveResultSets=true";
 
-        // Güvenlik kapısı: yalnız VetinityDb_TodayCounts_ prefix'i kabul edilir.
-        // VetinityDb / VeterinerDb / VetinityDb_IntegrationTests / Development-Production / boş ad reddedilir.
+        // Güvenlik kapısı: yalnız VetinityCommandDb_TodayCounts_ prefix'i kabul edilir.
+        // VetinityCommandDb / VetinityDb / VeterinerDb / VetinityCommandDb_IntegrationTests / Development-Production / boş ad reddedilir.
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: DatabasePrefix);
 
         _connectionString = connectionString;

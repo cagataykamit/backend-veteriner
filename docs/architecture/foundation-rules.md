@@ -81,7 +81,7 @@ Bu belge **Backend.Veteriner** deposunun güncel mimari ve süreç kurallarını
 
 - Kritik platform akışları (auth, izin, outbox, audit/correlation davranışı) için **entegrasyon testi** tercih edilir.
 - Test ortamı:
-  - Veteriner projesine özgü connection string / veritabanı adları kullanılır (ör. `VetinityDb_IntegrationTests`),
+  - Veteriner projesine özgü connection string / veritabanı adları kullanılır (ör. `VetinityCommandDb_IntegrationTests`, `VetinityQueryDb_IntegrationTests`; yük testi: `VetinityCommandDb_LoadTest`, `VetinityQueryDb_LoadTest`),
   - Şema için **`Migrate`** (veya eşdeğer tutarlı yol) ile test veritabanı güncel tutulur.
 - Factory / seed: testler birbirini bozmaması için izole DB veya deterministik seed stratejisi kullanır.
 

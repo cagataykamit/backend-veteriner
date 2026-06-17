@@ -155,11 +155,18 @@ static void PrintHelp()
           migrate-query  — QueryDbContext MigrateAsync (QueryConnection)
           seed           — Permission/Data/AdminClaim/InviteAssignable seed zinciri
           all            — önce migrate, sonra seed
-          loadtest-seed  — yük testi sentetik veri (yalnızca VetinityLoadTestDb; profil: small)
+          loadtest-seed  — yük testi sentetik veri (yalnızca VetinityCommandDb_LoadTest command DB; profil: small)
           rebuild-appointment-projections — Command DB randevularından Query read-model yeniden oluştur
                                             (--batch-size 1000 opsiyonel)
 
+        Load test ortamı (DOTNET_ENVIRONMENT=LoadTest):
+          Command DB : VetinityCommandDb_LoadTest  (DefaultConnection / migrate / loadtest-seed)
+          Query DB   : VetinityQueryDb_LoadTest    (QueryConnection / migrate-query / rebuild hedefi)
+          appsettings.LoadTest.json veya ortam değişkenleri ile sunucu/parola override edilebilir.
+
         Örnek:
+          $env:DOTNET_ENVIRONMENT = "LoadTest"
+          dotnet run --project src/Backend.Veteriner.DbMigrator -- migrate
           dotnet run --project src/Backend.Veteriner.DbMigrator -- migrate-query
           dotnet run --project src/Backend.Veteriner.DbMigrator -- loadtest-seed small
           dotnet run --project src/Backend.Veteriner.DbMigrator -- rebuild-appointment-projections --batch-size 1000

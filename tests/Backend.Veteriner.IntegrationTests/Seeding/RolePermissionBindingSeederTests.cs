@@ -26,7 +26,7 @@ public sealed class RolePermissionBindingSeedCollection;
 public sealed class RolePermissionBindingSeederTests
 {
     private const string ConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VeterinerDb_RolePermissionBindingSeed;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_RolePermissionBindingSeed;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     private static DbContextOptions<AppDbContext> CreateOptions()
     {

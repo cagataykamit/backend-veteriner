@@ -20,22 +20,27 @@ public sealed class IntegrationTestDatabaseGuardTests
         var db = IntegrationTestDatabaseGuard.EnsureSafeDatabase(
             IntegrationTestDatabaseGuard.DedicatedConnectionString);
 
-        db.Should().Be("VetinityDb_IntegrationTests");
+        db.Should().Be("VetinityCommandDb_IntegrationTests");
     }
 
     [Fact]
     public void EnsureSafeDatabase_Should_Allow_RunSpecificPrefixedName()
     {
         var db = IntegrationTestDatabaseGuard.EnsureSafeDatabase(
-            Conn("VetinityDb_IntegrationTests_Run42"));
+            Conn("VetinityCommandDb_IntegrationTests_Run42"));
 
-        db.Should().Be("VetinityDb_IntegrationTests_Run42");
+        db.Should().Be("VetinityCommandDb_IntegrationTests_Run42");
     }
 
     [Theory]
     [InlineData("VeterinerDb")]
     [InlineData("VeterinerDb_IntegrationTests")]
     [InlineData("VetinityDb")]
+    [InlineData("VetinityDb_IntegrationTests")]
+    [InlineData("VetinityCommandDb")]
+    [InlineData("VetinityQueryDb")]
+    [InlineData("VetinityLoadTestDb")]
+    [InlineData("VetinityCommandDb_LoadTest")]
     [InlineData("VeterinerDb_Development")]
     [InlineData("VeterinerDb_Production")]
     [InlineData("VeterinerProd")]
@@ -77,7 +82,7 @@ public sealed class IntegrationTestDatabaseGuardTests
 }
 
 /// <summary>
-/// Doğrulama senaryosu #1: host'un efektif veritabanı adı VetinityDb_IntegrationTests olmalı.
+/// Doğrulama senaryosu #1: host'un efektif veritabanı adı VetinityCommandDb_IntegrationTests olmalı.
 /// </summary>
 [Collection("pilot-smoke-api")]
 public sealed class IntegrationTestEffectiveDatabaseTests : IClassFixture<CustomWebApplicationFactory>
@@ -96,6 +101,6 @@ public sealed class IntegrationTestEffectiveDatabaseTests : IClassFixture<Custom
         connectionString.Should().NotBeNullOrWhiteSpace();
 
         var databaseName = new SqlConnectionStringBuilder(connectionString!).InitialCatalog;
-        databaseName.Should().Be("VetinityDb_IntegrationTests");
+        databaseName.Should().Be("VetinityCommandDb_IntegrationTests");
     }
 }
