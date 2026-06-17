@@ -24,4 +24,13 @@ internal static class IntegrationTestAppConfiguration
         {
             ["QueryReadModels:AppointmentsEnabled"] = "true"
         };
+
+    /// <summary>
+    /// Dashboard appointment read-model yolunu test etmek için.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string?> DashboardAppointmentsQueryReadEnabled { get; } =
+        new Dictionary<string, string?>
+        {
+            ["QueryReadModels:DashboardAppointmentsEnabled"] = "true"
+        };
 }

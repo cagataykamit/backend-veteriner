@@ -1,6 +1,9 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Dashboard.Contracts;
 using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
+using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Dashboard.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
@@ -9,6 +12,7 @@ using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Dashboard.Queries.GetSummary;
@@ -26,6 +30,8 @@ public sealed class GetDashboardSummaryQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IDashboardClinicScopedReader _clinicScopedReader;
+    private readonly IDashboardAppointmentReadModelReader _dashboardAppointmentReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetDashboardSummaryQueryHandler> _logger;
 
     public GetDashboardSummaryQueryHandler(
@@ -36,6 +42,8 @@ public sealed class GetDashboardSummaryQueryHandler
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
         IDashboardClinicScopedReader clinicScopedReader,
+        IDashboardAppointmentReadModelReader dashboardAppointmentReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetDashboardSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -45,6 +53,8 @@ public sealed class GetDashboardSummaryQueryHandler
         _clients = clients;
         _pets = pets;
         _clinicScopedReader = clinicScopedReader;
+        _dashboardAppointmentReader = dashboardAppointmentReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetDashboardSummaryQueryHandler>.Instance;
     }
 
@@ -60,8 +70,6 @@ public sealed class GetDashboardSummaryQueryHandler
         var utcNow = DateTime.UtcNow;
         var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(utcNow);
         var trendBuckets = OperationPeriodBounds.Last7DaysForUtcNow(utcNow);
-        var trendStartUtc = trendBuckets[0].StartUtcInclusive;
-        var trendEndUtc = trendBuckets[^1].EndUtcExclusive;
         var clinicId = _clinicContext.ClinicId;
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();
@@ -73,17 +81,65 @@ public sealed class GetDashboardSummaryQueryHandler
             stepSw.Restart();
         }
 
-        // Tek DbContext: paralel Task.WhenAll yerine sıralı await (EF Core concurrency kuralı).
-        var todayCounts = await _todayAppointmentCounts.GetAsync(tenantId, clinicId, dayStart, dayEnd, ct);
-        MarkStep(ms => timings.TodayStatusCountsMs = ms);
-        var todayScheduled = todayCounts.Scheduled;
-        var completedToday = todayCounts.Completed;
-        var cancelledToday = todayCounts.Cancelled;
-        var upcomingCount = await _appointments.CountAsync(
-            new DashboardUpcomingScheduledCountSpec(tenantId, clinicId, utcNow), ct);
-        MarkStep(ms => timings.UpcomingAppointmentsCountMs = ms);
-        // Aktif klinik varsa Client/Pet sayım ve listeleri klinik-dar (Appointment üzerinden);
-        // yoksa mevcut tenant-geniş fallback korunur. DTO şekli değişmez (Faz 6A).
+        if (_queryReadModelsOptions.DashboardAppointmentsEnabled)
+        {
+            return await HandleFromQueryReadModelAsync(
+                tenantId,
+                clinicId,
+                utcNow,
+                dayStart,
+                dayEnd,
+                trendBuckets,
+                totalSw,
+                timings,
+                MarkStep,
+                ct);
+        }
+
+        return await HandleFromCommandDbAsync(
+            tenantId,
+            clinicId,
+            utcNow,
+            dayStart,
+            dayEnd,
+            trendBuckets,
+            totalSw,
+            timings,
+            MarkStep,
+            ct);
+    }
+
+    private async Task<Result<DashboardSummaryDto>> HandleFromQueryReadModelAsync(
+        Guid tenantId,
+        Guid? clinicId,
+        DateTime utcNow,
+        DateTime dayStart,
+        DateTime dayEnd,
+        IReadOnlyList<OperationPeriodBounds.DailyWindow> trendBuckets,
+        Stopwatch totalSw,
+        DashboardSummaryStepTimings timings,
+        Action<Action<long>> markStep,
+        CancellationToken ct)
+    {
+        var todayLocalDate = OperationDayBounds.ToLocalDate(utcNow);
+        var readRequest = new DashboardAppointmentReadRequest(
+            tenantId,
+            clinicId,
+            todayLocalDate,
+            dayStart,
+            dayEnd,
+            utcNow,
+            dayStart,
+            UpcomingListTake,
+            RecentListTake,
+            trendBuckets);
+
+        var appointmentData = await _dashboardAppointmentReader.GetAsync(readRequest, ct);
+        markStep(ms => timings.TodayStatusCountsMs = ms);
+        markStep(ms => timings.UpcomingAppointmentsCountMs = ms);
+        markStep(ms => timings.UpcomingAppointmentsListMs = ms);
+        markStep(ms => timings.Last7DaysAppointmentsMs = ms);
+
         int clientsTotal;
         int petsTotal;
         IReadOnlyList<DashboardRecentClientRow> recentClientRows;
@@ -91,73 +147,127 @@ public sealed class GetDashboardSummaryQueryHandler
 
         if (clinicId is { } clinicScope)
         {
-            petsTotal = await _clinicScopedReader.CountPetsAtClinicAsync(tenantId, clinicScope, ct);
-            MarkStep(ms => timings.TotalPetsMs = ms);
-            clientsTotal = await _clinicScopedReader.CountClientsAtClinicAsync(tenantId, clinicScope, ct);
-            MarkStep(ms => timings.TotalClientsMs = ms);
-
-            // Dashboard listesi "bugun + gelecek" planlanmis randevulari gosterir; gecmis gun kayitlari disarida kalir.
-            var upcomingRowsClinic = await _appointments.ListAsync(
-                new DashboardUpcomingScheduledListSpec(tenantId, clinicId, dayStart, UpcomingListTake), ct);
-            MarkStep(ms => timings.UpcomingAppointmentsListMs = ms);
-
-            recentPetRows = await _clinicScopedReader.ListRecentPetsAtClinicAsync(
-                tenantId, clinicScope, RecentListTake, ct);
-            MarkStep(ms => timings.RecentPetsMs = ms);
-            recentClientRows = await _clinicScopedReader.ListRecentClientsAtClinicAsync(
-                tenantId, clinicScope, RecentListTake, ct);
-            MarkStep(ms => timings.RecentClientsMs = ms);
-
-            var trendScheduledAtUtcsClinic = await _appointments.ListAsync(
-                new DashboardAppointmentScheduledAtInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc), ct);
-            MarkStep(ms => timings.Last7DaysAppointmentsMs = ms);
-            var last7DaysAppointmentsClinic = BuildDailyCounts(trendBuckets, trendScheduledAtUtcsClinic);
-
-            return BuildResult(
-                tenantId,
-                clinicId,
-                todayScheduled,
-                upcomingCount,
-                completedToday,
-                cancelledToday,
-                clientsTotal,
-                petsTotal,
-                upcomingRowsClinic,
-                recentClientRows,
-                recentPetRows,
-                last7DaysAppointmentsClinic,
-                totalSw,
-                timings);
+            petsTotal = appointmentData.ClinicScopedPetsTotal ?? 0;
+            clientsTotal = appointmentData.ClinicScopedClientsTotal ?? 0;
+            recentPetRows = appointmentData.ClinicScopedRecentPets;
+            recentClientRows = appointmentData.ClinicScopedRecentClients;
+            markStep(ms => timings.TotalPetsMs = ms);
+            markStep(ms => timings.TotalClientsMs = ms);
+            markStep(ms => timings.RecentPetsMs = ms);
+            markStep(ms => timings.RecentClientsMs = ms);
         }
-
-        clientsTotal = await _clients.CountAsync(new DashboardClientsTotalCountSpec(tenantId), ct);
-        MarkStep(ms => timings.TotalClientsMs = ms);
-        petsTotal = await _pets.CountAsync(new DashboardPetsTotalCountSpec(tenantId), ct);
-        MarkStep(ms => timings.TotalPetsMs = ms);
-
-        // Dashboard listesi "bugun + gelecek" planlanmis randevulari gosterir; gecmis gun kayitlari disarida kalir.
-        var upcomingRows = await _appointments.ListAsync(
-            new DashboardUpcomingScheduledListSpec(tenantId, clinicId, dayStart, UpcomingListTake), ct);
-        MarkStep(ms => timings.UpcomingAppointmentsListMs = ms);
-        recentClientRows = await _clients.ListAsync(
-            new DashboardRecentClientsListSpec(tenantId, RecentListTake), ct);
-        MarkStep(ms => timings.RecentClientsMs = ms);
-        recentPetRows = await _pets.ListAsync(
-            new DashboardRecentPetsListSpec(tenantId, RecentListTake), ct);
-        MarkStep(ms => timings.RecentPetsMs = ms);
-
-        var trendScheduledAtUtcs = await _appointments.ListAsync(
-            new DashboardAppointmentScheduledAtInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc), ct);
-        MarkStep(ms => timings.Last7DaysAppointmentsMs = ms);
-        var last7DaysAppointments = BuildDailyCounts(trendBuckets, trendScheduledAtUtcs);
+        else
+        {
+            clientsTotal = await _clients.CountAsync(new DashboardClientsTotalCountSpec(tenantId), ct);
+            markStep(ms => timings.TotalClientsMs = ms);
+            petsTotal = await _pets.CountAsync(new DashboardPetsTotalCountSpec(tenantId), ct);
+            markStep(ms => timings.TotalPetsMs = ms);
+            recentClientRows = await _clients.ListAsync(
+                new DashboardRecentClientsListSpec(tenantId, RecentListTake), ct);
+            markStep(ms => timings.RecentClientsMs = ms);
+            recentPetRows = await _pets.ListAsync(
+                new DashboardRecentPetsListSpec(tenantId, RecentListTake), ct);
+            markStep(ms => timings.RecentPetsMs = ms);
+        }
 
         return BuildResult(
             tenantId,
             clinicId,
-            todayScheduled,
+            appointmentData.TodayCounts.Scheduled,
+            appointmentData.UpcomingCount,
+            appointmentData.TodayCounts.Completed,
+            appointmentData.TodayCounts.Cancelled,
+            clientsTotal,
+            petsTotal,
+            appointmentData.UpcomingAppointments,
+            recentClientRows,
+            recentPetRows,
+            appointmentData.LastSevenDaysAppointments,
+            totalSw,
+            timings);
+    }
+
+    private async Task<Result<DashboardSummaryDto>> HandleFromCommandDbAsync(
+        Guid tenantId,
+        Guid? clinicId,
+        DateTime utcNow,
+        DateTime dayStart,
+        DateTime dayEnd,
+        IReadOnlyList<OperationPeriodBounds.DailyWindow> trendBuckets,
+        Stopwatch totalSw,
+        DashboardSummaryStepTimings timings,
+        Action<Action<long>> markStep,
+        CancellationToken ct)
+    {
+        var trendStartUtc = trendBuckets[0].StartUtcInclusive;
+        var trendEndUtc = trendBuckets[^1].EndUtcExclusive;
+
+        var todayCounts = await _todayAppointmentCounts.GetAsync(tenantId, clinicId, dayStart, dayEnd, ct);
+        markStep(ms => timings.TodayStatusCountsMs = ms);
+        var upcomingCount = await _appointments.CountAsync(
+            new DashboardUpcomingScheduledCountSpec(tenantId, clinicId, utcNow), ct);
+        markStep(ms => timings.UpcomingAppointmentsCountMs = ms);
+
+        int clientsTotal;
+        int petsTotal;
+        IReadOnlyList<DashboardRecentClientRow> recentClientRows;
+        IReadOnlyList<DashboardRecentPetRow> recentPetRows;
+        IReadOnlyList<DashboardUpcomingAppointmentRow> upcomingRows;
+        IReadOnlyList<DashboardDailyCountDto> last7DaysAppointments;
+
+        if (clinicId is { } clinicScope)
+        {
+            petsTotal = await _clinicScopedReader.CountPetsAtClinicAsync(tenantId, clinicScope, ct);
+            markStep(ms => timings.TotalPetsMs = ms);
+            clientsTotal = await _clinicScopedReader.CountClientsAtClinicAsync(tenantId, clinicScope, ct);
+            markStep(ms => timings.TotalClientsMs = ms);
+
+            upcomingRows = await _appointments.ListAsync(
+                new DashboardUpcomingScheduledListSpec(tenantId, clinicId, dayStart, UpcomingListTake), ct);
+            markStep(ms => timings.UpcomingAppointmentsListMs = ms);
+
+            recentPetRows = await _clinicScopedReader.ListRecentPetsAtClinicAsync(
+                tenantId, clinicScope, RecentListTake, ct);
+            markStep(ms => timings.RecentPetsMs = ms);
+            recentClientRows = await _clinicScopedReader.ListRecentClientsAtClinicAsync(
+                tenantId, clinicScope, RecentListTake, ct);
+            markStep(ms => timings.RecentClientsMs = ms);
+
+            var trendScheduledAtUtcsClinic = await _appointments.ListAsync(
+                new DashboardAppointmentScheduledAtInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc), ct);
+            markStep(ms => timings.Last7DaysAppointmentsMs = ms);
+            last7DaysAppointments = BuildDailyCounts(trendBuckets, trendScheduledAtUtcsClinic);
+        }
+        else
+        {
+            clientsTotal = await _clients.CountAsync(new DashboardClientsTotalCountSpec(tenantId), ct);
+            markStep(ms => timings.TotalClientsMs = ms);
+            petsTotal = await _pets.CountAsync(new DashboardPetsTotalCountSpec(tenantId), ct);
+            markStep(ms => timings.TotalPetsMs = ms);
+
+            upcomingRows = await _appointments.ListAsync(
+                new DashboardUpcomingScheduledListSpec(tenantId, clinicId, dayStart, UpcomingListTake), ct);
+            markStep(ms => timings.UpcomingAppointmentsListMs = ms);
+            recentClientRows = await _clients.ListAsync(
+                new DashboardRecentClientsListSpec(tenantId, RecentListTake), ct);
+            markStep(ms => timings.RecentClientsMs = ms);
+            recentPetRows = await _pets.ListAsync(
+                new DashboardRecentPetsListSpec(tenantId, RecentListTake), ct);
+            markStep(ms => timings.RecentPetsMs = ms);
+
+            var trendScheduledAtUtcs = await _appointments.ListAsync(
+                new DashboardAppointmentScheduledAtInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc), ct);
+            markStep(ms => timings.Last7DaysAppointmentsMs = ms);
+            last7DaysAppointments = BuildDailyCounts(trendBuckets, trendScheduledAtUtcs);
+        }
+
+        return BuildResult(
+            tenantId,
+            clinicId,
+            todayCounts.Scheduled,
             upcomingCount,
-            completedToday,
-            cancelledToday,
+            todayCounts.Completed,
+            todayCounts.Cancelled,
             clientsTotal,
             petsTotal,
             upcomingRows,

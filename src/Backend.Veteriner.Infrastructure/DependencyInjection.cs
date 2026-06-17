@@ -12,10 +12,12 @@ using Backend.Veteriner.Infrastructure.Mailing;                                 
 using Backend.Veteriner.Infrastructure.Outbox;                                    // EfOutbox, OutboxProcessor, OutboxOptions, OutboxBuffer, OutboxSaveChangesInterceptor
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Query.Appointments;
+using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;                 // EfRepository, EfReadRepository, UserRepository, RefreshTokenRepository, VerificationTokenRepository
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
 using Backend.Veteriner.Application.Dashboard;
+using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
 using Backend.Veteriner.Application.Reports.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaimPermissions;
@@ -156,6 +158,7 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentProjectionProcessor, AppointmentProjectionProcessor>();
         services.AddScoped<IAppointmentProjectionRebuildService, AppointmentProjectionRebuildService>();
         services.AddScoped<IAppointmentReadModelReader, AppointmentReadModelReader>();
+        services.AddScoped<IDashboardAppointmentReadModelReader, DashboardAppointmentReadModelReader>();
         services.AddHostedService<AppointmentProjectionHostedService>();
 
         // ===== RefreshToken cleanup background worker =====

@@ -1,5 +1,8 @@
+using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Tests;
 using Ardalis.Specification;
+using Microsoft.Extensions.Options;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Dashboard.Contracts;
@@ -22,8 +25,9 @@ public sealed class GetDashboardSummaryQueryHandlerTests
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IDashboardClinicScopedReader> _clinicScoped = new();
+    private readonly Mock<IDashboardAppointmentReadModelReader> _dashboardAppointmentReader = new();
 
-    private GetDashboardSummaryQueryHandler CreateHandler()
+    private GetDashboardSummaryQueryHandler CreateHandler(bool dashboardAppointmentsEnabled = false)
         => new(
             _tenant.Object,
             _clinic.Object,
@@ -31,7 +35,13 @@ public sealed class GetDashboardSummaryQueryHandlerTests
             _todayAppointmentCounts.Object,
             _clients.Object,
             _pets.Object,
-            _clinicScoped.Object);
+            _clinicScoped.Object,
+            _dashboardAppointmentReader.Object,
+            Options.Create(new QueryReadModelsOptions
+            {
+                AppointmentsEnabled = false,
+                DashboardAppointmentsEnabled = dashboardAppointmentsEnabled
+            }));
 
     /// <summary>
     /// Handler trend projeksiyonu için `ListAsync(DashboardAppointmentScheduledAtInWindowSpec)` çağrısı yapar;
