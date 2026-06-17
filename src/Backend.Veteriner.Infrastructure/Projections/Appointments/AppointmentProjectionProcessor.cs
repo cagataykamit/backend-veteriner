@@ -21,6 +21,7 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
     private readonly QueryDbContext _queryDb;
     private readonly AppointmentProjectionOptions _options;
     private readonly OutboxOptions _outboxOptions;
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger<AppointmentProjectionProcessor> _logger;
 
     public AppointmentProjectionProcessor(
@@ -28,12 +29,14 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         QueryDbContext queryDb,
         IOptions<AppointmentProjectionOptions> options,
         IOptions<OutboxOptions> outboxOptions,
+        TimeProvider timeProvider,
         ILogger<AppointmentProjectionProcessor> logger)
     {
         _commandDb = commandDb;
         _queryDb = queryDb;
         _options = options.Value;
         _outboxOptions = outboxOptions.Value;
+        _timeProvider = timeProvider;
         _logger = logger;
     }
 
@@ -52,15 +55,21 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
 
     private async Task<int> ProcessBatchCoreAsync(CancellationToken cancellationToken)
     {
-        var now = DateTime.UtcNow;
+        var batchStarted = _timeProvider.GetUtcNow();
+        var now = batchStarted.UtcDateTime;
         var batchSize = Math.Max(1, _options.BatchSize);
         var processedCount = 0;
+        var failedCount = 0;
+        var deadLetteredCount = 0;
+        DateTime? oldestPendingCreatedAtUtc = null;
 
         for (var i = 0; i < batchSize; i++)
         {
             var head = await GetStrictOrderHeadAsync(cancellationToken);
             if (head is null)
                 break;
+
+            oldestPendingCreatedAtUtc ??= head.CreatedAtUtc;
 
             if (head.NextAttemptAtUtc is { } nextAttempt && nextAttempt > now)
                 break;
@@ -74,10 +83,12 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
             }
             catch (Exception ex)
             {
+                failedCount++;
                 OutboxRetryHelper.ApplyFailure(head, _outboxOptions, ex);
 
                 if (head.DeadLetterAtUtc is not null)
                 {
+                    deadLetteredCount++;
                     _logger.LogError(ex,
                         "Appointment projection dead-letter. Type={Type} Id={Id} Retry={Retry}",
                         head.Type, head.Id, head.RetryCount);
@@ -93,6 +104,24 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
                 await _commandDb.SaveChangesAsync(cancellationToken);
                 break;
             }
+        }
+
+        if (processedCount > 0 || failedCount > 0)
+        {
+            var durationMs = (_timeProvider.GetUtcNow() - batchStarted).TotalMilliseconds;
+            var oldestPendingAgeMs = oldestPendingCreatedAtUtc is { } oldest
+                ? (now - oldest).TotalMilliseconds
+                : 0d;
+
+            _logger.LogInformation(
+                "Appointment projection batch completed. BatchRequested={BatchRequested} ProcessedCount={ProcessedCount} FailedCount={FailedCount} DeadLetteredCount={DeadLetteredCount} DurationMs={DurationMs} OldestPendingAgeMs={OldestPendingAgeMs} ConsumerName={ConsumerName}",
+                batchSize,
+                processedCount,
+                failedCount,
+                deadLetteredCount,
+                (long)durationMs,
+                (long)Math.Max(0, oldestPendingAgeMs),
+                _options.ConsumerName);
         }
 
         return processedCount;

@@ -1,14 +1,14 @@
-using Backend.Veteriner.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Abstractions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Backend.Veteriner.Api.Health;
 
 public sealed class QueryDatabaseHealthCheck : IHealthCheck
 {
-    private readonly QueryDbContext _db;
+    private readonly IQueryDatabaseStatusReader _statusReader;
 
-    public QueryDatabaseHealthCheck(QueryDbContext db) => _db = db;
+    public QueryDatabaseHealthCheck(IQueryDatabaseStatusReader statusReader)
+        => _statusReader = statusReader;
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -16,17 +16,12 @@ public sealed class QueryDatabaseHealthCheck : IHealthCheck
     {
         try
         {
-            var canConnect = await _db.Database.CanConnectAsync(cancellationToken);
-            if (!canConnect)
+            var status = await _statusReader.GetStatusAsync(cancellationToken);
+            if (!status.IsReachable)
                 return HealthCheckResult.Unhealthy("Query SQL Server bağlantısı başarısız.");
 
-            var pending = await _db.Database.GetPendingMigrationsAsync(cancellationToken);
-            var pendingList = pending as IList<string> ?? pending.ToList();
-            if (pendingList.Count > 0)
-            {
-                return HealthCheckResult.Unhealthy(
-                    $"Query DB bekleyen migration var: {string.Join(", ", pendingList)}");
-            }
+            if (status.HasPendingMigrations)
+                return HealthCheckResult.Unhealthy("Query DB bekleyen migration var.");
 
             return HealthCheckResult.Healthy("Query SQL Server bağlantısı başarılı.");
         }

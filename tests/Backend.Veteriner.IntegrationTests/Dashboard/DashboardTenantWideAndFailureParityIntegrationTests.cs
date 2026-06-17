@@ -54,27 +54,20 @@ public sealed class DashboardTenantWideParityIntegrationTests : IClassFixture<Da
         await DashboardQueryParityTestSupport.ResetAppointmentProjectionAsync(_factory.Services);
         var scenario = await DashboardQueryParityTestSupport.SeedTwoClinicScenarioAsync(_factory.Services);
 
-        var futureA = DashboardQueryParityTestSupport.HoursFromUtcNow(48);
-        var futureB = DashboardQueryParityTestSupport.HoursFromUtcNow(72);
-        var tieBreakTime = DashboardQueryParityTestSupport.HoursFromUtcNow(96);
-        var pastScheduled = DashboardQueryParityTestSupport.DayOffsetFromUtcNow(-2, hoursFromDayStart: 10);
-        var futureCancelled = DashboardQueryParityTestSupport.HoursFromUtcNow(50);
-        var futureCompleted = DashboardQueryParityTestSupport.HoursFromUtcNow(52);
-
         await DashboardQueryParityTestSupport.SeedAppointmentAsync(
-            _factory.Services, scenario.TenantId, scenario.ClinicAId, scenario.PetAId, futureA, AppointmentStatus.Scheduled);
+            _factory.Services, scenario.TenantId, scenario.ClinicAId, scenario.PetAId, UpcomingFutureA, AppointmentStatus.Scheduled);
         await DashboardQueryParityTestSupport.SeedAppointmentAsync(
-            _factory.Services, scenario.TenantId, scenario.ClinicBId, scenario.PetBId, futureB, AppointmentStatus.Scheduled);
+            _factory.Services, scenario.TenantId, scenario.ClinicBId, scenario.PetBId, UpcomingFutureB, AppointmentStatus.Scheduled);
         await DashboardQueryParityTestSupport.SeedAppointmentAsync(
-            _factory.Services, scenario.TenantId, scenario.ClinicAId, scenario.PetAId, tieBreakTime, AppointmentStatus.Scheduled);
+            _factory.Services, scenario.TenantId, scenario.ClinicAId, scenario.PetAId, UpcomingTieBreakUtc, AppointmentStatus.Scheduled);
         await DashboardQueryParityTestSupport.SeedAppointmentAsync(
-            _factory.Services, scenario.TenantId, scenario.ClinicBId, scenario.PetBId, tieBreakTime, AppointmentStatus.Scheduled);
+            _factory.Services, scenario.TenantId, scenario.ClinicBId, scenario.PetBId, UpcomingTieBreakUtc, AppointmentStatus.Scheduled);
         await DashboardQueryParityTestSupport.SeedAppointmentAsync(
-            _factory.Services, scenario.TenantId, scenario.ClinicAId, scenario.PetAId, pastScheduled, AppointmentStatus.Scheduled);
+            _factory.Services, scenario.TenantId, scenario.ClinicAId, scenario.PetAId, UpcomingPastScheduledUtc, AppointmentStatus.Scheduled);
         await DashboardQueryParityTestSupport.SeedAppointmentAsync(
-            _factory.Services, scenario.TenantId, scenario.ClinicBId, scenario.PetBId, futureCancelled, AppointmentStatus.Cancelled);
+            _factory.Services, scenario.TenantId, scenario.ClinicBId, scenario.PetBId, UpcomingFutureCancelledUtc, AppointmentStatus.Cancelled);
         await DashboardQueryParityTestSupport.SeedAppointmentAsync(
-            _factory.Services, scenario.TenantId, scenario.ClinicAId, scenario.PetAId, futureCompleted, AppointmentStatus.Completed);
+            _factory.Services, scenario.TenantId, scenario.ClinicAId, scenario.PetAId, UpcomingFutureCompletedUtc, AppointmentStatus.Completed);
 
         await DashboardQueryParityTestSupport.RebuildAsync(_factory.Services);
 
@@ -87,13 +80,29 @@ public sealed class DashboardTenantWideParityIntegrationTests : IClassFixture<Da
         query.UpcomingAppointments.Should().HaveCountLessThanOrEqualTo(20);
         query.UpcomingAppointments.Should().OnlyContain(a => a.Status == AppointmentStatus.Scheduled);
 
-        var tieBreakIds = query.UpcomingAppointments
-            .Where(a => a.ScheduledAtUtc == tieBreakTime)
-            .Select(a => a.Id)
+        var tieBreakGroups = command.UpcomingAppointments
+            .GroupBy(a => a.ScheduledAtUtc)
+            .Where(g => g.Count() >= 2)
             .ToList();
-        tieBreakIds.Should().HaveCount(2);
-        tieBreakIds.Should().BeInAscendingOrder();
+        tieBreakGroups.Should().NotBeEmpty("seed must produce at least one shared ScheduledAtUtc tie-break bucket");
+
+        foreach (var group in tieBreakGroups)
+        {
+            var expectedIds = group.Select(a => a.Id).ToList();
+            var queryIds = query.UpcomingAppointments
+                .Where(a => a.ScheduledAtUtc == group.Key)
+                .Select(a => a.Id)
+                .ToList();
+            queryIds.Should().Equal(expectedIds, $"tie-break ordering at {group.Key:O} should match command path");
+        }
     }
+
+    private static readonly DateTime UpcomingFutureA = new(2030, 4, 10, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime UpcomingFutureB = new(2030, 4, 11, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime UpcomingTieBreakUtc = new(2030, 4, 12, 14, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime UpcomingPastScheduledUtc = new(2020, 1, 15, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime UpcomingFutureCancelledUtc = new(2030, 4, 13, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime UpcomingFutureCompletedUtc = new(2030, 4, 14, 10, 0, 0, DateTimeKind.Utc);
 
     [Fact]
     public async Task Summary_TenantWide_LastSevenDays_Should_MatchCommandPath_IncludingBoundaryAndZeroFill()

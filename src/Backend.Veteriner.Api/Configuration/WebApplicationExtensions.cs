@@ -1,3 +1,4 @@
+using Backend.Veteriner.Api.Health;
 using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.Common.Constants;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -129,23 +130,7 @@ public static class WebApplicationExtensions
                 [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
                 [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
             },
-            ResponseWriter = async (ctx, report) =>
-            {
-                ctx.Response.ContentType = "application/json";
-                var payload = new
-                {
-                    status = report.Status.ToString(),
-                    results = report.Entries.ToDictionary(
-                        e => e.Key,
-                        e => new
-                        {
-                            status = e.Value.Status.ToString(),
-                            description = e.Value.Description,
-                            duration = e.Value.Duration.TotalMilliseconds
-                        })
-                };
-                await ctx.Response.WriteAsync(JsonSerializer.Serialize(payload));
-            }
+            ResponseWriter = HealthCheckResponseWriter.WriteReadyAsync
         });
 
         app.MapHealthChecks("/health");

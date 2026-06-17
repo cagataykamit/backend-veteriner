@@ -12,6 +12,8 @@ using Backend.Veteriner.Infrastructure.Mailing;                                 
 using Backend.Veteriner.Infrastructure.Outbox;                                    // EfOutbox, OutboxProcessor, OutboxOptions, OutboxBuffer, OutboxSaveChangesInterceptor
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Query.Appointments;
+using Backend.Veteriner.Application.Projections.Appointments;
+using Backend.Veteriner.Infrastructure.Persistence.Query;
 using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;                 // EfRepository, EfReadRepository, UserRepository, RefreshTokenRepository, VerificationTokenRepository
@@ -66,8 +68,12 @@ public static class DependencyInjection
             configuration.GetSection(AppointmentProjectionOptions.SectionName));
         services.Configure<QueryReadModelsOptions>(
             configuration.GetSection(QueryReadModelsOptions.SectionName));
+        services.Configure<AppointmentProjectionHealthOptions>(
+            configuration.GetSection(AppointmentProjectionHealthOptions.SectionName));
         services.Configure<PerformanceDiagnosticsOptions>(
             configuration.GetSection(PerformanceDiagnosticsOptions.SectionName));
+
+        services.AddSingleton(TimeProvider.System);
 
         services.AddScoped<OutboxBuffer>();
         services.AddScoped<IOutboxBuffer>(sp => sp.GetRequiredService<OutboxBuffer>());
@@ -157,6 +163,8 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentProjectionSnapshotFactory, AppointmentProjectionSnapshotFactory>();
         services.AddScoped<IAppointmentProjectionProcessor, AppointmentProjectionProcessor>();
         services.AddScoped<IAppointmentProjectionRebuildService, AppointmentProjectionRebuildService>();
+        services.AddScoped<IAppointmentProjectionStatusReader, AppointmentProjectionStatusReader>();
+        services.AddScoped<IQueryDatabaseStatusReader, QueryDatabaseStatusReader>();
         services.AddScoped<IAppointmentReadModelReader, AppointmentReadModelReader>();
         services.AddScoped<IDashboardAppointmentReadModelReader, DashboardAppointmentReadModelReader>();
         services.AddHostedService<AppointmentProjectionHostedService>();
