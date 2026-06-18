@@ -163,3 +163,4 @@ See phase checklist in project tracking. Key gates:
 
 - [`appointment-projection-operations.md`](appointment-projection-operations.md)
 - [`appointment-cqrs-load-test.md`](appointment-cqrs-load-test.md)
+- [`cqrs-11b-operations-runbook.md`](cqrs-11b-operations-runbook.md)
