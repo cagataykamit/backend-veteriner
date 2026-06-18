@@ -138,6 +138,8 @@ public static class WebApplicationExtensions
         app.Logger.LogInformation(
             "API startup does not run EF migrations or database seeding. Apply schema with `dotnet ef database update` or run: dotnet run --project src/Backend.Veteriner.DbMigrator -- migrate | seed | all");
 
+        CqrsStartupConfigurationLogger.LogEffectiveConfiguration(app);
+
         return Task.FromResult(app);
     }
 }
