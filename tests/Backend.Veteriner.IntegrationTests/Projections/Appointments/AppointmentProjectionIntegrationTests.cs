@@ -15,10 +15,12 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Projections.Appointments;
 
 [CollectionDefinition("appointment-projection", DisableParallelization = true)]
-public sealed class AppointmentProjectionCollection;
+public sealed class AppointmentProjectionCollection :
+    ICollectionFixture<AppointmentProjectionWebApplicationFactory>,
+    ICollectionFixture<AppointmentProjectionHostedWebApplicationFactory>;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentProjectionIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentProjectionIntegrationTests
 {
     private readonly AppointmentProjectionWebApplicationFactory _factory;
 

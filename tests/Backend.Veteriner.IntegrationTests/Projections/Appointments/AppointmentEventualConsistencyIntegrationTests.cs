@@ -28,7 +28,7 @@ using Microsoft.Extensions.Options;
 namespace Backend.IntegrationTests.Projections.Appointments;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentEventualConsistencyIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentEventualConsistencyIntegrationTests
 {
     private readonly AppointmentProjectionWebApplicationFactory _factory;
 

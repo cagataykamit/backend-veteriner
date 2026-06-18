@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
@@ -40,7 +41,9 @@ public sealed class AppointmentProjectionHostedWebApplicationFactory : WebApplic
                 ["Outbox:Enabled"] = "false",
                 ["AppointmentProjection:Enabled"] = "true",
                 ["AppointmentProjection:LoopIntervalSeconds"] = "1",
-                ["AppointmentProjection:BatchSize"] = "20"
+                ["AppointmentProjection:BatchSize"] = "20",
+                ["QueryReadModels:AppointmentsEnabled"] = "false",
+                ["QueryReadModels:DashboardAppointmentsEnabled"] = "false"
             }.Concat(IntegrationTestAppConfiguration.RateLimitingDisabled));
         });
 
@@ -84,6 +87,11 @@ public sealed class AppointmentProjectionHostedWebApplicationFactory : WebApplic
                 o.BatchSize = 20;
                 o.ConsumerName = "appointment-read-model-v1";
             });
+            services.PostConfigure<QueryReadModelsOptions>(o =>
+            {
+                o.AppointmentsEnabled = false;
+                o.DashboardAppointmentsEnabled = false;
+            });
         });
     }
 
@@ -104,6 +112,3 @@ public sealed class AppointmentProjectionHostedWebApplicationFactory : WebApplic
         }
     }
 }
-
-[CollectionDefinition("appointment-projection-hosted", DisableParallelization = true)]
-public sealed class AppointmentProjectionHostedCollection : ICollectionFixture<AppointmentProjectionHostedWebApplicationFactory>;

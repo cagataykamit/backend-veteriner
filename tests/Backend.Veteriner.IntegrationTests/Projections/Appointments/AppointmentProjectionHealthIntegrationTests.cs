@@ -16,7 +16,7 @@ using Microsoft.Extensions.Options;
 namespace Backend.IntegrationTests.Projections.Appointments;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentProjectionHealthIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentProjectionHealthIntegrationTests
 {
     private readonly AppointmentProjectionWebApplicationFactory _factory;
 
@@ -26,11 +26,7 @@ public sealed class AppointmentProjectionHealthIntegrationTests : IClassFixture<
     [Fact]
     public async Task HealthEndpoint_Should_ExposeAppointmentProjectionSafeDataFields()
     {
-        await using (var scope = _factory.Services.CreateAsyncScope())
-        {
-            var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
-        }
+        await ResetHealthBaselineAsync();
 
         var client = _factory.CreateClient();
         var response = await client.GetAsync("/health/ready");
@@ -68,12 +64,10 @@ public sealed class AppointmentProjectionHealthIntegrationTests : IClassFixture<
     [Fact]
     public async Task Evaluate_Should_BeDegraded_WhenPendingAgeExceedsThreshold()
     {
+        await ResetHealthBaselineAsync();
+
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
-
-        await AppointmentProjectionTestSupport.ResetQuerySideAsync(queryDb);
-        await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
 
         commandDb.OutboxMessages.Add(new OutboxMessage
         {
@@ -95,12 +89,10 @@ public sealed class AppointmentProjectionHealthIntegrationTests : IClassFixture<
     [Fact]
     public async Task Evaluate_Should_BeUnhealthy_WhenDeadLetterExists()
     {
+        await ResetHealthBaselineAsync();
+
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
-
-        await AppointmentProjectionTestSupport.ResetQuerySideAsync(queryDb);
-        await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
 
         commandDb.OutboxMessages.Add(new OutboxMessage
         {
@@ -124,10 +116,10 @@ public sealed class AppointmentProjectionHealthIntegrationTests : IClassFixture<
     [Fact]
     public async Task Evaluate_Should_BeDegraded_WhenReadFlagsEnabledButProjectorDisabledWithoutPending()
     {
+        await ResetHealthBaselineAsync();
+
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
-        await AppointmentProjectionTestSupport.ResetQuerySideAsync(queryDb);
         await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
 
         var statusReader = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionStatusReader>();
@@ -141,5 +133,13 @@ public sealed class AppointmentProjectionHealthIntegrationTests : IClassFixture<
         evaluation.Level.Should().Be(AppointmentProjectionHealthLevel.Degraded);
         evaluation.Data["projectionEnabled"].Should().Be(false);
         evaluation.Data["appointmentsReadEnabled"].Should().Be(true);
+    }
+
+    private async Task ResetHealthBaselineAsync()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        await AppointmentProjectionTestSupport.ResetHealthBaselineAsync(commandDb, queryDb);
     }
 }

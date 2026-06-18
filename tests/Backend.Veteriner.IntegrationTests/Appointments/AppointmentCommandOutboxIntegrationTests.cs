@@ -108,28 +108,56 @@ public sealed class AppointmentCommandOutboxIntegrationTests : IClassFixture<App
     public async Task RescheduleCommand_Should_PersistRescheduledOutboxMessage()
     {
         await ResetDatabasesAsync();
+        var testStartedAtUtc = DateTime.UtcNow;
 
         var (clinicId, petId) = await SeedPetAsync();
         var appointmentId = await SeedScheduledAppointmentAsync(clinicId, petId);
+
+        DateTime originalScheduledAtUtc;
+        await using (var readScope = _factory.Services.CreateAsyncScope())
+        {
+            var readDb = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            originalScheduledAtUtc = await readDb.Appointments.AsNoTracking()
+                .Where(a => a.Id == appointmentId)
+                .Select(a => a.ScheduledAtUtc)
+                .SingleAsync();
+        }
+
+        var requestedScheduledAtUtc = DistinctSlotAlignedUtc(originalScheduledAtUtc, startDaysOffset: 7);
+        requestedScheduledAtUtc.Should().NotBe(originalScheduledAtUtc);
+
         var client = _factory.CreateClient();
         var login = await IntegrationTestAuthHelper.LoginAsync(client, _factory.Services, "admin@example.com", "123456");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
 
-        var newWhen = SlotAlignedUtcPlusDays(4);
         var response = await client.PostAsJsonAsync($"/api/v1/appointments/{appointmentId}/reschedule", new
         {
-            ScheduledAtUtc = newWhen
+            ScheduledAtUtc = requestedScheduledAtUtc
         });
         response.EnsureSuccessStatusCode();
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var outbox = await commandDb.OutboxMessages.AsNoTracking()
-            .SingleAsync(m => m.Type == AppointmentIntegrationEventTypes.Rescheduled);
+        var outboxMessages = await commandDb.OutboxMessages.AsNoTracking()
+            .Where(m => m.Type == AppointmentIntegrationEventTypes.Rescheduled && m.CreatedAtUtc >= testStartedAtUtc)
+            .OrderByDescending(m => m.CreatedAtUtc)
+            .ToListAsync();
 
-        var payload = JsonSerializer.Deserialize<AppointmentRescheduledIntegrationEvent>(outbox.Payload, JsonOptions);
+        AppointmentRescheduledIntegrationEvent? payload = null;
+        foreach (var message in outboxMessages)
+        {
+            var candidate = JsonSerializer.Deserialize<AppointmentRescheduledIntegrationEvent>(message.Payload, JsonOptions);
+            if (candidate?.Current.AppointmentId == appointmentId)
+            {
+                payload = candidate;
+                break;
+            }
+        }
+
+        payload.Should().NotBeNull();
         payload!.Previous.ScheduledAtUtc.Should().NotBe(payload.Current.ScheduledAtUtc);
-        payload.Current.ScheduledAtUtc.Should().BeCloseTo(newWhen, TimeSpan.FromSeconds(1));
+        payload.Previous.ScheduledAtUtc.Should().BeCloseTo(originalScheduledAtUtc, TimeSpan.FromSeconds(1));
+        payload.Current.ScheduledAtUtc.Should().BeCloseTo(requestedScheduledAtUtc, TimeSpan.FromSeconds(1));
     }
 
     [Fact]
@@ -329,5 +357,17 @@ public sealed class AppointmentCommandOutboxIntegrationTests : IClassFixture<App
         while (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday)
             date = date.AddDays(1);
         return date.AddHours(9);
+    }
+
+    private static DateTime DistinctSlotAlignedUtc(DateTime avoid, int startDaysOffset)
+    {
+        for (var days = startDaysOffset; days <= startDaysOffset + 30; days++)
+        {
+            var candidate = SlotAlignedUtcPlusDays(days);
+            if (candidate != avoid)
+                return candidate;
+        }
+
+        throw new InvalidOperationException("Distinct reschedule slot could not be resolved for integration test.");
     }
 }

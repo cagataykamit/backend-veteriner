@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
@@ -39,7 +40,9 @@ public sealed class AppointmentProjectionWebApplicationFactory : WebApplicationF
                 ["ConnectionStrings:SqlServer"] = CommandConnection,
                 ["ConnectionStrings:QueryConnection"] = QueryConnection,
                 ["Outbox:Enabled"] = "false",
-                ["AppointmentProjection:Enabled"] = "false"
+                ["AppointmentProjection:Enabled"] = "false",
+                ["QueryReadModels:AppointmentsEnabled"] = "false",
+                ["QueryReadModels:DashboardAppointmentsEnabled"] = "false"
             }.Concat(IntegrationTestAppConfiguration.RateLimitingDisabled));
         });
 
@@ -81,6 +84,11 @@ public sealed class AppointmentProjectionWebApplicationFactory : WebApplicationF
                 o.Enabled = false;
                 o.BatchSize = 50;
                 o.ConsumerName = "appointment-read-model-v1";
+            });
+            services.PostConfigure<QueryReadModelsOptions>(o =>
+            {
+                o.AppointmentsEnabled = false;
+                o.DashboardAppointmentsEnabled = false;
             });
         });
     }

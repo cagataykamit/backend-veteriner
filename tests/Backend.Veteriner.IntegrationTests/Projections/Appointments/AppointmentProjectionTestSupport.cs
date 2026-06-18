@@ -25,6 +25,15 @@ internal static class AppointmentProjectionTestSupport
         await commandDb.OutboxMessages.ExecuteDeleteAsync(ct);
     }
 
+    public static async Task ResetHealthBaselineAsync(
+        AppDbContext commandDb,
+        QueryDbContext queryDb,
+        CancellationToken ct = default)
+    {
+        await ClearOutboxAsync(commandDb, ct);
+        await ResetQuerySideAsync(queryDb, ct);
+    }
+
     public static async Task<OutboxMessage> EnqueueIntegrationEventAsync(
         AppDbContext commandDb,
         string eventType,

@@ -12,7 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Projections.Appointments;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentProjectionStatusIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentProjectionStatusIntegrationTests
 {
     private readonly AppointmentProjectionWebApplicationFactory _factory;
 

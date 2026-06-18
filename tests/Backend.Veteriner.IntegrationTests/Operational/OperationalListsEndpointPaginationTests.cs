@@ -19,6 +19,7 @@ using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -512,13 +513,14 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
         var tenant = new Tenant($"ApptPg-{Guid.NewGuid():N}"[..16]);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
         var clientEntity = new Client(tenant.Id, "Müşteri", "905551110001", "apptpg@example.com");
-        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
-        var pet = new Pet(tenant.Id, clientEntity.Id, "PetAppt", speciesId);
+        var species = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => new { s.Id, s.Name }).FirstAsync();
+        var pet = new Pet(tenant.Id, clientEntity.Id, "PetAppt", species.Id);
 
         var baseTime = DateTime.UtcNow.AddDays(1);
         var appointments = Enumerable.Range(0, count)
@@ -539,6 +541,37 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         db.AddRange(appointments);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
+
+        var projectedAtUtc = DateTime.UtcNow;
+        foreach (var appointment in appointments)
+        {
+            queryDb.AppointmentReadModels.Add(new AppointmentReadModel
+            {
+                AppointmentId = appointment.Id,
+                TenantId = tenant.Id,
+                ClinicId = clinic.Id,
+                ClinicName = clinic.Name,
+                PetId = pet.Id,
+                PetName = pet.Name,
+                SpeciesId = species.Id,
+                SpeciesName = species.Name,
+                ClientId = clientEntity.Id,
+                ClientName = clientEntity.FullName,
+                ClientPhone = clientEntity.Phone,
+                ClientPhoneNormalized = clientEntity.PhoneNormalized,
+                ClientEmail = clientEntity.Email,
+                ScheduledAtUtc = appointment.ScheduledAtUtc,
+                ScheduledEndUtc = appointment.ScheduledAtUtc.AddMinutes(appointment.DurationMinutes),
+                DurationMinutes = appointment.DurationMinutes,
+                AppointmentType = (int)appointment.AppointmentType,
+                Status = (int)appointment.Status,
+                Notes = appointment.Notes,
+                LastEventId = Guid.NewGuid(),
+                LastProjectedAtUtc = projectedAtUtc
+            });
+        }
+
+        await queryDb.SaveChangesAsync();
 
         var token = IssueToken(jwt, tenant.Id, "Appointments.Read");
         return new TenantTokenCtx(token, tenant.Id, clinic.Id);

@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
+using Backend.Veteriner.Application.Projections.Appointments;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
@@ -8,8 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Projections.Appointments;
 
-[Collection("appointment-projection-hosted")]
-public sealed class AppointmentProjectionHostedServiceIntegrationTests : IClassFixture<AppointmentProjectionHostedWebApplicationFactory>
+[Collection("appointment-projection")]
+public sealed class AppointmentProjectionHostedServiceIntegrationTests
 {
     private readonly AppointmentProjectionHostedWebApplicationFactory _factory;
 
@@ -36,8 +38,8 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests : IClassF
 
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
-            Backend.Veteriner.Application.Appointments.IntegrationEvents.AppointmentIntegrationEventTypes.Created,
-            new Backend.Veteriner.Application.Appointments.IntegrationEvents.AppointmentCreatedIntegrationEvent(
+            AppointmentIntegrationEventTypes.Created,
+            new AppointmentCreatedIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
                 snapshot));
@@ -57,6 +59,66 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests : IClassF
             timeout: TimeSpan.FromSeconds(15),
             pollInterval: TimeSpan.FromMilliseconds(300),
             because: "Hosted appointment projection should process pending outbox within bounded timeout.");
+    }
+
+    [Fact]
+    public async Task HostedService_Should_ProcessCreateThenReschedule_InImmediateSuccession()
+    {
+        await ResetAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
+
+        var appointmentId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var createTime = new DateTime(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
+        var rescheduleTime = createTime.AddMinutes(45);
+
+        var createSnapshot = AppointmentProjectionTestSupport.CreateSnapshot(
+            appointmentId, tenantId, clinicId, petId, clientId, createTime);
+
+        await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            AppointmentIntegrationEventTypes.Created,
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, createSnapshot));
+
+        var rescheduleSnapshot = AppointmentProjectionTestSupport.WithSchedule(
+            createSnapshot, rescheduleTime, (int)AppointmentStatus.Scheduled);
+
+        await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            AppointmentIntegrationEventTypes.Rescheduled,
+            new AppointmentRescheduledIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                createSnapshot,
+                rescheduleSnapshot));
+
+        var totalProcessed = 0;
+        var iterations = 0;
+        const int maxIterations = 10;
+
+        while (totalProcessed < 2 && iterations < maxIterations)
+        {
+            var processedCount = await processor.ProcessBatchAsync(CancellationToken.None);
+            totalProcessed += processedCount;
+            iterations++;
+
+            if (AppointmentProjectionPollingLoop.ShouldIdleWaitAfterBatch(processedCount))
+                break;
+        }
+
+        totalProcessed.Should().Be(2, "create and reschedule should process in back-to-back batches without idle wait");
+
+        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        var queryDb = verifyScope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var readModel = await queryDb.AppointmentReadModels
+            .SingleAsync(x => x.AppointmentId == appointmentId);
+        readModel.ScheduledAtUtc.Should().Be(rescheduleTime);
     }
 
     private async Task ResetAsync()

@@ -21,7 +21,7 @@ using Microsoft.Extensions.Logging;
 namespace Backend.IntegrationTests.Projections.Appointments;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentProjectionRebuildIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentProjectionRebuildIntegrationTests
 {
     private readonly AppointmentProjectionWebApplicationFactory _factory;
 
