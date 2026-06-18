@@ -333,6 +333,62 @@ function scheduledAtMatches(itemValue, expectedIso) {
     return Math.abs(actualMs - expectedMs) <= 1000;
 }
 
+function truncateResponseBody(body) {
+    if (body === null || body === undefined) {
+        return null;
+    }
+
+    const text = String(body);
+    if (!text) {
+        return null;
+    }
+
+    return text.length > 1000 ? text.substring(0, 1000) : text;
+}
+
+function logLifecycleHttpFailure(phase, response, sequence) {
+    try {
+        const payload = {
+            phase,
+            vu: __VU,
+            sequence,
+            status: response ? response.status : null,
+            durationMs:
+                response && response.timings && response.timings.duration !== undefined
+                    ? response.timings.duration
+                    : null,
+            error: response && response.error ? String(response.error) : null,
+            errorCode:
+                response && response.error_code !== undefined && response.error_code !== null
+                    ? response.error_code
+                    : null,
+            responseBody: response ? truncateResponseBody(response.body) : null,
+        };
+        console.error(JSON.stringify(payload));
+    } catch (_error) {
+        // Helper must never throw.
+    }
+}
+
+function logLifecycleParseFailure(phase, response, sequence) {
+    try {
+        const payload = {
+            phase,
+            vu: __VU,
+            sequence,
+            status: response ? response.status : null,
+            durationMs:
+                response && response.timings && response.timings.duration !== undefined
+                    ? response.timings.duration
+                    : null,
+            responseBody: response ? truncateResponseBody(response.body) : null,
+        };
+        console.error(JSON.stringify(payload));
+    } catch (_error) {
+        // Helper must never throw.
+    }
+}
+
 function parseCreatedAppointmentId(response) {
     if (response.status !== 201) {
         return null;
@@ -557,8 +613,17 @@ export default function (data) {
         "create HTTP 201": (r) => r.status === 201,
     });
 
+    if (createResponse.status !== 201) {
+        logLifecycleHttpFailure("create", createResponse, seq);
+        appointmentProjectionLifecycleSkippedRate.add(1);
+        sleep(1);
+        return;
+    }
+
     const appointmentId = parseCreatedAppointmentId(createResponse);
     if (!appointmentId) {
+        logLifecycleParseFailure("create_parse", createResponse, seq);
+        appointmentProjectionLifecycleSkippedRate.add(1);
         sleep(1);
         return;
     }
@@ -600,6 +665,7 @@ export default function (data) {
     });
 
     if (rescheduleResponse.status !== 204) {
+        logLifecycleHttpFailure("reschedule", rescheduleResponse, seq);
         appointmentProjectionLifecycleSkippedRate.add(1);
         sleep(1);
         return;
@@ -664,6 +730,7 @@ export default function (data) {
     });
 
     if (cancelResponse.status !== 204) {
+        logLifecycleHttpFailure("cancel", cancelResponse, seq);
         appointmentProjectionLifecycleSkippedRate.add(1);
         sleep(1);
         return;
