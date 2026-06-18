@@ -338,6 +338,10 @@ if ((Test-Path -LiteralPath $OutputPath) -and -not $Force) {
     throw "Cikti dosyasi zaten mevcut: $OutputPath (uzerine yazmak icin -Force kullanin)."
 }
 
+if (-not $Password -and -not [string]::IsNullOrWhiteSpace($env:LOADTEST_PASSWORD)) {
+    $Password = ConvertTo-SecureString -String $env:LOADTEST_PASSWORD -AsPlainText -Force
+}
+
 if (-not $Password) {
     $Password = Read-Host -AsSecureString "Password"
 }

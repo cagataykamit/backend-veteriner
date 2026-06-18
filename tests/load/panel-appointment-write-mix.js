@@ -1,6 +1,6 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
-import { Trend, Counter } from "k6/metrics";
+import { Trend, Counter, Rate } from "k6/metrics";
 import encoding from "k6/encoding";
 
 const dashboardDuration = new Trend("dashboard_duration", true);
@@ -25,6 +25,11 @@ const status401 = new Counter("status_401");
 const status403 = new Counter("status_403");
 const status429 = new Counter("status_429");
 const unexpectedStatus = new Counter("unexpected_status");
+const appointmentSlotConflictRate = new Rate("appointment_slot_conflict_rate");
+const appointmentValidationFailureRate = new Rate("appointment_validation_failure_rate");
+const appointmentAuthFailureRate = new Rate("appointment_auth_failure_rate");
+const appointmentServerFailureRate = new Rate("appointment_server_failure_rate");
+const appointmentNetworkFailureRate = new Rate("appointment_network_failure_rate");
 const endpointCheckFailures = new Counter("endpoint_check_failures");
 const clinicSlotRequests = new Counter("clinic_slot_requests");
 
@@ -35,7 +40,7 @@ const DEFAULT_DURATION_MINUTES = 30;
 const ISTANBUL_OFFSET_MINUTES = 180;
 const WORK_START_LOCAL_MINUTES = 9 * 60;
 const WORK_END_LOCAL_MINUTES = 18 * 60;
-const BASE_DAY_OFFSET = 90;
+const BASE_DAY_OFFSET = 120;
 const MAX_FUTURE_YEARS = 2;
 const LOAD_TEST_NOTE_PREFIX = "K6_LOAD_TEST";
 const RESCHEDULE_PHASE_OFFSET =
@@ -301,6 +306,55 @@ function trackStatus(status) {
     }
 }
 
+function trackWriteStatus(status, errorCode) {
+    if (status === 0) {
+        appointmentNetworkFailureRate.add(1);
+        return;
+    }
+    if (status === 401 || status === 403) {
+        appointmentAuthFailureRate.add(1);
+        trackStatus(status);
+        return;
+    }
+    if (status === 400 || status === 422) {
+        appointmentValidationFailureRate.add(1);
+        return;
+    }
+    if (status === 409 || (errorCode && String(errorCode).toLowerCase().includes("conflict"))) {
+        appointmentSlotConflictRate.add(1);
+        return;
+    }
+    if (status === 429) {
+        trackStatus(status);
+        return;
+    }
+    if (status >= 500) {
+        appointmentServerFailureRate.add(1);
+        return;
+    }
+    if (status !== 201 && status !== 204) {
+        unexpectedStatus.add(1);
+    }
+}
+
+function extractProblemCode(response) {
+    if (!response || !response.body) {
+        return null;
+    }
+    try {
+        const parsed = JSON.parse(String(response.body));
+        if (parsed && parsed.extensions && parsed.extensions.code) {
+            return String(parsed.extensions.code);
+        }
+        if (parsed && parsed.code) {
+            return String(parsed.code);
+        }
+    } catch (_error) {
+        return null;
+    }
+    return null;
+}
+
 function sendGet({ url, accessToken, tags, trend, recordTrend = true }) {
     const response = http.get(url, {
         headers: buildHeaders(accessToken),
@@ -316,13 +370,17 @@ function sendGet({ url, accessToken, tags, trend, recordTrend = true }) {
     return response;
 }
 
-function sendJsonRequest({ method, url, accessToken, body, tags, trend }) {
+function sendJsonRequest({ method, url, accessToken, body, tags, trend, trackWrite = false }) {
     const response = http.request(method, url, JSON.stringify(body), {
         headers: buildHeaders(accessToken, true),
         tags,
     });
 
-    trackStatus(response.status);
+    if (trackWrite) {
+        trackWriteStatus(response.status, extractProblemCode(response));
+    } else {
+        trackStatus(response.status);
+    }
 
     if (trend) {
         trend.add(response.timings.duration);
@@ -603,7 +661,7 @@ function buildBlockIndex(vu, writeSeq) {
 
 function buildScheduledAtUtcFromLinearSlot(linearSlot) {
     let remaining = linearSlot;
-    let dayOffset = BASE_DAY_OFFSET;
+    let dayOffset = BASE_DAY_OFFSET + __VU;
     const now = Date.now();
     const maxFutureMs = now + MAX_FUTURE_YEARS * 365 * 24 * 60 * 60 * 1000;
 
@@ -844,6 +902,7 @@ function attemptCancel(session, appointmentId, currentWriteSequence) {
             clinic_slot: session.slot,
         },
         trend: appointmentCancelDuration,
+        trackWrite: true,
     });
 
     check(cancelResponse, {
@@ -896,6 +955,7 @@ function runWriteLifecycle(session, petIds) {
                 clinic_slot: session.slot,
             },
             trend: appointmentCreateDuration,
+            trackWrite: true,
         });
 
         const createStatusSucceeded = createResponse.status === 201;
@@ -937,6 +997,7 @@ function runWriteLifecycle(session, petIds) {
                 clinic_slot: session.slot,
             },
             trend: appointmentRescheduleDuration,
+            trackWrite: true,
         });
 
         const rescheduleStatusSucceeded = rescheduleResponse.status === 204;

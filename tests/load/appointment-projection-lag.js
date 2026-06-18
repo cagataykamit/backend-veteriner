@@ -8,10 +8,11 @@ const appointmentProjectionRescheduleLagMs = new Trend("appointment_projection_r
 const appointmentProjectionCancelLagMs = new Trend("appointment_projection_cancel_lag_ms", true);
 const appointmentProjectionTimeoutRate = new Rate("appointment_projection_timeout_rate");
 const appointmentProjectionWrongStateRate = new Rate("appointment_projection_wrong_state_rate");
+const appointmentProjectionLifecycleSkippedRate = new Rate("appointment_projection_lifecycle_skipped_rate");
 const appointmentProjectionPollRequests = new Counter("appointment_projection_poll_requests");
 
 const CLINIC_CLAIM = "clinic_id";
-const LIST_PAGE_SIZE = 5;
+const LIST_PAGE_SIZE = 50;
 const SLOT_INTERVAL_MINUTES = 15;
 const DEFAULT_DURATION_MINUTES = 30;
 const ISTANBUL_OFFSET_MINUTES = 180;
@@ -125,6 +126,7 @@ export const options = {
         http_req_failed: ["rate<0.01"],
         appointment_projection_timeout_rate: ["rate==0"],
         appointment_projection_wrong_state_rate: ["rate==0"],
+        appointment_projection_lifecycle_skipped_rate: ["rate==0"],
         appointment_projection_create_lag_ms: ["p(95)<2000", "p(99)<5000"],
         appointment_projection_reschedule_lag_ms: ["p(95)<2000", "p(99)<5000"],
         appointment_projection_cancel_lag_ms: ["p(95)<2000", "p(99)<5000"],
@@ -278,43 +280,57 @@ function buildLifecycleSchedule(seq) {
 }
 
 function buildNarrowDateRange(scheduledAtUtc) {
-    const scheduled = new Date(scheduledAtUtc);
-    const from = new Date(scheduled);
-    from.setUTCDate(from.getUTCDate() - 1);
-    from.setUTCHours(0, 0, 0, 0);
+    const scheduledMs = Date.parse(String(scheduledAtUtc));
+    if (Number.isNaN(scheduledMs)) {
+        throw new Error(`Gecersiz scheduledAtUtc: ${scheduledAtUtc}`);
+    }
 
-    const to = new Date(scheduled);
-    to.setUTCDate(to.getUTCDate() + 1);
-    to.setUTCHours(23, 59, 59, 999);
+    const fromMs = scheduledMs - 2 * 60 * 60 * 1000;
+    const toMs = scheduledMs + 4 * 60 * 60 * 1000;
 
     return {
-        dateFromUtc: from.toISOString(),
-        dateToUtc: to.toISOString(),
+        dateFromUtc: new Date(fromMs).toISOString(),
+        dateToUtc: new Date(toMs).toISOString(),
     };
 }
 
-function normalizeGuid(value) {
-    return String(value || "").trim().toLowerCase();
+function buildReschedulePollDateRange(createScheduledAtUtc, rescheduleScheduledAtUtc) {
+    const createMs = toEpochMs(createScheduledAtUtc);
+    const rescheduleMs = toEpochMs(rescheduleScheduledAtUtc);
+    if (createMs === null || rescheduleMs === null) {
+        throw new Error("Reschedule poll date range icin gecersiz schedule.");
+    }
+
+    const fromMs = Math.min(createMs, rescheduleMs) - 2 * 60 * 60 * 1000;
+    const toMs = Math.max(createMs, rescheduleMs) + 4 * 60 * 60 * 1000;
+
+    return {
+        dateFromUtc: new Date(fromMs).toISOString(),
+        dateToUtc: new Date(toMs).toISOString(),
+    };
 }
 
-function normalizeScheduledAtUtc(value) {
-    if (!value) {
+function toEpochMs(value) {
+    if (value === null || value === undefined || value === "") {
         return null;
     }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-        return null;
+
+    let text = String(value).trim();
+    if (!/Z|[+-]\d{2}:\d{2}$/.test(text)) {
+        text = `${text}Z`;
     }
-    return parsed.getTime();
+
+    const parsed = Date.parse(text);
+    return Number.isNaN(parsed) ? null : parsed;
 }
 
 function scheduledAtMatches(itemValue, expectedIso) {
-    const actualMs = normalizeScheduledAtUtc(itemValue);
-    const expectedMs = normalizeScheduledAtUtc(expectedIso);
+    const actualMs = toEpochMs(itemValue);
+    const expectedMs = toEpochMs(expectedIso);
     if (actualMs === null || expectedMs === null) {
         return false;
     }
-    return Math.abs(actualMs - expectedMs) < 1000;
+    return Math.abs(actualMs - expectedMs) <= 1000;
 }
 
 function parseCreatedAppointmentId(response) {
@@ -342,6 +358,27 @@ function parseCreatedAppointmentId(response) {
     return null;
 }
 
+function normalizeGuid(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function logPollTimeout(details) {
+    console.warn(
+        JSON.stringify({
+            phase: details.phase,
+            appointmentId: details.appointmentId,
+            expectedScheduledAtUtc: details.expectedScheduledAtUtc ?? null,
+            expectedEpoch: details.expectedEpoch ?? null,
+            pollDateFrom: details.dateRange.dateFromUtc,
+            pollDateTo: details.dateRange.dateToUtc,
+            responseItemCount: details.responseItemCount ?? 0,
+            exactAppointmentFound: details.exactAppointmentFound === true,
+            actualScheduledAtUtc: details.actualScheduledAtUtc ?? null,
+            actualEpoch: details.actualEpoch ?? null,
+        })
+    );
+}
+
 function fetchAppointmentFromQueryList(session, petId, dateRange, appointmentId) {
     const url = buildAppointmentListUrl(
         CONFIG.baseUrl,
@@ -362,44 +399,64 @@ function fetchAppointmentFromQueryList(session, petId, dateRange, appointmentId)
     });
 
     if (response.status !== 200) {
-        return { found: false, item: null, httpStatus: response.status };
+        return {
+            found: false,
+            item: null,
+            httpStatus: response.status,
+            itemCount: 0,
+        };
     }
 
     let body;
     try {
         body = response.json();
     } catch (_error) {
-        return { found: false, item: null, httpStatus: response.status };
+        return {
+            found: false,
+            item: null,
+            httpStatus: response.status,
+            itemCount: 0,
+        };
     }
 
     if (!body || !Array.isArray(body.items)) {
-        return { found: false, item: null, httpStatus: response.status };
+        return {
+            found: false,
+            item: null,
+            httpStatus: response.status,
+            itemCount: 0,
+        };
     }
 
     const targetId = normalizeGuid(appointmentId);
     const item = body.items.find((row) => normalizeGuid(row.id) === targetId);
-    return { found: !!item, item: item || null, httpStatus: response.status };
+    return {
+        found: !!item,
+        item: item || null,
+        httpStatus: response.status,
+        itemCount: body.items.length,
+    };
 }
 
-function pollUntilPredicate(session, petId, dateRange, appointmentId, predicate, wrongStateCheck) {
+function pollUntilPredicate(session, petId, dateRange, appointmentId, predicate, wrongStateCheck, pollContext) {
     const started = Date.now();
     const deadline = started + PROJECTION_TIMEOUT_MS;
+    let lastResult = {
+        found: false,
+        item: null,
+        itemCount: 0,
+    };
 
     while (Date.now() < deadline) {
-        const result = fetchAppointmentFromQueryList(
-            session,
-            petId,
-            dateRange,
-            appointmentId
-        );
+        lastResult = fetchAppointmentFromQueryList(session, petId, dateRange, appointmentId);
 
-        if (result.found && result.item) {
-            if (wrongStateCheck && wrongStateCheck(result.item)) {
+        if (lastResult.found && lastResult.item) {
+            if (wrongStateCheck && wrongStateCheck(lastResult.item)) {
                 appointmentProjectionWrongStateRate.add(1);
                 return { ok: false, lagMs: Date.now() - started, timedOut: false, wrongState: true };
             }
 
-            if (predicate(result.item)) {
+            if (predicate(lastResult.item)) {
                 appointmentProjectionTimeoutRate.add(0);
                 appointmentProjectionWrongStateRate.add(0);
                 return { ok: true, lagMs: Date.now() - started, timedOut: false, wrongState: false };
@@ -410,6 +467,17 @@ function pollUntilPredicate(session, petId, dateRange, appointmentId, predicate,
     }
 
     appointmentProjectionTimeoutRate.add(1);
+    logPollTimeout({
+        phase: pollContext.phase,
+        appointmentId,
+        expectedScheduledAtUtc: pollContext.expectedScheduledAtUtc,
+        expectedEpoch: pollContext.expectedEpoch,
+        dateRange,
+        responseItemCount: lastResult.itemCount,
+        exactAppointmentFound: lastResult.found,
+        actualScheduledAtUtc: lastResult.item ? lastResult.item.scheduledAtUtc : null,
+        actualEpoch: lastResult.item ? toEpochMs(lastResult.item.scheduledAtUtc) : null,
+    });
     return { ok: false, lagMs: PROJECTION_TIMEOUT_MS, timedOut: true, wrongState: false };
 }
 
@@ -501,7 +569,12 @@ export default function (data) {
         dateRange,
         appointmentId,
         () => true,
-        null
+        null,
+        {
+            phase: "create",
+            expectedScheduledAtUtc: schedule.createScheduledAtUtc,
+            expectedEpoch: toEpochMs(schedule.createScheduledAtUtc),
+        }
     );
     appointmentProjectionCreateLagMs.add(createPoll.lagMs);
 
@@ -527,22 +600,47 @@ export default function (data) {
     });
 
     if (rescheduleResponse.status !== 204) {
+        appointmentProjectionLifecycleSkippedRate.add(1);
         sleep(1);
         return;
     }
 
     const expectedRescheduleUtc = schedule.rescheduleScheduledAtUtc;
+    const rescheduleDateRange = buildReschedulePollDateRange(
+        schedule.createScheduledAtUtc,
+        schedule.rescheduleScheduledAtUtc
+    );
     const reschedulePoll = pollUntilPredicate(
         session,
         petId,
-        buildNarrowDateRange(schedule.rescheduleScheduledAtUtc),
+        rescheduleDateRange,
         appointmentId,
         (item) => scheduledAtMatches(item.scheduledAtUtc, expectedRescheduleUtc),
-        null
+        null,
+        {
+            phase: "reschedule",
+            expectedScheduledAtUtc: expectedRescheduleUtc,
+            expectedEpoch: toEpochMs(expectedRescheduleUtc),
+        }
     );
     appointmentProjectionRescheduleLagMs.add(reschedulePoll.lagMs);
 
     if (!reschedulePoll.ok) {
+        http.post(
+            buildAppointmentCancelUrl(CONFIG.baseUrl, appointmentId),
+            JSON.stringify({
+                reason: `${LOAD_TEST_NOTE_PREFIX} lag cleanup vu=${__VU} seq=${seq}`,
+            }),
+            {
+                headers: buildHeaders(session.accessToken, true),
+                tags: {
+                    endpoint: "appointment_cancel",
+                    phase: "projection_lag_cleanup",
+                    clinic_slot: session.slot,
+                },
+            }
+        );
+        appointmentProjectionLifecycleSkippedRate.add(1);
         return;
     }
 
@@ -566,6 +664,7 @@ export default function (data) {
     });
 
     if (cancelResponse.status !== 204) {
+        appointmentProjectionLifecycleSkippedRate.add(1);
         sleep(1);
         return;
     }
@@ -573,10 +672,15 @@ export default function (data) {
     const cancelPoll = pollUntilPredicate(
         session,
         petId,
-        dateRange,
+        rescheduleDateRange,
         appointmentId,
         (item) => Number(item.status) === APPOINTMENT_STATUS_CANCELLED,
-        (item) => Number(item.status) === 1
+        (item) => Number(item.status) === 1,
+        {
+            phase: "cancel",
+            expectedScheduledAtUtc: expectedRescheduleUtc,
+            expectedEpoch: toEpochMs(expectedRescheduleUtc),
+        }
     );
     appointmentProjectionCancelLagMs.add(cancelPoll.lagMs);
     sleep(1);

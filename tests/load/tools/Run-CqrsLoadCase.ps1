@@ -169,8 +169,7 @@ $k6Args = @(
 if ($Workload -eq "projection-lag") {
     $k6Args += @(
         "-e", "PROJECTION_LAG_VUS=$effectiveVus",
-        "-e", "PROJECTION_LAG_DURATION=$Duration",
-        "-e", "PROJECTION_TIMEOUT_MS=15000"
+        "-e", "PROJECTION_LAG_DURATION=$Duration"
     )
 }
 
