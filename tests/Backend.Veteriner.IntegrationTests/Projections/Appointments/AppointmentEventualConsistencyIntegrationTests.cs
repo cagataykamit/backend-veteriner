@@ -231,13 +231,15 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
             .Options;
 
         await using var brokenQueryDb = new QueryDbContext(brokenQueryOptions);
+        using var metrics = new AppointmentProjectionMetrics(new AppointmentProjectionMetricsSnapshotHolder());
         var processor = new AppointmentProjectionProcessor(
             commandDb,
             brokenQueryDb,
             Options.Create(new AppointmentProjectionOptions { ConsumerName = AppointmentProjectionTestSupport.ConsumerName }),
             Options.Create(new OutboxOptions { MaxRetryCount = 8, BaseDelaySeconds = 5 }),
             TimeProvider.System,
-            NullLogger<AppointmentProjectionProcessor>.Instance);
+            NullLogger<AppointmentProjectionProcessor>.Instance,
+            metrics);
 
         var act = () => processor.ProcessBatchAsync(CancellationToken.None);
         await act.Should().ThrowAsync<Exception>();

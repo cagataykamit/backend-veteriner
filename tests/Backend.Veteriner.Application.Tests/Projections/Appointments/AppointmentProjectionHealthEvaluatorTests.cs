@@ -9,7 +9,7 @@ public sealed class AppointmentProjectionHealthEvaluatorTests
     private static readonly AppointmentProjectionHealthOptions DefaultHealth = new()
     {
         DegradedAfterSeconds = 10,
-        UnhealthyAfterSeconds = 60,
+        UnhealthyAfterSeconds = 30,
         DeadLetterIsUnhealthy = true
     };
 
@@ -50,9 +50,19 @@ public sealed class AppointmentProjectionHealthEvaluatorTests
     }
 
     [Fact]
+    public void Evaluate_Should_BeDegraded_WhenRetryWaitingExists()
+    {
+        var status = CreateStatus(retryWaitingCount: 1);
+
+        var result = AppointmentProjectionHealthEvaluator.Evaluate(status, DefaultHealth, FlagsOff);
+
+        result.Level.Should().Be(AppointmentProjectionHealthLevel.Degraded);
+    }
+
+    [Fact]
     public void Evaluate_Should_BeUnhealthy_WhenPendingAgeAtUnhealthyThreshold()
     {
-        var status = CreateStatus(pendingCount: 1, oldestPendingAge: TimeSpan.FromSeconds(60));
+        var status = CreateStatus(pendingCount: 1, oldestPendingAge: TimeSpan.FromSeconds(30));
 
         var result = AppointmentProjectionHealthEvaluator.Evaluate(status, DefaultHealth, FlagsOff);
 

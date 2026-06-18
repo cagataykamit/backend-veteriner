@@ -62,6 +62,107 @@ public sealed class AppointmentProjectionHealthIntegrationTests
     }
 
     [Fact]
+    public async Task HealthReadyEndpoint_Should_ReportDegraded_WhenPendingAgeExceedsWarningThreshold()
+    {
+        await ResetHealthBaselineAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        commandDb.OutboxMessages.Add(new OutboxMessage
+        {
+            Type = AppointmentIntegrationEventTypes.Created,
+            Payload = "{}",
+            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-15)
+        });
+        await commandDb.SaveChangesAsync();
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/health/ready");
+        var json = await response.Content.ReadAsStringAsync();
+
+        using var document = JsonDocument.Parse(json);
+        var entry = document.RootElement.GetProperty("results").GetProperty("appointment-projection");
+        entry.GetProperty("status").GetString().Should().Be("Degraded");
+    }
+
+    [Fact]
+    public async Task HealthReadyEndpoint_Should_ReportUnhealthy_WhenPendingAgeExceedsCriticalThreshold()
+    {
+        await ResetHealthBaselineAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        commandDb.OutboxMessages.Add(new OutboxMessage
+        {
+            Type = AppointmentIntegrationEventTypes.Created,
+            Payload = "{}",
+            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-35)
+        });
+        await commandDb.SaveChangesAsync();
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/health/ready");
+        var json = await response.Content.ReadAsStringAsync();
+
+        using var document = JsonDocument.Parse(json);
+        var entry = document.RootElement.GetProperty("results").GetProperty("appointment-projection");
+        entry.GetProperty("status").GetString().Should().Be("Unhealthy");
+    }
+
+    [Fact]
+    public async Task HealthReadyEndpoint_Should_ReportDegraded_WhenRetryWaitingExists()
+    {
+        await ResetHealthBaselineAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        commandDb.OutboxMessages.Add(new OutboxMessage
+        {
+            Type = AppointmentIntegrationEventTypes.Created,
+            Payload = "{}",
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-1),
+            NextAttemptAtUtc = DateTime.UtcNow.AddMinutes(5),
+            RetryCount = 1
+        });
+        await commandDb.SaveChangesAsync();
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/health/ready");
+        var json = await response.Content.ReadAsStringAsync();
+
+        using var document = JsonDocument.Parse(json);
+        var entry = document.RootElement.GetProperty("results").GetProperty("appointment-projection");
+        entry.GetProperty("status").GetString().Should().Be("Degraded");
+        entry.GetProperty("data").GetProperty("retryWaitingCount").GetInt32().Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task HealthReadyEndpoint_Should_ExposePendingSnapshotFields()
+    {
+        await ResetHealthBaselineAsync();
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/health/ready");
+        var json = await response.Content.ReadAsStringAsync();
+
+        using var document = JsonDocument.Parse(json);
+        var data = document.RootElement.GetProperty("results").GetProperty("appointment-projection").GetProperty("data");
+        data.GetProperty("pendingCount").GetInt32().Should().BeGreaterThanOrEqualTo(0);
+        data.GetProperty("oldestPendingAgeSeconds").GetDouble().Should().BeGreaterThanOrEqualTo(0);
+    }
+
+    [Fact]
+    public void Services_Should_RegisterAppointmentProjectionMetrics()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var metrics = scope.ServiceProvider.GetService<AppointmentProjectionMetrics>();
+        metrics.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Evaluate_Should_BeDegraded_WhenPendingAgeExceedsThreshold()
     {
         await ResetHealthBaselineAsync();

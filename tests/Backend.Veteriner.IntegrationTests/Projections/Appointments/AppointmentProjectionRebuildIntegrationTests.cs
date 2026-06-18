@@ -328,7 +328,8 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         var commandDb = failScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDbForFail = failScope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var logger = failScope.ServiceProvider.GetRequiredService<ILogger<AppointmentProjectionRebuildService>>();
-        var failing = new FailingAfterFirstBatchRebuildService(commandDb, queryDbForFail, logger);
+        var metrics = failScope.ServiceProvider.GetRequiredService<AppointmentProjectionMetrics>();
+        var failing = new FailingAfterFirstBatchRebuildService(commandDb, queryDbForFail, logger, metrics);
 
         var act = () => failing.RebuildAsync(batchSize: 1, CancellationToken.None);
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -560,8 +561,9 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         public FailingAfterFirstBatchRebuildService(
             AppDbContext commandDb,
             QueryDbContext queryDb,
-            ILogger<AppointmentProjectionRebuildService> logger)
-            : base(commandDb, queryDb, logger)
+            ILogger<AppointmentProjectionRebuildService> logger,
+            AppointmentProjectionMetrics metrics)
+            : base(commandDb, queryDb, logger, metrics)
         {
         }
 

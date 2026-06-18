@@ -6,7 +6,7 @@ public sealed class AppointmentProjectionHealthOptions
 
     public int DegradedAfterSeconds { get; set; } = 10;
 
-    public int UnhealthyAfterSeconds { get; set; } = 60;
+    public int UnhealthyAfterSeconds { get; set; } = 30;
 
     public bool DeadLetterIsUnhealthy { get; set; } = true;
 }

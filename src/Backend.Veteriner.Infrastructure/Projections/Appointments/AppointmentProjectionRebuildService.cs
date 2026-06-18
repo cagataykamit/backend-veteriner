@@ -18,15 +18,18 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
     private readonly AppDbContext _commandDb;
     private readonly QueryDbContext _queryDb;
     private readonly ILogger<AppointmentProjectionRebuildService> _logger;
+    private readonly AppointmentProjectionMetrics _metrics;
 
     public AppointmentProjectionRebuildService(
         AppDbContext commandDb,
         QueryDbContext queryDb,
-        ILogger<AppointmentProjectionRebuildService> logger)
+        ILogger<AppointmentProjectionRebuildService> logger,
+        AppointmentProjectionMetrics metrics)
     {
         _commandDb = commandDb;
         _queryDb = queryDb;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public async Task<AppointmentProjectionRebuildResult> RebuildAsync(
@@ -35,6 +38,24 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
     {
         var started = DateTime.UtcNow;
         batchSize = Math.Max(1, batchSize);
+
+        try
+        {
+            return await RebuildCoreAsync(batchSize, started, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _metrics.RecordRebuildCompleted((DateTime.UtcNow - started).TotalMilliseconds, success: false);
+            _logger.LogError(ex, "Appointment projection rebuild failed.");
+            throw;
+        }
+    }
+
+    private async Task<AppointmentProjectionRebuildResult> RebuildCoreAsync(
+        int batchSize,
+        DateTime started,
+        CancellationToken cancellationToken)
+    {
 
         await EnsureDistinctDatabasesAsync(cancellationToken);
 
@@ -109,6 +130,8 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
             PendingAppointmentOutboxCount: pendingOutboxCount,
             DeadLetterAppointmentOutboxCount: deadLetterOutboxCount,
             Duration: duration);
+
+        _metrics.RecordRebuildCompleted(result.Duration.TotalMilliseconds, success: true);
 
         _logger.LogInformation(
             "Appointment projection rebuild completed. Command={CommandCount} Query={QueryCount} PetActivity={PetActivity} ClientActivity={ClientActivity} DailyStats={DailyStats} DurationMs={DurationMs}",

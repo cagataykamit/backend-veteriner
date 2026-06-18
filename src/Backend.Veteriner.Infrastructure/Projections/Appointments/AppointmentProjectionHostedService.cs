@@ -60,6 +60,21 @@ public sealed class AppointmentProjectionHostedService : BackgroundService
             if (processedCount > 0)
                 lastActivityUtc = _timeProvider.GetUtcNow();
 
+            if (processedCount > 0)
+            {
+                try
+                {
+                    using var refreshScope = _sp.CreateScope();
+                    await AppointmentProjectionMetricsStatusRefresher.RefreshAsync(
+                        refreshScope.ServiceProvider,
+                        stoppingToken);
+                }
+                catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+                {
+                    _logger.LogWarning(ex, "Appointment projection metrics snapshot refresh failed.");
+                }
+            }
+
             if (!AppointmentProjectionPollingLoop.ShouldIdleWaitAfterBatch(processedCount))
                 continue;
 

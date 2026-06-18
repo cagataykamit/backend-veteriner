@@ -5,6 +5,7 @@ using Backend.Veteriner.Api.Swagger;
 using Backend.Veteriner.Application;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Infrastructure;
+using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -235,6 +236,7 @@ public static class WebApplicationBuilderExtensions
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddMeter("Backend.Veteriner.Outbox")
+                .AddMeter(AppointmentProjectionMetrics.MeterName)
                 .AddOtlpExporter(o =>
                 {
                     o.Endpoint = new Uri(otlpEndpoint);

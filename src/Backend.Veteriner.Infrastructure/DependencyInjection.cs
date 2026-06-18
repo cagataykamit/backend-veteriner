@@ -70,8 +70,15 @@ public static class DependencyInjection
             configuration.GetSection(QueryReadModelsOptions.SectionName));
         services.Configure<AppointmentProjectionHealthOptions>(
             configuration.GetSection(AppointmentProjectionHealthOptions.SectionName));
+        services.Configure<AppointmentProjectionMonitoringOptions>(
+            configuration.GetSection(AppointmentProjectionMonitoringOptions.SectionName));
+        services.AddSingleton<IValidateOptions<AppointmentProjectionMonitoringOptions>, AppointmentProjectionMonitoringOptionsValidator>();
+        services.AddOptions<AppointmentProjectionMonitoringOptions>().ValidateOnStart();
         services.Configure<PerformanceDiagnosticsOptions>(
             configuration.GetSection(PerformanceDiagnosticsOptions.SectionName));
+
+        services.AddSingleton<AppointmentProjectionMetricsSnapshotHolder>();
+        services.AddSingleton<AppointmentProjectionMetrics>();
 
         services.AddSingleton(TimeProvider.System);
 
