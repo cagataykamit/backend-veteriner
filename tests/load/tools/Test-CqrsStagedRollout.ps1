@@ -125,16 +125,47 @@ catch {
     Add-Result -Name "preflight-invalid-host-fails" -Passed $true
 }
 
-if (Test-Path -LiteralPath (Join-Path $repoRoot "tests\load\.tokens\clinic-tokens.json")) {
+$tokenFilePath = Join-Path $repoRoot "tests\load\.tokens\clinic-tokens.json"
+if (Test-Path -LiteralPath $tokenFilePath) {
+    $activeMode = $null
+    $modeResolveDetail = ""
     try {
-        & (Join-Path $PSScriptRoot "Test-CqrsLoadPreflight.ps1") `
-            -BaseUrl $BaseUrl `
-            -Mode "full-query" `
-            -TokenFile (Join-Path $repoRoot "tests\load\.tokens\clinic-tokens.json")
-        Add-Result -Name "preflight-mode-mismatch-fails" -Passed $false -Detail "API may already be in full-query mode."
+        $activeMode = Get-CqrsActiveApiStagedMode -BaseUrl $BaseUrl
     }
     catch {
-        Add-Result -Name "preflight-mode-mismatch-fails" -Passed $true
+        $modeResolveDetail = "health-read-error=$($_.Exception.Message)"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($activeMode)) {
+        $detail = if ($modeResolveDetail) {
+            $modeResolveDetail
+        }
+        else {
+            "activeMode could not be determined from appointment-projection health flags."
+        }
+        Add-Result -Name "preflight-mode-mismatch-fails" -Passed $false -Detail $detail
+    }
+    else {
+        $mismatchMode = Get-CqrsStagedPreflightMismatchMode -ActiveMode $activeMode
+        $preflightMode = ConvertTo-CqrsStagedPreflightMode -Mode $mismatchMode
+        try {
+            & (Join-Path $PSScriptRoot "Test-CqrsLoadPreflight.ps1") `
+                -BaseUrl $BaseUrl `
+                -Mode $preflightMode `
+                -TokenFile $tokenFilePath | Out-Null
+            Add-Result -Name "preflight-mode-mismatch-fails" -Passed $false `
+                -Detail "activeMode=$activeMode mismatchMode=$mismatchMode"
+        }
+        catch {
+            $isPreflightFailure = $_.Exception.Message -match '^Preflight failed:'
+            if ($isPreflightFailure) {
+                Add-Result -Name "preflight-mode-mismatch-fails" -Passed $true
+            }
+            else {
+                Add-Result -Name "preflight-mode-mismatch-fails" -Passed $false `
+                    -Detail "activeMode=$activeMode mismatchMode=$mismatchMode error=$($_.Exception.Message)"
+            }
+        }
     }
 }
 else {
@@ -198,6 +229,41 @@ if (Test-Path -LiteralPath $gitignorePath) {
 
 $dbMigratorHelp = dotnet run --project (Join-Path $repoRoot "src\Backend.Veteriner.DbMigrator") -- help 2>&1 | Out-String
 Add-Result -Name "dbmigrator-rebuild-command-exists" -Passed ($dbMigratorHelp -match "rebuild-appointment-projections")
+
+# CQRS-11C monitoring readiness (read-only)
+$monitoringDocPath = Join-Path $repoRoot "docs\cqrs\cqrs-11c-monitoring-alerts.md"
+Add-Result -Name "monitoring-doc-exists" -Passed (Test-Path -LiteralPath $monitoringDocPath)
+
+$metricsClassPath = Join-Path $repoRoot "src\Backend.Veteriner.Infrastructure\Projections\Appointments\AppointmentProjectionMetrics.cs"
+Add-Result -Name "projection-metrics-class-exists" -Passed (Test-Path -LiteralPath $metricsClassPath)
+
+$appSettingsPath = Join-Path $repoRoot "src\Backend.Veteriner.Api\appsettings.json"
+$monitoringConfigOk = $false
+if (Test-Path -LiteralPath $appSettingsPath) {
+    $appSettingsJson = Get-Content -LiteralPath $appSettingsPath -Raw | ConvertFrom-Json
+    $monitoringConfigOk = (
+        $null -ne $appSettingsJson.AppointmentProjectionMonitoring -and
+        $appSettingsJson.AppointmentProjectionMonitoring.WarningPendingAgeSeconds -eq 10 -and
+        $appSettingsJson.AppointmentProjectionMonitoring.CriticalPendingAgeSeconds -eq 30 -and
+        $appSettingsJson.AppointmentProjectionMonitoring.ParityCheckEnabled -eq $false
+    )
+}
+Add-Result -Name "monitoring-config-defaults" -Passed $monitoringConfigOk
+
+$otelMeterPath = Join-Path $repoRoot "src\Backend.Veteriner.Api\Configuration\WebApplicationBuilderExtensions.cs"
+$otelMeterOk = $false
+if (Test-Path -LiteralPath $otelMeterPath) {
+    $otelText = Get-Content -LiteralPath $otelMeterPath -Raw
+    $otelMeterOk = $otelText -match "Vetinity\.Cqrs\.Appointments|AppointmentProjectionMetrics\.MeterName"
+}
+Add-Result -Name "otel-meter-registered" -Passed $otelMeterOk
+
+if (Test-Path -LiteralPath $monitoringDocPath) {
+    $monitoringText = Get-Content -LiteralPath $monitoringDocPath -Raw
+    Add-Result -Name "monitoring-doc-no-secret-patterns" -Passed (-not (Test-CqrsStagedOutputContainsSecrets -Text $monitoringText))
+    Add-Result -Name "monitoring-doc-backend-lag-defined" -Passed ($monitoringText -match "backend projection lag|Backend projection lag")
+    Add-Result -Name "monitoring-doc-client-lag-distinction" -Passed ($monitoringText -match "client-observed|client visibility")
+}
 
 $failed = @($results | Where-Object { -not $_.passed })
 $summary = [ordered]@{

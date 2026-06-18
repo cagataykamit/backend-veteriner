@@ -17,6 +17,104 @@ function ConvertTo-CqrsStagedPreflightMode {
     }
 }
 
+function Get-CqrsLoadBooleanValue {
+    param(
+        $Value
+    )
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    if ($Value -is [bool]) {
+        return [bool]$Value
+    }
+
+    $normalized = [string]$Value
+    if ($normalized -eq "True" -or $normalized -eq "true" -or $normalized -eq "1") {
+        return $true
+    }
+
+    if ($normalized -eq "False" -or $normalized -eq "false" -or $normalized -eq "0") {
+        return $false
+    }
+
+    return $null
+}
+
+function Resolve-CqrsActiveStagedModeFromFlags {
+    param(
+        $AppointmentsReadEnabled,
+        $DashboardReadEnabled
+    )
+
+    $appointmentsRead = Get-CqrsLoadBooleanValue -Value $AppointmentsReadEnabled
+    $dashboardRead = Get-CqrsLoadBooleanValue -Value $DashboardReadEnabled
+
+    if ($null -eq $appointmentsRead -or $null -eq $dashboardRead) {
+        return $null
+    }
+
+    if (-not $appointmentsRead -and -not $dashboardRead) {
+        return "command-read"
+    }
+
+    if ($appointmentsRead -and -not $dashboardRead) {
+        return "appointment-query"
+    }
+
+    if ($appointmentsRead -and $dashboardRead) {
+        return "full-query"
+    }
+
+    return $null
+}
+
+function Get-CqrsStagedPreflightMismatchMode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("command-read", "appointment-query", "full-query")]
+        [string]$ActiveMode
+    )
+
+    switch ($ActiveMode) {
+        "command-read" { return "full-query" }
+        "appointment-query" { return "command-read" }
+        "full-query" { return "command-read" }
+    }
+}
+
+function Get-CqrsActiveApiStagedMode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BaseUrl
+    )
+
+    $normalizedBaseUrl = $BaseUrl.Trim().TrimEnd("/")
+    $tlsState = Enable-CqrsLoadLocalhostTlsBypass
+    try {
+        $health = Invoke-CqrsLoadHealthReady `
+            -BaseUrl $normalizedBaseUrl `
+            -SkipCertificateCheck:($tlsState.UseSkipCertificateCheck -or $true)
+
+        if ($null -eq $health -or $null -eq $health.results) {
+            return $null
+        }
+
+        $projectionEntry = $health.results.'appointment-projection'
+        if ($null -eq $projectionEntry -or $null -eq $projectionEntry.data) {
+            return $null
+        }
+
+        return Resolve-CqrsActiveStagedModeFromFlags `
+            -AppointmentsReadEnabled $projectionEntry.data.appointmentsReadEnabled `
+            -DashboardReadEnabled $projectionEntry.data.dashboardReadEnabled
+    }
+    finally {
+        Disable-CqrsLoadLocalhostTlsBypass -TlsState $tlsState
+    }
+}
+
 function Get-CqrsStagedModeDefinition {
     param(
         [Parameter(Mandatory = $true)]
