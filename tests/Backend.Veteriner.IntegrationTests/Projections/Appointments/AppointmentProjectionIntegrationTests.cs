@@ -17,7 +17,9 @@ namespace Backend.IntegrationTests.Projections.Appointments;
 [CollectionDefinition("appointment-projection", DisableParallelization = true)]
 public sealed class AppointmentProjectionCollection :
     ICollectionFixture<AppointmentProjectionWebApplicationFactory>,
-    ICollectionFixture<AppointmentProjectionHostedWebApplicationFactory>;
+    ICollectionFixture<AppointmentProjectionHostedWebApplicationFactory>,
+    ICollectionFixture<AppointmentProjectionClaimEnabledWebApplicationFactory>,
+    ICollectionFixture<AppointmentProjectionClaimInstrumentedWebApplicationFactory>;
 
 [Collection("appointment-projection")]
 public sealed class AppointmentProjectionIntegrationTests

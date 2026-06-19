@@ -1,11 +1,13 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Projections.Appointments;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.Veteriner.Infrastructure.Persistence.Query.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -24,6 +26,8 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<AppointmentProjectionProcessor> _logger;
     private readonly AppointmentProjectionMetrics _metrics;
+    private readonly IAppointmentOutboxClaimRepository _claimRepository;
+    private readonly IAppointmentProjectionWorkerIdentity _workerIdentity;
 
     public AppointmentProjectionProcessor(
         AppDbContext commandDb,
@@ -32,7 +36,9 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         IOptions<OutboxOptions> outboxOptions,
         TimeProvider timeProvider,
         ILogger<AppointmentProjectionProcessor> logger,
-        AppointmentProjectionMetrics metrics)
+        AppointmentProjectionMetrics metrics,
+        IAppointmentOutboxClaimRepository claimRepository,
+        IAppointmentProjectionWorkerIdentity workerIdentity)
     {
         _commandDb = commandDb;
         _queryDb = queryDb;
@@ -41,6 +47,8 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         _timeProvider = timeProvider;
         _logger = logger;
         _metrics = metrics;
+        _claimRepository = claimRepository;
+        _workerIdentity = workerIdentity;
     }
 
     public async Task<int> ProcessBatchAsync(CancellationToken cancellationToken)
@@ -48,7 +56,9 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         await BatchGate.WaitAsync(cancellationToken);
         try
         {
-            return await ProcessBatchCoreAsync(cancellationToken);
+            return _options.ClaimingEnabled
+                ? await ProcessClaimBatchAsync(cancellationToken)
+                : await ProcessLegacyFifoBatchAsync(cancellationToken);
         }
         finally
         {
@@ -56,7 +66,176 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         }
     }
 
-    private async Task<int> ProcessBatchCoreAsync(CancellationToken cancellationToken)
+    private async Task<int> ProcessClaimBatchAsync(CancellationToken cancellationToken)
+    {
+        var batchStarted = _timeProvider.GetUtcNow();
+        var now = batchStarted.UtcDateTime;
+        var workerId = _workerIdentity.WorkerId;
+        var batchSize = Math.Max(1, _options.ClaimBatchSize);
+        var leaseDuration = TimeSpan.FromSeconds(_options.LeaseDurationSeconds);
+        var processedCount = 0;
+        var failedCount = 0;
+        var deadLetteredCount = 0;
+        DateTime? oldestPendingCreatedAtUtc = null;
+
+        _logger.LogInformation(
+            "AppointmentProjectionClaimBatchStarted WorkerId={WorkerId} BatchSize={BatchSize} LeaseDurationSeconds={LeaseDurationSeconds}",
+            workerId,
+            batchSize,
+            _options.LeaseDurationSeconds);
+
+        var claimed = await _claimRepository.ClaimNextBatchAsync(
+            workerId,
+            batchSize,
+            leaseDuration,
+            cancellationToken);
+
+        foreach (var claimedMessage in claimed)
+        {
+            oldestPendingCreatedAtUtc ??= claimedMessage.CreatedAtUtc;
+
+            try
+            {
+                var integrationEvent = DeserializeIntegrationEvent(claimedMessage.Type, claimedMessage.Payload);
+                ValidateOrderedMetadata(claimedMessage, integrationEvent);
+
+                var eventId = ExtractEventId(integrationEvent);
+                var applyResult = await ApplyTransactionallyAsync(
+                    integrationEvent,
+                    eventId,
+                    claimedMessage.CreatedAtUtc,
+                    cancellationToken);
+
+                if (applyResult.IsDuplicate)
+                {
+                    _logger.LogInformation(
+                        "AppointmentProjectionDuplicateEventSkipped MessageId={MessageId} EventId={EventId}",
+                        claimedMessage.Id,
+                        eventId);
+                }
+
+                var acknowledged = await _claimRepository.MarkProcessedAsync(
+                    claimedMessage.Id,
+                    claimedMessage.ClaimToken,
+                    workerId,
+                    cancellationToken);
+
+                if (!acknowledged)
+                {
+                    _logger.LogWarning(
+                        "AppointmentProjectionStaleCompletionRejected MessageId={MessageId} EventId={EventId}",
+                        claimedMessage.Id,
+                        eventId);
+                }
+
+                processedCount++;
+                _metrics.RecordEventProcessed(claimedMessage.Type, applyResult.LagMs);
+            }
+            catch (AppointmentProjectionMetadataMismatchException ex)
+            {
+                var deadLettered = await _claimRepository.MarkDeadLetterAsync(
+                    claimedMessage.Id,
+                    claimedMessage.ClaimToken,
+                    workerId,
+                    ex.Message,
+                    cancellationToken);
+
+                if (!deadLettered)
+                {
+                    _logger.LogWarning(
+                        "AppointmentProjectionClaimDeadLetterRejected MessageId={MessageId}",
+                        claimedMessage.Id);
+                }
+                else
+                {
+                    deadLetteredCount++;
+                    _metrics.RecordEventDeadLettered(claimedMessage.Type);
+                    _logger.LogError(
+                        ex,
+                        "AppointmentProjectionDeadLetterDetected Type={Type} Reason=MetadataMismatch",
+                        claimedMessage.Type);
+                }
+            }
+            catch (Exception ex)
+            {
+                failedCount++;
+                _metrics.RecordEventFailed(claimedMessage.Type);
+
+                var newRetryCount = claimedMessage.RetryCount + 1;
+                if (newRetryCount >= _outboxOptions.MaxRetryCount)
+                {
+                    var deadLettered = await _claimRepository.MarkDeadLetterAsync(
+                        claimedMessage.Id,
+                        claimedMessage.ClaimToken,
+                        workerId,
+                        ex.Message,
+                        cancellationToken);
+
+                    if (!deadLettered)
+                    {
+                        _logger.LogWarning(
+                            "AppointmentProjectionClaimDeadLetterRejected MessageId={MessageId}",
+                            claimedMessage.Id);
+                    }
+                    else
+                    {
+                        deadLetteredCount++;
+                        _metrics.RecordEventDeadLettered(claimedMessage.Type);
+                        _logger.LogError(
+                            ex,
+                            "AppointmentProjectionDeadLetterDetected Type={Type} Retry={Retry}",
+                            claimedMessage.Type,
+                            newRetryCount);
+                    }
+                }
+                else
+                {
+                    var backoff = OutboxRetryHelper.ComputeBackoff(_outboxOptions.BaseDelaySeconds, newRetryCount);
+                    var nextAttemptAtUtc = now.Add(backoff);
+                    var retried = await _claimRepository.MarkRetryAsync(
+                        claimedMessage.Id,
+                        claimedMessage.ClaimToken,
+                        workerId,
+                        newRetryCount,
+                        nextAttemptAtUtc,
+                        ex.Message,
+                        cancellationToken);
+
+                    if (!retried)
+                    {
+                        _logger.LogWarning(
+                            "AppointmentProjectionClaimRetryRejected MessageId={MessageId}",
+                            claimedMessage.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Appointment projection retry in {DelaySeconds}s. Type={Type} Retry={Retry}",
+                            (int)backoff.TotalSeconds,
+                            claimedMessage.Type,
+                            newRetryCount);
+                    }
+                }
+
+                break;
+            }
+        }
+
+        LogBatchCompletion(
+            batchStarted,
+            now,
+            processedCount,
+            failedCount,
+            deadLetteredCount,
+            batchSize,
+            oldestPendingCreatedAtUtc,
+            claimBatchCompleted: true);
+
+        return processedCount;
+    }
+
+    private async Task<int> ProcessLegacyFifoBatchAsync(CancellationToken cancellationToken)
     {
         var batchStarted = _timeProvider.GetUtcNow();
         var now = batchStarted.UtcDateTime;
@@ -79,11 +258,26 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
 
             try
             {
-                var lagMs = await ProcessMessageAsync(head, cancellationToken);
+                var integrationEvent = DeserializeIntegrationEvent(head.Type, head.Payload);
+                var eventId = ExtractEventId(integrationEvent);
+                var applyResult = await ApplyTransactionallyAsync(
+                    integrationEvent,
+                    eventId,
+                    head.CreatedAtUtc,
+                    cancellationToken);
+
+                if (applyResult.IsDuplicate)
+                {
+                    _logger.LogInformation(
+                        "AppointmentProjectionDuplicateEventSkipped MessageId={MessageId} EventId={EventId}",
+                        head.Id,
+                        eventId);
+                }
+
                 OutboxRetryHelper.ApplySuccess(head);
                 await _commandDb.SaveChangesAsync(cancellationToken);
                 processedCount++;
-                _metrics.RecordEventProcessed(head.Type, lagMs);
+                _metrics.RecordEventProcessed(head.Type, applyResult.LagMs);
             }
             catch (Exception ex)
             {
@@ -112,41 +306,74 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
             }
         }
 
-        if (processedCount > 0 || failedCount > 0)
-        {
-            var durationMs = (_timeProvider.GetUtcNow() - batchStarted).TotalMilliseconds;
-            var oldestPendingAgeMs = oldestPendingCreatedAtUtc is { } oldest
-                ? (now - oldest).TotalMilliseconds
-                : 0d;
-
-            _metrics.RecordBatchCompleted(processedCount, failedCount, deadLetteredCount, durationMs);
-
-            if (failedCount > 0 || deadLetteredCount > 0)
-            {
-                _logger.LogWarning(
-                    "AppointmentProjectionBatchFailed ProcessedCount={ProcessedCount} FailedCount={FailedCount} DeadLetteredCount={DeadLetteredCount} DurationMs={DurationMs} BatchSize={BatchSize} OldestPendingAgeMs={OldestPendingAgeMs}",
-                    processedCount,
-                    failedCount,
-                    deadLetteredCount,
-                    (long)durationMs,
-                    batchSize,
-                    (long)Math.Max(0, oldestPendingAgeMs));
-            }
-            else
-            {
-                _logger.LogInformation(
-                    "AppointmentProjectionBatchCompleted ProcessedCount={ProcessedCount} FailedCount={FailedCount} DeadLetteredCount={DeadLetteredCount} DurationMs={DurationMs} BatchSize={BatchSize} OldestPendingAgeMs={OldestPendingAgeMs} ConsumerName={ConsumerName}",
-                    processedCount,
-                    failedCount,
-                    deadLetteredCount,
-                    (long)durationMs,
-                    batchSize,
-                    (long)Math.Max(0, oldestPendingAgeMs),
-                    _options.ConsumerName);
-            }
-        }
+        LogBatchCompletion(
+            batchStarted,
+            now,
+            processedCount,
+            failedCount,
+            deadLetteredCount,
+            batchSize,
+            oldestPendingCreatedAtUtc,
+            claimBatchCompleted: false);
 
         return processedCount;
+    }
+
+    private void LogBatchCompletion(
+        DateTimeOffset batchStarted,
+        DateTime now,
+        int processedCount,
+        int failedCount,
+        int deadLetteredCount,
+        int batchSize,
+        DateTime? oldestPendingCreatedAtUtc,
+        bool claimBatchCompleted)
+    {
+        if (processedCount == 0 && failedCount == 0)
+            return;
+
+        var durationMs = (_timeProvider.GetUtcNow() - batchStarted).TotalMilliseconds;
+        var oldestPendingAgeMs = oldestPendingCreatedAtUtc is { } oldest
+            ? (now - oldest).TotalMilliseconds
+            : 0d;
+
+        _metrics.RecordBatchCompleted(processedCount, failedCount, deadLetteredCount, durationMs);
+
+        if (claimBatchCompleted)
+        {
+            _logger.LogInformation(
+                "AppointmentProjectionClaimBatchCompleted ProcessedCount={ProcessedCount} FailedCount={FailedCount} DeadLetteredCount={DeadLetteredCount} DurationMs={DurationMs} BatchSize={BatchSize} OldestPendingAgeMs={OldestPendingAgeMs} ConsumerName={ConsumerName}",
+                processedCount,
+                failedCount,
+                deadLetteredCount,
+                (long)durationMs,
+                batchSize,
+                (long)Math.Max(0, oldestPendingAgeMs),
+                _options.ConsumerName);
+        }
+        else if (failedCount > 0 || deadLetteredCount > 0)
+        {
+            _logger.LogWarning(
+                "AppointmentProjectionBatchFailed ProcessedCount={ProcessedCount} FailedCount={FailedCount} DeadLetteredCount={DeadLetteredCount} DurationMs={DurationMs} BatchSize={BatchSize} OldestPendingAgeMs={OldestPendingAgeMs}",
+                processedCount,
+                failedCount,
+                deadLetteredCount,
+                (long)durationMs,
+                batchSize,
+                (long)Math.Max(0, oldestPendingAgeMs));
+        }
+        else
+        {
+            _logger.LogInformation(
+                "AppointmentProjectionBatchCompleted ProcessedCount={ProcessedCount} FailedCount={FailedCount} DeadLetteredCount={DeadLetteredCount} DurationMs={DurationMs} BatchSize={BatchSize} OldestPendingAgeMs={OldestPendingAgeMs} ConsumerName={ConsumerName}",
+                processedCount,
+                failedCount,
+                deadLetteredCount,
+                (long)durationMs,
+                batchSize,
+                (long)Math.Max(0, oldestPendingAgeMs),
+                _options.ConsumerName);
+        }
     }
 
     /// <summary>
@@ -160,57 +387,96 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
             .ThenBy(m => m.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-    private async Task<double> ProcessMessageAsync(OutboxMessage msg, CancellationToken cancellationToken)
+    private async Task<AppointmentProjectionApplyResult> ApplyTransactionallyAsync(
+        object integrationEvent,
+        Guid eventId,
+        DateTime messageCreatedAtUtc,
+        CancellationToken cancellationToken)
     {
-        var payloadType = AppointmentIntegrationEventTypeRegistry.ResolvePayloadType(msg.Type);
-        var integrationEvent = JsonSerializer.Deserialize(msg.Payload, payloadType, JsonOptions)
-            ?? throw new InvalidOperationException($"Appointment integration event deserialize edilemedi. Type={msg.Type}");
-
-        var eventId = ExtractEventId(integrationEvent);
-
-        var alreadyProcessed = await _queryDb.ProcessedProjectionEvents
+        var fastPathDuplicate = await _queryDb.ProcessedProjectionEvents
             .AsNoTracking()
             .AnyAsync(
                 x => x.EventId == eventId && x.ConsumerName == _options.ConsumerName,
                 cancellationToken);
 
-        if (alreadyProcessed)
-            return 0;
+        if (fastPathDuplicate)
+            return AppointmentProjectionApplyResult.DuplicateSkipped();
 
         await using var transaction = await _queryDb.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            alreadyProcessed = await _queryDb.ProcessedProjectionEvents
-                .AnyAsync(
-                    x => x.EventId == eventId && x.ConsumerName == _options.ConsumerName,
-                    cancellationToken);
+            var projectedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
+            var inserted = await TryInsertProcessedProjectionEventAsync(eventId, projectedAtUtc, cancellationToken);
 
-            if (!alreadyProcessed)
+            if (!inserted)
             {
-                var projectedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
-                await ApplyEventAsync(integrationEvent, eventId, projectedAtUtc, cancellationToken);
-
-                _queryDb.ProcessedProjectionEvents.Add(new ProcessedProjectionEvent
-                {
-                    EventId = eventId,
-                    ConsumerName = _options.ConsumerName,
-                    ProcessedAtUtc = projectedAtUtc
-                });
-
-                await _queryDb.SaveChangesAsync(cancellationToken);
+                await transaction.RollbackAsync(cancellationToken);
+                _queryDb.ChangeTracker.Clear();
+                return AppointmentProjectionApplyResult.DuplicateSkipped();
             }
 
+            await ApplyEventAsync(integrationEvent, eventId, projectedAtUtc, cancellationToken);
+            await _queryDb.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch
         {
             await transaction.RollbackAsync(cancellationToken);
+            _queryDb.ChangeTracker.Clear();
             throw;
         }
 
         var committedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
-        var lagMs = (committedAtUtc - msg.CreatedAtUtc).TotalMilliseconds;
-        return lagMs < 0 ? 0 : lagMs;
+        var lagMs = (committedAtUtc - messageCreatedAtUtc).TotalMilliseconds;
+        return AppointmentProjectionApplyResult.Applied(lagMs < 0 ? 0 : lagMs);
+    }
+
+    private async Task<bool> TryInsertProcessedProjectionEventAsync(
+        Guid eventId,
+        DateTime processedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            INSERT INTO ProcessedProjectionEvents (EventId, ConsumerName, ProcessedAtUtc)
+            VALUES (@eventId, @consumerName, @processedAtUtc)
+            """;
+
+        try
+        {
+            await _queryDb.Database.ExecuteSqlRawAsync(
+                sql,
+                [
+                    new SqlParameter("@eventId", eventId),
+                    new SqlParameter("@consumerName", _options.ConsumerName),
+                    new SqlParameter("@processedAtUtc", processedAtUtc)
+                ],
+                cancellationToken);
+            return true;
+        }
+        catch (SqlException ex) when (ex.Number is 2601 or 2627)
+        {
+            return false;
+        }
+    }
+
+    private static object DeserializeIntegrationEvent(string type, string payload)
+    {
+        var payloadType = AppointmentIntegrationEventTypeRegistry.ResolvePayloadType(type);
+        return JsonSerializer.Deserialize(payload, payloadType, JsonOptions)
+            ?? throw new InvalidOperationException($"Appointment integration event deserialize edilemedi. Type={type}");
+    }
+
+    private static void ValidateOrderedMetadata(ClaimedAppointmentOutboxMessage claimedMessage, object integrationEvent)
+    {
+        if (integrationEvent is not IAppointmentOrderedIntegrationEvent ordered)
+            return;
+
+        if (claimedMessage.AppointmentId != ordered.AppointmentId
+            || claimedMessage.AppointmentSequence != ordered.AppointmentSequence)
+        {
+            throw new AppointmentProjectionMetadataMismatchException(
+                "Outbox metadata does not match ordered integration event contract.");
+        }
     }
 
     private async Task ApplyEventAsync(

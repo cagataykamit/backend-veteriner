@@ -239,7 +239,9 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
             Options.Create(new OutboxOptions { MaxRetryCount = 8, BaseDelaySeconds = 5 }),
             TimeProvider.System,
             NullLogger<AppointmentProjectionProcessor>.Instance,
-            metrics);
+            metrics,
+            scope.ServiceProvider.GetRequiredService<IAppointmentOutboxClaimRepository>(),
+            scope.ServiceProvider.GetRequiredService<IAppointmentProjectionWorkerIdentity>());
 
         var act = () => processor.ProcessBatchAsync(CancellationToken.None);
         await act.Should().ThrowAsync<Exception>();

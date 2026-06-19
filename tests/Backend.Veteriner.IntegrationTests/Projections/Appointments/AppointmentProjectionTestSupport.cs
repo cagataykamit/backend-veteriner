@@ -56,6 +56,29 @@ internal static class AppointmentProjectionTestSupport
         return message;
     }
 
+    public static async Task<OutboxMessage> EnqueueOrderedIntegrationEventAsync(
+        AppDbContext commandDb,
+        string eventType,
+        object integrationEvent,
+        Guid appointmentId,
+        long appointmentSequence,
+        CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(integrationEvent, integrationEvent.GetType(), Json);
+        var message = new OutboxMessage
+        {
+            Type = eventType,
+            Payload = payload,
+            CreatedAtUtc = DateTime.UtcNow,
+            AppointmentId = appointmentId,
+            AppointmentSequence = appointmentSequence
+        };
+
+        commandDb.OutboxMessages.Add(message);
+        await commandDb.SaveChangesAsync(ct);
+        return message;
+    }
+
     public static AppointmentProjectionSnapshot CreateSnapshot(
         Guid appointmentId,
         Guid tenantId,
