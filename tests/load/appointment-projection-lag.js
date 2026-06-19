@@ -9,6 +9,12 @@ const appointmentProjectionCancelLagMs = new Trend("appointment_projection_cance
 const appointmentProjectionTimeoutRate = new Rate("appointment_projection_timeout_rate");
 const appointmentProjectionWrongStateRate = new Rate("appointment_projection_wrong_state_rate");
 const appointmentProjectionLifecycleSkippedRate = new Rate("appointment_projection_lifecycle_skipped_rate");
+const appointmentProjectionLifecycleAttempts = new Counter("appointment_projection_lifecycle_attempts");
+const appointmentProjectionLifecycleCompleted = new Counter("appointment_projection_lifecycle_completed");
+const appointmentProjectionCreateCompleted = new Counter("appointment_projection_create_completed");
+const appointmentProjectionRescheduleCompleted = new Counter("appointment_projection_reschedule_completed");
+const appointmentProjectionCancelCompleted = new Counter("appointment_projection_cancel_completed");
+const appointmentProjectionScheduleNullSkipped = new Counter("appointment_projection_schedule_null_skipped");
 const appointmentProjectionPollRequests = new Counter("appointment_projection_poll_requests");
 
 const CLINIC_CLAIM = "clinic_id";
@@ -18,7 +24,8 @@ const DEFAULT_DURATION_MINUTES = 30;
 const ISTANBUL_OFFSET_MINUTES = 180;
 const WORK_START_LOCAL_MINUTES = 9 * 60;
 const WORK_END_LOCAL_MINUTES = 18 * 60;
-const BASE_DAY_OFFSET = 120;
+const BASE_DAY_OFFSET = Number.parseInt(__ENV.VETINITY_BASE_DAY_OFFSET || "120", 10);
+const SLOT_SEQUENCE_OFFSET = Number.parseInt(__ENV.VETINITY_SLOT_SEQUENCE_OFFSET || "0", 10);
 const MAX_FUTURE_YEARS = 2;
 const LOAD_TEST_NOTE_PREFIX = "K6_LOAD_TEST";
 const RESCHEDULE_PHASE_OFFSET = 2;
@@ -127,6 +134,12 @@ export const options = {
         appointment_projection_timeout_rate: ["rate==0"],
         appointment_projection_wrong_state_rate: ["rate==0"],
         appointment_projection_lifecycle_skipped_rate: ["rate==0"],
+        appointment_projection_lifecycle_attempts: ["count>0"],
+        appointment_projection_lifecycle_completed: ["count>0"],
+        appointment_projection_create_completed: ["count>0"],
+        appointment_projection_reschedule_completed: ["count>0"],
+        appointment_projection_cancel_completed: ["count>0"],
+        appointment_projection_schedule_null_skipped: ["count==0"],
         appointment_projection_create_lag_ms: ["p(95)<2000", "p(99)<5000"],
         appointment_projection_reschedule_lag_ms: ["p(95)<2000", "p(99)<5000"],
         appointment_projection_cancel_lag_ms: ["p(95)<2000", "p(99)<5000"],
@@ -228,7 +241,8 @@ function istanbulLocalDateTimeToUtc(dayCursorUtcMidnight, localMinutes) {
 
 function buildScheduledAtUtcFromLinearSlot(linearSlot) {
     let remaining = linearSlot;
-    let dayOffset = BASE_DAY_OFFSET + __VU;
+    const boundedDayStride = Math.floor(SLOT_SEQUENCE_OFFSET / SESSIONS.length) % 180;
+    let dayOffset = BASE_DAY_OFFSET + ((__VU - 1) % SESSIONS.length) + boundedDayStride;
     const now = Date.now();
     const maxFutureMs = now + MAX_FUTURE_YEARS * 365 * 24 * 60 * 60 * 1000;
 
@@ -265,7 +279,9 @@ function buildScheduledAtUtcFromLinearSlot(linearSlot) {
 }
 
 function buildLifecycleSchedule(seq) {
-    const createLinearSlot = seq * 10 + __VU;
+    const sessionIndex = (__VU - 1) % SESSIONS.length;
+    const boundedSlotStride = SLOT_SEQUENCE_OFFSET % (SESSIONS.length * 100);
+    const createLinearSlot = seq * SESSIONS.length + sessionIndex + boundedSlotStride;
     const rescheduleLinearSlot = createLinearSlot + RESCHEDULE_PHASE_OFFSET;
 
     const createScheduledAtUtc = buildScheduledAtUtcFromLinearSlot(createLinearSlot);
@@ -581,9 +597,12 @@ export default function (data) {
     const petId = petIds[(__VU - 1) % petIds.length];
     const seq = lifecycleSequence;
     lifecycleSequence += 1;
+    appointmentProjectionLifecycleAttempts.add(1);
 
     const schedule = buildLifecycleSchedule(seq);
     if (!schedule) {
+        appointmentProjectionScheduleNullSkipped.add(1);
+        appointmentProjectionLifecycleSkippedRate.add(1);
         sleep(1);
         return;
     }
@@ -646,6 +665,8 @@ export default function (data) {
     if (!createPoll.ok) {
         return;
     }
+
+    appointmentProjectionCreateCompleted.add(1);
 
     const rescheduleResponse = http.post(
         buildAppointmentRescheduleUrl(CONFIG.baseUrl, appointmentId),
@@ -710,6 +731,8 @@ export default function (data) {
         return;
     }
 
+    appointmentProjectionRescheduleCompleted.add(1);
+
     const cancelResponse = http.post(
         buildAppointmentCancelUrl(CONFIG.baseUrl, appointmentId),
         JSON.stringify({
@@ -750,5 +773,13 @@ export default function (data) {
         }
     );
     appointmentProjectionCancelLagMs.add(cancelPoll.lagMs);
+
+    if (cancelPoll.ok) {
+        appointmentProjectionCancelCompleted.add(1);
+        appointmentProjectionLifecycleCompleted.add(1);
+    } else {
+        appointmentProjectionLifecycleSkippedRate.add(1);
+    }
+
     sleep(1);
 }

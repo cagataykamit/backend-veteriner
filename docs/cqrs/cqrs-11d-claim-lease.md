@@ -74,12 +74,18 @@ Rollout sırasında:
 
 Tarihî, zaten `ProcessedAtUtc` dolu processed satırların `AppointmentId` / `AppointmentSequence` alanlarının null kalması sorun değildir; drain-first migration varsayımıyla bu satırlar claim sorgusuna girmeyecektir. Risk yalnızca migration sonrası üretilen **yeni pending** appointment event’lerinin metadata’sız yazılmasıdır.
 
-## Henüz uygulanmayan (11D-2B+)
+## Henüz uygulanmayan (11D-3+)
 
-- Claim kolonları, `ClaimToken`, worker ID
-- Atomik claim SQL / lease expiry
-- Multi-instance processor
+- Multi-instance production enable
 - `LastAppliedAppointmentSequence` (Query read model)
+
+## 11D-3: İki instance acceptance
+
+LoadTest ortamında iki API instance ile claim path doğrulaması: [cqrs-11d-two-instance-acceptance.md](./cqrs-11d-two-instance-acceptance.md)
+
+```powershell
+.\tests\load\tools\Invoke-CqrsTwoInstanceAcceptance.ps1 -PrimaryBaseUrl https://localhost:7173 -SecondaryBaseUrl https://localhost:7174 -Apply
+```
 
 ## Transaction atomikliği
 

@@ -230,7 +230,9 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
             deadLetteredCount,
             batchSize,
             oldestPendingCreatedAtUtc,
-            claimBatchCompleted: true);
+            claimBatchCompleted: true,
+            workerId: workerId,
+            claimedCount: claimed.Count);
 
         return processedCount;
     }
@@ -327,7 +329,9 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         int deadLetteredCount,
         int batchSize,
         DateTime? oldestPendingCreatedAtUtc,
-        bool claimBatchCompleted)
+        bool claimBatchCompleted,
+        string? workerId = null,
+        int claimedCount = 0)
     {
         if (processedCount == 0 && failedCount == 0)
             return;
@@ -342,7 +346,9 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         if (claimBatchCompleted)
         {
             _logger.LogInformation(
-                "AppointmentProjectionClaimBatchCompleted ProcessedCount={ProcessedCount} FailedCount={FailedCount} DeadLetteredCount={DeadLetteredCount} DurationMs={DurationMs} BatchSize={BatchSize} OldestPendingAgeMs={OldestPendingAgeMs} ConsumerName={ConsumerName}",
+                "AppointmentProjectionClaimBatchCompleted WorkerId={WorkerId} ClaimedCount={ClaimedCount} ProcessedCount={ProcessedCount} FailedCount={FailedCount} DeadLetteredCount={DeadLetteredCount} DurationMs={DurationMs} BatchSize={BatchSize} OldestPendingAgeMs={OldestPendingAgeMs} ConsumerName={ConsumerName}",
+                workerId ?? string.Empty,
+                claimedCount,
                 processedCount,
                 failedCount,
                 deadLetteredCount,

@@ -13,18 +13,21 @@ public sealed class AppointmentProjectionHealthCheck : IHealthCheck
     private readonly AppointmentProjectionHealthOptions _healthOptions;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly AppointmentProjectionMetricsSnapshotHolder _snapshotHolder;
+    private readonly AppointmentProjectionOptions _projectionOptions;
     private readonly ILogger<AppointmentProjectionHealthCheck> _logger;
 
     public AppointmentProjectionHealthCheck(
         IAppointmentProjectionStatusReader statusReader,
         IOptions<AppointmentProjectionHealthOptions> healthOptions,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        IOptions<AppointmentProjectionOptions> projectionOptions,
         AppointmentProjectionMetricsSnapshotHolder snapshotHolder,
         ILogger<AppointmentProjectionHealthCheck> logger)
     {
         _statusReader = statusReader;
         _healthOptions = healthOptions.Value;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
+        _projectionOptions = projectionOptions.Value;
         _snapshotHolder = snapshotHolder;
         _logger = logger;
     }
@@ -46,7 +49,12 @@ public sealed class AppointmentProjectionHealthCheck : IHealthCheck
 
             LogHealthLevel(evaluation);
 
-            return MapToHealthCheckResult(evaluation);
+            var data = new Dictionary<string, object?>(evaluation.Data)
+            {
+                ["claimingEnabled"] = _projectionOptions.ClaimingEnabled
+            };
+
+            return MapToHealthCheckResult(evaluation, data);
         }
         catch (Exception ex)
         {
@@ -90,7 +98,9 @@ public sealed class AppointmentProjectionHealthCheck : IHealthCheck
         }
     }
 
-    internal static HealthCheckResult MapToHealthCheckResult(AppointmentProjectionHealthEvaluation evaluation)
+    internal static HealthCheckResult MapToHealthCheckResult(
+        AppointmentProjectionHealthEvaluation evaluation,
+        IReadOnlyDictionary<string, object?>? dataOverride = null)
     {
         var status = evaluation.Level switch
         {
@@ -99,10 +109,12 @@ public sealed class AppointmentProjectionHealthCheck : IHealthCheck
             _ => HealthStatus.Unhealthy
         };
 
+        var sourceData = dataOverride ?? evaluation.Data;
+
         return new HealthCheckResult(
             status,
             evaluation.Description,
-            data: evaluation.Data
+            data: sourceData
                 .Where(kvp => kvp.Value is not null)
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!));
     }
