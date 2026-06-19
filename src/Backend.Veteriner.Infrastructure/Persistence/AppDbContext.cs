@@ -206,7 +206,9 @@ public class AppDbContext : DbContext
         //   UserOperationClaimConfiguration
         //   OperationClaimPermissionConfiguration
         // =========================================================
-        b.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        b.ApplyConfigurationsFromAssembly(
+            typeof(AppDbContext).Assembly,
+            type => type.Namespace is null || !type.Namespace.Contains(".Persistence.Query.", StringComparison.Ordinal));
 
         base.OnModelCreating(b);
     }

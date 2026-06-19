@@ -12,6 +12,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Commands.Create;
 
@@ -172,13 +173,24 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
 
         await _appointmentsWrite.AddAsync(appointment, ct);
 
+        var sequence = appointment.AdvanceMutationSequence();
         var current = await _snapshotFactory.CreateAsync(appointment, ct);
         await _eventOutbox.EnqueueAsync(
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, current),
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, sequence, current),
             ct);
 
-        await _appointmentsWrite.SaveChangesAsync(ct);
+        try
+        {
+            await _appointmentsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<Guid>.Failure(
+                "Appointments.ConcurrencyConflict",
+                "Randevu eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
+        }
+
         return Result<Guid>.Success(appointment.Id);
     }
 

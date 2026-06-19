@@ -243,7 +243,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests : IClassFixture<App
             Guid.NewGuid(),
             appointment.ScheduledAtUtc);
         var json = JsonSerializer.Serialize(
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, snapshot),
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, snapshot),
             JsonOptions);
         await buffer.EnqueueAsync(AppointmentIntegrationEventTypes.Created, json);
 

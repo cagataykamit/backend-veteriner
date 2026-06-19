@@ -39,6 +39,11 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         b.Property(x => x.Notes)
             .HasMaxLength(2000);
 
+        b.Property(x => x.MutationSequence)
+            .IsRequired()
+            .HasDefaultValue(0L)
+            .IsConcurrencyToken();
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ScheduledAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ClinicId });

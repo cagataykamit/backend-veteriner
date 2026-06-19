@@ -45,7 +45,10 @@ internal static class AppointmentProjectionTestSupport
         {
             Type = eventType,
             Payload = payload,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            // CQRS-11D drain-first: tarihî / test harness enqueue metadata null kalır.
+            AppointmentId = null,
+            AppointmentSequence = null
         };
 
         commandDb.OutboxMessages.Add(message);

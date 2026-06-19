@@ -323,7 +323,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, snapshot));
+            new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, 1L, snapshot));
 
         (await processor.ProcessBatchAsync(CancellationToken.None)).Should().Be(1);
         (await queryDb.AppointmentReadModels.CountAsync(x => x.AppointmentId == appointmentId)).Should().Be(1);
@@ -355,14 +355,16 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
     {
         await ResetAsync();
         var (clinicId, petId) = await SeedPetAsync();
-        var legacyId = await SeedAppointmentDirectAsync(clinicId, petId, SlotAlignedUtcPlusDays(1));
+        var legacyWhen = SlotAlignedUtcPlusDays(1);
+        var legacyId = await SeedAppointmentDirectAsync(clinicId, petId, legacyWhen);
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var rebuild = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionRebuildService>();
         (await rebuild.RebuildAsync(500, CancellationToken.None)).CommandAppointmentCount.Should().BeGreaterThan(0);
 
         var client = await CreateAuthenticatedClientAsync();
-        var newId = await CreateAppointmentViaApiAsync(client, clinicId, petId, SlotAlignedUtcPlusDays(3));
+        var newWhen = DistinctSlotAlignedUtc(legacyWhen, startDaysOffset: 7);
+        var newId = await CreateAppointmentViaApiAsync(client, clinicId, petId, newWhen);
         await ProcessAllPendingAsync();
 
         await EventualConsistencyTestSupport.EventuallyAsync(
@@ -481,6 +483,18 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         while (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday)
             date = date.AddDays(1);
         return date.AddHours(9);
+    }
+
+    private static DateTime DistinctSlotAlignedUtc(DateTime avoid, int startDaysOffset)
+    {
+        for (var days = startDaysOffset; days <= startDaysOffset + 30; days++)
+        {
+            var candidate = SlotAlignedUtcPlusDays(days);
+            if (candidate != avoid)
+                return candidate;
+        }
+
+        throw new InvalidOperationException("Distinct appointment slot could not be resolved for integration test.");
     }
 }
 

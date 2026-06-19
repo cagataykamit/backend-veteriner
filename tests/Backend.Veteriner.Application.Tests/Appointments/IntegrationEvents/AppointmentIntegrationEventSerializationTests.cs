@@ -14,6 +14,7 @@ public sealed class AppointmentIntegrationEventSerializationTests
         var original = new AppointmentCreatedIntegrationEvent(
             Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
             new DateTime(2026, 6, 16, 10, 30, 0, DateTimeKind.Utc),
+            1L,
             CreateSnapshot(
                 appointmentId: Guid.Parse("11111111-2222-3333-4444-555555555555"),
                 notes: "Kontrol randevusu",
@@ -45,6 +46,7 @@ public sealed class AppointmentIntegrationEventSerializationTests
         var original = new AppointmentUpdatedIntegrationEvent(
             Guid.Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
             new DateTime(2026, 6, 16, 8, 15, 0, DateTimeKind.Utc),
+            2L,
             previous,
             current);
 
@@ -74,6 +76,7 @@ public sealed class AppointmentIntegrationEventSerializationTests
         var original = new AppointmentRescheduledIntegrationEvent(
             Guid.NewGuid(),
             DateTime.UtcNow,
+            3L,
             previous,
             current);
 

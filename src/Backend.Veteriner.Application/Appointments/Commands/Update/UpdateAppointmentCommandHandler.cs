@@ -10,6 +10,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Commands.Update;
 
@@ -138,6 +139,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         }
 
         var previous = await _snapshotFactory.CreateAsync(appointment, ct);
+        var sequenceBefore = appointment.MutationSequence;
 
         var domain = appointment.ApplyWriteUpdate(
             request.Status,
@@ -150,17 +152,35 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
 
-        var referencesChanged = previous.ClinicId != clinicId || previous.PetId != request.PetId;
-        var current = referencesChanged
-            ? await _snapshotFactory.CreateAsync(appointment, ct)
-            : _snapshotFactory.CreateScalarsFromPrevious(appointment, previous);
+        if (appointment.MutationSequence != sequenceBefore)
+        {
+            var referencesChanged = previous.ClinicId != clinicId || previous.PetId != request.PetId;
+            var current = referencesChanged
+                ? await _snapshotFactory.CreateAsync(appointment, ct)
+                : _snapshotFactory.CreateScalarsFromPrevious(appointment, previous);
 
-        await _eventOutbox.EnqueueAsync(
-            AppointmentIntegrationEventTypes.Updated,
-            new AppointmentUpdatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current),
-            ct);
+            await _eventOutbox.EnqueueAsync(
+                AppointmentIntegrationEventTypes.Updated,
+                new AppointmentUpdatedIntegrationEvent(
+                    Guid.NewGuid(),
+                    DateTime.UtcNow,
+                    appointment.MutationSequence,
+                    previous,
+                    current),
+                ct);
+        }
 
-        await _appointmentsWrite.SaveChangesAsync(ct);
+        try
+        {
+            await _appointmentsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(
+                "Appointments.ConcurrencyConflict",
+                "Randevu eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
+        }
+
         return Result.Success();
     }
 

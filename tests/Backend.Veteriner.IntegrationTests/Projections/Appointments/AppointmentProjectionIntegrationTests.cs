@@ -49,7 +49,7 @@ public sealed class AppointmentProjectionIntegrationTests
         var snapshot = AppointmentProjectionTestSupport.CreateSnapshot(
             appointmentId, tenantId, clinicId, petId, clientId, scheduledAtUtc);
 
-        var integrationEvent = new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, snapshot);
+        var integrationEvent = new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, 1L, snapshot);
         var outbox = await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb, AppointmentIntegrationEventTypes.Created, integrationEvent);
 
@@ -99,7 +99,7 @@ public sealed class AppointmentProjectionIntegrationTests
 
         var snapshot = AppointmentProjectionTestSupport.CreateSnapshot(
             appointmentId, tenantId, clinicId, petId, clientId, scheduledAtUtc);
-        var integrationEvent = new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, snapshot);
+        var integrationEvent = new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, 1L, snapshot);
 
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb, AppointmentIntegrationEventTypes.Created, integrationEvent);
@@ -147,7 +147,7 @@ public sealed class AppointmentProjectionIntegrationTests
             clientEmail: "search@example.com",
             clientPhoneNormalized: "905551112233");
 
-        var integrationEvent = new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, snapshot);
+        var integrationEvent = new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, 1L, snapshot);
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb, AppointmentIntegrationEventTypes.Created, integrationEvent);
 
@@ -181,7 +181,7 @@ public sealed class AppointmentProjectionIntegrationTests
 
         var snapshot = AppointmentProjectionTestSupport.CreateSnapshot(
             appointmentId, tenantId, clinicId, petId, clientId, scheduledAtUtc);
-        var integrationEvent = new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, snapshot);
+        var integrationEvent = new AppointmentCreatedIntegrationEvent(eventId, DateTime.UtcNow, 1L, snapshot);
 
         queryDb.AppointmentReadModels.Add(new AppointmentReadModel
         {
@@ -245,12 +245,12 @@ public sealed class AppointmentProjectionIntegrationTests
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous));
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous));
 
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Rescheduled,
-            new AppointmentRescheduledIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current));
+            new AppointmentRescheduledIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous, current));
 
         await processor.ProcessBatchAsync(CancellationToken.None);
 
@@ -292,12 +292,12 @@ public sealed class AppointmentProjectionIntegrationTests
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous));
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous));
 
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Rescheduled,
-            new AppointmentRescheduledIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current));
+            new AppointmentRescheduledIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous, current));
 
         await processor.ProcessBatchAsync(CancellationToken.None);
 
@@ -347,12 +347,12 @@ public sealed class AppointmentProjectionIntegrationTests
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous));
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous));
 
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Updated,
-            new AppointmentUpdatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current));
+            new AppointmentUpdatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous, current));
 
         await processor.ProcessBatchAsync(CancellationToken.None);
 
@@ -399,12 +399,12 @@ public sealed class AppointmentProjectionIntegrationTests
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous));
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous));
 
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Cancelled,
-            new AppointmentCancelledIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current));
+            new AppointmentCancelledIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous, current));
 
         await processor.ProcessBatchAsync(CancellationToken.None);
 
@@ -445,12 +445,12 @@ public sealed class AppointmentProjectionIntegrationTests
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous));
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous));
 
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Completed,
-            new AppointmentCompletedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current));
+            new AppointmentCompletedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, previous, current));
 
         await processor.ProcessBatchAsync(CancellationToken.None);
 
@@ -568,7 +568,7 @@ public sealed class AppointmentProjectionIntegrationTests
         var adapter = scope.ServiceProvider.GetRequiredService<IAppointmentIntegrationEventOutbox>();
         await adapter.EnqueueAsync(
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, snapshot));
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, snapshot));
         await commandDb.SaveChangesAsync();
 
         var messages = await commandDb.OutboxMessages.AsNoTracking().Select(m => m.Type).ToListAsync();

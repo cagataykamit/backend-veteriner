@@ -59,6 +59,7 @@ public sealed class AppointmentIntegrationEventInfrastructureTests : IClassFixtu
         var integrationEvent = new AppointmentCreatedIntegrationEvent(
             Guid.NewGuid(),
             DateTime.UtcNow,
+            1L,
             CreateSnapshot());
 
         await adapter.EnqueueAsync(AppointmentIntegrationEventTypes.Created, integrationEvent);
@@ -66,6 +67,8 @@ public sealed class AppointmentIntegrationEventInfrastructureTests : IClassFixtu
         var batch = buffer.Drain();
         batch.Should().ContainSingle();
         batch[0].Type.Should().Be(AppointmentIntegrationEventTypes.Created);
+        batch[0].AppointmentId.Should().Be(integrationEvent.AppointmentId);
+        batch[0].AppointmentSequence.Should().Be(integrationEvent.AppointmentSequence);
 
         var restored = JsonSerializer.Deserialize<AppointmentCreatedIntegrationEvent>(
             batch[0].Payload,
@@ -82,6 +85,7 @@ public sealed class AppointmentIntegrationEventInfrastructureTests : IClassFixtu
         var integrationEvent = new AppointmentCreatedIntegrationEvent(
             Guid.NewGuid(),
             DateTime.UtcNow,
+            1L,
             CreateSnapshot());
 
         var act = () => adapter.EnqueueAsync("appointment.unknown.v1", integrationEvent);
@@ -98,6 +102,7 @@ public sealed class AppointmentIntegrationEventInfrastructureTests : IClassFixtu
         var integrationEvent = new AppointmentCreatedIntegrationEvent(
             Guid.NewGuid(),
             DateTime.UtcNow,
+            1L,
             CreateSnapshot());
 
         var tooLong = new string('a', AppointmentIntegrationEventTypes.MaxTypeLength + 1);

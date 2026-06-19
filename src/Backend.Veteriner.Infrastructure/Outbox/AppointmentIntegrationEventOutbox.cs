@@ -43,7 +43,29 @@ public sealed class AppointmentIntegrationEventOutbox : IAppointmentIntegrationE
                 nameof(integrationEvent));
         }
 
+        Guid? appointmentId = null;
+        long? appointmentSequence = null;
+        if (integrationEvent is IAppointmentOrderedIntegrationEvent ordered)
+        {
+            if (ordered.AppointmentId == Guid.Empty)
+            {
+                throw new ArgumentException(
+                    "Appointment integration events require a non-empty AppointmentId.",
+                    nameof(integrationEvent));
+            }
+
+            if (ordered.AppointmentSequence <= 0)
+            {
+                throw new ArgumentException(
+                    "Appointment integration events require AppointmentSequence > 0.",
+                    nameof(integrationEvent));
+            }
+
+            appointmentId = ordered.AppointmentId;
+            appointmentSequence = ordered.AppointmentSequence;
+        }
+
         var payload = JsonSerializer.Serialize(integrationEvent, typeof(TEvent), JsonOptions);
-        await _buffer.EnqueueAsync(eventType, payload, ct);
+        await _buffer.EnqueueAsync(eventType, payload, ct, appointmentId, appointmentSequence);
     }
 }

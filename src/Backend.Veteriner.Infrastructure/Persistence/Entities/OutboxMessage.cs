@@ -58,4 +58,10 @@ public sealed class OutboxMessage
     /// Orijinal iste�in izleme kimli�i (OpenTelemetry ActivityTraceId)
     /// </summary>
     public string? TraceId { get; set; }
+
+    /// <summary>Appointment integration event'leri için sıralama anahtarı (nullable — diğer outbox tipleri).</summary>
+    public Guid? AppointmentId { get; set; }
+
+    /// <summary>Appointment mutation sequence; projection ordering için.</summary>
+    public long? AppointmentSequence { get; set; }
 }

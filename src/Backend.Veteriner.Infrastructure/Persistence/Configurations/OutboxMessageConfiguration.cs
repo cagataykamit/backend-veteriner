@@ -23,5 +23,10 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
         e.HasIndex(x => new { x.NextAttemptAtUtc, x.CreatedAtUtc })
             .HasDatabaseName("IX_OutboxMessages_Pending_NextAttemptAtUtc_CreatedAtUtc")
             .HasFilter("[ProcessedAtUtc] IS NULL AND [DeadLetterAtUtc] IS NULL");
+
+        e.HasIndex(x => new { x.AppointmentId, x.AppointmentSequence })
+            .HasDatabaseName("IX_OutboxMessages_AppointmentId_AppointmentSequence")
+            .IsUnique()
+            .HasFilter("[AppointmentId] IS NOT NULL AND [AppointmentSequence] IS NOT NULL");
     }
 }

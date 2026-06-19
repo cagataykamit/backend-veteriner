@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Commands.Complete;
 
@@ -58,10 +59,25 @@ public sealed class CompleteAppointmentCommandHandler : IRequestHandler<Complete
         var current = _snapshotFactory.CreateScalarsFromPrevious(appointment, previous);
         await _eventOutbox.EnqueueAsync(
             AppointmentIntegrationEventTypes.Completed,
-            new AppointmentCompletedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current),
+            new AppointmentCompletedIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                appointment.MutationSequence,
+                previous,
+                current),
             ct);
 
-        await _appointmentsWrite.SaveChangesAsync(ct);
+        try
+        {
+            await _appointmentsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(
+                "Appointments.ConcurrencyConflict",
+                "Randevu eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
+        }
+
         return Result.Success();
     }
 }

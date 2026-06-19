@@ -1,11 +1,9 @@
-// src/Backend.Veteriner.Infrastructure/Outbox/OutboxBuffer.cs
-using System.Collections.Concurrent;
 using Backend.Veteriner.Application.Common.Outbox;
 using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Infrastructure.Outbox;
 
-/// Scoped: Her HTTP iste�i i�in 1 instance
+/// Scoped: Her HTTP isteği için 1 instance
 public sealed class OutboxBuffer : IOutboxBuffer
 {
     private readonly List<OutboxEnvelope> _items = new();
@@ -13,15 +11,26 @@ public sealed class OutboxBuffer : IOutboxBuffer
 
     public OutboxBuffer(ILogger<OutboxBuffer> logger) => _logger = logger;
 
-    public Task EnqueueAsync(string type, string payload, CancellationToken ct = default)
+    public Task EnqueueAsync(
+        string type,
+        string payload,
+        CancellationToken ct = default,
+        Guid? appointmentId = null,
+        long? appointmentSequence = null)
     {
-        // basit guard
         if (string.IsNullOrWhiteSpace(type)) throw new ArgumentException("type required", nameof(type));
         if (payload is null) throw new ArgumentNullException(nameof(payload));
 
-        _items.Add(new OutboxEnvelope { Type = type, Payload = payload });
-        _logger.LogDebug("OutboxBuffer: Enqueued Type={Type}, Len={Len}, Count={Count}",
-            type, payload.Length, _items.Count);
+        _items.Add(new OutboxEnvelope
+        {
+            Type = type,
+            Payload = payload,
+            AppointmentId = appointmentId,
+            AppointmentSequence = appointmentSequence
+        });
+        _logger.LogDebug(
+            "OutboxBuffer: Enqueued Type={Type}, Len={Len}, Count={Count}, AppointmentId={AppointmentId}, AppointmentSequence={AppointmentSequence}",
+            type, payload.Length, _items.Count, appointmentId, appointmentSequence);
 
         return Task.CompletedTask;
     }

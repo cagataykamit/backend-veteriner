@@ -50,7 +50,7 @@ public sealed class AppointmentProjectionMonitoringIntegrationTests
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
             new DateTime(2026, 6, 16, 11, 0, 0, DateTimeKind.Utc));
 
-        var integrationEvent = new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, snapshot);
+        var integrationEvent = new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, snapshot);
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb, AppointmentIntegrationEventTypes.Created, integrationEvent);
 

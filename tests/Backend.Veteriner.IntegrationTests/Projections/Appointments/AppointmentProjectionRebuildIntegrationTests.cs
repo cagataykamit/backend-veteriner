@@ -255,6 +255,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
             new AppointmentCreatedIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
+                1L,
                 AppointmentProjectionTestSupport.CreateSnapshot(
                     appointmentId,
                     context.TenantId,

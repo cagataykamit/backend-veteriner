@@ -8,6 +8,7 @@ using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Commands.Reschedule;
 
@@ -132,10 +133,25 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         var current = _snapshotFactory.CreateScalarsFromPrevious(appointment, previous);
         await _eventOutbox.EnqueueAsync(
             AppointmentIntegrationEventTypes.Rescheduled,
-            new AppointmentRescheduledIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, previous, current),
+            new AppointmentRescheduledIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                appointment.MutationSequence,
+                previous,
+                current),
             ct);
 
-        await _appointmentsWrite.SaveChangesAsync(ct);
+        try
+        {
+            await _appointmentsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(
+                "Appointments.ConcurrencyConflict",
+                "Randevu eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
+        }
+
         return Result.Success();
     }
 

@@ -58,7 +58,9 @@ public sealed class OutboxSaveChangesInterceptor : SaveChangesInterceptor
                 Payload = item.Payload ?? string.Empty,
                 CreatedAtUtc = now,
                 RetryCount = 0,
-                NextAttemptAtUtc = now
+                NextAttemptAtUtc = now,
+                AppointmentId = item.AppointmentId,
+                AppointmentSequence = item.AppointmentSequence
             });
         }
 

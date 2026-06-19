@@ -42,6 +42,7 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests
             new AppointmentCreatedIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
+                1L,
                 snapshot));
 
         await EventualConsistencyTestSupport.EventuallyAsync(
@@ -84,7 +85,7 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests
         await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, createSnapshot));
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, createSnapshot));
 
         var rescheduleSnapshot = AppointmentProjectionTestSupport.WithSchedule(
             createSnapshot, rescheduleTime, (int)AppointmentStatus.Scheduled);
@@ -95,6 +96,7 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests
             new AppointmentRescheduledIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
+                1L,
                 createSnapshot,
                 rescheduleSnapshot));
 

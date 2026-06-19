@@ -99,7 +99,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
                 null);
 
             var payload = JsonSerializer.Serialize(
-                new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, snapshot),
+                new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, snapshot),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
             var message = new OutboxMessage

@@ -22,6 +22,12 @@ public sealed class Appointment : AggregateRoot
     public AppointmentStatus Status { get; private set; }
     public string? Notes { get; private set; }
 
+    /// <summary>
+    /// Başarılı domain mutasyon sayacı; optimistic concurrency token.
+    /// Yeni kayıt 0 ile başlar; ilk başarılı mutasyon 1 üretir.
+    /// </summary>
+    public long MutationSequence { get; private set; }
+
     /// <summary>UTC bitiş zamanı; <see cref="ScheduledAtUtc"/> + <see cref="DurationMinutes"/>.</summary>
     public DateTime ScheduledEndUtc => ScheduledAtUtc.AddMinutes(DurationMinutes);
 
@@ -66,6 +72,17 @@ public sealed class Appointment : AggregateRoot
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
 
+    /// <summary>Başarılı domain mutasyonundan sonra tam bir kez çağrılır.</summary>
+    public long AdvanceMutationSequence()
+    {
+        checked
+        {
+            MutationSequence++;
+        }
+
+        return MutationSequence;
+    }
+
     /// <summary>Yalnızca <see cref="AppointmentStatus.Scheduled"/> iken iptal.</summary>
     public Result Cancel(string? cancellationReason = null)
     {
@@ -83,6 +100,7 @@ public sealed class Appointment : AggregateRoot
             Notes = string.IsNullOrWhiteSpace(Notes) ? line : $"{Notes}\n{line}";
         }
 
+        AdvanceMutationSequence();
         return Result.Success();
     }
 
@@ -97,6 +115,7 @@ public sealed class Appointment : AggregateRoot
         }
 
         Status = AppointmentStatus.Completed;
+        AdvanceMutationSequence();
         return Result.Success();
     }
 
@@ -111,6 +130,7 @@ public sealed class Appointment : AggregateRoot
         }
 
         ScheduledAtUtc = NormalizeUtc(scheduledAtUtc);
+        AdvanceMutationSequence();
         return Result.Success();
     }
 
@@ -149,6 +169,7 @@ public sealed class Appointment : AggregateRoot
         DurationMinutes = durationMinutes;
         AppointmentType = appointmentType;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        AdvanceMutationSequence();
         return Result.Success();
     }
 
