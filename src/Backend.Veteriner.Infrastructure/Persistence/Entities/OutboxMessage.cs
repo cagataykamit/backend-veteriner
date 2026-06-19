@@ -64,4 +64,16 @@ public sealed class OutboxMessage
 
     /// <summary>Appointment mutation sequence; projection ordering için.</summary>
     public long? AppointmentSequence { get; set; }
+
+    /// <summary>Claim eden worker kimliği (process-scoped; max 128 karakter).</summary>
+    public string? ClaimedBy { get; set; }
+
+    /// <summary>Atomik claim fence token; completion/retry/dead-letter güncellemelerinde doğrulanır.</summary>
+    public Guid? ClaimToken { get; set; }
+
+    /// <summary>Claim anı (UTC).</summary>
+    public DateTime? ClaimedAtUtc { get; set; }
+
+    /// <summary>Lease bitiş zamanı (UTC); süresi dolunca başka worker reclaim edebilir.</summary>
+    public DateTime? LeaseExpiresAtUtc { get; set; }
 }

@@ -4,6 +4,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Backend.Veteriner.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260619030911_AddOutboxClaimLeaseColumns")]
+    partial class AddOutboxClaimLeaseColumns
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2063,8 +2066,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("AppointmentId", "AppointmentSequence")
                         .IsUnique()
-                        .HasDatabaseName("IX_OutboxMessages_AppointmentId_AppointmentSequence")
-                        .HasFilter("[AppointmentId] IS NOT NULL AND [AppointmentSequence] IS NOT NULL");
+                        .HasDatabaseName("IX_OutboxMessages_AppointmentId_AppointmentSequence_Pending")
+                        .HasFilter("[ProcessedAtUtc] IS NULL AND [AppointmentId] IS NOT NULL AND [AppointmentSequence] IS NOT NULL");
 
                     b.HasIndex("NextAttemptAtUtc", "CreatedAtUtc")
                         .HasDatabaseName("IX_OutboxMessages_Pending_NextAttemptAtUtc_CreatedAtUtc")

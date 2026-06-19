@@ -66,6 +66,8 @@ public static class DependencyInjection
         services.Configure<OutboxOptions>(configuration.GetSection("Outbox"));
         services.Configure<AppointmentProjectionOptions>(
             configuration.GetSection(AppointmentProjectionOptions.SectionName));
+        services.AddSingleton<IValidateOptions<AppointmentProjectionOptions>, AppointmentProjectionOptionsValidator>();
+        services.AddOptions<AppointmentProjectionOptions>().ValidateOnStart();
         services.Configure<QueryReadModelsOptions>(
             configuration.GetSection(QueryReadModelsOptions.SectionName));
         services.Configure<AppointmentProjectionHealthOptions>(
@@ -169,6 +171,8 @@ public static class DependencyInjection
 
         services.AddScoped<IAppointmentProjectionSnapshotFactory, AppointmentProjectionSnapshotFactory>();
         services.AddScoped<IAppointmentProjectionProcessor, AppointmentProjectionProcessor>();
+        services.AddScoped<IAppointmentOutboxClaimRepository, SqlAppointmentOutboxClaimRepository>();
+        services.AddSingleton<IAppointmentProjectionWorkerIdentity, AppointmentProjectionWorkerIdentity>();
         services.AddScoped<IAppointmentProjectionRebuildService, AppointmentProjectionRebuildService>();
         services.AddScoped<IAppointmentProjectionStatusReader, AppointmentProjectionStatusReader>();
         services.AddScoped<IQueryDatabaseStatusReader, QueryDatabaseStatusReader>();
