@@ -201,6 +201,9 @@ public static class DependencyInjection
         services.AddScoped<IClientProjectionStatusReader, ClientProjectionStatusReader>();
         services.AddScoped<IClientReadModelParityReader, ClientReadModelParityReader>();
 
+        // ===== Client read-model backfill / rebuild (CQRS-12B-6) =====
+        services.AddScoped<IClientReadModelBackfillService, ClientReadModelBackfillService>();
+
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));
         services.AddHostedService<RefreshTokenCleanupHostedService>();

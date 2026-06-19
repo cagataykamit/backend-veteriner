@@ -115,16 +115,18 @@ Read path geri alma sırası (en hızlıdan):
 `ClientProjection__Enabled=true` bırakmak tercih edilir; projector kapatılırsa Query DB geride kalır
 ve flag tekrar açılmadan önce **backfill** (12B-6) gerekebilir.
 
-## Backfill neden bu fazda yapılmadı
+## Backfill (CQRS-12B-6 ile eklendi)
 
 Mevcut/legacy client satırları read-model'e ancak yeni create/update event'leriyle yansır. Var olan
-satırlar için **toplu backfill/rebuild** ayrı bir konudur (CQRS-12B-6). Bu yüzden:
+satırlar için **toplu backfill/rebuild** CQRS-12B-6 ile eklendi (bkz.
+[`cqrs-12b-6-client-read-model-backfill.md`](cqrs-12b-6-client-read-model-backfill.md)). Bu yüzden:
 
 - Canlı ortamda `ClientReadModels` boş/eksikken `ClientsEnabled=true` açılırsa parity **fail eder** ve
   liste eksik döner — bu beklenen durumdur, fallback **yoktur**.
 - `ClientReadModelParityIntegrationTests` "read-model geride" senaryosu bu durumu deterministik olarak
   belgeler.
-- Üretimde flag açmadan önce 12B-6 backfill çalıştırılmalı ve parity in-sync doğrulanmalıdır.
+- Üretimde flag açmadan **önce** 12B-6 backfill (`backfill-client-projections`) çalıştırılmalı ve
+  parity in-sync doğrulanmalıdır.
 
 ## Garanti
 

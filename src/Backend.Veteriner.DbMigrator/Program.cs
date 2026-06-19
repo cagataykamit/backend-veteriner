@@ -3,6 +3,7 @@ using Backend.Veteriner.Infrastructure;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
+using Backend.Veteriner.Infrastructure.Projections.Clients;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -109,6 +110,56 @@ try
                     result.Duration.TotalSeconds);
                 break;
             }
+        case "backfill-client-projections":
+            {
+                var batchSize = ClientReadModelBackfillService.DefaultBatchSize;
+                Guid? tenantId = null;
+                for (var i = 1; i < args.Length; i++)
+                {
+                    if (args[i] == "--batch-size"
+                        && i + 1 < args.Length
+                        && int.TryParse(args[i + 1], out var parsedBatchSize))
+                    {
+                        batchSize = Math.Max(1, parsedBatchSize);
+                        i++;
+                    }
+                    else if (args[i] == "--tenant"
+                        && i + 1 < args.Length
+                        && Guid.TryParse(args[i + 1], out var parsedTenant))
+                    {
+                        tenantId = parsedTenant;
+                        i++;
+                    }
+                }
+
+                var backfill = sp.GetRequiredService<IClientReadModelBackfillService>();
+                var result = await backfill.BackfillAsync(tenantId, batchSize, CancellationToken.None);
+
+                Console.WriteLine("Client read-model backfill completed successfully.");
+                Console.WriteLine($"  Scope tenant         : {(result.ScopeTenantId?.ToString() ?? "<all tenants>")}");
+                Console.WriteLine($"  Command clients      : {result.CommandClientCount}");
+                Console.WriteLine($"  Query clients        : {result.QueryClientCount}");
+                Console.WriteLine($"  Inserted             : {result.InsertedCount}");
+                Console.WriteLine($"  Updated              : {result.UpdatedCount}");
+                Console.WriteLine($"  Skipped (stale)      : {result.SkippedStaleCount}");
+                Console.WriteLine($"  Parity in-sync       : {result.ParityInSync}");
+                Console.WriteLine($"  Duration             : {result.Duration.TotalSeconds:F2}s");
+                logger.LogInformation(
+                    "Client read-model backfill completed. Command={Command} Query={Query} ParityInSync={ParityInSync} DurationSec={DurationSec}",
+                    result.CommandClientCount,
+                    result.QueryClientCount,
+                    result.ParityInSync,
+                    result.Duration.TotalSeconds);
+
+                if (!result.ParityInSync)
+                {
+                    Console.Error.WriteLine(
+                        "UYARI: Backfill sonrası parity in-sync değil. ClientsEnabled açmadan önce parity'yi doğrulayın.");
+                    return 2;
+                }
+
+                break;
+            }
         default:
             Console.Error.WriteLine($"Unknown command: {args[0]}");
             PrintHelp();
@@ -158,6 +209,8 @@ static void PrintHelp()
           loadtest-seed  — yük testi sentetik veri (yalnızca VetinityCommandDb_LoadTest command DB; profil: small)
           rebuild-appointment-projections — Command DB randevularından Query read-model yeniden oluştur
                                             (--batch-size 1000 opsiyonel)
+          backfill-client-projections     — Command DB client'larından Query ClientReadModels idempotent doldur
+                                            (--batch-size 500 ve --tenant <guid> opsiyonel)
 
         Load test ortamı (DOTNET_ENVIRONMENT=LoadTest):
           Command DB : VetinityCommandDb_LoadTest  (DefaultConnection / migrate / loadtest-seed)
@@ -170,6 +223,8 @@ static void PrintHelp()
           dotnet run --project src/Backend.Veteriner.DbMigrator -- migrate-query
           dotnet run --project src/Backend.Veteriner.DbMigrator -- loadtest-seed small
           dotnet run --project src/Backend.Veteriner.DbMigrator -- rebuild-appointment-projections --batch-size 1000
+          dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-client-projections --batch-size 500
+          dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-client-projections --tenant 00000000-0000-0000-0000-000000000000
 
         Bağlantı: ConnectionStrings:DefaultConnection (command), ConnectionStrings:QueryConnection (query).
         Şema için alternatif: dotnet ef database update --project src/Backend.Veteriner.Infrastructure --startup-project src/Backend.Veteriner.Api

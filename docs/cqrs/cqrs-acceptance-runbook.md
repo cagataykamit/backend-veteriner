@@ -224,5 +224,12 @@ detayları için bkz. [`cqrs-12b-5-client-read-model-health-parity-smoke.md`](cq
   veya SQL `COUNT_BIG`). Client'ta silme yoktur → tüm event'ler işlendiğinde in-sync.
 - **Rollback:** `QueryReadModels__ClientsEnabled=false` → restart → health → parity. Projector açık
   kalır.
-- **Backfill:** Mevcut client satırları için toplu backfill **CQRS-12B-6** konusudur; bu yapılmadan
-  `ClientsEnabled=true` açılırsa parity fail eder ve liste eksik döner (fallback yok).
+- **Backfill:** Mevcut client satırlarını Query `ClientReadModels`'e idempotent dolduran backfill
+  **CQRS-12B-6** ile eklendi (bkz. [`cqrs-12b-6-client-read-model-backfill.md`](cqrs-12b-6-client-read-model-backfill.md)).
+  `ClientsEnabled=true` açmadan **önce** çalıştırılmalı ve parity in-sync doğrulanmalıdır; aksi halde
+  liste eksik döner (fallback yok).
+
+  ```text
+  dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-client-projections
+  dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-client-projections --tenant <guid>
+  ```
