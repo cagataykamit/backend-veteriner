@@ -14,6 +14,8 @@ using Backend.Veteriner.Infrastructure.Outbox;                                  
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Projections.Clients;
 using Backend.Veteriner.Infrastructure.Query.Appointments;
+using Backend.Veteriner.Infrastructure.Query.Clients;
+using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Projections.Appointments;
 using Backend.Veteriner.Application.Projections.Clients;
 using Backend.Veteriner.Infrastructure.Persistence.Query;
@@ -189,6 +191,9 @@ public static class DependencyInjection
         // ===== Client projection (CQRS-12B-3) =====
         services.AddScoped<IClientProjectionProcessor, ClientProjectionProcessor>();
         services.AddHostedService<ClientProjectionHostedService>();
+
+        // ===== Client query read-model reader (CQRS-12B-4) =====
+        services.AddScoped<IClientReadModelReader, ClientReadModelReader>();
 
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));

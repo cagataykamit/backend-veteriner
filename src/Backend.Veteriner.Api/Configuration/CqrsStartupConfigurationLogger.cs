@@ -27,11 +27,12 @@ internal static class CqrsStartupConfigurationLogger
         var queryConnection = configuration.GetConnectionString("QueryConnection");
 
         logger.LogInformation(
-            "CQRS startup configuration. Environment={Environment} ProjectionEnabled={ProjectionEnabled} AppointmentsQueryReadEnabled={AppointmentsQueryReadEnabled} DashboardQueryReadEnabled={DashboardQueryReadEnabled} CommandDbCatalog={CommandDbCatalog} QueryDbCatalog={QueryDbCatalog}",
+            "CQRS startup configuration. Environment={Environment} ProjectionEnabled={ProjectionEnabled} AppointmentsQueryReadEnabled={AppointmentsQueryReadEnabled} DashboardQueryReadEnabled={DashboardQueryReadEnabled} ClientsQueryReadEnabled={ClientsQueryReadEnabled} CommandDbCatalog={CommandDbCatalog} QueryDbCatalog={QueryDbCatalog}",
             app.Environment.EnvironmentName,
             projectionOptions.Enabled,
             queryReadModels.AppointmentsEnabled,
             queryReadModels.DashboardAppointmentsEnabled,
+            queryReadModels.ClientsEnabled,
             TryGetDatabaseCatalog(commandConnection),
             TryGetDatabaseCatalog(queryConnection));
     }

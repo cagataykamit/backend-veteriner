@@ -1,10 +1,13 @@
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetList;
+using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Domain.Clients;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Clients.Handlers;
@@ -13,9 +16,14 @@ public sealed class GetClientsListQueryHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IClientReadModelReader> _readModelReader = new();
 
     private GetClientsListQueryHandler CreateHandler()
-        => new(_tenantContext.Object, _clients.Object);
+        => new(
+            _tenantContext.Object,
+            _clients.Object,
+            _readModelReader.Object,
+            Options.Create(new QueryReadModelsOptions { ClientsEnabled = false }));
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
