@@ -13,6 +13,7 @@ public sealed class QueryDbContext : DbContext
     public QueryDbContext(DbContextOptions<QueryDbContext> options) : base(options) { }
 
     public DbSet<AppointmentReadModel> AppointmentReadModels => Set<AppointmentReadModel>();
+    public DbSet<ClientReadModel> ClientReadModels => Set<ClientReadModel>();
     public DbSet<ClinicPetActivityReadModel> ClinicPetActivityReadModels => Set<ClinicPetActivityReadModel>();
     public DbSet<ClinicClientActivityReadModel> ClinicClientActivityReadModels => Set<ClinicClientActivityReadModel>();
     public DbSet<ClinicDailyAppointmentStatsReadModel> ClinicDailyAppointmentStatsReadModels =>

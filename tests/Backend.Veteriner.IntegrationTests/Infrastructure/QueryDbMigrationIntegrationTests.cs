@@ -14,6 +14,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
     private static readonly string[] ExpectedQueryTables =
     [
         "AppointmentReadModels",
+        "ClientReadModels",
         "ClinicPetActivityReadModels",
         "ClinicClientActivityReadModels",
         "ClinicDailyAppointmentStatsReadModels",
@@ -61,6 +62,11 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
         appointmentIndexes.Should().Contain("IX_AppointmentReadModels_TenantId_ClinicId_Status_ScheduledAtUtc");
         appointmentIndexes.Should().Contain("IX_AppointmentReadModels_TenantId_PetId");
         appointmentIndexes.Should().Contain("IX_AppointmentReadModels_TenantId_ClientId");
+
+        var clientIndexes = await GetIndexNamesAsync(queryDb, "ClientReadModels");
+        clientIndexes.Should().Contain("IX_ClientReadModels_TenantId_FullNameNormalized_ClientId");
+        clientIndexes.Should().Contain("IX_ClientReadModels_TenantId_PhoneNormalized");
+        clientIndexes.Should().Contain("IX_ClientReadModels_TenantId_Email");
     }
 
     [Fact]

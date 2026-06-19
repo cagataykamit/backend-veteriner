@@ -9,6 +9,7 @@ internal static class QueryReadModelConstraints
     public const int PetName = 200;
     public const int SpeciesName = 200;
     public const int ClientName = 300;
+    public const int ClientNameNormalized = 300;
     public const int ClientPhone = 50;
     public const int ClientPhoneNormalized = 50;
     public const int ClientEmail = 320;
