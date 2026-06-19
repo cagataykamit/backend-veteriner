@@ -2,7 +2,7 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 
 /// <summary>
 /// Client list/search için CQRS query read-model (tenant kapsamlı).
-/// Bu faz yalnızca şema temelidir; projection/event emission ileride eklenecektir.
+/// CQRS-12B-3: Client projection processor bu satırları integration event'lerden upsert eder.
 /// </summary>
 public sealed class ClientReadModel
 {
@@ -16,4 +16,12 @@ public sealed class ClientReadModel
     public DateTime CreatedAtUtc { get; set; }
     public Guid LastEventId { get; set; }
     public DateTime LastProjectedAtUtc { get; set; }
+
+    /// <summary>
+    /// Bu satırı en son güncelleyen integration event'in <c>OccurredAtUtc</c> değeri.
+    /// Client event'lerinde per-aggregate sequence olmadığından stale/out-of-order korumasının
+    /// ordering anahtarıdır: daha eski OccurredAtUtc taşıyan event mevcut veriyi ezmez.
+    /// <see cref="LastProjectedAtUtc"/> (projection wall-clock) ile karıştırılmamalıdır.
+    /// </summary>
+    public DateTime LastEventOccurredAtUtc { get; set; }
 }

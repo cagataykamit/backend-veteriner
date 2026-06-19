@@ -20,6 +20,7 @@ public sealed class ClientReadModelConfiguration : IEntityTypeConfiguration<Clie
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.LastEventId).IsRequired();
         b.Property(x => x.LastProjectedAtUtc).IsRequired();
+        b.Property(x => x.LastEventOccurredAtUtc).IsRequired();
 
         b.HasIndex(x => new { x.TenantId, x.FullNameNormalized, x.ClientId })
             .HasDatabaseName("IX_ClientReadModels_TenantId_FullNameNormalized_ClientId");

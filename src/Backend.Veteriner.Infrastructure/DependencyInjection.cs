@@ -12,8 +12,10 @@ using Backend.Veteriner.Infrastructure.Caching;                                 
 using Backend.Veteriner.Infrastructure.Mailing;                                   // MailKitEmailSender, TransactionalEmailSender, SmtpOptions
 using Backend.Veteriner.Infrastructure.Outbox;                                    // EfOutbox, OutboxProcessor, OutboxOptions, OutboxBuffer, OutboxSaveChangesInterceptor
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
+using Backend.Veteriner.Infrastructure.Projections.Clients;
 using Backend.Veteriner.Infrastructure.Query.Appointments;
 using Backend.Veteriner.Application.Projections.Appointments;
+using Backend.Veteriner.Application.Projections.Clients;
 using Backend.Veteriner.Infrastructure.Persistence.Query;
 using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
@@ -69,6 +71,8 @@ public static class DependencyInjection
             configuration.GetSection(AppointmentProjectionOptions.SectionName));
         services.AddSingleton<IValidateOptions<AppointmentProjectionOptions>, AppointmentProjectionOptionsValidator>();
         services.AddOptions<AppointmentProjectionOptions>().ValidateOnStart();
+        services.Configure<ClientProjectionOptions>(
+            configuration.GetSection(ClientProjectionOptions.SectionName));
         services.Configure<QueryReadModelsOptions>(
             configuration.GetSection(QueryReadModelsOptions.SectionName));
         services.Configure<AppointmentProjectionHealthOptions>(
@@ -181,6 +185,10 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentReadModelReader, AppointmentReadModelReader>();
         services.AddScoped<IDashboardAppointmentReadModelReader, DashboardAppointmentReadModelReader>();
         services.AddHostedService<AppointmentProjectionHostedService>();
+
+        // ===== Client projection (CQRS-12B-3) =====
+        services.AddScoped<IClientProjectionProcessor, ClientProjectionProcessor>();
+        services.AddHostedService<ClientProjectionHostedService>();
 
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));
