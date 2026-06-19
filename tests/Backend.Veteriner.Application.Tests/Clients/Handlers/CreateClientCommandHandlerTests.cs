@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Commands.Create;
+using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -16,9 +17,10 @@ public sealed class CreateClientCommandHandlerTests
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IReadRepository<Client>> _clientsRead = new();
     private readonly Mock<IRepository<Client>> _clientsWrite = new();
+    private readonly Mock<IClientIntegrationEventOutbox> _eventOutbox = new();
 
     private CreateClientCommandHandler CreateHandler()
-        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object);
+        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object);
 
     private static void AlignTenantId(Tenant tenant, Guid id)
         => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);

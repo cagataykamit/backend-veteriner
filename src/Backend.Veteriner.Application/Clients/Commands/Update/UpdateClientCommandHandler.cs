@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -14,17 +15,20 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Client> _clientsRead;
     private readonly IRepository<Client> _clientsWrite;
+    private readonly IClientIntegrationEventOutbox _eventOutbox;
 
     public UpdateClientCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clientsRead,
-        IRepository<Client> clientsWrite)
+        IRepository<Client> clientsWrite,
+        IClientIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
         _clientsRead = clientsRead;
         _clientsWrite = clientsWrite;
+        _eventOutbox = eventOutbox;
     }
 
     public async Task<Result> Handle(UpdateClientCommand request, CancellationToken ct)
@@ -85,6 +89,16 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
 
         client.UpdateDetails(request.FullName, request.Email, request.Phone, request.Address);
         await _clientsWrite.UpdateAsync(client, ct);
+
+        // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
+        await _eventOutbox.EnqueueAsync(
+            ClientIntegrationEventTypes.Updated,
+            new ClientUpdatedIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                ClientProjectionSnapshotFactory.Create(client)),
+            ct);
+
         await _clientsWrite.SaveChangesAsync(ct);
         return Result.Success();
     }

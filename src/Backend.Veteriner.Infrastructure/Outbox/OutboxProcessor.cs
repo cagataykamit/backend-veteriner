@@ -59,9 +59,10 @@ public sealed class OutboxProcessor : BackgroundService
 
                 var now = DateTime.UtcNow;
 
-                // Hazir, islenmemis, dead-letter olmayan mesajlar (appointment integration eventleri SQL'de haric).
+                // Hazir, islenmemis, dead-letter olmayan mesajlar (projection integration eventleri SQL'de haric:
+                // appointment + client; bunlarin kendi dedike projection processor'lari vardir).
                 var batch = await OutboxMessageQueryFilters
-                    .ExcludingAppointmentIntegrationEvents(db.OutboxMessages)
+                    .ExcludingProjectionIntegrationEvents(db.OutboxMessages)
                     .Where(m => m.ProcessedAtUtc == null
                              && m.DeadLetterAtUtc == null
                              && (m.NextAttemptAtUtc == null || m.NextAttemptAtUtc <= now))
@@ -70,7 +71,7 @@ public sealed class OutboxProcessor : BackgroundService
                     .Take(Math.Max(1, _opt.BatchSize))
                     .ToListAsync(stoppingToken);
 
-                batch = batch.Where(m => !AppointmentIntegrationEventTypes.IsKnown(m.Type)).ToList();
+                batch = batch.Where(m => !OutboxMessageQueryFilters.IsProjectionIntegrationEvent(m.Type)).ToList();
 
                 if (batch.Count == 0)
                     continue;

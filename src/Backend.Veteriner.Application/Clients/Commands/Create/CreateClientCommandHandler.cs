@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
+using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -15,17 +16,20 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Client> _clientsRead;
     private readonly IRepository<Client> _clientsWrite;
+    private readonly IClientIntegrationEventOutbox _eventOutbox;
 
     public CreateClientCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clientsRead,
-        IRepository<Client> clientsWrite)
+        IRepository<Client> clientsWrite,
+        IClientIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
         _clientsRead = clientsRead;
         _clientsWrite = clientsWrite;
+        _eventOutbox = eventOutbox;
     }
 
     public async Task<Result<ClientCreatedDto>> Handle(CreateClientCommand request, CancellationToken ct)
@@ -82,6 +86,16 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
 
         var client = new Client(tenantId, request.FullName, request.Phone, request.Email, request.Address);
         await _clientsWrite.AddAsync(client, ct);
+
+        // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
+        await _eventOutbox.EnqueueAsync(
+            ClientIntegrationEventTypes.Created,
+            new ClientCreatedIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                ClientProjectionSnapshotFactory.Create(client)),
+            ct);
+
         await _clientsWrite.SaveChangesAsync(ct);
 
         var dto = new ClientCreatedDto(client.Id, client.TenantId, client.FullName, client.Email, client.Phone);
