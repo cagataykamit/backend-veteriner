@@ -203,3 +203,26 @@ Secret (JWT key, SQL password, connection string, token) **commit edilmez**; tü
 [ ] Secret taraması temiz; token/results .gitignore'da
 [ ] Monitoring alert eşikleri (11C) bağlandı
 ```
+
+---
+
+## 8. Client read-model (CQRS-12B)
+
+Appointment read-model'den **bağımsız** ikinci CQRS read-model. Health/parity/smoke ve rollback
+detayları için bkz. [`cqrs-12b-5-client-read-model-health-parity-smoke.md`](cqrs-12b-5-client-read-model-health-parity-smoke.md).
+
+| Config key | Env override | Etki |
+|------------|--------------|------|
+| `QueryReadModels:ClientsEnabled` | `QueryReadModels__ClientsEnabled` | Client list/search → Query DB read-model (default **false**) |
+| `ClientProjection:Enabled` | `ClientProjection__Enabled` | Client outbox → read model projector (default true) |
+| `ClientProjectionHealth:*` | `ClientProjectionHealth__*` | Health eşikleri (Degraded/Unhealthy/DeadLetter) |
+
+- **Health:** `/health/ready` → `client-projection` entry (appointment-projection ile aynı `data`
+  şeması: `pendingCount`, `retryWaitingCount`, `deadLetterCount`, `oldestPendingAgeSeconds`,
+  `projectionEnabled`, `clientsReadEnabled`).
+- **Parity:** Command `Clients` count == Query `ClientReadModels` count (`IClientReadModelParityReader`
+  veya SQL `COUNT_BIG`). Client'ta silme yoktur → tüm event'ler işlendiğinde in-sync.
+- **Rollback:** `QueryReadModels__ClientsEnabled=false` → restart → health → parity. Projector açık
+  kalır.
+- **Backfill:** Mevcut client satırları için toplu backfill **CQRS-12B-6** konusudur; bu yapılmadan
+  `ClientsEnabled=true` açılırsa parity fail eder ve liste eksik döner (fallback yok).

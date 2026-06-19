@@ -75,6 +75,8 @@ public static class DependencyInjection
         services.AddOptions<AppointmentProjectionOptions>().ValidateOnStart();
         services.Configure<ClientProjectionOptions>(
             configuration.GetSection(ClientProjectionOptions.SectionName));
+        services.Configure<ClientProjectionHealthOptions>(
+            configuration.GetSection(ClientProjectionHealthOptions.SectionName));
         services.Configure<QueryReadModelsOptions>(
             configuration.GetSection(QueryReadModelsOptions.SectionName));
         services.Configure<AppointmentProjectionHealthOptions>(
@@ -194,6 +196,10 @@ public static class DependencyInjection
 
         // ===== Client query read-model reader (CQRS-12B-4) =====
         services.AddScoped<IClientReadModelReader, ClientReadModelReader>();
+
+        // ===== Client projection health / parity (CQRS-12B-5) =====
+        services.AddScoped<IClientProjectionStatusReader, ClientProjectionStatusReader>();
+        services.AddScoped<IClientReadModelParityReader, ClientReadModelParityReader>();
 
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));

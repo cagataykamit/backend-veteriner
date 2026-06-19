@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.Veteriner.Infrastructure.Persistence.Query.Models;
@@ -74,6 +75,40 @@ internal static class ClientProjectionTestSupport
         commandDb.OutboxMessages.Add(message);
         await commandDb.SaveChangesAsync(ct);
         return message;
+    }
+
+    /// <summary>
+    /// Command DB'ye bir <see cref="Client"/> ekler ve aynı ClientId/TenantId için
+    /// <c>client.created.v1</c> integration event'ini outbox'a enqueue eder.
+    /// (Command handler emisyonu taklit edilir; parity/smoke için command + event birlikte hazırlanır.)
+    /// </summary>
+    public static async Task<Client> AddCommandClientWithCreatedEventAsync(
+        AppDbContext commandDb,
+        Guid tenantId,
+        string fullName,
+        string? phone = null,
+        string? email = null,
+        CancellationToken ct = default)
+    {
+        var client = new Client(tenantId, fullName, phone, email);
+        commandDb.Clients.Add(client);
+        await commandDb.SaveChangesAsync(ct);
+
+        var snapshot = CreateSnapshot(
+            client.Id,
+            tenantId,
+            fullName: client.FullName,
+            email: client.Email,
+            phone: client.Phone,
+            createdAtUtc: client.CreatedAtUtc);
+
+        await EnqueueIntegrationEventAsync(
+            commandDb,
+            ClientIntegrationEventTypes.Created,
+            new ClientCreatedIntegrationEvent(Guid.NewGuid(), client.CreatedAtUtc, snapshot),
+            ct);
+
+        return client;
     }
 
     public static async Task MarkProcessedInQueryDbAsync(

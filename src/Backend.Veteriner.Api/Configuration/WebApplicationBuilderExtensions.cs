@@ -149,7 +149,8 @@ public static class WebApplicationBuilderExtensions
             .AddCheck<DatabaseHealthCheck>("sql")
             .AddCheck<QueryDatabaseHealthCheck>("query-sql")
             .AddCheck<OutboxHealthCheck>("outbox")
-            .AddCheck<AppointmentProjectionHealthCheck>("appointment-projection");
+            .AddCheck<AppointmentProjectionHealthCheck>("appointment-projection")
+            .AddCheck<ClientProjectionHealthCheck>("client-projection");
 
         builder.Services.AddInfrastructure(builder.Configuration);
 
