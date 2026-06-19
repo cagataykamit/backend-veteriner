@@ -29,6 +29,7 @@ Live API, çalışan SQL Server veya token dosyası **gerektirmez**. Yalnızca p
 | `tests/load/tools/Test-CqrsStagedRollout.ps1` | 11A/11B/11C readiness: script parse, mode tanımları, rollback planı, runbook/monitoring doküman + secret taraması, DbMigrator `rebuild-appointment-projections` komutu | PowerShell 5.1+, repo; `dotnet run DbMigrator -- help` (build gerekir) |
 | `tests/load/tools/Test-CqrsTwoInstanceAcceptance.ps1` | 11D script parse, token partition, k6 lifecycle özet ayrıştırma, worker participation, processed-events delta mantığı | PowerShell 5.1+, repo |
 | `tests/load/tools/Test-CqrsRolloutAcceptance.ps1` | 11E acceptance sequence, projection-disabled override, health beklenti matrisi, rollback dokümantasyonu | PowerShell 5.1+, repo |
+| `tests/load/tools/Test-CqrsClientRolloutAcceptance.ps1` | 12B-7 client readiness: rollout (6)/rollback (4) sıraları, flag override invariant'ları, client health beklenti matrisi, DbMigrator `backfill-client-projections` varlığı, doküman/secret taraması | PowerShell 5.1+, repo |
 
 > **Not (determinism garantisi):** `Test-CqrsStagedRollout.ps1` içindeki canlı `preflight-mode-mismatch-fails` kontrolü, **token dosyası varsa ve API erişilebilirse** çalışır. API erişilemiyorsa (CI veya API kapalı dev makinesi) bu kontrol **atlanır (skip = pass)**; token dosyası yoksa da atlanır. Böylece bu test gerçek CI'da deterministiktir.
 
@@ -57,6 +58,7 @@ Live API, çalışan SQL Server veya token dosyası **gerektirmez**. Yalnızca p
 2. .\tests\load\tools\Test-CqrsStagedRollout.ps1
 3. .\tests\load\tools\Test-CqrsTwoInstanceAcceptance.ps1
 4. .\tests\load\tools\Test-CqrsRolloutAcceptance.ps1
+5. .\tests\load\tools\Test-CqrsClientRolloutAcceptance.ps1   # CQRS-12B client read-model
 ```
 
 Hepsi başarısızlıkta exit code != 0 döner (`Test-CqrsTwoInstanceAcceptance.ps1` throw eder; diğerleri `exit 1`). Sıra önemsizdir; paralel de koşabilir.
@@ -208,8 +210,11 @@ Secret (JWT key, SQL password, connection string, token) **commit edilmez**; tü
 
 ## 8. Client read-model (CQRS-12B)
 
-Appointment read-model'den **bağımsız** ikinci CQRS read-model. Health/parity/smoke ve rollback
-detayları için bkz. [`cqrs-12b-5-client-read-model-health-parity-smoke.md`](cqrs-12b-5-client-read-model-health-parity-smoke.md).
+Appointment read-model'den **bağımsız** ikinci CQRS read-model. Health/parity/smoke için bkz.
+[`cqrs-12b-5-client-read-model-health-parity-smoke.md`](cqrs-12b-5-client-read-model-health-parity-smoke.md);
+backfill için [`cqrs-12b-6-client-read-model-backfill.md`](cqrs-12b-6-client-read-model-backfill.md);
+**rollout/rollback acceptance ve final readiness** için
+[`cqrs-12b-7-client-read-model-rollout-acceptance.md`](cqrs-12b-7-client-read-model-rollout-acceptance.md).
 
 | Config key | Env override | Etki |
 |------------|--------------|------|
@@ -233,3 +238,23 @@ detayları için bkz. [`cqrs-12b-5-client-read-model-health-parity-smoke.md`](cq
   dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-client-projections
   dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-client-projections --tenant <guid>
   ```
+
+### 8.1 Client rollout sırası (CQRS-12B-7)
+
+ClientsEnable açma **en sonda**; backfill + parity önce. Tam tablo ve checklist için
+[`cqrs-12b-7-...`](cqrs-12b-7-client-read-model-rollout-acceptance.md).
+
+```text
+migrate-query -> backfill-client-projections -> parity (InSync) -> health (Healthy)
+              -> QueryReadModels__ClientsEnabled=true + restart -> list/search smoke
+```
+
+### 8.2 Client rollback sırası
+
+```text
+QueryReadModels__ClientsEnabled=false -> restart -> health (Healthy)
+                                      -> (opsiyonel, planlı pause) ClientProjection__Enabled=false
+```
+
+**Altın kural:** Read flag rollback edilse bile `ClientProjection__Enabled=true` kalır; aksi halde Query
+DB geride kalır ve flag tekrar açılmadan önce yeniden backfill gerekebilir.
