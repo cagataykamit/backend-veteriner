@@ -14,6 +14,7 @@ public sealed class QueryDbContext : DbContext
 
     public DbSet<AppointmentReadModel> AppointmentReadModels => Set<AppointmentReadModel>();
     public DbSet<ClientReadModel> ClientReadModels => Set<ClientReadModel>();
+    public DbSet<PetReadModel> PetReadModels => Set<PetReadModel>();
     public DbSet<ClinicPetActivityReadModel> ClinicPetActivityReadModels => Set<ClinicPetActivityReadModel>();
     public DbSet<ClinicClientActivityReadModel> ClinicClientActivityReadModels => Set<ClinicClientActivityReadModel>();
     public DbSet<ClinicDailyAppointmentStatsReadModel> ClinicDailyAppointmentStatsReadModels =>

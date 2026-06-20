@@ -15,6 +15,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
     [
         "AppointmentReadModels",
         "ClientReadModels",
+        "PetReadModels",
         "ClinicPetActivityReadModels",
         "ClinicClientActivityReadModels",
         "ClinicDailyAppointmentStatsReadModels",
@@ -67,6 +68,13 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
         clientIndexes.Should().Contain("IX_ClientReadModels_TenantId_FullNameNormalized_ClientId");
         clientIndexes.Should().Contain("IX_ClientReadModels_TenantId_PhoneNormalized");
         clientIndexes.Should().Contain("IX_ClientReadModels_TenantId_Email");
+
+        var petIndexes = await GetIndexNamesAsync(queryDb, "PetReadModels");
+        petIndexes.Should().Contain("IX_PetReadModels_TenantId_NameNormalized_PetId");
+        petIndexes.Should().Contain("IX_PetReadModels_TenantId_ClientId");
+        petIndexes.Should().Contain("IX_PetReadModels_TenantId_ClientFullNameNormalized_PetId");
+        petIndexes.Should().Contain("IX_PetReadModels_TenantId_SpeciesId");
+        petIndexes.Should().Contain("IX_PetReadModels_TenantId_ColorId");
     }
 
     [Fact]
@@ -159,6 +167,67 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
                 SELECT DATA_TYPE AS Value
                 FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE TABLE_NAME = 'ClinicDailyAppointmentStatsReadModels' AND COLUMN_NAME = 'LocalDate'
+                """)
+            .SingleAsync();
+
+        columnType.Should().Be("date");
+    }
+
+    [Fact]
+    public async Task PetReadModel_Should_Persist_NullableFields_And_BirthDate_As_SqlDate()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+
+        IntegrationTestDatabaseGuard.EnsureSafeDatabase(
+            queryDb.Database.GetConnectionString(),
+            allowedPrefix: IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName);
+
+        await IntegrationTestDatabaseReset.ResetAndMigrateAsync(queryDb);
+
+        var petId = Guid.NewGuid();
+        var birthDate = new DateOnly(2024, 3, 10);
+
+        queryDb.PetReadModels.Add(new PetReadModel
+        {
+            PetId = petId,
+            TenantId = Guid.NewGuid(),
+            ClientId = Guid.NewGuid(),
+            ClientFullName = "Ada Lovelace",
+            ClientFullNameNormalized = "ada lovelace",
+            Name = "Rex",
+            NameNormalized = "rex",
+            SpeciesId = Guid.NewGuid(),
+            SpeciesName = "Köpek",
+            SpeciesNameNormalized = "kopek",
+            BreedId = null,
+            Breed = null,
+            BreedRefName = null,
+            ColorId = null,
+            ColorName = null,
+            ColorNameNormalized = null,
+            Gender = 1,
+            BirthDate = birthDate,
+            Weight = 12.50m,
+            LastEventId = Guid.NewGuid(),
+            LastEventOccurredAtUtc = DateTime.UtcNow,
+            LastProjectedAtUtc = DateTime.UtcNow
+        });
+        await queryDb.SaveChangesAsync();
+
+        queryDb.ChangeTracker.Clear();
+        var loaded = await queryDb.PetReadModels.SingleAsync(x => x.PetId == petId);
+        loaded.BirthDate.Should().Be(birthDate);
+        loaded.Weight.Should().Be(12.50m);
+        loaded.BreedId.Should().BeNull();
+        loaded.ColorId.Should().BeNull();
+
+        var columnType = await queryDb.Database
+            .SqlQueryRaw<string>(
+                """
+                SELECT DATA_TYPE AS Value
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'PetReadModels' AND COLUMN_NAME = 'BirthDate'
                 """)
             .SingleAsync();
 
