@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Commands.Create;
+using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Application.Tenants;
@@ -26,6 +27,7 @@ public sealed class CreatePetCommandHandlerTests
     private readonly Mock<IReadRepository<Breed>> _breedsRead = new();
     private readonly Mock<IReadRepository<Pet>> _petsRead = new();
     private readonly Mock<IRepository<Pet>> _petsWrite = new();
+    private readonly Mock<IPetIntegrationEventOutbox> _eventOutbox = new();
 
     private CreatePetCommandHandler CreateHandler()
     {
@@ -44,7 +46,8 @@ public sealed class CreatePetCommandHandlerTests
             _breedsRead.Object,
             _petsRead.Object,
             _petsWrite.Object,
-            writeEvaluator);
+            writeEvaluator,
+            _eventOutbox.Object);
     }
 
     private static void AlignTenantId(Tenant tenant, Guid id)

@@ -60,7 +60,7 @@ public sealed class OutboxProcessor : BackgroundService
                 var now = DateTime.UtcNow;
 
                 // Hazir, islenmemis, dead-letter olmayan mesajlar (projection integration eventleri SQL'de haric:
-                // appointment + client; bunlarin kendi dedike projection processor'lari vardir).
+                // appointment + client + pet; bunlarin kendi dedike projection processor'lari vardir).
                 var batch = await OutboxMessageQueryFilters
                     .ExcludingProjectionIntegrationEvents(db.OutboxMessages)
                     .Where(m => m.ProcessedAtUtc == null

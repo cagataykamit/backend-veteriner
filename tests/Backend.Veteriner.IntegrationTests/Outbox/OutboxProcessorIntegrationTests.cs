@@ -2,6 +2,7 @@ using System.Text.Json;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Outbox;
+using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.IntegrationTests.Infrastructure;
@@ -128,6 +129,77 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
 
         row.Should().NotBeNull();
         row!.ProcessedAtUtc.Should().BeNull("appointment integration eventleri OutboxProcessor tarafindan tuketilmemeli");
+        row.DeadLetterAtUtc.Should().BeNull();
+        row.RetryCount.Should().Be(0);
+
+        await using (var cleanup = _factory.Services.CreateAsyncScope())
+        {
+            var db = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tracked = await db.OutboxMessages.FirstAsync(x => x.Id == messageId);
+            db.OutboxMessages.Remove(tracked);
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task OutboxProcessor_Should_NotConsumeKnownPetIntegrationEvents()
+    {
+        Guid messageId;
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var snapshot = new PetProjectionSnapshot(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                "Client",
+                "client",
+                "Pet",
+                "pet",
+                Guid.NewGuid(),
+                "Species",
+                "species",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            var payload = JsonSerializer.Serialize(
+                new PetCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, snapshot),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+            var message = new OutboxMessage
+            {
+                Type = PetIntegrationEventTypes.Created,
+                Payload = payload,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            commandDb.OutboxMessages.Add(message);
+            await commandDb.SaveChangesAsync();
+            messageId = message.Id;
+        }
+
+        OutboxMessage? row = null;
+        await using (var pollScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            for (var i = 0; i < 30; i++)
+            {
+                await Task.Delay(500);
+                row = await db.OutboxMessages.AsNoTracking().FirstOrDefaultAsync(x => x.Id == messageId);
+                if (row is not null && row.RetryCount > 0)
+                    break;
+            }
+        }
+
+        row.Should().NotBeNull();
+        row!.ProcessedAtUtc.Should().BeNull("pet integration eventleri OutboxProcessor tarafindan tuketilmemeli");
         row.DeadLetterAtUtc.Should().BeNull();
         row.RetryCount.Should().Be(0);
 

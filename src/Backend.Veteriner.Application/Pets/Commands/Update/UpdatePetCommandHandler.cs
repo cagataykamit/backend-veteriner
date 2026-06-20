@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.BreedsReference.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.PetColors.Specs;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
@@ -24,6 +25,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
     private readonly IReadRepository<Breed> _breedsRead;
     private readonly IReadRepository<Pet> _petsRead;
     private readonly IRepository<Pet> _petsWrite;
+    private readonly IPetIntegrationEventOutbox _eventOutbox;
 
     public UpdatePetCommandHandler(
         ITenantContext tenantContext,
@@ -33,7 +35,8 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         IReadRepository<PetColor> colorsRead,
         IReadRepository<Breed> breedsRead,
         IReadRepository<Pet> petsRead,
-        IRepository<Pet> petsWrite)
+        IRepository<Pet> petsWrite,
+        IPetIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
@@ -43,6 +46,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         _breedsRead = breedsRead;
         _petsRead = petsRead;
         _petsWrite = petsWrite;
+        _eventOutbox = eventOutbox;
     }
 
     public async Task<Result> Handle(UpdatePetCommand request, CancellationToken ct)
@@ -72,6 +76,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         if (species is null || !species.IsActive)
             return Result.Failure("Pets.SpeciesNotFound", "Tür bulunamadı veya pasif; geçerli bir SpeciesId gönderin.");
 
+        Breed? breedRef = null;
         if (request.BreedId is { } breedId)
         {
             var breed = await _breedsRead.FirstOrDefaultAsync(new BreedByIdWithSpeciesSpec(breedId), ct);
@@ -83,8 +88,10 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
                 return Result.Failure(
                     "Pets.BreedSpeciesMismatch",
                     "Secilen irk, secilen tur ile uyusmuyor.");
+            breedRef = breed;
         }
 
+        PetColor? colorRef = null;
         if (request.ColorId is { } colorId)
         {
             var color = await _colorsRead.FirstOrDefaultAsync(new PetColorByIdSpec(colorId), ct);
@@ -92,6 +99,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
                 return Result.Failure(
                     "Pets.ColorNotFound",
                     "Renk bulunamadı veya pasif; geçerli bir ColorId gönderin.");
+            colorRef = color;
         }
 
         if (request.BirthDate.HasValue && request.BirthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))
@@ -115,6 +123,16 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
             request.Notes);
 
         await _petsWrite.UpdateAsync(pet, ct);
+
+        // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
+        await _eventOutbox.EnqueueAsync(
+            PetIntegrationEventTypes.Updated,
+            new PetUpdatedIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                PetProjectionSnapshotFactory.Create(pet, client, species, breedRef, colorRef)),
+            ct);
+
         await _petsWrite.SaveChangesAsync(ct);
         return Result.Success();
     }

@@ -2,6 +2,7 @@
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
+using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Application.Auth.Contracts;                              // IPermissionReader
 using Backend.Veteriner.Application.Common.Abstractions;                        // IPasswordHasher, IJwtTokenService, ITokenHashService, IClientContext, IUser..., IRefreshTokenRepository, IVerificationTokenRepository, IEmailSender, IEmailSenderImmediate, IAppUrlProvider
 using Backend.Veteriner.Application.Common.Behaviors;
@@ -97,6 +98,7 @@ public static class DependencyInjection
         services.AddScoped<IOutboxBuffer>(sp => sp.GetRequiredService<OutboxBuffer>());
         services.AddScoped<IAppointmentIntegrationEventOutbox, AppointmentIntegrationEventOutbox>();
         services.AddScoped<IClientIntegrationEventOutbox, ClientIntegrationEventOutbox>();
+        services.AddScoped<IPetIntegrationEventOutbox, PetIntegrationEventOutbox>();
         services.AddScoped<OutboxSaveChangesInterceptor>();
         services.AddScoped<SlowQueryLoggingInterceptor>();
         services.AddScoped<DbConnectionSlowOpenInterceptor>();
