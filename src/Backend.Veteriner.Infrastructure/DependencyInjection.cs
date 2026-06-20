@@ -221,6 +221,9 @@ public static class DependencyInjection
         // ===== Client read-model backfill / rebuild (CQRS-12B-6) =====
         services.AddScoped<IClientReadModelBackfillService, ClientReadModelBackfillService>();
 
+        // ===== Pet read-model backfill / rebuild (CQRS-12C-6) =====
+        services.AddScoped<IPetReadModelBackfillService, PetReadModelBackfillService>();
+
         // ===== Pet projection (CQRS-12C-3) =====
         services.AddScoped<IPetProjectionProcessor, PetProjectionProcessor>();
         services.AddHostedService<PetProjectionHostedService>();

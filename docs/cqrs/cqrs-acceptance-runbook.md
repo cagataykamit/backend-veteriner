@@ -265,8 +265,8 @@ DB geride kalır ve flag tekrar açılmadan önce yeniden backfill gerekebilir.
 
 Appointment ve client read-model'den **bağımsız** üçüncü CQRS read-model. Health/parity/smoke için bkz.
 [`cqrs-12c-5-pet-read-model-health-parity-smoke.md`](cqrs-12c-5-pet-read-model-health-parity-smoke.md);
-backfill için **CQRS-12C-6** (henüz uygulanmadı); **rollout/rollback acceptance** için **CQRS-12C-7**
-(henüz uygulanmadı).
+backfill için [`cqrs-12c-6-pet-read-model-backfill.md`](cqrs-12c-6-pet-read-model-backfill.md);
+**rollout/rollback acceptance** için **CQRS-12C-7**
 
 | Config key | Env override | Etki |
 |------------|--------------|------|
@@ -282,8 +282,14 @@ backfill için **CQRS-12C-6** (henüz uygulanmadı); **rollout/rollback acceptan
 - **Rollback:** `QueryReadModels__PetsEnabled=false` → restart → health → parity. Projector açık
   kalır.
 - **Backfill:** Mevcut pet satırlarını Query `PetReadModels`'e idempotent dolduran backfill
-  **CQRS-12C-6** konusudur (henüz uygulanmadı). `PetsEnabled=true` açmadan **önce** çalıştırılmalı
-  ve parity in-sync doğrulanmalıdır; aksi halde liste eksik döner (fallback yok).
+  **CQRS-12C-6** ile eklendi (bkz. [`cqrs-12c-6-pet-read-model-backfill.md`](cqrs-12c-6-pet-read-model-backfill.md)).
+  `PetsEnabled=true` açmadan **önce** çalıştırılmalı ve parity in-sync doğrulanmalıdır; aksi halde
+  liste eksik döner (fallback yok).
+
+  ```text
+  dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-pet-projections
+  dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-pet-projections --tenant <guid>
+  ```
 
 ### 9.1 Pet rollout sırası (CQRS-12C-7 — planlanan)
 

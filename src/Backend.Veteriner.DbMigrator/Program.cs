@@ -4,6 +4,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Projections.Clients;
+using Backend.Veteriner.Infrastructure.Projections.Pets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -160,6 +161,56 @@ try
 
                 break;
             }
+        case "backfill-pet-projections":
+            {
+                var batchSize = PetReadModelBackfillService.DefaultBatchSize;
+                Guid? tenantId = null;
+                for (var i = 1; i < args.Length; i++)
+                {
+                    if (args[i] == "--batch-size"
+                        && i + 1 < args.Length
+                        && int.TryParse(args[i + 1], out var parsedBatchSize))
+                    {
+                        batchSize = Math.Max(1, parsedBatchSize);
+                        i++;
+                    }
+                    else if (args[i] == "--tenant"
+                        && i + 1 < args.Length
+                        && Guid.TryParse(args[i + 1], out var parsedTenant))
+                    {
+                        tenantId = parsedTenant;
+                        i++;
+                    }
+                }
+
+                var backfill = sp.GetRequiredService<IPetReadModelBackfillService>();
+                var result = await backfill.BackfillAsync(tenantId, batchSize, CancellationToken.None);
+
+                Console.WriteLine("Pet read-model backfill completed successfully.");
+                Console.WriteLine($"  Scope tenant         : {(result.ScopeTenantId?.ToString() ?? "<all tenants>")}");
+                Console.WriteLine($"  Command pets         : {result.CommandPetCount}");
+                Console.WriteLine($"  Query pets           : {result.QueryPetCount}");
+                Console.WriteLine($"  Inserted             : {result.InsertedCount}");
+                Console.WriteLine($"  Updated              : {result.UpdatedCount}");
+                Console.WriteLine($"  Skipped (stale)      : {result.SkippedStaleCount}");
+                Console.WriteLine($"  Parity in-sync       : {result.ParityInSync}");
+                Console.WriteLine($"  Duration             : {result.Duration.TotalSeconds:F2}s");
+                logger.LogInformation(
+                    "Pet read-model backfill completed. Command={Command} Query={Query} ParityInSync={ParityInSync} DurationSec={DurationSec}",
+                    result.CommandPetCount,
+                    result.QueryPetCount,
+                    result.ParityInSync,
+                    result.Duration.TotalSeconds);
+
+                if (!result.ParityInSync)
+                {
+                    Console.Error.WriteLine(
+                        "UYARI: Backfill sonrası parity in-sync değil. PetsEnabled açmadan önce parity'yi doğrulayın.");
+                    return 2;
+                }
+
+                break;
+            }
         default:
             Console.Error.WriteLine($"Unknown command: {args[0]}");
             PrintHelp();
@@ -211,6 +262,8 @@ static void PrintHelp()
                                             (--batch-size 1000 opsiyonel)
           backfill-client-projections     — Command DB client'larından Query ClientReadModels idempotent doldur
                                             (--batch-size 500 ve --tenant <guid> opsiyonel)
+          backfill-pet-projections        — Command DB pet'lerinden Query PetReadModels idempotent doldur
+                                            (--batch-size 500 ve --tenant <guid> opsiyonel)
 
         Load test ortamı (DOTNET_ENVIRONMENT=LoadTest):
           Command DB : VetinityCommandDb_LoadTest  (DefaultConnection / migrate / loadtest-seed)
@@ -225,6 +278,8 @@ static void PrintHelp()
           dotnet run --project src/Backend.Veteriner.DbMigrator -- rebuild-appointment-projections --batch-size 1000
           dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-client-projections --batch-size 500
           dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-client-projections --tenant 00000000-0000-0000-0000-000000000000
+          dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-pet-projections --batch-size 500
+          dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-pet-projections --tenant 00000000-0000-0000-0000-000000000000
 
         Bağlantı: ConnectionStrings:DefaultConnection (command), ConnectionStrings:QueryConnection (query).
         Şema için alternatif: dotnet ef database update --project src/Backend.Veteriner.Infrastructure --startup-project src/Backend.Veteriner.Api
