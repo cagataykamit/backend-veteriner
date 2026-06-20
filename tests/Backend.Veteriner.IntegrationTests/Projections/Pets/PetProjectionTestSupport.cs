@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.IntegrationTests.Infrastructure;
@@ -97,5 +98,54 @@ internal static class PetProjectionTestSupport
         commandDb.OutboxMessages.Add(message);
         await commandDb.SaveChangesAsync(ct);
         return message;
+    }
+
+    /// <summary>
+    /// Command DB'ye client + pet ekler ve <c>pet.created.v1</c> outbox event'ini enqueue eder.
+    /// Smoke/parity testlerinde command path veya projeksiyon senaryoları için kullanılır.
+    /// </summary>
+    public static async Task<(Client Client, Pet Pet)> AddCommandPetWithCreatedEventAsync(
+        AppDbContext commandDb,
+        Guid tenantId,
+        string petName,
+        string clientFullName = "Ayşe Yılmaz",
+        Guid? speciesId = null,
+        string? breed = null,
+        CancellationToken ct = default)
+    {
+        var client = new Client(tenantId, clientFullName);
+        commandDb.Clients.Add(client);
+        await commandDb.SaveChangesAsync(ct);
+
+        speciesId ??= await commandDb.Species
+            .OrderBy(s => s.DisplayOrder)
+            .Select(s => s.Id)
+            .FirstAsync(ct);
+        var speciesName = await commandDb.Species
+            .Where(s => s.Id == speciesId.Value)
+            .Select(s => s.Name)
+            .FirstAsync(ct);
+
+        var pet = new Pet(tenantId, client.Id, petName, speciesId.Value, breed);
+        commandDb.Pets.Add(pet);
+        await commandDb.SaveChangesAsync(ct);
+
+        var snapshot = CreateSnapshot(
+            pet.Id,
+            tenantId,
+            client.Id,
+            name: petName,
+            clientFullName: client.FullName,
+            speciesId: speciesId,
+            speciesName: speciesName,
+            breed: breed);
+
+        await EnqueueIntegrationEventAsync(
+            commandDb,
+            PetIntegrationEventTypes.Created,
+            new PetCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, snapshot),
+            ct);
+
+        return (client, pet);
     }
 }

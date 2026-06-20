@@ -9,4 +9,6 @@ public sealed class QueryReadModelsOptions
     public bool DashboardAppointmentsEnabled { get; set; }
 
     public bool ClientsEnabled { get; set; }
+
+    public bool PetsEnabled { get; set; }
 }

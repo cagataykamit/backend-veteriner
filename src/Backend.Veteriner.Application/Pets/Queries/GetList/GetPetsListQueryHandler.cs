@@ -2,12 +2,17 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Pets.Queries.GetList;
 
@@ -17,15 +22,24 @@ public sealed class GetPetsListQueryHandler
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IPetReadModelReader _readModelReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
+    private readonly ILogger<GetPetsListQueryHandler> _logger;
 
     public GetPetsListQueryHandler(
         ITenantContext tenantContext,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IPetReadModelReader readModelReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        ILogger<GetPetsListQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
         _pets = pets;
         _clients = clients;
+        _readModelReader = readModelReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
+        _logger = logger ?? NullLogger<GetPetsListQueryHandler>.Instance;
     }
 
     public async Task<Result<PagedResult<PetListItemDto>>> Handle(GetPetsListQuery request, CancellationToken ct)
@@ -41,7 +55,51 @@ public sealed class GetPetsListQueryHandler
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
 
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
-        string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
+        var searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
+
+        if (_queryReadModelsOptions.PetsEnabled)
+        {
+            return await HandleFromQueryReadModelAsync(
+                tenantId, page, pageSize, request.ClientId, request.SpeciesId, searchPattern, ct);
+        }
+
+        return await HandleFromCommandDbAsync(
+            tenantId, page, pageSize, request.ClientId, request.SpeciesId, searchPattern, ct);
+    }
+
+    private async Task<Result<PagedResult<PetListItemDto>>> HandleFromQueryReadModelAsync(
+        Guid tenantId,
+        int page,
+        int pageSize,
+        Guid? clientId,
+        Guid? speciesId,
+        string? searchPattern,
+        CancellationToken ct)
+    {
+        var readResult = await _readModelReader.GetListAsync(
+            new PetListReadRequest(tenantId, page, pageSize, clientId, speciesId, searchPattern),
+            ct);
+
+        _logger.LogInformation(
+            "Pets list generated from query read-model. TenantId={TenantId} Page={Page} PageSize={PageSize} TotalItems={TotalItems}",
+            tenantId,
+            page,
+            pageSize,
+            readResult.TotalCount);
+
+        return Result<PagedResult<PetListItemDto>>.Success(
+            PagedResult<PetListItemDto>.Create(readResult.Items, readResult.TotalCount, page, pageSize));
+    }
+
+    private async Task<Result<PagedResult<PetListItemDto>>> HandleFromCommandDbAsync(
+        Guid tenantId,
+        int page,
+        int pageSize,
+        Guid? clientId,
+        Guid? speciesId,
+        string? searchPattern,
+        CancellationToken ct)
+    {
         Guid[] petIdsFromClientText = [];
         if (searchPattern is not null)
         {
@@ -57,8 +115,8 @@ public sealed class GetPetsListQueryHandler
         var total = await _pets.CountAsync(
             new PetsByTenantCountSpec(
                 tenantId,
-                request.ClientId,
-                request.SpeciesId,
+                clientId,
+                speciesId,
                 searchPattern,
                 petIdsFromClientText),
             ct);
@@ -67,8 +125,8 @@ public sealed class GetPetsListQueryHandler
                 tenantId,
                 page,
                 pageSize,
-                request.ClientId,
-                request.SpeciesId,
+                clientId,
+                speciesId,
                 searchPattern,
                 petIdsFromClientText),
             ct);

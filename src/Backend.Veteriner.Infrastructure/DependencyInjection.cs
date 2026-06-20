@@ -17,7 +17,9 @@ using Backend.Veteriner.Infrastructure.Projections.Clients;
 using Backend.Veteriner.Infrastructure.Projections.Pets;
 using Backend.Veteriner.Infrastructure.Query.Appointments;
 using Backend.Veteriner.Infrastructure.Query.Clients;
+using Backend.Veteriner.Infrastructure.Query.Pets;
 using Backend.Veteriner.Application.Clients.ReadModels;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Projections.Appointments;
 using Backend.Veteriner.Application.Projections.Clients;
 using Backend.Veteriner.Application.Projections.Pets;
@@ -202,6 +204,9 @@ public static class DependencyInjection
 
         // ===== Client query read-model reader (CQRS-12B-4) =====
         services.AddScoped<IClientReadModelReader, ClientReadModelReader>();
+
+        // ===== Pet query read-model reader (CQRS-12C-4) =====
+        services.AddScoped<IPetReadModelReader, PetReadModelReader>();
 
         // ===== Client projection health / parity (CQRS-12B-5) =====
         services.AddScoped<IClientProjectionStatusReader, ClientProjectionStatusReader>();
