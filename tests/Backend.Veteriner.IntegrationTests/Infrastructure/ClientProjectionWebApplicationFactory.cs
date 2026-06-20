@@ -5,6 +5,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Projections.Clients;
+using Backend.Veteriner.Infrastructure.Projections.Pets;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,7 @@ public sealed class ClientProjectionWebApplicationFactory : WebApplicationFactor
                 ["Outbox:Enabled"] = "false",
                 ["AppointmentProjection:Enabled"] = "false",
                 ["ClientProjection:Enabled"] = "false",
+                ["PetProjection:Enabled"] = "false",
                 ["QueryReadModels:AppointmentsEnabled"] = "false",
                 ["QueryReadModels:DashboardAppointmentsEnabled"] = "false"
             }.Concat(IntegrationTestAppConfiguration.RateLimitingDisabled));
@@ -89,6 +91,7 @@ public sealed class ClientProjectionWebApplicationFactory : WebApplicationFactor
                 o.BatchSize = 50;
                 o.ConsumerName = "client-read-model-v1";
             });
+            services.PostConfigure<PetProjectionOptions>(o => o.Enabled = false);
             services.PostConfigure<QueryReadModelsOptions>(o =>
             {
                 o.AppointmentsEnabled = false;

@@ -14,11 +14,13 @@ using Backend.Veteriner.Infrastructure.Mailing;                                 
 using Backend.Veteriner.Infrastructure.Outbox;                                    // EfOutbox, OutboxProcessor, OutboxOptions, OutboxBuffer, OutboxSaveChangesInterceptor
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Projections.Clients;
+using Backend.Veteriner.Infrastructure.Projections.Pets;
 using Backend.Veteriner.Infrastructure.Query.Appointments;
 using Backend.Veteriner.Infrastructure.Query.Clients;
 using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Projections.Appointments;
 using Backend.Veteriner.Application.Projections.Clients;
+using Backend.Veteriner.Application.Projections.Pets;
 using Backend.Veteriner.Infrastructure.Persistence.Query;
 using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
@@ -76,6 +78,8 @@ public static class DependencyInjection
         services.AddOptions<AppointmentProjectionOptions>().ValidateOnStart();
         services.Configure<ClientProjectionOptions>(
             configuration.GetSection(ClientProjectionOptions.SectionName));
+        services.Configure<PetProjectionOptions>(
+            configuration.GetSection(PetProjectionOptions.SectionName));
         services.Configure<ClientProjectionHealthOptions>(
             configuration.GetSection(ClientProjectionHealthOptions.SectionName));
         services.Configure<QueryReadModelsOptions>(
@@ -205,6 +209,10 @@ public static class DependencyInjection
 
         // ===== Client read-model backfill / rebuild (CQRS-12B-6) =====
         services.AddScoped<IClientReadModelBackfillService, ClientReadModelBackfillService>();
+
+        // ===== Pet projection (CQRS-12C-3) =====
+        services.AddScoped<IPetProjectionProcessor, PetProjectionProcessor>();
+        services.AddHostedService<PetProjectionHostedService>();
 
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));

@@ -16,19 +16,20 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Backend.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Appointment projection testleri için ayrı command/query LocalDB veritabanları.
-/// Hosted servisler kapalı; testler <see cref="IAppointmentProjectionProcessor.ProcessBatchAsync"/> çağırır.
+/// Pet projection testleri için ayrı command/query LocalDB veritabanları.
+/// Hosted servisler kapalı; testler <see cref="Backend.Veteriner.Application.Projections.Pets.IPetProjectionProcessor.ProcessBatchAsync"/>
+/// çağırır.
 /// </summary>
-public sealed class AppointmentProjectionWebApplicationFactory : WebApplicationFactory<global::Program>
+public sealed class PetProjectionWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    public const string CommandDatabaseName = "VetinityCommandDb_AppointmentProjectionTests";
-    public const string QueryDatabaseName = "VetinityQueryDb_AppointmentProjectionTests";
+    public const string CommandDatabaseName = "VetinityCommandDb_PetProjectionTests";
+    public const string QueryDatabaseName = "VetinityQueryDb_PetProjectionTests";
 
     public const string CommandConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_AppointmentProjectionTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_PetProjectionTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     public const string QueryConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_AppointmentProjectionTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+        "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_PetProjectionTests;Trusted_Connection=True;MultipleActiveResultSets=true";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -83,14 +84,14 @@ public sealed class AppointmentProjectionWebApplicationFactory : WebApplicationF
             services.RemoveAll<IEmailSenderImmediate>();
             services.AddScoped<IEmailSenderImmediate, NoOpEmailSenderImmediate>();
             services.PostConfigure<OutboxOptions>(o => o.Enabled = false);
-            services.PostConfigure<AppointmentProjectionOptions>(o =>
+            services.PostConfigure<AppointmentProjectionOptions>(o => o.Enabled = false);
+            services.PostConfigure<ClientProjectionOptions>(o => o.Enabled = false);
+            services.PostConfigure<PetProjectionOptions>(o =>
             {
                 o.Enabled = false;
                 o.BatchSize = 50;
-                o.ConsumerName = "appointment-read-model-v1";
+                o.ConsumerName = "pet-read-model-v1";
             });
-            services.PostConfigure<ClientProjectionOptions>(o => o.Enabled = false);
-            services.PostConfigure<PetProjectionOptions>(o => o.Enabled = false);
             services.PostConfigure<QueryReadModelsOptions>(o =>
             {
                 o.AppointmentsEnabled = false;
