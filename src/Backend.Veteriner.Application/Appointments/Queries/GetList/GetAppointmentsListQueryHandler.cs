@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
@@ -32,6 +33,7 @@ public sealed class GetAppointmentsListQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IAppointmentReadModelReader _readModelReader;
+    private readonly IPetReadModelLookupReader _petLookupReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetAppointmentsListQueryHandler> _logger;
 
@@ -43,6 +45,7 @@ public sealed class GetAppointmentsListQueryHandler
         IReadRepository<Client> clients,
         IReadRepository<Clinic> clinics,
         IAppointmentReadModelReader readModelReader,
+        IPetReadModelLookupReader petLookupReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetAppointmentsListQueryHandler>? logger = null)
     {
@@ -53,6 +56,7 @@ public sealed class GetAppointmentsListQueryHandler
         _clients = clients;
         _clinics = clinics;
         _readModelReader = readModelReader;
+        _petLookupReader = petLookupReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetAppointmentsListQueryHandler>.Instance;
     }
@@ -175,9 +179,11 @@ public sealed class GetAppointmentsListQueryHandler
         Guid[] searchPetIds = [];
         if (searchPattern is not null)
         {
-            searchPetIds = await ListSearchPetIds.ResolveForAggregateListAsync(
+            searchPetIds = await SharedSearchPetIdsLookup.ResolveAsync(
                 tenantId,
                 searchPattern,
+                _queryReadModelsOptions.SharedSearchLookupEnabled,
+                _petLookupReader,
                 _clients,
                 _pets,
                 ct);

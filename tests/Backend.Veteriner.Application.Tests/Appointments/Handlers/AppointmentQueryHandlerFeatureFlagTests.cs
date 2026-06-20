@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -26,6 +27,7 @@ public sealed class AppointmentQueryHandlerFeatureFlagTests
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IAppointmentReadModelReader> _readModelReader = new();
+    private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
 
     [Fact]
     public async Task List_WhenFlagFalse_Should_UseCommandRepository_NotQueryReader()
@@ -153,6 +155,7 @@ public sealed class AppointmentQueryHandlerFeatureFlagTests
             _clients.Object,
             _clinics.Object,
             _readModelReader.Object,
+            _petLookupReader.Object,
             Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = enabled }));
 
     private GetAppointmentsCalendarQueryHandler CreateCalendarHandler(bool enabled)

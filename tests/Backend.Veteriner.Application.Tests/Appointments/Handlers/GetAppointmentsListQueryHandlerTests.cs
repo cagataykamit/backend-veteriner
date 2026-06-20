@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Domain.Appointments;
@@ -28,8 +29,11 @@ public sealed class GetAppointmentsListQueryHandlerTests
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IAppointmentReadModelReader> _readModelReader = new();
+    private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
 
-    private GetAppointmentsListQueryHandler CreateHandler(bool appointmentsQueryEnabled = false)
+    private GetAppointmentsListQueryHandler CreateHandler(
+        bool appointmentsQueryEnabled = false,
+        bool sharedSearchLookupEnabled = false)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
@@ -38,7 +42,12 @@ public sealed class GetAppointmentsListQueryHandlerTests
             _clients.Object,
             _clinics.Object,
             _readModelReader.Object,
-            Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = appointmentsQueryEnabled }));
+            _petLookupReader.Object,
+            Options.Create(new QueryReadModelsOptions
+            {
+                AppointmentsEnabled = appointmentsQueryEnabled,
+                SharedSearchLookupEnabled = sharedSearchLookupEnabled
+            }));
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

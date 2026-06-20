@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -385,6 +386,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests : IClassF
             sp.GetRequiredService<IReadRepository<Client>>(),
             sp.GetRequiredService<IReadRepository<Clinic>>(),
             sp.GetRequiredService<IAppointmentReadModelReader>(),
+            sp.GetRequiredService<IPetReadModelLookupReader>(),
             Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = appointmentsEnabled }));
 
         return await handler.Handle(query, CancellationToken.None);
