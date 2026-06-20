@@ -11,4 +11,10 @@ public sealed class QueryReadModelsOptions
     public bool ClientsEnabled { get; set; }
 
     public bool PetsEnabled { get; set; }
+
+    /// <summary>
+    /// Paylaşılan client/pet metin araması lookup'ını Query DB read-model'e yönlendirir (12D-3+).
+    /// Liste endpoint bayraklarından (<see cref="ClientsEnabled"/>, <see cref="PetsEnabled"/>) bağımsızdır.
+    /// </summary>
+    public bool SharedSearchLookupEnabled { get; set; }
 }

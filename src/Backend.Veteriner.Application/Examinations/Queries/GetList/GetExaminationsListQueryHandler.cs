@@ -2,9 +2,11 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
@@ -13,6 +15,7 @@ using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Examinations.Queries.GetList;
@@ -26,6 +29,8 @@ public sealed class GetExaminationsListQueryHandler
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IPetReadModelLookupReader _petLookupReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetExaminationsListQueryHandler> _logger;
 
     public GetExaminationsListQueryHandler(
@@ -35,6 +40,8 @@ public sealed class GetExaminationsListQueryHandler
         IReadRepository<Examination> examinations,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
+        IPetReadModelLookupReader petLookupReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetExaminationsListQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -43,6 +50,8 @@ public sealed class GetExaminationsListQueryHandler
         _examinations = examinations;
         _pets = pets;
         _clients = clients;
+        _petLookupReader = petLookupReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetExaminationsListQueryHandler>.Instance;
     }
 
@@ -108,13 +117,10 @@ public sealed class GetExaminationsListQueryHandler
         Guid[] searchPetIds = [];
         if (searchPattern is not null)
         {
-            searchPetIds = await ListSearchPetIds.ResolveForAggregateListAsync(
-                tenantId,
-                searchPattern,
-                _clients,
-                _pets,
-                ct);
-            MarkStep("searchPetIdsLookup");
+            searchPetIds = await ResolveSearchPetIdsAsync(tenantId, searchPattern, ct);
+            MarkStep(_queryReadModelsOptions.SharedSearchLookupEnabled
+                ? "searchPetIdsLookupQueryDb"
+                : "searchPetIdsLookup");
         }
 
         var total = await _examinations.CountAsync(
@@ -199,5 +205,26 @@ public sealed class GetExaminationsListQueryHandler
 
         return Result<PagedResult<ExaminationListItemDto>>.Success(
             PagedResult<ExaminationListItemDto>.Create(items, total, page, pageSize));
+    }
+
+    private async Task<Guid[]> ResolveSearchPetIdsAsync(
+        Guid tenantId,
+        string searchPattern,
+        CancellationToken ct)
+    {
+        if (_queryReadModelsOptions.SharedSearchLookupEnabled)
+        {
+            var lookup = await _petLookupReader.ResolvePetIdsByTextSearchAsync(
+                new PetTextSearchLookupRequest(tenantId, searchPattern),
+                ct);
+            return lookup.PetIds.Count > 0 ? lookup.PetIds.ToArray() : [];
+        }
+
+        return await ListSearchPetIds.ResolveForAggregateListAsync(
+            tenantId,
+            searchPattern,
+            _clients,
+            _pets,
+            ct);
     }
 }
