@@ -258,3 +258,48 @@ QueryReadModels__ClientsEnabled=false -> restart -> health (Healthy)
 
 **Altın kural:** Read flag rollback edilse bile `ClientProjection__Enabled=true` kalır; aksi halde Query
 DB geride kalır ve flag tekrar açılmadan önce yeniden backfill gerekebilir.
+
+---
+
+## 9. Pet read-model (CQRS-12C)
+
+Appointment ve client read-model'den **bağımsız** üçüncü CQRS read-model. Health/parity/smoke için bkz.
+[`cqrs-12c-5-pet-read-model-health-parity-smoke.md`](cqrs-12c-5-pet-read-model-health-parity-smoke.md);
+backfill için **CQRS-12C-6** (henüz uygulanmadı); **rollout/rollback acceptance** için **CQRS-12C-7**
+(henüz uygulanmadı).
+
+| Config key | Env override | Etki |
+|------------|--------------|------|
+| `QueryReadModels:PetsEnabled` | `QueryReadModels__PetsEnabled` | Pet list/search → Query DB read-model (default **false**) |
+| `PetProjection:Enabled` | `PetProjection__Enabled` | Pet outbox → read model projector (default **false**) |
+| `PetProjectionHealth:*` | `PetProjectionHealth__*` | Health eşikleri (Degraded/Unhealthy/DeadLetter) |
+
+- **Health:** `/health/ready` → `pet-projection` entry (client-projection ile aynı `data`
+  şeması: `pendingCount`, `retryWaitingCount`, `deadLetterCount`, `oldestPendingAgeSeconds`,
+  `projectionEnabled`, `petsReadEnabled`).
+- **Parity:** Command `Pets` count == Query `PetReadModels` count (`IPetReadModelParityReader`
+  veya SQL `COUNT_BIG`). Pet'te silme yoktur → tüm event'ler işlendiğinde in-sync.
+- **Rollback:** `QueryReadModels__PetsEnabled=false` → restart → health → parity. Projector açık
+  kalır.
+- **Backfill:** Mevcut pet satırlarını Query `PetReadModels`'e idempotent dolduran backfill
+  **CQRS-12C-6** konusudur (henüz uygulanmadı). `PetsEnabled=true` açmadan **önce** çalıştırılmalı
+  ve parity in-sync doğrulanmalıdır; aksi halde liste eksik döner (fallback yok).
+
+### 9.1 Pet rollout sırası (CQRS-12C-7 — planlanan)
+
+PetsEnabled açma **en sonda**; backfill + parity önce.
+
+```text
+migrate-query -> backfill-pet-projections (12C-6) -> parity (InSync) -> health (Healthy)
+              -> QueryReadModels__PetsEnabled=true + restart -> list/search smoke
+```
+
+### 9.2 Pet rollback sırası
+
+```text
+QueryReadModels__PetsEnabled=false -> restart -> health (Healthy)
+                                    -> (opsiyonel, planlı pause) PetProjection__Enabled=false
+```
+
+**Altın kural:** Read flag rollback edilse bile `PetProjection__Enabled=true` kalır; aksi halde Query
+DB geride kalır ve flag tekrar açılmadan önce yeniden backfill gerekebilir.

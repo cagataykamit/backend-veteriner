@@ -84,6 +84,8 @@ public static class DependencyInjection
             configuration.GetSection(PetProjectionOptions.SectionName));
         services.Configure<ClientProjectionHealthOptions>(
             configuration.GetSection(ClientProjectionHealthOptions.SectionName));
+        services.Configure<PetProjectionHealthOptions>(
+            configuration.GetSection(PetProjectionHealthOptions.SectionName));
         services.Configure<QueryReadModelsOptions>(
             configuration.GetSection(QueryReadModelsOptions.SectionName));
         services.Configure<AppointmentProjectionHealthOptions>(
@@ -211,6 +213,10 @@ public static class DependencyInjection
         // ===== Client projection health / parity (CQRS-12B-5) =====
         services.AddScoped<IClientProjectionStatusReader, ClientProjectionStatusReader>();
         services.AddScoped<IClientReadModelParityReader, ClientReadModelParityReader>();
+
+        // ===== Pet projection health / parity (CQRS-12C-5) =====
+        services.AddScoped<IPetProjectionStatusReader, PetProjectionStatusReader>();
+        services.AddScoped<IPetReadModelParityReader, PetReadModelParityReader>();
 
         // ===== Client read-model backfill / rebuild (CQRS-12B-6) =====
         services.AddScoped<IClientReadModelBackfillService, ClientReadModelBackfillService>();
