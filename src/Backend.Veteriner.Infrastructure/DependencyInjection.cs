@@ -206,9 +206,11 @@ public static class DependencyInjection
 
         // ===== Client query read-model reader (CQRS-12B-4) =====
         services.AddScoped<IClientReadModelReader, ClientReadModelReader>();
+        services.AddScoped<IClientReadModelLookupReader, ClientReadModelReader>();
 
         // ===== Pet query read-model reader (CQRS-12C-4) =====
         services.AddScoped<IPetReadModelReader, PetReadModelReader>();
+        services.AddScoped<IPetReadModelLookupReader, PetReadModelReader>();
 
         // ===== Client projection health / parity (CQRS-12B-5) =====
         services.AddScoped<IClientProjectionStatusReader, ClientProjectionStatusReader>();
