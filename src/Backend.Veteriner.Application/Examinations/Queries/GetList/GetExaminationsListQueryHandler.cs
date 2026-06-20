@@ -211,20 +211,12 @@ public sealed class GetExaminationsListQueryHandler
         Guid tenantId,
         string searchPattern,
         CancellationToken ct)
-    {
-        if (_queryReadModelsOptions.SharedSearchLookupEnabled)
-        {
-            var lookup = await _petLookupReader.ResolvePetIdsByTextSearchAsync(
-                new PetTextSearchLookupRequest(tenantId, searchPattern),
-                ct);
-            return lookup.PetIds.Count > 0 ? lookup.PetIds.ToArray() : [];
-        }
-
-        return await ListSearchPetIds.ResolveForAggregateListAsync(
+        => await SharedSearchPetIdsLookup.ResolveAsync(
             tenantId,
             searchPattern,
+            _queryReadModelsOptions.SharedSearchLookupEnabled,
+            _petLookupReader,
             _clients,
             _pets,
             ct);
-    }
 }

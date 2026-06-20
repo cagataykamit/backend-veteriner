@@ -3,6 +3,8 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Treatments.Contracts.Dtos;
 using Backend.Veteriner.Application.Treatments.Specs;
@@ -13,6 +15,7 @@ using Backend.Veteriner.Domain.Treatments;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Treatments.Queries.GetList;
@@ -26,6 +29,8 @@ public sealed class GetTreatmentsListQueryHandler
     private readonly IReadRepository<Treatment> _treatments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IPetReadModelLookupReader _petLookupReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetTreatmentsListQueryHandler> _logger;
 
     public GetTreatmentsListQueryHandler(
@@ -35,6 +40,8 @@ public sealed class GetTreatmentsListQueryHandler
         IReadRepository<Treatment> treatments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
+        IPetReadModelLookupReader petLookupReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetTreatmentsListQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -43,6 +50,8 @@ public sealed class GetTreatmentsListQueryHandler
         _treatments = treatments;
         _pets = pets;
         _clients = clients;
+        _petLookupReader = petLookupReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetTreatmentsListQueryHandler>.Instance;
     }
 
@@ -109,9 +118,11 @@ public sealed class GetTreatmentsListQueryHandler
         Guid[] searchPetIds = [];
         if (searchPattern is not null)
         {
-            searchPetIds = await ListSearchPetIds.ResolveForAggregateListAsync(
+            searchPetIds = await SharedSearchPetIdsLookup.ResolveAsync(
                 tenantId,
                 searchPattern,
+                _queryReadModelsOptions.SharedSearchLookupEnabled,
+                _petLookupReader,
                 _clients,
                 _pets,
                 ct);

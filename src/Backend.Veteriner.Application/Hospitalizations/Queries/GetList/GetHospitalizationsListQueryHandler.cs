@@ -3,14 +3,17 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Queries.GetList;
 
@@ -23,6 +26,8 @@ public sealed class GetHospitalizationsListQueryHandler
     private readonly IReadRepository<Hospitalization> _hospitalizations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IPetReadModelLookupReader _petLookupReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
 
     public GetHospitalizationsListQueryHandler(
         ITenantContext tenantContext,
@@ -30,7 +35,9 @@ public sealed class GetHospitalizationsListQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Hospitalization> hospitalizations,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IPetReadModelLookupReader petLookupReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -38,6 +45,8 @@ public sealed class GetHospitalizationsListQueryHandler
         _hospitalizations = hospitalizations;
         _pets = pets;
         _clients = clients;
+        _petLookupReader = petLookupReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
     }
 
     public async Task<Result<PagedResult<HospitalizationListItemDto>>> Handle(
@@ -83,9 +92,11 @@ public sealed class GetHospitalizationsListQueryHandler
         Guid[] searchPetIds = [];
         if (searchPattern is not null)
         {
-            searchPetIds = await ListSearchPetIds.ResolveForAggregateListAsync(
+            searchPetIds = await SharedSearchPetIdsLookup.ResolveAsync(
                 tenantId,
                 searchPattern,
+                _queryReadModelsOptions.SharedSearchLookupEnabled,
+                _petLookupReader,
                 _clients,
                 _pets,
                 ct);

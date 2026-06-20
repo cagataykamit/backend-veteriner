@@ -3,6 +3,8 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 using Backend.Veteriner.Application.Prescriptions.Specs;
@@ -11,6 +13,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Prescriptions.Queries.GetList;
 
@@ -23,6 +26,8 @@ public sealed class GetPrescriptionsListQueryHandler
     private readonly IReadRepository<Prescription> _prescriptions;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IPetReadModelLookupReader _petLookupReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
 
     public GetPrescriptionsListQueryHandler(
         ITenantContext tenantContext,
@@ -30,7 +35,9 @@ public sealed class GetPrescriptionsListQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Prescription> prescriptions,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IPetReadModelLookupReader petLookupReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -38,6 +45,8 @@ public sealed class GetPrescriptionsListQueryHandler
         _prescriptions = prescriptions;
         _pets = pets;
         _clients = clients;
+        _petLookupReader = petLookupReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
     }
 
     public async Task<Result<PagedResult<PrescriptionListItemDto>>> Handle(
@@ -83,9 +92,11 @@ public sealed class GetPrescriptionsListQueryHandler
         Guid[] searchPetIds = [];
         if (searchPattern is not null)
         {
-            searchPetIds = await ListSearchPetIds.ResolveForAggregateListAsync(
+            searchPetIds = await SharedSearchPetIdsLookup.ResolveAsync(
                 tenantId,
                 searchPattern,
+                _queryReadModelsOptions.SharedSearchLookupEnabled,
+                _petLookupReader,
                 _clients,
                 _pets,
                 ct);

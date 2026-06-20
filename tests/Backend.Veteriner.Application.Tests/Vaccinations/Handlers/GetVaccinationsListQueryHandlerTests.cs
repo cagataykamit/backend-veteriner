@@ -3,6 +3,8 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetList;
@@ -11,6 +13,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Vaccinations;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Vaccinations.Handlers;
@@ -22,16 +25,22 @@ public sealed class GetVaccinationsListQueryHandlerTests
     private readonly Mock<IReadRepository<Vaccination>> _vaccinations = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
-    private GetVaccinationsListQueryHandler CreateHandler()
+    private GetVaccinationsListQueryHandler CreateHandler(bool sharedSearchLookupEnabled = false)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
             _scopeResolver.Object,
             _vaccinations.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            _petLookupReader.Object,
+            Options.Create(new QueryReadModelsOptions
+            {
+                SharedSearchLookupEnabled = sharedSearchLookupEnabled
+            }));
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

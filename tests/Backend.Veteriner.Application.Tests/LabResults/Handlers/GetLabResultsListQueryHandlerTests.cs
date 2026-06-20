@@ -3,8 +3,10 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.LabResults.Queries.GetList;
 using Backend.Veteriner.Application.LabResults.Specs;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Tests.TestHelpers;
@@ -12,6 +14,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.LabResults.Handlers;
@@ -23,16 +26,22 @@ public sealed class GetLabResultsListQueryHandlerTests
     private readonly Mock<IReadRepository<LabResult>> _labResults = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
-    private GetLabResultsListQueryHandler CreateHandler()
+    private GetLabResultsListQueryHandler CreateHandler(bool sharedSearchLookupEnabled = false)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
             _scopeResolver.Object,
             _labResults.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            _petLookupReader.Object,
+            Options.Create(new QueryReadModelsOptions
+            {
+                SharedSearchLookupEnabled = sharedSearchLookupEnabled
+            }));
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
