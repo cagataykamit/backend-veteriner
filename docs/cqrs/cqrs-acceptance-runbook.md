@@ -30,6 +30,7 @@ Live API, çalışan SQL Server veya token dosyası **gerektirmez**. Yalnızca p
 | `tests/load/tools/Test-CqrsTwoInstanceAcceptance.ps1` | 11D script parse, token partition, k6 lifecycle özet ayrıştırma, worker participation, processed-events delta mantığı | PowerShell 5.1+, repo |
 | `tests/load/tools/Test-CqrsRolloutAcceptance.ps1` | 11E acceptance sequence, projection-disabled override, health beklenti matrisi, rollback dokümantasyonu | PowerShell 5.1+, repo |
 | `tests/load/tools/Test-CqrsClientRolloutAcceptance.ps1` | 12B-7 client readiness: rollout (6)/rollback (4) sıraları, flag override invariant'ları, client health beklenti matrisi, DbMigrator `backfill-client-projections` varlığı, doküman/secret taraması | PowerShell 5.1+, repo |
+| `tests/load/tools/Test-CqrsPetRolloutAcceptance.ps1` | 12C-7 pet readiness: rollout (6)/rollback (4) sıraları, flag override invariant'ları, pet health beklenti matrisi, DbMigrator `backfill-pet-projections` varlığı, doküman/secret taraması | PowerShell 5.1+, repo |
 
 > **Not (determinism garantisi):** `Test-CqrsStagedRollout.ps1` içindeki canlı `preflight-mode-mismatch-fails` kontrolü, **token dosyası varsa ve API erişilebilirse** çalışır. API erişilemiyorsa (CI veya API kapalı dev makinesi) bu kontrol **atlanır (skip = pass)**; token dosyası yoksa da atlanır. Böylece bu test gerçek CI'da deterministiktir.
 
@@ -59,6 +60,7 @@ Live API, çalışan SQL Server veya token dosyası **gerektirmez**. Yalnızca p
 3. .\tests\load\tools\Test-CqrsTwoInstanceAcceptance.ps1
 4. .\tests\load\tools\Test-CqrsRolloutAcceptance.ps1
 5. .\tests\load\tools\Test-CqrsClientRolloutAcceptance.ps1   # CQRS-12B client read-model
+6. .\tests\load\tools\Test-CqrsPetRolloutAcceptance.ps1      # CQRS-12C pet read-model
 ```
 
 Hepsi başarısızlıkta exit code != 0 döner (`Test-CqrsTwoInstanceAcceptance.ps1` throw eder; diğerleri `exit 1`). Sıra önemsizdir; paralel de koşabilir.
@@ -266,7 +268,8 @@ DB geride kalır ve flag tekrar açılmadan önce yeniden backfill gerekebilir.
 Appointment ve client read-model'den **bağımsız** üçüncü CQRS read-model. Health/parity/smoke için bkz.
 [`cqrs-12c-5-pet-read-model-health-parity-smoke.md`](cqrs-12c-5-pet-read-model-health-parity-smoke.md);
 backfill için [`cqrs-12c-6-pet-read-model-backfill.md`](cqrs-12c-6-pet-read-model-backfill.md);
-**rollout/rollback acceptance** için **CQRS-12C-7**
+**rollout/rollback acceptance ve final readiness** için
+[`cqrs-12c-7-pet-read-model-rollout-acceptance.md`](cqrs-12c-7-pet-read-model-rollout-acceptance.md).
 
 | Config key | Env override | Etki |
 |------------|--------------|------|
@@ -291,14 +294,19 @@ backfill için [`cqrs-12c-6-pet-read-model-backfill.md`](cqrs-12c-6-pet-read-mod
   dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-pet-projections --tenant <guid>
   ```
 
-### 9.1 Pet rollout sırası (CQRS-12C-7 — planlanan)
+### 9.1 Pet rollout sırası (CQRS-12C-7)
 
-PetsEnabled açma **en sonda**; backfill + parity önce.
+PetsEnabled açma **en sonda**; backfill + parity önce. Tam tablo ve checklist için
+[`cqrs-12c-7-...`](cqrs-12c-7-pet-read-model-rollout-acceptance.md).
 
 ```text
-migrate-query -> backfill-pet-projections (12C-6) -> parity (InSync) -> health (Healthy)
-              -> QueryReadModels__PetsEnabled=true + restart -> list/search smoke
+migrate-query -> backfill-pet-projections -> parity (InSync) -> health (Healthy)
+              -> PetProjection__Enabled=true (default false) -> PetsEnabled=true + restart -> smoke
 ```
+
+Backfill exit code: **0** success, **2** parity mismatch (PetsEnabled açma), **1** exception.
+
+Query DB boş/eksik + `PetsEnabled=true` → liste eksik; **Command DB fallback yok**.
 
 ### 9.2 Pet rollback sırası
 
