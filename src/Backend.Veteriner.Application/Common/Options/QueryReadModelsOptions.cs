@@ -23,4 +23,10 @@ public sealed class QueryReadModelsOptions
     /// <see cref="SharedSearchLookupEnabled"/> ve finansal rapor/export yüzeylerinden bağımsızdır.
     /// </summary>
     public bool PaymentsSearchLookupEnabled { get; set; }
+
+    /// <summary>
+    /// Dashboard finance özetini Query DB <c>ClinicDailyPaymentStatsReadModel</c> üzerinden okur (13E+).
+    /// Kapalıyken Command DB aggregate yolu korunur. Recent payments + isim hydration her iki yolda Command DB'den kalır.
+    /// </summary>
+    public bool DashboardFinanceReadEnabled { get; set; }
 }

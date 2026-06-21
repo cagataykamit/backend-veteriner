@@ -1,8 +1,10 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
+using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
@@ -12,6 +14,7 @@ using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Dashboard.Queries.GetFinanceSummary;
@@ -25,6 +28,8 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IDashboardFinancePaymentAggregatesReader _financeAggregates;
+    private readonly IDashboardFinanceReadModelReader _financeReadModelReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetDashboardFinanceSummaryQueryHandler> _logger;
 
     public GetDashboardFinanceSummaryQueryHandler(
@@ -34,6 +39,8 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
         IDashboardFinancePaymentAggregatesReader financeAggregates,
+        IDashboardFinanceReadModelReader financeReadModelReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetDashboardFinanceSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -42,6 +49,8 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         _clients = clients;
         _pets = pets;
         _financeAggregates = financeAggregates;
+        _financeReadModelReader = financeReadModelReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetDashboardFinanceSummaryQueryHandler>.Instance;
     }
 
@@ -69,6 +78,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         var querySteps = 0;
         var slowestStep = string.Empty;
         long slowestMs = 0;
+        var trendProjectionRowCount = 0;
 
         void MarkStep(string name)
         {
@@ -83,30 +93,63 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             stepSw.Restart();
         }
 
-        var totals = await _financeAggregates.GetTotalsAsync(
-            tenantId,
-            clinicId,
-            dayStart,
-            dayEnd,
-            weekStart,
-            weekEnd,
-            monthStart,
-            monthEnd,
-            ct);
-        MarkStep("financeWindowAggregates");
+        decimal todayTotalPaid;
+        decimal weekTotalPaid;
+        decimal monthTotalPaid;
+        int todayPaymentsCount;
+        int weekPaymentsCount;
+        int monthPaymentsCount;
+        List<DashboardDailyTotalDto> last7DaysPaid;
 
-        var todayTotalPaid = totals.TodayTotalPaid;
-        var todayPaymentsCount = totals.TodayPaymentsCount;
-        var weekTotalPaid = totals.WeekTotalPaid;
-        var weekPaymentsCount = totals.WeekPaymentsCount;
-        var monthTotalPaid = totals.MonthTotalPaid;
-        var monthPaymentsCount = totals.MonthPaymentsCount;
+        if (_queryReadModelsOptions.DashboardFinanceReadEnabled)
+        {
+            var readRequest = new DashboardFinanceReadRequest(
+                tenantId,
+                clinicId,
+                DashboardFinanceLocalDateRanges.TodayLocalDate(utcNow),
+                DashboardFinanceLocalDateRanges.WeekLocalDatesInclusive(utcNow),
+                DashboardFinanceLocalDateRanges.MonthLocalDatesInclusive(utcNow),
+                trendBuckets);
 
-        var trendProjectionRows = await _payments.ListAsync(
-            new PaymentsPaidAtAmountInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc),
-            ct);
-        MarkStep("last7DaysPaid");
-        var last7DaysPaid = BuildDailyTotals(trendBuckets, trendProjectionRows);
+            var readResult = await _financeReadModelReader.GetAsync(readRequest, ct);
+            MarkStep("financeReadModel");
+
+            todayTotalPaid = readResult.WindowTotals.TodayTotalPaid;
+            todayPaymentsCount = readResult.WindowTotals.TodayPaymentsCount;
+            weekTotalPaid = readResult.WindowTotals.WeekTotalPaid;
+            weekPaymentsCount = readResult.WindowTotals.WeekPaymentsCount;
+            monthTotalPaid = readResult.WindowTotals.MonthTotalPaid;
+            monthPaymentsCount = readResult.WindowTotals.MonthPaymentsCount;
+            last7DaysPaid = readResult.LastSevenDaysPaid.ToList();
+        }
+        else
+        {
+            var totals = await _financeAggregates.GetTotalsAsync(
+                tenantId,
+                clinicId,
+                dayStart,
+                dayEnd,
+                weekStart,
+                weekEnd,
+                monthStart,
+                monthEnd,
+                ct);
+            MarkStep("financeWindowAggregates");
+
+            todayTotalPaid = totals.TodayTotalPaid;
+            todayPaymentsCount = totals.TodayPaymentsCount;
+            weekTotalPaid = totals.WeekTotalPaid;
+            weekPaymentsCount = totals.WeekPaymentsCount;
+            monthTotalPaid = totals.MonthTotalPaid;
+            monthPaymentsCount = totals.MonthPaymentsCount;
+
+            var trendProjectionRows = await _payments.ListAsync(
+                new PaymentsPaidAtAmountInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc),
+                ct);
+            trendProjectionRowCount = trendProjectionRows.Count;
+            MarkStep("last7DaysPaid");
+            last7DaysPaid = BuildDailyTotals(trendBuckets, trendProjectionRows);
+        }
 
         var recentRows = await _payments.ListAsync(
             new PaymentsForDashboardRecentSpec(tenantId, clinicId, DashboardFinanceSummaryConstants.RecentPaymentsTake),
@@ -157,9 +200,10 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             last7DaysPaid);
 
         _logger.LogInformation(
-            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} UtcNow={UtcNow} DayWindowUtc={DayStartUtc}..{DayEndUtc} WeekWindowUtc={WeekStartUtc}..{WeekEndUtc} MonthWindowUtc={MonthStartUtc}..{MonthEndUtc} TrendWindowUtc={TrendStartUtc}..{TrendEndUtc} TrendProjectionRows={TrendProjectionRows} TodayCount={TodayCount} WeekCount={WeekCount} MonthCount={MonthCount} RecentPayments={RecentPayments} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} DashboardFinanceReadEnabled={DashboardFinanceReadEnabled} UtcNow={UtcNow} DayWindowUtc={DayStartUtc}..{DayEndUtc} WeekWindowUtc={WeekStartUtc}..{WeekEndUtc} MonthWindowUtc={MonthStartUtc}..{MonthEndUtc} TrendWindowUtc={TrendStartUtc}..{TrendEndUtc} TrendProjectionRows={TrendProjectionRows} TodayCount={TodayCount} WeekCount={WeekCount} MonthCount={MonthCount} RecentPayments={RecentPayments} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
             tenantId,
             clinicId,
+            _queryReadModelsOptions.DashboardFinanceReadEnabled,
             utcNow,
             dayStart,
             dayEnd,
@@ -169,7 +213,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             monthEnd,
             trendStartUtc,
             trendEndUtc,
-            trendProjectionRows.Count,
+            trendProjectionRowCount,
             todayPaymentsCount,
             weekPaymentsCount,
             monthPaymentsCount,

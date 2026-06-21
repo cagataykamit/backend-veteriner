@@ -1,15 +1,18 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Dashboard.Queries.GetFinanceSummary;
+using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Dashboard.Handlers;
@@ -22,15 +25,18 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IDashboardFinancePaymentAggregatesReader> _aggregates = new();
+    private readonly Mock<IDashboardFinanceReadModelReader> _financeReadModel = new();
 
-    private GetDashboardFinanceSummaryQueryHandler CreateHandler()
+    private GetDashboardFinanceSummaryQueryHandler CreateHandler(bool dashboardFinanceReadEnabled = false)
         => new(
             _tenant.Object,
             _clinic.Object,
             _payments.Object,
             _clients.Object,
             _pets.Object,
-            _aggregates.Object);
+            _aggregates.Object,
+            _financeReadModel.Object,
+            Options.Create(new QueryReadModelsOptions { DashboardFinanceReadEnabled = dashboardFinanceReadEnabled }));
 
     private void SetupEmptyLookups()
     {
