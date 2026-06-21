@@ -338,6 +338,12 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
             }
 
             var stale = await ApplySnapshotChangeAsync(snapshot, occurredAtUtc, eventId, projectedAtUtc, cancellationToken);
+
+            // Aynı transaction içinde list read-model upsert. Finance stale ise read-model de korunur
+            // (tek ordering otoritesi: contribution LastEventOccurredAtUtc).
+            if (!stale)
+                ApplyReadModelChange(snapshot, eventId, occurredAtUtc, projectedAtUtc);
+
             await _queryDb.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -449,6 +455,93 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
 
         return false;
     }
+
+    /// <summary>
+    /// PaymentReadModel list/search satırını idempotent upsert eder (aynı Query DB transaction'ı içinde).
+    /// Create → insert, Update → overwrite. Enrichment alanları (ClientName/PetName/Notes) snapshot'tan gelir;
+    /// 14C öncesi (eski) payload'larda bu alanlar yoksa defensive fallback uygulanır:
+    /// ClientName/ClientNameNormalized -> boş string, PetName/PetNameNormalized/Notes -> null.
+    /// </summary>
+    private void ApplyReadModelChange(
+        PaymentProjectionSnapshot snapshot,
+        Guid eventId,
+        DateTime occurredAtUtc,
+        DateTime projectedAtUtc)
+    {
+        var existing = _queryDb.PaymentReadModels.Find(snapshot.PaymentId);
+
+        // Defensive ordering guard; finance gate ile lockstep olduğundan normalde tetiklenmez.
+        if (existing is not null && occurredAtUtc < existing.LastEventOccurredAtUtc)
+            return;
+
+        var clientName = string.IsNullOrWhiteSpace(snapshot.ClientName)
+            ? string.Empty
+            : snapshot.ClientName.Trim();
+        var clientNameNormalized = !string.IsNullOrWhiteSpace(snapshot.ClientNameNormalized)
+            ? snapshot.ClientNameNormalized
+            : NormalizeOptional(clientName) ?? string.Empty;
+
+        var petName = string.IsNullOrWhiteSpace(snapshot.PetName) ? null : snapshot.PetName!.Trim();
+        var petNameNormalized = !string.IsNullOrWhiteSpace(snapshot.PetNameNormalized)
+            ? snapshot.PetNameNormalized
+            : NormalizeOptional(snapshot.PetName);
+
+        var notes = string.IsNullOrWhiteSpace(snapshot.Notes) ? null : snapshot.Notes!.Trim();
+        var notesNormalized = !string.IsNullOrWhiteSpace(snapshot.NotesNormalized)
+            ? snapshot.NotesNormalized
+            : NormalizeOptional(snapshot.Notes);
+
+        if (existing is null)
+        {
+            _queryDb.PaymentReadModels.Add(new PaymentReadModel
+            {
+                PaymentId = snapshot.PaymentId,
+                TenantId = snapshot.TenantId,
+                ClinicId = snapshot.ClinicId,
+                ClientId = snapshot.ClientId,
+                ClientName = clientName,
+                ClientNameNormalized = clientNameNormalized,
+                PetId = snapshot.PetId,
+                PetName = petName,
+                PetNameNormalized = petNameNormalized,
+                Amount = snapshot.Amount,
+                Currency = snapshot.Currency,
+                Method = snapshot.Method,
+                PaidAtUtc = snapshot.PaidAtUtc,
+                Notes = notes,
+                NotesNormalized = notesNormalized,
+                AppointmentId = snapshot.AppointmentId,
+                ExaminationId = snapshot.ExaminationId,
+                LastEventId = eventId,
+                LastEventOccurredAtUtc = occurredAtUtc,
+                LastProjectedAtUtc = projectedAtUtc
+            });
+            return;
+        }
+
+        existing.TenantId = snapshot.TenantId;
+        existing.ClinicId = snapshot.ClinicId;
+        existing.ClientId = snapshot.ClientId;
+        existing.ClientName = clientName;
+        existing.ClientNameNormalized = clientNameNormalized;
+        existing.PetId = snapshot.PetId;
+        existing.PetName = petName;
+        existing.PetNameNormalized = petNameNormalized;
+        existing.Amount = snapshot.Amount;
+        existing.Currency = snapshot.Currency;
+        existing.Method = snapshot.Method;
+        existing.PaidAtUtc = snapshot.PaidAtUtc;
+        existing.Notes = notes;
+        existing.NotesNormalized = notesNormalized;
+        existing.AppointmentId = snapshot.AppointmentId;
+        existing.ExaminationId = snapshot.ExaminationId;
+        existing.LastEventId = eventId;
+        existing.LastEventOccurredAtUtc = occurredAtUtc;
+        existing.LastProjectedAtUtc = projectedAtUtc;
+    }
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
 
     private void RecalculateDailyStats(
         Guid tenantId,

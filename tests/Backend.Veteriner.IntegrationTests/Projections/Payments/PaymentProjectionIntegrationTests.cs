@@ -378,6 +378,278 @@ public sealed class PaymentProjectionIntegrationTests
     }
 
     [Fact]
+    public async Task CreatedEvent_Should_UpsertPaymentReadModel_WithMappedFields()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
+
+        await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var paymentId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var appointmentId = Guid.NewGuid();
+        var examinationId = Guid.NewGuid();
+        var eventId = Guid.NewGuid();
+        var occurredAtUtc = new DateTime(2026, 6, 19, 10, 0, 0, DateTimeKind.Utc);
+        var paidAtUtc = new DateTime(2026, 6, 19, 12, 0, 0, DateTimeKind.Utc);
+
+        var snapshot = PaymentProjectionTestSupport.CreateSnapshot(
+            paymentId, tenantId, clinicId,
+            amount: 250m, currency: "TRY", paidAtUtc: paidAtUtc,
+            clientId: clientId, petId: petId,
+            clientName: "Ada Lovelace", petName: "Rex", notes: "Aşı bedeli",
+            method: 2, appointmentId: appointmentId, examinationId: examinationId);
+
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Created,
+            new PaymentCreatedIntegrationEvent(eventId, occurredAtUtc, snapshot));
+
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        var row = await PaymentProjectionTestSupport.FindReadModelAsync(queryDb, paymentId);
+        row.Should().NotBeNull();
+        row!.TenantId.Should().Be(tenantId);
+        row.ClinicId.Should().Be(clinicId);
+        row.ClientId.Should().Be(clientId);
+        row.ClientName.Should().Be("Ada Lovelace");
+        row.ClientNameNormalized.Should().Be("ada lovelace");
+        row.PetId.Should().Be(petId);
+        row.PetName.Should().Be("Rex");
+        row.PetNameNormalized.Should().Be("rex");
+        row.Amount.Should().Be(250m);
+        row.Currency.Should().Be("TRY");
+        row.Method.Should().Be(2);
+        row.PaidAtUtc.Should().Be(paidAtUtc);
+        row.Notes.Should().Be("Aşı bedeli");
+        row.NotesNormalized.Should().Be("aşı bedeli");
+        row.AppointmentId.Should().Be(appointmentId);
+        row.ExaminationId.Should().Be(examinationId);
+        row.LastEventId.Should().Be(eventId);
+        row.LastEventOccurredAtUtc.Should().Be(occurredAtUtc);
+    }
+
+    [Fact]
+    public async Task UpdatedEvent_Should_OverwritePaymentReadModel()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
+
+        await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var paymentId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paidAtUtc = new DateTime(2026, 6, 19, 12, 0, 0, DateTimeKind.Utc);
+
+        var created = PaymentProjectionTestSupport.CreateSnapshot(
+            paymentId, tenantId, clinicId, amount: 100m, paidAtUtc: paidAtUtc,
+            clientId: clientId, clientName: "Ada Lovelace", petName: "Rex", notes: "ilk");
+        var updated = PaymentProjectionTestSupport.CreateSnapshot(
+            paymentId, tenantId, clinicId, amount: 175m, paidAtUtc: paidAtUtc,
+            clientId: clientId, clientName: "Grace Hopper", petName: null, notes: "guncel", method: 3);
+
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Created,
+            new PaymentCreatedIntegrationEvent(
+                Guid.NewGuid(), new DateTime(2026, 6, 19, 9, 0, 0, DateTimeKind.Utc), created));
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Updated,
+            new PaymentUpdatedIntegrationEvent(
+                Guid.NewGuid(), new DateTime(2026, 6, 19, 11, 0, 0, DateTimeKind.Utc), updated));
+
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        (await queryDb.PaymentReadModels.CountAsync(x => x.PaymentId == paymentId)).Should().Be(1);
+        var row = await PaymentProjectionTestSupport.FindReadModelAsync(queryDb, paymentId);
+        row!.ClientName.Should().Be("Grace Hopper");
+        row.ClientNameNormalized.Should().Be("grace hopper");
+        row.PetName.Should().BeNull();
+        row.PetNameNormalized.Should().BeNull();
+        row.Amount.Should().Be(175m);
+        row.Method.Should().Be(3);
+        row.Notes.Should().Be("guncel");
+    }
+
+    [Fact]
+    public async Task DuplicateEvent_Should_NotDuplicatePaymentReadModel()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
+
+        await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var paymentId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var eventId = Guid.NewGuid();
+        var occurredAtUtc = new DateTime(2026, 6, 19, 10, 0, 0, DateTimeKind.Utc);
+        var snapshot = PaymentProjectionTestSupport.CreateSnapshot(
+            paymentId, tenantId, clinicId, amount: 100m, clientName: "Ada Lovelace");
+        var integrationEvent = new PaymentCreatedIntegrationEvent(eventId, occurredAtUtc, snapshot);
+
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, PaymentIntegrationEventTypes.Created, integrationEvent);
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, PaymentIntegrationEventTypes.Created, integrationEvent);
+
+        await processor.ProcessBatchAsync(CancellationToken.None);
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        (await queryDb.PaymentReadModels.CountAsync(x => x.PaymentId == paymentId)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task NullablePet_Should_ProjectNullPetFields()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
+
+        await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var paymentId = Guid.NewGuid();
+        var snapshot = PaymentProjectionTestSupport.CreateSnapshot(
+            paymentId, Guid.NewGuid(), Guid.NewGuid(),
+            clientName: "Ada Lovelace", petId: null, petName: null);
+
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Created,
+            new PaymentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, snapshot));
+
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        var row = await PaymentProjectionTestSupport.FindReadModelAsync(queryDb, paymentId);
+        row.Should().NotBeNull();
+        row!.PetId.Should().BeNull();
+        row.PetName.Should().BeNull();
+        row.PetNameNormalized.Should().BeNull();
+        row.ClientName.Should().Be("Ada Lovelace");
+    }
+
+    [Fact]
+    public async Task LegacyPayload_MissingEnrichedFields_Should_NotThrow_And_FallbackEmptyClientName()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
+
+        await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var paymentId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paidAtUtc = new DateTime(2026, 6, 19, 12, 0, 0, DateTimeKind.Utc);
+
+        // 14C öncesi payload: enrichment alanları yok.
+        var legacy = new
+        {
+            eventId = Guid.NewGuid(),
+            occurredAtUtc = new DateTime(2026, 6, 19, 10, 0, 0, DateTimeKind.Utc),
+            current = new
+            {
+                paymentId,
+                tenantId,
+                clinicId,
+                clientId,
+                petId = (Guid?)null,
+                appointmentId = (Guid?)null,
+                examinationId = (Guid?)null,
+                amount = 100m,
+                currency = "TRY",
+                method = 1,
+                paidAtUtc,
+                schemaVersion = 1
+            }
+        };
+        var payload = System.Text.Json.JsonSerializer.Serialize(legacy, PaymentProjectionTestSupport.Json);
+
+        await PaymentProjectionTestSupport.EnqueueRawAsync(
+            commandDb, PaymentIntegrationEventTypes.Created, payload);
+
+        var processed = await processor.ProcessBatchAsync(CancellationToken.None);
+        processed.Should().Be(1);
+
+        var row = await PaymentProjectionTestSupport.FindReadModelAsync(queryDb, paymentId);
+        row.Should().NotBeNull();
+        row!.ClientName.Should().BeEmpty();
+        row.ClientNameNormalized.Should().BeEmpty();
+        row.PetName.Should().BeNull();
+        row.PetNameNormalized.Should().BeNull();
+        row.Notes.Should().BeNull();
+        row.Amount.Should().Be(100m);
+
+        // Finance projection eski payload ile regresyona girmemeli.
+        var stats = await PaymentProjectionTestSupport.FindDailyStatsAsync(
+            queryDb, tenantId, clinicId, OperationDayBounds.ToLocalDate(paidAtUtc), "TRY");
+        stats!.PaidTotalAmount.Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task StaleEvent_Should_NotOverwritePaymentReadModel()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
+
+        await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var paymentId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var paidAtUtc = new DateTime(2026, 6, 19, 12, 0, 0, DateTimeKind.Utc);
+        var newerAt = new DateTime(2026, 6, 19, 12, 0, 0, DateTimeKind.Utc);
+        var olderAt = new DateTime(2026, 6, 19, 8, 0, 0, DateTimeKind.Utc);
+
+        var newerSnap = PaymentProjectionTestSupport.CreateSnapshot(
+            paymentId, tenantId, clinicId, amount: 500m, paidAtUtc: paidAtUtc,
+            clientId: clientId, clientName: "Grace Hopper");
+        var olderSnap = PaymentProjectionTestSupport.CreateSnapshot(
+            paymentId, tenantId, clinicId, amount: 50m, paidAtUtc: paidAtUtc,
+            clientId: clientId, clientName: "Stale Name");
+
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Updated,
+            new PaymentUpdatedIntegrationEvent(Guid.NewGuid(), newerAt, newerSnap));
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Updated,
+            new PaymentUpdatedIntegrationEvent(Guid.NewGuid(), olderAt, olderSnap));
+
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        var row = await PaymentProjectionTestSupport.FindReadModelAsync(queryDb, paymentId);
+        row!.ClientName.Should().Be("Grace Hopper", "stale event read-model'i ezmemeli");
+        row.Amount.Should().Be(500m);
+        row.LastEventOccurredAtUtc.Should().Be(newerAt);
+    }
+
+    [Fact]
     public async Task NonPaymentOutboxMessage_Should_NotBeConsumedByPaymentProcessor()
     {
         await using var scope = _factory.Services.CreateAsyncScope();

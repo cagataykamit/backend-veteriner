@@ -27,20 +27,44 @@ internal static class PaymentProjectionTestSupport
         decimal amount = 100m,
         string currency = "TRY",
         DateTime? paidAtUtc = null,
-        Guid? clientId = null)
+        Guid? clientId = null,
+        Guid? petId = null,
+        string? clientName = "Ada Lovelace",
+        string? petName = null,
+        string? notes = null,
+        int method = 1,
+        Guid? appointmentId = null,
+        Guid? examinationId = null)
         => new(
             paymentId,
             tenantId,
             clinicId,
             clientId ?? Guid.NewGuid(),
-            null,
-            null,
-            null,
+            petId,
+            appointmentId,
+            examinationId,
             amount,
             currency,
-            1,
+            method,
             paidAtUtc ?? new DateTime(2026, 6, 19, 10, 0, 0, DateTimeKind.Utc),
-            PaymentIntegrationEventTypes.SchemaVersion);
+            PaymentIntegrationEventTypes.SchemaVersion,
+            clientName,
+            NormalizeForTest(clientName),
+            petName,
+            NormalizeForTest(petName),
+            notes,
+            NormalizeForTest(notes));
+
+    private static string? NormalizeForTest(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
+
+    public static async Task<PaymentReadModel?> FindReadModelAsync(
+        QueryDbContext queryDb,
+        Guid paymentId,
+        CancellationToken ct = default)
+        => await queryDb.PaymentReadModels
+            .AsNoTracking()
+            .SingleOrDefaultAsync(x => x.PaymentId == paymentId, ct);
 
     public static async Task<OutboxMessage> EnqueueIntegrationEventAsync(
         AppDbContext commandDb,

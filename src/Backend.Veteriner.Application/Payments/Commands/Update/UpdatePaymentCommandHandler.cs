@@ -118,6 +118,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         if (client is null)
             return Result.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");
 
+        string? petName = null;
         if (request.PetId is { } pid)
         {
             var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, pid), ct);
@@ -130,6 +131,8 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
                     "Payments.PetClientMismatch",
                     "Seçilen hayvan bu müşteriye ait değil.");
             }
+
+            petName = pet.Name;
         }
 
         if (request.AppointmentId is { } aid)
@@ -223,7 +226,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
             new PaymentUpdatedIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
-                PaymentProjectionSnapshotFactory.Create(payment)),
+                PaymentProjectionSnapshotFactory.Create(payment, client.FullName, petName)),
             ct);
 
         await _paymentsWrite.SaveChangesAsync(ct);
