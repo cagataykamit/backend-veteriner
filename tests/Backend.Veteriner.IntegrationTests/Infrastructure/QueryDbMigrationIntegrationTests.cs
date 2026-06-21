@@ -20,6 +20,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
         "ClinicClientActivityReadModels",
         "ClinicDailyAppointmentStatsReadModels",
         "ClinicDailyPaymentStatsReadModels",
+        "PaymentDailyContributionReadModels",
         "ProcessedProjectionEvents"
     ];
 
@@ -79,6 +80,9 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
 
         var paymentStatsIndexes = await GetIndexNamesAsync(queryDb, "ClinicDailyPaymentStatsReadModels");
         paymentStatsIndexes.Should().Contain("IX_ClinicDailyPaymentStatsReadModels_TenantId_LocalDate");
+
+        var contributionIndexes = await GetIndexNamesAsync(queryDb, "PaymentDailyContributionReadModels");
+        contributionIndexes.Should().Contain("IX_PaymentDailyContributionReadModels_Tenant_Clinic_LocalDate_Currency");
     }
 
     [Fact]

@@ -24,6 +24,8 @@ using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Projections.Appointments;
 using Backend.Veteriner.Application.Projections.Clients;
 using Backend.Veteriner.Application.Projections.Pets;
+using Backend.Veteriner.Application.Projections.Payments;
+using Backend.Veteriner.Infrastructure.Projections.Payments;
 using Backend.Veteriner.Infrastructure.Persistence.Query;
 using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
@@ -83,6 +85,8 @@ public static class DependencyInjection
             configuration.GetSection(ClientProjectionOptions.SectionName));
         services.Configure<PetProjectionOptions>(
             configuration.GetSection(PetProjectionOptions.SectionName));
+        services.Configure<PaymentProjectionOptions>(
+            configuration.GetSection(PaymentProjectionOptions.SectionName));
         services.Configure<ClientProjectionHealthOptions>(
             configuration.GetSection(ClientProjectionHealthOptions.SectionName));
         services.Configure<PetProjectionHealthOptions>(
@@ -235,6 +239,12 @@ public static class DependencyInjection
         services.AddScoped<IPetOutboxClaimRepository, SqlPetOutboxClaimRepository>();
         services.AddSingleton<IPetProjectionWorkerIdentity, PetProjectionWorkerIdentity>();
         services.AddHostedService<PetProjectionHostedService>();
+
+        // ===== Payment finance projection (CQRS-13C) =====
+        services.AddScoped<IPaymentProjectionProcessor, PaymentProjectionProcessor>();
+        services.AddScoped<IPaymentOutboxClaimRepository, SqlPaymentOutboxClaimRepository>();
+        services.AddSingleton<IPaymentProjectionWorkerIdentity, PaymentProjectionWorkerIdentity>();
+        services.AddHostedService<PaymentProjectionHostedService>();
 
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));
