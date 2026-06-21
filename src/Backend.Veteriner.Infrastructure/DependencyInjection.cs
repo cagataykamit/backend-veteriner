@@ -256,6 +256,9 @@ public static class DependencyInjection
         services.AddScoped<IPaymentFinanceParityReader, PaymentFinanceParityReader>();
         services.AddScoped<IPaymentFinanceBackfillService, PaymentFinanceBackfillService>();
 
+        // ===== Payment list query read-model reader (CQRS-14D) =====
+        services.AddScoped<IPaymentsListReadModelReader, PaymentsListReadModelReader>();
+
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));
         services.AddHostedService<RefreshTokenCleanupHostedService>();
