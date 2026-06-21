@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Projections.Payments;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
+using Backend.Veteriner.Infrastructure.Projections.Payments;
 using Backend.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -174,6 +175,68 @@ public sealed class PaymentProjectionHealthIntegrationTests
         status.OldestPendingAge.Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task ReadModelHealthReader_Should_ReportDrift_WhenNotBackfilled()
+    {
+        await ResetBaselineWithPaymentsAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var (tenantId, clinicId, _) = await PaymentFinanceTestSupport.SeedTenantWithTwoClinicsAsync(commandDb);
+        await PaymentFinanceTestSupport.SeedPaymentAsync(commandDb, tenantId, clinicId, 100m, DateTime.UtcNow);
+        await PaymentFinanceTestSupport.SeedPaymentAsync(commandDb, tenantId, clinicId, 200m, DateTime.UtcNow);
+
+        var signal = await scope.ServiceProvider
+            .GetRequiredService<IPaymentReadModelHealthReader>()
+            .GetSignalAsync(CancellationToken.None);
+
+        signal.CommandPaymentCount.Should().Be(2);
+        signal.ReadModelCount.Should().Be(0);
+        signal.CountInSync.Should().BeFalse();
+
+        // Projection açık + drift + list read flag kapalı → Degraded (catch-up/backfill penceresi).
+        var status = new PaymentProjectionStatus(
+            PendingCount: 0,
+            RetryWaitingCount: 0,
+            DeadLetterCount: 0,
+            OldestPendingCreatedAtUtc: null,
+            OldestPendingAge: null,
+            NextRetryAtUtc: null,
+            QueryDatabaseReachable: true,
+            QueryDatabaseHasPendingMigrations: false,
+            ProjectionEnabled: true);
+
+        var evaluation = PaymentProjectionHealthEvaluator.Evaluate(
+            status,
+            new PaymentProjectionHealthOptions(),
+            signal);
+
+        evaluation.Level.Should().Be(PaymentProjectionHealthLevel.Degraded);
+    }
+
+    [Fact]
+    public async Task ReadModelHealthReader_Should_BeInSync_AfterBackfill()
+    {
+        await ResetBaselineWithPaymentsAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var (tenantId, clinicId, _) = await PaymentFinanceTestSupport.SeedTenantWithTwoClinicsAsync(commandDb);
+        await PaymentFinanceTestSupport.SeedPaymentAsync(commandDb, tenantId, clinicId, 100m, DateTime.UtcNow);
+
+        await scope.ServiceProvider
+            .GetRequiredService<IPaymentReadModelBackfillService>()
+            .BackfillAsync(tenantId, batchSize: 100, CancellationToken.None);
+
+        var signal = await scope.ServiceProvider
+            .GetRequiredService<IPaymentReadModelHealthReader>()
+            .GetSignalAsync(CancellationToken.None);
+
+        signal.CommandPaymentCount.Should().Be(1);
+        signal.ReadModelCount.Should().Be(1);
+        signal.CountInSync.Should().BeTrue();
+    }
+
     private async Task ResetBaselineAsync()
     {
         await using var scope = _factory.Services.CreateAsyncScope();
@@ -181,5 +244,15 @@ public sealed class PaymentProjectionHealthIntegrationTests
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+    }
+
+    private async Task ResetBaselineWithPaymentsAsync()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+        await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await commandDb.Payments.ExecuteDeleteAsync();
     }
 }

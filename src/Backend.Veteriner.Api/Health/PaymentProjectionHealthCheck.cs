@@ -10,19 +10,25 @@ namespace Backend.Veteriner.Api.Health;
 public sealed class PaymentProjectionHealthCheck : IHealthCheck
 {
     private readonly IPaymentProjectionStatusReader _statusReader;
+    private readonly IPaymentReadModelHealthReader _readModelHealthReader;
     private readonly PaymentProjectionHealthOptions _healthOptions;
     private readonly PaymentProjectionOptions _projectionOptions;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<PaymentProjectionHealthCheck> _logger;
 
     public PaymentProjectionHealthCheck(
         IPaymentProjectionStatusReader statusReader,
+        IPaymentReadModelHealthReader readModelHealthReader,
         IOptions<PaymentProjectionHealthOptions> healthOptions,
         IOptions<PaymentProjectionOptions> projectionOptions,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<PaymentProjectionHealthCheck> logger)
     {
         _statusReader = statusReader;
+        _readModelHealthReader = readModelHealthReader;
         _healthOptions = healthOptions.Value;
         _projectionOptions = projectionOptions.Value;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger;
     }
 
@@ -34,7 +40,16 @@ public sealed class PaymentProjectionHealthCheck : IHealthCheck
         {
             var status = await _statusReader.GetStatusAsync(cancellationToken);
 
-            var evaluation = PaymentProjectionHealthEvaluator.Evaluate(status, _healthOptions);
+            // Read-model drift sinyali yalnızca gate açıkken hesaplanır (production default kapalı → ekstra sorgu yok).
+            PaymentReadModelHealthSignal? readModelSignal = null;
+            if (status.QueryDatabaseReachable
+                && !status.QueryDatabaseHasPendingMigrations
+                && (_projectionOptions.Enabled || _queryReadModelsOptions.PaymentsListReadEnabled))
+            {
+                readModelSignal = await _readModelHealthReader.GetSignalAsync(cancellationToken);
+            }
+
+            var evaluation = PaymentProjectionHealthEvaluator.Evaluate(status, _healthOptions, readModelSignal);
 
             LogHealthLevel(evaluation);
 

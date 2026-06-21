@@ -259,6 +259,11 @@ public static class DependencyInjection
         // ===== Payment list query read-model reader (CQRS-14D) =====
         services.AddScoped<IPaymentsListReadModelReader, PaymentsListReadModelReader>();
 
+        // ===== Payment list read-model backfill / parity / health (CQRS-14F) =====
+        services.AddScoped<IPaymentReadModelBackfillService, PaymentReadModelBackfillService>();
+        services.AddScoped<IPaymentReadModelParityReader, PaymentReadModelParityReader>();
+        services.AddScoped<IPaymentReadModelHealthReader, PaymentReadModelHealthReader>();
+
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));
         services.AddHostedService<RefreshTokenCleanupHostedService>();

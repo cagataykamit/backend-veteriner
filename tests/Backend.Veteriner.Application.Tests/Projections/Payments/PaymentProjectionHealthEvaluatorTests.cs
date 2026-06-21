@@ -73,6 +73,79 @@ public sealed class PaymentProjectionHealthEvaluatorTests
         result.Level.Should().Be(PaymentProjectionHealthLevel.Healthy);
     }
 
+    [Fact]
+    public void Evaluate_Should_BeHealthy_WhenProjectionDisabledAndListReadDisabled_EvenWithEmptyReadModel()
+    {
+        var status = CreateStatus(projectionEnabled: false);
+        var signal = new PaymentReadModelHealthSignal(
+            CommandPaymentCount: 100,
+            ReadModelCount: 0,
+            PaymentsListReadEnabled: false);
+
+        var result = PaymentProjectionHealthEvaluator.Evaluate(status, DefaultHealth, signal);
+
+        result.Level.Should().Be(PaymentProjectionHealthLevel.Healthy);
+    }
+
+    [Fact]
+    public void Evaluate_Should_BeUnhealthy_WhenListReadEnabledAndReadModelDrift()
+    {
+        var status = CreateStatus(projectionEnabled: false);
+        var signal = new PaymentReadModelHealthSignal(
+            CommandPaymentCount: 100,
+            ReadModelCount: 0,
+            PaymentsListReadEnabled: true);
+
+        var result = PaymentProjectionHealthEvaluator.Evaluate(status, DefaultHealth, signal);
+
+        result.Level.Should().Be(PaymentProjectionHealthLevel.Unhealthy);
+        result.Data["readModelCountDrift"].Should().Be(100L);
+        result.Data["paymentsListReadEnabled"].Should().Be(true);
+    }
+
+    [Fact]
+    public void Evaluate_Should_BeDegraded_WhenProjectionEnabledAndReadModelDrift_AndListReadDisabled()
+    {
+        var status = CreateStatus(projectionEnabled: true);
+        var signal = new PaymentReadModelHealthSignal(
+            CommandPaymentCount: 50,
+            ReadModelCount: 10,
+            PaymentsListReadEnabled: false);
+
+        var result = PaymentProjectionHealthEvaluator.Evaluate(status, DefaultHealth, signal);
+
+        result.Level.Should().Be(PaymentProjectionHealthLevel.Degraded);
+    }
+
+    [Fact]
+    public void Evaluate_Should_BeHealthy_WhenReadModelInSync_AndQueueEmpty()
+    {
+        var status = CreateStatus(projectionEnabled: true);
+        var signal = new PaymentReadModelHealthSignal(
+            CommandPaymentCount: 42,
+            ReadModelCount: 42,
+            PaymentsListReadEnabled: true);
+
+        var result = PaymentProjectionHealthEvaluator.Evaluate(status, DefaultHealth, signal);
+
+        result.Level.Should().Be(PaymentProjectionHealthLevel.Healthy);
+        result.Data["readModelCountInSync"].Should().Be(true);
+    }
+
+    [Fact]
+    public void Evaluate_Should_KeepDeadLetterUnhealthy_EvenWhenReadModelInSync()
+    {
+        var status = CreateStatus(deadLetterCount: 1, projectionEnabled: true);
+        var signal = new PaymentReadModelHealthSignal(
+            CommandPaymentCount: 5,
+            ReadModelCount: 5,
+            PaymentsListReadEnabled: true);
+
+        var result = PaymentProjectionHealthEvaluator.Evaluate(status, DefaultHealth, signal);
+
+        result.Level.Should().Be(PaymentProjectionHealthLevel.Unhealthy);
+    }
+
     private static PaymentProjectionStatus CreateStatus(
         int pendingCount = 0,
         int retryWaitingCount = 0,
