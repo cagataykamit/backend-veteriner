@@ -105,6 +105,52 @@ public sealed class PaymentProjectionHealthIntegrationTests
     }
 
     [Fact]
+    public async Task Evaluate_Should_BeUnhealthy_WhenProjectionEnabledAndPendingAgeExceedsUnhealthyThreshold()
+    {
+        await ResetBaselineAsync();
+
+        var status = new PaymentProjectionStatus(
+            PendingCount: 1,
+            RetryWaitingCount: 0,
+            DeadLetterCount: 0,
+            OldestPendingCreatedAtUtc: DateTime.UtcNow.AddSeconds(-45),
+            OldestPendingAge: TimeSpan.FromSeconds(45),
+            NextRetryAtUtc: null,
+            QueryDatabaseReachable: true,
+            QueryDatabaseHasPendingMigrations: false,
+            ProjectionEnabled: true);
+
+        var evaluation = PaymentProjectionHealthEvaluator.Evaluate(
+            status,
+            new PaymentProjectionHealthOptions { DegradedAfterSeconds = 10, UnhealthyAfterSeconds = 30 });
+
+        evaluation.Level.Should().Be(PaymentProjectionHealthLevel.Unhealthy);
+    }
+
+    [Fact]
+    public async Task Evaluate_Should_BeUnhealthy_WhenProjectionEnabledAndDeadLetterExists()
+    {
+        await ResetBaselineAsync();
+
+        var status = new PaymentProjectionStatus(
+            PendingCount: 0,
+            RetryWaitingCount: 0,
+            DeadLetterCount: 1,
+            OldestPendingCreatedAtUtc: null,
+            OldestPendingAge: null,
+            NextRetryAtUtc: null,
+            QueryDatabaseReachable: true,
+            QueryDatabaseHasPendingMigrations: false,
+            ProjectionEnabled: true);
+
+        var evaluation = PaymentProjectionHealthEvaluator.Evaluate(
+            status,
+            new PaymentProjectionHealthOptions { DeadLetterIsUnhealthy = true });
+
+        evaluation.Level.Should().Be(PaymentProjectionHealthLevel.Unhealthy);
+    }
+
+    [Fact]
     public async Task StatusReader_Should_ReportPendingPaymentEvent()
     {
         await ResetBaselineAsync();
