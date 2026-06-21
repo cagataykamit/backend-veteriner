@@ -19,6 +19,8 @@ public sealed class QueryDbContext : DbContext
     public DbSet<ClinicClientActivityReadModel> ClinicClientActivityReadModels => Set<ClinicClientActivityReadModel>();
     public DbSet<ClinicDailyAppointmentStatsReadModel> ClinicDailyAppointmentStatsReadModels =>
         Set<ClinicDailyAppointmentStatsReadModel>();
+    public DbSet<ClinicDailyPaymentStatsReadModel> ClinicDailyPaymentStatsReadModels =>
+        Set<ClinicDailyPaymentStatsReadModel>();
     public DbSet<ProcessedProjectionEvent> ProcessedProjectionEvents => Set<ProcessedProjectionEvent>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

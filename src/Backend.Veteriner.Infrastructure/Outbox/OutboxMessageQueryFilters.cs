@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
+using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 
@@ -16,13 +17,17 @@ internal static class OutboxMessageQueryFilters
     private static readonly string[] PetIntegrationEventTypeValues =
         PetIntegrationEventTypes.All.ToArray();
 
+    private static readonly string[] PaymentIntegrationEventTypeValues =
+        PaymentIntegrationEventTypes.All.ToArray();
+
     // Projection (read-model) integration event tipleri: generic OutboxProcessor bunları tüketmez;
-    // her birinin kendi dedike projection processor'ı (appointment / client / pet) vardır.
+    // her birinin kendi dedike projection processor'ı vardır.
     private static readonly string[] ProjectionIntegrationEventTypeValues =
     [
         .. AppointmentIntegrationEventTypeValues,
         .. ClientIntegrationEventTypeValues,
-        .. PetIntegrationEventTypeValues
+        .. PetIntegrationEventTypeValues,
+        .. PaymentIntegrationEventTypeValues
     ];
 
     public static IQueryable<OutboxMessage> ExcludingAppointmentIntegrationEvents(IQueryable<OutboxMessage> query)
@@ -40,8 +45,12 @@ internal static class OutboxMessageQueryFilters
     public static IQueryable<OutboxMessage> ExcludingProjectionIntegrationEvents(IQueryable<OutboxMessage> query)
         => query.Where(m => !ProjectionIntegrationEventTypeValues.Contains(m.Type));
 
+    public static IQueryable<OutboxMessage> PaymentIntegrationEventsOnly(IQueryable<OutboxMessage> query)
+        => query.Where(m => PaymentIntegrationEventTypeValues.Contains(m.Type));
+
     public static bool IsProjectionIntegrationEvent(string type)
         => AppointmentIntegrationEventTypes.IsKnown(type)
            || ClientIntegrationEventTypes.IsKnown(type)
-           || PetIntegrationEventTypes.IsKnown(type);
+           || PetIntegrationEventTypes.IsKnown(type)
+           || PaymentIntegrationEventTypes.IsKnown(type);
 }

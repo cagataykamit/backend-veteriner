@@ -19,6 +19,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
         "ClinicPetActivityReadModels",
         "ClinicClientActivityReadModels",
         "ClinicDailyAppointmentStatsReadModels",
+        "ClinicDailyPaymentStatsReadModels",
         "ProcessedProjectionEvents"
     ];
 
@@ -75,6 +76,9 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
         petIndexes.Should().Contain("IX_PetReadModels_TenantId_ClientFullNameNormalized_PetId");
         petIndexes.Should().Contain("IX_PetReadModels_TenantId_SpeciesId");
         petIndexes.Should().Contain("IX_PetReadModels_TenantId_ColorId");
+
+        var paymentStatsIndexes = await GetIndexNamesAsync(queryDb, "ClinicDailyPaymentStatsReadModels");
+        paymentStatsIndexes.Should().Contain("IX_ClinicDailyPaymentStatsReadModels_TenantId_LocalDate");
     }
 
     [Fact]
@@ -171,6 +175,57 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
             .SingleAsync();
 
         columnType.Should().Be("date");
+    }
+
+    [Fact]
+    public async Task ClinicDailyPaymentStats_Should_Persist_DecimalAmount_And_DateOnly()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+
+        IntegrationTestDatabaseGuard.EnsureSafeDatabase(
+            queryDb.Database.GetConnectionString(),
+            allowedPrefix: IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName);
+
+        await IntegrationTestDatabaseReset.ResetAndMigrateAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var localDate = new DateOnly(2026, 6, 21);
+        var occurredAt = new DateTime(2026, 6, 21, 8, 0, 0, DateTimeKind.Utc);
+
+        queryDb.ClinicDailyPaymentStatsReadModels.Add(new ClinicDailyPaymentStatsReadModel
+        {
+            TenantId = tenantId,
+            ClinicId = clinicId,
+            LocalDate = localDate,
+            Currency = "TRY",
+            PaidTotalAmount = 1234567890123456.78m,
+            PaidCount = 3,
+            LastEventId = Guid.NewGuid(),
+            LastEventOccurredAtUtc = occurredAt,
+            LastProjectedAtUtc = DateTime.UtcNow
+        });
+        await queryDb.SaveChangesAsync();
+
+        queryDb.ChangeTracker.Clear();
+        var loaded = await queryDb.ClinicDailyPaymentStatsReadModels
+            .SingleAsync(x => x.TenantId == tenantId && x.ClinicId == clinicId && x.LocalDate == localDate && x.Currency == "TRY");
+
+        loaded.PaidTotalAmount.Should().Be(1234567890123456.78m);
+        loaded.PaidCount.Should().Be(3);
+        loaded.LastEventOccurredAtUtc.Should().Be(occurredAt);
+
+        var localDateColumnType = await queryDb.Database
+            .SqlQueryRaw<string>(
+                """
+                SELECT DATA_TYPE AS Value
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'ClinicDailyPaymentStatsReadModels' AND COLUMN_NAME = 'LocalDate'
+                """)
+            .SingleAsync();
+
+        localDateColumnType.Should().Be("date");
     }
 
     [Fact]

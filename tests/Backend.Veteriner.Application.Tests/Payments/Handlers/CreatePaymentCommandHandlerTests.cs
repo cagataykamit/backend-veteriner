@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Payments.Commands.Create;
+using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Appointments;
@@ -30,6 +31,7 @@ public sealed class CreatePaymentCommandHandlerTests
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
     private readonly Mock<IRepository<Payment>> _paymentsWrite = new();
+    private readonly Mock<IPaymentIntegrationEventOutbox> _eventOutbox = new();
 
     private CreatePaymentCommandHandler CreateHandler()
         => new(
@@ -41,7 +43,8 @@ public sealed class CreatePaymentCommandHandlerTests
             _pets.Object,
             _appointments.Object,
             _examinations.Object,
-            _paymentsWrite.Object);
+            _paymentsWrite.Object,
+            _eventOutbox.Object);
 
     private static CreatePaymentCommand Cmd(
         Guid clinicId,

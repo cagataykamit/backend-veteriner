@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -30,6 +31,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Payment> _paymentsRead;
     private readonly IRepository<Payment> _paymentsWrite;
+    private readonly IPaymentIntegrationEventOutbox _eventOutbox;
 
     public UpdatePaymentCommandHandler(
         ITenantContext tenantContext,
@@ -41,7 +43,8 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         IReadRepository<Appointment> appointments,
         IReadRepository<Examination> examinations,
         IReadRepository<Payment> paymentsRead,
-        IRepository<Payment> paymentsWrite)
+        IRepository<Payment> paymentsWrite,
+        IPaymentIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -53,6 +56,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         _examinations = examinations;
         _paymentsRead = paymentsRead;
         _paymentsWrite = paymentsWrite;
+        _eventOutbox = eventOutbox;
     }
 
     public async Task<Result> Handle(UpdatePaymentCommand request, CancellationToken ct)
@@ -212,6 +216,16 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
             return Result.Failure(domain.Error);
 
         await _paymentsWrite.UpdateAsync(payment, ct);
+
+        // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
+        await _eventOutbox.EnqueueAsync(
+            PaymentIntegrationEventTypes.Updated,
+            new PaymentUpdatedIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                PaymentProjectionSnapshotFactory.Create(payment)),
+            ct);
+
         await _paymentsWrite.SaveChangesAsync(ct);
         return Result.Success();
     }

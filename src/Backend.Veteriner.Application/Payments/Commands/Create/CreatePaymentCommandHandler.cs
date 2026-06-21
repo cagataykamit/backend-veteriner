@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Appointments;
@@ -28,6 +29,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Examination> _examinations;
     private readonly IRepository<Payment> _paymentsWrite;
+    private readonly IPaymentIntegrationEventOutbox _eventOutbox;
 
     public CreatePaymentCommandHandler(
         ITenantContext tenantContext,
@@ -38,7 +40,8 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         IReadRepository<Pet> pets,
         IReadRepository<Appointment> appointments,
         IReadRepository<Examination> examinations,
-        IRepository<Payment> paymentsWrite)
+        IRepository<Payment> paymentsWrite,
+        IPaymentIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -49,6 +52,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         _appointments = appointments;
         _examinations = examinations;
         _paymentsWrite = paymentsWrite;
+        _eventOutbox = eventOutbox;
     }
 
     public async Task<Result<Guid>> Handle(CreatePaymentCommand request, CancellationToken ct)
@@ -198,6 +202,16 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
             request.Notes);
 
         await _paymentsWrite.AddAsync(payment, ct);
+
+        // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
+        await _eventOutbox.EnqueueAsync(
+            PaymentIntegrationEventTypes.Created,
+            new PaymentCreatedIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                PaymentProjectionSnapshotFactory.Create(payment)),
+            ct);
+
         await _paymentsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(payment.Id);
     }

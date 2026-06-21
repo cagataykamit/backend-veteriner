@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Payments.Commands.Update;
 using Backend.Veteriner.Application.Payments.Specs;
+using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests;
@@ -32,6 +33,7 @@ public sealed class UpdatePaymentCommandHandlerTests
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
     private readonly Mock<IReadRepository<Payment>> _paymentsRead = new();
     private readonly Mock<IRepository<Payment>> _paymentsWrite = new();
+    private readonly Mock<IPaymentIntegrationEventOutbox> _eventOutbox = new();
 
     private UpdatePaymentCommandHandler CreateHandler()
         => new(
@@ -44,7 +46,8 @@ public sealed class UpdatePaymentCommandHandlerTests
             _appointments.Object,
             _examinations.Object,
             _paymentsRead.Object,
-            _paymentsWrite.Object);
+            _paymentsWrite.Object,
+            _eventOutbox.Object);
 
     private static UpdatePaymentCommand Cmd(
         Guid paymentId,
