@@ -24,8 +24,10 @@ using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Projections.Appointments;
 using Backend.Veteriner.Application.Projections.Clients;
 using Backend.Veteriner.Application.Projections.Pets;
+using Backend.Veteriner.Application.Payments.ReadModels;
 using Backend.Veteriner.Application.Projections.Payments;
 using Backend.Veteriner.Infrastructure.Projections.Payments;
+using Backend.Veteriner.Infrastructure.Query.Payments;
 using Backend.Veteriner.Infrastructure.Persistence.Query;
 using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
@@ -87,6 +89,8 @@ public static class DependencyInjection
             configuration.GetSection(PetProjectionOptions.SectionName));
         services.Configure<PaymentProjectionOptions>(
             configuration.GetSection(PaymentProjectionOptions.SectionName));
+        services.Configure<PaymentProjectionHealthOptions>(
+            configuration.GetSection(PaymentProjectionHealthOptions.SectionName));
         services.Configure<ClientProjectionHealthOptions>(
             configuration.GetSection(ClientProjectionHealthOptions.SectionName));
         services.Configure<PetProjectionHealthOptions>(
@@ -245,6 +249,11 @@ public static class DependencyInjection
         services.AddScoped<IPaymentOutboxClaimRepository, SqlPaymentOutboxClaimRepository>();
         services.AddSingleton<IPaymentProjectionWorkerIdentity, PaymentProjectionWorkerIdentity>();
         services.AddHostedService<PaymentProjectionHostedService>();
+
+        // ===== Payment finance projection health / parity / backfill (CQRS-13D) =====
+        services.AddScoped<IPaymentProjectionStatusReader, PaymentProjectionStatusReader>();
+        services.AddScoped<IPaymentFinanceParityReader, PaymentFinanceParityReader>();
+        services.AddScoped<IPaymentFinanceBackfillService, PaymentFinanceBackfillService>();
 
         // ===== RefreshToken cleanup background worker =====
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));

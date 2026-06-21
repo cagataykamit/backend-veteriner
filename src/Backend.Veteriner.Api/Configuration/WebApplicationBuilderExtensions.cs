@@ -151,7 +151,8 @@ public static class WebApplicationBuilderExtensions
             .AddCheck<OutboxHealthCheck>("outbox")
             .AddCheck<AppointmentProjectionHealthCheck>("appointment-projection")
             .AddCheck<ClientProjectionHealthCheck>("client-projection")
-            .AddCheck<PetProjectionHealthCheck>("pet-projection");
+            .AddCheck<PetProjectionHealthCheck>("pet-projection")
+            .AddCheck<PaymentProjectionHealthCheck>("payment-projection");
 
         builder.Services.AddInfrastructure(builder.Configuration);
 
