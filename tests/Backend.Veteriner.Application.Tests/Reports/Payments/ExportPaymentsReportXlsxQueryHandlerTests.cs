@@ -1,14 +1,22 @@
+using Backend.Veteriner.Application.Clients.ReadModels;
+using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Payments.Specs;
+using Backend.Veteriner.Application.Pets.ReadModels;
+using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
 using Backend.Veteriner.Application.Tests.TestHelpers;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
+using Backend.Veteriner.Domain.Pets;
 using ClosedXML.Excel;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Reports.Payments;
@@ -21,10 +29,25 @@ public sealed class ExportPaymentsReportXlsxQueryHandlerTests
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Clients.Client>> _clients = new();
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Pets.Pet>> _pets = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
+    private readonly Mock<IClientReadModelLookupReader> _clientLookupReader = new();
+    private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
-    private ExportPaymentsReportXlsxQueryHandler CreateHandler()
-        => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _payments.Object, _clients.Object, _pets.Object, _clinics.Object);
+    private ExportPaymentsReportXlsxQueryHandler CreateHandler(bool paymentsSearchLookupEnabled = false)
+        => new(
+            _tenant.Object,
+            _clinic.Object,
+            _scopeResolver.Object,
+            _payments.Object,
+            _clients.Object,
+            _pets.Object,
+            _clinics.Object,
+            _clientLookupReader.Object,
+            _petLookupReader.Object,
+            Options.Create(new QueryReadModelsOptions
+            {
+                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
+            }));
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

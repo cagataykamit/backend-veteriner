@@ -1,6 +1,8 @@
+using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Payments.Specs;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -30,6 +32,9 @@ internal static class PaymentsReportExportPipeline
         Guid? clientId,
         Guid? petId,
         string? search,
+        bool paymentsSearchLookupEnabled,
+        IClientReadModelLookupReader clientLookupReader,
+        IPetReadModelLookupReader petLookupReader,
         CancellationToken ct)
     {
         var validated = await PaymentsReportQueryValidation.ValidateAsync(
@@ -46,7 +51,15 @@ internal static class PaymentsReportExportPipeline
         var (tenantId, effectiveClinicId, accessibleClinicIds, validatedFrom, validatedTo) = validated.Value;
 
         var (searchPattern, searchClientIds, searchPetIds) =
-            await PaymentsReportSearchResolution.ResolveSearchAsync(tenantId, search, clients, pets, ct);
+            await PaymentsReportSearchResolution.ResolveSearchAsync(
+                tenantId,
+                search,
+                paymentsSearchLookupEnabled,
+                clientLookupReader,
+                petLookupReader,
+                clients,
+                pets,
+                ct);
 
         var total = await payments.CountAsync(
             new PaymentsFilteredCountSpec(

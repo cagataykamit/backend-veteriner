@@ -12,7 +12,7 @@ using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Reports.Payments;
 
-/// <summary>CQRS-12D-8: PaymentsReportSearchResolution flag routing unit tests.</summary>
+/// <summary>CQRS-12D-8/12D-9: PaymentsReportSearchResolution flag routing unit tests.</summary>
 public sealed class PaymentsReportSearchResolutionTests
 {
     private readonly Mock<IReadRepository<Client>> _clients = new();
@@ -75,27 +75,6 @@ public sealed class PaymentsReportSearchResolutionTests
             Times.Once);
         _petLookupReader.Verify(
             r => r.ResolvePetIdsByPetTextFieldsAsync(It.IsAny<PetTextFieldsSearchLookupRequest>(), It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task LegacyResolveSearch_ForExportPath_Should_StillUseCommandDb()
-    {
-        var tid = Guid.NewGuid();
-        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Client>());
-        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Pet>());
-
-        await PaymentsReportSearchResolution.ResolveSearchAsync(
-            tid,
-            "pamuk",
-            _clients.Object,
-            _pets.Object,
-            CancellationToken.None);
-
-        _clients.Verify(
-            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
