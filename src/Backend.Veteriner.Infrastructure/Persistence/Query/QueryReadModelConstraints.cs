@@ -20,5 +20,7 @@ internal static class QueryReadModelConstraints
     public const int PetColorName = 200;
     public const int PetColorNameNormalized = 200;
     public const int Notes = 2000;
+    public const int PaymentNotes = 4000;
+    public const int PaymentNotesNormalized = 4000;
     public const int ProjectionConsumerName = 128;
 }
