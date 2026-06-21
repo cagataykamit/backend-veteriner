@@ -202,6 +202,8 @@ public static class DependencyInjection
 
         // ===== Client projection (CQRS-12B-3) =====
         services.AddScoped<IClientProjectionProcessor, ClientProjectionProcessor>();
+        services.AddScoped<IClientOutboxClaimRepository, SqlClientOutboxClaimRepository>();
+        services.AddSingleton<IClientProjectionWorkerIdentity, ClientProjectionWorkerIdentity>();
         services.AddHostedService<ClientProjectionHostedService>();
 
         // ===== Client query read-model reader (CQRS-12B-4) =====
@@ -228,6 +230,8 @@ public static class DependencyInjection
 
         // ===== Pet projection (CQRS-12C-3) =====
         services.AddScoped<IPetProjectionProcessor, PetProjectionProcessor>();
+        services.AddScoped<IPetOutboxClaimRepository, SqlPetOutboxClaimRepository>();
+        services.AddSingleton<IPetProjectionWorkerIdentity, PetProjectionWorkerIdentity>();
         services.AddHostedService<PetProjectionHostedService>();
 
         // ===== RefreshToken cleanup background worker =====

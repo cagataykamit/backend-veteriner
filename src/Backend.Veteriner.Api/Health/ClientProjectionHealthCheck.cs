@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Projections.Clients;
+using Backend.Veteriner.Infrastructure.Projections.Clients;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,17 +12,20 @@ public sealed class ClientProjectionHealthCheck : IHealthCheck
     private readonly IClientProjectionStatusReader _statusReader;
     private readonly ClientProjectionHealthOptions _healthOptions;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
+    private readonly ClientProjectionOptions _projectionOptions;
     private readonly ILogger<ClientProjectionHealthCheck> _logger;
 
     public ClientProjectionHealthCheck(
         IClientProjectionStatusReader statusReader,
         IOptions<ClientProjectionHealthOptions> healthOptions,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        IOptions<ClientProjectionOptions> projectionOptions,
         ILogger<ClientProjectionHealthCheck> logger)
     {
         _statusReader = statusReader;
         _healthOptions = healthOptions.Value;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
+        _projectionOptions = projectionOptions.Value;
         _logger = logger;
     }
 
@@ -40,7 +44,12 @@ public sealed class ClientProjectionHealthCheck : IHealthCheck
 
             LogHealthLevel(evaluation);
 
-            return MapToHealthCheckResult(evaluation);
+            var data = new Dictionary<string, object?>(evaluation.Data)
+            {
+                ["claimingEnabled"] = _projectionOptions.ClaimingEnabled
+            };
+
+            return MapToHealthCheckResult(evaluation, data);
         }
         catch (Exception ex)
         {
@@ -78,7 +87,9 @@ public sealed class ClientProjectionHealthCheck : IHealthCheck
         }
     }
 
-    internal static HealthCheckResult MapToHealthCheckResult(ClientProjectionHealthEvaluation evaluation)
+    internal static HealthCheckResult MapToHealthCheckResult(
+        ClientProjectionHealthEvaluation evaluation,
+        IReadOnlyDictionary<string, object?> data)
     {
         var status = evaluation.Level switch
         {
@@ -90,7 +101,7 @@ public sealed class ClientProjectionHealthCheck : IHealthCheck
         return new HealthCheckResult(
             status,
             evaluation.Description,
-            data: evaluation.Data
+            data: data
                 .Where(kvp => kvp.Value is not null)
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!));
     }

@@ -4,8 +4,8 @@ namespace Backend.Veteriner.Application.Projections.Clients;
 
 /// <summary>
 /// Client projection health kurallarını tek yerde toplar (test edilebilir, hosting-neutral).
-/// Appointment health evaluator deseniyle hizalıdır; client tarafında claim/lease yoktur,
-/// read flag yalnızca <see cref="QueryReadModelsOptions.ClientsEnabled"/>'dır.
+/// Appointment health evaluator deseniyle hizalıdır; read flag yalnızca <see cref="QueryReadModelsOptions.ClientsEnabled"/>'dır.
+/// Claim/lease opt-in: <see cref="ClientProjectionOptions.ClaimingEnabled"/> (health data: claimingEnabled).
 /// </summary>
 public static class ClientProjectionHealthEvaluator
 {

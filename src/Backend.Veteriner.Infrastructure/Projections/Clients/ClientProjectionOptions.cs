@@ -16,4 +16,17 @@ public sealed class ClientProjectionOptions
     /// ayrıdır; PK (EventId, ConsumerName) olduğundan bağımsız dedup sağlar.
     /// </summary>
     public string ConsumerName { get; set; } = "client-read-model-v1";
+
+    /// <summary>
+    /// Atomik outbox claim/lease kullanımı. Varsayılan kapalı — mevcut FIFO processor davranışı korunur.
+    /// </summary>
+    public bool ClaimingEnabled { get; set; }
+
+    /// <summary>Claim sonrası lease süresi (saniye).</summary>
+    public int LeaseDurationSeconds { get; set; } = 60;
+
+    /// <summary>Her claim döngüsünde alınacak maksimum outbox satırı.</summary>
+    public int ClaimBatchSize { get; set; } = 1;
+
+    public const int MaxClaimBatchSize = 50;
 }

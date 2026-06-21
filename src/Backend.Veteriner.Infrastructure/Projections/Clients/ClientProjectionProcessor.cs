@@ -36,6 +36,8 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
     private readonly OutboxOptions _outboxOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ClientProjectionProcessor> _logger;
+    private readonly IClientOutboxClaimRepository _claimRepository;
+    private readonly IClientProjectionWorkerIdentity _workerIdentity;
 
     public ClientProjectionProcessor(
         AppDbContext commandDb,
@@ -43,7 +45,9 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
         IOptions<ClientProjectionOptions> options,
         IOptions<OutboxOptions> outboxOptions,
         TimeProvider timeProvider,
-        ILogger<ClientProjectionProcessor> logger)
+        ILogger<ClientProjectionProcessor> logger,
+        IClientOutboxClaimRepository claimRepository,
+        IClientProjectionWorkerIdentity workerIdentity)
     {
         _commandDb = commandDb;
         _queryDb = queryDb;
@@ -51,6 +55,8 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
         _outboxOptions = outboxOptions.Value;
         _timeProvider = timeProvider;
         _logger = logger;
+        _claimRepository = claimRepository;
+        _workerIdentity = workerIdentity;
     }
 
     public async Task<int> ProcessBatchAsync(CancellationToken cancellationToken)
@@ -58,12 +64,169 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
         await BatchGate.WaitAsync(cancellationToken);
         try
         {
-            return await ProcessFifoBatchAsync(cancellationToken);
+            return _options.ClaimingEnabled
+                ? await ProcessClaimBatchAsync(cancellationToken)
+                : await ProcessFifoBatchAsync(cancellationToken);
         }
         finally
         {
             BatchGate.Release();
         }
+    }
+
+    private async Task<int> ProcessClaimBatchAsync(CancellationToken cancellationToken)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var workerId = _workerIdentity.WorkerId;
+        var batchSize = Math.Max(1, _options.ClaimBatchSize);
+        var leaseDuration = TimeSpan.FromSeconds(_options.LeaseDurationSeconds);
+        var processedCount = 0;
+
+        _logger.LogInformation(
+            "ClientProjectionClaimBatchStarted WorkerId={WorkerId} BatchSize={BatchSize} LeaseDurationSeconds={LeaseDurationSeconds}",
+            workerId,
+            batchSize,
+            _options.LeaseDurationSeconds);
+
+        var claimed = await _claimRepository.ClaimNextBatchAsync(
+            workerId,
+            batchSize,
+            leaseDuration,
+            cancellationToken);
+
+        foreach (var claimedMessage in claimed)
+        {
+            try
+            {
+                var (integrationEvent, eventId, occurredAtUtc) =
+                    DeserializeIntegrationEvent(claimedMessage.Type, claimedMessage.Payload);
+                var applyResult = await ApplyTransactionallyAsync(
+                    integrationEvent, eventId, occurredAtUtc, cancellationToken);
+
+                if (applyResult.IsDuplicate)
+                {
+                    _logger.LogInformation(
+                        "ClientProjectionDuplicateEventSkipped MessageId={MessageId} EventId={EventId} ConsumerName={ConsumerName}",
+                        claimedMessage.Id, eventId, _options.ConsumerName);
+                }
+                else if (applyResult.IsStale)
+                {
+                    _logger.LogInformation(
+                        "ClientProjectionStaleEventSkipped MessageId={MessageId} EventId={EventId} OccurredAtUtc={OccurredAtUtc}",
+                        claimedMessage.Id, eventId, occurredAtUtc);
+                }
+
+                var acknowledged = await _claimRepository.MarkProcessedAsync(
+                    claimedMessage.Id,
+                    claimedMessage.ClaimToken,
+                    workerId,
+                    cancellationToken);
+
+                if (!acknowledged)
+                {
+                    _logger.LogWarning(
+                        "ClientProjectionStaleCompletionRejected MessageId={MessageId} EventId={EventId}",
+                        claimedMessage.Id,
+                        eventId);
+                }
+
+                processedCount++;
+            }
+            catch (UnknownClientIntegrationEventTypeException ex)
+            {
+                var deadLettered = await _claimRepository.MarkDeadLetterAsync(
+                    claimedMessage.Id,
+                    claimedMessage.ClaimToken,
+                    workerId,
+                    ex.Message,
+                    cancellationToken);
+
+                if (!deadLettered)
+                {
+                    _logger.LogWarning(
+                        "ClientProjectionClaimDeadLetterRejected MessageId={MessageId}",
+                        claimedMessage.Id);
+                }
+                else
+                {
+                    _logger.LogError(
+                        ex,
+                        "ClientProjectionDeadLetterDetected Type={Type} Reason=UnknownEventType",
+                        claimedMessage.Type);
+                }
+            }
+            catch (Exception ex)
+            {
+                var newRetryCount = claimedMessage.RetryCount + 1;
+                if (newRetryCount >= _outboxOptions.MaxRetryCount)
+                {
+                    var deadLettered = await _claimRepository.MarkDeadLetterAsync(
+                        claimedMessage.Id,
+                        claimedMessage.ClaimToken,
+                        workerId,
+                        ex.Message,
+                        cancellationToken);
+
+                    if (!deadLettered)
+                    {
+                        _logger.LogWarning(
+                            "ClientProjectionClaimDeadLetterRejected MessageId={MessageId}",
+                            claimedMessage.Id);
+                    }
+                    else
+                    {
+                        _logger.LogError(
+                            ex,
+                            "ClientProjectionDeadLetterDetected Type={Type} Retry={Retry}",
+                            claimedMessage.Type,
+                            newRetryCount);
+                    }
+                }
+                else
+                {
+                    var backoff = OutboxRetryHelper.ComputeBackoff(_outboxOptions.BaseDelaySeconds, newRetryCount);
+                    var nextAttemptAtUtc = now.Add(backoff);
+                    var retried = await _claimRepository.MarkRetryAsync(
+                        claimedMessage.Id,
+                        claimedMessage.ClaimToken,
+                        workerId,
+                        newRetryCount,
+                        nextAttemptAtUtc,
+                        ex.Message,
+                        cancellationToken);
+
+                    if (!retried)
+                    {
+                        _logger.LogWarning(
+                            "ClientProjectionClaimRetryRejected MessageId={MessageId}",
+                            claimedMessage.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Client projection retry in {DelaySeconds}s. Type={Type} Retry={Retry}",
+                            (int)backoff.TotalSeconds,
+                            claimedMessage.Type,
+                            newRetryCount);
+                    }
+                }
+
+                break;
+            }
+        }
+
+        if (processedCount > 0 || claimed.Count > 0)
+        {
+            _logger.LogInformation(
+                "ClientProjectionClaimBatchCompleted WorkerId={WorkerId} ClaimedCount={ClaimedCount} ProcessedCount={ProcessedCount} ConsumerName={ConsumerName}",
+                workerId,
+                claimed.Count,
+                processedCount,
+                _options.ConsumerName);
+        }
+
+        return processedCount;
     }
 
     private async Task<int> ProcessFifoBatchAsync(CancellationToken cancellationToken)

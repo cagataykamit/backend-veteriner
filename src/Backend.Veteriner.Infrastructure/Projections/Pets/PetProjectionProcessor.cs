@@ -36,6 +36,8 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
     private readonly OutboxOptions _outboxOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<PetProjectionProcessor> _logger;
+    private readonly IPetOutboxClaimRepository _claimRepository;
+    private readonly IPetProjectionWorkerIdentity _workerIdentity;
 
     public PetProjectionProcessor(
         AppDbContext commandDb,
@@ -43,7 +45,9 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
         IOptions<PetProjectionOptions> options,
         IOptions<OutboxOptions> outboxOptions,
         TimeProvider timeProvider,
-        ILogger<PetProjectionProcessor> logger)
+        ILogger<PetProjectionProcessor> logger,
+        IPetOutboxClaimRepository claimRepository,
+        IPetProjectionWorkerIdentity workerIdentity)
     {
         _commandDb = commandDb;
         _queryDb = queryDb;
@@ -51,6 +55,8 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
         _outboxOptions = outboxOptions.Value;
         _timeProvider = timeProvider;
         _logger = logger;
+        _claimRepository = claimRepository;
+        _workerIdentity = workerIdentity;
     }
 
     public async Task<int> ProcessBatchAsync(CancellationToken cancellationToken)
@@ -58,12 +64,169 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
         await BatchGate.WaitAsync(cancellationToken);
         try
         {
-            return await ProcessFifoBatchAsync(cancellationToken);
+            return _options.ClaimingEnabled
+                ? await ProcessClaimBatchAsync(cancellationToken)
+                : await ProcessFifoBatchAsync(cancellationToken);
         }
         finally
         {
             BatchGate.Release();
         }
+    }
+
+    private async Task<int> ProcessClaimBatchAsync(CancellationToken cancellationToken)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var workerId = _workerIdentity.WorkerId;
+        var batchSize = Math.Max(1, _options.ClaimBatchSize);
+        var leaseDuration = TimeSpan.FromSeconds(_options.LeaseDurationSeconds);
+        var processedCount = 0;
+
+        _logger.LogInformation(
+            "PetProjectionClaimBatchStarted WorkerId={WorkerId} BatchSize={BatchSize} LeaseDurationSeconds={LeaseDurationSeconds}",
+            workerId,
+            batchSize,
+            _options.LeaseDurationSeconds);
+
+        var claimed = await _claimRepository.ClaimNextBatchAsync(
+            workerId,
+            batchSize,
+            leaseDuration,
+            cancellationToken);
+
+        foreach (var claimedMessage in claimed)
+        {
+            try
+            {
+                var (integrationEvent, eventId, occurredAtUtc) =
+                    DeserializeIntegrationEvent(claimedMessage.Type, claimedMessage.Payload);
+                var applyResult = await ApplyTransactionallyAsync(
+                    integrationEvent, eventId, occurredAtUtc, cancellationToken);
+
+                if (applyResult.IsDuplicate)
+                {
+                    _logger.LogInformation(
+                        "PetProjectionDuplicateEventSkipped MessageId={MessageId} EventId={EventId} ConsumerName={ConsumerName}",
+                        claimedMessage.Id, eventId, _options.ConsumerName);
+                }
+                else if (applyResult.IsStale)
+                {
+                    _logger.LogInformation(
+                        "PetProjectionStaleEventSkipped MessageId={MessageId} EventId={EventId} OccurredAtUtc={OccurredAtUtc}",
+                        claimedMessage.Id, eventId, occurredAtUtc);
+                }
+
+                var acknowledged = await _claimRepository.MarkProcessedAsync(
+                    claimedMessage.Id,
+                    claimedMessage.ClaimToken,
+                    workerId,
+                    cancellationToken);
+
+                if (!acknowledged)
+                {
+                    _logger.LogWarning(
+                        "PetProjectionStaleCompletionRejected MessageId={MessageId} EventId={EventId}",
+                        claimedMessage.Id,
+                        eventId);
+                }
+
+                processedCount++;
+            }
+            catch (UnknownPetIntegrationEventTypeException ex)
+            {
+                var deadLettered = await _claimRepository.MarkDeadLetterAsync(
+                    claimedMessage.Id,
+                    claimedMessage.ClaimToken,
+                    workerId,
+                    ex.Message,
+                    cancellationToken);
+
+                if (!deadLettered)
+                {
+                    _logger.LogWarning(
+                        "PetProjectionClaimDeadLetterRejected MessageId={MessageId}",
+                        claimedMessage.Id);
+                }
+                else
+                {
+                    _logger.LogError(
+                        ex,
+                        "PetProjectionDeadLetterDetected Type={Type} Reason=UnknownEventType",
+                        claimedMessage.Type);
+                }
+            }
+            catch (Exception ex)
+            {
+                var newRetryCount = claimedMessage.RetryCount + 1;
+                if (newRetryCount >= _outboxOptions.MaxRetryCount)
+                {
+                    var deadLettered = await _claimRepository.MarkDeadLetterAsync(
+                        claimedMessage.Id,
+                        claimedMessage.ClaimToken,
+                        workerId,
+                        ex.Message,
+                        cancellationToken);
+
+                    if (!deadLettered)
+                    {
+                        _logger.LogWarning(
+                            "PetProjectionClaimDeadLetterRejected MessageId={MessageId}",
+                            claimedMessage.Id);
+                    }
+                    else
+                    {
+                        _logger.LogError(
+                            ex,
+                            "PetProjectionDeadLetterDetected Type={Type} Retry={Retry}",
+                            claimedMessage.Type,
+                            newRetryCount);
+                    }
+                }
+                else
+                {
+                    var backoff = OutboxRetryHelper.ComputeBackoff(_outboxOptions.BaseDelaySeconds, newRetryCount);
+                    var nextAttemptAtUtc = now.Add(backoff);
+                    var retried = await _claimRepository.MarkRetryAsync(
+                        claimedMessage.Id,
+                        claimedMessage.ClaimToken,
+                        workerId,
+                        newRetryCount,
+                        nextAttemptAtUtc,
+                        ex.Message,
+                        cancellationToken);
+
+                    if (!retried)
+                    {
+                        _logger.LogWarning(
+                            "PetProjectionClaimRetryRejected MessageId={MessageId}",
+                            claimedMessage.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Pet projection retry in {DelaySeconds}s. Type={Type} Retry={Retry}",
+                            (int)backoff.TotalSeconds,
+                            claimedMessage.Type,
+                            newRetryCount);
+                    }
+                }
+
+                break;
+            }
+        }
+
+        if (processedCount > 0 || claimed.Count > 0)
+        {
+            _logger.LogInformation(
+                "PetProjectionClaimBatchCompleted WorkerId={WorkerId} ClaimedCount={ClaimedCount} ProcessedCount={ProcessedCount} ConsumerName={ConsumerName}",
+                workerId,
+                claimed.Count,
+                processedCount,
+                _options.ConsumerName);
+        }
+
+        return processedCount;
     }
 
     private async Task<int> ProcessFifoBatchAsync(CancellationToken cancellationToken)
