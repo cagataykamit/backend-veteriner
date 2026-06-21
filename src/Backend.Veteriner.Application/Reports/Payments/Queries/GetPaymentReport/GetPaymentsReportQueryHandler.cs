@@ -1,6 +1,9 @@
+using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Payments.Specs;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -8,6 +11,7 @@ using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Reports.Payments.Queries.GetPaymentReport;
 
@@ -21,6 +25,9 @@ public sealed class GetPaymentsReportQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IClientReadModelLookupReader _clientLookupReader;
+    private readonly IPetReadModelLookupReader _petLookupReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
 
     public GetPaymentsReportQueryHandler(
         ITenantContext tenantContext,
@@ -29,7 +36,10 @@ public sealed class GetPaymentsReportQueryHandler
         IReadRepository<Payment> payments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        IClientReadModelLookupReader clientLookupReader,
+        IPetReadModelLookupReader petLookupReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -38,6 +48,9 @@ public sealed class GetPaymentsReportQueryHandler
         _clients = clients;
         _pets = pets;
         _clinics = clinics;
+        _clientLookupReader = clientLookupReader;
+        _petLookupReader = petLookupReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
     }
 
     public async Task<Result<PaymentReportResultDto>> Handle(
@@ -58,7 +71,15 @@ public sealed class GetPaymentsReportQueryHandler
         var (tenantId, effectiveClinicId, accessibleClinicIds, fromUtc, toUtc) = validated.Value;
 
         var (searchPattern, searchClientIds, searchPetIds) =
-            await PaymentsReportSearchResolution.ResolveSearchAsync(tenantId, request.Search, _clients, _pets, ct);
+            await PaymentsReportSearchResolution.ResolveSearchAsync(
+                tenantId,
+                request.Search,
+                _queryReadModelsOptions.PaymentsSearchLookupEnabled,
+                _clientLookupReader,
+                _petLookupReader,
+                _clients,
+                _pets,
+                ct);
 
         var total = await _payments.CountAsync(
             new PaymentsFilteredCountSpec(
