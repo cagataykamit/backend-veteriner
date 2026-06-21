@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Payments.Queries.GetList;
+using Backend.Veteriner.Application.Payments.ReadModels;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Payments.Specs;
@@ -28,6 +29,7 @@ public sealed class GetPaymentsListQueryHandlerTests
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IClientReadModelLookupReader> _clientLookupReader = new();
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
+    private readonly Mock<IPaymentsListReadModelReader> _listReadModelReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetPaymentsListQueryHandler CreateHandler(bool paymentsSearchLookupEnabled = false)
@@ -40,6 +42,7 @@ public sealed class GetPaymentsListQueryHandlerTests
             _clients.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _listReadModelReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
@@ -293,6 +296,7 @@ public sealed class GetPaymentsListQueryHandlerTests
             _clients.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _listReadModelReader.Object,
             Options.Create(new QueryReadModelsOptions()));
 
         var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
@@ -321,6 +325,7 @@ public sealed class GetPaymentsListQueryHandlerTests
             _clients.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _listReadModelReader.Object,
             Options.Create(new QueryReadModelsOptions()));
 
         var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };

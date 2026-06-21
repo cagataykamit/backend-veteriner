@@ -29,4 +29,12 @@ public sealed class QueryReadModelsOptions
     /// Kapalıyken Command DB aggregate yolu korunur. Recent payments + isim hydration her iki yolda Command DB'den kalır.
     /// </summary>
     public bool DashboardFinanceReadEnabled { get; set; }
+
+    /// <summary>
+    /// Ödeme listesini Query DB <c>PaymentReadModels</c> reader üzerinden okur (14E+).
+    /// Yalnızca arama (search) boş/null ve klinik kapsamı tek kliniğe çözülebiliyorken Query DB yolu kullanılır;
+    /// arama dolu ise bilinçli olarak Command DB yolunda kalınır (search parity ayrı fazda ele alınır).
+    /// Query DB yolu seçildiğinde Command DB'ye fallback yapılmaz; Query DB boşsa boş liste döner.
+    /// </summary>
+    public bool PaymentsListReadEnabled { get; set; }
 }

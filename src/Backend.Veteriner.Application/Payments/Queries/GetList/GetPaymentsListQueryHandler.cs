@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
+using Backend.Veteriner.Application.Payments.ReadModels;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -32,6 +33,7 @@ public sealed class GetPaymentsListQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IClientReadModelLookupReader _clientLookupReader;
     private readonly IPetReadModelLookupReader _petLookupReader;
+    private readonly IPaymentsListReadModelReader _paymentsListReadModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetPaymentsListQueryHandler> _logger;
 
@@ -44,6 +46,7 @@ public sealed class GetPaymentsListQueryHandler
         IReadRepository<Client> clients,
         IClientReadModelLookupReader clientLookupReader,
         IPetReadModelLookupReader petLookupReader,
+        IPaymentsListReadModelReader paymentsListReadModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetPaymentsListQueryHandler>? logger = null)
     {
@@ -55,6 +58,7 @@ public sealed class GetPaymentsListQueryHandler
         _clients = clients;
         _clientLookupReader = clientLookupReader;
         _petLookupReader = petLookupReader;
+        _paymentsListReadModelReader = paymentsListReadModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetPaymentsListQueryHandler>.Instance;
     }
@@ -117,10 +121,53 @@ public sealed class GetPaymentsListQueryHandler
         var effectiveClinicId = scopeResult.Value!.SingleClinicId;
         var accessibleClinicIds = scopeResult.Value!.AccessibleClinicIds;
 
+        var normalizedSearch = ListQueryTextSearch.Normalize(request.Search);
+
+        // CQRS-14E: Query DB read-model routing.
+        // Query DB PaymentReadModels reader yalnızca aşağıdaki koşullarda kullanılır:
+        //   (a) PaymentsListReadEnabled flag açık,
+        //   (b) arama (search) boş/null,
+        //   (c) klinik kapsamı tek kliniğe (SingleClinicId) çözülmüş.
+        // Arama dolu iken Query DB reader'ın search parity'si Command DB ile tam eşleşmediği için
+        // bilinçli olarak Command DB yolunda kalınır ("unsupported search route guard"; sessiz fallback değildir).
+        // Query DB yolu seçildiğinde Command DB'ye fallback YAPILMAZ; Query DB boşsa boş paged result döner.
+        if (_queryReadModelsOptions.PaymentsListReadEnabled
+            && normalizedSearch is null
+            && effectiveClinicId is { } queryClinicId)
+        {
+            var readRequest = new PaymentsListReadRequest(
+                tenantId,
+                queryClinicId,
+                page,
+                pageSize,
+                request.ClientId,
+                request.PetId,
+                request.Method,
+                request.PaidFromUtc,
+                request.PaidToUtc,
+                SearchContainsLikePattern: null);
+
+            var readResult = await _paymentsListReadModelReader.GetListAsync(readRequest, ct);
+            MarkStep("paymentsListReadModel");
+
+            _logger.LogInformation(
+                "Payments list generated from Query DB read model. TenantId={TenantId} ClinicId={ClinicId} Page={Page} PageSize={PageSize} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+                tenantId,
+                queryClinicId,
+                page,
+                pageSize,
+                querySteps,
+                slowestStep,
+                slowestMs,
+                totalSw.ElapsedMilliseconds);
+
+            return Result<PagedResult<PaymentListItemDto>>.Success(
+                PagedResult<PaymentListItemDto>.Create(readResult.Items, readResult.TotalCount, page, pageSize));
+        }
+
         string? searchPattern = null;
         Guid[] searchClientIds = [];
         Guid[] searchPetIds = [];
-        var normalizedSearch = ListQueryTextSearch.Normalize(request.Search);
         if (normalizedSearch is not null)
         {
             searchPattern = ListQueryTextSearch.BuildContainsLikePattern(normalizedSearch);
