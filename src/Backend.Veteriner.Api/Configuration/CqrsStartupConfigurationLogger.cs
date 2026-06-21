@@ -27,7 +27,7 @@ internal static class CqrsStartupConfigurationLogger
         var queryConnection = configuration.GetConnectionString("QueryConnection");
 
         logger.LogInformation(
-            "CQRS startup configuration. Environment={Environment} ProjectionEnabled={ProjectionEnabled} AppointmentsQueryReadEnabled={AppointmentsQueryReadEnabled} DashboardQueryReadEnabled={DashboardQueryReadEnabled} ClientsQueryReadEnabled={ClientsQueryReadEnabled} PetsQueryReadEnabled={PetsQueryReadEnabled} SharedSearchLookupEnabled={SharedSearchLookupEnabled} CommandDbCatalog={CommandDbCatalog} QueryDbCatalog={QueryDbCatalog}",
+            "CQRS startup configuration. Environment={Environment} ProjectionEnabled={ProjectionEnabled} AppointmentsQueryReadEnabled={AppointmentsQueryReadEnabled} DashboardQueryReadEnabled={DashboardQueryReadEnabled} ClientsQueryReadEnabled={ClientsQueryReadEnabled} PetsQueryReadEnabled={PetsQueryReadEnabled} SharedSearchLookupEnabled={SharedSearchLookupEnabled} PaymentsSearchLookupEnabled={PaymentsSearchLookupEnabled} CommandDbCatalog={CommandDbCatalog} QueryDbCatalog={QueryDbCatalog}",
             app.Environment.EnvironmentName,
             projectionOptions.Enabled,
             queryReadModels.AppointmentsEnabled,
@@ -35,6 +35,7 @@ internal static class CqrsStartupConfigurationLogger
             queryReadModels.ClientsEnabled,
             queryReadModels.PetsEnabled,
             queryReadModels.SharedSearchLookupEnabled,
+            queryReadModels.PaymentsSearchLookupEnabled,
             TryGetDatabaseCatalog(commandConnection),
             TryGetDatabaseCatalog(queryConnection));
     }

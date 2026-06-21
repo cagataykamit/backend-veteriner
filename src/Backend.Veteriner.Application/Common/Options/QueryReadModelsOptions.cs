@@ -17,4 +17,10 @@ public sealed class QueryReadModelsOptions
     /// Liste endpoint bayraklarından (<see cref="ClientsEnabled"/>, <see cref="PetsEnabled"/>) bağımsızdır.
     /// </summary>
     public bool SharedSearchLookupEnabled { get; set; }
+
+    /// <summary>
+    /// Ödeme listesi Strateji B search resolution'ını Query DB read-model'e yönlendirir (12D-7+).
+    /// <see cref="SharedSearchLookupEnabled"/> ve finansal rapor/export yüzeylerinden bağımsızdır.
+    /// </summary>
+    public bool PaymentsSearchLookupEnabled { get; set; }
 }

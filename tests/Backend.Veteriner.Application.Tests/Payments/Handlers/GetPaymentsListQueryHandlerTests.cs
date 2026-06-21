@@ -1,9 +1,12 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Payments.Queries.GetList;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
@@ -11,6 +14,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Payments.Handlers;
@@ -22,16 +26,24 @@ public sealed class GetPaymentsListQueryHandlerTests
     private readonly Mock<IReadRepository<Payment>> _payments = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IClientReadModelLookupReader> _clientLookupReader = new();
+    private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
-    private GetPaymentsListQueryHandler CreateHandler()
+    private GetPaymentsListQueryHandler CreateHandler(bool paymentsSearchLookupEnabled = false)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
             _scopeResolver.Object,
             _payments.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            _clientLookupReader.Object,
+            _petLookupReader.Object,
+            Options.Create(new QueryReadModelsOptions
+            {
+                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
+            }));
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -278,7 +290,10 @@ public sealed class GetPaymentsListQueryHandlerTests
             caMock.Object,
             _payments.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            _clientLookupReader.Object,
+            _petLookupReader.Object,
+            Options.Create(new QueryReadModelsOptions()));
 
         var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
         var result = await handler.Handle(new GetPaymentsListQuery(paging, unassigned), CancellationToken.None);
@@ -303,7 +318,10 @@ public sealed class GetPaymentsListQueryHandlerTests
             caMock.Object,
             _payments.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            _clientLookupReader.Object,
+            _petLookupReader.Object,
+            Options.Create(new QueryReadModelsOptions()));
 
         var paging = new PaymentListPagingRequest { Page = 1, PageSize = 20 };
         var result = await handler.Handle(new GetPaymentsListQuery(paging), CancellationToken.None);

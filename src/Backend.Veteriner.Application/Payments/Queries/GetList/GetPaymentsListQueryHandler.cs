@@ -1,10 +1,13 @@
+using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.Specs;
+using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
@@ -13,6 +16,7 @@ using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Payments.Queries.GetList;
@@ -26,6 +30,9 @@ public sealed class GetPaymentsListQueryHandler
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IClientReadModelLookupReader _clientLookupReader;
+    private readonly IPetReadModelLookupReader _petLookupReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetPaymentsListQueryHandler> _logger;
 
     public GetPaymentsListQueryHandler(
@@ -35,6 +42,9 @@ public sealed class GetPaymentsListQueryHandler
         IReadRepository<Payment> payments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
+        IClientReadModelLookupReader clientLookupReader,
+        IPetReadModelLookupReader petLookupReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetPaymentsListQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -43,6 +53,9 @@ public sealed class GetPaymentsListQueryHandler
         _payments = payments;
         _pets = pets;
         _clients = clients;
+        _clientLookupReader = clientLookupReader;
+        _petLookupReader = petLookupReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetPaymentsListQueryHandler>.Instance;
     }
 
@@ -111,14 +124,15 @@ public sealed class GetPaymentsListQueryHandler
         if (normalizedSearch is not null)
         {
             searchPattern = ListQueryTextSearch.BuildContainsLikePattern(normalizedSearch);
-            var nameClients = await _clients.ListAsync(
-                new ClientsByTenantTextSearchSpec(tenantId, searchPattern),
+            (searchClientIds, searchPetIds) = await PaymentsListSearchResolution.ResolveSearchIdsAsync(
+                tenantId,
+                searchPattern,
+                _queryReadModelsOptions.PaymentsSearchLookupEnabled,
+                _clientLookupReader,
+                _petLookupReader,
+                _clients,
+                _pets,
                 ct);
-            searchClientIds = nameClients.Select(c => c.Id).Distinct().ToArray();
-            var petsMatchingText = await _pets.ListAsync(
-                new PetsByTenantTextFieldsSearchSpec(tenantId, searchPattern),
-                ct);
-            searchPetIds = petsMatchingText.Select(p => p.Id).Distinct().ToArray();
             MarkStep("searchLookup");
         }
 
