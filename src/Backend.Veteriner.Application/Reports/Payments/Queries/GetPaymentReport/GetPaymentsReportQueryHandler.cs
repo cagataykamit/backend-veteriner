@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Payments;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
@@ -80,18 +81,33 @@ public sealed class GetPaymentsReportQueryHandler
 
         var (tenantId, effectiveClinicId, accessibleClinicIds, fromUtc, toUtc) = validated.Value;
 
-        // CQRS-15G: payment report JSON Query DB routing (PaymentReadModels).
-        // Flag açık + search boş + scope represent edilebiliyorsa (tek klinik veya tenant-wide Admin/Owner) Query DB'den okunur.
-        // Search dolu (search parity 15I'ye bırakıldı) ya da multi-clinic (ClinicAdmin, aktif klinik yok) scope → Command DB fallback.
+        // CQRS-15G + 15M: payment report JSON Query DB routing (PaymentReadModels).
+        // Flag açık + scope represent edilebiliyorsa (tek klinik veya tenant-wide Admin/Owner) Query DB'den okunur (search boş veya dolu).
+        // Multi-clinic (ClinicAdmin, aktif klinik yok) scope → Command DB fallback.
         // Scope resolve hatası validation aşamasında zaten failure döndürür (Command path da aynı scope'a bağlıdır) — Query DB'ye gidilmez.
-        // Query path seçildiğinde Command DB'ye fallback YAPILMAZ; search resolution ÇALIŞTIRILMAZ (search boş olduğu garanti).
+        // Query path seçildiğinde Command DB'ye fallback YAPILMAZ; Command PaymentsReportSearchResolution ÇALIŞTIRILMAZ.
+        // Query path search: Query DB lookup reader'lar + PaymentReadModels filtre; PaymentsSearchLookupEnabled etkilemez.
         // Export CSV/XLSX ayrı handler'larda; export routing için <see cref="QueryReadModelsOptions.PaymentsReportExportReadEnabled"/> (15J).
         if (_queryReadModelsOptions.PaymentsReportReadEnabled
-            && ListQueryTextSearch.Normalize(request.Search) is null
             && TryGetRepresentableQueryClinicScope(effectiveClinicId, accessibleClinicIds, out var queryClinicId))
         {
             var queryPage = Math.Max(1, request.Page);
             var queryPageSize = Math.Clamp(request.PageSize, 1, PaymentsReportConstants.MaxPageSize);
+
+            string? querySearchPattern = null;
+            Guid[] querySearchClientIds = [];
+            Guid[] querySearchPetIds = [];
+            var normalizedSearch = ListQueryTextSearch.Normalize(request.Search);
+            if (normalizedSearch is not null)
+            {
+                querySearchPattern = ListQueryTextSearch.BuildContainsLikePattern(normalizedSearch);
+                (querySearchClientIds, querySearchPetIds) = await PaymentsListQuerySearchResolution.ResolveSearchIdsAsync(
+                    tenantId,
+                    querySearchPattern,
+                    _clientLookupReader,
+                    _petLookupReader,
+                    ct);
+            }
 
             var readResult = await _reportReadModelReader.GetReportAsync(
                 new PaymentsReportReadRequest(
@@ -103,13 +119,17 @@ public sealed class GetPaymentsReportQueryHandler
                     fromUtc,
                     toUtc,
                     queryPage,
-                    queryPageSize),
+                    queryPageSize,
+                    querySearchPattern,
+                    querySearchClientIds,
+                    querySearchPetIds),
                 ct);
 
             _logger.LogInformation(
-                "Payments report generated from Query DB read model. TenantId={TenantId} ClinicScoped={ClinicScoped} Total={Total}",
+                "Payments report generated from Query DB read model. TenantId={TenantId} ClinicScoped={ClinicScoped} SearchProvided={SearchProvided} Total={Total}",
                 tenantId,
                 queryClinicId.HasValue,
+                normalizedSearch is not null,
                 readResult.TotalCount);
 
             return Result<PaymentReportResultDto>.Success(

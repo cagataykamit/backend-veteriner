@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Payments.Specs;
@@ -22,8 +23,8 @@ using Moq;
 namespace Backend.Veteriner.Application.Tests.Reports.Payments;
 
 /// <summary>
-/// CQRS-15G: <see cref="QueryReadModelsOptions.PaymentsReportReadEnabled"/> routing for payment report JSON
-/// (GET /api/v1/reports/payments). Search guard + scope guard + Query DB fallback-yok davranışı.
+/// CQRS-15G + 15M: <see cref="QueryReadModelsOptions.PaymentsReportReadEnabled"/> routing for payment report JSON
+/// (GET /api/v1/reports/payments). Search + scope guard + Query DB fallback-yok davranışı.
 /// </summary>
 public sealed class PaymentsReportReadRoutingTests
 {
@@ -98,25 +99,196 @@ public sealed class PaymentsReportReadRoutingTests
     }
 
     [Fact]
-    public async Task WhenFlagTrue_AndSearchPresent_Should_FallbackToCommandDb()
+    public async Task WhenFlagFalse_AndSearchPresent_Should_UseCommandDb_NotQueryReader()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
         _clinic.SetupGet(c => c.ClinicId).Returns(cid);
         SetupCommandAggregates();
-        // Command path search resolution (PaymentsSearchLookupEnabled=false → Command DB lookup specs).
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client>());
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Pet>());
 
-        var result = await CreateHandler(paymentsReportReadEnabled: true)
+        var result = await CreateHandler(paymentsReportReadEnabled: false)
             .Handle(Query(clinicId: cid, search: "pamuk"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        VerifyCommandPathUsed();
+        VerifyReaderNeverCalled();
+    }
+
+    [Theory]
+    [InlineData("ada")]
+    [InlineData("  pamuk  ")]
+    public async Task WhenFlagTrue_AndSearchProvided_AndSingleClinic_Should_UseQueryReader_WithLookup(string search)
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupReaderResult(EmptyReadResult());
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([clientId]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([petId]));
+
+        PaymentsReportReadRequest? captured = null;
+        _reportReader
+            .Setup(r => r.GetReportAsync(It.IsAny<PaymentsReportReadRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<PaymentsReportReadRequest, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(EmptyReadResult());
+
+        var result = await CreateHandler(paymentsReportReadEnabled: true)
+            .Handle(Query(clinicId: cid, search: search), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _reportReader.Verify(
+            r => r.GetReportAsync(It.IsAny<PaymentsReportReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        VerifyCommandPathNeverUsed();
+        VerifyCommandSearchResolutionNeverUsed();
+        captured.Should().NotBeNull();
+        captured!.SearchContainsLikePattern.Should().NotBeNullOrEmpty();
+        captured.SearchMatchClientIds.Should().Equal(clientId);
+        captured.SearchMatchPetIds.Should().Equal(petId);
+    }
+
+    [Fact]
+    public async Task WhenFlagTrue_AndSearchProvided_AndTenantWide_Should_UseQueryReader_WithoutClinicFilter()
+    {
+        var tid = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+
+        PaymentsReportReadRequest? captured = null;
+        _reportReader
+            .Setup(r => r.GetReportAsync(It.IsAny<PaymentsReportReadRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<PaymentsReportReadRequest, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(EmptyReadResult());
+
+        await CreateHandler(paymentsReportReadEnabled: true)
+            .Handle(Query(clinicId: null, search: "pamuk"), CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.ClinicId.Should().BeNull("tenant-wide scope clinic filtresi olmadan okur");
+        captured.SearchContainsLikePattern.Should().NotBeNullOrEmpty();
+        VerifyCommandPathNeverUsed();
+    }
+
+    [Fact]
+    public async Task WhenFlagTrue_AndSearchPresent_AndMultiClinicScope_Should_FallbackToCommandDb()
+    {
+        var tid = Guid.NewGuid();
+        var c1 = Guid.NewGuid();
+        var c2 = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        var scopeResolver = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { c1, c2 });
+        SetupCommandAggregates();
+        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Client>());
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Pet>());
+
+        var result = await CreateHandler(paymentsReportReadEnabled: true, scopeResolver: scopeResolver)
+            .Handle(Query(clinicId: null, search: "pamuk"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         VerifyReaderNeverCalled();
         VerifyCommandPathUsed();
+        _clientLookupReader.Verify(
+            r => r.ResolveClientIdsByTextSearchAsync(It.IsAny<ClientTextSearchLookupRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task WhenQueryPath_AndSearchProvided_AndLookupThrows_Should_NotFallbackToCommandDb()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns(cid);
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("lookup down"));
+
+        var act = () => CreateHandler(paymentsReportReadEnabled: true)
+            .Handle(Query(clinicId: cid, search: "pamuk"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        VerifyCommandPathNeverUsed();
+        VerifyReaderNeverCalled();
+    }
+
+    [Fact]
+    public async Task WhenQueryPath_AndSearchNoMatches_Should_ReturnEmptyReport_WithoutCommandFallback()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns(cid);
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+        SetupReaderResult(EmptyReadResult());
+
+        var result = await CreateHandler(paymentsReportReadEnabled: true)
+            .Handle(Query(clinicId: cid, search: "nonexistent"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TotalCount.Should().Be(0);
+        result.Value.TotalAmount.Should().Be(0m);
+        VerifyCommandPathNeverUsed();
+    }
+
+    [Fact]
+    public async Task WhenQueryPath_AndSearchProvided_Should_NotUsePaymentsSearchLookupFlag()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupReaderResult(EmptyReadResult());
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+
+        await CreateHandler(paymentsReportReadEnabled: true, paymentsSearchLookupEnabled: false)
+            .Handle(Query(clinicId: cid, search: "pamuk"), CancellationToken.None);
+
+        _clientLookupReader.Verify(
+            r => r.ResolveClientIdsByTextSearchAsync(It.IsAny<ClientTextSearchLookupRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _clients.Verify(
+            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -245,6 +417,7 @@ public sealed class PaymentsReportReadRoutingTests
         captured.ToUtc.Should().Be(To);
         captured.Page.Should().Be(2);
         captured.PageSize.Should().Be(25);
+        captured.SearchContainsLikePattern.Should().BeNull();
     }
 
     [Fact]
@@ -323,8 +496,19 @@ public sealed class PaymentsReportReadRoutingTests
             r => r.GetReportAsync(It.IsAny<PaymentsReportReadRequest>(), It.IsAny<CancellationToken>()),
             Times.Never);
 
+    private void VerifyCommandSearchResolutionNeverUsed()
+    {
+        _clients.Verify(
+            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _pets.Verify(
+            r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private GetPaymentsReportQueryHandler CreateHandler(
         bool paymentsReportReadEnabled = false,
+        bool paymentsSearchLookupEnabled = false,
         Mock<IClinicReadScopeResolver>? scopeResolver = null)
         => new(
             _tenant.Object,
@@ -339,6 +523,7 @@ public sealed class PaymentsReportReadRoutingTests
             _reportReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
-                PaymentsReportReadEnabled = paymentsReportReadEnabled
+                PaymentsReportReadEnabled = paymentsReportReadEnabled,
+                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
             }));
 }

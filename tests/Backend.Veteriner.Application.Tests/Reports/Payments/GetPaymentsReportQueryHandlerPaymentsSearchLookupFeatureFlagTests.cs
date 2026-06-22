@@ -274,6 +274,7 @@ public sealed class GetPaymentsReportQueryHandlerPaymentsSearchLookupFeatureFlag
             _reportReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
+                PaymentsReportReadEnabled = false,
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
             }));
 }

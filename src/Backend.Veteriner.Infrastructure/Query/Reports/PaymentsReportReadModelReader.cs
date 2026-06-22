@@ -12,7 +12,7 @@ namespace Backend.Veteriner.Infrastructure.Query.Reports;
 /// <para>
 /// Aggregate'ler SQL tarafında hesaplanır: <c>TotalCount = COUNT(*)</c>, <c>TotalAmount = SUM(Amount)</c> (boşsa 0).
 /// Items <c>PaidAtUtc DESC, PaymentId DESC</c> ile sayfalanır (Command DB report spec'i ile birebir). Filtre kümesi
-/// mevcut report JSON Command DB davranışı ile aynıdır (date range + clinic + client + pet + method); search desteklenmez.
+/// mevcut report JSON Command DB davranışı ile aynıdır (date range + clinic + client + pet + method + search — 15M).
 /// Tüm satırlar sırf aggregate için belleğe çekilmez.
 /// </para>
 /// </summary>
@@ -66,7 +66,36 @@ public sealed class PaymentsReportReadModelReader : IPaymentsReportReadModelRead
 
         query = query.Where(x => x.PaidAtUtc >= request.FromUtc && x.PaidAtUtc <= request.ToUtc);
 
+        if (request.SearchContainsLikePattern is { } pattern)
+        {
+            query = ApplyReportSearchFilter(
+                query,
+                pattern,
+                request.SearchMatchClientIds ?? [],
+                request.SearchMatchPetIds ?? []);
+        }
+
         return query;
+    }
+
+    /// <summary>
+    /// CQRS-15M: direct normalized alanlar + lookup ID filtreleri (Command report search OR mantığı ile hizalı).
+    /// </summary>
+    private static IQueryable<PaymentReadModel> ApplyReportSearchFilter(
+        IQueryable<PaymentReadModel> query,
+        string pattern,
+        IReadOnlyList<Guid> searchClientIds,
+        IReadOnlyList<Guid> searchPetIds)
+    {
+        var cids = searchClientIds;
+        var pids = searchPetIds;
+        return query.Where(x =>
+            EF.Functions.Like(x.ClientNameNormalized, pattern)
+            || (x.PetNameNormalized != null && EF.Functions.Like(x.PetNameNormalized, pattern))
+            || (x.NotesNormalized != null && EF.Functions.Like(x.NotesNormalized, pattern))
+            || EF.Functions.Like(x.Currency, pattern)
+            || (cids.Count > 0 && cids.Contains(x.ClientId))
+            || (x.PetId != null && pids.Count > 0 && pids.Contains(x.PetId.Value)));
     }
 
     private static PaymentReportItemDto MapItem(PaymentReadModel x)

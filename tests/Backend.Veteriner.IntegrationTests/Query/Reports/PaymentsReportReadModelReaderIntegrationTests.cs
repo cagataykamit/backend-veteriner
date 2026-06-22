@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Infrastructure.Persistence;
@@ -11,7 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Query.Reports;
 
 /// <summary>
-/// CQRS-15G: <see cref="IPaymentsReportReadModelReader"/> Query DB (PaymentReadModels) filtre/scope/aggregate/ordering davranışı.
+/// CQRS-15G + 15M: <see cref="IPaymentsReportReadModelReader"/> Query DB (PaymentReadModels) filtre/scope/aggregate/ordering/search davranışı.
 /// </summary>
 [Collection("payment-projection")]
 public sealed class PaymentsReportReadModelReaderIntegrationTests
@@ -272,6 +273,199 @@ public sealed class PaymentsReportReadModelReaderIntegrationTests
         result.Items.Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData("yılmaz", "Ayşe Yılmaz", null, null)]
+    [InlineData("pamuk", "Mehmet Demir", "Pamuk", null)]
+    [InlineData("nakit", "Ali Veli", "Boncuk", "Nakit ödeme")]
+    public async Task GetReport_Should_MatchSearchAcrossClientPetNotesAndCurrency(
+        string term,
+        string clientName,
+        string? petName,
+        string? notes)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportReadModelReader>();
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicId, clientName: clientName, petName: petName, notes: notes, amount: 100m),
+            Row(tenantId, clinicId, clientName: "Other Client", petName: "Other Pet", notes: "Other notes", amount: 999m));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize(term)!);
+        var result = await reader.GetReportAsync(Request(tenantId, clinicId, searchPattern: pattern));
+
+        result.TotalCount.Should().Be(1);
+        result.TotalAmount.Should().Be(100m);
+        result.Items.Should().ContainSingle(x => x.ClientName == clientName);
+    }
+
+    [Fact]
+    public async Task GetReport_Should_MatchSearchByCurrency()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportReadModelReader>();
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicId, currency: "TRY", amount: 50m),
+            Row(tenantId, clinicId, currency: "USD", amount: 999m));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("try")!);
+        var result = await reader.GetReportAsync(Request(tenantId, clinicId, searchPattern: pattern));
+
+        result.TotalCount.Should().Be(1);
+        result.TotalAmount.Should().Be(50m);
+        result.Items.Should().ContainSingle(x => x.Currency == "TRY");
+    }
+
+    [Fact]
+    public async Task GetReport_Should_MatchSearchByClientIdLookup()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportReadModelReader>();
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var clientMatch = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicId, clientId: clientMatch, clientName: "Hidden Name", amount: 80m),
+            Row(tenantId, clinicId, clientId: Guid.NewGuid(), clientName: "Other", amount: 999m));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("nomatchdirect")!);
+        var result = await reader.GetReportAsync(
+            Request(tenantId, clinicId, searchPattern: pattern, searchClientIds: [clientMatch]));
+
+        result.TotalCount.Should().Be(1);
+        result.TotalAmount.Should().Be(80m);
+        result.Items.Should().ContainSingle(x => x.ClientId == clientMatch);
+    }
+
+    [Fact]
+    public async Task GetReport_Should_MatchSearchByPetIdLookup()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportReadModelReader>();
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petMatch = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicId, petId: petMatch, petName: "Hidden Pet", amount: 60m),
+            Row(tenantId, clinicId, petId: Guid.NewGuid(), petName: "Visible Pet", amount: 999m));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("nomatchdirect")!);
+        var result = await reader.GetReportAsync(
+            Request(tenantId, clinicId, searchPattern: pattern, searchPetIds: [petMatch]));
+
+        result.TotalCount.Should().Be(1);
+        result.TotalAmount.Should().Be(60m);
+        result.Items.Should().ContainSingle(x => x.PetId == petMatch);
+    }
+
+    [Fact]
+    public async Task GetReport_Should_NotLeakLookupMatchesAcrossClinic()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportReadModelReader>();
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicA = Guid.NewGuid();
+        var clinicB = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicA, clientId: clientId, clientName: "Ayşe Yılmaz", amount: 100m),
+            Row(tenantId, clinicB, clientId: clientId, clientName: "Ayşe Yılmaz", amount: 200m));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("nomatchdirect")!);
+        var result = await reader.GetReportAsync(
+            Request(tenantId, clinicA, searchPattern: pattern, searchClientIds: [clientId]));
+
+        result.TotalCount.Should().Be(1);
+        result.TotalAmount.Should().Be(100m);
+        result.Items.Should().ContainSingle(x => x.ClinicId == clinicA);
+    }
+
+    [Fact]
+    public async Task GetReport_TenantWideSearch_Should_SeeAllClinicsInTenant()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportReadModelReader>();
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicA = Guid.NewGuid();
+        var clinicB = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicA, clientName: "Ayşe Yılmaz", amount: 100m),
+            Row(tenantId, clinicB, clientName: "Ayşe Yılmaz", amount: 50m),
+            Row(Guid.NewGuid(), clinicA, clientName: "Ayşe Yılmaz", amount: 999m));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("yılmaz")!);
+        var result = await reader.GetReportAsync(Request(tenantId, clinicId: null, searchPattern: pattern));
+
+        result.TotalCount.Should().Be(2);
+        result.TotalAmount.Should().Be(150m);
+    }
+
+    [Fact]
+    public async Task GetReport_Should_ReturnEmpty_WhenSearchUnrelated()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportReadModelReader>();
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        await SeedAsync(queryDb, Row(tenantId, clinicId));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("zzznomatch")!);
+        var result = await reader.GetReportAsync(Request(tenantId, clinicId, searchPattern: pattern));
+
+        result.TotalCount.Should().Be(0);
+        result.TotalAmount.Should().Be(0m);
+        result.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetReport_Should_RespectPaging_WithSearchFilter()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportReadModelReader>();
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        for (var i = 0; i < 5; i++)
+            await SeedAsync(queryDb, Row(tenantId, clinicId, clientName: "Match Client", amount: 10m, paidAtUtc: From.AddDays(i)));
+
+        await SeedAsync(queryDb, Row(tenantId, clinicId, clientName: "Other", amount: 999m));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("match")!);
+        var page1 = await reader.GetReportAsync(Request(tenantId, clinicId, page: 1, pageSize: 2, searchPattern: pattern));
+        page1.TotalCount.Should().Be(5);
+        page1.TotalAmount.Should().Be(50m);
+        page1.Items.Should().HaveCount(2);
+
+        var page3 = await reader.GetReportAsync(Request(tenantId, clinicId, page: 3, pageSize: 2, searchPattern: pattern));
+        page3.TotalCount.Should().Be(5);
+        page3.Items.Should().HaveCount(1);
+    }
+
     private static PaymentsReportReadRequest Request(
         Guid tenantId,
         Guid? clinicId,
@@ -279,8 +473,23 @@ public sealed class PaymentsReportReadModelReaderIntegrationTests
         Guid? petId = null,
         PaymentMethod? method = null,
         int page = 1,
-        int pageSize = 50)
-        => new(tenantId, clinicId, clientId, petId, method, From, To, page, pageSize);
+        int pageSize = 50,
+        string? searchPattern = null,
+        IReadOnlyList<Guid>? searchClientIds = null,
+        IReadOnlyList<Guid>? searchPetIds = null)
+        => new(
+            tenantId,
+            clinicId,
+            clientId,
+            petId,
+            method,
+            From,
+            To,
+            page,
+            pageSize,
+            searchPattern,
+            searchClientIds,
+            searchPetIds);
 
     private static async Task ResetAsync(QueryDbContext queryDb)
     {

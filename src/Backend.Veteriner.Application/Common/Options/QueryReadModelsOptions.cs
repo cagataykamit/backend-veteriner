@@ -59,10 +59,10 @@ public sealed class QueryReadModelsOptions
     public bool ClientPaymentSummaryReadEnabled { get; set; }
 
     /// <summary>
-    /// Payment report JSON yüzeyini (GET /api/v1/reports/payments) Query DB <c>PaymentReadModels</c> üzerinden okur (15G).
-    /// Yalnızca arama (search) boş/null ve klinik kapsamı tek kliniğe (<see cref="Clinics.Access.ClinicReadScope.SingleClinicId"/>)
-    /// ya da tenant-wide'a (Admin/Owner için clinic filtresi yok) çözülebiliyorken Query DB yolu kullanılır; arama dolu veya
-    /// multi-clinic (ClinicAdmin, aktif klinik yok) scope'ta bilinçli olarak Command DB yolunda kalınır (search parity ayrı fazda).
+    /// Payment report JSON yüzeyini (GET /api/v1/reports/payments) Query DB <c>PaymentReadModels</c> üzerinden okur (15G + 15M search).
+    /// Klinik kapsamı tek kliniğe (<see cref="Clinics.Access.ClinicReadScope.SingleClinicId"/>) ya da tenant-wide'a
+    /// (Admin/Owner için clinic filtresi yok) çözülebiliyorken Query DB yolu kullanılır (search boş veya dolu);
+    /// multi-clinic (ClinicAdmin, aktif klinik yok) scope'ta bilinçli olarak Command DB yolunda kalınır.
     /// Query DB yolu seçildiğinde Command DB'ye fallback yapılmaz; Query DB boşsa boş/zero rapor döner.
     /// Export CSV/XLSX yüzeyleri bu bayraktan etkilenmez; export için
     /// <see cref="PaymentsReportExportReadEnabled"/> kullanılır.
