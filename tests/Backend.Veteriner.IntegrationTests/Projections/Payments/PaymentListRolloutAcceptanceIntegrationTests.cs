@@ -71,6 +71,8 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
             .Should().BeFalse($"{fileName} QueryReadModels:ClientPaymentSummaryReadEnabled default false olmalı");
         queryReadModels.GetProperty("PaymentsReportReadEnabled").GetBoolean()
             .Should().BeFalse($"{fileName} QueryReadModels:PaymentsReportReadEnabled default false olmalı");
+        queryReadModels.GetProperty("PaymentsReportExportReadEnabled").GetBoolean()
+            .Should().BeFalse($"{fileName} QueryReadModels:PaymentsReportExportReadEnabled default false olmalı");
     }
 
     // -------------------------------------------------------------------------

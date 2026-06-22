@@ -163,6 +163,34 @@ public sealed class PaymentListQueryHandlerFeatureFlagTests
     }
 
     [Fact]
+    public async Task PaymentList_WhenQueryPath_AndSearchProvided_Should_NotUsePaymentsSearchLookupFlag()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
+        SetupEmptyReader();
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+
+        await CreateHandler(paymentsListReadEnabled: true, paymentsSearchLookupEnabled: false).Handle(
+            new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }, Search: "pamuk"),
+            CancellationToken.None);
+
+        _clientLookupReader.Verify(
+            r => r.ResolveClientIdsByTextSearchAsync(It.IsAny<ClientTextSearchLookupRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _clients.Verify(
+            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task PaymentList_WhenFlagTrue_AndMultiClinicScope_Should_FallbackToCommandDb_EvenWithSearch()
     {
         var tid = Guid.NewGuid();
@@ -464,7 +492,9 @@ public sealed class PaymentListQueryHandlerFeatureFlagTests
         => _listReadModelReader.Setup(r => r.GetListAsync(It.IsAny<PaymentsListReadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PaymentsListReadResult([], 0));
 
-    private GetPaymentsListQueryHandler CreateHandler(bool paymentsListReadEnabled)
+    private GetPaymentsListQueryHandler CreateHandler(
+        bool paymentsListReadEnabled,
+        bool paymentsSearchLookupEnabled = false)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
@@ -477,6 +507,7 @@ public sealed class PaymentListQueryHandlerFeatureFlagTests
             _listReadModelReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
-                PaymentsListReadEnabled = paymentsListReadEnabled
+                PaymentsListReadEnabled = paymentsListReadEnabled,
+                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
             }));
 }
