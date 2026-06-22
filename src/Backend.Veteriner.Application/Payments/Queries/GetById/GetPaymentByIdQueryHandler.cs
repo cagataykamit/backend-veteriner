@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.Specs;
@@ -16,6 +17,9 @@ public sealed class GetPaymentByIdQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClientContext _clientContext;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -23,12 +27,18 @@ public sealed class GetPaymentByIdQueryHandler
     public GetPaymentByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClientContext clientContext,
+        IUserOperationClaimRepository userOperationClaims,
+        IUserClinicRepository userClinics,
         IReadRepository<Payment> payments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clientContext = clientContext;
+        _userOperationClaims = userOperationClaims;
+        _userClinics = userClinics;
         _payments = payments;
         _pets = pets;
         _clients = clients;
@@ -43,12 +53,30 @@ public sealed class GetPaymentByIdQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
+        if (_clientContext.UserId is not { } userId)
+        {
+            return Result<PaymentDetailDto>.Failure(
+                "Auth.Unauthorized.UserContextMissing",
+                "Kullanıcı bağlamı yok.");
+        }
+
         var p = await _payments.FirstOrDefaultAsync(
             new PaymentByIdSpec(tenantId, request.Id), ct);
         if (p is null)
             return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
         if (_clinicContext.ClinicId is { } clinicId && p.ClinicId != clinicId)
             return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
+
+        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId, ct);
+        if (!TenantWideClaimNames.IsTenantWide(operationClaimNames))
+        {
+            if (!await _userClinics.ExistsAsync(userId, p.ClinicId, ct))
+            {
+                return Result<PaymentDetailDto>.Failure(
+                    "Payments.NotFound",
+                    "Ödeme kaydı bulunamadı.");
+            }
+        }
 
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, p.ClientId), ct);
         var clientName = client?.FullName ?? string.Empty;

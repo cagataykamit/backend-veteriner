@@ -12,6 +12,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.LabResults;
+using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Tenants;
@@ -722,6 +723,75 @@ internal static class IntegrationTestAuthHelper
     }
 
     /// <summary>
+    /// Tenant-wide olmayan kullanıcı: <c>Payments.Read</c> iznine sahip, Admin / Owner / PlatformAdmin /
+    /// ClinicAdmin claim'i yok. Yalnız atandığı kliniğin payment detayını okuyabilmeli.
+    /// </summary>
+    public static async Task<(string Email, string Password, Guid AssignedClinicId, Guid UnassignedClinicId)>
+        SeedPaymentReaderUserAsync(IServiceProvider services, IPasswordHasher hasher)
+    {
+        await EnsureRolePermissionBindingsAsync(services);
+
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+        var assignedClinic = await db.Clinics.SingleAsync(c =>
+            c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+
+        var unassignedClinic = new Clinic(tenant.Id, $"PayReader-{Guid.NewGuid():N}"[..14], "Konya");
+        db.Clinics.Add(unassignedClinic);
+        await db.SaveChangesAsync();
+
+        var claim = await EnsurePaymentsReadClaimAsync(db);
+
+        var email = $"pay-reader-{Guid.NewGuid():N}@example.com";
+        const string password = "123456";
+        var user = new User(email, hasher.Hash(password));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        await db.SaveChangesAsync();
+
+        return (email, password, assignedClinic.Id, unassignedClinic.Id);
+    }
+
+    /// <summary>Belirtilen klinikte tek payment kaydı oluşturur.</summary>
+    public static async Task<Guid> SeedPaymentInClinicAsync(
+        IServiceProvider services,
+        Guid clinicId,
+        TimeSpan? paidOffsetFromUtcNow = null)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
+        var client = new Client(clinic.TenantId, $"PayClient-{Guid.NewGuid():N}"[..14], "905551110022");
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var paidAt = DateTime.UtcNow.Add(paidOffsetFromUtcNow ?? TimeSpan.FromHours(-2));
+        var payment = new Payment(
+            clinic.TenantId,
+            clinic.Id,
+            client.Id,
+            petId: null,
+            appointmentId: null,
+            examinationId: null,
+            amount: 150m,
+            currency: "TRY",
+            PaymentMethod.Cash,
+            paidAt,
+            notes: "IDOR Test Payment");
+        db.Payments.Add(payment);
+        await db.SaveChangesAsync();
+
+        return payment.Id;
+    }
+
+    /// <summary>
     /// Operation claim'i olmayan düz tenant üyesi: hiçbir permission taşımaz, dolayısıyla
     /// <c>Clinics.Read</c> policy'si authorization katmanında 403 ile engellenir.
     /// </summary>
@@ -998,6 +1068,37 @@ internal static class IntegrationTestAuthHelper
         if (perm is null)
         {
             perm = new Permission(code, code, "LabResults");
+            db.Permissions.Add(perm);
+            await db.SaveChangesAsync();
+        }
+
+        var linked = await db.OperationClaimPermissions
+            .AnyAsync(x => x.OperationClaimId == claim.Id && x.PermissionId == perm.Id);
+        if (!linked)
+        {
+            db.OperationClaimPermissions.Add(new OperationClaimPermission(claim.Id, perm.Id));
+            await db.SaveChangesAsync();
+        }
+
+        return claim;
+    }
+
+    private static async Task<OperationClaim> EnsurePaymentsReadClaimAsync(AppDbContext db)
+    {
+        const string claimName = "IntegrationPaymentReader";
+        var claim = await db.OperationClaims.FirstOrDefaultAsync(c => c.Name == claimName);
+        if (claim is null)
+        {
+            claim = new OperationClaim(claimName);
+            db.OperationClaims.Add(claim);
+            await db.SaveChangesAsync();
+        }
+
+        var code = PermissionCatalog.Payments.Read;
+        var perm = await db.Permissions.FirstOrDefaultAsync(p => p.Code == code);
+        if (perm is null)
+        {
+            perm = new Permission(code, code, "Payments");
             db.Permissions.Add(perm);
             await db.SaveChangesAsync();
         }
