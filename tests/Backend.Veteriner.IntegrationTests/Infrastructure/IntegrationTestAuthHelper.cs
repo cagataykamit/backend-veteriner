@@ -11,6 +11,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Users;
@@ -424,6 +425,79 @@ internal static class IntegrationTestAuthHelper
     }
 
     /// <summary>
+    /// Tenant-wide olmayan kullanıcı: <c>Prescriptions.Read</c> iznine sahip, Admin / Owner / PlatformAdmin /
+    /// ClinicAdmin claim'i yok. Yalnız atandığı kliniğin reçete detayını okuyabilmeli.
+    /// </summary>
+    public static async Task<(string Email, string Password, Guid AssignedClinicId, Guid UnassignedClinicId)>
+        SeedPrescriptionReaderUserAsync(IServiceProvider services, IPasswordHasher hasher)
+    {
+        await EnsureRolePermissionBindingsAsync(services);
+
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+        var assignedClinic = await db.Clinics.SingleAsync(c =>
+            c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+
+        var unassignedClinic = new Clinic(tenant.Id, $"PrescReader-{Guid.NewGuid():N}"[..14], "Konya");
+        db.Clinics.Add(unassignedClinic);
+        await db.SaveChangesAsync();
+
+        var claim = await EnsurePrescriptionsReadClaimAsync(db);
+
+        var email = $"presc-reader-{Guid.NewGuid():N}@example.com";
+        const string password = "123456";
+        var user = new User(email, hasher.Hash(password));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        await db.SaveChangesAsync();
+
+        return (email, password, assignedClinic.Id, unassignedClinic.Id);
+    }
+
+    /// <summary>Belirtilen klinikte tek reçete kaydı oluşturur.</summary>
+    public static async Task<Guid> SeedPrescriptionInClinicAsync(
+        IServiceProvider services,
+        Guid clinicId,
+        TimeSpan? prescribedOffsetFromUtcNow = null)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
+        var client = new Client(clinic.TenantId, $"PrescClient-{Guid.NewGuid():N}"[..14], "905551110066");
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+        var pet = new Pet(clinic.TenantId, client.Id, $"PrescPet-{Guid.NewGuid():N}"[..12], speciesId);
+        db.Pets.Add(pet);
+        await db.SaveChangesAsync();
+
+        var prescribedAt = DateTime.UtcNow.Add(prescribedOffsetFromUtcNow ?? TimeSpan.FromHours(-2));
+        var prescription = new Prescription(
+            clinic.TenantId,
+            clinic.Id,
+            pet.Id,
+            examinationId: null,
+            treatmentId: null,
+            prescribedAt,
+            "IDOR Test Reçete",
+            "Reçete içeriği",
+            null,
+            null);
+        db.Prescriptions.Add(prescription);
+        await db.SaveChangesAsync();
+
+        return prescription.Id;
+    }
+
+    /// <summary>
     /// Operation claim'i olmayan düz tenant üyesi: hiçbir permission taşımaz, dolayısıyla
     /// <c>Clinics.Read</c> policy'si authorization katmanında 403 ile engellenir.
     /// </summary>
@@ -576,6 +650,37 @@ internal static class IntegrationTestAuthHelper
         if (perm is null)
         {
             perm = new Permission(code, code, "Treatments");
+            db.Permissions.Add(perm);
+            await db.SaveChangesAsync();
+        }
+
+        var linked = await db.OperationClaimPermissions
+            .AnyAsync(x => x.OperationClaimId == claim.Id && x.PermissionId == perm.Id);
+        if (!linked)
+        {
+            db.OperationClaimPermissions.Add(new OperationClaimPermission(claim.Id, perm.Id));
+            await db.SaveChangesAsync();
+        }
+
+        return claim;
+    }
+
+    private static async Task<OperationClaim> EnsurePrescriptionsReadClaimAsync(AppDbContext db)
+    {
+        const string claimName = "IntegrationPrescriptionReader";
+        var claim = await db.OperationClaims.FirstOrDefaultAsync(c => c.Name == claimName);
+        if (claim is null)
+        {
+            claim = new OperationClaim(claimName);
+            db.OperationClaims.Add(claim);
+            await db.SaveChangesAsync();
+        }
+
+        var code = PermissionCatalog.Prescriptions.Read;
+        var perm = await db.Permissions.FirstOrDefaultAsync(p => p.Code == code);
+        if (perm is null)
+        {
+            perm = new Permission(code, code, "Prescriptions");
             db.Permissions.Add(perm);
             await db.SaveChangesAsync();
         }
