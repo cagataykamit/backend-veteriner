@@ -29,7 +29,7 @@ internal static class CqrsStartupConfigurationLogger
         var queryConnection = configuration.GetConnectionString("QueryConnection");
 
         logger.LogInformation(
-            "CQRS startup configuration. Environment={Environment} ProjectionEnabled={ProjectionEnabled} PaymentProjectionEnabled={PaymentProjectionEnabled} AppointmentsQueryReadEnabled={AppointmentsQueryReadEnabled} DashboardQueryReadEnabled={DashboardQueryReadEnabled} DashboardFinanceReadEnabled={DashboardFinanceReadEnabled} DashboardRecentPaymentsReadEnabled={DashboardRecentPaymentsReadEnabled} ClientsQueryReadEnabled={ClientsQueryReadEnabled} PetsQueryReadEnabled={PetsQueryReadEnabled} SharedSearchLookupEnabled={SharedSearchLookupEnabled} PaymentsSearchLookupEnabled={PaymentsSearchLookupEnabled} PaymentsListReadEnabled={PaymentsListReadEnabled} CommandDbCatalog={CommandDbCatalog} QueryDbCatalog={QueryDbCatalog}",
+            "CQRS startup configuration. Environment={Environment} ProjectionEnabled={ProjectionEnabled} PaymentProjectionEnabled={PaymentProjectionEnabled} AppointmentsQueryReadEnabled={AppointmentsQueryReadEnabled} DashboardQueryReadEnabled={DashboardQueryReadEnabled} DashboardFinanceReadEnabled={DashboardFinanceReadEnabled} DashboardRecentPaymentsReadEnabled={DashboardRecentPaymentsReadEnabled} ClientsQueryReadEnabled={ClientsQueryReadEnabled} PetsQueryReadEnabled={PetsQueryReadEnabled} SharedSearchLookupEnabled={SharedSearchLookupEnabled} PaymentsSearchLookupEnabled={PaymentsSearchLookupEnabled} PaymentsListReadEnabled={PaymentsListReadEnabled} ClientPaymentSummaryReadEnabled={ClientPaymentSummaryReadEnabled} CommandDbCatalog={CommandDbCatalog} QueryDbCatalog={QueryDbCatalog}",
             app.Environment.EnvironmentName,
             projectionOptions.Enabled,
             paymentProjectionOptions.Enabled,
@@ -42,6 +42,7 @@ internal static class CqrsStartupConfigurationLogger
             queryReadModels.SharedSearchLookupEnabled,
             queryReadModels.PaymentsSearchLookupEnabled,
             queryReadModels.PaymentsListReadEnabled,
+            queryReadModels.ClientPaymentSummaryReadEnabled,
             TryGetDatabaseCatalog(commandConnection),
             TryGetDatabaseCatalog(queryConnection));
     }

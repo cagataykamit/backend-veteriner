@@ -47,4 +47,14 @@ public sealed class QueryReadModelsOptions
     /// <see cref="DashboardFinanceReadEnabled"/> totals/trend routing'inden bağımsızdır.
     /// </summary>
     public bool DashboardRecentPaymentsReadEnabled { get; set; }
+
+    /// <summary>
+    /// Client payment summary (GET /clients/{id}/payment-summary) aggregate + recent payments bölümünü
+    /// Query DB <c>PaymentReadModels</c> üzerinden okur (15E+).
+    /// Klinik kapsamı tek kliniğe (<see cref="Clinics.Access.ClinicReadScope.SingleClinicId"/>) ya da tenant-wide'a
+    /// (Admin/Owner için clinic filtresi yok) çözülebiliyorken Query DB yolu kullanılır; multi-clinic (ClinicAdmin,
+    /// aktif klinik yok) scope represent edilemediğinden bilinçli olarak Command DB yolunda kalınır.
+    /// Query DB yolu seçildiğinde Command DB'ye fallback yapılmaz; Query DB boşsa count 0 / totals boş / recent boş döner.
+    /// </summary>
+    public bool ClientPaymentSummaryReadEnabled { get; set; }
 }
