@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Specs;
@@ -16,6 +17,9 @@ public sealed class GetLabResultByIdQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClientContext _clientContext;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<LabResult> _labResults;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -23,12 +27,18 @@ public sealed class GetLabResultByIdQueryHandler
     public GetLabResultByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClientContext clientContext,
+        IUserOperationClaimRepository userOperationClaims,
+        IUserClinicRepository userClinics,
         IReadRepository<LabResult> labResults,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clientContext = clientContext;
+        _userOperationClaims = userOperationClaims;
+        _userClinics = userClinics;
         _labResults = labResults;
         _pets = pets;
         _clients = clients;
@@ -43,12 +53,30 @@ public sealed class GetLabResultByIdQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
+        if (_clientContext.UserId is not { } userId)
+        {
+            return Result<LabResultDetailDto>.Failure(
+                "Auth.Unauthorized.UserContextMissing",
+                "Kullanıcı bağlamı yok.");
+        }
+
         var row = await _labResults.FirstOrDefaultAsync(
             new LabResultByIdSpec(tenantId, request.Id), ct);
         if (row is null)
             return Result<LabResultDetailDto>.Failure("LabResults.NotFound", "Laboratuvar sonucu bulunamadı.");
         if (_clinicContext.ClinicId is { } clinicId && row.ClinicId != clinicId)
             return Result<LabResultDetailDto>.Failure("LabResults.NotFound", "Laboratuvar sonucu bulunamadı.");
+
+        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId, ct);
+        if (!TenantWideClaimNames.IsTenantWide(operationClaimNames))
+        {
+            if (!await _userClinics.ExistsAsync(userId, row.ClinicId, ct))
+            {
+                return Result<LabResultDetailDto>.Failure(
+                    "LabResults.NotFound",
+                    "Laboratuvar sonucu bulunamadı.");
+            }
+        }
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, row.PetId), ct);
         var petName = pet?.Name ?? string.Empty;
