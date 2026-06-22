@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Treatments.Contracts.Dtos;
@@ -16,6 +17,9 @@ public sealed class GetTreatmentByIdQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClientContext _clientContext;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Treatment> _treatments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -23,12 +27,18 @@ public sealed class GetTreatmentByIdQueryHandler
     public GetTreatmentByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClientContext clientContext,
+        IUserOperationClaimRepository userOperationClaims,
+        IUserClinicRepository userClinics,
         IReadRepository<Treatment> treatments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clientContext = clientContext;
+        _userOperationClaims = userOperationClaims;
+        _userClinics = userClinics;
         _treatments = treatments;
         _pets = pets;
         _clients = clients;
@@ -43,12 +53,30 @@ public sealed class GetTreatmentByIdQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
+        if (_clientContext.UserId is not { } userId)
+        {
+            return Result<TreatmentDetailDto>.Failure(
+                "Auth.Unauthorized.UserContextMissing",
+                "Kullanıcı bağlamı yok.");
+        }
+
         var t = await _treatments.FirstOrDefaultAsync(
             new TreatmentByIdSpec(tenantId, request.Id), ct);
         if (t is null)
             return Result<TreatmentDetailDto>.Failure("Treatments.NotFound", "Tedavi kaydı bulunamadı.");
         if (_clinicContext.ClinicId is { } clinicId && t.ClinicId != clinicId)
             return Result<TreatmentDetailDto>.Failure("Treatments.NotFound", "Tedavi kaydı bulunamadı.");
+
+        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId, ct);
+        if (!TenantWideClaimNames.IsTenantWide(operationClaimNames))
+        {
+            if (!await _userClinics.ExistsAsync(userId, t.ClinicId, ct))
+            {
+                return Result<TreatmentDetailDto>.Failure(
+                    "Treatments.NotFound",
+                    "Tedavi kaydı bulunamadı.");
+            }
+        }
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, t.PetId), ct);
         var petName = pet?.Name ?? string.Empty;
