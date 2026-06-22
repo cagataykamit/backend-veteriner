@@ -29,13 +29,14 @@ internal static class CqrsStartupConfigurationLogger
         var queryConnection = configuration.GetConnectionString("QueryConnection");
 
         logger.LogInformation(
-            "CQRS startup configuration. Environment={Environment} ProjectionEnabled={ProjectionEnabled} PaymentProjectionEnabled={PaymentProjectionEnabled} AppointmentsQueryReadEnabled={AppointmentsQueryReadEnabled} DashboardQueryReadEnabled={DashboardQueryReadEnabled} DashboardFinanceReadEnabled={DashboardFinanceReadEnabled} ClientsQueryReadEnabled={ClientsQueryReadEnabled} PetsQueryReadEnabled={PetsQueryReadEnabled} SharedSearchLookupEnabled={SharedSearchLookupEnabled} PaymentsSearchLookupEnabled={PaymentsSearchLookupEnabled} PaymentsListReadEnabled={PaymentsListReadEnabled} CommandDbCatalog={CommandDbCatalog} QueryDbCatalog={QueryDbCatalog}",
+            "CQRS startup configuration. Environment={Environment} ProjectionEnabled={ProjectionEnabled} PaymentProjectionEnabled={PaymentProjectionEnabled} AppointmentsQueryReadEnabled={AppointmentsQueryReadEnabled} DashboardQueryReadEnabled={DashboardQueryReadEnabled} DashboardFinanceReadEnabled={DashboardFinanceReadEnabled} DashboardRecentPaymentsReadEnabled={DashboardRecentPaymentsReadEnabled} ClientsQueryReadEnabled={ClientsQueryReadEnabled} PetsQueryReadEnabled={PetsQueryReadEnabled} SharedSearchLookupEnabled={SharedSearchLookupEnabled} PaymentsSearchLookupEnabled={PaymentsSearchLookupEnabled} PaymentsListReadEnabled={PaymentsListReadEnabled} CommandDbCatalog={CommandDbCatalog} QueryDbCatalog={QueryDbCatalog}",
             app.Environment.EnvironmentName,
             projectionOptions.Enabled,
             paymentProjectionOptions.Enabled,
             queryReadModels.AppointmentsEnabled,
             queryReadModels.DashboardAppointmentsEnabled,
             queryReadModels.DashboardFinanceReadEnabled,
+            queryReadModels.DashboardRecentPaymentsReadEnabled,
             queryReadModels.ClientsEnabled,
             queryReadModels.PetsEnabled,
             queryReadModels.SharedSearchLookupEnabled,

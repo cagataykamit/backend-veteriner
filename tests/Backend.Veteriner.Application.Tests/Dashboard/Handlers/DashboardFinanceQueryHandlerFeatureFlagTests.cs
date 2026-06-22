@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Time;
@@ -6,6 +7,7 @@ using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
 using Backend.Veteriner.Application.Dashboard.Queries.GetFinanceSummary;
 using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Payments.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Payments;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
@@ -21,7 +23,9 @@ public sealed class DashboardFinanceQueryHandlerFeatureFlagTests
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Clients.Client>> _clients = new();
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Pets.Pet>> _pets = new();
     private readonly Mock<IDashboardFinancePaymentAggregatesReader> _aggregates = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IDashboardFinanceReadModelReader> _financeReadModel = new();
+    private readonly Mock<IDashboardRecentPaymentsReadModelReader> _recentReadModel = new();
 
     [Fact]
     public async Task FinanceSummary_WhenFlagFalse_Should_UseCommandAggregates_NotQueryReader()
@@ -194,11 +198,13 @@ public sealed class DashboardFinanceQueryHandlerFeatureFlagTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _payments.Object,
             _clients.Object,
             _pets.Object,
             _aggregates.Object,
             _financeReadModel.Object,
+            _recentReadModel.Object,
             Options.Create(new QueryReadModelsOptions { DashboardFinanceReadEnabled = dashboardFinanceReadEnabled }));
 
     private void SetupEmptyRecentPayments()

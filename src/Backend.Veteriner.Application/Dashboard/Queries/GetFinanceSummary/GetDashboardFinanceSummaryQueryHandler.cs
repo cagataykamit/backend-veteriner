@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Time;
@@ -24,32 +25,38 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IDashboardFinancePaymentAggregatesReader _financeAggregates;
     private readonly IDashboardFinanceReadModelReader _financeReadModelReader;
+    private readonly IDashboardRecentPaymentsReadModelReader _recentPaymentsReadModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetDashboardFinanceSummaryQueryHandler> _logger;
 
     public GetDashboardFinanceSummaryQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Payment> payments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
         IDashboardFinancePaymentAggregatesReader financeAggregates,
         IDashboardFinanceReadModelReader financeReadModelReader,
+        IDashboardRecentPaymentsReadModelReader recentPaymentsReadModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetDashboardFinanceSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _payments = payments;
         _clients = clients;
         _pets = pets;
         _financeAggregates = financeAggregates;
         _financeReadModelReader = financeReadModelReader;
+        _recentPaymentsReadModelReader = recentPaymentsReadModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetDashboardFinanceSummaryQueryHandler>.Instance;
     }
@@ -151,43 +158,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             last7DaysPaid = BuildDailyTotals(trendBuckets, trendProjectionRows);
         }
 
-        var recentRows = await _payments.ListAsync(
-            new PaymentsForDashboardRecentSpec(tenantId, clinicId, DashboardFinanceSummaryConstants.RecentPaymentsTake),
-            ct);
-        MarkStep("recentPayments");
-
-        var clientIds = recentRows.Select(r => r.ClientId).Distinct().ToArray();
-        var clients = clientIds.Length == 0
-            ? []
-            : await _clients.ListAsync(new ClientsByTenantIdsSpec(tenantId, clientIds), ct);
-        MarkStep("recentClientsLookup");
-        var clientNameById = clients.ToDictionary(c => c.Id, c => c.FullName);
-
-        var petIds = recentRows
-            .Where(r => r.PetId.HasValue)
-            .Select(r => r.PetId!.Value)
-            .Distinct()
-            .ToArray();
-        var petNameById = new Dictionary<Guid, string>();
-        if (petIds.Length > 0)
-        {
-            var pets = await _pets.ListAsync(new PetsByTenantIdsSpec(tenantId, petIds), ct);
-            MarkStep("recentPetsLookup");
-            petNameById = pets.ToDictionary(p => p.Id, p => p.Name);
-        }
-
-        var recentDtos = recentRows
-            .Select(r => new DashboardFinanceRecentPaymentDto(
-                r.Id,
-                r.PaidAtUtc,
-                r.ClientId,
-                clientNameById.GetValueOrDefault(r.ClientId, string.Empty),
-                r.PetId,
-                r.PetId is { } pid ? petNameById.GetValueOrDefault(pid, string.Empty) : string.Empty,
-                r.Amount,
-                r.Currency,
-                r.Method))
-            .ToList();
+        var recentDtos = await LoadRecentPaymentsAsync(tenantId, clinicId, ct, MarkStep);
 
         var dto = new DashboardFinanceSummaryDto(
             todayTotalPaid,
@@ -200,10 +171,11 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             last7DaysPaid);
 
         _logger.LogInformation(
-            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} DashboardFinanceReadEnabled={DashboardFinanceReadEnabled} UtcNow={UtcNow} DayWindowUtc={DayStartUtc}..{DayEndUtc} WeekWindowUtc={WeekStartUtc}..{WeekEndUtc} MonthWindowUtc={MonthStartUtc}..{MonthEndUtc} TrendWindowUtc={TrendStartUtc}..{TrendEndUtc} TrendProjectionRows={TrendProjectionRows} TodayCount={TodayCount} WeekCount={WeekCount} MonthCount={MonthCount} RecentPayments={RecentPayments} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} DashboardFinanceReadEnabled={DashboardFinanceReadEnabled} DashboardRecentPaymentsReadEnabled={DashboardRecentPaymentsReadEnabled} UtcNow={UtcNow} DayWindowUtc={DayStartUtc}..{DayEndUtc} WeekWindowUtc={WeekStartUtc}..{WeekEndUtc} MonthWindowUtc={MonthStartUtc}..{MonthEndUtc} TrendWindowUtc={TrendStartUtc}..{TrendEndUtc} TrendProjectionRows={TrendProjectionRows} TodayCount={TodayCount} WeekCount={WeekCount} MonthCount={MonthCount} RecentPayments={RecentPayments} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
             tenantId,
             clinicId,
             _queryReadModelsOptions.DashboardFinanceReadEnabled,
+            _queryReadModelsOptions.DashboardRecentPaymentsReadEnabled,
             utcNow,
             dayStart,
             dayEnd,
@@ -224,6 +196,86 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             totalSw.ElapsedMilliseconds);
 
         return Result<DashboardFinanceSummaryDto>.Success(dto);
+    }
+
+    /// <summary>
+    /// CQRS-15B: recent payments Query DB routing.
+    /// Query DB yolu yalnızca <see cref="QueryReadModelsOptions.DashboardRecentPaymentsReadEnabled"/> açık
+    /// ve klinik kapsamı tek kliniğe çözülebildiğinde kullanılır; aksi halde mevcut Command DB yolu korunur.
+    /// Query path seçildiğinde Command DB fallback yapılmaz.
+    /// </summary>
+    private async Task<List<DashboardFinanceRecentPaymentDto>> LoadRecentPaymentsAsync(
+        Guid tenantId,
+        Guid? clinicId,
+        CancellationToken ct,
+        Action<string> markStep)
+    {
+        Guid? queryClinicId = null;
+        if (_queryReadModelsOptions.DashboardRecentPaymentsReadEnabled)
+        {
+            var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, clinicId, ct);
+            markStep("recentScopeResolve");
+            if (scopeResult.IsSuccess && scopeResult.Value!.SingleClinicId is { } singleClinicId)
+                queryClinicId = singleClinicId;
+        }
+
+        if (queryClinicId is { } effectiveQueryClinicId)
+        {
+            var readRequest = new DashboardRecentPaymentsReadRequest(
+                tenantId,
+                effectiveQueryClinicId,
+                DashboardFinanceSummaryConstants.RecentPaymentsTake);
+            var items = await _recentPaymentsReadModelReader.GetRecentAsync(readRequest, ct);
+            markStep("recentPaymentsReadModel");
+            return items.ToList();
+        }
+
+        return await LoadRecentPaymentsFromCommandDbAsync(tenantId, clinicId, ct, markStep);
+    }
+
+    private async Task<List<DashboardFinanceRecentPaymentDto>> LoadRecentPaymentsFromCommandDbAsync(
+        Guid tenantId,
+        Guid? clinicId,
+        CancellationToken ct,
+        Action<string> markStep)
+    {
+        var recentRows = await _payments.ListAsync(
+            new PaymentsForDashboardRecentSpec(tenantId, clinicId, DashboardFinanceSummaryConstants.RecentPaymentsTake),
+            ct);
+        markStep("recentPayments");
+
+        var clientIds = recentRows.Select(r => r.ClientId).Distinct().ToArray();
+        var clients = clientIds.Length == 0
+            ? []
+            : await _clients.ListAsync(new ClientsByTenantIdsSpec(tenantId, clientIds), ct);
+        markStep("recentClientsLookup");
+        var clientNameById = clients.ToDictionary(c => c.Id, c => c.FullName);
+
+        var petIds = recentRows
+            .Where(r => r.PetId.HasValue)
+            .Select(r => r.PetId!.Value)
+            .Distinct()
+            .ToArray();
+        var petNameById = new Dictionary<Guid, string>();
+        if (petIds.Length > 0)
+        {
+            var pets = await _pets.ListAsync(new PetsByTenantIdsSpec(tenantId, petIds), ct);
+            markStep("recentPetsLookup");
+            petNameById = pets.ToDictionary(p => p.Id, p => p.Name);
+        }
+
+        return recentRows
+            .Select(r => new DashboardFinanceRecentPaymentDto(
+                r.Id,
+                r.PaidAtUtc,
+                r.ClientId,
+                clientNameById.GetValueOrDefault(r.ClientId, string.Empty),
+                r.PetId,
+                r.PetId is { } pid ? petNameById.GetValueOrDefault(pid, string.Empty) : string.Empty,
+                r.Amount,
+                r.Currency,
+                r.Method))
+            .ToList();
     }
 
     /// <summary>

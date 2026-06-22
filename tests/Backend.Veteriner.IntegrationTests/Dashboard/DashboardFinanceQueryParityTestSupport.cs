@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Time;
@@ -60,11 +61,13 @@ internal static class DashboardFinanceQueryParityTestSupport
         var handler = new GetDashboardFinanceSummaryQueryHandler(
             new FixedTenantContext(tenantId),
             clinicId is { } id ? new FixedClinicContext(id) : new NullClinicContext(),
+            sp.GetRequiredService<IClinicReadScopeResolver>(),
             sp.GetRequiredService<IReadRepository<Payment>>(),
             sp.GetRequiredService<IReadRepository<Client>>(),
             sp.GetRequiredService<IReadRepository<Pet>>(),
             sp.GetRequiredService<IDashboardFinancePaymentAggregatesReader>(),
             sp.GetRequiredService<IDashboardFinanceReadModelReader>(),
+            sp.GetRequiredService<IDashboardRecentPaymentsReadModelReader>(),
             Options.Create(new QueryReadModelsOptions { DashboardFinanceReadEnabled = dashboardFinanceReadEnabled }));
 
         return await handler.Handle(new GetDashboardFinanceSummaryQuery(), CancellationToken.None);

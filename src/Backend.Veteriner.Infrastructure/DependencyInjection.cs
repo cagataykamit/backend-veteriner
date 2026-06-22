@@ -209,6 +209,7 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentReadModelReader, AppointmentReadModelReader>();
         services.AddScoped<IDashboardAppointmentReadModelReader, DashboardAppointmentReadModelReader>();
         services.AddScoped<IDashboardFinanceReadModelReader, DashboardFinanceReadModelReader>();
+        services.AddScoped<IDashboardRecentPaymentsReadModelReader, DashboardRecentPaymentsReadModelReader>();
         services.AddHostedService<AppointmentProjectionHostedService>();
 
         // ===== Client projection (CQRS-12B-3) =====

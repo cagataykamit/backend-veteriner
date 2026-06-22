@@ -26,7 +26,8 @@ public sealed class QueryReadModelsOptions
 
     /// <summary>
     /// Dashboard finance özetini Query DB <c>ClinicDailyPaymentStatsReadModel</c> üzerinden okur (13E+).
-    /// Kapalıyken Command DB aggregate yolu korunur. Recent payments + isim hydration her iki yolda Command DB'den kalır.
+    /// Kapalıyken Command DB aggregate yolu korunur. Recent payments routing için
+    /// <see cref="DashboardRecentPaymentsReadEnabled"/> kullanılır.
     /// </summary>
     public bool DashboardFinanceReadEnabled { get; set; }
 
@@ -37,4 +38,13 @@ public sealed class QueryReadModelsOptions
     /// Query DB yolu seçildiğinde Command DB'ye fallback yapılmaz; Query DB boşsa boş liste döner.
     /// </summary>
     public bool PaymentsListReadEnabled { get; set; }
+
+    /// <summary>
+    /// Dashboard finance özetindeki recent payments bölümünü Query DB <c>PaymentReadModels</c> üzerinden okur (15B+).
+    /// Yalnızca klinik kapsamı tek kliniğe (<see cref="Clinics.Access.ClinicReadScope.SingleClinicId"/>) çözülebiliyorken Query DB yolu kullanılır;
+    /// tenant-wide veya multi-clinic scope'ta bilinçli olarak Command DB yolunda kalınır.
+    /// Query DB yolu seçildiğinde Command DB'ye fallback yapılmaz; Query DB boşsa recent payments boş döner.
+    /// <see cref="DashboardFinanceReadEnabled"/> totals/trend routing'inden bağımsızdır.
+    /// </summary>
+    public bool DashboardRecentPaymentsReadEnabled { get; set; }
 }
