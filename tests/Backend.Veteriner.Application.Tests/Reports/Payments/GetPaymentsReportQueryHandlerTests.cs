@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Application.Reports.Payments.Queries.GetPaymentReport;
+using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
@@ -26,6 +27,7 @@ public sealed class GetPaymentsReportQueryHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IClientReadModelLookupReader> _clientLookupReader = new();
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
+    private readonly Mock<IPaymentsReportReadModelReader> _reportReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetPaymentsReportQueryHandler CreateHandler(bool paymentsSearchLookupEnabled = false)
@@ -39,6 +41,7 @@ public sealed class GetPaymentsReportQueryHandlerTests
             _clinics.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _reportReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
@@ -305,6 +308,7 @@ public sealed class GetPaymentsReportQueryHandlerTests
             _clinics.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _reportReader.Object,
             Options.Create(new QueryReadModelsOptions()));
 
         var cmd = new GetPaymentsReportQuery(
@@ -350,6 +354,7 @@ public sealed class GetPaymentsReportQueryHandlerTests
             _clinics.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _reportReader.Object,
             Options.Create(new QueryReadModelsOptions()));
 
         var cmd = new GetPaymentsReportQuery(
@@ -395,6 +400,7 @@ public sealed class GetPaymentsReportQueryHandlerTests
             _clinics.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _reportReader.Object,
             Options.Create(new QueryReadModelsOptions()));
 
         var cmd = new GetPaymentsReportQuery(

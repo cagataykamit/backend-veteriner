@@ -28,6 +28,8 @@ using Backend.Veteriner.Application.Payments.ReadModels;
 using Backend.Veteriner.Application.Projections.Payments;
 using Backend.Veteriner.Infrastructure.Projections.Payments;
 using Backend.Veteriner.Infrastructure.Query.Payments;
+using Backend.Veteriner.Infrastructure.Query.Reports;
+using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Query;
 using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
@@ -262,6 +264,9 @@ public static class DependencyInjection
 
         // ===== Client payment summary query read-model reader (CQRS-15E) =====
         services.AddScoped<IClientPaymentSummaryReadModelReader, ClientPaymentSummaryReadModelReader>();
+
+        // ===== Payment report JSON query read-model reader (CQRS-15G) =====
+        services.AddScoped<IPaymentsReportReadModelReader, PaymentsReportReadModelReader>();
 
         // ===== Payment list read-model backfill / parity / health (CQRS-14F) =====
         services.AddScoped<IPaymentReadModelBackfillService, PaymentReadModelBackfillService>();
