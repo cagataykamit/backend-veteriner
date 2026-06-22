@@ -12,6 +12,9 @@ namespace Backend.Veteriner.Application.Payments.IntegrationEvents;
 /// Normalize değerler command-side normalizer'larıyla hizalıdır:
 /// ClientNameNormalized = <see cref="Client.NormalizeFullNameForDuplicateCheck"/> (trim + invariant lower),
 /// PetName/Notes normalize = trim + invariant lower.
+///
+/// CQRS-15D: <paramref name="clinicName"/> write path'te zorunludur; payment daima geçerli bir kliniğe
+/// bağlıdır (domain ilişkisi). ClinicName display alanıdır, normalize edilmez.
 /// </summary>
 public static class PaymentProjectionSnapshotFactory
 {
@@ -42,10 +45,12 @@ public static class PaymentProjectionSnapshotFactory
     public static PaymentProjectionSnapshot Create(
         Payment payment,
         string clientName,
+        string clinicName,
         string? petName = null)
     {
         ArgumentNullException.ThrowIfNull(payment);
         ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clinicName);
 
         return new PaymentProjectionSnapshot(
             payment.Id,
@@ -65,7 +70,8 @@ public static class PaymentProjectionSnapshotFactory
             NormalizeRaw(petName),
             NormalizeLower(petName),
             NormalizeRaw(payment.Notes),
-            NormalizeLower(payment.Notes));
+            NormalizeLower(payment.Notes),
+            clinicName.Trim());
     }
 
     private static string? NormalizeRaw(string? value)

@@ -458,9 +458,9 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
 
     /// <summary>
     /// PaymentReadModel list/search satırını idempotent upsert eder (aynı Query DB transaction'ı içinde).
-    /// Create → insert, Update → overwrite. Enrichment alanları (ClientName/PetName/Notes) snapshot'tan gelir;
-    /// 14C öncesi (eski) payload'larda bu alanlar yoksa defensive fallback uygulanır:
-    /// ClientName/ClientNameNormalized -> boş string, PetName/PetNameNormalized/Notes -> null.
+    /// Create → insert, Update → overwrite. Enrichment alanları (ClientName/ClinicName/PetName/Notes) snapshot'tan gelir;
+    /// eski payload'larda bu alanlar yoksa defensive fallback uygulanır:
+    /// ClientName/ClientNameNormalized/ClinicName -> boş string, PetName/PetNameNormalized/Notes -> null.
     /// </summary>
     private void ApplyReadModelChange(
         PaymentProjectionSnapshot snapshot,
@@ -481,6 +481,12 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
             ? snapshot.ClientNameNormalized
             : NormalizeOptional(clientName) ?? string.Empty;
 
+        // CQRS-15D: ClinicName denormalize alanı. 15D öncesi payload'larda null gelir → boş string fallback
+        // (ClientName ile aynı kural; non-null kolon korunur, sessiz bozulma yapılmaz).
+        var clinicName = string.IsNullOrWhiteSpace(snapshot.ClinicName)
+            ? string.Empty
+            : snapshot.ClinicName.Trim();
+
         var petName = string.IsNullOrWhiteSpace(snapshot.PetName) ? null : snapshot.PetName!.Trim();
         var petNameNormalized = !string.IsNullOrWhiteSpace(snapshot.PetNameNormalized)
             ? snapshot.PetNameNormalized
@@ -498,6 +504,7 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
                 PaymentId = snapshot.PaymentId,
                 TenantId = snapshot.TenantId,
                 ClinicId = snapshot.ClinicId,
+                ClinicName = clinicName,
                 ClientId = snapshot.ClientId,
                 ClientName = clientName,
                 ClientNameNormalized = clientNameNormalized,
@@ -521,6 +528,7 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
 
         existing.TenantId = snapshot.TenantId;
         existing.ClinicId = snapshot.ClinicId;
+        existing.ClinicName = clinicName;
         existing.ClientId = snapshot.ClientId;
         existing.ClientName = clientName;
         existing.ClientNameNormalized = clientNameNormalized;

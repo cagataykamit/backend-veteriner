@@ -90,6 +90,9 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
         paymentReadModelIndexes.Should().Contain("IX_PaymentReadModels_TenantId_ClientId_PaidAtUtc");
         paymentReadModelIndexes.Should().Contain("IX_PaymentReadModels_TenantId_ClinicId_ClientNameNormalized");
         paymentReadModelIndexes.Should().Contain("IX_PaymentReadModels_TenantId_ClinicId_PetNameNormalized");
+
+        // CQRS-15D: ClinicName enrichment kolonu migration ile gelmeli.
+        (await ColumnExistsAsync(queryDb, "PaymentReadModels", "ClinicName")).Should().BeTrue();
     }
 
     [Fact]
@@ -336,6 +339,21 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
         {
             await db.Database.CloseConnectionAsync();
         }
+    }
+
+    private static async Task<bool> ColumnExistsAsync(DbContext db, string tableName, string columnName)
+    {
+        var count = await db.Database
+            .SqlQueryRaw<int>(
+                """
+                SELECT COUNT(*) AS Value
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = {0} AND COLUMN_NAME = {1}
+                """,
+                tableName,
+                columnName)
+            .SingleAsync();
+        return count > 0;
     }
 
     private static async Task<IReadOnlyList<string>> GetIndexNamesAsync(DbContext db, string tableName)

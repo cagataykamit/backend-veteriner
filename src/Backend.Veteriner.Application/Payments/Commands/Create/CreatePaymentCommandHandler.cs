@@ -212,7 +212,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
             new PaymentCreatedIntegrationEvent(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
-                PaymentProjectionSnapshotFactory.Create(payment, client.FullName, petName)),
+                PaymentProjectionSnapshotFactory.Create(payment, client.FullName, clinic.Name, petName)),
             ct);
 
         await _paymentsWrite.SaveChangesAsync(ct);

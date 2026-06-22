@@ -18,7 +18,8 @@ public sealed class PaymentReadModelParityEvaluatorTests
         DateTime? paidAt = null,
         string clientName = "Ada Lovelace",
         string? petName = null,
-        string? notes = null)
+        string? notes = null,
+        string clinicName = "Vetinity Clinic")
         => new(
             paymentId,
             ClientId,
@@ -29,7 +30,8 @@ public sealed class PaymentReadModelParityEvaluatorTests
             paidAt ?? PaidAt,
             clientName,
             petName,
-            notes);
+            notes,
+            clinicName);
 
     [Fact]
     public void Evaluate_Should_BeInSync_WhenCountsRowsAndOrderingMatch()
@@ -72,6 +74,23 @@ public sealed class PaymentReadModelParityEvaluatorTests
         result.RowSampleMismatchCount.Should().Be(1);
         result.RowSampleMismatches[0].PaymentId.Should().Be(paymentId);
         result.RowSampleMismatches[0].Field.Should().Be("Amount");
+        result.InSync.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Evaluate_Should_ReportRowFieldMismatch_WhenClinicNameDiffers()
+    {
+        var paymentId = Guid.NewGuid();
+        var command = new[] { Row(paymentId, clinicName: "Vetinity Clinic") };
+        var query = new[] { Row(paymentId, clinicName: "") };
+
+        var result = PaymentReadModelParityEvaluator.Evaluate(1, 1, command, query, TenantId, ClinicId);
+
+        result.CountInSync.Should().BeTrue();
+        result.RowSampleParityInSync.Should().BeFalse();
+        result.RowSampleMismatchCount.Should().Be(1);
+        result.RowSampleMismatches[0].PaymentId.Should().Be(paymentId);
+        result.RowSampleMismatches[0].Field.Should().Be("ClinicName");
         result.InSync.Should().BeFalse();
     }
 

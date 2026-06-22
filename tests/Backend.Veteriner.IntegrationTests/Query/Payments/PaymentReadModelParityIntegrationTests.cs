@@ -86,6 +86,33 @@ public sealed class PaymentReadModelParityIntegrationTests
     }
 
     [Fact]
+    public async Task ClinicParity_Should_BeOutOfSync_OnClinicNameMismatch()
+    {
+        await ResetAsync();
+        var (tenantId, clinicId) = await SeedTenantAsync();
+        var paidAt = new DateTime(2026, 6, 20, 10, 0, 0, DateTimeKind.Utc);
+        var paymentId = await SeedPaymentAsync(tenantId, clinicId, "Ada Lovelace", null, 100m, paidAt);
+
+        await RunBackfillAsync(tenantId);
+
+        // Read-model ClinicName'i bozarak field mismatch üret (Command DB truth = "Clinic A").
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+            var rm = await queryDb.PaymentReadModels.SingleAsync(x => x.PaymentId == paymentId);
+            rm.ClinicName = "Drifted Clinic";
+            await queryDb.SaveChangesAsync();
+        }
+
+        var result = await GetParityAsync(tenantId, clinicId);
+
+        result.CountInSync.Should().BeTrue();
+        result.RowSampleParityInSync.Should().BeFalse();
+        result.RowSampleMismatches.Should().Contain(m => m.PaymentId == paymentId && m.Field == "ClinicName");
+        result.InSync.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ClinicParity_Should_BeOutOfSync_OnRecentOrderingMismatch()
     {
         await ResetAsync();

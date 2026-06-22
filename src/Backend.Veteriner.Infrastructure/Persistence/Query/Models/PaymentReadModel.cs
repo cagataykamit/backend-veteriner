@@ -9,6 +9,13 @@ public sealed class PaymentReadModel
     public Guid PaymentId { get; set; }
     public Guid TenantId { get; set; }
     public Guid ClinicId { get; set; }
+
+    /// <summary>
+    /// Denormalize klinik adı (CQRS-15D). Client payment summary / report-export gibi yüzeyler için display alanıdır.
+    /// ClientName ile aynı pattern: zorunlu (non-null); 15D öncesi payload'larda projection/backfill defensive
+    /// fallback ile boş string yazar. Klinik adı ile filtre/search yapılmadığından normalize alan eklenmemiştir.
+    /// </summary>
+    public string ClinicName { get; set; } = default!;
     public Guid ClientId { get; set; }
     public string ClientName { get; set; } = default!;
     public string ClientNameNormalized { get; set; } = default!;

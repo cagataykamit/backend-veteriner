@@ -57,7 +57,8 @@ public sealed class PaymentReadModelParityReader : IPaymentReadModelParityReader
                 x.PaidAtUtc,
                 x.ClientName,
                 x.PetName,
-                x.Notes))
+                x.Notes,
+                x.ClinicName))
             .ToListAsync(cancellationToken);
 
         return PaymentReadModelParityEvaluator.Evaluate(
@@ -84,6 +85,14 @@ public sealed class PaymentReadModelParityReader : IPaymentReadModelParityReader
 
         if (payments.Count == 0)
             return [];
+
+        // Parity recent örneği tek clinic kapsamlıdır; ClinicName denormalize değeri projection/backfill ile
+        // aynı kuralla (trim, null ise boş string) üretilir ki backfill sonrası karşılaştırma adil olsun (CQRS-15D).
+        var clinicRawName = await _commandDb.Clinics.AsNoTracking()
+            .Where(c => c.Id == clinicId)
+            .Select(c => c.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+        var clinicName = string.IsNullOrWhiteSpace(clinicRawName) ? string.Empty : clinicRawName.Trim();
 
         var clientIds = payments.Select(p => p.ClientId).Distinct().ToList();
         var clientNames = await _commandDb.Clients.AsNoTracking()
@@ -121,7 +130,8 @@ public sealed class PaymentReadModelParityReader : IPaymentReadModelParityReader
                 payment.PaidAtUtc,
                 clientName,
                 petName,
-                notes));
+                notes,
+                clinicName));
         }
 
         return rows;

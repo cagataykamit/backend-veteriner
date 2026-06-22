@@ -198,6 +198,7 @@ public sealed class DashboardRecentPaymentsReadModelReaderIntegrationTests
             PaymentId = paymentId ?? Guid.NewGuid(),
             TenantId = tenantId,
             ClinicId = clinicId,
+            ClinicName = "Vetinity Clinic",
             ClientId = clientId ?? Guid.NewGuid(),
             ClientName = clientName,
             ClientNameNormalized = clientName.Trim().ToLowerInvariant(),

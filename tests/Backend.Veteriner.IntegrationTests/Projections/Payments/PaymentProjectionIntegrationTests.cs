@@ -404,7 +404,8 @@ public sealed class PaymentProjectionIntegrationTests
             amount: 250m, currency: "TRY", paidAtUtc: paidAtUtc,
             clientId: clientId, petId: petId,
             clientName: "Ada Lovelace", petName: "Rex", notes: "Aşı bedeli",
-            method: 2, appointmentId: appointmentId, examinationId: examinationId);
+            method: 2, appointmentId: appointmentId, examinationId: examinationId,
+            clinicName: "Vetinity Clinic");
 
         await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
@@ -417,6 +418,7 @@ public sealed class PaymentProjectionIntegrationTests
         row.Should().NotBeNull();
         row!.TenantId.Should().Be(tenantId);
         row.ClinicId.Should().Be(clinicId);
+        row.ClinicName.Should().Be("Vetinity Clinic");
         row.ClientId.Should().Be(clientId);
         row.ClientName.Should().Be("Ada Lovelace");
         row.ClientNameNormalized.Should().Be("ada lovelace");
@@ -454,10 +456,12 @@ public sealed class PaymentProjectionIntegrationTests
 
         var created = PaymentProjectionTestSupport.CreateSnapshot(
             paymentId, tenantId, clinicId, amount: 100m, paidAtUtc: paidAtUtc,
-            clientId: clientId, clientName: "Ada Lovelace", petName: "Rex", notes: "ilk");
+            clientId: clientId, clientName: "Ada Lovelace", petName: "Rex", notes: "ilk",
+            clinicName: "Clinic One");
         var updated = PaymentProjectionTestSupport.CreateSnapshot(
             paymentId, tenantId, clinicId, amount: 175m, paidAtUtc: paidAtUtc,
-            clientId: clientId, clientName: "Grace Hopper", petName: null, notes: "guncel", method: 3);
+            clientId: clientId, clientName: "Grace Hopper", petName: null, notes: "guncel", method: 3,
+            clinicName: "Clinic Two");
 
         await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
             commandDb,
@@ -476,6 +480,7 @@ public sealed class PaymentProjectionIntegrationTests
         var row = await PaymentProjectionTestSupport.FindReadModelAsync(queryDb, paymentId);
         row!.ClientName.Should().Be("Grace Hopper");
         row.ClientNameNormalized.Should().Be("grace hopper");
+        row.ClinicName.Should().Be("Clinic Two");
         row.PetName.Should().BeNull();
         row.PetNameNormalized.Should().BeNull();
         row.Amount.Should().Be(175m);
@@ -595,6 +600,7 @@ public sealed class PaymentProjectionIntegrationTests
         row.Should().NotBeNull();
         row!.ClientName.Should().BeEmpty();
         row.ClientNameNormalized.Should().BeEmpty();
+        row.ClinicName.Should().BeEmpty("15D öncesi payload'da ClinicName yok → defensive boş string fallback");
         row.PetName.Should().BeNull();
         row.PetNameNormalized.Should().BeNull();
         row.Notes.Should().BeNull();

@@ -66,6 +66,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
         rm.Should().NotBeNull();
         rm!.TenantId.Should().Be(tenantId);
         rm.ClinicId.Should().Be(clinicId);
+        rm.ClinicName.Should().Be("Clinic A");
         rm.ClientName.Should().Be("Ada Lovelace");
         rm.ClientNameNormalized.Should().Be("ada lovelace");
         rm.PetName.Should().Be("Lord Byron");
@@ -120,6 +121,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
                 PaymentId = paymentId,
                 TenantId = tenantId,
                 ClinicId = clinicId,
+                ClinicName = "STALE CLINIC",
                 ClientId = Guid.NewGuid(),
                 ClientName = "STALE",
                 ClientNameNormalized = "stale",
@@ -141,6 +143,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
         var verifyDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var rm = await PaymentProjectionTestSupport.FindReadModelAsync(verifyDb, paymentId);
         rm!.ClientName.Should().Be("Grace Hopper");
+        rm.ClinicName.Should().Be("Clinic A", "backfill ClinicName'i Command DB truth'tan günceller");
         rm.Amount.Should().Be(500m);
         rm.Currency.Should().Be("TRY");
     }
@@ -210,6 +213,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
                 PaymentId = paymentId,
                 TenantId = tenantId,
                 ClinicId = clinicId,
+                ClinicName = "NEWER CLINIC",
                 ClientId = Guid.NewGuid(),
                 ClientName = "NEWER",
                 ClientNameNormalized = "newer",

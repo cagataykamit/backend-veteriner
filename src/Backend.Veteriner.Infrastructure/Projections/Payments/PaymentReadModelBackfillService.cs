@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Projections.Payments;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Infrastructure.Persistence;
@@ -19,8 +20,8 @@ namespace Backend.Veteriner.Infrastructure.Projections.Payments;
 /// - <b>Non-destructive upsert</b>: Query tablosu silinmez; eksikler insert, mevcutlar update edilir (PK <c>PaymentId</c>).
 /// - <b>Idempotency</b>: tekrar çalıştırma duplicate üretmez; stale guard ile daha yeni gerçek event satırı ezilmez.
 /// - <b>Snapshot</b>: list projection ile birebir aynı zenginleştirilmiş snapshot
-///   (<see cref="PaymentProjectionSnapshotFactory.Create(Payment, string, string?)"/>) — Command DB'den
-///   client/pet isimleri ve normalize alanlar doldurulur.
+///   (<see cref="PaymentProjectionSnapshotFactory.Create(Payment, string, string, string?)"/>) — Command DB'den
+///   client/pet isimleri, klinik adı (CQRS-15D) ve normalize alanlar doldurulur.
 /// - <b>Timestamp stratejisi</b>: Payment domain'de mutasyon timestamp yok →
 ///   <see cref="PaymentReadModelBackfillPlanner.BackfillBaselineOccurredAtUtc"/> (UTC MinValue sentinel).
 ///   <c>LastProjectedAtUtc</c> backfill wall-clock. <c>LastEventId</c> = <see cref="BackfillEventId"/> (Guid.Empty).
@@ -140,6 +141,7 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
                 var snapshot = PaymentProjectionSnapshotFactory.Create(
                     row.Payment,
                     row.Client.FullName,
+                    row.Clinic.Name,
                     row.Pet?.Name);
 
                 existingRows.TryGetValue(row.Payment.Id, out var existing);
@@ -185,7 +187,7 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
         DateTime occurredAtUtc,
         DateTime projectedAtUtc)
     {
-        var (clientName, clientNameNormalized, petName, petNameNormalized, notes, notesNormalized) =
+        var (clientName, clientNameNormalized, clinicName, petName, petNameNormalized, notes, notesNormalized) =
             ResolveDenormalizedFields(snap);
 
         return new PaymentReadModel
@@ -193,6 +195,7 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
             PaymentId = snap.PaymentId,
             TenantId = snap.TenantId,
             ClinicId = snap.ClinicId,
+            ClinicName = clinicName,
             ClientId = snap.ClientId,
             ClientName = clientName,
             ClientNameNormalized = clientNameNormalized,
@@ -219,11 +222,12 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
         DateTime occurredAtUtc,
         DateTime projectedAtUtc)
     {
-        var (clientName, clientNameNormalized, petName, petNameNormalized, notes, notesNormalized) =
+        var (clientName, clientNameNormalized, clinicName, petName, petNameNormalized, notes, notesNormalized) =
             ResolveDenormalizedFields(snap);
 
         existing.TenantId = snap.TenantId;
         existing.ClinicId = snap.ClinicId;
+        existing.ClinicName = clinicName;
         existing.ClientId = snap.ClientId;
         existing.ClientName = clientName;
         existing.ClientNameNormalized = clientNameNormalized;
@@ -247,8 +251,9 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
     /// Snapshot denormalize alanlarını <see cref="PaymentProjectionProcessor"/> ile birebir aynı kurallarla çözer
     /// (defensive fallback dahil), böylece backfill ve canlı projection aynı değerleri üretir.
     /// </summary>
-    private static (string ClientName, string ClientNameNormalized, string? PetName, string? PetNameNormalized,
-        string? Notes, string? NotesNormalized) ResolveDenormalizedFields(PaymentProjectionSnapshot snapshot)
+    private static (string ClientName, string ClientNameNormalized, string ClinicName, string? PetName,
+        string? PetNameNormalized, string? Notes, string? NotesNormalized) ResolveDenormalizedFields(
+        PaymentProjectionSnapshot snapshot)
     {
         var clientName = string.IsNullOrWhiteSpace(snapshot.ClientName)
             ? string.Empty
@@ -256,6 +261,11 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
         var clientNameNormalized = !string.IsNullOrWhiteSpace(snapshot.ClientNameNormalized)
             ? snapshot.ClientNameNormalized
             : NormalizeOptional(clientName) ?? string.Empty;
+
+        // CQRS-15D: ClinicName projection ile birebir aynı kural — null/empty ise boş string (non-null kolon).
+        var clinicName = string.IsNullOrWhiteSpace(snapshot.ClinicName)
+            ? string.Empty
+            : snapshot.ClinicName.Trim();
 
         var petName = string.IsNullOrWhiteSpace(snapshot.PetName) ? null : snapshot.PetName!.Trim();
         var petNameNormalized = !string.IsNullOrWhiteSpace(snapshot.PetNameNormalized)
@@ -267,7 +277,7 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
             ? snapshot.NotesNormalized
             : NormalizeOptional(snapshot.Notes);
 
-        return (clientName, clientNameNormalized, petName, petNameNormalized, notes, notesNormalized);
+        return (clientName, clientNameNormalized, clinicName, petName, petNameNormalized, notes, notesNormalized);
     }
 
     private static string? NormalizeOptional(string? value)
@@ -314,6 +324,11 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
             .Where(c => clientIds.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, cancellationToken);
 
+        var clinicIds = payments.Select(p => p.ClinicId).Distinct().ToList();
+        var clinics = await _commandDb.Clinics.AsNoTracking()
+            .Where(c => clinicIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, cancellationToken);
+
         var petIds = payments.Where(p => p.PetId.HasValue).Select(p => p.PetId!.Value).Distinct().ToList();
         var pets = petIds.Count == 0
             ? new Dictionary<Guid, Pet>()
@@ -328,11 +343,15 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
                 throw new InvalidOperationException(
                     $"Payment Client missing. PaymentId={payment.Id} ClientId={payment.ClientId}");
 
+            if (!clinics.TryGetValue(payment.ClinicId, out var clinic))
+                throw new InvalidOperationException(
+                    $"Payment Clinic missing. PaymentId={payment.Id} ClinicId={payment.ClinicId}");
+
             Pet? pet = null;
             if (payment.PetId is { } petId)
                 pets.TryGetValue(petId, out pet);
 
-            rows.Add(new PaymentBackfillRow(payment, client, pet));
+            rows.Add(new PaymentBackfillRow(payment, client, clinic, pet));
         }
 
         return rows;
@@ -357,5 +376,5 @@ public sealed class PaymentReadModelBackfillService : IPaymentReadModelBackfillS
         await Task.CompletedTask;
     }
 
-    private sealed record PaymentBackfillRow(Payment Payment, Client Client, Pet? Pet);
+    private sealed record PaymentBackfillRow(Payment Payment, Client Client, Clinic Clinic, Pet? Pet);
 }

@@ -34,7 +34,8 @@ internal static class PaymentProjectionTestSupport
         string? notes = null,
         int method = 1,
         Guid? appointmentId = null,
-        Guid? examinationId = null)
+        Guid? examinationId = null,
+        string? clinicName = "Vetinity Clinic")
         => new(
             paymentId,
             tenantId,
@@ -53,7 +54,8 @@ internal static class PaymentProjectionTestSupport
             petName,
             NormalizeForTest(petName),
             notes,
-            NormalizeForTest(notes));
+            NormalizeForTest(notes),
+            clinicName);
 
     private static string? NormalizeForTest(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();

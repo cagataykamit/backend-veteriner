@@ -13,6 +13,7 @@ public sealed class PaymentReadModelConfiguration : IEntityTypeConfiguration<Pay
 
         b.Property(x => x.TenantId).IsRequired();
         b.Property(x => x.ClinicId).IsRequired();
+        b.Property(x => x.ClinicName).IsRequired().HasMaxLength(QueryReadModelConstraints.ClinicName);
         b.Property(x => x.ClientId).IsRequired();
         b.Property(x => x.ClientName).IsRequired().HasMaxLength(QueryReadModelConstraints.ClientName);
         b.Property(x => x.ClientNameNormalized).IsRequired()

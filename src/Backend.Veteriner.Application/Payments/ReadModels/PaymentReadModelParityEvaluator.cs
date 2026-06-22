@@ -19,7 +19,8 @@ public static class PaymentReadModelParityEvaluator
         DateTime PaidAtUtc,
         string ClientName,
         string? PetName,
-        string? Notes);
+        string? Notes,
+        string ClinicName = "");
 
     public static PaymentReadModelParityResult Evaluate(
         long commandCount,
@@ -90,6 +91,8 @@ public static class PaymentReadModelParityEvaluator
             return nameof(RowSnapshot.PetId);
         if (!string.Equals(command.ClientName, query.ClientName, StringComparison.Ordinal))
             return nameof(RowSnapshot.ClientName);
+        if (!string.Equals(command.ClinicName, query.ClinicName, StringComparison.Ordinal))
+            return nameof(RowSnapshot.ClinicName);
         if (!string.Equals(command.PetName, query.PetName, StringComparison.Ordinal))
             return nameof(RowSnapshot.PetName);
         if (!string.Equals(command.Notes, query.Notes, StringComparison.Ordinal))

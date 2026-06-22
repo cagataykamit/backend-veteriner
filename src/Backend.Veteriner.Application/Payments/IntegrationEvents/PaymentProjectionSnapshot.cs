@@ -8,6 +8,10 @@ namespace Backend.Veteriner.Application.Payments.IntegrationEvents;
 /// CQRS-14C enrichment: <see cref="ClientName"/>/<see cref="PetName"/> ve normalize alanları
 /// PaymentReadModel list/search yüzeyini besler. Bu alanlar geriye uyumluluk için nullable'dır:
 /// 14C öncesi (eski) payload'larda bulunmazlar ve projection tarafında defensive fallback uygulanır.
+///
+/// CQRS-15D enrichment: <see cref="ClinicName"/> client payment summary / report-export display'i için eklendi.
+/// ClientName ile aynı kontrat: write path'te dolu gelir; 15D öncesi payload'larda <c>null</c> olur ve
+/// projection/backfill defensive fallback ile boş string yazar.
 /// </summary>
 public sealed record PaymentProjectionSnapshot(
     Guid PaymentId,
@@ -27,4 +31,5 @@ public sealed record PaymentProjectionSnapshot(
     string? PetName = null,
     string? PetNameNormalized = null,
     string? Notes = null,
-    string? NotesNormalized = null);
+    string? NotesNormalized = null,
+    string? ClinicName = null);
