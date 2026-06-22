@@ -245,6 +245,142 @@ public sealed class PaymentReadModelReaderIntegrationTests
     }
 
     [Fact]
+    public async Task GetList_Should_MatchSearchByCurrency()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
+
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicId, currency: "TRY"),
+            Row(tenantId, clinicId, currency: "USD"));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("try")!);
+        var result = await reader.GetListAsync(
+            new PaymentsListReadRequest(tenantId, clinicId, 1, 20, SearchContainsLikePattern: pattern));
+
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().ContainSingle(x => x.Currency == "TRY");
+    }
+
+    [Fact]
+    public async Task GetList_Should_MatchSearchByClientIdLookup()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
+
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var clientMatch = Guid.NewGuid();
+        var clientOther = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicId, clientId: clientMatch, clientName: "Hidden Name"),
+            Row(tenantId, clinicId, clientId: clientOther, clientName: "Other"));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("nomatchdirect")!);
+        var result = await reader.GetListAsync(
+            new PaymentsListReadRequest(
+                tenantId,
+                clinicId,
+                1,
+                20,
+                SearchContainsLikePattern: pattern,
+                SearchMatchClientIds: [clientMatch]));
+
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().ContainSingle(x => x.ClientId == clientMatch);
+    }
+
+    [Fact]
+    public async Task GetList_Should_MatchSearchByPetIdLookup()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
+
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petMatch = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicId, petId: petMatch, petName: "Hidden Pet"),
+            Row(tenantId, clinicId, petId: Guid.NewGuid(), petName: "Visible Pet"));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("nomatchdirect")!);
+        var result = await reader.GetListAsync(
+            new PaymentsListReadRequest(
+                tenantId,
+                clinicId,
+                1,
+                20,
+                SearchContainsLikePattern: pattern,
+                SearchMatchPetIds: [petMatch]));
+
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().ContainSingle(x => x.PetId == petMatch);
+    }
+
+    [Fact]
+    public async Task GetList_Should_NotLeakLookupMatchesAcrossClinic()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
+
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicA = Guid.NewGuid();
+        var clinicB = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        await SeedAsync(queryDb,
+            Row(tenantId, clinicA, clientId: clientId, clientName: "Ayşe Yılmaz"),
+            Row(tenantId, clinicB, clientId: clientId, clientName: "Ayşe Yılmaz"));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("nomatchdirect")!);
+        var result = await reader.GetListAsync(
+            new PaymentsListReadRequest(
+                tenantId,
+                clinicA,
+                1,
+                20,
+                SearchContainsLikePattern: pattern,
+                SearchMatchClientIds: [clientId]));
+
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().ContainSingle(x => x.ClinicId == clinicA);
+    }
+
+    [Fact]
+    public async Task GetList_Should_ReturnEmpty_WhenSearchUnrelated()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
+
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        await SeedAsync(queryDb, Row(tenantId, clinicId));
+
+        var pattern = ListQueryTextSearch.BuildContainsLikePattern(ListQueryTextSearch.Normalize("zzznomatch")!);
+        var result = await reader.GetListAsync(
+            new PaymentsListReadRequest(tenantId, clinicId, 1, 20, SearchContainsLikePattern: pattern));
+
+        result.TotalCount.Should().Be(0);
+        result.Items.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task GetList_Should_HandleNullablePetWithoutError()
     {
         await using var scope = _factory.Services.CreateAsyncScope();

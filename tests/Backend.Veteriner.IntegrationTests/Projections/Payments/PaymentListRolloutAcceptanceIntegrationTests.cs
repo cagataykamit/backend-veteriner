@@ -24,10 +24,10 @@ using Microsoft.Extensions.Options;
 namespace Backend.IntegrationTests.Projections.Payments;
 
 /// <summary>
-/// CQRS-14G — Payment list Query DB rollout acceptance / smoke.
+/// CQRS-14G + 15L — Payment list Query DB rollout acceptance / smoke.
 /// Uçtan uca rollout zincirini tek yerde bağlar: production-safe default flag posture,
 /// flag false → Command DB source of truth, backfill + parity + flag true → Query DB source of truth,
-/// Query DB boş + flag true → fallback yok, search route guard, read-model health gate ve rollback.
+/// Query DB boş + flag true → fallback yok, search Query route (15L single clinic), read-model health gate ve rollback.
 ///
 /// Bu sınıf production davranışını DEĞİŞTİRMEZ; yalnızca 14E/14F altyapısının rollout güvenliğini doğrular.
 /// Per-flag/per-bileşen detayları (14E routing, 14F backfill/parity/health) ayrı sınıflarda kalır; burada
@@ -159,25 +159,45 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
     }
 
     // -------------------------------------------------------------------------
-    // (e) Search dolu + flag true → Command DB guard (search parity eksikliği).
+    // (e) CQRS-15L: Search dolu + flag true + single clinic → Query DB search path;
+    //     Query DB boş → fallback yok. Multi-clinic scope → Command DB fallback (search guard).
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task SearchProvided_FlagTrue_Should_UseCommandDbGuard_EvenWhenQueryDbEmpty()
+    public async Task SearchProvided_FlagTrue_SingleClinic_Should_UseQueryDbWithoutCommandFallback_WhenQueryDbEmpty()
     {
         await ResetAsync();
         var (tenantId, clinicId) = await SeedTenantAsync();
         var paidAt = new DateTime(2026, 6, 22, 10, 0, 0, DateTimeKind.Utc);
-        var paymentId = await SeedCustomPaymentAsync(
+        await SeedCustomPaymentAsync(
             tenantId, clinicId, "Ayşe Yılmaz", "Pamuk", 150m, "TRY", PaymentMethod.Cash, paidAt, "Nakit tahsilat");
 
-        // Query DB boş; ama search dolu olduğundan Query path KULLANILMAZ, Command DB geniş search davranışı korunur.
+        // Query DB boş; single clinic + search dolu → Query path (15L). Command DB fallback yok.
         await AssertReadModelEmptyAsync(tenantId);
 
         var result = await InvokeListAsync(tenantId, clinicId, paymentsListReadEnabled: true, search: "tahsilat");
 
         result.IsSuccess.Should().BeTrue();
-        result.Value!.TotalItems.Should().Be(1, "search dolu iken Command DB path kullanılır (route guard)");
+        result.Value!.TotalItems.Should().Be(0, "Query path seçildiğinde Command DB'ye fallback yapılmaz");
+        result.Value.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SearchProvided_FlagTrue_MultiClinicScope_Should_UseCommandDbFallback()
+    {
+        await ResetAsync();
+        var (tenantId, clinicId) = await SeedTenantAsync();
+        var paidAt = new DateTime(2026, 6, 22, 11, 0, 0, DateTimeKind.Utc);
+        var paymentId = await SeedCustomPaymentAsync(
+            tenantId, clinicId, "Ayşe Yılmaz", "Pamuk", 150m, "TRY", PaymentMethod.Cash, paidAt, "Nakit tahsilat");
+
+        await AssertReadModelEmptyAsync(tenantId);
+
+        var result = await InvokeListWithMultiClinicScopeAsync(
+            tenantId, clinicId, paymentsListReadEnabled: true, search: "tahsilat");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TotalItems.Should().Be(1, "multi-clinic scope represent edilemediğinden Command DB path kullanılır");
         result.Value.Items.Should().ContainSingle(x => x.Id == paymentId);
     }
 
@@ -432,6 +452,54 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
             CancellationToken.None);
     }
 
+    private async Task<Result<PagedResult<PaymentListItemDto>>> InvokeListWithMultiClinicScopeAsync(
+        Guid tenantId,
+        Guid clinicId,
+        bool paymentsListReadEnabled,
+        string? search = null)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var sp = scope.ServiceProvider;
+        var (_, _, clinicB) = await GetTwoClinicIdsAsync(tenantId);
+        var accessibleClinicIds = new[] { clinicId, clinicB };
+
+        var handler = new GetPaymentsListQueryHandler(
+            new FixedTenantContext(tenantId),
+            new FixedClinicContext(clinicId),
+            new MultiClinicReadScopeResolver(accessibleClinicIds),
+            sp.GetRequiredService<IReadRepository<Payment>>(),
+            sp.GetRequiredService<IReadRepository<Pet>>(),
+            sp.GetRequiredService<IReadRepository<Client>>(),
+            sp.GetRequiredService<IClientReadModelLookupReader>(),
+            sp.GetRequiredService<IPetReadModelLookupReader>(),
+            sp.GetRequiredService<IPaymentsListReadModelReader>(),
+            Options.Create(new QueryReadModelsOptions
+            {
+                PaymentsListReadEnabled = paymentsListReadEnabled
+            }));
+
+        return await handler.Handle(
+            new GetPaymentsListQuery(
+                new PaymentListPagingRequest { Page = 1, PageSize = 50 },
+                clinicId,
+                Search: search),
+            CancellationToken.None);
+    }
+
+    private async Task<(Guid TenantId, Guid ClinicA, Guid ClinicB)> GetTwoClinicIdsAsync(Guid tenantId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var clinics = await commandDb.Clinics
+            .Where(c => c.TenantId == tenantId)
+            .OrderBy(c => c.Id)
+            .Select(c => c.Id)
+            .Take(2)
+            .ToListAsync();
+        clinics.Should().HaveCount(2);
+        return (tenantId, clinics[0], clinics[1]);
+    }
+
     private static PaymentProjectionHealthEvaluation Evaluate(bool projectionEnabled, PaymentReadModelHealthSignal signal)
         => PaymentProjectionHealthEvaluator.Evaluate(
             CreateStatus(projectionEnabled: projectionEnabled),
@@ -489,5 +557,12 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
     {
         public Task<Result<ClinicReadScope>> ResolveAsync(Guid tenantId, Guid? requestClinicId, CancellationToken ct)
             => Task.FromResult(Result<ClinicReadScope>.Success(new ClinicReadScope(requestClinicId, null)));
+    }
+
+    /// <summary>ClinicAdmin multi-clinic: SingleClinicId null + AccessibleClinicIds dolu → Query path temsil edilemez.</summary>
+    private sealed class MultiClinicReadScopeResolver(IReadOnlyCollection<Guid> accessibleClinicIds) : IClinicReadScopeResolver
+    {
+        public Task<Result<ClinicReadScope>> ResolveAsync(Guid tenantId, Guid? requestClinicId, CancellationToken ct)
+            => Task.FromResult(Result<ClinicReadScope>.Success(new ClinicReadScope(null, accessibleClinicIds)));
     }
 }

@@ -56,23 +56,36 @@ public sealed class PaymentsListReadModelReader : IPaymentsListReadModelReader
             query = query.Where(x => x.PaidAtUtc <= request.PaidToUtc.Value);
 
         if (request.SearchContainsLikePattern is { } pattern)
-            query = ApplyListSearchFilter(query, pattern);
+        {
+            query = ApplyListSearchFilter(
+                query,
+                pattern,
+                request.SearchMatchClientIds ?? [],
+                request.SearchMatchPetIds ?? []);
+        }
 
         return query;
     }
 
     /// <summary>
-    /// Command DB <see cref="Application.Payments.Specs.PaymentsListFilteredPagedSpec"/> ile aynı alan kümesi;
-    /// denormalize normalized alanlar üzerinden (client/pet lookup yok).
+    /// CQRS-15L: direct normalized alanlar + lookup ID filtreleri (Command list search OR mantığı ile hizalı).
     /// </summary>
     private static IQueryable<PaymentReadModel> ApplyListSearchFilter(
         IQueryable<PaymentReadModel> query,
-        string pattern)
-        => query.Where(x =>
+        string pattern,
+        IReadOnlyList<Guid> searchClientIds,
+        IReadOnlyList<Guid> searchPetIds)
+    {
+        var cids = searchClientIds;
+        var pids = searchPetIds;
+        return query.Where(x =>
             EF.Functions.Like(x.ClientNameNormalized, pattern)
             || (x.PetNameNormalized != null && EF.Functions.Like(x.PetNameNormalized, pattern))
             || (x.NotesNormalized != null && EF.Functions.Like(x.NotesNormalized, pattern))
-            || EF.Functions.Like(x.Currency, pattern));
+            || EF.Functions.Like(x.Currency, pattern)
+            || (cids.Count > 0 && cids.Contains(x.ClientId))
+            || (x.PetId != null && pids.Count > 0 && pids.Contains(x.PetId.Value)));
+    }
 
     private static PaymentListItemDto MapListItem(PaymentReadModel x)
         => new(

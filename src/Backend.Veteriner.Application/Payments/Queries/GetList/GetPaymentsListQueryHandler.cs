@@ -123,18 +123,29 @@ public sealed class GetPaymentsListQueryHandler
 
         var normalizedSearch = ListQueryTextSearch.Normalize(request.Search);
 
-        // CQRS-14E: Query DB read-model routing.
-        // Query DB PaymentReadModels reader yalnızca aşağıdaki koşullarda kullanılır:
-        //   (a) PaymentsListReadEnabled flag açık,
-        //   (b) arama (search) boş/null,
-        //   (c) klinik kapsamı tek kliniğe (SingleClinicId) çözülmüş.
-        // Arama dolu iken Query DB reader'ın search parity'si Command DB ile tam eşleşmediği için
-        // bilinçli olarak Command DB yolunda kalınır ("unsupported search route guard"; sessiz fallback değildir).
+        // CQRS-14E + 15L: Query DB read-model routing.
+        // PaymentsListReadEnabled + klinik kapsamı tek kliniğe (SingleClinicId) çözülmüş → Query DB (search boş veya dolu).
+        // Multi-clinic (SingleClinicId null + AccessibleClinicIds dolu) → Command DB fallback.
+        // Query path search: Query DB lookup reader'lar + PaymentReadModels filtre; Command DB search resolution kullanılmaz.
         // Query DB yolu seçildiğinde Command DB'ye fallback YAPILMAZ; Query DB boşsa boş paged result döner.
         if (_queryReadModelsOptions.PaymentsListReadEnabled
-            && normalizedSearch is null
             && effectiveClinicId is { } queryClinicId)
         {
+            string? querySearchPattern = null;
+            Guid[] querySearchClientIds = [];
+            Guid[] querySearchPetIds = [];
+            if (normalizedSearch is not null)
+            {
+                querySearchPattern = ListQueryTextSearch.BuildContainsLikePattern(normalizedSearch);
+                (querySearchClientIds, querySearchPetIds) = await PaymentsListQuerySearchResolution.ResolveSearchIdsAsync(
+                    tenantId,
+                    querySearchPattern,
+                    _clientLookupReader,
+                    _petLookupReader,
+                    ct);
+                MarkStep("searchLookup");
+            }
+
             var readRequest = new PaymentsListReadRequest(
                 tenantId,
                 queryClinicId,
@@ -145,17 +156,20 @@ public sealed class GetPaymentsListQueryHandler
                 request.Method,
                 request.PaidFromUtc,
                 request.PaidToUtc,
-                SearchContainsLikePattern: null);
+                querySearchPattern,
+                querySearchClientIds,
+                querySearchPetIds);
 
             var readResult = await _paymentsListReadModelReader.GetListAsync(readRequest, ct);
             MarkStep("paymentsListReadModel");
 
             _logger.LogInformation(
-                "Payments list generated from Query DB read model. TenantId={TenantId} ClinicId={ClinicId} Page={Page} PageSize={PageSize} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+                "Payments list generated from Query DB read model. TenantId={TenantId} ClinicId={ClinicId} Page={Page} PageSize={PageSize} SearchProvided={SearchProvided} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
                 tenantId,
                 queryClinicId,
                 page,
                 pageSize,
+                normalizedSearch is not null,
                 querySteps,
                 slowestStep,
                 slowestMs,

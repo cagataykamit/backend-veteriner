@@ -241,6 +241,7 @@ public sealed class GetPaymentsListQueryHandlerPaymentsSearchLookupFeatureFlagTe
             _listReadModelReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
-                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
+                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled,
+                PaymentsListReadEnabled = false
             }));
 }

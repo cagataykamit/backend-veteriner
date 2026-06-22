@@ -16,4 +16,6 @@ public sealed record PaymentsListReadRequest(
     PaymentMethod? Method = null,
     DateTime? PaidFromUtc = null,
     DateTime? PaidToUtc = null,
-    string? SearchContainsLikePattern = null);
+    string? SearchContainsLikePattern = null,
+    IReadOnlyList<Guid>? SearchMatchClientIds = null,
+    IReadOnlyList<Guid>? SearchMatchPetIds = null);

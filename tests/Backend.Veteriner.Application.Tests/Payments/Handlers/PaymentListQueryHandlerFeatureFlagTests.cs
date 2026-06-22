@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
@@ -21,9 +22,9 @@ using Moq;
 namespace Backend.Veteriner.Application.Tests.Payments.Handlers;
 
 /// <summary>
-/// CQRS-14E: <see cref="QueryReadModelsOptions.PaymentsListReadEnabled"/> routing for the payment list.
-/// Flag false → Command DB; flag true + boş arama → Query DB reader; arama dolu → Command DB (search route guard).
-/// Query DB yolu seçilince Command DB'ye fallback yapılmaz.
+/// CQRS-14E + 15L: <see cref="QueryReadModelsOptions.PaymentsListReadEnabled"/> routing for the payment list.
+/// Flag false → Command DB; flag true + single clinic → Query DB reader (search boş veya dolu);
+/// multi-clinic scope → Command DB fallback. Query DB yolu seçilince Command DB'ye fallback yapılmaz.
 /// </summary>
 public sealed class PaymentListQueryHandlerFeatureFlagTests
 {
@@ -88,7 +89,56 @@ public sealed class PaymentListQueryHandlerFeatureFlagTests
     [Theory]
     [InlineData("ada")]
     [InlineData("  pamuk  ")]
-    public async Task PaymentList_WhenFlagTrue_AndSearchProvided_Should_UseCommandDb_NotQueryReader(string search)
+    public async Task PaymentList_WhenFlagTrue_AndSearchProvided_Should_UseQueryReader_WithLookup(string search)
+    {
+        var tid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
+        SetupEmptyReader();
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([clientId]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([petId]));
+
+        PaymentsListReadRequest? captured = null;
+        _listReadModelReader.Setup(r => r.GetListAsync(It.IsAny<PaymentsListReadRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<PaymentsListReadRequest, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(new PaymentsListReadResult([], 0));
+
+        var result = await CreateHandler(paymentsListReadEnabled: true).Handle(
+            new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }, Search: search),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _listReadModelReader.Verify(
+            r => r.GetListAsync(It.IsAny<PaymentsListReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _payments.Verify(
+            r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _clients.Verify(
+            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _pets.Verify(
+            r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        captured.Should().NotBeNull();
+        captured!.SearchContainsLikePattern.Should().NotBeNullOrEmpty();
+        captured.SearchMatchClientIds.Should().Equal(clientId);
+        captured.SearchMatchPetIds.Should().Equal(petId);
+    }
+
+    [Fact]
+    public async Task PaymentList_WhenFlagFalse_AndSearchProvided_Should_UseCommandDb_NotQueryReader()
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -99,8 +149,8 @@ public sealed class PaymentListQueryHandlerFeatureFlagTests
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Pet>());
 
-        var result = await CreateHandler(paymentsListReadEnabled: true).Handle(
-            new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }, Search: search),
+        var result = await CreateHandler(paymentsListReadEnabled: false).Handle(
+            new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }, Search: "pamuk"),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -110,9 +160,104 @@ public sealed class PaymentListQueryHandlerFeatureFlagTests
         _payments.Verify(
             r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task PaymentList_WhenFlagTrue_AndMultiClinicScope_Should_FallbackToCommandDb_EvenWithSearch()
+    {
+        var tid = Guid.NewGuid();
+        var clinicA = Guid.NewGuid();
+        var clinicB = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicA);
+        var scopeResolver = new Mock<IClinicReadScopeResolver>();
+        scopeResolver
+            .Setup(x => x.ResolveAsync(tid, clinicA, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<ClinicReadScope>.Success(new ClinicReadScope(null, [clinicA, clinicB])));
+        SetupEmptyCommandPath();
+        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Client>());
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Pet>());
+
+        var handler = new GetPaymentsListQueryHandler(
+            _tenantContext.Object,
+            _clinicContext.Object,
+            scopeResolver.Object,
+            _payments.Object,
+            _pets.Object,
+            _clients.Object,
+            _clientLookupReader.Object,
+            _petLookupReader.Object,
+            _listReadModelReader.Object,
+            Options.Create(new QueryReadModelsOptions { PaymentsListReadEnabled = true }));
+
+        var result = await handler.Handle(
+            new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }, clinicA, Search: "pamuk"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _listReadModelReader.Verify(
+            r => r.GetListAsync(It.IsAny<PaymentsListReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         _payments.Verify(
-            r => r.ListAsync(It.IsAny<PaymentsListFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
+        _clientLookupReader.Verify(
+            r => r.ResolveClientIdsByTextSearchAsync(It.IsAny<ClientTextSearchLookupRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task PaymentList_WhenQueryPath_AndSearchProvided_AndLookupThrows_Should_NotFallbackToCommandDb()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("lookup down"));
+
+        var act = () => CreateHandler(paymentsListReadEnabled: true).Handle(
+            new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }, Search: "pamuk"),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        _listReadModelReader.Verify(
+            r => r.GetListAsync(It.IsAny<PaymentsListReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task PaymentList_WhenQueryPath_AndSearchNoMatches_Should_ReturnEmpty_WithoutCommandFallback()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+        _listReadModelReader.Setup(r => r.GetListAsync(It.IsAny<PaymentsListReadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PaymentsListReadResult([], 0));
+
+        var result = await CreateHandler(paymentsListReadEnabled: true).Handle(
+            new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }, Search: "nonexistent"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TotalItems.Should().Be(0);
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
