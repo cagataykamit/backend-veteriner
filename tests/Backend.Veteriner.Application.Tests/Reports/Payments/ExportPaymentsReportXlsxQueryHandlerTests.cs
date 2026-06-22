@@ -72,6 +72,41 @@ public sealed class ExportPaymentsReportXlsxQueryHandlerTests
         r.Error.Code.Should().Be("Payments.ReportDateRangeInvalid");
     }
 
+    [Theory]
+    [InlineData(49_999)]
+    [InlineData(50_000)]
+    public async Task Handle_Should_AllowExport_When_CountAtOrBelowMaxExportRows(int totalRows)
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns(clinicId);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "A", "B"));
+        _payments.Setup(r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(totalRows);
+        _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsFilteredOrderedForReportSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Payment>());
+        _clients
+            .Setup(r => r.ListAsync(It.IsAny<Backend.Veteriner.Application.Clients.Specs.ClientsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Backend.Veteriner.Domain.Clients.Client>());
+        _pets
+            .Setup(r => r.ListAsync(It.IsAny<Backend.Veteriner.Application.Pets.Specs.PetsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Backend.Veteriner.Domain.Pets.Pet>());
+        _clinics
+            .Setup(r => r.ListAsync(It.IsAny<ClinicsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic>());
+
+        var from = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 1, 31, 0, 0, 0, DateTimeKind.Utc);
+        var r = await CreateHandler().Handle(new ExportPaymentsReportXlsxQuery(from, to, null, null, null, null, null), CancellationToken.None);
+
+        r.IsSuccess.Should().BeTrue();
+        _payments.Verify(
+            x => x.ListAsync(It.IsAny<PaymentsFilteredOrderedForReportSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     [Fact]
     public async Task Handle_Should_Fail_When_ExportTooManyRows()
     {
@@ -90,6 +125,12 @@ public sealed class ExportPaymentsReportXlsxQueryHandlerTests
 
         r.IsSuccess.Should().BeFalse();
         r.Error.Code.Should().Be("Payments.ReportExportTooManyRows");
+        _payments.Verify(
+            x => x.ListAsync(It.IsAny<PaymentsFilteredOrderedForReportSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _clients.Verify(
+            x => x.ListAsync(It.IsAny<Backend.Veteriner.Application.Clients.Specs.ClientsByTenantIdsSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
