@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.Veteriner.Infrastructure.Query.Reports;
 
 /// <summary>
-/// CQRS-15J: payment export CSV/XLSX Query DB <c>PaymentReadModels</c> reader.
+/// CQRS-15J + 15N: payment export CSV/XLSX Query DB <c>PaymentReadModels</c> reader.
 /// Count SQL tarafında; items yalnızca count &gt; 0 iken ve pipeline limit doğrulamasına uygun şekilde çekilir.
 /// Sıralama export Command DB spec'i ile birebir: <c>PaidAtUtc DESC, PaymentId DESC</c>.
 /// </summary>
@@ -61,7 +61,36 @@ public sealed class PaymentsReportExportReadModelReader : IPaymentsReportExportR
 
         query = query.Where(x => x.PaidAtUtc >= request.FromUtc && x.PaidAtUtc <= request.ToUtc);
 
+        if (request.SearchContainsLikePattern is { } pattern)
+        {
+            query = ApplyExportSearchFilter(
+                query,
+                pattern,
+                request.SearchMatchClientIds ?? [],
+                request.SearchMatchPetIds ?? []);
+        }
+
         return query;
+    }
+
+    /// <summary>
+    /// CQRS-15N: direct normalized alanlar + lookup ID filtreleri (Command export search OR mantığı ile hizalı).
+    /// </summary>
+    private static IQueryable<PaymentReadModel> ApplyExportSearchFilter(
+        IQueryable<PaymentReadModel> query,
+        string pattern,
+        IReadOnlyList<Guid> searchClientIds,
+        IReadOnlyList<Guid> searchPetIds)
+    {
+        var cids = searchClientIds;
+        var pids = searchPetIds;
+        return query.Where(x =>
+            EF.Functions.Like(x.ClientNameNormalized, pattern)
+            || (x.PetNameNormalized != null && EF.Functions.Like(x.PetNameNormalized, pattern))
+            || (x.NotesNormalized != null && EF.Functions.Like(x.NotesNormalized, pattern))
+            || EF.Functions.Like(x.Currency, pattern)
+            || (cids.Count > 0 && cids.Contains(x.ClientId))
+            || (x.PetId != null && pids.Count > 0 && pids.Contains(x.PetId.Value)));
     }
 
     private static PaymentReportItemDto MapItem(PaymentReadModel x)

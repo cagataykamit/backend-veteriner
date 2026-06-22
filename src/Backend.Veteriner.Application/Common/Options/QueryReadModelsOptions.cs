@@ -70,10 +70,10 @@ public sealed class QueryReadModelsOptions
     public bool PaymentsReportReadEnabled { get; set; }
 
     /// <summary>
-    /// Payment export CSV/XLSX yüzeylerini Query DB <c>PaymentReadModels</c> üzerinden okur (15J).
-    /// Yalnızca arama (search) boş/null ve klinik kapsamı tek kliniğe (<see cref="Clinics.Access.ClinicReadScope.SingleClinicId"/>)
-    /// ya da tenant-wide'a (Admin/Owner için clinic filtresi yok) çözülebiliyorken Query DB yolu kullanılır; arama dolu veya
-    /// multi-clinic (ClinicAdmin, aktif klinik yok) scope'ta bilinçli olarak Command DB yolunda kalınır (search parity ayrı fazda).
+    /// Payment export CSV/XLSX yüzeylerini Query DB <c>PaymentReadModels</c> üzerinden okur (15J + 15N search).
+    /// Klinik kapsamı tek kliniğe (<see cref="Clinics.Access.ClinicReadScope.SingleClinicId"/>) ya da tenant-wide'a
+    /// (Admin/Owner için clinic filtresi yok) çözülebiliyorken Query DB yolu kullanılır (search boş veya dolu);
+    /// multi-clinic (ClinicAdmin, aktif klinik yok) scope'ta bilinçli olarak Command DB yolunda kalınır.
     /// Query DB yolu seçildiğinde Command DB'ye fallback yapılmaz; Query DB boşsa boş export döner.
     /// JSON report yüzeyi (<see cref="PaymentsReportReadEnabled"/>) bu bayraktan etkilenmez.
     /// </summary>

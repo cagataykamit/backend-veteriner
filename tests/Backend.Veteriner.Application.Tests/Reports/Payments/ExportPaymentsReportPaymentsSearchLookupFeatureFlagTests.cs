@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Payments;
+using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
 using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Application.Tests.TestHelpers;
@@ -72,11 +73,12 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
     }
 
     [Fact]
-    public async Task CsvExport_WhenFlagTrue_AndReaderThrows_Should_NotFallbackToCommandDb()
+    public async Task CsvExport_WhenCommandPath_AndSearchLookupFlagTrue_AndReaderThrows_Should_NotFallbackToCommandDb()
     {
         var tid = Guid.NewGuid();
         var clinicId = Guid.NewGuid();
         SetupTenantAndClinic(tid, clinicId);
+        SetupExportAggregateMocks();
         _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
                 It.IsAny<ClientTextSearchLookupRequest>(),
                 It.IsAny<CancellationToken>()))
@@ -93,7 +95,7 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
     }
 
     [Fact]
-    public async Task CsvExport_WhenSearchWhitespaceOnly_Should_NotCallLookupReaders()
+    public async Task CsvExport_WhenCommandPath_AndSearchWhitespaceOnly_Should_NotCallLookupReaders()
     {
         var tid = Guid.NewGuid();
         var clinicId = Guid.NewGuid();
@@ -110,6 +112,91 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
         _petLookupReader.Verify(
             r => r.ResolvePetIdsByPetTextFieldsAsync(It.IsAny<PetTextFieldsSearchLookupRequest>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task CsvExport_WhenExportReadFlagTrue_AndSearchProvided_Should_UseQueryLookup_RegardlessOfPaymentsSearchFlag()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        SetupTenantAndClinic(tid, clinicId);
+        _exportReader
+            .Setup(r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PaymentsReportExportReadResult(0, Array.Empty<PaymentReportItemDto>()));
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+
+        await CreateCsvHandler(
+                paymentsSearchLookupEnabled: false,
+                paymentsReportExportReadEnabled: true)
+            .Handle(CreateExportQuery(clinicId, search: "pamuk"), CancellationToken.None);
+
+        _exportReader.Verify(
+            r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _clientLookupReader.Verify(
+            r => r.ResolveClientIdsByTextSearchAsync(It.IsAny<ClientTextSearchLookupRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _clients.Verify(
+            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task CsvExport_WhenExportReadFlagTrue_AndLookupThrows_Should_NotFallbackToCommandDb()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        SetupTenantAndClinic(tid, clinicId);
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("query db down"));
+
+        var act = () => CreateCsvHandler(
+                paymentsSearchLookupEnabled: true,
+                paymentsReportExportReadEnabled: true)
+            .Handle(CreateExportQuery(clinicId, search: "pamuk"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        _clients.Verify(
+            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _payments.Verify(
+            r => r.CountAsync(It.IsAny<PaymentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task CsvExport_WhenExportReadFlagTrue_AndSearchWhitespaceOnly_Should_UseQueryReader_WithoutLookup()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        SetupTenantAndClinic(tid, clinicId);
+        _exportReader
+            .Setup(r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PaymentsReportExportReadResult(0, Array.Empty<PaymentReportItemDto>()));
+
+        await CreateCsvHandler(
+                paymentsSearchLookupEnabled: true,
+                paymentsReportExportReadEnabled: true)
+            .Handle(CreateExportQuery(clinicId, search: "   "), CancellationToken.None);
+
+        _clientLookupReader.Verify(
+            r => r.ResolveClientIdsByTextSearchAsync(It.IsAny<ClientTextSearchLookupRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _exportReader.Verify(
+            r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -249,7 +336,9 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
         return new ExportPaymentsReportXlsxQuery(from, to, clinicId, null, null, null, search);
     }
 
-    private ExportPaymentsReportQueryHandler CreateCsvHandler(bool paymentsSearchLookupEnabled)
+    private ExportPaymentsReportQueryHandler CreateCsvHandler(
+        bool paymentsSearchLookupEnabled,
+        bool paymentsReportExportReadEnabled = false)
         => new(
             _tenant.Object,
             _clinic.Object,
@@ -263,10 +352,13 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
             _exportReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
-                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
+                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled,
+                PaymentsReportExportReadEnabled = paymentsReportExportReadEnabled
             }));
 
-    private ExportPaymentsReportXlsxQueryHandler CreateXlsxHandler(bool paymentsSearchLookupEnabled)
+    private ExportPaymentsReportXlsxQueryHandler CreateXlsxHandler(
+        bool paymentsSearchLookupEnabled,
+        bool paymentsReportExportReadEnabled = false)
         => new(
             _tenant.Object,
             _clinic.Object,
@@ -280,6 +372,7 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
             _exportReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
-                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
+                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled,
+                PaymentsReportExportReadEnabled = paymentsReportExportReadEnabled
             }));
 }

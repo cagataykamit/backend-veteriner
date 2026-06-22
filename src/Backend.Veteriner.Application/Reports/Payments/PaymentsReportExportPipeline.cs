@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Payments;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
@@ -54,14 +55,29 @@ internal static class PaymentsReportExportPipeline
 
         var (tenantId, effectiveClinicId, accessibleClinicIds, validatedFrom, validatedTo) = validated.Value;
 
-        // CQRS-15J: payment export Query DB routing (PaymentReadModels).
-        // Flag açık + search boş + scope represent edilebiliyorsa Query DB'den okunur.
-        // Search dolu ya da multi-clinic scope → Command DB fallback.
-        // Query path seçildiğinde Command DB'ye fallback YAPILMAZ; search resolution ÇALIŞTIRILMAZ.
+        // CQRS-15J + 15N: payment export Query DB routing (PaymentReadModels).
+        // Flag açık + scope represent edilebiliyorsa (tek klinik veya tenant-wide) Query DB'den okunur (search boş veya dolu).
+        // Multi-clinic scope → Command DB fallback.
+        // Query path seçildiğinde Command DB'ye fallback YAPILMAZ; Command PaymentsReportSearchResolution ÇALIŞTIRILMAZ.
+        // Query path search: Query DB lookup reader'lar + PaymentReadModels filtre; PaymentsSearchLookupEnabled etkilemez.
         if (paymentsReportExportReadEnabled
-            && ListQueryTextSearch.Normalize(search) is null
             && TryGetRepresentableQueryClinicScope(effectiveClinicId, accessibleClinicIds, out var queryClinicId))
         {
+            string? querySearchPattern = null;
+            Guid[] querySearchClientIds = [];
+            Guid[] querySearchPetIds = [];
+            var normalizedSearch = ListQueryTextSearch.Normalize(search);
+            if (normalizedSearch is not null)
+            {
+                querySearchPattern = ListQueryTextSearch.BuildContainsLikePattern(normalizedSearch);
+                (querySearchClientIds, querySearchPetIds) = await PaymentsListQuerySearchResolution.ResolveSearchIdsAsync(
+                    tenantId,
+                    querySearchPattern,
+                    clientLookupReader,
+                    petLookupReader,
+                    ct);
+            }
+
             var readResult = await exportReadModelReader.GetExportAsync(
                 new PaymentsReportExportReadRequest(
                     tenantId,
@@ -70,7 +86,10 @@ internal static class PaymentsReportExportPipeline
                     petId,
                     method,
                     validatedFrom,
-                    validatedTo),
+                    validatedTo,
+                    querySearchPattern,
+                    querySearchClientIds,
+                    querySearchPetIds),
                 ct);
 
             if (readResult.TotalCount > PaymentsReportConstants.MaxExportRows)

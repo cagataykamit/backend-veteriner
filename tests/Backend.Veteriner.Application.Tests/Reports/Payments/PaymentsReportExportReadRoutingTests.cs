@@ -24,7 +24,7 @@ using Moq;
 namespace Backend.Veteriner.Application.Tests.Reports.Payments;
 
 /// <summary>
-/// CQRS-15J: <see cref="QueryReadModelsOptions.PaymentsReportExportReadEnabled"/> routing for payment export CSV/XLSX.
+/// CQRS-15J + 15N: <see cref="QueryReadModelsOptions.PaymentsReportExportReadEnabled"/> routing for payment export CSV/XLSX.
 /// </summary>
 public sealed class PaymentsReportExportReadRoutingTests
 {
@@ -127,8 +127,250 @@ public sealed class PaymentsReportExportReadRoutingTests
         VerifyCommandExportPathNeverUsed();
     }
 
+    [Theory]
+    [InlineData("ada")]
+    [InlineData("  pamuk  ")]
+    public async Task WhenExportFlagTrue_AndSearchProvided_AndSingleClinic_Should_UseQueryReader_WithLookup(string search)
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        SetupTenantAndClinic(tid, cid);
+        SetupExportReaderResult(EmptyExportResult());
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([clientId]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([petId]));
+
+        PaymentsReportExportReadRequest? captured = null;
+        _exportReader
+            .Setup(r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<PaymentsReportExportReadRequest, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(EmptyExportResult());
+
+        var result = await CreateCsvHandler(exportReadEnabled: true)
+            .Handle(CsvQuery(cid, search: search), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _exportReader.Verify(
+            r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        VerifyCommandExportPathNeverUsed();
+        VerifyCommandSearchResolutionNeverUsed();
+        captured.Should().NotBeNull();
+        captured!.SearchContainsLikePattern.Should().NotBeNullOrEmpty();
+        captured.SearchMatchClientIds.Should().Equal(clientId);
+        captured.SearchMatchPetIds.Should().Equal(petId);
+    }
+
     [Fact]
-    public async Task WhenExportFlagTrue_AndSearchPresent_Should_FallbackToCommandDb()
+    public async Task WhenExportFlagTrue_AndSearchProvided_AndSingleClinic_Xlsx_Should_UseQueryReader_WithLookup()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        SetupTenantAndClinic(tid, cid);
+        SetupExportReaderResult(EmptyExportResult());
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+
+        await CreateXlsxHandler(exportReadEnabled: true)
+            .Handle(XlsxQuery(cid, search: "pamuk"), CancellationToken.None);
+
+        _exportReader.Verify(
+            r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        VerifyCommandExportPathNeverUsed();
+    }
+
+    [Fact]
+    public async Task WhenExportFlagTrue_AndSearchProvided_AndTenantWide_Should_UseQueryReader_WithoutClinicFilter()
+    {
+        var tid = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+
+        PaymentsReportExportReadRequest? captured = null;
+        _exportReader
+            .Setup(r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<PaymentsReportExportReadRequest, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(EmptyExportResult());
+
+        await CreateCsvHandler(exportReadEnabled: true)
+            .Handle(CsvQuery(null, search: "pamuk"), CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.ClinicId.Should().BeNull();
+        captured.SearchContainsLikePattern.Should().NotBeNullOrEmpty();
+        VerifyCommandExportPathNeverUsed();
+    }
+
+    [Fact]
+    public async Task WhenExportFlagTrue_AndSearchPresent_AndMultiClinicScope_Should_FallbackToCommandDb()
+    {
+        var tid = Guid.NewGuid();
+        var c1 = Guid.NewGuid();
+        var c2 = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        var scopeResolver = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { c1, c2 });
+        SetupCommandExportMocks();
+        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Client>());
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Pet>());
+
+        var result = await CreateCsvHandler(exportReadEnabled: true, scopeResolver: scopeResolver)
+            .Handle(CsvQuery(null, search: "pamuk"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        VerifyExportReaderNeverCalled();
+        VerifyCommandExportPathUsed();
+        _clientLookupReader.Verify(
+            r => r.ResolveClientIdsByTextSearchAsync(It.IsAny<ClientTextSearchLookupRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task WhenQueryPath_AndSearchProvided_AndLookupThrows_Should_NotFallbackToCommandDb()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        SetupTenantAndClinic(tid, cid);
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("lookup down"));
+
+        var act = () => CreateCsvHandler(exportReadEnabled: true)
+            .Handle(CsvQuery(cid, search: "pamuk"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        VerifyCommandExportPathNeverUsed();
+        VerifyExportReaderNeverCalled();
+    }
+
+    [Fact]
+    public async Task WhenQueryPath_AndSearchNoMatches_Should_ReturnEmptyExport_WithoutCommandFallback()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        SetupTenantAndClinic(tid, cid);
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+        SetupExportReaderResult(EmptyExportResult());
+
+        var result = await CreateCsvHandler(exportReadEnabled: true)
+            .Handle(CsvQuery(cid, search: "nonexistent"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        VerifyCommandExportPathNeverUsed();
+    }
+
+    [Fact]
+    public async Task WhenQueryPath_AndSearchProvided_Should_NotUsePaymentsSearchLookupFlag()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        SetupTenantAndClinic(tid, cid);
+        SetupExportReaderResult(EmptyExportResult());
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+
+        await CreateCsvHandler(exportReadEnabled: true, paymentsSearchLookupEnabled: false)
+            .Handle(CsvQuery(cid, search: "pamuk"), CancellationToken.None);
+
+        _clientLookupReader.Verify(
+            r => r.ResolveClientIdsByTextSearchAsync(It.IsAny<ClientTextSearchLookupRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _clients.Verify(
+            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Theory]
+    [InlineData(49_999)]
+    [InlineData(50_000)]
+    public async Task WhenQueryPath_AndSearchFilteredCountAtOrBelowMax_Should_AllowExport(int totalRows)
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        SetupTenantAndClinic(tid, cid);
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+        SetupExportReaderResult(new PaymentsReportExportReadResult(totalRows, Array.Empty<PaymentReportItemDto>()));
+
+        var result = await CreateCsvHandler(exportReadEnabled: true)
+            .Handle(CsvQuery(cid, search: "pamuk"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        VerifyCommandExportPathNeverUsed();
+    }
+
+    [Fact]
+    public async Task WhenQueryPath_AndSearchFilteredCountExceedsMax_Should_ReturnSameTooManyRowsError()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        SetupTenantAndClinic(tid, cid);
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+        SetupExportReaderResult(new PaymentsReportExportReadResult(
+            PaymentsReportConstants.MaxExportRows + 1,
+            Array.Empty<PaymentReportItemDto>()));
+
+        var result = await CreateCsvHandler(exportReadEnabled: true)
+            .Handle(CsvQuery(cid, search: "pamuk"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.ReportExportTooManyRows");
+        VerifyCommandExportPathNeverUsed();
+    }
+
+    [Fact]
+    public async Task WhenExportFlagFalse_AndSearchPresent_Should_UseCommandDb_NotQueryReader()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -139,7 +381,7 @@ public sealed class PaymentsReportExportReadRoutingTests
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Pet>());
 
-        var result = await CreateCsvHandler(exportReadEnabled: true)
+        var result = await CreateCsvHandler(exportReadEnabled: false)
             .Handle(CsvQuery(cid, search: "pamuk"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -339,7 +581,53 @@ public sealed class PaymentsReportExportReadRoutingTests
     }
 
     [Fact]
-    public async Task Pipeline_WhenQueryPath_Should_NotRunSearchResolution()
+    public async Task Pipeline_WhenQueryPath_WithSearch_Should_NotRunCommandSearchResolution()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        SetupTenantAndClinic(tid, cid);
+        SetupExportReaderResult(EmptyExportResult());
+        _clientLookupReader.Setup(r => r.ResolveClientIdsByTextSearchAsync(
+                It.IsAny<ClientTextSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClientTextSearchLookupResult([]));
+        _petLookupReader.Setup(r => r.ResolvePetIdsByPetTextFieldsAsync(
+                It.IsAny<PetTextFieldsSearchLookupRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetTextFieldsSearchLookupResult([]));
+
+        await PaymentsReportExportPipeline.LoadAsync(
+            _tenant.Object,
+            _clinic.Object,
+            _scopeResolver.Object,
+            _payments.Object,
+            _clients.Object,
+            _pets.Object,
+            _clinics.Object,
+            From,
+            To,
+            cid,
+            null,
+            null,
+            null,
+            search: "pamuk",
+            paymentsSearchLookupEnabled: false,
+            paymentsReportExportReadEnabled: true,
+            _clientLookupReader.Object,
+            _petLookupReader.Object,
+            _exportReader.Object,
+            CancellationToken.None);
+
+        _clients.Verify(
+            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _clientLookupReader.Verify(
+            r => r.ResolveClientIdsByTextSearchAsync(It.IsAny<ClientTextSearchLookupRequest>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Pipeline_WhenQueryPath_WithoutSearch_Should_NotRunCommandSearchResolution()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -434,9 +722,20 @@ public sealed class PaymentsReportExportReadRoutingTests
             r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()),
             Times.Never);
 
+    private void VerifyCommandSearchResolutionNeverUsed()
+    {
+        _clients.Verify(
+            r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _pets.Verify(
+            r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private ExportPaymentsReportQueryHandler CreateCsvHandler(
         bool exportReadEnabled = false,
         bool paymentsReportReadEnabled = false,
+        bool paymentsSearchLookupEnabled = false,
         Mock<IClinicReadScopeResolver>? scopeResolver = null)
         => new(
             _tenant.Object,
@@ -452,7 +751,8 @@ public sealed class PaymentsReportExportReadRoutingTests
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsReportReadEnabled = paymentsReportReadEnabled,
-                PaymentsReportExportReadEnabled = exportReadEnabled
+                PaymentsReportExportReadEnabled = exportReadEnabled,
+                PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
             }));
 
     private ExportPaymentsReportXlsxQueryHandler CreateXlsxHandler(
