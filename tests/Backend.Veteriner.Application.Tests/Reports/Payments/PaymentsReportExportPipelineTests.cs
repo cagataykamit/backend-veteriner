@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Payments;
+using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -29,6 +30,7 @@ public sealed class PaymentsReportExportPipelineTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IClientReadModelLookupReader> _clientLookupReader = new();
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
+    private readonly Mock<IPaymentsReportExportReadModelReader> _exportReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     [Theory]
@@ -202,7 +204,8 @@ public sealed class PaymentsReportExportPipelineTests
         DateTime fromUtc,
         DateTime toUtc,
         string? search,
-        bool paymentsSearchLookupEnabled = false)
+        bool paymentsSearchLookupEnabled = false,
+        bool paymentsReportExportReadEnabled = false)
         => PaymentsReportExportPipeline.LoadAsync(
             _tenant.Object,
             _clinic.Object,
@@ -219,7 +222,9 @@ public sealed class PaymentsReportExportPipelineTests
             petId: null,
             search,
             paymentsSearchLookupEnabled,
+            paymentsReportExportReadEnabled,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _exportReader.Object,
             CancellationToken.None);
 }

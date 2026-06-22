@@ -268,6 +268,9 @@ public static class DependencyInjection
         // ===== Payment report JSON query read-model reader (CQRS-15G) =====
         services.AddScoped<IPaymentsReportReadModelReader, PaymentsReportReadModelReader>();
 
+        // ===== Payment export CSV/XLSX query read-model reader (CQRS-15J) =====
+        services.AddScoped<IPaymentsReportExportReadModelReader, PaymentsReportExportReadModelReader>();
+
         // ===== Payment list read-model backfill / parity / health (CQRS-14F) =====
         services.AddScoped<IPaymentReadModelBackfillService, PaymentReadModelBackfillService>();
         services.AddScoped<IPaymentReadModelParityReader, PaymentReadModelParityReader>();

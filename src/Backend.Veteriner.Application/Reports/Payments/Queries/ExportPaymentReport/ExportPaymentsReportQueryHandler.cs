@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments;
+using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
@@ -26,6 +27,7 @@ public sealed class ExportPaymentsReportQueryHandler
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IClientReadModelLookupReader _clientLookupReader;
     private readonly IPetReadModelLookupReader _petLookupReader;
+    private readonly IPaymentsReportExportReadModelReader _exportReadModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
 
     public ExportPaymentsReportQueryHandler(
@@ -38,6 +40,7 @@ public sealed class ExportPaymentsReportQueryHandler
         IReadRepository<Clinic> clinics,
         IClientReadModelLookupReader clientLookupReader,
         IPetReadModelLookupReader petLookupReader,
+        IPaymentsReportExportReadModelReader exportReadModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions)
     {
         _tenantContext = tenantContext;
@@ -49,6 +52,7 @@ public sealed class ExportPaymentsReportQueryHandler
         _clinics = clinics;
         _clientLookupReader = clientLookupReader;
         _petLookupReader = petLookupReader;
+        _exportReadModelReader = exportReadModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
     }
 
@@ -72,8 +76,10 @@ public sealed class ExportPaymentsReportQueryHandler
             request.PetId,
             request.Search,
             _queryReadModelsOptions.PaymentsSearchLookupEnabled,
+            _queryReadModelsOptions.PaymentsReportExportReadEnabled,
             _clientLookupReader,
             _petLookupReader,
+            _exportReadModelReader,
             ct);
         if (!loaded.IsSuccess)
             return Result<PaymentsCsvExportResult>.Failure(loaded.Error);

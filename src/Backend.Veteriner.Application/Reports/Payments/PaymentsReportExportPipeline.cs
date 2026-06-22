@@ -1,9 +1,11 @@
 using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
+using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
@@ -33,8 +35,10 @@ internal static class PaymentsReportExportPipeline
         Guid? petId,
         string? search,
         bool paymentsSearchLookupEnabled,
+        bool paymentsReportExportReadEnabled,
         IClientReadModelLookupReader clientLookupReader,
         IPetReadModelLookupReader petLookupReader,
+        IPaymentsReportExportReadModelReader exportReadModelReader,
         CancellationToken ct)
     {
         var validated = await PaymentsReportQueryValidation.ValidateAsync(
@@ -49,6 +53,36 @@ internal static class PaymentsReportExportPipeline
             return Result<Loaded>.Failure(validated.Error);
 
         var (tenantId, effectiveClinicId, accessibleClinicIds, validatedFrom, validatedTo) = validated.Value;
+
+        // CQRS-15J: payment export Query DB routing (PaymentReadModels).
+        // Flag açık + search boş + scope represent edilebiliyorsa Query DB'den okunur.
+        // Search dolu ya da multi-clinic scope → Command DB fallback.
+        // Query path seçildiğinde Command DB'ye fallback YAPILMAZ; search resolution ÇALIŞTIRILMAZ.
+        if (paymentsReportExportReadEnabled
+            && ListQueryTextSearch.Normalize(search) is null
+            && TryGetRepresentableQueryClinicScope(effectiveClinicId, accessibleClinicIds, out var queryClinicId))
+        {
+            var readResult = await exportReadModelReader.GetExportAsync(
+                new PaymentsReportExportReadRequest(
+                    tenantId,
+                    queryClinicId,
+                    clientId,
+                    petId,
+                    method,
+                    validatedFrom,
+                    validatedTo),
+                ct);
+
+            if (readResult.TotalCount > PaymentsReportConstants.MaxExportRows)
+            {
+                return Result<Loaded>.Failure(
+                    "Payments.ReportExportTooManyRows",
+                    $"Dışa aktarma en fazla {PaymentsReportConstants.MaxExportRows} satır destekler; filtreyi daraltın.");
+            }
+
+            return Result<Loaded>.Success(
+                new Loaded(readResult.Items, validatedFrom, validatedTo));
+        }
 
         var (searchPattern, searchClientIds, searchPetIds) =
             await PaymentsReportSearchResolution.ResolveSearchAsync(
@@ -101,5 +135,30 @@ internal static class PaymentsReportExportPipeline
         var items = await PaymentsReportItemMapping.MapAsync(tenantId, rows, clients, pets, clinics, ct);
 
         return Result<Loaded>.Success(new Loaded(items, validatedFrom, validatedTo));
+    }
+
+    /// <summary>
+    /// Validation tarafından çözülen scope'un (tek clinic veya tenant-wide) Query DB reader ile represent edilip
+    /// edilemeyeceğini belirler. 15G/15E ile aynı kural.
+    /// </summary>
+    private static bool TryGetRepresentableQueryClinicScope(
+        Guid? effectiveClinicId,
+        IReadOnlyCollection<Guid>? accessibleClinicIds,
+        out Guid? queryClinicId)
+    {
+        if (effectiveClinicId is { } single)
+        {
+            queryClinicId = single;
+            return true;
+        }
+
+        if (accessibleClinicIds is null)
+        {
+            queryClinicId = null;
+            return true;
+        }
+
+        queryClinicId = null;
+        return false;
     }
 }

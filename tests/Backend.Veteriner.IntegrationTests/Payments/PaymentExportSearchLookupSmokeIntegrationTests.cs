@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
+using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
@@ -256,6 +257,7 @@ public sealed class PaymentExportSearchLookupSmokeIntegrationTests
             sp.GetRequiredService<IReadRepository<Clinic>>(),
             sp.GetRequiredService<IClientReadModelLookupReader>(),
             sp.GetRequiredService<IPetReadModelLookupReader>(),
+            sp.GetRequiredService<IPaymentsReportExportReadModelReader>(),
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
@@ -287,6 +289,7 @@ public sealed class PaymentExportSearchLookupSmokeIntegrationTests
             sp.GetRequiredService<IReadRepository<Clinic>>(),
             sp.GetRequiredService<IClientReadModelLookupReader>(),
             sp.GetRequiredService<IPetReadModelLookupReader>(),
+            sp.GetRequiredService<IPaymentsReportExportReadModelReader>(),
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled

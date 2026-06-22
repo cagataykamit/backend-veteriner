@@ -85,7 +85,7 @@ public sealed class GetPaymentsReportQueryHandler
         // Search dolu (search parity 15I'ye bırakıldı) ya da multi-clinic (ClinicAdmin, aktif klinik yok) scope → Command DB fallback.
         // Scope resolve hatası validation aşamasında zaten failure döndürür (Command path da aynı scope'a bağlıdır) — Query DB'ye gidilmez.
         // Query path seçildiğinde Command DB'ye fallback YAPILMAZ; search resolution ÇALIŞTIRILMAZ (search boş olduğu garanti).
-        // Export CSV/XLSX bu routing'in kapsamı dışındadır (ayrı handler'lar, flagsız Command DB).
+        // Export CSV/XLSX ayrı handler'larda; export routing için <see cref="QueryReadModelsOptions.PaymentsReportExportReadEnabled"/> (15J).
         if (_queryReadModelsOptions.PaymentsReportReadEnabled
             && ListQueryTextSearch.Normalize(request.Search) is null
             && TryGetRepresentableQueryClinicScope(effectiveClinicId, accessibleClinicIds, out var queryClinicId))

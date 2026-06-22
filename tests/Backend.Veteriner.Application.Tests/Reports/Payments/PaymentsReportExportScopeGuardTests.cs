@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
+using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -30,6 +31,7 @@ public sealed class PaymentsReportExportScopeGuardTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IClientReadModelLookupReader> _clientLookupReader = new();
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
+    private readonly Mock<IPaymentsReportExportReadModelReader> _exportReader = new();
 
     [Theory]
     [InlineData(false)]
@@ -176,6 +178,7 @@ public sealed class PaymentsReportExportScopeGuardTests
             _clinics.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _exportReader.Object,
             Options.Create(new QueryReadModelsOptions()));
 
         var from = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -214,6 +217,7 @@ public sealed class PaymentsReportExportScopeGuardTests
 
     private ExportPaymentsReportQueryHandler CreateCsvHandler(
         bool paymentsReportReadEnabled = false,
+        bool paymentsReportExportReadEnabled = false,
         bool paymentsSearchLookupEnabled = false)
         => new(
             _tenant.Object,
@@ -225,14 +229,17 @@ public sealed class PaymentsReportExportScopeGuardTests
             _clinics.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _exportReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsReportReadEnabled = paymentsReportReadEnabled,
+                PaymentsReportExportReadEnabled = paymentsReportExportReadEnabled,
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
             }));
 
     private ExportPaymentsReportXlsxQueryHandler CreateXlsxHandler(
         bool paymentsReportReadEnabled = false,
+        bool paymentsReportExportReadEnabled = false,
         bool paymentsSearchLookupEnabled = false)
         => new(
             _tenant.Object,
@@ -244,9 +251,11 @@ public sealed class PaymentsReportExportScopeGuardTests
             _clinics.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _exportReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsReportReadEnabled = paymentsReportReadEnabled,
+                PaymentsReportExportReadEnabled = paymentsReportExportReadEnabled,
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
             }));
 }

@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
+using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -31,6 +32,7 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IClientReadModelLookupReader> _clientLookupReader = new();
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
+    private readonly Mock<IPaymentsReportExportReadModelReader> _exportReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     [Theory]
@@ -258,6 +260,7 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
             _clinics.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _exportReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
@@ -274,6 +277,7 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
             _clinics.Object,
             _clientLookupReader.Object,
             _petLookupReader.Object,
+            _exportReader.Object,
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
