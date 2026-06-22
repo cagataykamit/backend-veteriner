@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
@@ -16,6 +17,9 @@ public sealed class GetHospitalizationByIdQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClientContext _clientContext;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
+    private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Hospitalization> _hospitalizations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -23,12 +27,18 @@ public sealed class GetHospitalizationByIdQueryHandler
     public GetHospitalizationByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClientContext clientContext,
+        IUserOperationClaimRepository userOperationClaims,
+        IUserClinicRepository userClinics,
         IReadRepository<Hospitalization> hospitalizations,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clientContext = clientContext;
+        _userOperationClaims = userOperationClaims;
+        _userClinics = userClinics;
         _hospitalizations = hospitalizations;
         _pets = pets;
         _clients = clients;
@@ -43,12 +53,30 @@ public sealed class GetHospitalizationByIdQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
+        if (_clientContext.UserId is not { } userId)
+        {
+            return Result<HospitalizationDetailDto>.Failure(
+                "Auth.Unauthorized.UserContextMissing",
+                "Kullanıcı bağlamı yok.");
+        }
+
         var row = await _hospitalizations.FirstOrDefaultAsync(
             new HospitalizationByIdSpec(tenantId, request.Id), ct);
         if (row is null)
             return Result<HospitalizationDetailDto>.Failure("Hospitalizations.NotFound", "Yatış kaydı bulunamadı.");
         if (_clinicContext.ClinicId is { } clinicId && row.ClinicId != clinicId)
             return Result<HospitalizationDetailDto>.Failure("Hospitalizations.NotFound", "Yatış kaydı bulunamadı.");
+
+        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId, ct);
+        if (!TenantWideClaimNames.IsTenantWide(operationClaimNames))
+        {
+            if (!await _userClinics.ExistsAsync(userId, row.ClinicId, ct))
+            {
+                return Result<HospitalizationDetailDto>.Failure(
+                    "Hospitalizations.NotFound",
+                    "Yatış kaydı bulunamadı.");
+            }
+        }
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, row.PetId), ct);
         var petName = pet?.Name ?? string.Empty;
