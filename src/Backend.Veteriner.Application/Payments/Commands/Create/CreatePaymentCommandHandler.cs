@@ -1,8 +1,10 @@
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.Payments.Access;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -22,6 +24,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Client> _clients;
@@ -34,6 +37,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
     public CreatePaymentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Client> clients,
@@ -45,6 +49,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
         _clients = clients;
@@ -95,6 +100,11 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
+
+        var clinicAccess = await PaymentClinicWriteScope.EnsureWriteAccessAsync(
+            _clinicScopeResolver, tenantId, effectiveClinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return Result<Guid>.Failure(clinicAccess.Error);
 
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, effectiveClinicId), ct);

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -9,6 +10,7 @@ using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
@@ -25,6 +27,7 @@ public sealed class UpdatePaymentCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
@@ -35,10 +38,11 @@ public sealed class UpdatePaymentCommandHandlerTests
     private readonly Mock<IRepository<Payment>> _paymentsWrite = new();
     private readonly Mock<IPaymentIntegrationEventOutbox> _eventOutbox = new();
 
-    private UpdatePaymentCommandHandler CreateHandler()
+    private UpdatePaymentCommandHandler CreateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            resolver ?? _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
             _clients.Object,
@@ -167,13 +171,14 @@ public sealed class UpdatePaymentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnFailure_When_PaymentBelongsToDifferentClinicThanContext()
+    public async Task Handle_Should_ReturnAccessDenied_When_PaymentBelongsToDifferentClinicThanContext()
     {
         var tid = Guid.NewGuid();
         var ctxClinic = Guid.NewGuid();
         var paymentClinic = Guid.NewGuid();
         var clientId = Guid.NewGuid();
         var paymentId = Guid.NewGuid();
+        var scope = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { ctxClinic });
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(ctxClinic);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -181,11 +186,10 @@ public sealed class UpdatePaymentCommandHandlerTests
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, paymentClinic, clientId));
 
-        // Body clinicId must match active clinic context (handler checks this before row-vs-context hide).
-        var result = await CreateHandler().Handle(Cmd(paymentId, ctxClinic, clientId), CancellationToken.None);
+        var result = await CreateHandler(scope.Object).Handle(Cmd(paymentId, ctxClinic, clientId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Payments.NotFound");
+        result.Error.Code.Should().Be("Clinics.AccessDenied");
     }
 
     [Fact]

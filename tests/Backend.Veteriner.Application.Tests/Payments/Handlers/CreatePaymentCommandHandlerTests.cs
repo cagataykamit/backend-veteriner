@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -8,6 +9,7 @@ using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
@@ -24,6 +26,7 @@ public sealed class CreatePaymentCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
@@ -33,10 +36,11 @@ public sealed class CreatePaymentCommandHandlerTests
     private readonly Mock<IRepository<Payment>> _paymentsWrite = new();
     private readonly Mock<IPaymentIntegrationEventOutbox> _eventOutbox = new();
 
-    private CreatePaymentCommandHandler CreateHandler()
+    private CreatePaymentCommandHandler CreateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            resolver ?? _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
             _clients.Object,

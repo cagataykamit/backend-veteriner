@@ -1,8 +1,10 @@
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.Payments.Access;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -23,6 +25,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Client> _clients;
@@ -36,6 +39,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
     public UpdatePaymentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Client> clients,
@@ -48,6 +52,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
         _clients = clients;
@@ -91,6 +96,11 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         if (!window.IsSuccess)
             return Result.Failure(window.Error);
 
+        var payment = await _paymentsRead.FirstOrDefaultAsync(
+            new PaymentByIdSpec(tenantId, request.Id), ct);
+        if (payment is null)
+            return Result.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
+
         if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
         {
             return Result.Failure(
@@ -99,14 +109,20 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
+        if (effectiveClinicId == Guid.Empty)
+            effectiveClinicId = payment.ClinicId;
 
-        var payment = await _paymentsRead.FirstOrDefaultAsync(
-            new PaymentByIdSpec(tenantId, request.Id), ct);
-        if (payment is null)
-            return Result.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
+        var clinicAccess = await PaymentClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
+            _clinicScopeResolver, tenantId, payment.ClinicId, effectiveClinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return clinicAccess;
 
-        if (_clinicContext.ClinicId is { } ctxClinicId && payment.ClinicId != ctxClinicId)
-            return Result.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
+        if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
+        {
+            return Result.Failure(
+                "Payments.ClinicContextMismatch",
+                "Ödeme kaydı sadece aktif clinic bağlamında güncellenebilir.");
+        }
 
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, effectiveClinicId), ct);

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -6,6 +7,7 @@ using Backend.Veteriner.Application.Payments.Commands.Update;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -22,6 +24,7 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IReadRepository<Client>> _clientsRead = new();
@@ -36,6 +39,7 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _tenantsRead.Object,
             _clinicsRead.Object,
             _clientsRead.Object,
@@ -49,6 +53,7 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _tenantsRead.Object,
             _clinicsRead.Object,
             _clientsRead.Object,

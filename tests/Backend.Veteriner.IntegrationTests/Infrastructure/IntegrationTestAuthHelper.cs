@@ -1195,6 +1195,46 @@ internal static class IntegrationTestAuthHelper
     }
 
     /// <summary>
+    /// Tenant-wide olmayan kullanıcı: payment create/update izinlerine sahip, Admin / Owner / PlatformAdmin /
+    /// ClinicAdmin claim'i yok. Yalnız atandığı kliniğe payment yazabilmeli.
+    /// </summary>
+    public static async Task<(string Email, string Password, Guid AssignedClinicId, Guid UnassignedClinicId)>
+        SeedPaymentWriterUserAsync(IServiceProvider services, IPasswordHasher hasher)
+    {
+        await EnsureRolePermissionBindingsAsync(services);
+
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+        var assignedClinic = await db.Clinics.SingleAsync(c =>
+            c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+
+        var unassignedClinic = new Clinic(tenant.Id, $"PayWriter-{Guid.NewGuid():N}"[..14], "Konya");
+        db.Clinics.Add(unassignedClinic);
+        await db.SaveChangesAsync();
+
+        var createClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationPaymentCreator", PermissionCatalog.Payments.Create, "Payments");
+        var updateClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationPaymentUpdater", PermissionCatalog.Payments.Update, "Payments");
+
+        var email = $"pay-writer-{Guid.NewGuid():N}@example.com";
+        const string password = "123456";
+        var user = new User(email, hasher.Hash(password));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        await db.SaveChangesAsync();
+
+        return (email, password, assignedClinic.Id, unassignedClinic.Id);
+    }
+
+    /// <summary>
     /// Tenant-wide olmayan kullanıcı: <c>Payments.Read</c> iznine sahip, Admin / Owner / PlatformAdmin /
     /// ClinicAdmin claim'i yok. Yalnız atandığı kliniğin payment detayını okuyabilmeli.
     /// </summary>
