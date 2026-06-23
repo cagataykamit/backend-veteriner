@@ -1,6 +1,8 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.LabResults.Access;
 using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -18,6 +20,7 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -28,6 +31,7 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
     public UpdateLabResultCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -37,6 +41,7 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
@@ -79,7 +84,22 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
         if (effectiveClinicId == Guid.Empty)
+            effectiveClinicId = existing.ClinicId;
+
+        if (effectiveClinicId == Guid.Empty)
             return Result.Failure("LabResults.Validation", "ClinicId is required.");
+
+        var clinicAccess = await LabResultClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
+            _clinicScopeResolver, tenantId, existing.ClinicId, effectiveClinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return clinicAccess;
+
+        if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
+        {
+            return Result.Failure(
+                "LabResults.ClinicContextMismatch",
+                "Laboratuvar sonucu sadece aktif clinic bağlamında güncellenebilir.");
+        }
 
         var resultUtc = ResultDateUtcWindow.ToUtc(request.ResultDateUtc);
         var window = ResultDateUtcWindow.Validate(resultUtc);

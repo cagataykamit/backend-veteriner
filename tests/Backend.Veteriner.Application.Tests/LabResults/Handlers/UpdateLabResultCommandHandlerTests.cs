@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
@@ -6,6 +7,7 @@ using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.LabResults;
@@ -20,6 +22,7 @@ public sealed class UpdateLabResultCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
@@ -31,6 +34,7 @@ public sealed class UpdateLabResultCommandHandlerTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
@@ -154,7 +158,7 @@ public sealed class UpdateLabResultCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnFailure_When_ClinicIdMissing_And_NoContextClinic()
+    public async Task Handle_Should_UseExistingClinicId_When_ClinicIdMissing_And_NoContextClinic()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -164,8 +168,12 @@ public sealed class UpdateLabResultCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
+        var row = ExistingLabResult(tid, cid, petId);
         _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ExistingLabResult(tid, cid, petId));
+            .ReturnsAsync(row);
+        SetupTenantClinicPet(tid, cid, petId);
+        _labResultsWrite.Setup(r => r.UpdateAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _labResultsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var cmd = new UpdateLabResultCommand(
             lrId,
@@ -180,8 +188,8 @@ public sealed class UpdateLabResultCommandHandlerTests
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("LabResults.Validation");
+        result.IsSuccess.Should().BeTrue();
+        row.ClinicId.Should().Be(cid);
     }
 
     [Fact]
