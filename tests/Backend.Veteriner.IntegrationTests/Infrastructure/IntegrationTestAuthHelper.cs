@@ -68,7 +68,8 @@ internal static class IntegrationTestAuthHelper
     public static async Task<string> IssueUserAccessTokenAsync(
         IServiceProvider services,
         string email,
-        IReadOnlyCollection<string> permissions)
+        IReadOnlyCollection<string> permissions,
+        Guid? clinicId = null)
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -84,6 +85,9 @@ internal static class IntegrationTestAuthHelper
             .Select(p => new Claim("permission", p))
             .Append(new Claim(VeterinerClaims.TenantId, tenantId.ToString("D")))
             .ToList();
+
+        if (clinicId.HasValue)
+            claims.Add(new Claim(VeterinerClaims.ClinicId, clinicId.Value.ToString("D")));
 
         var (accessToken, _, _) = jwt.Create(user.Id, user.Email, Array.Empty<string>(), claims);
         return accessToken;
@@ -875,6 +879,46 @@ internal static class IntegrationTestAuthHelper
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        await db.SaveChangesAsync();
+
+        return (email, password, assignedClinic.Id, unassignedClinic.Id);
+    }
+
+    /// <summary>
+    /// Tenant-wide olmayan kullanıcı: <c>Vaccinations.Create</c> ve <c>Vaccinations.Update</c> iznine sahip,
+    /// Admin / Owner / PlatformAdmin / ClinicAdmin claim'i yok. Yalnız atandığı kliniğe aşı yazabilmeli.
+    /// </summary>
+    public static async Task<(string Email, string Password, Guid AssignedClinicId, Guid UnassignedClinicId)>
+        SeedVaccinationWriterUserAsync(IServiceProvider services, IPasswordHasher hasher)
+    {
+        await EnsureRolePermissionBindingsAsync(services);
+
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+        var assignedClinic = await db.Clinics.SingleAsync(c =>
+            c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+
+        var unassignedClinic = new Clinic(tenant.Id, $"VaccWriter-{Guid.NewGuid():N}"[..14], "Konya");
+        db.Clinics.Add(unassignedClinic);
+        await db.SaveChangesAsync();
+
+        var createClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationVaccinationCreator", PermissionCatalog.Vaccinations.Create, "Vaccinations");
+        var updateClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationVaccinationUpdater", PermissionCatalog.Vaccinations.Update, "Vaccinations");
+
+        var email = $"vacc-writer-{Guid.NewGuid():N}@example.com";
+        const string password = "123456";
+        var user = new User(email, hasher.Hash(password));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
         db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
         db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
         await db.SaveChangesAsync();

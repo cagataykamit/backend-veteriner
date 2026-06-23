@@ -1,5 +1,7 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Vaccinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -19,6 +21,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -30,6 +33,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
     public UpdateVaccinationCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -40,6 +44,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
@@ -101,15 +106,26 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
-        var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
-
         var v = await _vaccinationsRead.FirstOrDefaultAsync(
             new VaccinationByIdSpec(tenantId, request.Id), ct);
         if (v is null)
             return Result.Failure("Vaccinations.NotFound", "Aşı kaydı bulunamadı.");
 
-        if (_clinicContext.ClinicId is { } clinicId && v.ClinicId != clinicId)
-            return Result.Failure("Vaccinations.NotFound", "Aşı kaydı bulunamadı.");
+        var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
+        if (effectiveClinicId == Guid.Empty)
+            effectiveClinicId = v.ClinicId;
+
+        var clinicAccess = await VaccinationClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
+            _clinicScopeResolver, tenantId, v.ClinicId, effectiveClinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return clinicAccess;
+
+        if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
+        {
+            return Result.Failure(
+                "Vaccinations.ClinicContextMismatch",
+                "Aşı kaydı sadece aktif clinic bağlamında güncellenebilir.");
+        }
 
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, effectiveClinicId), ct);
