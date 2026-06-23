@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Domain.Appointments;
@@ -93,7 +94,9 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
     public async Task GetPayments_Should_Return404_ClinicsNotFound_When_ClinicId_Unknown()
     {
         var client = _factory.CreateClient();
-        var ctx = await SeedTenantWithSinglePaymentAsync(new DateTime(2026, 3, 1, 12, 0, 0, DateTimeKind.Utc));
+        var ctx = await SeedTenantWithSinglePaymentAsync(
+            new DateTime(2026, 3, 1, 12, 0, 0, DateTimeKind.Utc),
+            tenantWideAdmin: true);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
         var from = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc);
         var to = new DateTime(2026, 3, 31, 23, 59, 59, DateTimeKind.Utc);
@@ -385,6 +388,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
         var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
@@ -403,22 +407,22 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
-        var claims = new List<Claim>
-        {
-            new("permission", "Payments.Read"),
-            new(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"rep-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        var token = await IntegrationTestAuthHelper.SeedReportReaderAndIssueTokenAsync(
+            db, jwt, hasher, tenant.Id, clinic.Id, PermissionCatalog.Payments.Read);
         return new PaymentWindowSeed(tenant.Id, token, inside.Id, early.Id, late.Id);
     }
 
     private sealed record SinglePaymentSeed(Guid TenantId, string Token, Guid PaymentId);
 
-    private async Task<SinglePaymentSeed> SeedTenantWithSinglePaymentAsync(DateTime paidAtUtc, bool readOnlyTenant = false)
+    private async Task<SinglePaymentSeed> SeedTenantWithSinglePaymentAsync(
+        DateTime paidAtUtc,
+        bool readOnlyTenant = false,
+        bool tenantWideAdmin = false)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
         var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
@@ -435,12 +439,18 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
                 : TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 400));
         await db.SaveChangesAsync();
 
-        var claims = new List<Claim>
+        string token;
+        if (tenantWideAdmin)
         {
-            new("permission", "Payments.Read"),
-            new(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"rep-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+            token = await IntegrationTestAuthHelper.SeedTenantWideAdminAndIssueTokenAsync(
+                db, jwt, hasher, tenant.Id, [PermissionCatalog.Payments.Read]);
+        }
+        else
+        {
+            token = await IntegrationTestAuthHelper.SeedReportReaderAndIssueTokenAsync(
+                db, jwt, hasher, tenant.Id, clinic.Id, PermissionCatalog.Payments.Read);
+        }
+
         return new SinglePaymentSeed(tenant.Id, token, payment.Id);
     }
 
@@ -479,6 +489,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         db.AddRange(tenant, ca, cb, user);
         var clinicAdminClaim = await db.OperationClaims.AsNoTracking().FirstAsync(c => c.Name == "ClinicAdmin");
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, clinicAdminClaim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
         db.UserClinics.Add(new UserClinic(user.Id, ca.Id));
@@ -500,6 +511,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
         var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
@@ -515,12 +527,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
-        var claims = new List<Claim>
-        {
-            new("permission", "Appointments.Read"),
-            new(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"rep-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        var token = await IntegrationTestAuthHelper.SeedReportReaderAndIssueTokenAsync(
+            db, jwt, hasher, tenant.Id, clinic.Id, PermissionCatalog.Appointments.Read);
         return new AppointmentSeed(token);
     }
 
@@ -531,6 +539,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
         var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
@@ -552,12 +561,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
-        var claims = new List<Claim>
-        {
-            new("permission", "Examinations.Read"),
-            new(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"rep-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        var token = await IntegrationTestAuthHelper.SeedReportReaderAndIssueTokenAsync(
+            db, jwt, hasher, tenant.Id, clinic.Id, PermissionCatalog.Examinations.Read);
         return new ExaminationSeed(token);
     }
 
@@ -568,6 +573,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
         var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
@@ -619,12 +625,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
-        var claims = new List<Claim>
-        {
-            new("permission", "Vaccinations.Read"),
-            new(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"rep-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        var token = await IntegrationTestAuthHelper.SeedReportReaderAndIssueTokenAsync(
+            db, jwt, hasher, tenant.Id, clinic.Id, PermissionCatalog.Vaccinations.Read);
         return new VaccinationSeed(token, appliedInside.Id, scheduledInside.Id);
     }
 

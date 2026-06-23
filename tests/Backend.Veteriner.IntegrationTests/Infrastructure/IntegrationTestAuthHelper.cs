@@ -124,6 +124,49 @@ internal static class IntegrationTestAuthHelper
     }
 
     /// <summary>
+    /// Report/export endpoint smoke testleri: tenant/kliniğe atanmış non-tenant-wide reader
+    /// (<see cref="SeedScopedListReaderAndIssueTokenAsync"/> ile aynı).
+    /// </summary>
+    public static Task<string> SeedReportReaderAndIssueTokenAsync(
+        AppDbContext db,
+        IJwtTokenService jwt,
+        IPasswordHasher hasher,
+        Guid tenantId,
+        Guid clinicId,
+        string permissionCode)
+        => SeedScopedListReaderAndIssueTokenAsync(db, jwt, hasher, tenantId, clinicId, permissionCode);
+
+    /// <summary>
+    /// Tenant-wide Admin claim'li kullanıcı; bilinmeyen clinicId için Clinics.NotFound senaryolarında kullanılır.
+    /// </summary>
+    public static async Task<string> SeedTenantWideAdminAndIssueTokenAsync(
+        AppDbContext db,
+        IJwtTokenService jwt,
+        IPasswordHasher hasher,
+        Guid tenantId,
+        IReadOnlyCollection<string> jwtPermissions)
+    {
+        var adminClaim = await db.OperationClaims.AsNoTracking().FirstAsync(c => c.Name == "Admin");
+
+        var email = $"rep-admin-{Guid.NewGuid():N}@example.com";
+        var user = new User(email, hasher.Hash("123456"));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, adminClaim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenantId));
+        await db.SaveChangesAsync();
+
+        var claims = jwtPermissions
+            .Select(p => new Claim("permission", p))
+            .Append(new Claim(VeterinerClaims.TenantId, tenantId.ToString("D")))
+            .ToList();
+
+        var (accessToken, _, _) = jwt.Create(user.Id, email, Array.Empty<string>(), claims);
+        return accessToken;
+    }
+
+    /// <summary>
     /// Tenant Admin claim'li kullanıcı; tenant-wide /me/clinics ve Clinics.Create smoke için.
     /// </summary>
     public static async Task<(string Email, string Password, Guid ExtraClinicId)> SeedTenantAdminUserAsync(
