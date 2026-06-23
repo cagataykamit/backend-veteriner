@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Appointments.Queries.GetCalendar;
 using Backend.Veteriner.Application.Appointments.Queries.GetList;
 using Backend.Veteriner.Application.Appointments.ReadModels;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
@@ -375,12 +376,15 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests : IClassF
         await using var scope = _factory.Services.CreateAsyncScope();
         var sp = scope.ServiceProvider;
         var (tenantId, clinicId) = await ResolveDefaultScopeAsync(sp);
+        var adminUserId = await ResolveDefaultAdminUserIdAsync(sp);
         var tenantContext = new FixedTenantContext(tenantId);
         var clinicContext = new FixedClinicContext(clinicId);
+        var scopeResolver = CreateTestScopeResolver(sp, adminUserId);
 
         var handler = new GetAppointmentsListQueryHandler(
             tenantContext,
             clinicContext,
+            scopeResolver,
             sp.GetRequiredService<IReadRepository<Appointment>>(),
             sp.GetRequiredService<IReadRepository<Pet>>(),
             sp.GetRequiredService<IReadRepository<Client>>(),
@@ -399,12 +403,15 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests : IClassF
         await using var scope = _factory.Services.CreateAsyncScope();
         var sp = scope.ServiceProvider;
         var (tenantId, clinicId) = await ResolveDefaultScopeAsync(sp);
+        var adminUserId = await ResolveDefaultAdminUserIdAsync(sp);
         var tenantContext = new FixedTenantContext(tenantId);
         var clinicContext = new FixedClinicContext(clinicId);
+        var scopeResolver = CreateTestScopeResolver(sp, adminUserId);
 
         var handler = new GetAppointmentsCalendarQueryHandler(
             tenantContext,
             clinicContext,
+            scopeResolver,
             sp.GetRequiredService<IReadRepository<Appointment>>(),
             sp.GetRequiredService<IReadRepository<Pet>>(),
             sp.GetRequiredService<IReadRepository<Client>>(),
@@ -426,6 +433,23 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests : IClassF
         return (tenantId, clinicId);
     }
 
+    private static async Task<Guid> ResolveDefaultAdminUserIdAsync(IServiceProvider sp)
+    {
+        await using var scope = sp.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Users
+            .Where(u => u.Email == AdminClaimSeeder.PlatformAdminUserEmail)
+            .Select(u => u.Id)
+            .SingleAsync();
+    }
+
+    private static IClinicReadScopeResolver CreateTestScopeResolver(IServiceProvider sp, Guid userId)
+        => new ClinicReadScopeResolver(
+            new FixedClientContext(userId),
+            sp.GetRequiredService<IClinicAssignmentAccessGuard>(),
+            sp.GetRequiredService<IUserClinicRepository>(),
+            sp.GetRequiredService<IReadRepository<Clinic>>());
+
     private static DateTime SlotAlignedUtcPlusDays(int days)
     {
         var date = DateTime.UtcNow.Date.AddDays(days);
@@ -446,4 +470,14 @@ file sealed class FixedTenantContext(Guid tenantId) : ITenantContext
 file sealed class FixedClinicContext(Guid clinicId) : IClinicContext
 {
     public Guid? ClinicId { get; } = clinicId;
+}
+
+file sealed class FixedClientContext(Guid userId) : IClientContext
+{
+    public Guid? UserId { get; } = userId;
+    public string? IpAddress => null;
+    public string? UserAgent => null;
+    public string? Path => null;
+    public string? Method => null;
+    public string? CorrelationId => null;
 }

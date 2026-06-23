@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common;
@@ -28,6 +29,7 @@ public sealed class GetAppointmentsListQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -40,6 +42,7 @@ public sealed class GetAppointmentsListQueryHandler
     public GetAppointmentsListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Appointment> appointments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
@@ -51,6 +54,7 @@ public sealed class GetAppointmentsListQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _appointments = appointments;
         _pets = pets;
         _clients = clients;
@@ -75,7 +79,6 @@ public sealed class GetAppointmentsListQueryHandler
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
 
-        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
             return Result<PagedResult<AppointmentListItemDto>>.Failure(
@@ -83,19 +86,26 @@ public sealed class GetAppointmentsListQueryHandler
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
-        if (effectiveClinicId is null)
+        var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+        if (requestedClinicId is null)
         {
             return Result<PagedResult<AppointmentListItemDto>>.Failure(
                 "Appointments.ClinicScopeRequired",
                 "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Randevular klinik kapsamı olmadan listelenemez.");
         }
 
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<PagedResult<AppointmentListItemDto>>.Failure(scopeResult.Error);
+
+        var effectiveClinicId = scopeResult.Value!.SingleClinicId ?? requestedClinicId.Value;
+
         if (_queryReadModelsOptions.AppointmentsEnabled)
         {
             return await HandleFromQueryReadModelAsync(
                 request,
                 tenantId,
-                effectiveClinicId.Value,
+                effectiveClinicId,
                 page,
                 pageSize,
                 ct);
@@ -150,7 +160,7 @@ public sealed class GetAppointmentsListQueryHandler
     private async Task<Result<PagedResult<AppointmentListItemDto>>> HandleFromCommandDbAsync(
         GetAppointmentsListQuery request,
         Guid tenantId,
-        Guid? effectiveClinicId,
+        Guid effectiveClinicId,
         int page,
         int pageSize,
         CancellationToken ct)
@@ -243,11 +253,10 @@ public sealed class GetAppointmentsListQueryHandler
         {
             clinicNameById = [];
         }
-        else if (effectiveClinicId is { } scopedClinicId &&
-                 rows.All(a => a.ClinicId == scopedClinicId))
+        else if (rows.All(a => a.ClinicId == effectiveClinicId))
         {
             var scopedClinics = await _clinics.ListAsync(
-                new ClinicsByTenantIdsNameSpec(tenantId, new[] { scopedClinicId }),
+                new ClinicsByTenantIdsNameSpec(tenantId, new[] { effectiveClinicId }),
                 ct);
             MarkStep("clinicsLookup");
             clinicNameById = scopedClinics.ToDictionary(x => x.Id, x => x.Name);

@@ -90,6 +90,40 @@ internal static class IntegrationTestAuthHelper
     }
 
     /// <summary>
+    /// List pagination smoke testleri: tenant/kliniğe <see cref="UserClinic"/> atanmış non-tenant-wide reader
+    /// kullanıcı seed eder; gerçek userId + operation claim + JWT permission ile access token döndürür.
+    /// </summary>
+    public static async Task<string> SeedScopedListReaderAndIssueTokenAsync(
+        AppDbContext db,
+        IJwtTokenService jwt,
+        IPasswordHasher hasher,
+        Guid tenantId,
+        Guid clinicId,
+        string permissionCode)
+    {
+        var claim = await EnsureReadClaimForPermissionAsync(db, permissionCode);
+
+        var email = $"list-reader-{Guid.NewGuid():N}@example.com";
+        var user = new User(email, hasher.Hash("123456"));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenantId));
+        db.UserClinics.Add(new UserClinic(user.Id, clinicId));
+        await db.SaveChangesAsync();
+
+        var claims = new List<Claim>
+        {
+            new("permission", permissionCode),
+            new(VeterinerClaims.TenantId, tenantId.ToString("D"))
+        };
+
+        var (accessToken, _, _) = jwt.Create(user.Id, email, Array.Empty<string>(), claims);
+        return accessToken;
+    }
+
+    /// <summary>
     /// Tenant Admin claim'li kullanıcı; tenant-wide /me/clinics ve Clinics.Create smoke için.
     /// </summary>
     public static async Task<(string Email, string Password, Guid ExtraClinicId)> SeedTenantAdminUserAsync(
@@ -865,6 +899,23 @@ internal static class IntegrationTestAuthHelper
 
         return claim;
     }
+
+    private static Task<OperationClaim> EnsureReadClaimForPermissionAsync(AppDbContext db, string permissionCode)
+        => permissionCode switch
+        {
+            _ when permissionCode == PermissionCatalog.Appointments.Read => EnsureAppointmentsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Treatments.Read => EnsureTreatmentsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Vaccinations.Read => EnsureVaccinationsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Examinations.Read => EnsureExaminationsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Prescriptions.Read => EnsurePrescriptionsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Hospitalizations.Read => EnsureHospitalizationsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.LabResults.Read => EnsureLabResultsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Payments.Read => EnsurePaymentsReadClaimAsync(db),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(permissionCode),
+                permissionCode,
+                "SeedScopedListReaderAndIssueTokenAsync için desteklenmeyen permission kodu.")
+        };
 
     private static async Task<OperationClaim> EnsureAppointmentsReadClaimAsync(AppDbContext db)
     {

@@ -3,12 +3,14 @@ using Backend.Veteriner.Application.Appointments.Queries.GetList;
 using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -30,6 +32,7 @@ public sealed class GetAppointmentsListQueryHandlerSharedSearchLookupFeatureFlag
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IAppointmentReadModelReader> _readModelReader = new();
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     [Theory]
     [InlineData(false)]
@@ -243,6 +246,7 @@ public sealed class GetAppointmentsListQueryHandlerSharedSearchLookupFeatureFlag
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointments.Object,
             _pets.Object,
             _clients.Object,

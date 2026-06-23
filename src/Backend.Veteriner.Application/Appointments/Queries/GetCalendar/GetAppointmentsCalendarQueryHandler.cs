@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -21,6 +22,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
 
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
@@ -30,6 +32,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
     public GetAppointmentsCalendarQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Appointment> appointments,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
@@ -38,6 +41,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _appointments = appointments;
         _pets = pets;
         _clients = clients;
@@ -77,7 +81,6 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 "Tarih aralığı en fazla 45 gün olabilir.");
         }
 
-        var effectiveClinicId = request.ClinicId ?? _clinicContext.ClinicId;
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
         {
             return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(
@@ -85,18 +88,25 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
-        if (effectiveClinicId is null)
+        var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;
+        if (requestedClinicId is null)
         {
             return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(
                 "Appointments.ClinicScopeRequired",
                 "Klinik kapsamı gerekli: aktif klinik bağlamı yok ve clinicId belirtilmedi. Takvim klinik kapsamı olmadan listelenemez.");
         }
 
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, requestedClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(scopeResult.Error);
+
+        var effectiveClinicId = scopeResult.Value!.SingleClinicId ?? requestedClinicId.Value;
+
         if (_queryReadModelsOptions.AppointmentsEnabled)
         {
             var items = await _readModelReader.GetCalendarAsync(
                 new AppointmentCalendarReadRequest(
-                    new AppointmentReadScope(tenantId, effectiveClinicId.Value),
+                    new AppointmentReadScope(tenantId, effectiveClinicId),
                     dateFromUtc,
                     dateToUtc,
                     request.Status),
@@ -116,7 +126,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
 
     private async Task<Result<IReadOnlyList<AppointmentCalendarItemDto>>> HandleFromCommandDbAsync(
         Guid tenantId,
-        Guid? effectiveClinicId,
+        Guid effectiveClinicId,
         DateTime dateFromUtc,
         DateTime dateToUtc,
         AppointmentStatus? status,

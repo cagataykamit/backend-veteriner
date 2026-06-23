@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Domain.Appointments;
@@ -323,7 +324,15 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
-        var token = IssueToken(jwt, tenant.Id, "Treatments.Read");
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            PermissionCatalog.Treatments.Read);
         return new TenantTokenCtx(token, tenant.Id, clinic.Id);
     }
 
@@ -573,7 +582,15 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
         await queryDb.SaveChangesAsync();
 
-        var token = IssueToken(jwt, tenant.Id, "Appointments.Read");
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            PermissionCatalog.Appointments.Read);
         return new TenantTokenCtx(token, tenant.Id, clinic.Id);
     }
 
@@ -655,7 +672,15 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
-        var token = IssueToken(jwt, tenant.Id, "Vaccinations.Read");
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            PermissionCatalog.Vaccinations.Read);
         return new TenantTokenCtx(token, tenant.Id, clinic.Id);
     }
 

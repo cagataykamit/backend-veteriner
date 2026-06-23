@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.Queries.GetList;
 using Backend.Veteriner.Application.Appointments.ReadModels;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
@@ -465,10 +466,19 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         var tenantId = await db.Tenants.Where(t => t.Name == DataSeeder.DefaultTenantName).Select(t => t.Id).SingleAsync();
         var clinicId = await db.Clinics.Where(c => c.TenantId == tenantId && c.Name == DataSeeder.DefaultSeedClinicName)
             .Select(c => c.Id).SingleAsync();
+        var adminUserId = await db.Users
+            .Where(u => u.Email == AdminClaimSeeder.PlatformAdminUserEmail)
+            .Select(u => u.Id)
+            .SingleAsync();
 
         var handler = new GetAppointmentsListQueryHandler(
             new FixedTenantContext(tenantId),
             new FixedClinicContext(clinicId),
+            new ClinicReadScopeResolver(
+                new FixedClientContext(adminUserId),
+                sp.GetRequiredService<IClinicAssignmentAccessGuard>(),
+                sp.GetRequiredService<IUserClinicRepository>(),
+                sp.GetRequiredService<IReadRepository<Clinic>>()),
             sp.GetRequiredService<IReadRepository<Appointment>>(),
             sp.GetRequiredService<IReadRepository<Pet>>(),
             sp.GetRequiredService<IReadRepository<Client>>(),
@@ -510,4 +520,14 @@ file sealed class FixedTenantContext(Guid tenantId) : ITenantContext
 file sealed class FixedClinicContext(Guid clinicId) : IClinicContext
 {
     public Guid? ClinicId { get; } = clinicId;
+}
+
+file sealed class FixedClientContext(Guid userId) : IClientContext
+{
+    public Guid? UserId { get; } = userId;
+    public string? IpAddress => null;
+    public string? UserAgent => null;
+    public string? Path => null;
+    public string? Method => null;
+    public string? CorrelationId => null;
 }

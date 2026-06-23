@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments.Queries.GetList;
 using Backend.Veteriner.Application.Appointments.ReadModels;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
@@ -12,6 +13,7 @@ using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Query.Models;
+using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Pets;
 using FluentAssertions;
@@ -208,6 +210,7 @@ public sealed class AppointmentSharedSearchLookupSmokeIntegrationTests
         var handler = new GetAppointmentsListQueryHandler(
             new FixedTenantContext(tenantId),
             new FixedClinicContext(clinicId),
+            CreateTestScopeResolver(sp, await ResolveDefaultAdminUserIdAsync(sp)),
             sp.GetRequiredService<IReadRepository<Appointment>>(),
             sp.GetRequiredService<IReadRepository<Pet>>(),
             sp.GetRequiredService<IReadRepository<Client>>(),
@@ -246,5 +249,32 @@ public sealed class AppointmentSharedSearchLookupSmokeIntegrationTests
     private sealed class FixedClinicContext(Guid clinicId) : IClinicContext
     {
         public Guid? ClinicId { get; } = clinicId;
+    }
+
+    private static async Task<Guid> ResolveDefaultAdminUserIdAsync(IServiceProvider sp)
+    {
+        await using var scope = sp.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Users
+            .Where(u => u.Email == AdminClaimSeeder.PlatformAdminUserEmail)
+            .Select(u => u.Id)
+            .SingleAsync();
+    }
+
+    private static IClinicReadScopeResolver CreateTestScopeResolver(IServiceProvider sp, Guid userId)
+        => new ClinicReadScopeResolver(
+            new FixedClientContext(userId),
+            sp.GetRequiredService<IClinicAssignmentAccessGuard>(),
+            sp.GetRequiredService<IUserClinicRepository>(),
+            sp.GetRequiredService<IReadRepository<Clinic>>());
+
+    private sealed class FixedClientContext(Guid userId) : IClientContext
+    {
+        public Guid? UserId { get; } = userId;
+        public string? IpAddress => null;
+        public string? UserAgent => null;
+        public string? Path => null;
+        public string? Method => null;
+        public string? CorrelationId => null;
     }
 }

@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Appointments.Queries.GetList;
 using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
@@ -10,6 +11,7 @@ using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tests;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -30,13 +32,16 @@ public sealed class GetAppointmentsListQueryHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IAppointmentReadModelReader> _readModelReader = new();
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetAppointmentsListQueryHandler CreateHandler(
         bool appointmentsQueryEnabled = false,
-        bool sharedSearchLookupEnabled = false)
+        bool sharedSearchLookupEnabled = false,
+        Mock<IClinicReadScopeResolver>? scopeResolver = null)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            (scopeResolver ?? _scopeResolver).Object,
             _appointments.Object,
             _pets.Object,
             _clients.Object,
@@ -292,5 +297,163 @@ public sealed class GetAppointmentsListQueryHandlerTests
         _clinics.Verify(
             r => r.ListAsync(It.IsAny<ClinicsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_When_NonTenantWideUser_RequestsAssignedClinicId()
+    {
+        var tid = Guid.NewGuid();
+        var assignedClinicId = Guid.NewGuid();
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assignedClinicId });
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _appointments.Setup(r => r.CountAsync(It.IsAny<AppointmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Appointment>());
+
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler(scopeResolver: caMock)
+            .Handle(new GetAppointmentsListQuery(page, assignedClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        caMock.Verify(
+            x => x.ResolveAsync(tid, assignedClinicId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_NonTenantWideUser_RequestsUnassignedClinicId()
+    {
+        var tid = Guid.NewGuid();
+        var assignedClinicId = Guid.NewGuid();
+        var unassignedClinicId = Guid.NewGuid();
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assignedClinicId });
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler(scopeResolver: caMock)
+            .Handle(new GetAppointmentsListQuery(page, unassignedClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clinics.AccessDenied");
+        _appointments.Verify(
+            r => r.CountAsync(It.IsAny<AppointmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _readModelReader.Verify(
+            r => r.GetListAsync(It.IsAny<AppointmentListReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_When_TenantWideAdmin_RequestsExplicitClinicId()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _appointments.Setup(r => r.CountAsync(It.IsAny<AppointmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Appointment>());
+
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler()
+            .Handle(new GetAppointmentsListQuery(page, clinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _scopeResolver.Verify(
+            x => x.ResolveAsync(tid, clinicId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_ResolverReturnsNotFound_WithoutQueryingRepository()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var caMock = ClinicReadScopeResolverMock.Default();
+        caMock.SetupNotFound();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler(scopeResolver: caMock)
+            .Handle(new GetAppointmentsListQuery(page, clinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clinics.NotFound");
+        _appointments.Verify(
+            r => r.CountAsync(It.IsAny<AppointmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _readModelReader.Verify(
+            r => r.GetListAsync(It.IsAny<AppointmentListReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseQueryDb_WithValidatedClinicId_When_CqrsEnabledAndAssigned()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { clinicId });
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        AppointmentListReadRequest? captured = null;
+        _readModelReader.Setup(r => r.GetListAsync(It.IsAny<AppointmentListReadRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<AppointmentListReadRequest, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(new AppointmentListReadResult(Array.Empty<AppointmentListItemDto>(), 0));
+
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler(appointmentsQueryEnabled: true, scopeResolver: caMock)
+            .Handle(new GetAppointmentsListQuery(page, clinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured.Should().NotBeNull();
+        captured!.Scope.TenantId.Should().Be(tid);
+        captured.Scope.ClinicId.Should().Be(clinicId);
+        _appointments.Verify(
+            r => r.CountAsync(It.IsAny<AppointmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotCallQueryDb_When_CqrsEnabledAndUnassignedClinicId()
+    {
+        var tid = Guid.NewGuid();
+        var assignedClinicId = Guid.NewGuid();
+        var unassignedClinicId = Guid.NewGuid();
+        var caMock = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assignedClinicId });
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+
+        var page = new PageRequest { Page = 1, PageSize = 20 };
+        var result = await CreateHandler(appointmentsQueryEnabled: true, scopeResolver: caMock)
+            .Handle(new GetAppointmentsListQuery(page, unassignedClinicId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clinics.AccessDenied");
+        _readModelReader.Verify(
+            r => r.GetListAsync(It.IsAny<AppointmentListReadRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_PropagateCancellationToken_ToResolver()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var ct = new CancellationTokenSource().Token;
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
+        _appointments.Setup(r => r.CountAsync(It.IsAny<AppointmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Appointment>());
+
+        await CreateHandler().Handle(new GetAppointmentsListQuery(new PageRequest()), ct);
+
+        _scopeResolver.Verify(x => x.ResolveAsync(tid, clinicId, ct), Times.Once);
     }
 }
