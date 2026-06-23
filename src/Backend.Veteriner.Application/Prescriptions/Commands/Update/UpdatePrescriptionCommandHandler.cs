@@ -1,5 +1,7 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Prescriptions.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Prescriptions.Specs;
@@ -20,6 +22,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -31,6 +34,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
     public UpdatePrescriptionCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -41,6 +45,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
@@ -83,7 +88,22 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
         if (effectiveClinicId == Guid.Empty)
+            effectiveClinicId = p.ClinicId;
+
+        if (effectiveClinicId == Guid.Empty)
             return Result.Failure("Prescriptions.Validation", "ClinicId is required.");
+
+        var clinicAccess = await PrescriptionClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
+            _clinicScopeResolver, tenantId, p.ClinicId, effectiveClinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return clinicAccess;
+
+        if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
+        {
+            return Result.Failure(
+                "Prescriptions.ClinicContextMismatch",
+                "Reçete kaydı sadece aktif clinic bağlamında güncellenebilir.");
+        }
 
         var prescribedUtc = PrescribedAtUtcWindow.ToUtc(request.PrescribedAtUtc);
         var window = PrescribedAtUtcWindow.Validate(prescribedUtc);
