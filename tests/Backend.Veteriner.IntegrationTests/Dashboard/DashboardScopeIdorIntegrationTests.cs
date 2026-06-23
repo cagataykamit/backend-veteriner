@@ -11,6 +11,7 @@ using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
@@ -23,7 +24,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Dashboard;
 
 /// <summary>
-/// GET /api/v1/dashboard/summary ve /operational-alerts clinic scope IDOR kontrolü (IDOR-4B.1).
+/// GET /api/v1/dashboard/summary, /operational-alerts ve /finance-summary clinic scope IDOR kontrolü (IDOR-4B.1 / 4B.2).
 /// </summary>
 [Collection("pilot-smoke-api")]
 public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWebApplicationFactory>
@@ -150,6 +151,177 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
 
         var response = await http.GetAsync("/api/v1/dashboard/summary");
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetFinanceSummary_Should_ReturnAssignedClinicAggregate_When_ClinicAdminHasNoActiveClinicContext()
+    {
+        await ResetTenantPaymentsAsync(_factory.Services);
+
+        var http = _factory.CreateClient();
+        var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
+
+        var (email, password, assignedClinicId, unassignedClinicId) =
+            await IntegrationTestAuthHelper.SeedClinicAdminUserAsync(_factory.Services, hasher);
+
+        await SeedTodayPaymentAsync(_factory.Services, assignedClinicId, 100m);
+        await SeedTodayPaymentAsync(_factory.Services, unassignedClinicId, 200m);
+
+        var login = await IntegrationTestAuthHelper.LoginAsync(http, _factory.Services, email, password);
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+
+        var response = await http.GetAsync("/api/v1/dashboard/finance-summary");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("todayPaymentsCount").GetInt32().Should().Be(1);
+        json.GetProperty("todayTotalPaid").GetDecimal().Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task GetFinanceSummary_Should_ReturnOnlyAssignedClinicRecentPayments_When_ClinicAdminHasNoActiveClinicContext()
+    {
+        await ResetTenantPaymentsAsync(_factory.Services);
+
+        var http = _factory.CreateClient();
+        var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
+
+        var (email, password, assignedClinicId, unassignedClinicId) =
+            await IntegrationTestAuthHelper.SeedClinicAdminUserAsync(_factory.Services, hasher);
+
+        await SeedTodayPaymentAsync(_factory.Services, assignedClinicId, 100m);
+        await SeedTodayPaymentAsync(_factory.Services, unassignedClinicId, 200m);
+
+        var login = await IntegrationTestAuthHelper.LoginAsync(http, _factory.Services, email, password);
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+
+        var response = await http.GetAsync("/api/v1/dashboard/finance-summary");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var recent = json.GetProperty("recentPayments").EnumerateArray().ToArray();
+        recent.Should().HaveCount(1);
+        recent[0].GetProperty("amount").GetDecimal().Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task GetFinanceSummary_Should_ReturnTenantWideAggregate_When_TenantAdminHasNoActiveClinicContext()
+    {
+        await ResetTenantPaymentsAsync(_factory.Services);
+
+        var http = _factory.CreateClient();
+        var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
+
+        var (email, password, extraClinicId) =
+            await IntegrationTestAuthHelper.SeedTenantAdminUserAsync(_factory.Services, hasher);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+            var defaultClinic = await db.Clinics.SingleAsync(c =>
+                c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+            await SeedTodayPaymentAsync(_factory.Services, defaultClinic.Id, 100m);
+        }
+
+        await SeedTodayPaymentAsync(_factory.Services, extraClinicId, 200m);
+
+        var login = await IntegrationTestAuthHelper.LoginAsync(http, _factory.Services, email, password);
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+
+        var response = await http.GetAsync("/api/v1/dashboard/finance-summary");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("todayPaymentsCount").GetInt32().Should().BeGreaterThanOrEqualTo(2);
+        json.GetProperty("todayTotalPaid").GetDecimal().Should().BeGreaterThanOrEqualTo(300m);
+    }
+
+    [Fact]
+    public async Task GetFinanceSummary_Should_ReturnEmptyAggregate_When_NonTenantWideUserHasNoClinicAssignments()
+    {
+        await ResetTenantPaymentsAsync(_factory.Services);
+
+        var http = _factory.CreateClient();
+        var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
+
+        var (email, password) = await SeedDashboardReaderWithoutClinicAssignmentAsync(hasher);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+            var clinic = await db.Clinics.SingleAsync(c =>
+                c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+            await SeedTodayPaymentAsync(_factory.Services, clinic.Id, 150m);
+        }
+
+        var login = await IntegrationTestAuthHelper.LoginAsync(http, _factory.Services, email, password);
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+
+        var response = await http.GetAsync("/api/v1/dashboard/finance-summary");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("todayPaymentsCount").GetInt32().Should().Be(0);
+        json.GetProperty("todayTotalPaid").GetDecimal().Should().Be(0m);
+        json.GetProperty("recentPayments").EnumerateArray().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetFinanceSummary_Should_Return403_When_UserLacksDashboardReadPermission()
+    {
+        var http = _factory.CreateClient();
+        var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
+
+        var (email, password) = await SeedUserWithoutDashboardReadAsync(hasher);
+
+        var login = await IntegrationTestAuthHelper.LoginAsync(http, _factory.Services, email, password);
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+
+        var response = await http.GetAsync("/api/v1/dashboard/finance-summary");
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    private static async Task ResetTenantPaymentsAsync(IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+        await db.Payments.Where(p => p.TenantId == tenant.Id).ExecuteDeleteAsync();
+    }
+
+    private static async Task SeedTodayPaymentAsync(
+        IServiceProvider services,
+        Guid clinicId,
+        decimal amount)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
+        var client = new Client(clinic.TenantId, $"DashFin-{Guid.NewGuid():N}"[..14], "905551118877");
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(DateTime.UtcNow);
+        var paidAt = dayStart.AddHours(2);
+        if (paidAt >= dayEnd)
+            paidAt = dayStart.AddMinutes(30);
+
+        db.Payments.Add(new Payment(
+            clinic.TenantId,
+            clinic.Id,
+            client.Id,
+            petId: null,
+            appointmentId: null,
+            examinationId: null,
+            amount,
+            "TRY",
+            PaymentMethod.Cash,
+            paidAt,
+            notes: "IDOR finance scope test"));
+        await db.SaveChangesAsync();
     }
 
     private static async Task SeedTodayAppointmentAsync(

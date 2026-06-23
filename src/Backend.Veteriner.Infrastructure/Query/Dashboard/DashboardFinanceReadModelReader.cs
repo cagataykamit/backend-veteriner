@@ -22,7 +22,12 @@ public sealed class DashboardFinanceReadModelReader : IDashboardFinanceReadModel
         var trendDates = request.LastSevenDayBuckets.Select(b => b.LocalDate).ToHashSet();
         var relevantDates = monthDates.Union(trendDates).ToArray();
 
-        var stats = await LoadDailyStatsAsync(request.TenantId, request.ClinicId, relevantDates, cancellationToken);
+        var stats = await LoadDailyStatsAsync(
+            request.TenantId,
+            request.ClinicId,
+            request.AccessibleClinicIds,
+            relevantDates,
+            cancellationToken);
 
         var todayTotalPaid = 0m;
         var todayPaymentsCount = 0;
@@ -75,6 +80,7 @@ public sealed class DashboardFinanceReadModelReader : IDashboardFinanceReadModel
     private async Task<List<ClinicDailyPaymentStatsReadModel>> LoadDailyStatsAsync(
         Guid tenantId,
         Guid? clinicId,
+        IReadOnlyCollection<Guid>? accessibleClinicIds,
         DateOnly[] relevantDates,
         CancellationToken cancellationToken)
     {
@@ -86,6 +92,10 @@ public sealed class DashboardFinanceReadModelReader : IDashboardFinanceReadModel
 
         if (clinicId is { } scopedClinicId)
             query = query.Where(x => x.ClinicId == scopedClinicId);
+        else if (accessibleClinicIds is { Count: > 0 })
+            query = query.Where(x => accessibleClinicIds.Contains(x.ClinicId));
+        else if (accessibleClinicIds is { Count: 0 })
+            return [];
 
         return await query.ToListAsync(cancellationToken);
     }

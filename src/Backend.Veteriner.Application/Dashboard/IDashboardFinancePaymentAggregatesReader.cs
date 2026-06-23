@@ -15,5 +15,6 @@ public interface IDashboardFinancePaymentAggregatesReader
         DateTime weekEndUtcExclusive,
         DateTime monthStartUtc,
         DateTime monthEndUtcExclusive,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         CancellationToken ct = default);
 }

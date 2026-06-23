@@ -21,6 +21,7 @@ public sealed class DashboardFinancePaymentAggregatesReader : IDashboardFinanceP
         DateTime weekEndUtcExclusive,
         DateTime monthStartUtc,
         DateTime monthEndUtcExclusive,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         CancellationToken ct = default)
     {
         IQueryable<Payment> Base()
@@ -28,6 +29,10 @@ public sealed class DashboardFinancePaymentAggregatesReader : IDashboardFinanceP
             var q = _db.Payments.AsNoTracking().Where(p => p.TenantId == tenantId);
             if (clinicId.HasValue)
                 q = q.Where(p => p.ClinicId == clinicId.Value);
+            else if (accessibleClinicIds is { Count: > 0 })
+                q = q.Where(p => accessibleClinicIds.Contains(p.ClinicId));
+            else if (accessibleClinicIds is { Count: 0 })
+                q = q.Where(_ => false);
             return q;
         }
 

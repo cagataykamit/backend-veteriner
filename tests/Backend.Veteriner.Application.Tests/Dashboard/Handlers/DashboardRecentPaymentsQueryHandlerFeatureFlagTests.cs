@@ -52,7 +52,7 @@ public sealed class DashboardRecentPaymentsQueryHandlerFeatureFlagTests
             Times.Never);
         _scopeResolver.Verify(
             r => r.ResolveAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
-            Times.Never);
+            Times.Once);
     }
 
     [Fact]
@@ -267,6 +267,7 @@ public sealed class DashboardRecentPaymentsQueryHandlerFeatureFlagTests
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
+                It.IsAny<IReadOnlyCollection<Guid>?>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
@@ -295,6 +296,7 @@ public sealed class DashboardRecentPaymentsQueryHandlerFeatureFlagTests
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
+                It.IsAny<IReadOnlyCollection<Guid>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardFinanceWindowTotals(0, 0, 0, 0, 0, 0));
         _payments

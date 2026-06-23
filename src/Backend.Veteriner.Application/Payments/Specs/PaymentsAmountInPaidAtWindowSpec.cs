@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Payments;
 
 namespace Backend.Veteriner.Application.Payments.Specs;
@@ -15,14 +16,14 @@ public sealed class PaymentsPaidAtAmountInWindowSpec : Specification<Payment, Pa
         Guid tenantId,
         Guid? clinicId,
         DateTime startUtcInclusive,
-        DateTime endUtcExclusive)
+        DateTime endUtcExclusive,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId
             && p.PaidAtUtc >= startUtcInclusive
             && p.PaidAtUtc < endUtcExclusive);
-        if (clinicId.HasValue)
-            Query.Where(p => p.ClinicId == clinicId.Value);
+        DashboardSpecificationClinicScope.ApplyToPayment(Query, clinicId, accessibleClinicIds);
         Query.Select(p => new PaymentPaidAtAmountRow(p.PaidAtUtc, p.Amount));
     }
 }

@@ -11,4 +11,5 @@ public sealed record DashboardFinanceReadRequest(
     DateOnly TodayLocalDate,
     IReadOnlyList<DateOnly> WeekLocalDatesInclusive,
     IReadOnlyList<DateOnly> MonthLocalDatesInclusive,
-    IReadOnlyList<OperationPeriodBounds.DailyWindow> LastSevenDayBuckets);
+    IReadOnlyList<OperationPeriodBounds.DailyWindow> LastSevenDayBuckets,
+    IReadOnlyCollection<Guid>? AccessibleClinicIds = null);

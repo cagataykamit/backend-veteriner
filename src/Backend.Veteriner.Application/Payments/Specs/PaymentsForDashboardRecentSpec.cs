@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Payments;
 
 namespace Backend.Veteriner.Application.Payments.Specs;
@@ -15,12 +16,15 @@ public sealed record DashboardFinancePaymentRow(
 
 public sealed class PaymentsForDashboardRecentSpec : Specification<Payment, DashboardFinancePaymentRow>
 {
-    public PaymentsForDashboardRecentSpec(Guid tenantId, Guid? clinicId, int take)
+    public PaymentsForDashboardRecentSpec(
+        Guid tenantId,
+        Guid? clinicId,
+        int take,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
-        if (clinicId.HasValue)
-            Query.Where(p => p.ClinicId == clinicId.Value);
+        DashboardSpecificationClinicScope.ApplyToPayment(Query, clinicId, accessibleClinicIds);
         Query.OrderByDescending(p => p.PaidAtUtc)
             .ThenByDescending(p => p.Id)
             .Take(take);

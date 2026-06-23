@@ -1,10 +1,11 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Dashboard;
 
-/// <summary>Dashboard appointment/vaccination spec'lerinde tekrarlanan klinik kapsam filtresi.</summary>
+/// <summary>Dashboard appointment/vaccination/payment spec'lerinde tekrarlanan klinik kapsam filtresi.</summary>
 internal static class DashboardSpecificationClinicScope
 {
     internal static ISpecificationBuilder<Appointment> ApplyToAppointment(
@@ -39,5 +40,22 @@ internal static class DashboardSpecificationClinicScope
             return query.Where(_ => false);
 
         return query.Where(v => accessibleClinicIds.Contains(v.ClinicId));
+    }
+
+    internal static ISpecificationBuilder<Payment> ApplyToPayment(
+        ISpecificationBuilder<Payment> query,
+        Guid? clinicId,
+        IReadOnlyCollection<Guid>? accessibleClinicIds)
+    {
+        if (clinicId.HasValue)
+            return query.Where(p => p.ClinicId == clinicId.Value);
+
+        if (accessibleClinicIds is null)
+            return query;
+
+        if (accessibleClinicIds.Count == 0)
+            return query.Where(_ => false);
+
+        return query.Where(p => accessibleClinicIds.Contains(p.ClinicId));
     }
 }

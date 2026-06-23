@@ -72,6 +72,13 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, _clinicContext.ClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<DashboardFinanceSummaryDto>.Failure(scopeResult.Error);
+
+        var singleClinicId = scopeResult.Value!.SingleClinicId;
+        var accessibleClinicIds = scopeResult.Value.AccessibleClinicIds;
+
         var utcNow = DateTime.UtcNow;
         var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(utcNow);
         var (weekStart, weekEnd) = OperationPeriodBounds.WeekForUtcNow(utcNow);
@@ -79,7 +86,10 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         var trendBuckets = OperationPeriodBounds.Last7DaysForUtcNow(utcNow);
         var trendStartUtc = trendBuckets[0].StartUtcInclusive;
         var trendEndUtc = trendBuckets[^1].EndUtcExclusive;
-        var clinicId = _clinicContext.ClinicId;
+
+        if (accessibleClinicIds is { Count: 0 })
+            return BuildEmptyFinanceSummary(trendBuckets);
+
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();
         var querySteps = 0;
@@ -112,11 +122,12 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         {
             var readRequest = new DashboardFinanceReadRequest(
                 tenantId,
-                clinicId,
+                singleClinicId,
                 DashboardFinanceLocalDateRanges.TodayLocalDate(utcNow),
                 DashboardFinanceLocalDateRanges.WeekLocalDatesInclusive(utcNow),
                 DashboardFinanceLocalDateRanges.MonthLocalDatesInclusive(utcNow),
-                trendBuckets);
+                trendBuckets,
+                accessibleClinicIds);
 
             var readResult = await _financeReadModelReader.GetAsync(readRequest, ct);
             MarkStep("financeReadModel");
@@ -133,13 +144,14 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         {
             var totals = await _financeAggregates.GetTotalsAsync(
                 tenantId,
-                clinicId,
+                singleClinicId,
                 dayStart,
                 dayEnd,
                 weekStart,
                 weekEnd,
                 monthStart,
                 monthEnd,
+                accessibleClinicIds,
                 ct);
             MarkStep("financeWindowAggregates");
 
@@ -151,14 +163,16 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             monthPaymentsCount = totals.MonthPaymentsCount;
 
             var trendProjectionRows = await _payments.ListAsync(
-                new PaymentsPaidAtAmountInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc),
+                new PaymentsPaidAtAmountInWindowSpec(
+                    tenantId, singleClinicId, trendStartUtc, trendEndUtc, accessibleClinicIds),
                 ct);
             trendProjectionRowCount = trendProjectionRows.Count;
             MarkStep("last7DaysPaid");
             last7DaysPaid = BuildDailyTotals(trendBuckets, trendProjectionRows);
         }
 
-        var recentDtos = await LoadRecentPaymentsAsync(tenantId, clinicId, ct, MarkStep);
+        var recentDtos = await LoadRecentPaymentsAsync(
+            tenantId, singleClinicId, accessibleClinicIds, ct, MarkStep);
 
         var dto = new DashboardFinanceSummaryDto(
             todayTotalPaid,
@@ -171,9 +185,10 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
             last7DaysPaid);
 
         _logger.LogInformation(
-            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} DashboardFinanceReadEnabled={DashboardFinanceReadEnabled} DashboardRecentPaymentsReadEnabled={DashboardRecentPaymentsReadEnabled} UtcNow={UtcNow} DayWindowUtc={DayStartUtc}..{DayEndUtc} WeekWindowUtc={WeekStartUtc}..{WeekEndUtc} MonthWindowUtc={MonthStartUtc}..{MonthEndUtc} TrendWindowUtc={TrendStartUtc}..{TrendEndUtc} TrendProjectionRows={TrendProjectionRows} TodayCount={TodayCount} WeekCount={WeekCount} MonthCount={MonthCount} RecentPayments={RecentPayments} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
+            "Dashboard finance summary generated. TenantId={TenantId} ClinicId={ClinicId} AccessibleClinicIds={AccessibleClinicIds} DashboardFinanceReadEnabled={DashboardFinanceReadEnabled} DashboardRecentPaymentsReadEnabled={DashboardRecentPaymentsReadEnabled} UtcNow={UtcNow} DayWindowUtc={DayStartUtc}..{DayEndUtc} WeekWindowUtc={WeekStartUtc}..{WeekEndUtc} MonthWindowUtc={MonthStartUtc}..{MonthEndUtc} TrendWindowUtc={TrendStartUtc}..{TrendEndUtc} TrendProjectionRows={TrendProjectionRows} TodayCount={TodayCount} WeekCount={WeekCount} MonthCount={MonthCount} RecentPayments={RecentPayments} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
             tenantId,
-            clinicId,
+            singleClinicId,
+            accessibleClinicIds is null ? null : string.Join(',', accessibleClinicIds),
             _queryReadModelsOptions.DashboardFinanceReadEnabled,
             _queryReadModelsOptions.DashboardRecentPaymentsReadEnabled,
             utcNow,
@@ -198,6 +213,24 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         return Result<DashboardFinanceSummaryDto>.Success(dto);
     }
 
+    private static Result<DashboardFinanceSummaryDto> BuildEmptyFinanceSummary(
+        IReadOnlyList<OperationPeriodBounds.DailyWindow> trendBuckets)
+    {
+        var last7DaysPaid = trendBuckets
+            .Select(b => new DashboardDailyTotalDto(b.LocalDate, 0m))
+            .ToList();
+
+        return Result<DashboardFinanceSummaryDto>.Success(new DashboardFinanceSummaryDto(
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            Array.Empty<DashboardFinanceRecentPaymentDto>(),
+            last7DaysPaid));
+    }
+
     /// <summary>
     /// CQRS-15B: recent payments Query DB routing.
     /// Query DB yolu yalnızca <see cref="QueryReadModelsOptions.DashboardRecentPaymentsReadEnabled"/> açık
@@ -206,41 +239,39 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
     /// </summary>
     private async Task<List<DashboardFinanceRecentPaymentDto>> LoadRecentPaymentsAsync(
         Guid tenantId,
-        Guid? clinicId,
+        Guid? singleClinicId,
+        IReadOnlyCollection<Guid>? accessibleClinicIds,
         CancellationToken ct,
         Action<string> markStep)
     {
-        Guid? queryClinicId = null;
-        if (_queryReadModelsOptions.DashboardRecentPaymentsReadEnabled)
-        {
-            var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, clinicId, ct);
-            markStep("recentScopeResolve");
-            if (scopeResult.IsSuccess && scopeResult.Value!.SingleClinicId is { } singleClinicId)
-                queryClinicId = singleClinicId;
-        }
-
-        if (queryClinicId is { } effectiveQueryClinicId)
+        if (_queryReadModelsOptions.DashboardRecentPaymentsReadEnabled && singleClinicId is { } queryClinicId)
         {
             var readRequest = new DashboardRecentPaymentsReadRequest(
                 tenantId,
-                effectiveQueryClinicId,
+                queryClinicId,
                 DashboardFinanceSummaryConstants.RecentPaymentsTake);
             var items = await _recentPaymentsReadModelReader.GetRecentAsync(readRequest, ct);
             markStep("recentPaymentsReadModel");
             return items.ToList();
         }
 
-        return await LoadRecentPaymentsFromCommandDbAsync(tenantId, clinicId, ct, markStep);
+        return await LoadRecentPaymentsFromCommandDbAsync(
+            tenantId, singleClinicId, accessibleClinicIds, ct, markStep);
     }
 
     private async Task<List<DashboardFinanceRecentPaymentDto>> LoadRecentPaymentsFromCommandDbAsync(
         Guid tenantId,
-        Guid? clinicId,
+        Guid? singleClinicId,
+        IReadOnlyCollection<Guid>? accessibleClinicIds,
         CancellationToken ct,
         Action<string> markStep)
     {
         var recentRows = await _payments.ListAsync(
-            new PaymentsForDashboardRecentSpec(tenantId, clinicId, DashboardFinanceSummaryConstants.RecentPaymentsTake),
+            new PaymentsForDashboardRecentSpec(
+                tenantId,
+                singleClinicId,
+                DashboardFinanceSummaryConstants.RecentPaymentsTake,
+                accessibleClinicIds),
             ct);
         markStep("recentPayments");
 

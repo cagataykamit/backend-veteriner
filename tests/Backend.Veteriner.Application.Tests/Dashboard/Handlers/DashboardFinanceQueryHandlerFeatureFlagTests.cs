@@ -45,6 +45,7 @@ public sealed class DashboardFinanceQueryHandlerFeatureFlagTests
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
+                It.IsAny<IReadOnlyCollection<Guid>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardFinanceWindowTotals(0, 0, 0, 0, 0, 0));
         _payments
@@ -63,6 +64,7 @@ public sealed class DashboardFinanceQueryHandlerFeatureFlagTests
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
+                It.IsAny<IReadOnlyCollection<Guid>?>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
         _financeReadModel.Verify(
@@ -106,6 +108,7 @@ public sealed class DashboardFinanceQueryHandlerFeatureFlagTests
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
+                It.IsAny<IReadOnlyCollection<Guid>?>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
         _payments.Verify(
@@ -159,6 +162,7 @@ public sealed class DashboardFinanceQueryHandlerFeatureFlagTests
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
+                It.IsAny<IReadOnlyCollection<Guid>?>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
