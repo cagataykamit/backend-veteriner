@@ -1,8 +1,10 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Hospitalizations.Commands.Discharge;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
@@ -14,6 +16,7 @@ public sealed class DischargeHospitalizationCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizationsRead = new();
     private readonly Mock<IRepository<Hospitalization>> _hospitalizationsWrite = new();
@@ -22,6 +25,7 @@ public sealed class DischargeHospitalizationCommandHandlerTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _tenants.Object,
             _hospitalizationsRead.Object,
             _hospitalizationsWrite.Object);

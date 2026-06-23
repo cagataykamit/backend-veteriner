@@ -1,4 +1,6 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Hospitalizations.Access;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Hospitalizations;
@@ -12,6 +14,7 @@ public sealed class DischargeHospitalizationCommandHandler : IRequestHandler<Dis
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Hospitalization> _hospitalizationsRead;
     private readonly IRepository<Hospitalization> _hospitalizationsWrite;
@@ -19,12 +22,14 @@ public sealed class DischargeHospitalizationCommandHandler : IRequestHandler<Dis
     public DischargeHospitalizationCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Hospitalization> hospitalizationsRead,
         IRepository<Hospitalization> hospitalizationsWrite)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _hospitalizationsRead = hospitalizationsRead;
         _hospitalizationsWrite = hospitalizationsWrite;
@@ -57,6 +62,11 @@ public sealed class DischargeHospitalizationCommandHandler : IRequestHandler<Dis
 
         if (_clinicContext.ClinicId is { } ctxClinicId && row.ClinicId != ctxClinicId)
             return Result.Failure("Hospitalizations.NotFound", "Yatış kaydı bulunamadı.");
+
+        var clinicAccess = await HospitalizationClinicWriteScope.EnsureWriteAccessAsync(
+            _clinicScopeResolver, tenantId, row.ClinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return clinicAccess;
 
         var dischargedUtc = AdmittedAtUtcWindow.ToUtc(request.DischargedAtUtc);
         var applyNotes = request.Notes != null;
