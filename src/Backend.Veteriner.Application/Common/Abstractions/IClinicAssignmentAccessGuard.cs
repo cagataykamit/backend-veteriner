@@ -1,14 +1,16 @@
 namespace Backend.Veteriner.Application.Common.Abstractions;
 
 /// <summary>
-/// Kiracı içi klinik API'lerinde ClinicAdmin kullanıcılarını yalnızca <see cref="Backend.Veteriner.Domain.Clinics.UserClinic"/>
-/// atamalarıyla sınırlar. Tenant <c>Admin</c> operation claim (JWT ile uyumlu owner/kiracı yöneticisi) bu kısıta tabi değildir.
+/// Kiracı içi klinik okuma/yazma yüzeylerinde tenant-wide olmayan kullanıcıları yalnızca
+/// <see cref="Backend.Veteriner.Domain.Clinics.UserClinic"/> atamalarıyla sınırlar.
+/// <see cref="Backend.Veteriner.Application.Clinics.Access.TenantWideClaimNames"/> (Admin / Owner / PlatformAdmin)
+/// bu kısıta tabi değildir.
 /// </summary>
 public interface IClinicAssignmentAccessGuard
 {
     /// <summary>
-    /// Kullanıcıda <c>ClinicAdmin</c> claim'i var ve <c>Admin</c> claim'i yoksa <c>true</c>.
-    /// Diğer roller (ör. Veteriner) için <c>false</c> — mevcut tenant geniş listelenir.
+    /// Kullanıcı tenant-wide değilse <c>true</c> (ClinicAdmin, Veteriner, Sekreter vb.).
+    /// Admin, Owner veya PlatformAdmin claim'lerinden en az biri varsa <c>false</c>.
     /// </summary>
     Task<bool> MustApplyAssignedClinicScopeAsync(Guid userId, CancellationToken ct);
 }

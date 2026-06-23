@@ -2,7 +2,7 @@ namespace Backend.Veteriner.Application.Clinics.Access;
 
 /// <summary>
 /// Tenant geneline erişim hakkı olan OperationClaim adları (whitelist).
-/// <see cref="ClinicAssignmentAccessGuard"/>'ın read-scope semantiğinden farklı olarak burada
+/// <see cref="ClinicAssignmentAccessGuard"/> ve <see cref="ClinicReadScopeResolver"/> ile aynı semantik:
 /// claim'i hiç olmayan kullanıcılar tenant-wide kabul EDİLMEZ; yalnız aşağıdaki adlardan biri
 /// kullanıcının OperationClaim'leri arasında varsa <c>true</c> döner.
 /// /me/clinics listesi ve /auth/select-clinic akışında UserClinic atamasını bypass etmek için
