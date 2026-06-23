@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Domain.Auth;
@@ -381,12 +382,16 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
 
         await db.SaveChangesAsync();
 
-        var claims = permissions
-            .Select(p => new Claim("permission", p))
-            .Append(new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D")))
-            .ToList();
-
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"mut-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedClinicUserAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            permissions,
+            includeClinicClaimInJwt: true);
 
         return new MutationSeedCtx(clinic.Id, product.Id, token);
     }
@@ -542,12 +547,15 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
 
         await db.SaveChangesAsync();
 
-        var claims = new[]
-        {
-            new Claim("permission", "StockMovements.Read"),
-            new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"mv-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            PermissionCatalog.StockMovements.Read);
 
         return new MovementSeedResult(tenant.Id, product.Id, clinic.Id, first!.Id, token);
     }
@@ -697,12 +705,15 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         db.StockMovements.AddRange(early, mvMiddle, late);
         await db.SaveChangesAsync();
 
-        var claims = new[]
-        {
-            new Claim("permission", "StockMovements.Read"),
-            new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"dv-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            PermissionCatalog.StockMovements.Read);
 
         return new DateFilterSeedResult(product.Id, clinic.Id, mvMiddle.Id, mvMiddle.OccurredAtUtc, token);
     }

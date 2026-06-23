@@ -99,7 +99,8 @@ internal static class IntegrationTestAuthHelper
         IPasswordHasher hasher,
         Guid tenantId,
         Guid clinicId,
-        string permissionCode)
+        string permissionCode,
+        bool includeClinicClaimInJwt = false)
     {
         var claim = await EnsureReadClaimForPermissionAsync(db, permissionCode);
 
@@ -118,6 +119,57 @@ internal static class IntegrationTestAuthHelper
             new("permission", permissionCode),
             new(VeterinerClaims.TenantId, tenantId.ToString("D"))
         };
+        if (includeClinicClaimInJwt)
+        {
+            claims.Add(new Claim(VeterinerClaims.ClinicId, clinicId.ToString("D")));
+        }
+
+        var (accessToken, _, _) = jwt.Create(user.Id, email, Array.Empty<string>(), claims);
+        return accessToken;
+    }
+
+    /// <summary>
+    /// Clinic-scoped kullanıcı; birden fazla JWT permission + eşleşen operation claim seed eder.
+    /// Mutation smoke testleri (Products.Update + Products.Read vb.) için.
+    /// </summary>
+    public static async Task<string> SeedScopedClinicUserAndIssueTokenAsync(
+        AppDbContext db,
+        IJwtTokenService jwt,
+        IPasswordHasher hasher,
+        Guid tenantId,
+        Guid clinicId,
+        IReadOnlyCollection<string> permissionCodes,
+        bool includeClinicClaimInJwt = false)
+    {
+        var distinctCodes = permissionCodes.Distinct(StringComparer.Ordinal).ToArray();
+        var operationClaims = new List<OperationClaim>();
+        foreach (var code in distinctCodes)
+        {
+            operationClaims.Add(await EnsureReadClaimForPermissionAsync(db, code));
+        }
+
+        var email = $"scoped-{Guid.NewGuid():N}@example.com";
+        var user = new User(email, hasher.Hash("123456"));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        foreach (var claim in operationClaims.DistinctBy(c => c.Id))
+        {
+            db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
+        }
+
+        db.UserTenants.Add(new UserTenant(user.Id, tenantId));
+        db.UserClinics.Add(new UserClinic(user.Id, clinicId));
+        await db.SaveChangesAsync();
+
+        var claims = distinctCodes
+            .Select(p => new Claim("permission", p))
+            .Append(new Claim(VeterinerClaims.TenantId, tenantId.ToString("D")))
+            .ToList();
+        if (includeClinicClaimInJwt)
+        {
+            claims.Add(new Claim(VeterinerClaims.ClinicId, clinicId.ToString("D")));
+        }
 
         var (accessToken, _, _) = jwt.Create(user.Id, email, Array.Empty<string>(), claims);
         return accessToken;
@@ -954,11 +1006,101 @@ internal static class IntegrationTestAuthHelper
             _ when permissionCode == PermissionCatalog.Hospitalizations.Read => EnsureHospitalizationsReadClaimAsync(db),
             _ when permissionCode == PermissionCatalog.LabResults.Read => EnsureLabResultsReadClaimAsync(db),
             _ when permissionCode == PermissionCatalog.Payments.Read => EnsurePaymentsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Clients.Read => EnsureClientsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Pets.Read => EnsurePetsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Products.Read => EnsureProductsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Products.Update => EnsureProductsUpdateClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.StockMovements.Read => EnsureStockMovementsReadClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.StockMovements.Create => EnsureStockMovementsCreateClaimAsync(db),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(permissionCode),
                 permissionCode,
                 "SeedScopedListReaderAndIssueTokenAsync için desteklenmeyen permission kodu.")
         };
+
+    private static Task<OperationClaim> EnsureIntegrationPermissionClaimAsync(
+        AppDbContext db,
+        string claimName,
+        string permissionCode,
+        string category)
+    {
+        return EnsureNamedPermissionClaimAsync(db, claimName, permissionCode, category);
+    }
+
+    private static async Task<OperationClaim> EnsureNamedPermissionClaimAsync(
+        AppDbContext db,
+        string claimName,
+        string permissionCode,
+        string category)
+    {
+        var claim = await db.OperationClaims.FirstOrDefaultAsync(c => c.Name == claimName);
+        if (claim is null)
+        {
+            claim = new OperationClaim(claimName);
+            db.OperationClaims.Add(claim);
+            await db.SaveChangesAsync();
+        }
+
+        var perm = await db.Permissions.FirstOrDefaultAsync(p => p.Code == permissionCode);
+        if (perm is null)
+        {
+            perm = new Permission(permissionCode, permissionCode, category);
+            db.Permissions.Add(perm);
+            await db.SaveChangesAsync();
+        }
+
+        var linked = await db.OperationClaimPermissions
+            .AnyAsync(x => x.OperationClaimId == claim.Id && x.PermissionId == perm.Id);
+        if (!linked)
+        {
+            db.OperationClaimPermissions.Add(new OperationClaimPermission(claim.Id, perm.Id));
+            await db.SaveChangesAsync();
+        }
+
+        return claim;
+    }
+
+    private static Task<OperationClaim> EnsureClientsReadClaimAsync(AppDbContext db)
+        => EnsureIntegrationPermissionClaimAsync(
+            db,
+            "IntegrationClientReader",
+            PermissionCatalog.Clients.Read,
+            "Clients");
+
+    private static Task<OperationClaim> EnsurePetsReadClaimAsync(AppDbContext db)
+        => EnsureIntegrationPermissionClaimAsync(
+            db,
+            "IntegrationPetReader",
+            PermissionCatalog.Pets.Read,
+            "Pets");
+
+    private static Task<OperationClaim> EnsureProductsReadClaimAsync(AppDbContext db)
+        => EnsureIntegrationPermissionClaimAsync(
+            db,
+            "IntegrationProductReader",
+            PermissionCatalog.Products.Read,
+            "Products");
+
+    private static Task<OperationClaim> EnsureProductsUpdateClaimAsync(AppDbContext db)
+        => EnsureIntegrationPermissionClaimAsync(
+            db,
+            "IntegrationProductUpdater",
+            PermissionCatalog.Products.Update,
+            "Products");
+
+    private static Task<OperationClaim> EnsureStockMovementsReadClaimAsync(AppDbContext db)
+        => EnsureIntegrationPermissionClaimAsync(
+            db,
+            "IntegrationStockMovementReader",
+            PermissionCatalog.StockMovements.Read,
+            "StockMovements");
+
+    private static Task<OperationClaim> EnsureStockMovementsCreateClaimAsync(AppDbContext db)
+        => EnsureIntegrationPermissionClaimAsync(
+            db,
+            "IntegrationStockMovementCreator",
+            PermissionCatalog.StockMovements.Create,
+            "StockMovements");
 
     private static async Task<OperationClaim> EnsureAppointmentsReadClaimAsync(AppDbContext db)
     {

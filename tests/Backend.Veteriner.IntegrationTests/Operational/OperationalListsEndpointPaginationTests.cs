@@ -286,7 +286,15 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
-        var token = IssueToken(jwt, tenant.Id, "Clients.Read");
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            PermissionCatalog.Clients.Read);
         return new TenantTokenCtx(token, tenant.Id, clinic.Id);
     }
 
@@ -514,7 +522,15 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
-        var token = IssueToken(jwt, tenant.Id, "Pets.Read");
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            PermissionCatalog.Pets.Read);
         return new TenantTokenCtx(token, tenant.Id, clinic.Id);
     }
 

@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Domain.Clinics;
@@ -189,12 +190,15 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
-        var claims = new List<Claim>
-        {
-            new("permission", "Vaccinations.Read"),
-            new(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"vac-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            PermissionCatalog.Vaccinations.Read);
 
         return new OverdueSeedCtx(
             token,

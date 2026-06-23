@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Domain.Auth;
@@ -339,12 +340,16 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         db.ProductStocks.Add(stock);
         await db.SaveChangesAsync();
 
-        var claims = permissions
-            .Select(p => new Claim("permission", p))
-            .Append(new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D")))
-            .ToList();
-
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"pm-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedScopedClinicUserAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            clinic.Id,
+            permissions,
+            includeClinicClaimInJwt: true);
 
         return new MinimumMutationSeedCtx(stock.Id, clinic.Id, product.Id, token);
     }
@@ -432,17 +437,29 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
 
         await db.SaveChangesAsync();
 
-        var claims = new List<Claim>
-        {
-            new("permission", "Products.Read"),
-            new(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
+        string token;
         if (includeClinicClaimInToken)
         {
-            claims.Add(new Claim(VeterinerClaims.ClinicId, clinics.First().Id.ToString("D")));
+            await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+            var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+            token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(
+                db,
+                jwt,
+                hasher,
+                tenant.Id,
+                clinics.First().Id,
+                PermissionCatalog.Products.Read,
+                includeClinicClaimInJwt: true);
         }
-
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"ro-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        else
+        {
+            var claims = new List<Claim>
+            {
+                new("permission", "Products.Read"),
+                new(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
+            };
+            (token, _, _) = jwt.Create(Guid.NewGuid(), $"ro-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        }
 
         return new TenantStockSeedResult(tenant.Id, product.Id, clinics.First().Id, token);
     }
@@ -558,12 +575,14 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         db.ProductStocks.Add(new ProductStock(tenant.Id, clinicOk.Id, product.Id, 100m, 1m));
         await db.SaveChangesAsync();
 
-        var claims = new[]
-        {
-            new Claim("permission", "Products.Read"),
-            new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D"))
-        };
-        var (token, _, _) = jwt.Create(Guid.NewGuid(), $"fil-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var token = await IntegrationTestAuthHelper.SeedTenantWideAdminAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            [PermissionCatalog.Products.Read]);
 
         return new TwoClinicMinSeedResult(clinicLow.Id, clinicOk.Id, token);
     }
