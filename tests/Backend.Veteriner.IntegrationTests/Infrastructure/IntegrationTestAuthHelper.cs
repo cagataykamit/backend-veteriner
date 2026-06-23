@@ -524,6 +524,46 @@ internal static class IntegrationTestAuthHelper
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
     }
 
+    /// <summary>
+    /// Tenant-wide olmayan kullanıcı: examination create/update izinleri;
+    /// yalnız atandığı klinikte yazma yapabilmeli.
+    /// </summary>
+    public static async Task<(string Email, string Password, Guid AssignedClinicId, Guid UnassignedClinicId)>
+        SeedExaminationWriterUserAsync(IServiceProvider services, IPasswordHasher hasher)
+    {
+        await EnsureRolePermissionBindingsAsync(services);
+
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+        var assignedClinic = await db.Clinics.SingleAsync(c =>
+            c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+
+        var unassignedClinic = new Clinic(tenant.Id, $"ExamWriter-{Guid.NewGuid():N}"[..14], "Konya");
+        db.Clinics.Add(unassignedClinic);
+        await db.SaveChangesAsync();
+
+        var createClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationExaminationCreator", PermissionCatalog.Examinations.Create, "Examinations");
+        var updateClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationExaminationUpdater", PermissionCatalog.Examinations.Update, "Examinations");
+
+        var email = $"exam-writer-{Guid.NewGuid():N}@example.com";
+        const string password = "123456";
+        var user = new User(email, hasher.Hash(password));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        await db.SaveChangesAsync();
+
+        return (email, password, assignedClinic.Id, unassignedClinic.Id);
+    }
+
     /// <summary>Belirtilen klinikte tek muayene oluşturur; isteğe bağlı bağlı tedavi kaydı ekler.</summary>
     public static async Task<ExaminationSeedResult> SeedExaminationInClinicAsync(
         IServiceProvider services,

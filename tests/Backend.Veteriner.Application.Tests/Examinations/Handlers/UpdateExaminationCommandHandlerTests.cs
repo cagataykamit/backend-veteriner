@@ -1,10 +1,12 @@
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Commands.Update;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
@@ -19,6 +21,7 @@ public sealed class UpdateExaminationCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
@@ -26,10 +29,11 @@ public sealed class UpdateExaminationCommandHandlerTests
     private readonly Mock<IReadRepository<Examination>> _examinationsRead = new();
     private readonly Mock<IRepository<Examination>> _examinationsWrite = new();
 
-    private UpdateExaminationCommandHandler CreateHandler()
+    private UpdateExaminationCommandHandler CreateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            resolver ?? _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,

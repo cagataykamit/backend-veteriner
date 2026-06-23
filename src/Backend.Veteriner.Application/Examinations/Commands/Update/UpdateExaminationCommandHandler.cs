@@ -1,6 +1,8 @@
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -18,6 +20,7 @@ public sealed class UpdateExaminationCommandHandler : IRequestHandler<UpdateExam
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -28,6 +31,7 @@ public sealed class UpdateExaminationCommandHandler : IRequestHandler<UpdateExam
     public UpdateExaminationCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -37,6 +41,7 @@ public sealed class UpdateExaminationCommandHandler : IRequestHandler<UpdateExam
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
@@ -118,6 +123,18 @@ public sealed class UpdateExaminationCommandHandler : IRequestHandler<UpdateExam
             clinicId = cid;
             petId = pid;
             appointmentId = null;
+        }
+
+        var clinicAccess = await ExaminationClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
+            _clinicScopeResolver, tenantId, e.ClinicId, clinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return clinicAccess;
+
+        if (_clinicContext.ClinicId is { } currentClinicId && clinicId != currentClinicId)
+        {
+            return Result.Failure(
+                "Examinations.ClinicContextMismatch",
+                "Muayene kaydı sadece aktif clinic bağlamında güncellenebilir.");
         }
 
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, clinicId), ct);
