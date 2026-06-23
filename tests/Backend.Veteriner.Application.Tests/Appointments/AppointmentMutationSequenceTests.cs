@@ -5,11 +5,13 @@ using Backend.Veteriner.Application.Appointments.Commands.Reschedule;
 using Backend.Veteriner.Application.Appointments.Commands.Update;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
@@ -24,6 +26,7 @@ public sealed class AppointmentMutationSequenceTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
@@ -66,6 +69,7 @@ public sealed class AppointmentMutationSequenceTests
         var handler = new CreateAppointmentCommandHandler(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
@@ -109,6 +113,7 @@ public sealed class AppointmentMutationSequenceTests
         var handler = new RescheduleAppointmentCommandHandler(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointmentsRead.Object,
             _clinicAppointmentSettings.Object,
             _clinicWorkingHoursRead.Object,
@@ -146,6 +151,7 @@ public sealed class AppointmentMutationSequenceTests
         var handler = new CancelAppointmentCommandHandler(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointmentsRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
@@ -179,6 +185,7 @@ public sealed class AppointmentMutationSequenceTests
         var handler = new CompleteAppointmentCommandHandler(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointmentsRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
@@ -212,6 +219,7 @@ public sealed class AppointmentMutationSequenceTests
         var handler = new UpdateAppointmentCommandHandler(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointmentsRead.Object,
             _clinics.Object,
             _pets.Object,

@@ -1,6 +1,8 @@
 using Backend.Veteriner.Application.Appointments;
+using Backend.Veteriner.Application.Appointments.Access;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.AppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -20,6 +22,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -33,6 +36,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
     public CreateAppointmentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -45,6 +49,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
@@ -96,6 +101,11 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         var clinic = clinicResolve.Value!;
 
         var clinicId = clinic.Id;
+
+        var clinicAccess = await AppointmentClinicWriteScope.EnsureWriteAccessAsync(
+            _clinicScopeResolver, tenantId, clinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return Result<Guid>.Failure(clinicAccess.Error);
 
         var pet = await _pets.FirstOrDefaultAsync(
             new PetByIdSpec(tenantId, request.PetId), ct);

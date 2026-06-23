@@ -1,8 +1,10 @@
 using Backend.Veteriner.Application.Appointments.Commands.Reschedule;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using FluentAssertions;
@@ -15,6 +17,7 @@ public sealed class AppointmentConcurrencyCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Appointment>> _appointmentsRead = new();
     private readonly Mock<IReadRepository<ClinicAppointmentSettings>> _clinicAppointmentSettings = new();
     private readonly Mock<IReadRepository<ClinicWorkingHour>> _clinicWorkingHoursRead = new();
@@ -51,6 +54,7 @@ public sealed class AppointmentConcurrencyCommandHandlerTests
         var handler = new RescheduleAppointmentCommandHandler(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointmentsRead.Object,
             _clinicAppointmentSettings.Object,
             _clinicWorkingHoursRead.Object,

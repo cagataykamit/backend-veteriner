@@ -424,6 +424,71 @@ internal static class IntegrationTestAuthHelper
     }
 
     /// <summary>
+    /// Tenant-wide olmayan kullanıcı: appointment create/cancel/complete/reschedule izinleri;
+    /// yalnız atandığı klinikte yazma yapabilmeli.
+    /// </summary>
+    public static async Task<(string Email, string Password, Guid AssignedClinicId, Guid UnassignedClinicId)>
+        SeedAppointmentWriterUserAsync(IServiceProvider services, IPasswordHasher hasher)
+    {
+        await EnsureRolePermissionBindingsAsync(services);
+
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+        var assignedClinic = await db.Clinics.SingleAsync(c =>
+            c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
+
+        var unassignedClinic = new Clinic(tenant.Id, $"ApptWriter-{Guid.NewGuid():N}"[..14], "Konya");
+        db.Clinics.Add(unassignedClinic);
+        await db.SaveChangesAsync();
+
+        var createClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationAppointmentCreator", PermissionCatalog.Appointments.Create, "Appointments");
+        var cancelClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationAppointmentCanceller", PermissionCatalog.Appointments.Cancel, "Appointments");
+        var completeClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationAppointmentCompleter", PermissionCatalog.Appointments.Complete, "Appointments");
+        var rescheduleClaim = await EnsureIntegrationPermissionClaimAsync(
+            db, "IntegrationAppointmentRescheduler", PermissionCatalog.Appointments.Reschedule, "Appointments");
+
+        var email = $"appt-writer-{Guid.NewGuid():N}@example.com";
+        const string password = "123456";
+        var user = new User(email, hasher.Hash(password));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, cancelClaim.Id));
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, completeClaim.Id));
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, rescheduleClaim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        await db.SaveChangesAsync();
+
+        return (email, password, assignedClinic.Id, unassignedClinic.Id);
+    }
+
+    /// <summary>Belirtilen klinik için tenant-owned pet oluşturur.</summary>
+    public static async Task<Guid> SeedPetInClinicAsync(IServiceProvider services, Guid clinicId)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
+        var client = new Client(clinic.TenantId, $"ApptPetClient-{Guid.NewGuid():N}"[..14], "905551110088");
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+        var pet = new Pet(clinic.TenantId, client.Id, $"ApptPet-{Guid.NewGuid():N}"[..12], speciesId);
+        db.Pets.Add(pet);
+        await db.SaveChangesAsync();
+
+        return pet.Id;
+    }
+
+    /// <summary>
     /// Tenant-wide olmayan kullanıcı: <c>Examinations.Read</c> iznine sahip, Admin / Owner / PlatformAdmin /
     /// ClinicAdmin claim'i yok. Yalnız atandığı kliniğin muayene detayını okuyabilmeli.
     /// </summary>

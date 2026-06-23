@@ -1,6 +1,8 @@
 using Backend.Veteriner.Application.Appointments;
+using Backend.Veteriner.Application.Appointments.Access;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.AppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -16,6 +18,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Appointment> _appointmentsRead;
     private readonly IReadRepository<ClinicAppointmentSettings> _clinicAppointmentSettings;
     private readonly IReadRepository<ClinicWorkingHour> _clinicWorkingHoursRead;
@@ -26,6 +29,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
     public RescheduleAppointmentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Appointment> appointmentsRead,
         IReadRepository<ClinicAppointmentSettings> clinicAppointmentSettings,
         IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
@@ -35,6 +39,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _appointmentsRead = appointmentsRead;
         _clinicAppointmentSettings = clinicAppointmentSettings;
         _clinicWorkingHoursRead = clinicWorkingHoursRead;
@@ -61,6 +66,11 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
         if (_clinicContext.ClinicId is { } clinicId && appointment.ClinicId != clinicId)
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
+
+        var clinicAccess = await AppointmentClinicWriteScope.EnsureWriteAccessAsync(
+            _clinicScopeResolver, tenantId, appointment.ClinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return clinicAccess;
 
         if (appointment.Status != AppointmentStatus.Scheduled)
         {

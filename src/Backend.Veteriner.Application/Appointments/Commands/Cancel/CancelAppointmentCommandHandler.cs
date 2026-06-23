@@ -1,5 +1,7 @@
+using Backend.Veteriner.Application.Appointments.Access;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
@@ -12,6 +14,7 @@ public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppo
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Appointment> _appointmentsRead;
     private readonly IRepository<Appointment> _appointmentsWrite;
     private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
@@ -20,6 +23,7 @@ public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppo
     public CancelAppointmentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Appointment> appointmentsRead,
         IRepository<Appointment> appointmentsWrite,
         IAppointmentProjectionSnapshotFactory snapshotFactory,
@@ -27,6 +31,7 @@ public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppo
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _appointmentsRead = appointmentsRead;
         _appointmentsWrite = appointmentsWrite;
         _snapshotFactory = snapshotFactory;
@@ -49,6 +54,11 @@ public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppo
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
         if (_clinicContext.ClinicId is { } clinicId && appointment.ClinicId != clinicId)
             return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
+
+        var clinicAccess = await AppointmentClinicWriteScope.EnsureWriteAccessAsync(
+            _clinicScopeResolver, tenantId, appointment.ClinicId, ct);
+        if (!clinicAccess.IsSuccess)
+            return clinicAccess;
 
         var previous = await _snapshotFactory.CreateAsync(appointment, ct);
 

@@ -1,10 +1,11 @@
-using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Appointments.Commands.Update;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
@@ -18,6 +19,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Appointment>> _appointmentsRead = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
@@ -38,6 +40,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
         return new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointmentsRead.Object,
             _clinics.Object,
             _pets.Object,

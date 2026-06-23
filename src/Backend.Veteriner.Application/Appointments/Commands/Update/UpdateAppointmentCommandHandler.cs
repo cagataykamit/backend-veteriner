@@ -1,6 +1,8 @@
 using Backend.Veteriner.Application.Appointments;
+using Backend.Veteriner.Application.Appointments.Access;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.AppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -18,6 +20,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Appointment> _appointmentsRead;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -30,6 +33,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
     public UpdateAppointmentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Appointment> appointmentsRead,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -41,6 +45,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _appointmentsRead = appointmentsRead;
         _clinics = clinics;
         _pets = pets;
@@ -79,14 +84,24 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
             return Result.Failure("Appointments.ClinicContextMismatch", "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
 
-        var clinicId = _clinicContext.ClinicId ?? request.ClinicId ?? appointment.ClinicId;
+        var clinicAccess = await AppointmentClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
+            _clinicScopeResolver,
+            tenantId,
+            appointment.ClinicId,
+            request.ClinicId ?? appointment.ClinicId,
+            ct);
+        if (!clinicAccess.IsSuccess)
+            return clinicAccess;
+
+        var clinicId = request.ClinicId ?? appointment.ClinicId;
+        if (_clinicContext.ClinicId is { } currentClinicId && clinicId != currentClinicId)
+            return Result.Failure("Appointments.ClinicContextMismatch", "Randevu sadece aktif clinic bağlamında güncellenebilir.");
+
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, clinicId), ct);
         if (clinic is null)
             return Result.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
         if (!clinic.IsActive)
             return Result.Failure("Clinics.Inactive", "Seçilen klinik pasif.");
-        if (_clinicContext.ClinicId is { } currentClinicId && clinicId != currentClinicId)
-            return Result.Failure("Appointments.ClinicContextMismatch", "Randevu sadece aktif clinic bağlamında güncellenebilir.");
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, request.PetId), ct);
         if (pet is null)

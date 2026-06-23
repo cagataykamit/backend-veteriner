@@ -6,10 +6,12 @@ using Backend.Veteriner.Application.Appointments.Commands.Update;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
@@ -25,6 +27,7 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
@@ -300,6 +303,7 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
@@ -314,6 +318,7 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointmentsRead.Object,
             _clinics.Object,
             _pets.Object,
@@ -327,6 +332,7 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointmentsRead.Object,
             _clinicAppointmentSettings.Object,
             _clinicWorkingHoursRead.Object,
@@ -335,10 +341,10 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
             _eventOutbox.Object);
 
     private CancelAppointmentCommandHandler CreateCancelHandler()
-        => new(_tenantContext.Object, _clinicContext.Object, _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object);
+        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object);
 
     private CompleteAppointmentCommandHandler CreateCompleteHandler()
-        => new(_tenantContext.Object, _clinicContext.Object, _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object);
+        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object);
 
     private void SetupCreateSuccess(Guid tid, Guid cid, Guid pid, DateTime when)
     {
