@@ -445,23 +445,23 @@ Faz 1 (kademeli — her adım: config → restart → startup log → smoke):
 ### Başlangıç topolojisi (düşük maliyet, repo ile uyumlu)
 
 ```text
-┌─────────────────────────────────────────────┐
-│  Single VPS / Windows Server / Linux VM      │
-│  ┌─────────────────────────────────────┐    │
-│  │  IIS (reverse proxy) veya Kestrel    │    │
-│  │  Backend.Veteriner.Api (1 instance)  │    │
-│  │  ASPNETCORE_ENVIRONMENT=Staging      │    │
-│  └─────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────┐    │
-│  │  SQL Server (single instance)        │    │
-│  │  ├─ VetinityCommandDb_Staging        │    │
-│  │  └─ VetinityQueryDb_Staging          │    │
-│  └─────────────────────────────────────┘    │
-└─────────────────────────────────────────────┘
++---------------------------------------------+
+| Single VPS / Windows Server / Linux VM      |
+| +-----------------------------------------+ |
+| | IIS (reverse proxy) veya Kestrel        | |
+| | Backend.Veteriner.Api (1 instance)      | |
+| | ASPNETCORE_ENVIRONMENT=Staging          | |
+| +-----------------------------------------+ |
+| +-----------------------------------------+ |
+| | SQL Server (single instance)            | |
+| | +- VetinityCommandDb_Staging            | |
+| | +- VetinityQueryDb_Staging              | |
+| +-----------------------------------------+ |
++---------------------------------------------+
 
 Deploy adımları (CI/CD veya manuel):
-  publish Api → configure secrets → migrate → migrate-query → seed? → restart
-  Payment CQRS Faz 0: projection + backfill → health gate → kademeli flag
+  publish Api -> configure secrets -> migrate -> migrate-query -> seed? -> restart
+  Payment CQRS Faz 0: projection + backfill -> health gate -> kademeli flag
 ```
 
 | Soru | Öneri |

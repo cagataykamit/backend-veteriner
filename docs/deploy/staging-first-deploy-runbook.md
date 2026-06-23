@@ -23,32 +23,32 @@
 Başlangıç için önerilen şekil (DEPLOY-0 ile uyumlu):
 
 ```text
-┌──────────────────────────────────────────────────────────┐
-│  Tek VPS / VM                                             │
-│                                                           │
-│  ASPNETCORE_ENVIRONMENT = Staging                         │
-│                                                           │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │  Reverse proxy (tercihen TLS)                       │  │
-│  │  • Windows: IIS + ASP.NET Core Hosting Bundle       │  │
-│  │  • Linux: nginx / Caddy → Kestrel                   │  │
-│  └───────────────────────┬────────────────────────────┘  │
-│                          │                                │
-│  ┌───────────────────────▼────────────────────────────┐  │
-│  │  Backend.Veteriner.Api (tek instance)               │  │
-│  │  • Outbox worker (hosted service)                   │  │
-│  │  • Projection workers (appointment/client/pet/      │  │
-│  │    payment — config'e bağlı)                        │  │
-│  └───────────────────────┬────────────────────────────┘  │
-│                          │                                │
-│  ┌───────────────────────▼────────────────────────────┐  │
-│  │  SQL Server (aynı instance)                         │  │
-│  │  ├─ VetinityCommandDb_Staging   (Command DB)        │  │
-│  │  └─ VetinityQueryDb_Staging     (Query DB)          │  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                           │
-│  DbMigrator: deploy sırasında CLI (sürekli servis değil) │
-└──────────────────────────────────────────────────────────┘
++----------------------------------------------------------+
+| Tek VPS / VM                                              |
+|                                                           |
+| ASPNETCORE_ENVIRONMENT = Staging                          |
+|                                                           |
+| +--------------------------------------------------------+|
+| | Reverse proxy (tercihen TLS)                           ||
+| | * Windows: IIS + ASP.NET Core Hosting Bundle           ||
+| | * Linux: nginx / Caddy -> Kestrel                      ||
+| +---------------------------+----------------------------+|
+|                             |                             |
+| +---------------------------v----------------------------+|
+| | Backend.Veteriner.Api (tek instance)                   ||
+| | * Outbox worker (hosted service)                       ||
+| | * Projection workers (appointment/client/pet/           ||
+| |   payment - config'e bağlı)                            ||
+| +---------------------------+----------------------------+|
+|                             |                             |
+| +---------------------------v----------------------------+|
+| | SQL Server (aynı instance)                             ||
+| | +- VetinityCommandDb_Staging   (Command DB)            ||
+| | +- VetinityQueryDb_Staging     (Query DB)              ||
+| +--------------------------------------------------------+|
+|                                                           |
+| DbMigrator: deploy sırasında CLI (sürekli servis değil)   |
++----------------------------------------------------------+
 ```
 
 | Bileşen | Karar |
