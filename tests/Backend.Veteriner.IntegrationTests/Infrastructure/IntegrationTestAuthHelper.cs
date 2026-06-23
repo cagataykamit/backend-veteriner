@@ -189,6 +189,37 @@ internal static class IntegrationTestAuthHelper
         => SeedScopedListReaderAndIssueTokenAsync(db, jwt, hasher, tenantId, clinicId, permissionCode);
 
     /// <summary>
+    /// Reminders.Read yetkili non-tenant-wide kullanıcı; <see cref="UserTenant"/> var, <see cref="UserClinic"/> yok.
+    /// GetLogs clinic-scope guard'ında atanmış klinik olmadığı için boş sonuç beklenir.
+    /// </summary>
+    public static async Task<string> SeedRemindersReaderWithoutClinicAssignmentAndIssueTokenAsync(
+        AppDbContext db,
+        IJwtTokenService jwt,
+        IPasswordHasher hasher,
+        Guid tenantId)
+    {
+        var claim = await EnsureRemindersReadClaimAsync(db);
+
+        var email = $"rem-reader-{Guid.NewGuid():N}@example.com";
+        var user = new User(email, hasher.Hash("123456"));
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenantId));
+        await db.SaveChangesAsync();
+
+        var claims = new List<Claim>
+        {
+            new("permission", PermissionCatalog.Reminders.Read),
+            new(VeterinerClaims.TenantId, tenantId.ToString("D"))
+        };
+
+        var (accessToken, _, _) = jwt.Create(user.Id, email, Array.Empty<string>(), claims);
+        return accessToken;
+    }
+
+    /// <summary>
     /// Tenant-wide Admin claim'li kullanıcı; bilinmeyen clinicId için Clinics.NotFound senaryolarında kullanılır.
     /// </summary>
     public static async Task<string> SeedTenantWideAdminAndIssueTokenAsync(
@@ -1012,6 +1043,7 @@ internal static class IntegrationTestAuthHelper
             _ when permissionCode == PermissionCatalog.Products.Update => EnsureProductsUpdateClaimAsync(db),
             _ when permissionCode == PermissionCatalog.StockMovements.Read => EnsureStockMovementsReadClaimAsync(db),
             _ when permissionCode == PermissionCatalog.StockMovements.Create => EnsureStockMovementsCreateClaimAsync(db),
+            _ when permissionCode == PermissionCatalog.Reminders.Read => EnsureRemindersReadClaimAsync(db),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(permissionCode),
                 permissionCode,
@@ -1087,6 +1119,13 @@ internal static class IntegrationTestAuthHelper
             "IntegrationProductUpdater",
             PermissionCatalog.Products.Update,
             "Products");
+
+    private static Task<OperationClaim> EnsureRemindersReadClaimAsync(AppDbContext db)
+        => EnsureIntegrationPermissionClaimAsync(
+            db,
+            "IntegrationReminderReader",
+            PermissionCatalog.Reminders.Read,
+            "Reminders");
 
     private static Task<OperationClaim> EnsureStockMovementsReadClaimAsync(AppDbContext db)
         => EnsureIntegrationPermissionClaimAsync(

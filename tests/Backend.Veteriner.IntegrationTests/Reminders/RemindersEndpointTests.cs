@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Domain.Auth;
@@ -205,7 +206,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
     public async Task GetLogs_Should_Return200_Paged_When_RemindersRead()
     {
         var client = _factory.CreateClient();
-        var (tenantId, _, token) = await SeedTenantAndIssueTokenAsync(new[] { "Reminders.Read" });
+        var (tenantId, token) = await SeedTenantWithTenantWideRemindersReaderAsync();
         await SeedReminderLogsAsync(tenantId, clinicId: null, ReminderType.Appointment, ReminderDispatchStatus.Sent);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -222,7 +223,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
     public async Task GetLogs_Should_Filter_By_ReminderType()
     {
         var client = _factory.CreateClient();
-        var (tenantId, _, token) = await SeedTenantAndIssueTokenAsync(new[] { "Reminders.Read" });
+        var (tenantId, token) = await SeedTenantWithTenantWideRemindersReaderAsync();
         await SeedReminderLogsAsync(tenantId, null, ReminderType.Appointment, ReminderDispatchStatus.Enqueued);
         await SeedReminderLogsAsync(tenantId, null, ReminderType.Vaccination, ReminderDispatchStatus.Enqueued);
 
@@ -230,6 +231,8 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         var response = await client.GetAsync("/api/v1/reminders/logs?page=1&pageSize=50&reminderType=Vaccination");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("totalItems").GetInt32().Should().BeGreaterThanOrEqualTo(1);
+        json.GetProperty("items").GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
         foreach (var item in json.GetProperty("items").EnumerateArray())
             item.GetProperty("reminderType").GetInt32().Should().Be((int)ReminderType.Vaccination);
     }
@@ -238,7 +241,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
     public async Task GetLogs_Should_Filter_By_Status()
     {
         var client = _factory.CreateClient();
-        var (tenantId, _, token) = await SeedTenantAndIssueTokenAsync(new[] { "Reminders.Read" });
+        var (tenantId, token) = await SeedTenantWithTenantWideRemindersReaderAsync();
         await SeedReminderLogsAsync(tenantId, null, ReminderType.Appointment, ReminderDispatchStatus.Failed);
         await SeedReminderLogsAsync(tenantId, null, ReminderType.Appointment, ReminderDispatchStatus.Sent);
 
@@ -246,6 +249,8 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         var response = await client.GetAsync("/api/v1/reminders/logs?page=1&pageSize=50&status=Failed");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("totalItems").GetInt32().Should().BeGreaterThanOrEqualTo(1);
+        json.GetProperty("items").GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
         foreach (var item in json.GetProperty("items").EnumerateArray())
             item.GetProperty("status").GetInt32().Should().Be((int)ReminderDispatchStatus.Failed);
     }
@@ -254,7 +259,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
     public async Task GetLogs_Should_Include_RecentLogs_When_DateRange_Wide()
     {
         var client = _factory.CreateClient();
-        var (tenantId, _, token) = await SeedTenantAndIssueTokenAsync(new[] { "Reminders.Read" });
+        var (tenantId, token) = await SeedTenantWithTenantWideRemindersReaderAsync();
         await SeedReminderLogsAsync(tenantId, null, ReminderType.Appointment, ReminderDispatchStatus.Skipped);
 
         var from = Uri.EscapeDataString(DateTime.UtcNow.AddDays(-7).ToString("O"));
@@ -270,7 +275,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
     public async Task GetLogs_Should_ReturnEmpty_When_DateRange_Excludes_Now()
     {
         var client = _factory.CreateClient();
-        var (tenantId, _, token) = await SeedTenantAndIssueTokenAsync(new[] { "Reminders.Read" });
+        var (tenantId, token) = await SeedTenantWithTenantWideRemindersReaderAsync();
         await SeedReminderLogsAsync(tenantId, null, ReminderType.Appointment, ReminderDispatchStatus.Pending);
 
         var from = Uri.EscapeDataString(DateTime.UtcNow.AddDays(1).ToString("O"));
@@ -297,10 +302,10 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
     }
 
     [Fact]
-    public async Task GetLogs_Should_Return404_ClinicsNotFound_When_ClinicId_Unknown_For_NonClinicScopedUser()
+    public async Task GetLogs_Should_Return404_ClinicsNotFound_When_ClinicId_Unknown_For_TenantWideAdmin()
     {
         var client = _factory.CreateClient();
-        var (tenantId, _, token) = await SeedTenantAndIssueTokenAsync(new[] { "Reminders.Read" });
+        var (tenantId, token) = await SeedTenantWithTenantWideRemindersReaderAsync();
         await SeedReminderLogsAsync(tenantId, null, ReminderType.Appointment, ReminderDispatchStatus.Enqueued);
 
         var foreignClinicId = Guid.NewGuid();
@@ -308,6 +313,20 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         var response = await client.GetAsync($"/api/v1/reminders/logs?page=1&pageSize=20&clinicId={foreignClinicId:D}");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await ReadProblemCodeAsync(response)).Should().Be("Clinics.NotFound");
+    }
+
+    [Fact]
+    public async Task GetLogs_Should_Return403_ClinicsAccessDenied_When_ScopedReader_Without_UserClinic_Requests_ClinicId()
+    {
+        var client = _factory.CreateClient();
+        var (tenantId, token) = await SeedTenantWithScopedRemindersReaderWithoutClinicAssignmentAsync();
+        await SeedReminderLogsAsync(tenantId, null, ReminderType.Appointment, ReminderDispatchStatus.Enqueued);
+
+        var foreignClinicId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await client.GetAsync($"/api/v1/reminders/logs?page=1&pageSize=20&clinicId={foreignClinicId:D}");
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await ReadProblemCodeAsync(response)).Should().Be("Clinics.AccessDenied");
     }
 
     [Fact]
@@ -328,10 +347,10 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
     public async Task GetLogs_Should_NotExpose_OtherTenant_Logs()
     {
         var client = _factory.CreateClient();
-        var (tenantA, _, _) = await SeedTenantAndIssueTokenAsync(new[] { "Reminders.Read" });
+        var (tenantA, _) = await SeedTenantWithTenantWideRemindersReaderAsync();
         var logId = await SeedReminderLogsAsync(tenantA, null, ReminderType.Vaccination, ReminderDispatchStatus.Enqueued);
 
-        var (_, _, tokenB) = await SeedTenantAndIssueTokenAsync(new[] { "Reminders.Read" });
+        var (_, tokenB) = await SeedTenantWithTenantWideRemindersReaderAsync();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenB);
         var response = await client.GetAsync("/api/v1/reminders/logs?page=1&pageSize=100");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -358,10 +377,10 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
     }
 
     [Fact]
-    public async Task GetLogs_NonClinicAdmin_Should_See_All_Tenant_Logs_Without_ClinicId_Filter()
+    public async Task GetLogs_TenantWideAdmin_Should_See_All_Tenant_Logs_Without_ClinicId_Filter()
     {
         var client = _factory.CreateClient();
-        var (tenantId, _, token) = await SeedTenantAndIssueTokenAsync(new[] { "Reminders.Read" });
+        var (tenantId, token) = await SeedTenantWithTenantWideRemindersReaderAsync();
         Guid c1;
         Guid c2;
         using (var scope = _factory.Services.CreateScope())
@@ -385,6 +404,35 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         json.GetProperty("totalItems").GetInt32().Should().BeGreaterThanOrEqualTo(2);
     }
 
+    [Fact]
+    public async Task GetLogs_ScopedReader_Without_UserClinic_Should_ReturnEmpty_Without_ClinicId_Filter()
+    {
+        var client = _factory.CreateClient();
+        var (tenantId, token) = await SeedTenantWithScopedRemindersReaderWithoutClinicAssignmentAsync();
+        Guid c1;
+        Guid c2;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var clinic1 = new Clinic(tenantId, "L1", "Istanbul");
+            var clinic2 = new Clinic(tenantId, "L2", "Ankara");
+            db.Clinics.AddRange(clinic1, clinic2);
+            await db.SaveChangesAsync();
+            c1 = clinic1.Id;
+            c2 = clinic2.Id;
+        }
+
+        await SeedReminderLogsAsync(tenantId, c1, ReminderType.Appointment, ReminderDispatchStatus.Enqueued);
+        await SeedReminderLogsAsync(tenantId, c2, ReminderType.Appointment, ReminderDispatchStatus.Enqueued);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await client.GetAsync("/api/v1/reminders/logs?page=1&pageSize=50");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("totalItems").GetInt32().Should().Be(0);
+        json.GetProperty("items").GetArrayLength().Should().Be(0);
+    }
+
     private static object ValidUpdateBody() => new
     {
         appointmentRemindersEnabled = false,
@@ -393,6 +441,51 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         vaccinationReminderDaysBefore = 3,
         emailChannelEnabled = true
     };
+
+    private async Task<(Guid TenantId, string Token)> SeedTenantWithTenantWideRemindersReaderAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        db.Tenants.Add(tenant);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
+        await db.SaveChangesAsync();
+
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var token = await IntegrationTestAuthHelper.SeedTenantWideAdminAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id,
+            [PermissionCatalog.Reminders.Read]);
+
+        return (tenant.Id, token);
+    }
+
+    private async Task<(Guid TenantId, string Token)> SeedTenantWithScopedRemindersReaderWithoutClinicAssignmentAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        db.Tenants.Add(tenant);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
+        await db.SaveChangesAsync();
+
+        await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
+        var token = await IntegrationTestAuthHelper.SeedRemindersReaderWithoutClinicAssignmentAndIssueTokenAsync(
+            db,
+            jwt,
+            hasher,
+            tenant.Id);
+
+        return (tenant.Id, token);
+    }
 
     private async Task<(Guid TenantId, Guid UserId, string AccessToken)> SeedTenantAndIssueTokenAsync(
         IReadOnlyCollection<string> permissions,
