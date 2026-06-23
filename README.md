@@ -64,6 +64,8 @@ dotnet test Veteriner.sln -c Debug
 - **Birim / uygulama testleri:** `tests/Backend.Veteriner.Application.Tests`, `tests/Backend.Veteriner.Domain.Tests`
 - **Entegrasyon testleri:** `tests/Backend.Veteriner.IntegrationTests` (`appsettings.IntegrationTests.json` → LocalDB, varsayılan DB adları **`VetinityCommandDb_IntegrationTests`** / **`VetinityQueryDb_IntegrationTests`**)
 
+IDOR / clinic isolation regression komutları (Quick Smoke, Full Regression, Release Safety Set): [`docs/security/idor-regression.md`](docs/security/idor-regression.md).
+
 ## Ürün modülü ekleme (özet)
 
 1. Veteriner domain kodunu `Application` / `Domain` / `Infrastructure` içinde **ayrı klasörler** (veya ileride ayrı derlemeler) ile ekleyin; mevcut çekirdek katman kurallarına uyun.
