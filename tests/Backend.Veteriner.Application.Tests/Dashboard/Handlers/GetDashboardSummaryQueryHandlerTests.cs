@@ -1,6 +1,7 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Dashboard.ReadModels;
-using Backend.Veteriner.Application.Tests;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Ardalis.Specification;
 using Microsoft.Extensions.Options;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -26,11 +27,13 @@ public sealed class GetDashboardSummaryQueryHandlerTests
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IDashboardClinicScopedReader> _clinicScoped = new();
     private readonly Mock<IDashboardAppointmentReadModelReader> _dashboardAppointmentReader = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetDashboardSummaryQueryHandler CreateHandler(bool dashboardAppointmentsEnabled = false)
         => new(
             _tenant.Object,
             _clinic.Object,
+            _scopeResolver.Object,
             _appointments.Object,
             _todayAppointmentCounts.Object,
             _clients.Object,
@@ -76,7 +79,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         var tid = Guid.NewGuid();
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
         _todayAppointmentCounts
-            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 0));
         _appointments.Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
@@ -116,7 +119,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
 
         _todayAppointmentCounts
-            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(4, 1, 2));
         _appointments.Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(10);
@@ -165,7 +168,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
 
         _todayAppointmentCounts
-            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 0));
         _appointments.Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
@@ -185,7 +188,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         await handler.Handle(new GetDashboardSummaryQuery(), CancellationToken.None);
 
         _todayAppointmentCounts.Verify(
-            r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+            r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _appointments.Verify(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()), Times.Once);
         _appointments.Verify(a => a.ListAsync(It.IsAny<DashboardUpcomingScheduledListSpec>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -209,7 +212,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         _clinic.SetupGet(c => c.ClinicId).Returns(cid);
 
         _todayAppointmentCounts
-            .Setup(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(2, 1, 0));
         _appointments
             .Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
@@ -342,7 +345,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
 
         _todayAppointmentCounts
-            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 0));
         _appointments.Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
@@ -379,7 +382,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         _clinic.SetupGet(c => c.ClinicId).Returns(cid);
 
         _todayAppointmentCounts
-            .Setup(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 0));
         _appointments
             .Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
@@ -410,7 +413,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
 
         _todayAppointmentCounts
-            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 0));
         _appointments.Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
@@ -445,7 +448,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
 
         _todayAppointmentCounts
-            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tid, It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 0));
         _appointments.Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
@@ -495,7 +498,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
         _clinic.SetupGet(c => c.ClinicId).Returns(cid);
 
         _todayAppointmentCounts
-            .Setup(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 0));
         _appointments.Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);

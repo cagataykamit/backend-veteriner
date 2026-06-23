@@ -17,6 +17,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReader : IDashboardToda
         Guid? clinicId,
         DateTime dayStartUtc,
         DateTime dayEndUtc,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         CancellationToken ct = default)
     {
         var query = _db.Appointments
@@ -27,7 +28,16 @@ public sealed class DashboardTodayAppointmentStatusCountsReader : IDashboardToda
                 a.ScheduledAtUtc < dayEndUtc);
 
         if (clinicId is { } cid && cid != Guid.Empty)
+        {
             query = query.Where(a => a.ClinicId == cid);
+        }
+        else if (accessibleClinicIds is not null)
+        {
+            if (accessibleClinicIds.Count == 0)
+                return new DashboardTodayAppointmentStatusCounts(0, 0, 0);
+
+            query = query.Where(a => accessibleClinicIds.Contains(a.ClinicId));
+        }
 
         var rows = await query
             .GroupBy(a => a.Status)

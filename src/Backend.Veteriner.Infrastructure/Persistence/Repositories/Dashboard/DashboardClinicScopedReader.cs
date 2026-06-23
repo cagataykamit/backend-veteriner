@@ -135,4 +135,137 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
             .Select(x => new DashboardRecentClientRow(x.Id, x.FullName, x.Phone))
             .ToListAsync(ct);
     }
+
+    public Task<int> CountPetsAtClinicsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> clinicIds,
+        CancellationToken ct = default)
+    {
+        if (clinicIds.Count == 0)
+            return Task.FromResult(0);
+
+        return _db.Appointments.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && clinicIds.Contains(a.ClinicId))
+            .Select(a => a.PetId)
+            .Distinct()
+            .CountAsync(ct);
+    }
+
+    public Task<int> CountClientsAtClinicsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> clinicIds,
+        CancellationToken ct = default)
+    {
+        if (clinicIds.Count == 0)
+            return Task.FromResult(0);
+
+        return (
+            from a in _db.Appointments.AsNoTracking()
+            join p in _db.Pets.AsNoTracking() on a.PetId equals p.Id
+            where a.TenantId == tenantId
+                  && clinicIds.Contains(a.ClinicId)
+                  && p.TenantId == tenantId
+            select p.ClientId
+        ).Distinct().CountAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<DashboardRecentPetRow>> ListRecentPetsAtClinicsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> clinicIds,
+        int take,
+        CancellationToken ct = default)
+    {
+        if (take <= 0 || clinicIds.Count == 0)
+            return Array.Empty<DashboardRecentPetRow>();
+
+        var topPets = await _db.Appointments.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && clinicIds.Contains(a.ClinicId))
+            .GroupBy(a => a.PetId)
+            .Select(g => new { PetId = g.Key, LastAt = g.Max(a => a.ScheduledAtUtc) })
+            .OrderByDescending(x => x.LastAt)
+            .ThenBy(x => x.PetId)
+            .Take(take)
+            .ToListAsync(ct);
+
+        if (topPets.Count == 0)
+            return Array.Empty<DashboardRecentPetRow>();
+
+        var petIds = topPets.Select(x => x.PetId).ToArray();
+
+        var pets = await _db.Pets.AsNoTracking()
+            .Where(p => p.TenantId == tenantId && petIds.Contains(p.Id))
+            .Select(p => new
+            {
+                p.Id,
+                p.ClientId,
+                p.Name,
+                SpeciesName = p.Species != null ? p.Species.Name : string.Empty
+            })
+            .ToListAsync(ct);
+
+        var byId = pets.ToDictionary(p => p.Id);
+
+        var result = new List<DashboardRecentPetRow>(topPets.Count);
+        foreach (var row in topPets)
+        {
+            if (byId.TryGetValue(row.PetId, out var p))
+                result.Add(new DashboardRecentPetRow(p.Id, p.ClientId, p.Name, p.SpeciesName));
+        }
+
+        return result;
+    }
+
+    public async Task<IReadOnlyList<DashboardRecentClientRow>> ListRecentClientsAtClinicsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> clinicIds,
+        int take,
+        CancellationToken ct = default)
+    {
+        if (take <= 0 || clinicIds.Count == 0)
+            return Array.Empty<DashboardRecentClientRow>();
+
+        var latestAppointmentByPet = _db.Appointments.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && clinicIds.Contains(a.ClinicId))
+            .GroupBy(a => a.PetId)
+            .Select(g => new
+            {
+                PetId = g.Key,
+                LastAt = g.Max(a => a.ScheduledAtUtc)
+            });
+
+        var latestAppointmentByClient = latestAppointmentByPet
+            .Join(
+                _db.Pets.AsNoTracking().Where(p => p.TenantId == tenantId),
+                x => x.PetId,
+                p => p.Id,
+                (x, p) => new
+                {
+                    p.ClientId,
+                    x.LastAt
+                })
+            .GroupBy(x => x.ClientId)
+            .Select(g => new
+            {
+                ClientId = g.Key,
+                LastAt = g.Max(x => x.LastAt)
+            });
+
+        return await latestAppointmentByClient
+            .Join(
+                _db.Clients.AsNoTracking().Where(c => c.TenantId == tenantId),
+                x => x.ClientId,
+                c => c.Id,
+                (x, c) => new
+                {
+                    x.LastAt,
+                    c.Id,
+                    c.FullName,
+                    c.Phone
+                })
+            .OrderByDescending(x => x.LastAt)
+            .ThenBy(x => x.Id)
+            .Take(take)
+            .Select(x => new DashboardRecentClientRow(x.Id, x.FullName, x.Phone))
+            .ToListAsync(ct);
+    }
 }

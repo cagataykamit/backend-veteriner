@@ -1,8 +1,8 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Appointments;
 
 namespace Backend.Veteriner.Application.Dashboard.Specs;
-
 /// <summary>
 /// Belirtilen yarı-açık UTC penceresinde <c>ScheduledAtUtc</c> değerlerini projeksiyonla döner
 /// (yalnız zaman damgası; entity takip edilmez). Dashboard 7-günlük randevu trendinde günlük bucket
@@ -16,15 +16,14 @@ public sealed class DashboardAppointmentScheduledAtInWindowSpec
         Guid tenantId,
         Guid? clinicId,
         DateTime startUtcInclusive,
-        DateTime endUtcExclusive)
+        DateTime endUtcExclusive,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.AsNoTracking();
         Query.Where(a =>
             a.TenantId == tenantId
             && a.ScheduledAtUtc >= startUtcInclusive
             && a.ScheduledAtUtc < endUtcExclusive);
-        if (clinicId.HasValue)
-            Query.Where(a => a.ClinicId == clinicId.Value);
+        DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
         Query.Select(a => a.ScheduledAtUtc);
-    }
-}
+    }}

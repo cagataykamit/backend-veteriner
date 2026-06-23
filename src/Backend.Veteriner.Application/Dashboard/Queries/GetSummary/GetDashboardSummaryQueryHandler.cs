@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Time;
@@ -25,6 +26,7 @@ public sealed class GetDashboardSummaryQueryHandler
 
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IDashboardTodayAppointmentStatusCountsReader _todayAppointmentCounts;
     private readonly IReadRepository<Client> _clients;
@@ -37,6 +39,7 @@ public sealed class GetDashboardSummaryQueryHandler
     public GetDashboardSummaryQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Appointment> appointments,
         IDashboardTodayAppointmentStatusCountsReader todayAppointmentCounts,
         IReadRepository<Client> clients,
@@ -48,6 +51,7 @@ public sealed class GetDashboardSummaryQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _appointments = appointments;
         _todayAppointmentCounts = todayAppointmentCounts;
         _clients = clients;
@@ -67,10 +71,20 @@ public sealed class GetDashboardSummaryQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, _clinicContext.ClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<DashboardSummaryDto>.Failure(scopeResult.Error);
+
+        var singleClinicId = scopeResult.Value!.SingleClinicId;
+        var accessibleClinicIds = scopeResult.Value.AccessibleClinicIds;
+
         var utcNow = DateTime.UtcNow;
         var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(utcNow);
         var trendBuckets = OperationPeriodBounds.Last7DaysForUtcNow(utcNow);
-        var clinicId = _clinicContext.ClinicId;
+
+        if (accessibleClinicIds is { Count: 0 })
+            return BuildEmptySummary(tenantId, singleClinicId, trendBuckets);
+
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();
         var timings = new DashboardSummaryStepTimings();
@@ -85,7 +99,8 @@ public sealed class GetDashboardSummaryQueryHandler
         {
             return await HandleFromQueryReadModelAsync(
                 tenantId,
-                clinicId,
+                singleClinicId,
+                accessibleClinicIds,
                 utcNow,
                 dayStart,
                 dayEnd,
@@ -98,7 +113,8 @@ public sealed class GetDashboardSummaryQueryHandler
 
         return await HandleFromCommandDbAsync(
             tenantId,
-            clinicId,
+            singleClinicId,
+            accessibleClinicIds,
             utcNow,
             dayStart,
             dayEnd,
@@ -111,7 +127,8 @@ public sealed class GetDashboardSummaryQueryHandler
 
     private async Task<Result<DashboardSummaryDto>> HandleFromQueryReadModelAsync(
         Guid tenantId,
-        Guid? clinicId,
+        Guid? singleClinicId,
+        IReadOnlyCollection<Guid>? accessibleClinicIds,
         DateTime utcNow,
         DateTime dayStart,
         DateTime dayEnd,
@@ -124,7 +141,7 @@ public sealed class GetDashboardSummaryQueryHandler
         var todayLocalDate = OperationDayBounds.ToLocalDate(utcNow);
         var readRequest = new DashboardAppointmentReadRequest(
             tenantId,
-            clinicId,
+            singleClinicId,
             todayLocalDate,
             dayStart,
             dayEnd,
@@ -132,7 +149,8 @@ public sealed class GetDashboardSummaryQueryHandler
             dayStart,
             UpcomingListTake,
             RecentListTake,
-            trendBuckets);
+            trendBuckets,
+            singleClinicId is null ? accessibleClinicIds : null);
 
         var appointmentData = await _dashboardAppointmentReader.GetAsync(readRequest, ct);
         markStep(ms => timings.TodayStatusCountsMs = ms);
@@ -145,7 +163,7 @@ public sealed class GetDashboardSummaryQueryHandler
         IReadOnlyList<DashboardRecentClientRow> recentClientRows;
         IReadOnlyList<DashboardRecentPetRow> recentPetRows;
 
-        if (clinicId is { } clinicScope)
+        if (singleClinicId is not null || accessibleClinicIds is not null)
         {
             petsTotal = appointmentData.ClinicScopedPetsTotal ?? 0;
             clientsTotal = appointmentData.ClinicScopedClientsTotal ?? 0;
@@ -172,7 +190,7 @@ public sealed class GetDashboardSummaryQueryHandler
 
         return BuildResult(
             tenantId,
-            clinicId,
+            singleClinicId ?? _clinicContext.ClinicId,
             appointmentData.TodayCounts.Scheduled,
             appointmentData.UpcomingCount,
             appointmentData.TodayCounts.Completed,
@@ -189,7 +207,8 @@ public sealed class GetDashboardSummaryQueryHandler
 
     private async Task<Result<DashboardSummaryDto>> HandleFromCommandDbAsync(
         Guid tenantId,
-        Guid? clinicId,
+        Guid? singleClinicId,
+        IReadOnlyCollection<Guid>? accessibleClinicIds,
         DateTime utcNow,
         DateTime dayStart,
         DateTime dayEnd,
@@ -202,10 +221,11 @@ public sealed class GetDashboardSummaryQueryHandler
         var trendStartUtc = trendBuckets[0].StartUtcInclusive;
         var trendEndUtc = trendBuckets[^1].EndUtcExclusive;
 
-        var todayCounts = await _todayAppointmentCounts.GetAsync(tenantId, clinicId, dayStart, dayEnd, ct);
+        var todayCounts = await _todayAppointmentCounts.GetAsync(
+            tenantId, singleClinicId, dayStart, dayEnd, accessibleClinicIds, ct);
         markStep(ms => timings.TodayStatusCountsMs = ms);
         var upcomingCount = await _appointments.CountAsync(
-            new DashboardUpcomingScheduledCountSpec(tenantId, clinicId, utcNow), ct);
+            new DashboardUpcomingScheduledCountSpec(tenantId, singleClinicId, utcNow, accessibleClinicIds), ct);
         markStep(ms => timings.UpcomingAppointmentsCountMs = ms);
 
         int clientsTotal;
@@ -215,7 +235,7 @@ public sealed class GetDashboardSummaryQueryHandler
         IReadOnlyList<DashboardUpcomingAppointmentRow> upcomingRows;
         IReadOnlyList<DashboardDailyCountDto> last7DaysAppointments;
 
-        if (clinicId is { } clinicScope)
+        if (singleClinicId is { } clinicScope)
         {
             petsTotal = await _clinicScopedReader.CountPetsAtClinicAsync(tenantId, clinicScope, ct);
             markStep(ms => timings.TotalPetsMs = ms);
@@ -223,7 +243,7 @@ public sealed class GetDashboardSummaryQueryHandler
             markStep(ms => timings.TotalClientsMs = ms);
 
             upcomingRows = await _appointments.ListAsync(
-                new DashboardUpcomingScheduledListSpec(tenantId, clinicId, dayStart, UpcomingListTake), ct);
+                new DashboardUpcomingScheduledListSpec(tenantId, singleClinicId, dayStart, UpcomingListTake, accessibleClinicIds), ct);
             markStep(ms => timings.UpcomingAppointmentsListMs = ms);
 
             recentPetRows = await _clinicScopedReader.ListRecentPetsAtClinicAsync(
@@ -234,9 +254,34 @@ public sealed class GetDashboardSummaryQueryHandler
             markStep(ms => timings.RecentClientsMs = ms);
 
             var trendScheduledAtUtcsClinic = await _appointments.ListAsync(
-                new DashboardAppointmentScheduledAtInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc), ct);
+                new DashboardAppointmentScheduledAtInWindowSpec(
+                    tenantId, singleClinicId, trendStartUtc, trendEndUtc, accessibleClinicIds), ct);
             markStep(ms => timings.Last7DaysAppointmentsMs = ms);
             last7DaysAppointments = BuildDailyCounts(trendBuckets, trendScheduledAtUtcsClinic);
+        }
+        else if (accessibleClinicIds is not null)
+        {
+            petsTotal = await _clinicScopedReader.CountPetsAtClinicsAsync(tenantId, accessibleClinicIds, ct);
+            markStep(ms => timings.TotalPetsMs = ms);
+            clientsTotal = await _clinicScopedReader.CountClientsAtClinicsAsync(tenantId, accessibleClinicIds, ct);
+            markStep(ms => timings.TotalClientsMs = ms);
+
+            upcomingRows = await _appointments.ListAsync(
+                new DashboardUpcomingScheduledListSpec(tenantId, null, dayStart, UpcomingListTake, accessibleClinicIds), ct);
+            markStep(ms => timings.UpcomingAppointmentsListMs = ms);
+
+            recentPetRows = await _clinicScopedReader.ListRecentPetsAtClinicsAsync(
+                tenantId, accessibleClinicIds, RecentListTake, ct);
+            markStep(ms => timings.RecentPetsMs = ms);
+            recentClientRows = await _clinicScopedReader.ListRecentClientsAtClinicsAsync(
+                tenantId, accessibleClinicIds, RecentListTake, ct);
+            markStep(ms => timings.RecentClientsMs = ms);
+
+            var trendScheduledAtUtcsMulti = await _appointments.ListAsync(
+                new DashboardAppointmentScheduledAtInWindowSpec(
+                    tenantId, null, trendStartUtc, trendEndUtc, accessibleClinicIds), ct);
+            markStep(ms => timings.Last7DaysAppointmentsMs = ms);
+            last7DaysAppointments = BuildDailyCounts(trendBuckets, trendScheduledAtUtcsMulti);
         }
         else
         {
@@ -246,7 +291,7 @@ public sealed class GetDashboardSummaryQueryHandler
             markStep(ms => timings.TotalPetsMs = ms);
 
             upcomingRows = await _appointments.ListAsync(
-                new DashboardUpcomingScheduledListSpec(tenantId, clinicId, dayStart, UpcomingListTake), ct);
+                new DashboardUpcomingScheduledListSpec(tenantId, null, dayStart, UpcomingListTake), ct);
             markStep(ms => timings.UpcomingAppointmentsListMs = ms);
             recentClientRows = await _clients.ListAsync(
                 new DashboardRecentClientsListSpec(tenantId, RecentListTake), ct);
@@ -256,14 +301,14 @@ public sealed class GetDashboardSummaryQueryHandler
             markStep(ms => timings.RecentPetsMs = ms);
 
             var trendScheduledAtUtcs = await _appointments.ListAsync(
-                new DashboardAppointmentScheduledAtInWindowSpec(tenantId, clinicId, trendStartUtc, trendEndUtc), ct);
+                new DashboardAppointmentScheduledAtInWindowSpec(tenantId, null, trendStartUtc, trendEndUtc), ct);
             markStep(ms => timings.Last7DaysAppointmentsMs = ms);
             last7DaysAppointments = BuildDailyCounts(trendBuckets, trendScheduledAtUtcs);
         }
 
         return BuildResult(
             tenantId,
-            clinicId,
+            singleClinicId ?? _clinicContext.ClinicId,
             todayCounts.Scheduled,
             upcomingCount,
             todayCounts.Completed,
@@ -278,10 +323,29 @@ public sealed class GetDashboardSummaryQueryHandler
             timings);
     }
 
-    /// <summary>
-    /// UTC timestamp'leri 7 günlük İstanbul bucket'larına [start, end) aralığı ile eşler; sonuç oldest→newest
-    /// sıralı tam 7 eleman döner, boş günler 0 ile doldurulur.
-    /// </summary>
+    private static Result<DashboardSummaryDto> BuildEmptySummary(
+        Guid tenantId,
+        Guid? clinicId,
+        IReadOnlyList<OperationPeriodBounds.DailyWindow> trendBuckets)
+    {
+        var last7Days = trendBuckets
+            .Select(b => new DashboardDailyCountDto(b.LocalDate, 0))
+            .ToList();
+
+        return Result<DashboardSummaryDto>.Success(
+            new DashboardSummaryDto(
+                TodayAppointmentsCount: 0,
+                UpcomingAppointmentsCount: 0,
+                CompletedTodayCount: 0,
+                CancelledTodayCount: 0,
+                TotalClientsCount: 0,
+                TotalPetsCount: 0,
+                UpcomingAppointments: [],
+                RecentClients: [],
+                RecentPets: [],
+                Last7DaysAppointments: last7Days));
+    }
+
     private static List<DashboardDailyCountDto> BuildDailyCounts(
         IReadOnlyList<OperationPeriodBounds.DailyWindow> buckets,
         IReadOnlyList<DateTime> timestampsUtc)

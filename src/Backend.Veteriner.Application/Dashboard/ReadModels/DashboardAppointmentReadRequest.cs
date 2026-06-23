@@ -15,4 +15,5 @@ public sealed record DashboardAppointmentReadRequest(
     DateTime UpcomingListFromUtcInclusive,
     int UpcomingListLimit,
     int RecentListLimit,
-    IReadOnlyList<OperationPeriodBounds.DailyWindow> LastSevenDayBuckets);
+    IReadOnlyList<OperationPeriodBounds.DailyWindow> LastSevenDayBuckets,
+    IReadOnlyCollection<Guid>? AccessibleClinicIds = null);

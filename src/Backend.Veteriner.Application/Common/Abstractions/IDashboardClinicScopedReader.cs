@@ -29,4 +29,30 @@ public interface IDashboardClinicScopedReader
         Guid clinicId,
         int take,
         CancellationToken ct = default);
+
+    /// <summary>Atanmış kliniklerde en az bir randevusu olan distinct Pet sayısı.</summary>
+    Task<int> CountPetsAtClinicsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> clinicIds,
+        CancellationToken ct = default);
+
+    /// <summary>Atanmış kliniklerde en az bir randevusu olan distinct Client sayısı.</summary>
+    Task<int> CountClientsAtClinicsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> clinicIds,
+        CancellationToken ct = default);
+
+    /// <summary>Atanmış kliniklerdeki en güncel randevu zamanına göre sıralı Pet'ler.</summary>
+    Task<IReadOnlyList<DashboardRecentPetRow>> ListRecentPetsAtClinicsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> clinicIds,
+        int take,
+        CancellationToken ct = default);
+
+    /// <summary>Atanmış kliniklerdeki Pet sahibi Client'lar; en güncel randevu zamanına göre sıralı.</summary>
+    Task<IReadOnlyList<DashboardRecentClientRow>> ListRecentClientsAtClinicsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> clinicIds,
+        int take,
+        CancellationToken ct = default);
 }

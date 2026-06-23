@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Dashboard.Contracts;
@@ -6,6 +7,7 @@ using Backend.Veteriner.Application.Dashboard.Queries.GetOperationalAlerts;
 using Backend.Veteriner.Application.Dashboard.Queries.GetSummary;
 using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Dashboard.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
@@ -23,6 +25,7 @@ public sealed class DashboardQueryHandlerFeatureFlagTests
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.Pets.Pet>> _pets = new();
     private readonly Mock<IDashboardClinicScopedReader> _clinicScoped = new();
     private readonly Mock<IDashboardAppointmentReadModelReader> _dashboardReader = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     [Fact]
     public async Task Summary_WhenFlagFalse_Should_UseCommandReaders_NotQueryReader()
@@ -31,7 +34,7 @@ public sealed class DashboardQueryHandlerFeatureFlagTests
         var cid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
-        _todayCounts.Setup(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _todayCounts.Setup(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(1, 0, 0));
         _appointments.Setup(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
@@ -48,7 +51,7 @@ public sealed class DashboardQueryHandlerFeatureFlagTests
 
         await CreateSummaryHandler(false).Handle(new GetDashboardSummaryQuery(), CancellationToken.None);
 
-        _todayCounts.Verify(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        _todayCounts.Verify(r => r.GetAsync(tid, cid, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()), Times.Once);
         _dashboardReader.Verify(r => r.GetAsync(It.IsAny<DashboardAppointmentReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -73,7 +76,7 @@ public sealed class DashboardQueryHandlerFeatureFlagTests
         await CreateSummaryHandler(true).Handle(new GetDashboardSummaryQuery(), CancellationToken.None);
 
         _dashboardReader.Verify(r => r.GetAsync(It.IsAny<DashboardAppointmentReadRequest>(), It.IsAny<CancellationToken>()), Times.Once);
-        _todayCounts.Verify(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+        _todayCounts.Verify(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()), Times.Never);
         _appointments.Verify(a => a.CountAsync(It.IsAny<DashboardUpcomingScheduledCountSpec>(), It.IsAny<CancellationToken>()), Times.Never);
         _clinicScoped.Verify(r => r.CountPetsAtClinicAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -108,7 +111,7 @@ public sealed class DashboardQueryHandlerFeatureFlagTests
         var act = () => CreateSummaryHandler(true).Handle(new GetDashboardSummaryQuery(), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
-        _todayCounts.Verify(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+        _todayCounts.Verify(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -139,6 +142,7 @@ public sealed class DashboardQueryHandlerFeatureFlagTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _scopeResolver.Object,
             _appointments.Object,
             _todayCounts.Object,
             _clients.Object,

@@ -306,6 +306,7 @@ file static class DashboardOperationalAlertsTestInvoker
         var handler = new GetDashboardOperationalAlertsQueryHandler(
             new FixedTenantContext(tenantId),
             clinicId is { } id ? new FixedClinicContext(id) : new NullClinicContext(),
+            new DashboardParityClinicReadScopeResolver(),
             sp.GetRequiredService<IReadRepository<Appointment>>(),
             sp.GetRequiredService<IReadRepository<Backend.Veteriner.Domain.Vaccinations.Vaccination>>(),
             sp.GetRequiredService<IDashboardTodayAppointmentStatusCountsReader>());

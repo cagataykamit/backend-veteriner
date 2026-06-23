@@ -1,7 +1,9 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Dashboard.Contracts;
 using Backend.Veteriner.Application.Dashboard.Queries.GetOperationalAlerts;
 using Backend.Veteriner.Application.Dashboard.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Vaccinations;
 using FluentAssertions;
@@ -16,11 +18,13 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerTests
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
     private readonly Mock<IReadRepository<Vaccination>> _vaccinations = new();
     private readonly Mock<IDashboardTodayAppointmentStatusCountsReader> _todayCounts = new();
+    private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private GetDashboardOperationalAlertsQueryHandler CreateHandler()
         => new(
             _tenant.Object,
             _clinic.Object,
+            _scopeResolver.Object,
             _appointments.Object,
             _vaccinations.Object,
             _todayCounts.Object);
@@ -44,7 +48,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tenantId);
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
         _todayCounts
-            .Setup(r => r.GetAsync(tenantId, null, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tenantId, null, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 0));
         _appointments
             .Setup(r => r.CountAsync(It.IsAny<DashboardOverdueScheduledAppointmentsCountSpec>(), It.IsAny<CancellationToken>()))
@@ -78,7 +82,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tenantId);
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
         _todayCounts
-            .Setup(r => r.GetAsync(tenantId, null, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tenantId, null, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(4, 1, 3));
         _appointments
             .Setup(r => r.CountAsync(It.IsAny<DashboardOverdueScheduledAppointmentsCountSpec>(), It.IsAny<CancellationToken>()))
@@ -113,7 +117,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tenantId);
         _clinic.SetupGet(c => c.ClinicId).Returns(clinicId);
         _todayCounts
-            .Setup(r => r.GetAsync(tenantId, clinicId, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetAsync(tenantId, clinicId, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 1));
         _appointments
             .Setup(r => r.CountAsync(It.IsAny<DashboardOverdueScheduledAppointmentsCountSpec>(), It.IsAny<CancellationToken>()))
@@ -133,7 +137,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         _todayCounts.Verify(
-            r => r.GetAsync(tenantId, clinicId, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+            r => r.GetAsync(tenantId, clinicId, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

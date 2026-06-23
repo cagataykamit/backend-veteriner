@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Time;
@@ -8,6 +9,7 @@ using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
@@ -97,6 +99,7 @@ internal static class DashboardQueryParityTestSupport
         var handler = new GetDashboardSummaryQueryHandler(
             new FixedTenantContext(tenantId),
             clinicId is { } id ? new FixedClinicContext(id) : new NullClinicContext(),
+            new DashboardParityClinicReadScopeResolver(),
             sp.GetRequiredService<IReadRepository<Appointment>>(),
             sp.GetRequiredService<IDashboardTodayAppointmentStatusCountsReader>(),
             sp.GetRequiredService<IReadRepository<Client>>(),
@@ -256,4 +259,16 @@ internal sealed class FixedClinicContext(Guid clinicId) : IClinicContext
 internal sealed class NullClinicContext : IClinicContext
 {
     public Guid? ClinicId { get; } = null;
+}
+
+/// <summary>Parity testleri: aktif klinik varsa tek klinik; yoksa tenant-wide (Admin/Owner simülasyonu).</summary>
+internal sealed class DashboardParityClinicReadScopeResolver : IClinicReadScopeResolver
+{
+    public Task<Result<ClinicReadScope>> ResolveAsync(Guid tenantId, Guid? requestClinicId, CancellationToken ct)
+    {
+        if (requestClinicId is { } id)
+            return Task.FromResult(Result<ClinicReadScope>.Success(new ClinicReadScope(id, null)));
+
+        return Task.FromResult(Result<ClinicReadScope>.Success(new ClinicReadScope(null, null)));
+    }
 }

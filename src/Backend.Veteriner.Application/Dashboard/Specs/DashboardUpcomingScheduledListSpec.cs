@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Appointments;
 
 namespace Backend.Veteriner.Application.Dashboard.Specs;
@@ -12,14 +13,20 @@ public sealed record DashboardUpcomingAppointmentRow(
 
 public sealed class DashboardUpcomingScheduledListSpec : Specification<Appointment, DashboardUpcomingAppointmentRow>
 {
-    public DashboardUpcomingScheduledListSpec(Guid tenantId, Guid? clinicId, DateTime fromUtcInclusive, int take)
+    public DashboardUpcomingScheduledListSpec(
+        Guid tenantId,
+        Guid? clinicId,
+        DateTime fromUtcInclusive,
+        int take,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.AsNoTracking();
         Query.Where(a =>
                 a.TenantId == tenantId
                 && a.Status == AppointmentStatus.Scheduled
-                && a.ScheduledAtUtc >= fromUtcInclusive)
-            .Where(a => !clinicId.HasValue || a.ClinicId == clinicId.Value)
+                && a.ScheduledAtUtc >= fromUtcInclusive);
+        DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
+        Query
             .OrderBy(a => a.ScheduledAtUtc)
             .ThenBy(a => a.Id)
             .Take(take)

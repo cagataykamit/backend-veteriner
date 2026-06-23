@@ -12,5 +12,6 @@ public interface IDashboardTodayAppointmentStatusCountsReader
         Guid? clinicId,
         DateTime dayStartUtc,
         DateTime dayEndUtc,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         CancellationToken ct = default);
 }

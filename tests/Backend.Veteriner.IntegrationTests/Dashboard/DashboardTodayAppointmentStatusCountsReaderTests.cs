@@ -81,7 +81,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
         await db.SaveChangesAsync();
 
         var reader = new DashboardTodayAppointmentStatusCountsReader(db);
-        var counts = await reader.GetAsync(tenant.Id, clinic.Id, DayStart, DayEnd, CancellationToken.None);
+        var counts = await reader.GetAsync(tenant.Id, clinic.Id, DayStart, DayEnd, null, CancellationToken.None);
 
         counts.Scheduled.Should().Be(0);
         counts.Completed.Should().Be(0);
@@ -108,7 +108,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
         await db.SaveChangesAsync();
 
         var reader = new DashboardTodayAppointmentStatusCountsReader(db);
-        var counts = await reader.GetAsync(tenant.Id, clinic.Id, DayStart, DayEnd, CancellationToken.None);
+        var counts = await reader.GetAsync(tenant.Id, clinic.Id, DayStart, DayEnd, null, CancellationToken.None);
 
         counts.Scheduled.Should().Be(1);
         counts.Completed.Should().Be(1);
@@ -131,8 +131,8 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
         await db.SaveChangesAsync();
 
         var reader = new DashboardTodayAppointmentStatusCountsReader(db);
-        var atA = await reader.GetAsync(tenant.Id, clinicA.Id, DayStart, DayEnd, CancellationToken.None);
-        var atB = await reader.GetAsync(tenant.Id, clinicB.Id, DayStart, DayEnd, CancellationToken.None);
+        var atA = await reader.GetAsync(tenant.Id, clinicA.Id, DayStart, DayEnd, null, CancellationToken.None);
+        var atB = await reader.GetAsync(tenant.Id, clinicB.Id, DayStart, DayEnd, null, CancellationToken.None);
 
         atA.Scheduled.Should().Be(0);
         atB.Scheduled.Should().Be(1);
@@ -155,7 +155,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
         await db.SaveChangesAsync();
 
         var reader = new DashboardTodayAppointmentStatusCountsReader(db);
-        var counts = await reader.GetAsync(t1.Id, c1.Id, DayStart, DayEnd, CancellationToken.None);
+        var counts = await reader.GetAsync(t1.Id, c1.Id, DayStart, DayEnd, null, CancellationToken.None);
 
         counts.Completed.Should().Be(0);
     }
@@ -178,7 +178,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
         await db.SaveChangesAsync();
 
         var reader = new DashboardTodayAppointmentStatusCountsReader(db);
-        var counts = await reader.GetAsync(tenant.Id, null, DayStart, DayEnd, CancellationToken.None);
+        var counts = await reader.GetAsync(tenant.Id, null, DayStart, DayEnd, null, CancellationToken.None);
 
         counts.Scheduled.Should().Be(2);
     }
