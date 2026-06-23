@@ -78,4 +78,14 @@ public sealed class QueryReadModelsOptions
     /// JSON report yüzeyi (<see cref="PaymentsReportReadEnabled"/>) bu bayraktan etkilenmez.
     /// </summary>
     public bool PaymentsReportExportReadEnabled { get; set; }
+
+    /// <summary>
+    /// Payment detail (GET /api/v1/payments/{id}) yüzeyini Query DB <c>PaymentReadModels</c> üzerinden okur (16B+).
+    /// Kapalıyken Command DB <see cref="PaymentByIdSpec"/> yolu korunur.
+    /// Query DB yolu seçildiğinde Command DB'ye fallback yapılmaz; Query DB satırı yoksa
+    /// <c>Payments.NotFound</c> döner. GetById PK lookup olduğundan multi-clinic scope fallback gerekmez;
+    /// erişim kararı satır yüklendikten sonra mevcut inline auth (aktif klinik, tenant-wide, UserClinic) ile verilir.
+    /// List/report/export bayraklarından bağımsızdır.
+    /// </summary>
+    public bool PaymentsGetByIdReadEnabled { get; set; }
 }

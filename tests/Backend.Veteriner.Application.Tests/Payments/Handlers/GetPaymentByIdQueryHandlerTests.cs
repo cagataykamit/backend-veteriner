@@ -1,7 +1,9 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Payments.Queries.GetById;
+using Backend.Veteriner.Application.Payments.ReadModels;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tests;
@@ -9,6 +11,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Payments.Handlers;
@@ -23,6 +26,7 @@ public sealed class GetPaymentByIdQueryHandlerTests
     private readonly Mock<IReadRepository<Payment>> _payments = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IPaymentGetByIdReadModelReader> _getByIdReader = new();
 
     private readonly Guid _userId = Guid.NewGuid();
 
@@ -34,7 +38,7 @@ public sealed class GetPaymentByIdQueryHandlerTests
             .ReturnsAsync(Array.Empty<string>());
     }
 
-    private GetPaymentByIdQueryHandler CreateHandler()
+    private GetPaymentByIdQueryHandler CreateHandler(bool paymentsGetByIdReadEnabled = false)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
@@ -43,7 +47,12 @@ public sealed class GetPaymentByIdQueryHandlerTests
             _userClinics.Object,
             _payments.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            _getByIdReader.Object,
+            Options.Create(new QueryReadModelsOptions
+            {
+                PaymentsGetByIdReadEnabled = paymentsGetByIdReadEnabled
+            }));
 
     private void SetupTenant(Guid tenantId) => _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
 

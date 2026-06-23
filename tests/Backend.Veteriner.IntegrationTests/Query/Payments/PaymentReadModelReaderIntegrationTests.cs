@@ -406,6 +406,63 @@ public sealed class PaymentReadModelReaderIntegrationTests
         search.Items.Should().ContainSingle(x => x.PetId == null);
     }
 
+    [Fact]
+    public async Task GetById_Should_ReturnDetail_When_TenantAndPaymentIdMatch()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentGetByIdReadModelReader>();
+
+        await ResetAsync(queryDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        await SeedAsync(queryDb, Row(tenantId, clinicId, paymentId: paymentId, clientName: "Detail Client"));
+
+        var result = await reader.GetByIdAsync(tenantId, paymentId);
+
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(paymentId);
+        result.TenantId.Should().Be(tenantId);
+        result.ClinicId.Should().Be(clinicId);
+        result.ClientName.Should().Be("Detail Client");
+    }
+
+    [Fact]
+    public async Task GetById_Should_ReturnNull_When_RowMissing()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentGetByIdReadModelReader>();
+
+        await ResetAsync(queryDb);
+
+        var result = await reader.GetByIdAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetById_Should_ReturnNull_When_CrossTenantPaymentId()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IPaymentGetByIdReadModelReader>();
+
+        await ResetAsync(queryDb);
+
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        await SeedAsync(queryDb, Row(tenantB, clinicId, paymentId: paymentId));
+
+        var result = await reader.GetByIdAsync(tenantA, paymentId);
+
+        result.Should().BeNull("reader tenant filtresi cross-tenant erişimi engellemeli");
+    }
+
     private static async Task ResetAsync(QueryDbContext queryDb)
     {
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);

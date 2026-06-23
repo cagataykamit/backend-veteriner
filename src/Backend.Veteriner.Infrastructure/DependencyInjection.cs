@@ -262,6 +262,9 @@ public static class DependencyInjection
         // ===== Payment list query read-model reader (CQRS-14D) =====
         services.AddScoped<IPaymentsListReadModelReader, PaymentsListReadModelReader>();
 
+        // ===== Payment detail get-by-id query read-model reader (CQRS-16B) =====
+        services.AddScoped<IPaymentGetByIdReadModelReader, PaymentGetByIdReadModelReader>();
+
         // ===== Client payment summary query read-model reader (CQRS-15E) =====
         services.AddScoped<IClientPaymentSummaryReadModelReader, ClientPaymentSummaryReadModelReader>();
 

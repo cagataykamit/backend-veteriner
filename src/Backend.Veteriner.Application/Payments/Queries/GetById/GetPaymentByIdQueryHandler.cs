@@ -1,7 +1,9 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
+using Backend.Veteriner.Application.Payments.ReadModels;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
@@ -9,6 +11,8 @@ using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Payments.Queries.GetById;
 
@@ -23,6 +27,9 @@ public sealed class GetPaymentByIdQueryHandler
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IPaymentGetByIdReadModelReader _getByIdReadModelReader;
+    private readonly QueryReadModelsOptions _queryReadModelsOptions;
+    private readonly ILogger<GetPaymentByIdQueryHandler>? _logger;
 
     public GetPaymentByIdQueryHandler(
         ITenantContext tenantContext,
@@ -32,7 +39,10 @@ public sealed class GetPaymentByIdQueryHandler
         IUserClinicRepository userClinics,
         IReadRepository<Payment> payments,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IPaymentGetByIdReadModelReader getByIdReadModelReader,
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        ILogger<GetPaymentByIdQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -42,6 +52,9 @@ public sealed class GetPaymentByIdQueryHandler
         _payments = payments;
         _pets = pets;
         _clients = clients;
+        _getByIdReadModelReader = getByIdReadModelReader;
+        _queryReadModelsOptions = queryReadModelsOptions.Value;
+        _logger = logger;
     }
 
     public async Task<Result<PaymentDetailDto>> Handle(GetPaymentByIdQuery request, CancellationToken ct)
@@ -60,23 +73,48 @@ public sealed class GetPaymentByIdQueryHandler
                 "Kullanıcı bağlamı yok.");
         }
 
-        var p = await _payments.FirstOrDefaultAsync(
-            new PaymentByIdSpec(tenantId, request.Id), ct);
-        if (p is null)
-            return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
-        if (_clinicContext.ClinicId is { } clinicId && p.ClinicId != clinicId)
+        if (_queryReadModelsOptions.PaymentsGetByIdReadEnabled)
+            return await HandleQueryPathAsync(tenantId, userId, request.Id, ct);
+
+        return await HandleCommandPathAsync(tenantId, userId, request.Id, ct);
+    }
+
+    private async Task<Result<PaymentDetailDto>> HandleQueryPathAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid paymentId,
+        CancellationToken ct)
+    {
+        var dto = await _getByIdReadModelReader.GetByIdAsync(tenantId, paymentId, ct);
+        if (dto is null)
             return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
 
-        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId, ct);
-        if (!TenantWideClaimNames.IsTenantWide(operationClaimNames))
-        {
-            if (!await _userClinics.ExistsAsync(userId, p.ClinicId, ct))
-            {
-                return Result<PaymentDetailDto>.Failure(
-                    "Payments.NotFound",
-                    "Ödeme kaydı bulunamadı.");
-            }
-        }
+        var authFailure = await TryGetClinicAccessFailureAsync(userId, dto.ClinicId, ct);
+        if (authFailure is not null)
+            return authFailure.Value;
+
+        _logger?.LogInformation(
+            "Payment detail generated from Query DB read model. TenantId={TenantId} PaymentId={PaymentId}",
+            tenantId,
+            paymentId);
+
+        return Result<PaymentDetailDto>.Success(dto);
+    }
+
+    private async Task<Result<PaymentDetailDto>> HandleCommandPathAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid paymentId,
+        CancellationToken ct)
+    {
+        var p = await _payments.FirstOrDefaultAsync(
+            new PaymentByIdSpec(tenantId, paymentId), ct);
+        if (p is null)
+            return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
+
+        var authFailure = await TryGetClinicAccessFailureAsync(userId, p.ClinicId, ct);
+        if (authFailure is not null)
+            return authFailure.Value;
 
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, p.ClientId), ct);
         var clientName = client?.FullName ?? string.Empty;
@@ -104,5 +142,27 @@ public sealed class GetPaymentByIdQueryHandler
             p.PaidAtUtc,
             p.Notes);
         return Result<PaymentDetailDto>.Success(dto);
+    }
+
+    private async Task<Result<PaymentDetailDto>?> TryGetClinicAccessFailureAsync(
+        Guid userId,
+        Guid paymentClinicId,
+        CancellationToken ct)
+    {
+        if (_clinicContext.ClinicId is { } clinicId && paymentClinicId != clinicId)
+            return Result<PaymentDetailDto>.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
+
+        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(userId, ct);
+        if (!TenantWideClaimNames.IsTenantWide(operationClaimNames))
+        {
+            if (!await _userClinics.ExistsAsync(userId, paymentClinicId, ct))
+            {
+                return Result<PaymentDetailDto>.Failure(
+                    "Payments.NotFound",
+                    "Ödeme kaydı bulunamadı.");
+            }
+        }
+
+        return null;
     }
 }
