@@ -28,6 +28,14 @@ public sealed class ClientPaymentSummaryReadModelReader : IClientPaymentSummaryR
 
         if (request.ClinicId is { } clinicId)
             baseQuery = baseQuery.Where(x => x.ClinicId == clinicId);
+        else if (request.AccessibleClinicIds is { Count: > 0 })
+            baseQuery = baseQuery.Where(x => request.AccessibleClinicIds.Contains(x.ClinicId));
+        else if (request.AccessibleClinicIds is { Count: 0 })
+            return new ClientPaymentSummaryReadResult(
+                0,
+                Array.Empty<ClientPaymentCurrencyTotalDto>(),
+                null,
+                Array.Empty<ClientPaymentRecentItemDto>());
 
         var totalCount = await baseQuery.CountAsync(cancellationToken);
         if (totalCount == 0)

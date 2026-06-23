@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
@@ -23,6 +24,7 @@ public sealed class GetPetHistorySummaryQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Clinic> _clinics;
@@ -37,6 +39,7 @@ public sealed class GetPetHistorySummaryQueryHandler
     public GetPetHistorySummaryQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
         IReadRepository<Clinic> clinics,
@@ -50,6 +53,7 @@ public sealed class GetPetHistorySummaryQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _pets = pets;
         _clients = clients;
         _clinics = clinics;
@@ -78,16 +82,32 @@ public sealed class GetPetHistorySummaryQueryHandler
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, pet.ClientId), ct);
         var clientName = client?.FullName ?? string.Empty;
 
-        var clinicId = _clinicContext.ClinicId;
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, _clinicContext.ClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<PetHistorySummaryDto>.Failure(scopeResult.Error);
+
+        var singleClinicId = scopeResult.Value!.SingleClinicId;
+        var accessibleClinicIds = scopeResult.Value.AccessibleClinicIds;
+
+        if (accessibleClinicIds is { Count: 0 })
+            return EmptyHistory(pet, clientName);
+
         var take = PetHistorySummaryConstants.RecentItemsTake;
 
-        var appts = await _appointments.ListAsync(new AppointmentsForPetRecentSpec(tenantId, clinicId, request.PetId, take), ct);
-        var exams = await _examinations.ListAsync(new ExaminationsForPetRecentSpec(tenantId, clinicId, request.PetId, take), ct);
-        var treatments = await _treatments.ListAsync(new TreatmentsForPetRecentSpec(tenantId, clinicId, request.PetId, take), ct);
-        var rx = await _prescriptions.ListAsync(new PrescriptionsForPetRecentSpec(tenantId, clinicId, request.PetId, take), ct);
-        var labs = await _labResults.ListAsync(new LabResultsForPetRecentSpec(tenantId, clinicId, request.PetId, take), ct);
-        var hosp = await _hospitalizations.ListAsync(new HospitalizationsForPetRecentSpec(tenantId, clinicId, request.PetId, take), ct);
-        var pays = await _payments.ListAsync(new PaymentsForPetRecentSpec(tenantId, clinicId, request.PetId, take), ct);
+        var appts = await _appointments.ListAsync(
+            new AppointmentsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
+        var exams = await _examinations.ListAsync(
+            new ExaminationsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
+        var treatments = await _treatments.ListAsync(
+            new TreatmentsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
+        var rx = await _prescriptions.ListAsync(
+            new PrescriptionsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
+        var labs = await _labResults.ListAsync(
+            new LabResultsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
+        var hosp = await _hospitalizations.ListAsync(
+            new HospitalizationsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
+        var pays = await _payments.ListAsync(
+            new PaymentsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
 
         var clinicIds = new HashSet<Guid>();
         foreach (var a in appts) clinicIds.Add(a.ClinicId);
@@ -179,7 +199,7 @@ public sealed class GetPetHistorySummaryQueryHandler
                 p.Method))
             .ToList();
 
-        var dto = new PetHistorySummaryDto(
+        return Result<PetHistorySummaryDto>.Success(new PetHistorySummaryDto(
             pet.Id,
             pet.Name,
             pet.ClientId,
@@ -190,8 +210,20 @@ public sealed class GetPetHistorySummaryQueryHandler
             recentRx,
             recentLabs,
             recentHosp,
-            recentPays);
-
-        return Result<PetHistorySummaryDto>.Success(dto);
+            recentPays));
     }
+
+    private static Result<PetHistorySummaryDto> EmptyHistory(Pet pet, string clientName)
+        => Result<PetHistorySummaryDto>.Success(new PetHistorySummaryDto(
+            pet.Id,
+            pet.Name,
+            pet.ClientId,
+            clientName,
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []));
 }

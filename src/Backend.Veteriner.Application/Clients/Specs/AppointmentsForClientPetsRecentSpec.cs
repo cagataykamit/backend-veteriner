@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Appointments;
 
 namespace Backend.Veteriner.Application.Clients.Specs;
@@ -9,11 +10,11 @@ public sealed class AppointmentsForClientPetsRecentSpec : Specification<Appointm
         Guid tenantId,
         Guid? clinicId,
         Guid[] petIds,
-        int take)
+        int take,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.Where(a => a.TenantId == tenantId);
-        if (clinicId.HasValue)
-            Query.Where(a => a.ClinicId == clinicId.Value);
+        DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
         Query.Where(a => petIds.Contains(a.PetId));
         Query.OrderByDescending(a => a.ScheduledAtUtc)
             .ThenByDescending(a => a.Id)

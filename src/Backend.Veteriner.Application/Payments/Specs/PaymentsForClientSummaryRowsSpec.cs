@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Payments;
 
 namespace Backend.Veteriner.Application.Payments.Specs;
@@ -16,11 +17,14 @@ public sealed record ClientPaymentSummaryRow(
 
 public sealed class PaymentsForClientSummaryRowsSpec : Specification<Payment, ClientPaymentSummaryRow>
 {
-    public PaymentsForClientSummaryRowsSpec(Guid tenantId, Guid? clinicId, Guid clientId)
+    public PaymentsForClientSummaryRowsSpec(
+        Guid tenantId,
+        Guid? clinicId,
+        Guid clientId,
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.Where(p => p.TenantId == tenantId && p.ClientId == clientId);
-        if (clinicId.HasValue)
-            Query.Where(p => p.ClinicId == clinicId.Value);
+        DashboardSpecificationClinicScope.ApplyToPayment(Query, clinicId, accessibleClinicIds);
         Query.Select(p => new ClientPaymentSummaryRow(
             p.Id,
             p.PaidAtUtc,

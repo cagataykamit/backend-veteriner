@@ -12,4 +12,5 @@ public sealed record ClientPaymentSummaryReadRequest(
     Guid TenantId,
     Guid ClientId,
     Guid? ClinicId,
-    int RecentTake);
+    int RecentTake,
+    IReadOnlyCollection<Guid>? AccessibleClinicIds = null);

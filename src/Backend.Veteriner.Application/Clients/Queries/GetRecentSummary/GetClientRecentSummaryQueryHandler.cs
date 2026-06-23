@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Appointments;
@@ -16,6 +17,7 @@ public sealed class GetClientRecentSummaryQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Appointment> _appointments;
@@ -24,6 +26,7 @@ public sealed class GetClientRecentSummaryQueryHandler
     public GetClientRecentSummaryQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
         IReadRepository<Appointment> appointments,
@@ -31,6 +34,7 @@ public sealed class GetClientRecentSummaryQueryHandler
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clinicScopeResolver = clinicScopeResolver;
         _clients = clients;
         _pets = pets;
         _appointments = appointments;
@@ -48,8 +52,19 @@ public sealed class GetClientRecentSummaryQueryHandler
 
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, request.ClientId), ct);
         if (client is null)
-        {
             return Result<ClientRecentSummaryDto>.Failure("Clients.NotFound", "Müşteri bulunamadı.");
+
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, _clinicContext.ClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<ClientRecentSummaryDto>.Failure(scopeResult.Error);
+
+        var singleClinicId = scopeResult.Value!.SingleClinicId;
+        var accessibleClinicIds = scopeResult.Value.AccessibleClinicIds;
+
+        if (accessibleClinicIds is { Count: 0 })
+        {
+            return Result<ClientRecentSummaryDto>.Success(
+                new ClientRecentSummaryDto(request.ClientId, [], []));
         }
 
         var pets = await _pets.ListAsync(new PetsByTenantClientIdSpec(tenantId, request.ClientId), ct);
@@ -61,22 +76,23 @@ public sealed class GetClientRecentSummaryQueryHandler
 
         var petIds = pets.Select(p => p.Id).ToArray();
         var petNameById = pets.ToDictionary(p => p.Id, p => p.Name);
-        var clinicId = _clinicContext.ClinicId;
 
         var appts = await _appointments.ListAsync(
             new AppointmentsForClientPetsRecentSpec(
                 tenantId,
-                clinicId,
+                singleClinicId,
                 petIds,
-                ClientRecentSummaryConstants.RecentAppointmentsTake),
+                ClientRecentSummaryConstants.RecentAppointmentsTake,
+                accessibleClinicIds),
             ct);
 
         var exams = await _examinations.ListAsync(
             new ExaminationsForClientPetsRecentSpec(
                 tenantId,
-                clinicId,
+                singleClinicId,
                 petIds,
-                ClientRecentSummaryConstants.RecentExaminationsTake),
+                ClientRecentSummaryConstants.RecentExaminationsTake,
+                accessibleClinicIds),
             ct);
 
         var recentAppts = appts
@@ -98,7 +114,7 @@ public sealed class GetClientRecentSummaryQueryHandler
                 e.VisitReason))
             .ToList();
 
-        var dto = new ClientRecentSummaryDto(request.ClientId, recentAppts, recentExams);
-        return Result<ClientRecentSummaryDto>.Success(dto);
+        return Result<ClientRecentSummaryDto>.Success(
+            new ClientRecentSummaryDto(request.ClientId, recentAppts, recentExams));
     }
 }

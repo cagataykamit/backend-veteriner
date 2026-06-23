@@ -66,55 +66,55 @@ public sealed class GetClientPaymentSummaryQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
-        // Client existence/access validation: mevcut Command DB pattern'i (ClientByIdSpec) her iki yolda da korunur.
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, request.Id), ct);
         if (client is null)
             return Result<ClientPaymentSummaryDto>.Failure("Clients.NotFound", "Müşteri bulunamadı.");
 
-        var clinicId = _clinicContext.ClinicId;
+        var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, _clinicContext.ClinicId, ct);
+        if (!scopeResult.IsSuccess)
+            return Result<ClientPaymentSummaryDto>.Failure(scopeResult.Error);
 
-        // CQRS-15E: Query DB PaymentReadModels routing.
-        // Flag açık + scope represent edilebiliyorsa (tek klinik veya tenant-wide Admin/Owner) Query DB'den okunur.
-        // Multi-clinic (ClinicAdmin, aktif klinik yok) scope tek ClinicId/tenant-wide ile represent edilemez → Command DB fallback.
-        // Query path seçildiğinde Command DB'ye fallback YAPILMAZ; Query DB boşsa count 0 / totals boş / recent boş döner.
-        if (_queryReadModelsOptions.ClientPaymentSummaryReadEnabled)
+        var singleClinicId = scopeResult.Value!.SingleClinicId;
+        var accessibleClinicIds = scopeResult.Value.AccessibleClinicIds;
+
+        if (accessibleClinicIds is { Count: 0 })
+            return EmptySummary(request.Id, client.FullName);
+
+        if (_queryReadModelsOptions.ClientPaymentSummaryReadEnabled
+            && TryGetRepresentableQueryClinicScope(scopeResult.Value!, out var queryClinicId))
         {
-            var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, clinicId, ct);
-            if (scopeResult.IsSuccess
-                && TryGetRepresentableQueryClinicScope(scopeResult.Value!, out var queryClinicId))
-            {
-                var readResult = await _summaryReadModelReader.GetSummaryAsync(
-                    new ClientPaymentSummaryReadRequest(
-                        tenantId,
-                        request.Id,
-                        queryClinicId,
-                        ClientPaymentSummaryConstants.RecentPaymentsTake),
-                    ct);
-
-                var queryDistinctCurrencies = readResult.CurrencyTotals.Count;
-                var queryTotalPaidAmount = queryDistinctCurrencies == 1
-                    ? readResult.CurrencyTotals[0].TotalAmount
-                    : 0m;
-
-                _logger.LogInformation(
-                    "Client payment summary generated from Query DB read model. TenantId={TenantId} ClientId={ClientId} ClinicScoped={ClinicScoped}",
+            var readResult = await _summaryReadModelReader.GetSummaryAsync(
+                new ClientPaymentSummaryReadRequest(
                     tenantId,
                     request.Id,
-                    queryClinicId.HasValue);
+                    queryClinicId,
+                    ClientPaymentSummaryConstants.RecentPaymentsTake,
+                    accessibleClinicIds),
+                ct);
 
-                return Result<ClientPaymentSummaryDto>.Success(new ClientPaymentSummaryDto(
-                    request.Id,
-                    client.FullName,
-                    readResult.TotalPaymentsCount,
-                    queryTotalPaidAmount,
-                    readResult.CurrencyTotals,
-                    readResult.LastPaymentAtUtc,
-                    readResult.RecentPayments));
-            }
+            var queryDistinctCurrencies = readResult.CurrencyTotals.Count;
+            var queryTotalPaidAmount = queryDistinctCurrencies == 1
+                ? readResult.CurrencyTotals[0].TotalAmount
+                : 0m;
+
+            _logger.LogInformation(
+                "Client payment summary generated from Query DB read model. TenantId={TenantId} ClientId={ClientId} ClinicScoped={ClinicScoped}",
+                tenantId,
+                request.Id,
+                queryClinicId.HasValue);
+
+            return Result<ClientPaymentSummaryDto>.Success(new ClientPaymentSummaryDto(
+                request.Id,
+                client.FullName,
+                readResult.TotalPaymentsCount,
+                queryTotalPaidAmount,
+                readResult.CurrencyTotals,
+                readResult.LastPaymentAtUtc,
+                readResult.RecentPayments));
         }
 
         var rows = await _payments.ListAsync(
-            new PaymentsForClientSummaryRowsSpec(tenantId, clinicId, request.Id), ct);
+            new PaymentsForClientSummaryRowsSpec(tenantId, singleClinicId, request.Id, accessibleClinicIds), ct);
 
         var count = rows.Count;
         var currencyTotals = rows
@@ -166,26 +166,29 @@ public sealed class GetClientPaymentSummaryQueryHandler
                 r.Notes))
             .ToList();
 
-        var dto = new ClientPaymentSummaryDto(
+        return Result<ClientPaymentSummaryDto>.Success(new ClientPaymentSummaryDto(
             request.Id,
             client.FullName,
             count,
             totalPaidAmount,
             currencyTotals,
             lastAt,
-            recentDtos);
-
-        return Result<ClientPaymentSummaryDto>.Success(dto);
+            recentDtos));
     }
+
+    private static Result<ClientPaymentSummaryDto> EmptySummary(Guid clientId, string clientName)
+        => Result<ClientPaymentSummaryDto>.Success(new ClientPaymentSummaryDto(
+            clientId,
+            clientName,
+            0,
+            0m,
+            Array.Empty<ClientPaymentCurrencyTotalDto>(),
+            null,
+            Array.Empty<ClientPaymentRecentItemDto>()));
 
     /// <summary>
     /// Çözülen scope'un Query DB reader (tenant + opsiyonel tek clinic) ile represent edilip edilemeyeceğini belirler.
     /// </summary>
-    /// <returns>
-    /// <c>true</c> + <paramref name="queryClinicId"/> dolu: tek klinik kapsamı. <c>true</c> + <paramref name="queryClinicId"/> null:
-    /// tenant-wide (Admin/Owner, aktif klinik yok) — clinic filtresi olmadan TenantId+ClientId okunur (mevcut Command DB davranışı).
-    /// <c>false</c>: multi-clinic (ClinicAdmin, aktif klinik yok) — tek ClinicId/tenant-wide ile represent edilemez, Command DB fallback.
-    /// </returns>
     private static bool TryGetRepresentableQueryClinicScope(ClinicReadScope scope, out Guid? queryClinicId)
     {
         if (scope.SingleClinicId is { } single)

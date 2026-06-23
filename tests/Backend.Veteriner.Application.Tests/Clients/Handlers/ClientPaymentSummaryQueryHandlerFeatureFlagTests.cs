@@ -67,7 +67,7 @@ public sealed class ClientPaymentSummaryQueryHandlerFeatureFlagTests
     }
 
     [Fact]
-    public async Task WhenFlagFalse_Should_UseCommandDb_NotQueryReader_NorScopeResolver()
+    public async Task WhenFlagFalse_Should_UseCommandDb_NotQueryReader_AndResolveScopeOnce()
     {
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -85,7 +85,7 @@ public sealed class ClientPaymentSummaryQueryHandlerFeatureFlagTests
         VerifyReaderNeverCalled();
         _scopeResolver.Verify(
             r => r.ResolveAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
-            Times.Never);
+            Times.Once);
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public sealed class ClientPaymentSummaryQueryHandlerFeatureFlagTests
     }
 
     [Fact]
-    public async Task WhenFlagTrue_AndScopeResolveFails_Should_FallbackToCommandDb()
+    public async Task WhenFlagTrue_AndScopeResolveFails_Should_Fail_WithoutCommandOrReader()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -190,15 +190,16 @@ public sealed class ClientPaymentSummaryQueryHandlerFeatureFlagTests
         var scopeResolver = ClinicReadScopeResolverMock.Default();
         scopeResolver.SetupAccessDenied();
         SetupClientFound(tid);
-        SetupEmptyCommandRows();
 
-        await CreateHandler(clientPaymentSummaryReadEnabled: true, scopeResolver: scopeResolver)
+        var result = await CreateHandler(clientPaymentSummaryReadEnabled: true, scopeResolver: scopeResolver)
             .Handle(new GetClientPaymentSummaryQuery(Guid.NewGuid()), CancellationToken.None);
 
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Clinics.AccessDenied");
         VerifyReaderNeverCalled();
         _payments.Verify(
             r => r.ListAsync(It.IsAny<PaymentsForClientSummaryRowsSpec>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Never);
     }
 
     [Fact]
