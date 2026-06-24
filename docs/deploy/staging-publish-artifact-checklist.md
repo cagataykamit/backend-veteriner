@@ -1,6 +1,8 @@
 # Staging Publish Artifact Checklist
 
-**Tür:** Staging deploy öncesi publish artifact dry-run / paket denetimi (DEPLOY-4). **Production kod, test, appsettings, migration değişmedi.**
+**Tür:** Staging deploy öncesi publish artifact dry-run / paket denetimi (DEPLOY-4 / DEPLOY-4A). **Production kod, test, appsettings içeriği, migration değişmedi.**
+
+**DEPLOY-4A (2026-06-24):** Publish artifact hygiene — csproj `CopyToPublishDirectory=Never` ile gereksiz `appsettings.*.json` dosyaları publish output'tan exclude edildi. Staging/Production overlay exclude **`EnvironmentName` MSBuild property** ile koşullu (`-p:EnvironmentName=Staging` / `Production`).
 
 **Ön durum:**
 
@@ -13,12 +15,12 @@
 
 **İlgili dokümanlar:** [`staging-first-deploy-runbook.md`](staging-first-deploy-runbook.md) · [`staging-config-secrets-inventory.md`](staging-config-secrets-inventory.md) · [`windows-iis-staging-host-checklist.md`](windows-iis-staging-host-checklist.md)
 
-**Git doğrulama (2026-06-23, DEPLOY-4 başlangıcı):**
+**Git doğrulama (2026-06-24, DEPLOY-4A başlangıcı):**
 
 | Kontrol | Sonuç |
 |---|---|
-| DEPLOY-3 commit | `2f841ed` — `docs(deploy): add staging config secrets inventory` |
-| `git status --short` (başlangıç) | **Temiz değildi** — `ClinicAssignmentAccessGuard.cs` + test dosyası modified (DEPLOY-4 dışı değişiklik) |
+| DEPLOY-4 commit | `118d252` — `docs(deploy): add staging publish artifact checklist` |
+| `git status --short` (başlangıç) | **Temiz** — yalnızca DEPLOY-4A csproj değişiklikleri |
 | Publish profile (`.pubxml`) | **Yok** |
 | Dockerfile / publish script | **Yok** |
 
@@ -28,17 +30,25 @@
 
 ## API publish command
 
-Repo root'tan Release publish:
+Repo root'tan Release publish — **`-p:EnvironmentName=Staging` zorunlu** (staging artifact için doğru appsettings exclude):
 
 ```powershell
-dotnet publish src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj -c Release -o artifacts/deploy-dryrun/api
+dotnet publish src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj -c Release -p:EnvironmentName=Staging -o artifacts/deploy-dryrun/api
+```
+
+**Production publish (ileride):**
+
+```powershell
+dotnet publish src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj -c Release -p:EnvironmentName=Production -o <output>
 ```
 
 **Proje:** `src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj` — `TargetFramework: net9.0`, `Microsoft.NET.Sdk.Web`
 
 **Ön koşul:** `dotnet restore` (dry-run'da otomatik restore yapıldı).
 
-**DEPLOY-4 dry-run:** **Başarılı** (exit 0).
+**`EnvironmentName` uyarısı:** MSBuild property verilmezse Staging/Production overlay exclude koşulları çalışmaz; hem `appsettings.Staging.json` hem `appsettings.Production.json` publish output'a girebilir. Deploy publish komutlarında **`-p:EnvironmentName` açıkça set edilmelidir.**
+
+**DEPLOY-4A dry-run:** **Başarılı** (exit 0).
 
 ---
 
@@ -50,9 +60,51 @@ dotnet publish src/Backend.Veteriner.DbMigrator/Backend.Veteriner.DbMigrator.csp
 
 **Proje:** `src/Backend.Veteriner.DbMigrator/Backend.Veteriner.DbMigrator.csproj` — `OutputType: Exe`, `TargetFramework: net9.0`
 
-**Csproj config copy:** `appsettings.json`, `appsettings.Development.json`, `appsettings.LoadTest.json` (`CopyToOutputDirectory: PreserveNewest`). **`appsettings.Staging.json` yok** — Staging'de env var zorunlu ([`staging-config-secrets-inventory.md`](staging-config-secrets-inventory.md)).
+**Csproj config copy:** `appsettings.json`, `appsettings.Development.json`, `appsettings.LoadTest.json` (`CopyToOutputDirectory: PreserveNewest`; Development/LoadTest **`CopyToPublishDirectory: Never`** — DEPLOY-4A). **`appsettings.Staging.json` yok** — Staging'de env var zorunlu ([`staging-config-secrets-inventory.md`](staging-config-secrets-inventory.md)).
 
-**DEPLOY-4 dry-run:** **Başarılı** (exit 0).
+**DEPLOY-4A dry-run:** **Başarılı** (exit 0).
+
+---
+
+## Publish appsettings hygiene (DEPLOY-4A)
+
+`CopyToPublishDirectory=Never` ile publish artifact'ta yalnızca deploy hedefi için gerekli config dosyaları kalır. Kaynak dosyalar repo'da durur; local `dotnet run` / Debug output etkilenmez.
+
+### API — staging artifact (`-p:EnvironmentName=Staging`)
+
+| Dosya | Publish artifact |
+|---|---|
+| `appsettings.json` | **Evet** |
+| `appsettings.Staging.json` | **Evet** |
+| `appsettings.Development.json` | **Hayır** (her zaman) |
+| `appsettings.IntegrationTests.json` | **Hayır** (her zaman) |
+| `appsettings.LoadTest.json` | **Hayır** (her zaman) |
+| `appsettings.Production.json` | **Hayır** (Staging publish'te exclude) |
+
+### API — production artifact (`-p:EnvironmentName=Production`, ileride)
+
+| Dosya | Publish artifact |
+|---|---|
+| `appsettings.json` | **Evet** |
+| `appsettings.Production.json` | **Evet** |
+| `appsettings.Staging.json` | **Hayır** (Production publish'te exclude) |
+| `appsettings.Development.json` | **Hayır** (her zaman) |
+| `appsettings.IntegrationTests.json` | **Hayır** (her zaman) |
+| `appsettings.LoadTest.json` | **Hayır** (her zaman) |
+
+Kaynak: `Backend.Veteriner.Api.csproj` — `Content Update` + koşullu `CopyToPublishDirectory=Never`.
+
+### DbMigrator publish artifact — beklenen `appsettings*.json`
+
+| Dosya | Publish artifact |
+|---|---|
+| `appsettings.json` | **Evet** (boş connection string şablonu) |
+| `appsettings.Development.json` | **Hayır** |
+| `appsettings.LoadTest.json` | **Hayır** |
+
+Staging'de connection string **yalnızca env var** (`DOTNET_ENVIRONMENT=Staging`; `appsettings.Staging.json` repo'da yok).
+
+---
 
 **DB bağlantısı gerektirmeyen doğrulama:**
 
@@ -79,17 +131,9 @@ Exit 0; komut listesi (`migrate`, `migrate-query`, `seed`, `all`, backfill komut
 | `Backend.Veteriner.Infrastructure.dll` | **Var** | Transitive publish |
 | NuGet runtime DLL'leri | **Var** | ~107 dosya toplam (publish output) |
 
-### Ek olarak publish'e dahil olan dosyalar (staging deploy'da dikkat)
+**Publish dışı (DEPLOY-4A, `-p:EnvironmentName=Staging`):** `appsettings.Development.json`, `appsettings.IntegrationTests.json`, `appsettings.LoadTest.json`, `appsettings.Production.json`.
 
-| Dosya | Risk | Not |
-|---|---|---|
-| `appsettings.Development.json` | **Orta** | Dev makine adı, e-posta, Iyzico sandbox key'leri, ngrok URL — bkz. §Secret leak checks |
-| `appsettings.Production.json` | Düşük | Şablon; `Password=` ve `Jwt:Key` boş |
-| `appsettings.IntegrationTests.json` | Düşük | Test overlay |
-| `appsettings.LoadTest.json` | Düşük | Load test overlay |
-| `*.pdb` | Düşük | Debug symbols; staging'de opsiyonel |
-
-**Staging runtime:** `ASPNETCORE_ENVIRONMENT=Staging` ile yalnızca `appsettings.json` + `appsettings.Staging.json` overlay yüklenir; Development dosyası **runtime'da okunmaz**. Dosya diskte kalır — operasyonel hijyen için sunucuya kopyalamadan önce silinebilir (open issue).
+**Staging runtime:** `ASPNETCORE_ENVIRONMENT=Staging` ile yalnızca `appsettings.json` + `appsettings.Staging.json` overlay yüklenir.
 
 ---
 
@@ -100,8 +144,6 @@ Exit 0; komut listesi (`migrate`, `migrate-query`, `seed`, `all`, backfill komut
 | `Backend.Veteriner.DbMigrator.dll` | **Var** | Ana assembly |
 | `Backend.Veteriner.DbMigrator.exe` | **Var** | Windows apphost |
 | `appsettings.json` | **Var** | Boş connection string şablonu |
-| `appsettings.Development.json` | **Var** | Dev makine connection string (Trusted_Connection) |
-| `appsettings.LoadTest.json` | **Var** | Load test şablonu |
 | `Backend.Veteriner.DbMigrator.deps.json` | **Var** | |
 | `Backend.Veteriner.DbMigrator.runtimeconfig.json` | **Var** | |
 | `Backend.Veteriner.Infrastructure.dll` | **Var** | Migration/backfill için gerekli |
@@ -148,40 +190,25 @@ Detaylı IIS checklist: [`windows-iis-staging-host-checklist.md`](windows-iis-st
 
 Dry-run publish output'ta pattern taraması (`Password=`, `Jwt__Key`, sandbox key kalıpları, dev hostname).
 
-### Staging-relevant dosyalar (temiz)
+### Staging-relevant dosyalar (temiz — DEPLOY-4A dry-run)
 
 | Dosya | Sonuç |
 |---|---|
-| `appsettings.json` | Connection string boş; `Jwt:Key` boş |
+| `appsettings.json` | Connection string boş; `Jwt:Key` boş; `Billing:Iyzico` section adı var (değer yok) |
 | `appsettings.Staging.json` | Connection string boş; Payment CQRS flags false |
-| `appsettings.Production.json` | `Password=` boş; `Jwt:Key` boş (şablon) |
 | `web.config` | Secret yok |
 
-### Bulgu: Development overlay artifact'ta mevcut
+**Publish artifact'ta yok (DEPLOY-4A):** `appsettings.Development.json`, `appsettings.IntegrationTests.json`, `appsettings.LoadTest.json`, `appsettings.Production.json` (API); DbMigrator'da Development/LoadTest yok.
 
-`appsettings.Development.json` **hem API hem DbMigrator** publish output'una kopyalanır (Sdk/content default davranışı / DbMigrator csproj `CopyToOutputDirectory`).
+### Önceki bulgu (DEPLOY-4) — mitigated
 
-API `appsettings.Development.json` içeriği (özet — **staging sunucuya taşınmamalı / silinmeli**):
-
-| Alan | Değer tipi | Staging riski |
-|---|---|---|
-| `ConnectionStrings` | Dev makine adı (`DESKTOP-*`), Trusted_Connection | Ortam fingerprint; parola yok |
-| `Smtp:User` / `From` | Gerçek e-posta adresi | PII sızıntısı |
-| `Billing:Iyzico:ApiKey` / `SecretKey` | Iyzico **sandbox** API credential | Gerçek sandbox secret (repo kaynak dosyasında) |
-| `Billing:Iyzico:CallbackUrl` | ngrok URL | Dev tunnel fingerprint |
-| `Billing:Iyzico:SandboxBuyerIp` | Gerçek IP | PII/fingerprint |
-
-DbMigrator `appsettings.Development.json`: dev makine connection string (Trusted_Connection, parola yok).
-
-### Staging runtime etkisi
-
-`ASPNETCORE_ENVIRONMENT=Staging` / `DOTNET_ENVIRONMENT=Staging` ile Development overlay **yüklenmez**. Risk: yanlış ortam değişkeni, dosya incelemesi, backup sızıntısı.
+DEPLOY-4'te `appsettings.Development.json` publish output'ta sandbox key / dev PII taşıyordu. **DEPLOY-4A:** csproj `CopyToPublishDirectory=Never` ile publish artifact'tan exclude edildi. Kaynak dosya repo'da kalır (local dev); staging sunucuya kopyalanmaz.
 
 ### JWT / SQL parola
 
-Publish output'ta **JWT signing key yok** (boş). SQL **Password=** dolu connection string yok (Production şablonu boş; Development Trusted_Connection).
+Publish output'ta **JWT signing key yok** (boş). SQL **Password=** dolu connection string yok. Pattern taraması (`Iyzico`, `ngrok`, `Password=`, `Jwt__Key`, `User Id=`): API'de yalnızca `appsettings.json` içinde boş `Billing:Iyzico` section adı eşleşti; DbMigrator **temiz**.
 
-**Özet:** Staging deploy paketi **üretilebilir**; operatör sunucuya kopyalamadan önce `appsettings.Development.json` (ve isteğe bağlı diğer ortam overlay'leri) **silmeli** veya deploy pipeline'da exclude etmeli (repo değişikliği — open issue).
+**Özet:** Staging deploy paketi publish aşamasında hijyenik; operatör env var injection ile devam eder.
 
 ---
 
@@ -206,32 +233,30 @@ Remove-Item -Recurse -Force artifacts/deploy-dryrun
 
 | Adım | Sonuç | Tarih |
 |---|---|---|
-| API `dotnet publish -c Release` | **Başarılı** | 2026-06-23 |
-| DbMigrator `dotnet publish -c Release` | **Başarılı** | 2026-06-23 |
-| API beklenen dosyalar | **Tam** (dll, exe, web.config, appsettings, deps, runtimeconfig) | |
-| DbMigrator beklenen dosyalar | **Tam** | |
-| DbMigrator `help` (DB yok) | **Başarılı** (exit 0) | |
-| Secret leak (staging config) | **Temiz** | |
-| Secret leak (Development overlay diskte) | **Bulgu** — sandbox key / dev PII; runtime Staging'de aktif değil | |
+| API `dotnet publish -c Release` | **Başarılı** | 2026-06-24 (DEPLOY-4A) |
+| DbMigrator `dotnet publish -c Release` | **Başarılı** | 2026-06-24 (DEPLOY-4A) |
+| API beklenen dosyalar | **Tam** — yalnızca `appsettings.json` + `appsettings.Staging.json` | |
+| DbMigrator beklenen dosyalar | **Tam** — yalnızca `appsettings.json` | |
+| DbMigrator `help` (DB yok) | **Başarılı** (exit 0) | DEPLOY-4 |
+| Secret leak (publish artifact) | **Temiz** — Development overlay publish dışı | DEPLOY-4A |
 | Git artifact leak | **Yok** (`artifacts/` ignored) | |
-| `dotnet build --no-restore` | **Başarılı** (0 uyarı, 0 hata) | |
+| `dotnet build --no-restore` | **Başarılı** (0 uyarı, 0 hata) | 2026-06-24 |
 
-**Sonuç:** Local build makinesinde staging deploy paketi **üretilebilir**. Sunucuya geçmeden önce env var injection + Development overlay temizliği önerilir.
+**Sonuç:** Staging deploy paketi publish aşamasında hijyenik; env var injection ile sunucuya deploy edilebilir.
 
 ---
 
 ## Open issues
 
-| # | Konu | Öneri |
+| # | Konu | Durum |
 |---|---|---|
-| 1 | Publish tüm `appsettings.*.json` dosyalarını API output'a kopyalar | Staging deploy pipeline'da `appsettings.Development.json` (ve gereksiz overlay'ler) **exclude** veya sunucuda sil |
-| 2 | DbMigrator'da `appsettings.Staging.json` yok | Staging'de connection string **yalnızca env var** — [`staging-config-secrets-inventory.md`](staging-config-secrets-inventory.md) ile uyumlu; dokümante edildi |
-| 3 | DbMigrator publish `appsettings.Development.json` taşır | Migrator çalıştırırken `DOTNET_ENVIRONMENT=Staging` zorunlu; dev dosyası yüklenmez |
-| 4 | Publish profile / CI script yok | Manuel `dotnet publish` veya pipeline adımı operasyon kararı |
-| 5 | `.pdb` staging'de gerekli mi? | Opsiyonel; güvenlik/hardening kararı |
-| 6 | Repo `appsettings.Development.json` içinde sandbox credential | Kaynak dosya hijyeni ayrı tech debt (DEPLOY-4 kapsamı dışı — kod değiştirilmedi) |
-| 7 | DEPLOY-4 başlangıç working tree | Modified `ClinicAssignmentAccessGuard` dosyaları — deploy audit'ten bağımsız; commit öncesi temizlenmeli |
+| 1 | Publish tüm `appsettings.*.json` dosyalarını API output'a kopyalar | **Resolved (DEPLOY-4A)** — csproj exclude + `-p:EnvironmentName` |
+| 2 | DbMigrator'da `appsettings.Staging.json` yok | **By design** — env var zorunlu |
+| 3 | DbMigrator publish `appsettings.Development.json` taşır | **Resolved (DEPLOY-4A)** — csproj exclude |
+| 4 | Publish profile / CI script yok | Açık — operasyon kararı |
+| 5 | `.pdb` staging'de gerekli mi? | Açık — opsiyonel hardening |
+| 6 | Repo `appsettings.Development.json` içinde sandbox credential | Açık — kaynak dosya tech debt (içerik değiştirilmedi) |
 
 ---
 
-**DEPLOY-4:** Commit atılmadı (kullanıcı talimatı).
+**DEPLOY-4 / DEPLOY-4A:** Commit atılmadı (kullanıcı talimatı).

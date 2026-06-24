@@ -48,4 +48,23 @@
 		<ProjectReference Include="..\Backend.Veteriner.Domain\Backend.Veteriner.Domain.csproj" />
 	</ItemGroup>
 
+	<!-- Publish hygiene: dev/test overlays always excluded; Staging/Production overlay excluded for the other deploy target -->
+	<ItemGroup>
+		<Content Update="appsettings.Development.json">
+			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
+		</Content>
+		<Content Update="appsettings.IntegrationTests.json">
+			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
+		</Content>
+		<Content Update="appsettings.LoadTest.json">
+			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
+		</Content>
+		<Content Update="appsettings.Production.json" Condition="'$(EnvironmentName)' == 'Staging'">
+			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
+		</Content>
+		<Content Update="appsettings.Staging.json" Condition="'$(EnvironmentName)' == 'Production'">
+			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
+		</Content>
+	</ItemGroup>
+
 </Project>
