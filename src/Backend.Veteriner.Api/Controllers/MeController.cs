@@ -1,12 +1,15 @@
 using Backend.Veteriner.Api.Common.Extensions;
+using Backend.Veteriner.Application.Auth.Commands.ChangePassword;
 using Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeAllMy;
 using Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeMy;
 using Backend.Veteriner.Application.Auth.Queries.Sessions;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.Queries.GetMyClinics;
+using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Backend.Veteriner.Api.Controllers;
@@ -57,6 +60,34 @@ public sealed class MeController : ControllerBase
     {
         var result = await _mediator.Send(new RevokeMySessionCommand(id), ct);
         return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Oturum açmış kullanıcının mevcut şifresini doğrulayarak yeni şifre belirler.
+    /// </summary>
+    [HttpPost("change-password")]
+    [EnableRateLimiting("change-password")]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordCommand? command, CancellationToken ct)
+    {
+        if (command is null)
+        {
+            return Result.Failure(
+                    "Auth.Validation.InvalidRequestBody",
+                    "İstek gövdesi boş veya hatalı JSON.")
+                .ToActionResult(this);
+        }
+
+        var result = await _mediator.Send(command, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        return Ok(new { ok = true });
     }
 
     /// <summary>

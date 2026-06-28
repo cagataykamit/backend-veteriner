@@ -148,6 +148,27 @@ public static class RateLimitingExtensions
                     });
             });
 
+            // -- CHANGE PASSWORD: authenticated self-service (IP + sub)
+            options.AddPolicy("change-password", httpContext =>
+            {
+                var ip = GetClientIp(httpContext);
+                var sub = httpContext.User.FindFirst("sub")?.Value
+                          ?? httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? "anon";
+                var key = $"{ip}:{sub}";
+
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
             // -- EMAIL VERIFICATION: request
             options.AddPolicy("email-verify-request", httpContext =>
             {
