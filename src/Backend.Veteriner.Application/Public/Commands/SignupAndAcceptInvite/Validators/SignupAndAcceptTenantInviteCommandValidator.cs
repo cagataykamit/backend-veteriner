@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Validation;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite.Validators;
@@ -7,6 +8,8 @@ public sealed class SignupAndAcceptTenantInviteCommandValidator : AbstractValida
     public SignupAndAcceptTenantInviteCommandValidator()
     {
         RuleFor(x => x.RawToken).NotEmpty();
-        RuleFor(x => x.Password).NotEmpty().MinimumLength(8).MaximumLength(128);
+        RuleFor(x => x.Password)
+            .NotEmpty()
+            .StrongPasswordRules(includeMaxLength: true);
     }
 }

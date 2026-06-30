@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Validation;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Public.Commands.OwnerSignup.Validators;
@@ -32,7 +33,6 @@ public sealed class PublicOwnerSignupCommandValidator : AbstractValidator<Public
 
         RuleFor(x => x.Password)
             .NotEmpty()
-            .MinimumLength(8)
-            .MaximumLength(128);
+            .StrongPasswordRules(includeMaxLength: true);
     }
 }

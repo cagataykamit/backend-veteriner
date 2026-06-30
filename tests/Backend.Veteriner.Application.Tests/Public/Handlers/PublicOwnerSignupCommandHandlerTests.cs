@@ -49,7 +49,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_PlanCodeInvalid()
     {
         var handler = CreateHandler();
-        var command = new PublicOwnerSignupCommand("gold", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "12345678");
+        var command = new PublicOwnerSignupCommand("gold", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!");
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -62,7 +62,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_DuplicateEmail()
     {
         var handler = CreateHandler();
-        var command = new PublicOwnerSignupCommand("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "12345678");
+        var command = new PublicOwnerSignupCommand("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!");
 
         _usersRead.Setup(r => r.AnyAsync(It.IsAny<UserExistsByEmailSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -78,7 +78,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     public async Task Handle_Should_CreateOwnerTenantClinicMembershipsAndSubscription_When_Successful()
     {
         var handler = CreateHandler();
-        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "12345678");
+        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!");
         var adminClaim = new OperationClaim("Admin");
 
         _usersRead.Setup(r => r.AnyAsync(It.IsAny<UserExistsByEmailSpec>(), It.IsAny<CancellationToken>()))

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Validation;
 using Backend.Veteriner.Application.Users.Commands.Create;
 using FluentValidation;
 
@@ -14,7 +15,6 @@ public sealed class AdminCreateUserCommandValidator : AbstractValidator<AdminCre
 
         RuleFor(x => x.Password)
             .NotEmpty()
-            .MinimumLength(8)
-            .MaximumLength(128);
+            .StrongPasswordRules(includeMaxLength: true);
     }
 }
