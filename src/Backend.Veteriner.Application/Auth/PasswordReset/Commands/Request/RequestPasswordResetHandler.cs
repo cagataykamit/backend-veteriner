@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Auth.PasswordReset.Commands.Request;
 
@@ -16,7 +18,7 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
     private readonly IVerificationTokenRepository _repo;
     private readonly ITokenHashService _hash;
     private readonly IEmailSender _email;
-    private readonly IAppUrlProvider _url;
+    private readonly AppOptions _appOptions;
     private readonly ILogger<RequestPasswordResetHandler> _logger;
 
     public RequestPasswordResetHandler(
@@ -24,14 +26,14 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
         IVerificationTokenRepository repo,
         ITokenHashService hash,
         IEmailSender email,
-        IAppUrlProvider url,
+        IOptions<AppOptions> appOptions,
         ILogger<RequestPasswordResetHandler> logger)
     {
         _users = users;
         _repo = repo;
         _hash = hash;
         _email = email;
-        _url = url;
+        _appOptions = appOptions.Value;
         _logger = logger;
     }
 
@@ -74,9 +76,8 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
 
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            var shortRaw = raw.Length > 6 ? raw[..6] + "â€¦" : raw;
-            var shortHash = tokenHash.Length > 12 ? tokenHash[..12] + "â€¦" : tokenHash;
-            _logger.LogDebug("PasswordReset: token generated raw='{Raw}', hash='{Hash}'", shortRaw, shortHash);
+            var shortHash = tokenHash.Length > 12 ? tokenHash[..12] + "…" : tokenHash;
+            _logger.LogDebug("PasswordReset: token generated hash='{Hash}'", shortHash);
         }
 
         var vt = new VerificationToken(
@@ -88,7 +89,8 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
         await _repo.AddAsync(vt, ct);
 
         // 4) Link ve e-posta
-        var link = _url.BuildAbsolute("/api/password/confirm", $"token={raw}");
+        var frontendBaseUrl = (_appOptions.FrontendBaseUrl ?? string.Empty).TrimEnd('/');
+        var link = $"{frontendBaseUrl}/auth/reset-password?token={Uri.EscapeDataString(raw)}";
         var subject = "Şifre Sıfırlama";
         var bodyText = new StringBuilder()
             .AppendLine("Merhaba,")

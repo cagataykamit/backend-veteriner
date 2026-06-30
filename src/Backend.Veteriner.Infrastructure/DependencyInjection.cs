@@ -166,6 +166,7 @@ public static class DependencyInjection
 
         // ===== JWT =====
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
+        services.Configure<AppOptions>(configuration.GetSection("App"));
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IJwtOptionsProvider, JwtOptionsProvider>();
 
