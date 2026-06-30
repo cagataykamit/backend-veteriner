@@ -2,6 +2,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth.Commands.ChangePassword;
 using Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeAllMy;
 using Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeMy;
+using Backend.Veteriner.Application.Auth.Queries.Me;
 using Backend.Veteriner.Application.Auth.Queries.Sessions;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.Queries.GetMyClinics;
@@ -34,6 +35,19 @@ public sealed class MeController : ControllerBase
     public async Task<IActionResult> GetSessions(CancellationToken ct)
     {
         var result = await _mediator.Send(new ListSessionsQuery(), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Oturum açmış kullanıcının hesap özetini döner (read-only).
+    /// </summary>
+    [HttpGet("account-summary")]
+    [ProducesResponseType(typeof(AccountSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAccountSummary(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetAccountSummaryQuery(), ct);
         return result.ToActionResult(this);
     }
 
