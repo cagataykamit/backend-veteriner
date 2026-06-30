@@ -36,6 +36,7 @@ public sealed class RequestPasswordResetHandlerTests
         var handler = CreateHandler();
         var user = new User("user@example.com", "hash");
         string? capturedRaw = null;
+        string? capturedSubject = null;
         string? capturedBody = null;
 
         _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
@@ -46,7 +47,11 @@ public sealed class RequestPasswordResetHandlerTests
             .Callback<string>(raw => capturedRaw = raw)
             .Returns("hash");
         _email.Setup(e => e.SendAsync(user.Email, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
-            .Callback<string, string, string, CancellationToken, bool>((_, _, body, _, _) => capturedBody = body)
+            .Callback<string, string, string, CancellationToken, bool>((_, subject, body, _, _) =>
+            {
+                capturedSubject = subject;
+                capturedBody = body;
+            })
             .Returns(Task.CompletedTask);
 
         // Act
@@ -54,9 +59,12 @@ public sealed class RequestPasswordResetHandlerTests
 
         // Assert
         capturedRaw.Should().NotBeNullOrEmpty();
+        capturedSubject.Should().Be("Vetinity Şifre Sıfırlama");
         capturedBody.Should().NotBeNull();
+        capturedBody.Should().Contain("Vetinity hesabınız");
         capturedBody.Should().Contain($"{FrontendBaseUrl}/auth/reset-password?token={Uri.EscapeDataString(capturedRaw!)}");
         capturedBody.Should().NotContain("/api/password/confirm");
+        capturedBody.Should().Contain("Bu işlemi siz başlatmadıysanız");
 
         _email.Verify(
             e => e.SendAsync(user.Email, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),

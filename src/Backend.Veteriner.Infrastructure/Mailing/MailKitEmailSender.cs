@@ -42,7 +42,10 @@ public sealed class MailKitEmailSender : IEmailSenderImmediate
             throw new ArgumentException("Alıcı adresi boş olamaz.", nameof(to));
 
         var message = new MimeMessage();
-        message.From.Add(MailboxAddress.Parse(_opt.From));
+        message.From.Add(
+            string.IsNullOrWhiteSpace(_opt.FromName)
+                ? MailboxAddress.Parse(_opt.From)
+                : new MailboxAddress(_opt.FromName, _opt.From));
         message.To.Add(MailboxAddress.Parse(to));
         message.Subject = subject ?? string.Empty;
 

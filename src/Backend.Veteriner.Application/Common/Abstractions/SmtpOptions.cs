@@ -9,4 +9,5 @@ public sealed class SmtpOptions
     public string? User { get; set; }
     public string? Pass { get; set; }              // DİKKAT: "Pass" adı appsettings ile aynı olmalı
     public string From { get; set; } = "";
+    public string? FromName { get; set; }
 }

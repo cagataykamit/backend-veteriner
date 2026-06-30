@@ -91,14 +91,20 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
         // 4) Link ve e-posta
         var frontendBaseUrl = (_appOptions.FrontendBaseUrl ?? string.Empty).TrimEnd('/');
         var link = $"{frontendBaseUrl}/auth/reset-password?token={Uri.EscapeDataString(raw)}";
-        var subject = "Şifre Sıfırlama";
+        const string subject = "Vetinity Şifre Sıfırlama";
         var bodyText = new StringBuilder()
             .AppendLine("Merhaba,")
             .AppendLine()
-            .AppendLine("Şifrenizi sıfırlamak için bağlantı:")
+            .AppendLine("Vetinity hesabınız için bir şifre sıfırlama talebi aldık.")
+            .AppendLine()
+            .AppendLine("Şifrenizi yenilemek için aşağıdaki bağlantıya tıklayın:")
             .AppendLine(link)
             .AppendLine()
             .AppendLine("Bu bağlantı 1 saat boyunca geçerlidir.")
+            .AppendLine()
+            .AppendLine("Bu işlemi siz başlatmadıysanız bu e-postayı dikkate almayabilirsiniz.")
+            .AppendLine()
+            .AppendLine("Vetinity")
             .ToString();
 
         await _email.SendAsync(user.Email, subject, bodyText, ct);
