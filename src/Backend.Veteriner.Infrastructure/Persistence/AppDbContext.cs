@@ -85,6 +85,7 @@ public class AppDbContext : DbContext
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<LabResult> LabResults => Set<LabResult>();
     public DbSet<Hospitalization> Hospitalizations => Set<Hospitalization>();
+    public DbSet<TenantBillingProfile> TenantBillingProfiles => Set<TenantBillingProfile>();
     public DbSet<TenantReminderSettings> TenantReminderSettings => Set<TenantReminderSettings>();
     public DbSet<ReminderDispatchLog> ReminderDispatchLogs => Set<ReminderDispatchLog>();
 
