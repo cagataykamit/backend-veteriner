@@ -17,6 +17,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<TenantSubscription>> _subscriptionsRead = new();
+    private readonly Mock<IRepository<TenantSubscription>> _subscriptionsWrite = new();
     private readonly Mock<IRepository<ScheduledSubscriptionPlanChange>> _planChangesWrite = new();
     private readonly Mock<IReadRepository<ScheduledSubscriptionPlanChange>> _planChangesRead = new();
     private readonly Mock<IRepository<BillingCheckoutSession>> _checkoutSessionsWrite = new();
@@ -28,6 +29,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
             _tenantContext.Object,
             _tenants.Object,
             _subscriptionsRead.Object,
+            _subscriptionsWrite.Object,
             _planChangesWrite.Object,
             _planChangesRead.Object,
             _checkoutSessionsWrite.Object,
@@ -81,7 +83,10 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         var tid = Guid.NewGuid();
         var tenant = new Tenant("T");
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
-        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+        // Paid/active tenant: trial dönemindeki tenantlar artık proration/checkout akışına girmiyor
+        // (bkz. Trial_* testleri); bu test var olan ücretli abonelikte upgrade proration davranışını korur.
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-30), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-16));
 
         _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
         _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -125,7 +130,8 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         var tid = Guid.NewGuid();
         var tenant = new Tenant("T");
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
-        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-30), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-16));
 
         var created = DateTime.UtcNow.AddMinutes(-10);
         var expires = DateTime.UtcNow.AddHours(2);
@@ -175,7 +181,8 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         var tid = Guid.NewGuid();
         var tenant = new Tenant("T");
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
-        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-30), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-16));
 
         var created = DateTime.UtcNow.AddHours(-4);
         var expires = created.AddMinutes(30);
@@ -227,5 +234,126 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         manualProvider.Verify(
             x => x.PrepareCheckoutAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<string?>(), It.IsAny<long?>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    // BILLING-LIVE-1: Trial dönemindeki tenant plan yükseltirse ödeme farkı hesaplanmamalı ve
+    // checkout session oluşturulmamalıdır (public vaat: 14 gün ödeme alınmaz).
+    [Theory]
+    [InlineData("Pro")]
+    [InlineData("Premium")]
+    public async Task Handle_Should_ApplyPlanDirectly_Without_Checkout_Or_Proration_When_TenantIsTrialing(string targetPlan)
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("T");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
+        var trialStart = DateTime.UtcNow.AddDays(-7);
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, trialStart, 14);
+        var expectedTrialEnd = sub.TrialEndsAtUtc;
+
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+        _planChangesRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<OpenScheduledPlanChangeByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ScheduledSubscriptionPlanChange?)null);
+        _checkoutSessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<OpenBillingCheckoutSessionByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((BillingCheckoutSession?)null);
+
+        // Fiyat yapılandırılmış olsa bile trial'da kullanılmamalı (proration asla hesaplanmamalı).
+        var billing = new BillingOptions
+        {
+            DefaultCheckoutProvider = "Manual",
+            PlanPricesMinor = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Basic"] = 10_000L,
+                ["Pro"] = 20_000L,
+                ["Premium"] = 30_000L,
+            },
+        };
+
+        var handler = CreateHandler(billing);
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, targetPlan), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TrialPlanChangeApplied.Should().BeTrue();
+        result.Value.CheckoutSessionId.Should().BeNull();
+        result.Value.CheckoutUrl.Should().BeNull();
+        result.Value.CanContinue.Should().BeFalse();
+        result.Value.Status.Should().BeNull();
+        result.Value.ProratedChargeMinor.Should().Be(0);
+        result.Value.ProrationRatio.Should().BeNull();
+        result.Value.ChargeCurrencyCode.Should().BeNull();
+        result.Value.TargetPlanCode.Should().Be(targetPlan);
+        result.Value.CurrentPlanCode.Should().Be("Basic");
+
+        sub.PlanCode.Should().Be(Enum.Parse<SubscriptionPlanCode>(targetPlan));
+        sub.Status.Should().Be(TenantSubscriptionStatus.Trialing);
+        sub.TrialStartsAtUtc.Should().Be(trialStart);
+        sub.TrialEndsAtUtc.Should().Be(expectedTrialEnd);
+
+        _subscriptionsWrite.Verify(x => x.UpdateAsync(sub, It.IsAny<CancellationToken>()), Times.Once);
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
+        _resolver.Verify(x => x.Resolve(It.IsAny<BillingProvider>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_CancelOpenCheckoutSession_When_TrialUpgradeAppliedDirectly()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("T");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+
+        var staleSession = BillingCheckoutSession.CreatePending(
+            tid,
+            SubscriptionPlanCode.Basic,
+            SubscriptionPlanCode.Pro,
+            BillingProvider.Manual,
+            DateTime.UtcNow.AddMinutes(-5),
+            DateTime.UtcNow.AddMinutes(25));
+
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+        _planChangesRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<OpenScheduledPlanChangeByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ScheduledSubscriptionPlanChange?)null);
+        _checkoutSessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<OpenBillingCheckoutSessionByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(staleSession);
+
+        var billing = new BillingOptions { DefaultCheckoutProvider = "Manual" };
+        var handler = CreateHandler(billing);
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, "Pro"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TrialPlanChangeApplied.Should().BeTrue();
+        staleSession.Status.Should().Be(BillingCheckoutSessionStatus.Cancelled);
+        _checkoutSessionsWrite.Verify(x => x.UpdateAsync(staleSession, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TrialTenant_RequestsSamePlan_NoOp()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("T");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var billing = new BillingOptions { DefaultCheckoutProvider = "Manual" };
+        var handler = CreateHandler(billing);
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, "Basic"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.SamePlanAlreadyActive");
+        _subscriptionsWrite.Verify(x => x.UpdateAsync(It.IsAny<TenantSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -48,6 +48,25 @@ public sealed class TenantSubscription : AggregateRoot
         };
     }
 
+    /// <summary>
+    /// Deneme (trial) döneminde plan seçimi/yükseltme: 14 gün ücretsiz vaadi gereği ödeme farkı
+    /// hesaplanmaz ve checkout başlatılmaz (Model A). Seçilen plan doğrudan aktif plan olarak
+    /// yazılır; trial status, trial tarihleri ve billing period anchor'ı DEĞİŞMEZ. Ücretli akış
+    /// yalnızca trial bittiğinde (ör. ActivatePaidPlan ile) devreye girer.
+    /// </summary>
+    public void ChangePlanDuringTrial(SubscriptionPlanCode targetPlanCode, DateTime utcNow)
+    {
+        if (Status != TenantSubscriptionStatus.Trialing)
+        {
+            throw new InvalidOperationException(
+                "ChangePlanDuringTrial yalnızca Trialing durumundaki abonelikler için kullanılabilir.");
+        }
+
+        var now = NormalizeUtc(utcNow);
+        PlanCode = targetPlanCode;
+        UpdatedAtUtc = now;
+    }
+
     public void ActivatePaidPlan(SubscriptionPlanCode targetPlanCode, DateTime utcNow)
     {
         var now = NormalizeUtc(utcNow);

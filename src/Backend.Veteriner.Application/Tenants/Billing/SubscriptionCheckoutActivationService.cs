@@ -120,7 +120,8 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
             session.ExpiresAtUtc,
             null,
             null,
-            null);
+            null,
+            TrialPlanChangeApplied: false);
 
     private static string? ResolveCompletionReference(BillingCheckoutSession session, string? incomingReference)
     {

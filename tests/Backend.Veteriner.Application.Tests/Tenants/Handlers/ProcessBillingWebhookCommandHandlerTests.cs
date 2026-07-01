@@ -149,7 +149,8 @@ public sealed class ProcessBillingWebhookCommandHandlerTests
             null,
             null,
             null,
-            null);
+            null,
+            false);
 
         _clientContext.SetupGet(x => x.CorrelationId).Returns("corr-123");
         _clientContext.SetupGet(x => x.UserId).Returns(Guid.NewGuid());

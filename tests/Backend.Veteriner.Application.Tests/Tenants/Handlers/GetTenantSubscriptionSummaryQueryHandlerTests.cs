@@ -117,7 +117,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandlerTests
         _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Subscriptions.Read)).Returns(true);
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.Read)).Returns(false);
-        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.Create)).Returns(true);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Subscriptions.Manage)).Returns(true);
         _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
         _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
@@ -135,6 +135,32 @@ public sealed class GetTenantSubscriptionSummaryQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_SetCanManageSubscriptionFalse_When_MissingSubscriptionsManage()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("Acme");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Subscriptions.Read)).Returns(true);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.Read)).Returns(false);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Subscriptions.Manage)).Returns(false);
+        _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+        _planChanges.Setup(x => x.FirstOrDefaultAsync(It.IsAny<OpenScheduledPlanChangeByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ScheduledSubscriptionPlanChange?)null);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(new GetTenantSubscriptionSummaryQuery(tid), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.CanManageSubscription.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Handle_Should_Allow_CrossTenant_When_TenantsRead()
     {
         var jwtTenant = Guid.NewGuid();
@@ -146,7 +172,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandlerTests
         _tenantContext.SetupGet(x => x.TenantId).Returns(jwtTenant);
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Subscriptions.Read)).Returns(false);
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.Read)).Returns(true);
-        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.Create)).Returns(false);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Subscriptions.Manage)).Returns(false);
         _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
         _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))

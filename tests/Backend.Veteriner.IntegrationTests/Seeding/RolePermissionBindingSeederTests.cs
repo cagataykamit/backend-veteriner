@@ -123,6 +123,19 @@ public sealed class RolePermissionBindingSeederTests
         var clinicAdminDashboard = await db.OperationClaimPermissions
             .CountAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == dashboardReadId);
         clinicAdminDashboard.Should().Be(1, "ClinicAdmin rolü Dashboard.Read bağını almalı");
+
+        var subscriptionsManageId = await GetPermissionIdAsync(db, PermissionCatalog.Subscriptions.Manage);
+        var adminSubscriptionsManage = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == adminClaimId && x.PermissionId == subscriptionsManageId);
+        adminSubscriptionsManage.Should().Be(1, "Admin rolü Subscriptions.Manage bağını almalı");
+
+        var ownerSubscriptionsManage = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == ownerClaimId && x.PermissionId == subscriptionsManageId);
+        ownerSubscriptionsManage.Should().Be(1, "Owner rolü Subscriptions.Manage bağını almalı");
+
+        var clinicAdminSubscriptionsManage = await db.OperationClaimPermissions
+            .CountAsync(x => x.OperationClaimId == clinicAdminClaimId && x.PermissionId == subscriptionsManageId);
+        clinicAdminSubscriptionsManage.Should().Be(0, "ClinicAdmin rolü Subscriptions.Manage bağını almamalı");
     }
 
     [Fact]
@@ -264,7 +277,6 @@ public sealed class RolePermissionBindingSeederTests
             PermissionCatalog.Users.Write,
             PermissionCatalog.Admin.Diagnostics,
             PermissionCatalog.Tenants.Create,
-            PermissionCatalog.Subscriptions.Manage,
         };
 
         foreach (var code in systemPermissionCodes)
@@ -378,7 +390,7 @@ public sealed class RolePermissionBindingSeederTests
         tenantAdminPermCount.Should().Be(expectedAdminMapSize,
             "Tenant Admin claim yalnız RolePermissionBindings.Map[\"Admin\"] içeriğine sahip olmalı");
 
-        // Tenant Admin claim'inde sistem permission'ları olmamalı.
+        // Tenant Admin claim'inde sistem permission'ları olmamalı; abonelik yönetimi tenant Admin/Owner paketindedir.
         var systemCodes = new[]
         {
             PermissionCatalog.Outbox.Read,
@@ -388,7 +400,6 @@ public sealed class RolePermissionBindingSeederTests
             PermissionCatalog.Permissions.Write,
             PermissionCatalog.Users.Write,
             PermissionCatalog.Tenants.Create,
-            PermissionCatalog.Subscriptions.Manage,
         };
         foreach (var code in systemCodes)
         {
@@ -398,5 +409,10 @@ public sealed class RolePermissionBindingSeederTests
             hasSystemLink.Should().BeFalse(
                 $"Tenant Admin claim '{code}' sistem permission'ını içermemeli (Faz 4B-6 ayrımı)");
         }
+
+        var subscriptionsManageId = await GetPermissionIdAsync(db, PermissionCatalog.Subscriptions.Manage);
+        var hasSubscriptionsManage = await db.OperationClaimPermissions
+            .AnyAsync(x => x.OperationClaimId == tenantAdminClaimId && x.PermissionId == subscriptionsManageId);
+        hasSubscriptionsManage.Should().BeTrue("Tenant Admin claim Subscriptions.Manage içermeli");
     }
 }

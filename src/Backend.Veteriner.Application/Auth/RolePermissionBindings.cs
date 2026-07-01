@@ -115,6 +115,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Tenants.InviteCreate,
 
                 PermissionCatalog.Subscriptions.Read,
+                PermissionCatalog.Subscriptions.Manage,
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Species.Create,
@@ -138,8 +139,6 @@ public static class RolePermissionBindings
             ],
 
             // Tenant sahibi: Admin ile aynı operasyonel paket (ürün kararı: Owner ≈ Admin).
-            // Subscriptions.Manage burada verilmez — abonelik checkout/aktivasyonu ayrı bir karar; gerekirse
-            // ileride genişletilir.
             ["Owner"] =
             [
                 PermissionCatalog.Dashboard.Read,
@@ -202,6 +201,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Tenants.InviteCreate,
 
                 PermissionCatalog.Subscriptions.Read,
+                PermissionCatalog.Subscriptions.Manage,
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Species.Create,

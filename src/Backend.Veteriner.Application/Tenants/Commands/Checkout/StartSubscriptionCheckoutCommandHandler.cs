@@ -17,6 +17,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<TenantSubscription> _subscriptionsRead;
+    private readonly IRepository<TenantSubscription> _subscriptionsWrite;
     private readonly IRepository<ScheduledSubscriptionPlanChange> _planChangesWrite;
     private readonly IReadRepository<ScheduledSubscriptionPlanChange> _planChangesRead;
     private readonly IRepository<BillingCheckoutSession> _checkoutSessionsWrite;
@@ -29,6 +30,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<TenantSubscription> subscriptionsRead,
+        IRepository<TenantSubscription> subscriptionsWrite,
         IRepository<ScheduledSubscriptionPlanChange> planChangesWrite,
         IReadRepository<ScheduledSubscriptionPlanChange> planChangesRead,
         IRepository<BillingCheckoutSession> checkoutSessionsWrite,
@@ -40,6 +42,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         _tenantContext = tenantContext;
         _tenants = tenants;
         _subscriptionsRead = subscriptionsRead;
+        _subscriptionsWrite = subscriptionsWrite;
         _planChangesWrite = planChangesWrite;
         _planChangesRead = planChangesRead;
         _checkoutSessionsWrite = checkoutSessionsWrite;
@@ -109,6 +112,15 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             openPlanChange.Cancel(DateTime.UtcNow);
             await _planChangesWrite.UpdateAsync(openPlanChange, ct);
             await _planChangesWrite.SaveChangesAsync(ct);
+        }
+
+        // Trial vaadi (14 gün ücretsiz): deneme dönemindeki kiracı için plan yükseltmesi asla ödeme
+        // farkı hesaplamaz ve checkout başlatmaz (Model A / Seçenek A). Seçilen plan doğrudan
+        // subscription üzerine yazılır; trial status/tarihleri değişmez. Bkz. StartSubscriptionCheckoutCommandHandlerTests
+        // (Trial_*) ve TenantSubscription.ChangePlanDuringTrial.
+        if (sub.Status == TenantSubscriptionStatus.Trialing)
+        {
+            return await ApplyTrialPlanChangeAsync(request.TenantId, sub, targetPlanCode, now, ct);
         }
 
         string? chargeCurrency = null;
@@ -230,6 +242,58 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         return Result<SubscriptionCheckoutSessionDto>.Success(Map(session, afterPrepare, chargeCurrency, proratedChargeMinor, prorationRatio));
     }
 
+    /// <summary>
+    /// Trial dönemindeki plan yükseltmesini ücretsiz uygular (Model A / Seçenek A): checkout session
+    /// oluşturulmaz, ödeme farkı hesaplanmaz. Trial status ve tarihleri değişmez.
+    /// </summary>
+    private async Task<Result<SubscriptionCheckoutSessionDto>> ApplyTrialPlanChangeAsync(
+        Guid tenantId,
+        TenantSubscription sub,
+        SubscriptionPlanCode targetPlanCode,
+        DateTime now,
+        CancellationToken ct)
+    {
+        var previousPlanCode = sub.PlanCode;
+
+        // Trial'da önceden (hatalı akışla) açılmış bir checkout session kalmışsa iptal edilir;
+        // trial döneminde açık/ödeme bekleyen bir session bulunmamalıdır.
+        var openCheckout = await _checkoutSessionsRead.FirstOrDefaultAsync(
+            new OpenBillingCheckoutSessionByTenantSpec(tenantId, now), ct);
+        if (openCheckout is not null && openCheckout.IsOpen(now))
+        {
+            openCheckout.MarkCancelled(now);
+            await _checkoutSessionsWrite.UpdateAsync(openCheckout, ct);
+            await _checkoutSessionsWrite.SaveChangesAsync(ct);
+        }
+
+        sub.ChangePlanDuringTrial(targetPlanCode, now);
+        await _subscriptionsWrite.UpdateAsync(sub, ct);
+        await _subscriptionsWrite.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Trial dönemindeki kiracı için plan değişikliği ücretsiz uygulandı: Tenant {TenantId}, {CurrentPlan} -> {TargetPlan}. Checkout session oluşturulmadı.",
+            tenantId,
+            SubscriptionPlanCatalog.ToApiCode(previousPlanCode),
+            SubscriptionPlanCatalog.ToApiCode(targetPlanCode));
+
+        var dto = new SubscriptionCheckoutSessionDto(
+            CheckoutSessionId: null,
+            TenantId: tenantId,
+            CurrentPlanCode: SubscriptionPlanCatalog.ToApiCode(previousPlanCode),
+            TargetPlanCode: SubscriptionPlanCatalog.ToApiCode(targetPlanCode),
+            Status: null,
+            Provider: null,
+            CheckoutUrl: null,
+            CanContinue: false,
+            ExpiresAtUtc: null,
+            ChargeCurrencyCode: null,
+            ProratedChargeMinor: 0,
+            ProrationRatio: null,
+            TrialPlanChangeApplied: true);
+
+        return Result<SubscriptionCheckoutSessionDto>.Success(dto);
+    }
+
     private static SubscriptionCheckoutSessionDto Map(
         BillingCheckoutSession session,
         DateTime utcNow,
@@ -249,7 +313,8 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             session.ExpiresAtUtc,
             chargeCurrency,
             proratedChargeMinor,
-            prorationRatio);
+            prorationRatio,
+            TrialPlanChangeApplied: false);
     }
 
     private static string ResolvePlanPriceCurrency(BillingOptions options)

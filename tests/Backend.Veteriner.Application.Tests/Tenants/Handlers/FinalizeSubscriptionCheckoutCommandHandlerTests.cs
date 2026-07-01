@@ -53,7 +53,8 @@ public sealed class FinalizeSubscriptionCheckoutCommandHandlerTests
             null,
             null,
             null,
-            null);
+            null,
+            false);
 
         _activation.Setup(x => x.TryActivateAsync(
                 sid,

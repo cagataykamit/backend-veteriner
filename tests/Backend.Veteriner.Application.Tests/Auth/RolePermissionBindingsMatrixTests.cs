@@ -106,6 +106,7 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Tenants.Read },
         new object[] { PermissionCatalog.Tenants.InviteCreate },
         new object[] { PermissionCatalog.Subscriptions.Read },
+        new object[] { PermissionCatalog.Subscriptions.Manage },
 
         new object[] { PermissionCatalog.Species.Read },
         new object[] { PermissionCatalog.Species.Create },
@@ -137,7 +138,7 @@ public sealed class RolePermissionBindingsMatrixTests
     [MemberData(nameof(AdminExpectedPermissions))]
     public void Owner_Should_Contain_Same_Operational_Permissions_As_Admin(string code)
     {
-        // Ürün kararı: Owner ≈ Admin (operasyon paketi aynı). Subscriptions.Manage burada verilmedi.
+        // Ürün kararı: Owner ≈ Admin (operasyon paketi aynı).
         Perms("Owner").Should().Contain(code);
     }
 
@@ -345,7 +346,6 @@ public sealed class RolePermissionBindingsMatrixTests
         admin.Should().NotContain(PermissionCatalog.Permissions.Write);
         admin.Should().NotContain(PermissionCatalog.Users.Write);
         admin.Should().NotContain(PermissionCatalog.Tenants.Create);
-        admin.Should().NotContain(PermissionCatalog.Subscriptions.Manage);
     }
 
     [Fact]

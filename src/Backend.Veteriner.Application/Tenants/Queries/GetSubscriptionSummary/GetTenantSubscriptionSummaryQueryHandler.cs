@@ -111,7 +111,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         }
 
         var isReadOnly = !TenantSubscriptionEffectiveWriteEvaluator.WriteAllowed(effectiveStatus);
-        var canManage = _permissions.HasPermission(PermissionCatalog.Tenants.Create);
+        var canManage = _permissions.HasPermission(PermissionCatalog.Subscriptions.Manage);
         var period = TenantSubscriptionPeriodCalculator.ResolveCurrentWindow(sub, utcNow);
 
         var planCodeStr = SubscriptionPlanCatalog.ToApiCode(sub.PlanCode);

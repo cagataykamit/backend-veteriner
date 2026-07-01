@@ -60,7 +60,8 @@ public sealed class GetSubscriptionCheckoutQueryHandler
             session.ExpiresAtUtc,
             null,
             null,
-            null);
+            null,
+            TrialPlanChangeApplied: false);
 
         return Result<SubscriptionCheckoutSessionDto>.Success(dto);
     }
