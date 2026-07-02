@@ -136,20 +136,64 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
         invoiceDoorNo = (string?)null
     };
 
-    private static object ValidBody() => new
+    [Fact]
+    public async Task PutBillingProfile_Should_Return400_ValidationFluentValidation_When_PhoneInvalid()
     {
-        companyName = "YağmurVet",
-        legalCompanyName = "YağmurVet Veteriner Hizmetleri",
-        taxOffice = "Kadıköy",
-        taxNumber = "1234567890",
-        companyPhone = "+905551234567",
-        invoiceProvince = "İstanbul",
-        invoiceDistrict = "Kadıköy",
-        invoiceNeighborhood = "Caferağa",
-        invoiceStreet = "Moda Cd.",
-        invoiceBuildingName = "Vet Plaza",
-        invoiceBuildingNo = "12",
-        invoiceDoorNo = "4"
+        var client = _factory.CreateClient();
+        var (_, _, token) = await SeedTenantAndIssueTokenAsync([PermissionCatalog.Tenants.InviteCreate]);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.PutAsJsonAsync(
+            "/api/v1/organization/billing-profile",
+            ValidBody(companyPhone: "05551231"));
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+        ReadCodeFromProblemJson(doc).Should().Be("Validation.FluentValidation");
+        doc.TryGetProperty("errors", out var errors).Should().BeTrue();
+        errors.EnumerateObject().Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task PutBillingProfile_Should_Return400_ValidationFluentValidation_When_BuildingNoInvalid()
+    {
+        var client = _factory.CreateClient();
+        var (_, _, token) = await SeedTenantAndIssueTokenAsync([PermissionCatalog.Tenants.InviteCreate]);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.PutAsJsonAsync(
+            "/api/v1/organization/billing-profile",
+            ValidBody(invoiceBuildingNo: "aa"));
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+        ReadCodeFromProblemJson(doc).Should().Be("Validation.FluentValidation");
+    }
+
+    private static object ValidBody(
+        string companyName = "YağmurVet",
+        string legalCompanyName = "YağmurVet Veteriner Hizmetleri",
+        string taxOffice = "Kadıköy",
+        string taxNumber = "1234567890",
+        string companyPhone = "+905551234567",
+        string invoiceProvince = "İstanbul",
+        string invoiceDistrict = "Kadıköy",
+        string invoiceNeighborhood = "Caferağa",
+        string invoiceStreet = "Moda Cd.",
+        string? invoiceBuildingName = "Vet Plaza",
+        string invoiceBuildingNo = "12",
+        string invoiceDoorNo = "4") => new
+    {
+        companyName,
+        legalCompanyName,
+        taxOffice,
+        taxNumber,
+        companyPhone,
+        invoiceProvince,
+        invoiceDistrict,
+        invoiceNeighborhood,
+        invoiceStreet,
+        invoiceBuildingName,
+        invoiceBuildingNo,
+        invoiceDoorNo
     };
 
     private async Task<(Guid TenantId, string Token)> SeedTenantWithBillingProfileAsync(string companyName, string taxNumber)
@@ -218,5 +262,15 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
 
         var (accessToken, _, _) = jwt.Create(userId, $"it-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
         return (tenant.Id, userId, accessToken);
+    }
+
+    private static string? ReadCodeFromProblemJson(JsonElement json)
+    {
+        if (json.TryGetProperty("code", out var code))
+            return code.GetString();
+        if (json.TryGetProperty("extensions", out var ext)
+            && ext.TryGetProperty("code", out var extCode))
+            return extCode.GetString();
+        return null;
     }
 }
