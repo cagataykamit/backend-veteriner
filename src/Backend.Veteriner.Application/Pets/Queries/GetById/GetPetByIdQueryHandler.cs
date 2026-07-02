@@ -63,7 +63,11 @@ public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Re
             pet.BreedId,
             pet.Gender,
             pet.Weight,
-            pet.Notes);
+            pet.Notes,
+            pet.MicrochipNumber,
+            pet.PassportOrTagNumber,
+            pet.SpecialProtocolNumber,
+            pet.IsNeutered);
         return Result<PetDetailDto>.Success(dto);
     }
 }

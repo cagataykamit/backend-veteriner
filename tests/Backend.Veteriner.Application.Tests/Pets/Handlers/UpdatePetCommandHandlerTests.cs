@@ -143,6 +143,49 @@ public sealed class UpdatePetCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_UpdateIdentityFields_When_Provided()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var cmd = new UpdatePetCommand(
+            pid,
+            cid,
+            "Pamuk",
+            TestSpeciesIds.Cat,
+            MicrochipNumber: "982000123456789",
+            PassportOrTagNumber: "TR-12345",
+            SpecialProtocolNumber: "PROT-001",
+            IsNeutered: true);
+
+        var tenant = new Tenant("X");
+        AlignTenantId(tenant, tid);
+        var existing = new Pet(tid, cid, "Old", TestSpeciesIds.Cat, null, null);
+        typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(existing, pid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _petsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Client(tid, "Ali", null));
+        _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Species("CAT", "Kedi"));
+        _petsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByClientNameAndSpeciesIdExcludingIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Pet?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        existing.MicrochipNumber.Should().Be("982000123456789");
+        existing.PassportOrTagNumber.Should().Be("TR-12345");
+        existing.SpecialProtocolNumber.Should().Be("PROT-001");
+        existing.IsNeutered.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_ColorNotFound()
     {
         var handler = CreateHandler();

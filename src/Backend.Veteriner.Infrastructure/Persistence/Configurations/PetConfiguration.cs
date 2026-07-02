@@ -38,6 +38,19 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
         b.Property(x => x.Notes)
             .HasMaxLength(2000);
 
+        b.Property(x => x.MicrochipNumber)
+            .HasMaxLength(50);
+
+        b.Property(x => x.PassportOrTagNumber)
+            .HasMaxLength(50);
+
+        b.Property(x => x.SpecialProtocolNumber)
+            .HasMaxLength(50);
+
+        b.Property(x => x.IsNeutered)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         b.Property(x => x.Gender)
             .HasConversion<int>();
 

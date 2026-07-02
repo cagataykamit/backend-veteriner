@@ -19,4 +19,8 @@ public sealed record PetDetailDto(
     Guid? BreedId,
     PetGender? Gender,
     decimal? Weight,
-    string? Notes);
+    string? Notes,
+    string? MicrochipNumber,
+    string? PassportOrTagNumber,
+    string? SpecialProtocolNumber,
+    bool IsNeutered);

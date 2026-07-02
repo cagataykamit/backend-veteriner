@@ -300,8 +300,55 @@ public sealed class CreatePetCommandHandlerTests
         captured.Gender.Should().Be(PetGender.Female);
         captured.Weight.Should().Be(4.25m);
         captured.Notes.Should().Be("Sağlıklı, hafif kilo almış.");
+        captured.MicrochipNumber.Should().BeNull();
+        captured.PassportOrTagNumber.Should().BeNull();
+        captured.SpecialProtocolNumber.Should().BeNull();
+        captured.IsNeutered.Should().BeFalse();
 
         _petsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_CreatePet_WithIdentityFields_When_Provided()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var cmd = new CreatePetCommand(
+            cid,
+            "Pamuk",
+            TestSpeciesIds.Cat,
+            Gender: PetGender.Female,
+            MicrochipNumber: " 982000123456789 ",
+            PassportOrTagNumber: " TR-12345 ",
+            SpecialProtocolNumber: " PROT-001 ",
+            IsNeutered: true);
+
+        var tenant = new Tenant("X");
+        AlignTenantId(tenant, tid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Client(tid, "Ali", null));
+        _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Species("CAT", "Kedi"));
+        _petsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByClientNameAndSpeciesIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Pet?)null);
+
+        Pet? captured = null;
+        _petsWrite.Setup(r => r.AddAsync(It.IsAny<Pet>(), It.IsAny<CancellationToken>()))
+            .Callback<Pet, CancellationToken>((p, _) => captured = p);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured.Should().NotBeNull();
+        captured!.MicrochipNumber.Should().Be("982000123456789");
+        captured.PassportOrTagNumber.Should().Be("TR-12345");
+        captured.SpecialProtocolNumber.Should().Be("PROT-001");
+        captured.IsNeutered.Should().BeTrue();
     }
 
     [Fact]

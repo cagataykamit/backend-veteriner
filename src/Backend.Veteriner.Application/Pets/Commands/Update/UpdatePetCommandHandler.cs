@@ -120,7 +120,11 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
             request.Gender,
             request.ColorId,
             request.Weight,
-            request.Notes);
+            request.Notes,
+            request.MicrochipNumber,
+            request.PassportOrTagNumber,
+            request.SpecialProtocolNumber,
+            request.IsNeutered);
 
         await _petsWrite.UpdateAsync(pet, ct);
 

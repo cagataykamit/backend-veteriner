@@ -31,6 +31,18 @@ public sealed class Pet : AggregateRoot
     /// <summary>Klinik notları / veteriner gözlemleri; opsiyonel, serbest metin.</summary>
     public string? Notes { get; private set; }
 
+    /// <summary>Mikroçip numarası; opsiyonel.</summary>
+    public string? MicrochipNumber { get; private set; }
+
+    /// <summary>Karne / küpe numarası; opsiyonel.</summary>
+    public string? PassportOrTagNumber { get; private set; }
+
+    /// <summary>Özel protokol numarası; opsiyonel.</summary>
+    public string? SpecialProtocolNumber { get; private set; }
+
+    /// <summary>Kısırlaştırılmış mı; varsayılan false.</summary>
+    public bool IsNeutered { get; private set; }
+
     /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
     public Species? Species { get; private set; }
 
@@ -52,7 +64,11 @@ public sealed class Pet : AggregateRoot
         PetGender? gender = null,
         Guid? colorId = null,
         decimal? weight = null,
-        string? notes = null)
+        string? notes = null,
+        string? microchipNumber = null,
+        string? passportOrTagNumber = null,
+        string? specialProtocolNumber = null,
+        bool isNeutered = false)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -74,6 +90,10 @@ public sealed class Pet : AggregateRoot
         ColorId = colorId;
         Weight = weight;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        MicrochipNumber = NormalizeOptionalIdentityNumber(microchipNumber);
+        PassportOrTagNumber = NormalizeOptionalIdentityNumber(passportOrTagNumber);
+        SpecialProtocolNumber = NormalizeOptionalIdentityNumber(specialProtocolNumber);
+        IsNeutered = isNeutered;
     }
 
     public void UpdateDetails(
@@ -85,7 +105,11 @@ public sealed class Pet : AggregateRoot
         PetGender? gender = null,
         Guid? colorId = null,
         decimal? weight = null,
-        string? notes = null)
+        string? notes = null,
+        string? microchipNumber = null,
+        string? passportOrTagNumber = null,
+        string? specialProtocolNumber = null,
+        bool isNeutered = false)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Hayvan adı boş olamaz.", nameof(name));
@@ -100,5 +124,12 @@ public sealed class Pet : AggregateRoot
         ColorId = colorId;
         Weight = weight;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        MicrochipNumber = NormalizeOptionalIdentityNumber(microchipNumber);
+        PassportOrTagNumber = NormalizeOptionalIdentityNumber(passportOrTagNumber);
+        SpecialProtocolNumber = NormalizeOptionalIdentityNumber(specialProtocolNumber);
+        IsNeutered = isNeutered;
     }
+
+    private static string? NormalizeOptionalIdentityNumber(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

@@ -135,7 +135,11 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             request.Gender,
             request.ColorId,
             request.Weight,
-            request.Notes);
+            request.Notes,
+            request.MicrochipNumber,
+            request.PassportOrTagNumber,
+            request.SpecialProtocolNumber,
+            request.IsNeutered);
         await _petsWrite.AddAsync(pet, ct);
 
         // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).

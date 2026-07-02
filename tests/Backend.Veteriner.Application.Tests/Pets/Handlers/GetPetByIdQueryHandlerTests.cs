@@ -138,4 +138,40 @@ public sealed class GetPetByIdQueryHandlerTests
         result.Value.ClientPhone.Should().NotBeNullOrEmpty();
         result.Value.ClientEmail.Should().Be("ali@example.com");
     }
+
+    [Fact]
+    public async Task Handle_Should_MapIdentityFields_When_Set()
+    {
+        var tid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+
+        var species = new Species("CAT", "Kedi");
+        typeof(Species).GetProperty(nameof(Species.Id))!.SetValue(species, TestSpeciesIds.Cat);
+        var pet = new Pet(
+            tid,
+            cid,
+            "Pamuk",
+            TestSpeciesIds.Cat,
+            microchipNumber: "982000123456789",
+            passportOrTagNumber: "TR-12345",
+            specialProtocolNumber: "PROT-001",
+            isNeutered: true);
+        typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, pid);
+        typeof(Pet).GetProperty(nameof(Pet.Species))!.SetValue(pet, species);
+
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pet);
+        _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Client?)null);
+
+        var result = await CreateHandler().Handle(new GetPetByIdQuery(pid), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.MicrochipNumber.Should().Be("982000123456789");
+        result.Value.PassportOrTagNumber.Should().Be("TR-12345");
+        result.Value.SpecialProtocolNumber.Should().Be("PROT-001");
+        result.Value.IsNeutered.Should().BeTrue();
+    }
 }

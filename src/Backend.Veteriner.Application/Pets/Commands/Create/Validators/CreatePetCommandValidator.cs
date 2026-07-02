@@ -15,6 +15,9 @@ public sealed class CreatePetCommandValidator : AbstractValidator<CreatePetComma
         RuleFor(x => x.Name).NotEmpty().MinimumLength(1).MaximumLength(200);
         RuleFor(x => x.Breed).MaximumLength(150);
         RuleFor(x => x.Notes).MaximumLength(2000);
+        RuleFor(x => x.MicrochipNumber).MaximumLength(50);
+        RuleFor(x => x.PassportOrTagNumber).MaximumLength(50);
+        RuleFor(x => x.SpecialProtocolNumber).MaximumLength(50);
         RuleFor(x => x.Gender!.Value)
             .IsInEnum()
             .When(x => x.Gender.HasValue);
