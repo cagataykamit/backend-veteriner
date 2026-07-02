@@ -48,7 +48,7 @@
 		<ProjectReference Include="..\Backend.Veteriner.Domain\Backend.Veteriner.Domain.csproj" />
 	</ItemGroup>
 
-	<!-- Publish hygiene: dev/test overlays always excluded; Staging/Production overlay excluded for the other deploy target -->
+	<!-- Publish hygiene: dev/test/production overlays excluded; Staging overlay ships in artifact -->
 	<ItemGroup>
 		<Content Update="appsettings.Development.json">
 			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
@@ -59,10 +59,7 @@
 		<Content Update="appsettings.LoadTest.json">
 			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
 		</Content>
-		<Content Update="appsettings.Production.json" Condition="'$(EnvironmentName)' == 'Staging'">
-			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
-		</Content>
-		<Content Update="appsettings.Staging.json" Condition="'$(EnvironmentName)' == 'Production'">
+		<Content Update="appsettings.Production.json">
 			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
 		</Content>
 	</ItemGroup>
