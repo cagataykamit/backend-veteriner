@@ -38,6 +38,63 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
             _resolver.Object,
             NullLogger<StartSubscriptionCheckoutCommandHandler>.Instance);
 
+    private static BillingOptions CreateBillingOptions()
+        => new()
+        {
+            DefaultCheckoutProvider = "Manual",
+            PlanPricesMinor = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Basic"] = 10_000L,
+                ["Pro"] = 20_000L,
+                ["Premium"] = 30_000L,
+            },
+        };
+
+    private static Tenant CreateTenant(Guid tenantId)
+    {
+        var tenant = new Tenant("T");
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
+        return tenant;
+    }
+
+    private static TenantSubscription CreateExpiredReadOnlyPaidSubscription(
+        Guid tenantId,
+        SubscriptionPlanCode planCode)
+    {
+        var sub = TenantSubscription.StartTrial(tenantId, planCode, DateTime.UtcNow.AddDays(-60), 14);
+        sub.ActivatePaidPlan(planCode, DateTime.UtcNow.AddDays(-46));
+        typeof(TenantSubscription).GetProperty(nameof(TenantSubscription.Status))!
+            .SetValue(sub, TenantSubscriptionStatus.ReadOnly);
+        return sub;
+    }
+
+    private void SetupCheckoutInfrastructure(
+        Guid tenantId,
+        Tenant tenant,
+        TenantSubscription sub,
+        BillingCheckoutSession? existingOpenSession = null)
+    {
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+        _planChangesRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<OpenScheduledPlanChangeByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ScheduledSubscriptionPlanChange?)null);
+        _checkoutSessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<OpenBillingCheckoutSessionByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingOpenSession);
+    }
+
+    private void SetupManualCheckoutProvider(long chargeMinor = 30_000L)
+    {
+        var manualProvider = new Mock<IBillingCheckoutProvider>();
+        manualProvider.SetupGet(x => x.Provider).Returns(BillingProvider.Manual);
+        manualProvider
+            .Setup(x => x.PrepareCheckoutAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<string?>(), It.IsAny<long?>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<CheckoutPrepareResult>.Success(new CheckoutPrepareResult("https://checkout/new", "ext-new", "TRY", chargeMinor, 1.0m)));
+        _resolver.Setup(x => x.Resolve(BillingProvider.Manual)).Returns(manualProvider.Object);
+    }
+
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantMismatch()
     {
@@ -355,5 +412,125 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         result.Error.Code.Should().Be("Subscriptions.SamePlanAlreadyActive");
         _subscriptionsWrite.Verify(x => x.UpdateAsync(It.IsAny<TenantSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
         _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnSuccess_When_ExpiredReadOnly_RequestsSamePlanRenewal()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Premium);
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+        SetupManualCheckoutProvider(30_000L);
+
+        var handler = CreateHandler(CreateBillingOptions());
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, "Premium"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TargetPlanCode.Should().Be("Premium");
+        result.Value.CurrentPlanCode.Should().Be("Premium");
+        result.Value.ProratedChargeMinor.Should().Be(30_000L);
+        result.Value.ProrationRatio.Should().Be(1.0m);
+        result.Value.TrialPlanChangeApplied.Should().BeFalse();
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnSuccess_When_ExpiredReadOnly_RequestsLowerPlan()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Premium);
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+        SetupManualCheckoutProvider(10_000L);
+
+        var handler = CreateHandler(CreateBillingOptions());
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, "Basic"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TargetPlanCode.Should().Be("Basic");
+        result.Value.CurrentPlanCode.Should().Be("Premium");
+        result.Value.ProratedChargeMinor.Should().Be(10_000L);
+        result.Value.ProrationRatio.Should().Be(1.0m);
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnSuccess_When_ExpiredReadOnly_RequestsHigherPlan()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Basic);
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+        SetupManualCheckoutProvider();
+
+        var handler = CreateHandler(CreateBillingOptions());
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, "Pro"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TargetPlanCode.Should().Be("Pro");
+        result.Value.CurrentPlanCode.Should().Be("Basic");
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ActivePaid_RequestsSamePlan()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Premium, DateTime.UtcNow.AddDays(-30), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Premium, DateTime.UtcNow.AddDays(-16));
+
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+
+        var handler = CreateHandler(CreateBillingOptions());
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, "Premium"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.SamePlanAlreadyActive");
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ActivePaid_RequestsDowngrade()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Premium, DateTime.UtcNow.AddDays(-30), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Premium, DateTime.UtcNow.AddDays(-16));
+
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+
+        var handler = CreateHandler(CreateBillingOptions());
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, "Basic"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.DowngradeMustBeScheduled");
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnSuccess_When_ExpiredTrialEffectiveReadOnly_RequestsSamePlanRenewal()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = TenantSubscription.StartTrial(
+            tid,
+            SubscriptionPlanCode.Basic,
+            new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            trialDays: 0);
+
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+        SetupManualCheckoutProvider(10_000L);
+
+        var handler = CreateHandler(CreateBillingOptions());
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, "Basic"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TargetPlanCode.Should().Be("Basic");
+        result.Value.TrialPlanChangeApplied.Should().BeFalse();
+        result.Value.CheckoutSessionId.Should().NotBeNull();
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
+        _subscriptionsWrite.Verify(x => x.UpdateAsync(It.IsAny<TenantSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

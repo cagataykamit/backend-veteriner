@@ -91,19 +91,23 @@ public sealed class StartSubscriptionCheckoutCommandHandler
                 "İptal edilmiş abonelik için checkout başlatılamaz.");
         }
 
+        var isExpiredReadOnly = effective == TenantSubscriptionStatus.ReadOnly;
         var decision = SubscriptionPlanChangeDecider.Decide(sub.PlanCode, targetPlanCode);
-        if (decision == SubscriptionPlanChangeDecision.Same)
+        if (!isExpiredReadOnly)
         {
-            return Result<SubscriptionCheckoutSessionDto>.Failure(
-                "Subscriptions.SamePlanAlreadyActive",
-                "Kiracı zaten seçilen planda.");
-        }
+            if (decision == SubscriptionPlanChangeDecision.Same)
+            {
+                return Result<SubscriptionCheckoutSessionDto>.Failure(
+                    "Subscriptions.SamePlanAlreadyActive",
+                    "Kiracı zaten seçilen planda.");
+            }
 
-        if (decision == SubscriptionPlanChangeDecision.Downgrade)
-        {
-            return Result<SubscriptionCheckoutSessionDto>.Failure(
-                "Subscriptions.DowngradeMustBeScheduled",
-                "Downgrade için checkout açılmaz; plan değişikliği schedule edilmelidir.");
+            if (decision == SubscriptionPlanChangeDecision.Downgrade)
+            {
+                return Result<SubscriptionCheckoutSessionDto>.Failure(
+                    "Subscriptions.DowngradeMustBeScheduled",
+                    "Downgrade için checkout açılmaz; plan değişikliği schedule edilmelidir.");
+            }
         }
 
         var openPlanChange = await _planChangesRead.FirstOrDefaultAsync(new OpenScheduledPlanChangeByTenantSpec(request.TenantId), ct);
@@ -118,7 +122,8 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         // farkı hesaplamaz ve checkout başlatmaz (Model A / Seçenek A). Seçilen plan doğrudan
         // subscription üzerine yazılır; trial status/tarihleri değişmez. Bkz. StartSubscriptionCheckoutCommandHandlerTests
         // (Trial_*) ve TenantSubscription.ChangePlanDuringTrial.
-        if (sub.Status == TenantSubscriptionStatus.Trialing)
+        // Süresi dolmuş trial (effective ReadOnly) bu yola girmez; yenileme checkout'u ödeme ile devam eder.
+        if (sub.Status == TenantSubscriptionStatus.Trialing && !isExpiredReadOnly)
         {
             return await ApplyTrialPlanChangeAsync(request.TenantId, sub, targetPlanCode, now, ct);
         }
@@ -126,9 +131,23 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         string? chargeCurrency = null;
         long? proratedChargeMinor = null;
         decimal? prorationRatio = null;
-        if (decision == SubscriptionPlanChangeDecision.Upgrade)
+        var prices = _billingOptions.Value;
+        if (isExpiredReadOnly
+            && decision is SubscriptionPlanChangeDecision.Same or SubscriptionPlanChangeDecision.Downgrade)
         {
-            var prices = _billingOptions.Value;
+            if (!TryGetPlanPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
+            {
+                return Result<SubscriptionCheckoutSessionDto>.Failure(
+                    "Billing.PlanPriceNotConfigured",
+                    "Yenileme için hedef plan fiyatı (minor unit) yapılandırılmalı.");
+            }
+
+            chargeCurrency = ResolvePlanPriceCurrency(prices);
+            proratedChargeMinor = Math.Max(1, targetPriceMinor);
+            prorationRatio = 1.0m;
+        }
+        else if (decision == SubscriptionPlanChangeDecision.Upgrade)
+        {
             if (!TryGetPlanPriceMinor(prices, sub.PlanCode, out var currentPriceMinor)
                 || !TryGetPlanPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
             {
