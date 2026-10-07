@@ -70,17 +70,21 @@ public sealed class TenantSubscription : AggregateRoot
     public void ActivatePaidPlan(SubscriptionPlanCode targetPlanCode, DateTime utcNow)
     {
         var now = NormalizeUtc(utcNow);
-        if (Status == TenantSubscriptionStatus.Active && PlanCode == targetPlanCode)
+        var anchor = ActivatedAtUtc;
+        var currentPeriodExpired = anchor.HasValue && anchor.Value.AddMonths(1) <= now;
+
+        if (Status == TenantSubscriptionStatus.Active && PlanCode == targetPlanCode && !currentPeriodExpired)
         {
             UpdatedAtUtc = now;
             return;
         }
 
-        // Billing cycle anchor korunur: aktif abonelikte plan geçişi anchor'ı reset etmez.
-        var anchor = ActivatedAtUtc;
+        // Billing cycle anchor korunur: süresi dolmamış aktif abonelikte plan geçişi (upgrade) anchor'ı
+        // reset etmez. Ancak önceki ödeme dönemi süresi dolmuşsa (renewal), anchor yeni ödeme zamanına
+        // taşınır; aksi halde ödeme tamamlansa bile abonelik hemen tekrar ReadOnly'e düşerdi.
         PlanCode = targetPlanCode;
         Status = TenantSubscriptionStatus.Active;
-        ActivatedAtUtc = anchor ?? now;
+        ActivatedAtUtc = currentPeriodExpired || anchor is null ? now : anchor.Value;
         CancelledAtUtc = null;
         UpdatedAtUtc = now;
     }

@@ -474,6 +474,31 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnSuccess_When_ActivePaid_PeriodExpired_RequestsSamePlanRenewal()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        // Status alanı persiste edilmiş şekilde "Active" kalır (gerçek DB davranışı); süresi dolmuş
+        // olması effective status hesaplamasıyla (ActivatedAtUtc.AddMonths(1) <= now) ReadOnly'e döner.
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Premium, DateTime.UtcNow.AddDays(-60), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Premium, DateTime.UtcNow.AddDays(-46));
+
+        sub.Status.Should().Be(TenantSubscriptionStatus.Active);
+
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+        SetupManualCheckoutProvider(30_000L);
+
+        var handler = CreateHandler(CreateBillingOptions());
+        var result = await handler.Handle(new StartSubscriptionCheckoutCommand(tid, "Premium"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TargetPlanCode.Should().Be("Premium");
+        result.Value.CurrentPlanCode.Should().Be("Premium");
+        result.Value.ProratedChargeMinor.Should().Be(30_000L);
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_ActivePaid_RequestsSamePlan()
     {
         var tid = Guid.NewGuid();

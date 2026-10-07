@@ -18,15 +18,13 @@ public static class TenantSubscriptionPeriodCalculator
             return new TenantSubscriptionPeriodWindow(EnsureUtc(trialStart), EnsureUtc(trialEnd), EnsureUtc(trialStart));
         }
 
+        // Ücretli (Active/ReadOnly/Cancelled) abonelikte dönem otomatik ileri sarılmaz: paid period
+        // her zaman ActivatedAtUtc ile başlar ve ActivatedAtUtc.AddMonths(1)'de biter. Dönem sonu
+        // geçmişte kalsa bile (ödeme alınmadıysa) effective status ReadOnly'e döner; period pencereni
+        // ileri sarmak bu durumu maskeler ve ücretsiz sonsuz erişime yol açardı.
         var anchor = EnsureUtc(sub.ActivatedAtUtc ?? sub.TrialStartsAtUtc ?? now);
         var periodStart = anchor;
         var periodEnd = periodStart.AddMonths(1);
-
-        while (periodEnd <= now)
-        {
-            periodStart = periodEnd;
-            periodEnd = periodStart.AddMonths(1);
-        }
 
         return new TenantSubscriptionPeriodWindow(periodStart, periodEnd, anchor);
     }

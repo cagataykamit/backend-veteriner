@@ -150,4 +150,47 @@ public sealed class SubscriptionCheckoutActivationServiceTests
         _subscriptionsWrite.Verify(x => x.UpdateAsync(sub, It.IsAny<CancellationToken>()), Times.Once);
         _sessionsWrite.Verify(x => x.UpdateAsync(session, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task TryActivateAsync_Should_RefreshActivatedAtUtc_When_RenewingExpiredActiveSubscription()
+    {
+        var tenantId = Guid.NewGuid();
+        var session = BillingCheckoutSession.CreatePending(
+            tenantId,
+            SubscriptionPlanCode.Premium,
+            SubscriptionPlanCode.Premium,
+            BillingProvider.Manual,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(30));
+
+        // Süresi dolmuş (renewal öncesi) aktif ücretli abonelik: persiste edilen Status "Active" ama
+        // ActivatedAtUtc.AddMonths(1) geçmişte kaldığı için effective status ReadOnly'dir.
+        var oldActivatedAt = DateTime.UtcNow.AddDays(-46);
+        var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Premium, oldActivatedAt.AddDays(-14), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Premium, oldActivatedAt);
+
+        _sessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<BillingCheckoutSessionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+        _sessionsWrite.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var svc = CreateService();
+        var utcNow = DateTime.UtcNow;
+        var result = await svc.TryActivateAsync(
+            session.Id,
+            tenantIdConstraint: tenantId,
+            providerMustMatch: null,
+            externalReference: "manual_renewal_ref",
+            source: BillingActivationSource.Manual,
+            ct: CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        sub.Status.Should().Be(TenantSubscriptionStatus.Active);
+        sub.ActivatedAtUtc.Should().BeCloseTo(utcNow, TimeSpan.FromSeconds(5));
+
+        var effectiveAfterRenewal = Backend.Veteriner.Application.Tenants.TenantSubscriptionEffectiveWriteEvaluator
+            .GetEffectiveStatus(sub, utcNow);
+        effectiveAfterRenewal.Should().Be(TenantSubscriptionStatus.Active);
+    }
 }

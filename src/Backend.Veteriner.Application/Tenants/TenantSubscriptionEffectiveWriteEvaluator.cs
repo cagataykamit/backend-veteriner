@@ -31,6 +31,15 @@ public sealed class TenantSubscriptionEffectiveWriteEvaluator
             return TenantSubscriptionStatus.ReadOnly;
         }
 
+        // Ücretli Active abonelikte de dönem sonu kontrolü yapılır: ActivatedAtUtc.AddMonths(1) geçmişse
+        // ve ödeme ile yenilenmemişse abonelik salt okunur sayılır (bkz. TenantSubscriptionPeriodCalculator).
+        if (sub.Status == TenantSubscriptionStatus.Active
+            && sub.ActivatedAtUtc.HasValue
+            && sub.ActivatedAtUtc.Value.AddMonths(1) <= utcNow)
+        {
+            return TenantSubscriptionStatus.ReadOnly;
+        }
+
         return sub.Status;
     }
 
