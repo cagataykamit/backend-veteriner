@@ -108,37 +108,39 @@ public sealed class Examination : AggregateRoot
     }
 
     /// <summary>
-    /// Klinik içerik güncellemesi; <see cref="ClinicId"/>, <see cref="PetId"/> ve <see cref="AppointmentId"/> değişmez.
+    /// Kısmi klinik içerik güncellemesi; <see cref="ClinicId"/>, <see cref="PetId"/> ve <see cref="AppointmentId"/> değişmez.
+    /// Kural: <c>null</c> = mevcut değere dokunma; metinde boş/boşluk = temizle; vitalleri temizlemek için
+    /// <see cref="ExaminationClinicalUpdate.ClearVitals"/> (vital değer/ölçüm zamanı ile birlikte verilemez).
     /// </summary>
-    public Result UpdateClinicalContent(
-        DateTime examinedAtUtc,
-        string visitReason,
-        string? findings,
-        string? assessment,
-        string? notes,
-        string? anamnesis,
-        string? plan,
-        decimal? weightKg,
-        decimal? temperatureC,
-        int? heartRateBpm,
-        int? respiratoryRatePerMin,
-        DateTime? vitalsMeasuredAtUtc)
+    public Result UpdateClinicalContent(ExaminationClinicalUpdate update)
     {
-        if (string.IsNullOrWhiteSpace(visitReason))
+        if (string.IsNullOrWhiteSpace(update.VisitReason))
             return Result.Failure("Examinations.Validation", "VisitReason bos olamaz.");
 
-        var vitals = ValidateVitals(weightKg, temperatureC, heartRateBpm, respiratoryRatePerMin, vitalsMeasuredAtUtc);
+        if (update.ClearVitals && update.HasVitalInput)
+        {
+            return Result.Failure(
+                "Examinations.Validation",
+                "ClearVitals ile vital değer veya VitalsMeasuredAtUtc birlikte gönderilemez.");
+        }
+
+        var weightKg = update.ClearVitals ? null : update.WeightKg ?? WeightKg;
+        var temperatureC = update.ClearVitals ? null : update.TemperatureC ?? TemperatureC;
+        var heartRateBpm = update.ClearVitals ? null : update.HeartRateBpm ?? HeartRateBpm;
+        var respiratoryRatePerMin = update.ClearVitals ? null : update.RespiratoryRatePerMin ?? RespiratoryRatePerMin;
+
+        var vitals = ValidateVitals(weightKg, temperatureC, heartRateBpm, respiratoryRatePerMin, update.VitalsMeasuredAtUtc);
         if (!vitals.IsSuccess)
             return vitals;
 
-        ExaminedAtUtc = NormalizeUtc(examinedAtUtc);
-        VisitReason = visitReason.Trim();
-        Anamnesis = NormalizeOptional(anamnesis);
-        Findings = findings?.Trim() ?? string.Empty;
-        Assessment = NormalizeOptional(assessment);
-        Plan = NormalizeOptional(plan);
-        Notes = NormalizeOptional(notes);
-        ApplyVitals(weightKg, temperatureC, heartRateBpm, respiratoryRatePerMin, vitalsMeasuredAtUtc);
+        ExaminedAtUtc = NormalizeUtc(update.ExaminedAtUtc);
+        VisitReason = update.VisitReason.Trim();
+        Anamnesis = MergeOptional(Anamnesis, update.Anamnesis);
+        Findings = MergeOptional(Findings, update.Findings) ?? string.Empty;
+        Assessment = MergeOptional(Assessment, update.Assessment);
+        Plan = MergeOptional(Plan, update.Plan);
+        Notes = MergeOptional(Notes, update.Notes);
+        ApplyVitals(weightKg, temperatureC, heartRateBpm, respiratoryRatePerMin, update.VitalsMeasuredAtUtc);
         UpdatedAtUtc = DateTime.UtcNow;
         return Result.Success();
     }
@@ -211,6 +213,10 @@ public sealed class Examination : AggregateRoot
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary><c>null</c> = mevcut değer korunur; aksi halde <see cref="NormalizeOptional"/> (boş/boşluk → null).</summary>
+    private static string? MergeOptional(string? current, string? incoming)
+        => incoming is null ? current : NormalizeOptional(incoming);
 
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch

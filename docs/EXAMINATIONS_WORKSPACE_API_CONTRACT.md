@@ -34,6 +34,15 @@ Yeni özet endpoint eklenmedi.
 - Eşzamanlı güncelleme çakışması → `409` + `Examinations.ConcurrencyConflict`.
 - Başarılı `POST` / `PUT` yanıt gövdesi: `ExaminationWriteResultDto` (`id`, `rowVersion`).
 
+### `409` sonrası akış
+
+1. Sunucu çakışmada kaydı **değiştirmez**; veriler birleştirilmez.
+2. İstemci `GET /api/v1/examinations/{id}` ile güncel kaydı ve **yeni** `rowVersion` değerini alır.
+3. Kullanıcının bekleyen değişikliklerini güncel kayıt üzerine uygular (yalnızca değiştirdiği alanları göndermek, başkasının yazdığı alanların ezilmesini önler).
+4. Yeni `rowVersion` ile PUT’u yeniden dener. Aynı eski `rowVersion` ile tekrar denemek yine `409` döner.
+
+Çakışma tespiti veritabanı `rowversion` belirtecine dayanır; iki oturumun aynı eski sürümle yazması entegrasyon testinde (DbContext düzeyinde) doğrulandı, HTTP uçtan uca çağrı yapılmadı.
+
 ---
 
 ## `POST /api/v1/examinations`
@@ -141,7 +150,29 @@ Eski kayıtlar: yeni alanlar `null` / `findings` `""`; `rowVersion` migration so
 
 ### İstek
 
-`POST` ile aynı klinik alanları + zorunlu `rowVersion`.
+`POST` ile aynı klinik alanları + zorunlu `rowVersion` + isteğe bağlı `clearVitals` (aşağıda). PUT **kısmi güncellemedir**.
+
+**Her zaman gönderilmesi gerekenler:** `rowVersion`, `examinedAtUtc`, `visitReason` (veya legacy `complaint`).
+
+**Alan kuralı (null = dokunma)**
+
+| Alan | Gövdede yok / `null` | `""` veya yalnızca boşluk | Dolu değer |
+|------|----------------------|---------------------------|------------|
+| `findings` | mevcut değer korunur | temizlenir → kayıtta `""` | kaydedilir (baş/son boşluk kırpılır) |
+| `anamnesis`, `assessment`, `plan`, `notes` | mevcut değer korunur | temizlenir → `null` | kaydedilir (kırpılır) |
+| `weightKg`, `temperatureC`, `heartRateBpm`, `respiratoryRatePerMin` | mevcut değer korunur | — (sayısal alan) | kaydedilir; `> 0` olmalı |
+| `vitalsMeasuredAtUtc` | mevcut ölçüm zamanı korunur | — | kaydedilir; yalnızca güncelleme sonrası en az bir vital varsa |
+
+Gönderilmeyen alan hiçbir zaman silinmez/ezilmez.
+
+**Vitalleri bilerek temizleme:** `clearVitals: true` → dört vital değer **ve** `vitalsMeasuredAtUtc` temizlenir (`null`). Metin alanları etkilenmez. `clearVitals: true` ile birlikte herhangi bir vital değer veya `vitalsMeasuredAtUtc` gönderilirse `400` + `Examinations.Validation` (kayıt değişmez). Tek bir vitali temizlemek desteklenmez; yalnızca tümü.
+
+**Ölçüm zamanı:** vitaller yokken ilk kez vital girilirse ve `vitalsMeasuredAtUtc` verilmediyse güncellenmiş `examinedAtUtc` kullanılır; vital zaten varsa mevcut ölçüm zamanı korunur (yalnızca `examinedAtUtc` değişince kaymaz).
+
+**Gövde alanları (doğrulanmış, kodda):**
+
+- `id` (gövdede, isteğe bağlı): doluysa ve route `id` ile farklıysa `400` + `Examinations.RouteIdMismatch`. Boş/`null`/aynı ise yok sayılır.
+- `complaint` (legacy): `visitReason` boş/boşluksa `visitReason` yerine `complaint` kullanılır; ikisi de doluysa `visitReason` önceliklidir. İkisi de boşsa `400` (`Validation.FluentValidation`, alan `visitReason`). Yanıtlarda yalnızca `visitReason` döner.
 
 **İlişki kuralları**
 
@@ -149,13 +180,27 @@ Eski kayıtlar: yeni alanlar `null` / `findings` `""`; `rowVersion` migration so
 - `appointmentId` mevcut değerden farklı → `400` + `Examinations.AppointmentChangeNotAllowed`.
 - `clinicId` / `petId` mevcut kayıttan farklı → `400` + `Examinations.Validation` (değiştirilemez).
 
-### Örnek (yalnızca klinik metin)
+### Örnek (kısmi: yalnızca bulgular değişir; diğer alanlar korunur)
 
 ```json
 {
   "examinedAtUtc": "2026-10-08T11:00:00Z",
   "visitReason": "İştahsızlık — güncellendi",
   "findings": "Hafif dehidrasyon",
+  "rowVersion": "AQIDBAUGBwgJCgs="
+}
+```
+
+### Örnek (bilinçli temizleme)
+
+`notes` temizlenir, vitaller temizlenir; `plan`, `anamnesis` vb. korunur.
+
+```json
+{
+  "examinedAtUtc": "2026-10-08T11:00:00Z",
+  "visitReason": "İştahsızlık",
+  "notes": "",
+  "clearVitals": true,
   "rowVersion": "AQIDBAUGBwgJCgs="
 }
 ```
@@ -190,6 +235,40 @@ Alternatif (frontend UTC hesaplıyorsa): `dateFromUtc=2026-10-07T21:00:00Z&dateT
 
 Rapor/export: `GET /api/v1/reports/examinations*` — `from`/`to` UTC, filtre `[from,to)` (to hariç), liste ile uyumlu.
 
+### Sayfalama ve yanıt şekli (doğrulanmış, kodda)
+
+Sorgu: `page` (varsayılan `1`, en az 1), `pageSize` (varsayılan `20`, sunucuda `1..200` aralığına sıkıştırılır), `search` veya `page.search` (metin araması). `sort`/`order` **işlenmez**; sıralama sabit: `examinedAtUtc` azalan, eşitlikte `id` azalan.
+
+```json
+{
+  "items": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "clinicId": "...",
+      "petId": "...",
+      "petName": "Pamuk",
+      "clientId": "...",
+      "clientName": "Ali Veli",
+      "appointmentId": null,
+      "examinedAtUtc": "2026-10-08T10:30:00Z",
+      "visitReason": "İştahsızlık"
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "totalItems": 1,
+  "totalPages": 1
+}
+```
+
+Liste öğesinde `rowVersion`, `findings` ve vital alanlar **yoktur**; düzenleme için `GET /examinations/{id}` kullanılır. Hayvan/sahip bulunamazsa `petName`/`clientName` boş string, `clientId` boş Guid döner. JSON alan adlarının camelCase olduğu, hata zarfı örnekleriyle aynı serileştirme ayarına dayanır; ayrıca HTTP düzeyinde çalıştırılıp doğrulanmadı.
+
+### Tarih yorumlama (Z’siz değerler)
+
+- **Gövde (`examinedAtUtc`, `vitalsMeasuredAtUtc`)**: sunucu `Kind=Utc` ise olduğu gibi, `Kind=Local` ise UTC’ye çevirerek, `Kind=Unspecified` (ofsetsiz, `Z`’siz metin) ise **UTC kabul ederek** işler (kodda doğrulandı). İstemci her zaman `Z` veya açık ofsetle göndermelidir; ofsetli değerin JSON ayrıştırıcıda hangi `Kind` ile geldiği HTTP düzeyinde doğrulanmadı.
+- **Liste sorgusu (`dateFromUtc`, `dateToUtc`)**: değerler olduğu gibi (Kind dönüştürülmeden) filtreye geçer; `Z`’siz değer UTC gibi karşılaştırılır. Ofsetli sorgu değerinin model bağlayıcıda nasıl dönüştüğü doğrulanmadı — `Z` ile gönderin.
+- **`examinedOnLocalDate`** `yyyy-MM-dd` biçimindedir ve İstanbul takvim günüdür; saat dilimi bilgisi taşımaz.
+
 ---
 
 ## Hata kodları (seçilmiş)
@@ -203,6 +282,8 @@ Rapor/export: `GET /api/v1/reports/examinations*` — `from`/`to` UTC, filtre `[
 | 404 | `Examinations.NotFound` | IDOR-safe bulunamadı |
 | 409 | `Examinations.ConcurrencyConflict` | Eski `rowVersion` |
 | 400 | `Examinations.AppointmentChangeNotAllowed` | Randevu değiştirme |
+| 400 | `Examinations.RouteIdMismatch` | PUT gövdesindeki `id` route `id` ile farklı |
+| 400 | `Examinations.Validation` | `clearVitals: true` ile vital değer / `vitalsMeasuredAtUtc` birlikte gönderildi |
 
 Örnek ProblemDetails:
 
@@ -255,4 +336,19 @@ Rapor/export: `GET /api/v1/reports/examinations*` — `from`/`to` UTC, filtre `[
 - Üretimde yalnızca felaket kurtarma veya bilinçli şema gerilemesi senaryosunda, yedek sonrası değerlendirilir.
 - `Down` çalıştırmadan önce: tam DB yedekği, frontend/backend sürümünün şemayla uyumu, rapor/export ihtiyaçları.
 
-**Kod durumu:** repoda uygulandı; paylaşılan DB migration **bu iş kapsamında çalıştırılmadı**.
+**Kod durumu:** repoda uygulandı. Migration `AddExaminationWorkspaceFieldsAndRowVersion` yerel geliştirme veritabanına (sunucu `DESKTOP-2U2UUHO`, `VetinityCommandDb`) 2026-10-09’da `DbMigrator migrate` ile uygulandı. Paylaşılan, staging ve canlı ortamlara **uygulanmadı**.
+
+---
+
+## Frontend için değişiklik özeti (kısmi PUT ve `clearVitals`)
+
+Bu değişiklik sözleşmeyi etkiler: yeni `clearVitals` alanı eklendi ve gönderilmeyen alanların anlamı değişti.
+
+- **Eski davranış:** PUT’ta gönderilmeyen (`null`) alanlar kayıttan silinirdi; istemci formdaki tüm alanları göndermek zorundaydı.
+- **Yeni davranış:** gönderilmeyen alan korunur. Yalnızca değişen alanları göndermek güvenlidir.
+- **Her istekte gönderin:** `rowVersion`, `examinedAtUtc`, `visitReason`.
+- **Metni silmek için** alanı `""` ile gönderin. `null`/gönderilmeme artık silmez. Form alanını boşaltan kullanıcı için `""` gönderilmelidir.
+- **Vitalleri silmek için** `clearVitals: true` gönderin (vital değerlerle birlikte göndermeyin). Tek bir vitali silmek yok; yalnızca tümü.
+- **Etki:** tüm alanları hâlâ gönderen mevcut istemci aynı sonucu alır (dolu değerler yazılır). Boş bırakılmış metin alanını `null` ile gönderen istemci artık o alanı **silemez**; `""` göndermesi gerekir. Boş vital alanını `null` ile gönderen istemci vitali silemez; `clearVitals` kullanmalıdır.
+- **`409` sonrası:** `GET` ile yeni `rowVersion` alıp yeniden deneyin (bkz. “`409` sonrası akış”).
+- Bu davranışın HTTP üzerinden uçtan uca çağrısı yapılmadı; kural domain, handler ve veritabanı düzeyinde test edildi.

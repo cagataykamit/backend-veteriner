@@ -21,6 +21,64 @@ public sealed class ExaminationRowVersionConcurrencyIntegrationTests : IClassFix
         => _factory = factory;
 
     [Fact]
+    public async Task PartialUpdate_Should_PersistOnlySuppliedFields_And_ClearVitals_Explicitly()
+    {
+        var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
+        var (_, _, assignedClinicId, _) = await IntegrationTestAuthHelper.SeedExaminationWriterUserAsync(
+            _factory.Services,
+            hasher);
+        var seed = await IntegrationTestAuthHelper.SeedExaminationInClinicAsync(_factory.Services, assignedClinicId);
+
+        async Task<Examination> UpdateAsync(ExaminationClinicalUpdate update)
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var entity = await db.Examinations.SingleAsync(x => x.Id == seed.ExaminationId);
+            entity.UpdateClinicalContent(update).IsSuccess.Should().BeTrue();
+            await db.SaveChangesAsync();
+            return await Read();
+        }
+
+        async Task<Examination> Read()
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return await db.Examinations.AsNoTracking().SingleAsync(x => x.Id == seed.ExaminationId);
+        }
+
+        var examinedAt = DateTime.UtcNow.AddHours(-2);
+
+        var filled = await UpdateAsync(new ExaminationClinicalUpdate(
+            examinedAt, "Kontrol", "Bulgu", "Degerlendirme", "Not", "Hikaye", "Plan",
+            WeightKg: 4.25m, TemperatureC: 38.6m, HeartRateBpm: 120, RespiratoryRatePerMin: 30));
+        filled.Plan.Should().Be("Plan");
+        filled.WeightKg.Should().Be(4.25m);
+
+        var partial = await UpdateAsync(new ExaminationClinicalUpdate(examinedAt, "Kontrol", Plan: "Yeni plan"));
+        partial.Plan.Should().Be("Yeni plan");
+        partial.Findings.Should().Be("Bulgu");
+        partial.Assessment.Should().Be("Degerlendirme");
+        partial.Notes.Should().Be("Not");
+        partial.Anamnesis.Should().Be("Hikaye");
+        partial.WeightKg.Should().Be(4.25m);
+        partial.TemperatureC.Should().Be(38.6m);
+        partial.HeartRateBpm.Should().Be(120);
+        partial.RespiratoryRatePerMin.Should().Be(30);
+        partial.VitalsMeasuredAtUtc.Should().NotBeNull();
+
+        var cleared = await UpdateAsync(new ExaminationClinicalUpdate(
+            examinedAt, "Kontrol", Notes: "", Findings: "", ClearVitals: true));
+        cleared.Notes.Should().BeNull();
+        cleared.Findings.Should().BeEmpty();
+        cleared.Plan.Should().Be("Yeni plan");
+        cleared.WeightKg.Should().BeNull();
+        cleared.TemperatureC.Should().BeNull();
+        cleared.HeartRateBpm.Should().BeNull();
+        cleared.RespiratoryRatePerMin.Should().BeNull();
+        cleared.VitalsMeasuredAtUtc.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ConcurrentUpdate_WithSameStaleRowVersion_Should_AllowOneWinner_And_RejectOther()
     {
         var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
@@ -52,33 +110,13 @@ public sealed class ExaminationRowVersionConcurrencyIntegrationTests : IClassFix
         var e1 = await db1.Examinations.AsNoTracking().SingleAsync(x => x.Id == examinationId);
         var e2 = await db2.Examinations.AsNoTracking().SingleAsync(x => x.Id == examinationId);
 
-        e1.UpdateClinicalContent(
+        e1.UpdateClinicalContent(new ExaminationClinicalUpdate(
             e1.ExaminedAtUtc,
-            "Winner visit",
-            e1.Findings,
-            e1.Assessment,
-            e1.Notes,
-            e1.Anamnesis,
-            e1.Plan,
-            e1.WeightKg,
-            e1.TemperatureC,
-            e1.HeartRateBpm,
-            e1.RespiratoryRatePerMin,
-            e1.VitalsMeasuredAtUtc).IsSuccess.Should().BeTrue();
+            "Winner visit")).IsSuccess.Should().BeTrue();
 
-        e2.UpdateClinicalContent(
+        e2.UpdateClinicalContent(new ExaminationClinicalUpdate(
             e2.ExaminedAtUtc,
-            "Loser visit",
-            e2.Findings,
-            e2.Assessment,
-            e2.Notes,
-            e2.Anamnesis,
-            e2.Plan,
-            e2.WeightKg,
-            e2.TemperatureC,
-            e2.HeartRateBpm,
-            e2.RespiratoryRatePerMin,
-            e2.VitalsMeasuredAtUtc).IsSuccess.Should().BeTrue();
+            "Loser visit")).IsSuccess.Should().BeTrue();
 
         e1.SetExpectedRowVersion(staleRowVersion);
         e2.SetExpectedRowVersion(staleRowVersion);

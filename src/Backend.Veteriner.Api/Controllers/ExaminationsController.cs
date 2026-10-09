@@ -98,7 +98,6 @@ public sealed class ExaminationsController : ControllerBase
             return Result.Failure("Examinations.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
 
         var visitReason = ExaminationVisitReasonResolver.Resolve(body.VisitReason, body.Complaint);
-        var findings = body.Findings ?? string.Empty;
 
         var cmd = new UpdateExaminationCommand(
             id,
@@ -107,7 +106,7 @@ public sealed class ExaminationsController : ControllerBase
             body.AppointmentId,
             body.ExaminedAtUtc,
             visitReason,
-            findings,
+            body.Findings,
             body.Assessment,
             body.Notes,
             body.RowVersion,
@@ -117,7 +116,8 @@ public sealed class ExaminationsController : ControllerBase
             body.TemperatureC,
             body.HeartRateBpm,
             body.RespiratoryRatePerMin,
-            body.VitalsMeasuredAtUtc);
+            body.VitalsMeasuredAtUtc,
+            body.ClearVitals);
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);

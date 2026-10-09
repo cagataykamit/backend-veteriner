@@ -7,6 +7,7 @@ namespace Backend.Veteriner.Application.Examinations.Commands.Update;
 /// <summary>
 /// <see cref="RowVersion"/>: istemcinin formu açarken GET ile aldığı sürüm (Base64); zorunlu.
 /// <see cref="AppointmentId"/> null ise mevcut randevu bağlantısı korunur.
+/// Kısmi güncelleme: metin alanlarında null = dokunma, boş/boşluk = temizle; vitallerde null = dokunma, <see cref="ClearVitals"/> = temizle.
 /// </summary>
 public sealed record UpdateExaminationCommand(
     Guid Id,
@@ -15,7 +16,7 @@ public sealed record UpdateExaminationCommand(
     Guid? AppointmentId,
     DateTime ExaminedAtUtc,
     string VisitReason,
-    string Findings,
+    string? Findings,
     string? Assessment,
     string? Notes,
     string? RowVersion = null,
@@ -25,5 +26,6 @@ public sealed record UpdateExaminationCommand(
     decimal? TemperatureC = null,
     int? HeartRateBpm = null,
     int? RespiratoryRatePerMin = null,
-    DateTime? VitalsMeasuredAtUtc = null)
+    DateTime? VitalsMeasuredAtUtc = null,
+    bool ClearVitals = false)
     : IRequest<Result<ExaminationWriteResultDto>>;

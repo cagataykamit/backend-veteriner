@@ -133,7 +133,7 @@ public sealed class UpdateExaminationCommandHandler
         if (pet is null)
             return Result<ExaminationWriteResultDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
-        var domain = e.UpdateClinicalContent(
+        var domain = e.UpdateClinicalContent(new ExaminationClinicalUpdate(
             examinedUtc,
             request.VisitReason,
             request.Findings,
@@ -145,7 +145,8 @@ public sealed class UpdateExaminationCommandHandler
             request.TemperatureC,
             request.HeartRateBpm,
             request.RespiratoryRatePerMin,
-            request.VitalsMeasuredAtUtc);
+            request.VitalsMeasuredAtUtc,
+            request.ClearVitals));
 
         if (!domain.IsSuccess)
             return Result<ExaminationWriteResultDto>.Failure(domain.Error);

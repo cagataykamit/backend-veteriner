@@ -35,7 +35,7 @@ public sealed class CreateExaminationBody
 
 /// <summary>
 /// PUT /examinations/{id} gövdesi. Kanonik: <see cref="VisitReason"/>; <c>complaint</c> legacy.
-/// <see cref="RowVersion"/> zorunlu (GET ile alınan Base64 sürüm).
+/// <see cref="RowVersion"/> zorunlu (GET ile alınan Base64 sürüm). Kısmi güncelleme: null = dokunma, metinde boş/boşluk = temizle; vitaller için <see cref="ClearVitals"/>.
 /// </summary>
 public sealed class UpdateExaminationBody
 {
@@ -60,6 +60,9 @@ public sealed class UpdateExaminationBody
     public string? Assessment { get; init; }
     public string? Plan { get; init; }
     public string? Notes { get; init; }
+
+    /// <summary>true: tüm vital değerleri ve ölçüm zamanını temizler; vital değer/<c>vitalsMeasuredAtUtc</c> ile birlikte gönderilemez.</summary>
+    public bool ClearVitals { get; init; }
 
     public string? RowVersion { get; init; }
 }
