@@ -187,6 +187,66 @@ public sealed class UpdateExaminationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_ClinicContextMismatch()
+    {
+        var tid = Guid.NewGuid();
+        var eid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
+        ExaminationTestSupport.SetRowVersion(existing);
+
+        _examinationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var result = await CreateHandler().Handle(BuildCommand(eid), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.ClinicContextMismatch");
+        _examinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Handle_Should_Fail_When_ClinicOrPetChangeRequested(bool changeClinic, bool changePet)
+    {
+        var tid = Guid.NewGuid();
+        var eid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
+        ExaminationTestSupport.SetRowVersion(existing);
+
+        _examinationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var result = await CreateHandler().Handle(
+            BuildCommand(eid, changeClinic ? Guid.NewGuid() : cid, changePet ? Guid.NewGuid() : pid),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Validation");
+        existing.ClinicId.Should().Be(cid);
+        existing.PetId.Should().Be(pid);
+        existing.VisitReason.Should().Be("Old");
+        _examinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Should_Fail_When_ExaminedTooFarInPast()
     {
         var tid = Guid.NewGuid();

@@ -28,7 +28,9 @@ Yeni özet endpoint eklenmedi.
 
 - SQL Server `rowversion` → API’de **Base64** (8 bayt), alan adı: `rowVersion`.
 - `GET /examinations/{id}` yanıtında zorunlu.
-- `PUT /examinations/{id}` isteğinde **zorunlu**; eksik/geçersiz → `400` + `Examinations.Validation`.
+- `PUT /examinations/{id}` isteğinde **zorunlu**:
+  - eksik/boş → `400` + `Validation.FluentValidation` (alan hatası `rowVersion`, `ValidationProblemDetails`);
+  - dolu ama geçersiz Base64 / 8 bayt değil → `400` + `Examinations.Validation`.
 - Eşzamanlı güncelleme çakışması → `409` + `Examinations.ConcurrencyConflict`.
 - Başarılı `POST` / `PUT` yanıt gövdesi: `ExaminationWriteResultDto` (`id`, `rowVersion`).
 
@@ -194,12 +196,13 @@ Rapor/export: `GET /api/v1/reports/examinations*` — `from`/`to` UTC, filtre `[
 
 | HTTP | code | Durum |
 |------|------|--------|
-| 400 | `Examinations.Validation` | Doğrulama, geçersiz `rowVersion` |
+| 400 | `Validation.FluentValidation` | Alan doğrulaması; eksik/boş `rowVersion` dahil |
+| 400 | `Examinations.Validation` | Geçersiz `rowVersion` (Base64/8 bayt), `clinicId`/`petId` değiştirme girişimi |
 | 400 | `Examinations.DateFilterInvalid` | Tarih filtresi çakışması |
 | 403 | `Clinics.AccessDenied` | Klinik yazma/okuma |
 | 404 | `Examinations.NotFound` | IDOR-safe bulunamadı |
 | 409 | `Examinations.ConcurrencyConflict` | Eski `rowVersion` |
-| 409 | `Examinations.AppointmentChangeNotAllowed` | Randevu değiştirme |
+| 400 | `Examinations.AppointmentChangeNotAllowed` | Randevu değiştirme |
 
 Örnek ProblemDetails:
 
@@ -227,7 +230,7 @@ Rapor/export: `GET /api/v1/reports/examinations*` — `from`/`to` UTC, filtre `[
 | 2 | **Yeni backend** deploy edilir. |
 | 3 | **Yeni frontend** deploy edilir (`rowVersion` zorunlu PUT, write yanıtı, yeni alanlar). |
 
-**Eski frontend + yeni backend:** `PUT /examinations/{id}` gövdesinde `rowVersion` yoksa FluentValidation/handler → **HTTP 400** + `Examinations.Validation` (“RowVersion zorunludur…”). Kayıt değişmez. Bu bilinçli sözleşme kırılımıdır; sürümsüz PUT desteklenmez.
+**Eski frontend + yeni backend:** `PUT /examinations/{id}` gövdesinde `rowVersion` yoksa FluentValidation → **HTTP 400** + `Validation.FluentValidation` (alan: `rowVersion`, “RowVersion zorunludur.”). Kayıt değişmez. Bu bilinçli sözleşme kırılımıdır; sürümsüz PUT desteklenmez.
 
 **Yeni frontend + eski backend:** Yeni alanlar ve sürüm koruması yok; üretimde bu kombinasyonu hedeflemeyin — önce backend.
 
