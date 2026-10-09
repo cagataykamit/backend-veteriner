@@ -4,7 +4,7 @@ using MediatR;
 
 namespace Backend.Veteriner.Application.Reports.Examinations.Queries.GetExaminationReport;
 
-/// <summary><c>from</c>/<c>to</c>: UTC; filtre <c>ExaminedAtUtc</c> üzerinde kapalı aralık <c>[from,to]</c> dahil.</summary>
+/// <summary><c>from</c>/<c>to</c>: UTC; filtre <c>ExaminedAtUtc</c> üzerinde yarı-açık aralık <c>[from,to)</c> (from dahil, to hariç).</summary>
 public sealed record GetExaminationsReportQuery(
     DateTime FromUtc,
     DateTime ToUtc,

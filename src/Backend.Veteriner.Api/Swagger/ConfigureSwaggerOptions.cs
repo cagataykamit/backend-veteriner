@@ -927,8 +927,10 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             SetDesc(operation, "clinicId",
                 "Optional clinic filter. Must match JWT/header clinic context when both are set.");
             SetDesc(operation, "petId", "Optional pet filter.");
+            SetDesc(operation, "examinedOnLocalDate",
+                "Optional Istanbul calendar day (yyyy-MM-dd). Resolves to UTC half-open [start,end) on ExaminedAtUtc via OperationDayBounds. Mutually exclusive with dateFromUtc/dateToUtc.");
             SetDesc(operation, "dateFromUtc", "Optional lower bound (inclusive) on ExaminedAtUtc.");
-            SetDesc(operation, "dateToUtc", "Optional upper bound (inclusive) on ExaminedAtUtc.");
+            SetDesc(operation, "dateToUtc", "Optional upper bound (exclusive) on ExaminedAtUtc.");
             SetDesc(operation, "search",
                 "Optional text search; merged with page.search when both are used (see PageRequestQuery.WithMergedSearch).");
         }

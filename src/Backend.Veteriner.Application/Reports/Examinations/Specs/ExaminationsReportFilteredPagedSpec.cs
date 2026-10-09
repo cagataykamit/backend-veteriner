@@ -40,7 +40,7 @@ public sealed class ExaminationsReportFilteredPagedSpec : Specification<Examinat
         if (appointmentId.HasValue)
             Query.Where(e => e.AppointmentId == appointmentId.Value);
 
-        Query.Where(e => e.ExaminedAtUtc >= fromUtc && e.ExaminedAtUtc <= toUtc);
+        Query.Where(e => e.ExaminedAtUtc >= fromUtc && e.ExaminedAtUtc < toUtc);
 
         if (searchContainsLikePattern is not null)
         {

@@ -21,13 +21,21 @@ public sealed class CreateExaminationBody
     [JsonPropertyName("complaint")]
     public string? Complaint { get; init; }
 
+    public string? Anamnesis { get; init; }
     public string? Findings { get; init; }
+    public decimal? WeightKg { get; init; }
+    public decimal? TemperatureC { get; init; }
+    public int? HeartRateBpm { get; init; }
+    public int? RespiratoryRatePerMin { get; init; }
+    public DateTime? VitalsMeasuredAtUtc { get; init; }
     public string? Assessment { get; init; }
+    public string? Plan { get; init; }
     public string? Notes { get; init; }
 }
 
 /// <summary>
 /// PUT /examinations/{id} gövdesi. Kanonik: <see cref="VisitReason"/>; <c>complaint</c> legacy.
+/// <see cref="RowVersion"/> zorunlu (GET ile alınan Base64 sürüm).
 /// </summary>
 public sealed class UpdateExaminationBody
 {
@@ -42,8 +50,16 @@ public sealed class UpdateExaminationBody
     [JsonPropertyName("complaint")]
     public string? Complaint { get; init; }
 
+    public string? Anamnesis { get; init; }
     public string? Findings { get; init; }
+    public decimal? WeightKg { get; init; }
+    public decimal? TemperatureC { get; init; }
+    public int? HeartRateBpm { get; init; }
+    public int? RespiratoryRatePerMin { get; init; }
+    public DateTime? VitalsMeasuredAtUtc { get; init; }
     public string? Assessment { get; init; }
+    public string? Plan { get; init; }
     public string? Notes { get; init; }
-}
 
+    public string? RowVersion { get; init; }
+}

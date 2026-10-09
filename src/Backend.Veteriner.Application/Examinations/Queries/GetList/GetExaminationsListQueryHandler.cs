@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
@@ -112,6 +113,15 @@ public sealed class GetExaminationsListQueryHandler
         var effectiveClinicId = scopeResult.Value!.SingleClinicId;
         var accessibleClinicIds = scopeResult.Value!.AccessibleClinicIds;
 
+        var dateBounds = ExaminationExaminedAtUtcFilter.Resolve(
+            request.ExaminedOnLocalDate,
+            request.DateFromUtc,
+            request.DateToUtc);
+        if (!dateBounds.IsSuccess)
+            return Result<PagedResult<ExaminationListItemDto>>.Failure(dateBounds.Error);
+
+        var (dateFromUtc, dateToUtcExclusive) = dateBounds.Value!;
+
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
         Guid[] searchPetIds = [];
@@ -129,8 +139,8 @@ public sealed class GetExaminationsListQueryHandler
                 effectiveClinicId,
                 request.PetId,
                 request.AppointmentId,
-                request.DateFromUtc,
-                request.DateToUtc,
+                dateFromUtc,
+                dateToUtcExclusive,
                 searchPattern,
                 searchPetIds,
                 accessibleClinicIds),
@@ -143,8 +153,8 @@ public sealed class GetExaminationsListQueryHandler
                 effectiveClinicId,
                 request.PetId,
                 request.AppointmentId,
-                request.DateFromUtc,
-                request.DateToUtc,
+                dateFromUtc,
+                dateToUtcExclusive,
                 page,
                 pageSize,
                 searchPattern,

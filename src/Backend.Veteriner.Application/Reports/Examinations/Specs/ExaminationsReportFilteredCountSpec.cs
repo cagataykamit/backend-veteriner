@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.Veteriner.Application.Reports.Examinations.Specs;
 
 /// <summary>
-/// <see cref="Examination.ExaminedAtUtc"/> üzerinde kapalı aralık <c>[fromUtc, toUtc]</c> (UTC, dahil uçlar).
+/// <see cref="Examination.ExaminedAtUtc"/> üzerinde yarı-açık aralık <c>[fromUtc, toUtc)</c> (UTC).
 /// Liste endpoint’iyle aynı arama alanları.</summary>
 public sealed class ExaminationsReportFilteredCountSpec : Specification<Examination>
 {
@@ -41,7 +41,7 @@ public sealed class ExaminationsReportFilteredCountSpec : Specification<Examinat
         if (appointmentId.HasValue)
             Query.Where(e => e.AppointmentId == appointmentId.Value);
 
-        Query.Where(e => e.ExaminedAtUtc >= fromUtc && e.ExaminedAtUtc <= toUtc);
+        Query.Where(e => e.ExaminedAtUtc >= fromUtc && e.ExaminedAtUtc < toUtc);
 
         if (searchContainsLikePattern is not null)
         {

@@ -20,12 +20,6 @@ public sealed class UpdateExaminationCommandValidator : AbstractValidator<Update
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("AppointmentId gecersiz.");
 
-        RuleFor(x => x)
-            .Must(x =>
-                x.AppointmentId is { } aid && aid != Guid.Empty
-                || (x.ClinicId is { } cid && cid != Guid.Empty) && (x.PetId is { } pid && pid != Guid.Empty))
-            .WithMessage("AppointmentId veya ClinicId+PetId zorunludur.");
-
         RuleFor(x => x.ExaminedAtUtc).NotEqual(default(DateTime));
 
         RuleFor(x => x.VisitReason)
@@ -33,8 +27,15 @@ public sealed class UpdateExaminationCommandValidator : AbstractValidator<Update
             .MaximumLength(2000);
 
         RuleFor(x => x.Findings)
-            .NotEmpty()
             .MaximumLength(8000);
+
+        RuleFor(x => x.Anamnesis)
+            .MaximumLength(4000)
+            .When(x => !string.IsNullOrEmpty(x.Anamnesis));
+
+        RuleFor(x => x.Plan)
+            .MaximumLength(4000)
+            .When(x => !string.IsNullOrEmpty(x.Plan));
 
         RuleFor(x => x.Assessment)
             .MaximumLength(4000)
@@ -43,6 +44,25 @@ public sealed class UpdateExaminationCommandValidator : AbstractValidator<Update
         RuleFor(x => x.Notes)
             .MaximumLength(4000)
             .When(x => !string.IsNullOrEmpty(x.Notes));
+
+        RuleFor(x => x.WeightKg)
+            .GreaterThan(0)
+            .When(x => x.WeightKg.HasValue);
+
+        RuleFor(x => x.TemperatureC)
+            .GreaterThan(0)
+            .When(x => x.TemperatureC.HasValue);
+
+        RuleFor(x => x.HeartRateBpm)
+            .GreaterThan(0)
+            .When(x => x.HeartRateBpm.HasValue);
+
+        RuleFor(x => x.RespiratoryRatePerMin)
+            .GreaterThan(0)
+            .When(x => x.RespiratoryRatePerMin.HasValue);
+
+        RuleFor(x => x.RowVersion)
+            .NotEmpty()
+            .WithMessage("RowVersion zorunludur.");
     }
 }
-

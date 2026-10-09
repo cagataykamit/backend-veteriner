@@ -237,7 +237,7 @@ public sealed class GetExaminationsListQueryHandlerTests
 
         var page = new PageRequest { Page = 0, PageSize = 500 };
         var result = await CreateHandler().Handle(
-            new GetExaminationsListQuery(page, clinicId, petId, appointmentId, dateFrom, dateTo),
+            new GetExaminationsListQuery(page, clinicId, petId, appointmentId, null, dateFrom, dateTo),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();

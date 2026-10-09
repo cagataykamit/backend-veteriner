@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -132,7 +133,7 @@ public sealed class ExaminationWriteClinicAssignmentIdorIntegrationTests : IClas
         var token = await IssueExaminationWriteTokenAsync(email);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var (clinicId, petId, visitReason) = await GetExaminationSnapshotAsync(seed.ExaminationId);
+        var (clinicId, petId, visitReason, rowVersion) = await GetExaminationSnapshotAsync(seed.ExaminationId);
 
         var response = await client.PutAsJsonAsync($"/api/v1/examinations/{seed.ExaminationId}", new
         {
@@ -141,12 +142,13 @@ public sealed class ExaminationWriteClinicAssignmentIdorIntegrationTests : IClas
             ExaminedAtUtc = ValidExaminedAtUtc,
             VisitReason = "Mutated",
             Findings = "Bulgu",
+            RowVersion = rowVersion,
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Clinics.AccessDenied");
 
-        var (_, _, afterReason) = await GetExaminationSnapshotAsync(seed.ExaminationId);
+        var (_, _, afterReason, _) = await GetExaminationSnapshotAsync(seed.ExaminationId);
         afterReason.Should().Be(visitReason);
     }
 
@@ -172,17 +174,21 @@ public sealed class ExaminationWriteClinicAssignmentIdorIntegrationTests : IClas
             Findings = "Bulgu",
         });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
-        var examinationId = await createResponse.Content.ReadFromJsonAsync<Guid>();
+        var created = await createResponse.Content.ReadFromJsonAsync<ExaminationWriteResultDto>();
+        created.Should().NotBeNull();
 
-        var updateResponse = await client.PutAsJsonAsync($"/api/v1/examinations/{examinationId}", new
+        var (_, _, _, rowVersion) = await GetExaminationSnapshotAsync(created!.Id);
+
+        var updateResponse = await client.PutAsJsonAsync($"/api/v1/examinations/{created.Id}", new
         {
             ClinicId = extraClinicId,
             PetId = petId,
             ExaminedAtUtc = ValidExaminedAtUtc,
             VisitReason = "Admin update",
             Findings = "Bulgu",
+            RowVersion = rowVersion,
         });
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -201,6 +207,8 @@ public sealed class ExaminationWriteClinicAssignmentIdorIntegrationTests : IClas
         var token = await IssueExaminationWriteTokenAsync(email);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
+        var (_, _, _, rowVersion) = await GetExaminationSnapshotAsync(seed.ExaminationId);
+
         var response = await client.PutAsJsonAsync($"/api/v1/examinations/{seed.ExaminationId}", new
         {
             ClinicId = Guid.NewGuid(),
@@ -208,6 +216,7 @@ public sealed class ExaminationWriteClinicAssignmentIdorIntegrationTests : IClas
             ExaminedAtUtc = ValidExaminedAtUtc,
             VisitReason = "X",
             Findings = "Bulgu",
+            RowVersion = rowVersion,
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -242,11 +251,11 @@ public sealed class ExaminationWriteClinicAssignmentIdorIntegrationTests : IClas
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    private async Task<(Guid ClinicId, Guid PetId, string VisitReason)> GetExaminationSnapshotAsync(Guid examinationId)
+    private async Task<(Guid ClinicId, Guid PetId, string VisitReason, string RowVersion)> GetExaminationSnapshotAsync(Guid examinationId)
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Examinations.AsNoTracking().SingleAsync(e => e.Id == examinationId);
-        return (row.ClinicId, row.PetId, row.VisitReason);
+        return (row.ClinicId, row.PetId, row.VisitReason, Convert.ToBase64String(row.RowVersion));
     }
 }

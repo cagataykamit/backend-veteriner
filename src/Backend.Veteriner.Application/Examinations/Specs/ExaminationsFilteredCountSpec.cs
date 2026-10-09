@@ -37,7 +37,7 @@ public sealed class ExaminationsFilteredCountSpec : Specification<Examination>
         if (dateFromUtc.HasValue)
             Query.Where(e => e.ExaminedAtUtc >= dateFromUtc.Value);
         if (dateToUtc.HasValue)
-            Query.Where(e => e.ExaminedAtUtc <= dateToUtc.Value);
+            Query.Where(e => e.ExaminedAtUtc < dateToUtc.Value);
 
         if (searchContainsLikePattern is not null)
         {

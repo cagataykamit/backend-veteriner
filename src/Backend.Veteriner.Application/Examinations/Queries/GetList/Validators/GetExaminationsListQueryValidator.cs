@@ -29,7 +29,11 @@ public sealed class GetExaminationsListQueryValidator : AbstractValidator<GetExa
             .WithMessage("appointmentId is invalid.");
 
         RuleFor(x => x)
-            .Must(x => !x.DateFromUtc.HasValue || !x.DateToUtc.HasValue || x.DateFromUtc <= x.DateToUtc)
-            .WithMessage("dateFromUtc, dateToUtc'den küçük veya eşit olmalıdır.");
+            .Must(x => !x.ExaminedOnLocalDate.HasValue || (!x.DateFromUtc.HasValue && !x.DateToUtc.HasValue))
+            .WithMessage("examinedOnLocalDate ile dateFromUtc/dateToUtc birlikte kullanılamaz.");
+
+        RuleFor(x => x)
+            .Must(x => !x.DateFromUtc.HasValue || !x.DateToUtc.HasValue || x.DateFromUtc < x.DateToUtc)
+            .WithMessage("dateFromUtc, dateToUtc'den küçük olmalıdır (dateToUtc üst sınırı hariç).");
     }
 }

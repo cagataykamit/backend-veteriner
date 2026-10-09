@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -99,9 +100,17 @@ public sealed class GetExaminationByIdQueryHandler
             e.AppointmentId,
             e.ExaminedAtUtc,
             e.VisitReason,
+            e.Anamnesis,
             e.Findings,
+            e.WeightKg,
+            e.TemperatureC,
+            e.HeartRateBpm,
+            e.RespiratoryRatePerMin,
+            e.VitalsMeasuredAtUtc,
             e.Assessment,
+            e.Plan,
             e.Notes,
+            ExaminationRowVersion.Encode(e.RowVersion),
             e.CreatedAtUtc,
             e.UpdatedAtUtc);
         return Result<ExaminationDetailDto>.Success(dto);

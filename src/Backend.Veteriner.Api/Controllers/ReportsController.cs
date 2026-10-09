@@ -210,7 +210,7 @@ public sealed class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Muayene raporu (sayfalı). <c>from</c>/<c>to</c> UTC — <c>ExaminedAtUtc</c> <c>[from,to]</c> dahil.
+    /// Muayene raporu (sayfalı). <c>from</c>/<c>to</c> UTC — <c>ExaminedAtUtc</c> <c>[from,to)</c> (to hariç).
     /// </summary>
     [HttpGet("examinations")]
     [Authorize(Policy = PermissionCatalog.Examinations.Read)]

@@ -56,8 +56,6 @@ public sealed class ExaminationWriteClinicAssignmentCommandHandlerTests
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
-            _appointments.Object,
-            _examinationsRead.Object,
             _examinationsWrite.Object);
 
     private void SetupTenant(Guid tid, Guid cid)
@@ -247,7 +245,8 @@ public sealed class ExaminationWriteClinicAssignmentCommandHandlerTests
 
         var existing = new Examination(tid, cid, pid, null, ValidExaminedAt, "Old", "Old", null, null);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
-        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+        ExaminationTestSupport.SetRowVersion(existing);
+        _examinationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -256,7 +255,7 @@ public sealed class ExaminationWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Pet(tid, pid, "P", TestSpeciesIds.Cat, null, null));
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
-            new UpdateExaminationCommand(eid, cid, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null),
+            new UpdateExaminationCommand(eid, cid, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null, ExaminationTestSupport.SampleRowVersionBase64),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -279,11 +278,12 @@ public sealed class ExaminationWriteClinicAssignmentCommandHandlerTests
 
         var existing = new Examination(tid, entityCid, pid, null, ValidExaminedAt, "Old", "Old", null, null);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
-        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+        ExaminationTestSupport.SetRowVersion(existing);
+        _examinationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
-            new UpdateExaminationCommand(eid, entityCid, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null),
+            new UpdateExaminationCommand(eid, entityCid, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null, ExaminationTestSupport.SampleRowVersionBase64),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -308,15 +308,16 @@ public sealed class ExaminationWriteClinicAssignmentCommandHandlerTests
 
         var existing = new Examination(tid, assignedCid, pid, null, ValidExaminedAt, "Old", "Old", null, null);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
-        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+        ExaminationTestSupport.SetRowVersion(existing);
+        _examinationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
-            new UpdateExaminationCommand(eid, targetCid, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null),
+            new UpdateExaminationCommand(eid, targetCid, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null, ExaminationTestSupport.SampleRowVersionBase64),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Clinics.AccessDenied");
+        result.Error.Code.Should().Be("Examinations.Validation");
     }
 
     [Fact]
@@ -336,11 +337,12 @@ public sealed class ExaminationWriteClinicAssignmentCommandHandlerTests
 
         var existing = new Examination(tid, entityCid, pid, null, ValidExaminedAt, "Old", "Old", null, null);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
-        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+        ExaminationTestSupport.SetRowVersion(existing);
+        _examinationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
-            new UpdateExaminationCommand(eid, null, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null),
+            new UpdateExaminationCommand(eid, null, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null, ExaminationTestSupport.SampleRowVersionBase64),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -349,7 +351,7 @@ public sealed class ExaminationWriteClinicAssignmentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Update_Should_Succeed_When_TenantWide_DefaultResolver()
+    public async Task Update_Should_Fail_When_TenantWide_AttemptsClinicChange()
     {
         var tid = Guid.NewGuid();
         var entityCid = Guid.NewGuid();
@@ -363,20 +365,17 @@ public sealed class ExaminationWriteClinicAssignmentCommandHandlerTests
 
         var existing = new Examination(tid, entityCid, pid, null, ValidExaminedAt, "Old", "Old", null, null);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
-        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+        ExaminationTestSupport.SetRowVersion(existing);
+        _examinationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
-        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Clinic(tid, "K", "X"));
-        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Pet(tid, pid, "P", TestSpeciesIds.Cat, null, null));
-
         var result = await CreateUpdateHandler().Handle(
-            new UpdateExaminationCommand(eid, targetCid, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null),
+            new UpdateExaminationCommand(eid, targetCid, pid, null, ValidExaminedAt, "Yeni", "Bulgu", null, null, ExaminationTestSupport.SampleRowVersionBase64),
             CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        existing.ClinicId.Should().Be(targetCid);
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Validation");
+        existing.ClinicId.Should().Be(entityCid);
     }
 
     [Fact]
@@ -386,11 +385,11 @@ public sealed class ExaminationWriteClinicAssignmentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
-        _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _examinationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Examination?)null);
 
         var result = await CreateUpdateHandler().Handle(
-            new UpdateExaminationCommand(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, ValidExaminedAt, "Yeni", "Bulgu", null, null),
+            new UpdateExaminationCommand(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, ValidExaminedAt, "Yeni", "Bulgu", null, null, ExaminationTestSupport.SampleRowVersionBase64),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();

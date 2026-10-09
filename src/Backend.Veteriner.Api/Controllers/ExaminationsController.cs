@@ -39,7 +39,7 @@ public sealed class ExaminationsController : ControllerBase
     [HttpPost]
     [Authorize(Policy = PermissionCatalog.Examinations.Create)]
     [Consumes("application/json")]
-    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ExaminationWriteResultDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -60,23 +60,30 @@ public sealed class ExaminationsController : ControllerBase
             visitReason,
             findings,
             body.Assessment,
-            body.Notes);
+            body.Notes,
+            body.Anamnesis,
+            body.Plan,
+            body.WeightKg,
+            body.TemperatureC,
+            body.HeartRateBpm,
+            body.RespiratoryRatePerMin,
+            body.VitalsMeasuredAtUtc);
 
         var result = await _mediator.Send(cmd, ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
-        var id = result.Value;
+        var writeResult = result.Value!;
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
-            id);
+            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id = writeResult.Id },
+            writeResult);
     }
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = PermissionCatalog.Examinations.Update)]
     [Consumes("application/json")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ExaminationWriteResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -102,7 +109,15 @@ public sealed class ExaminationsController : ControllerBase
             visitReason,
             findings,
             body.Assessment,
-            body.Notes);
+            body.Notes,
+            body.RowVersion,
+            body.Anamnesis,
+            body.Plan,
+            body.WeightKg,
+            body.TemperatureC,
+            body.HeartRateBpm,
+            body.RespiratoryRatePerMin,
+            body.VitalsMeasuredAtUtc);
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);
@@ -141,7 +156,8 @@ public sealed class ExaminationsController : ControllerBase
 
     /// <summary>
     /// Sayfalı muayene listesi.
-    /// Filtreler (hepsi AND): opsiyonel <c>clinicId</c>, <c>petId</c>, <c>appointmentId</c> (bu randevuya bağlı kayıtlar; <c>Examination.AppointmentId</c>), <c>dateFromUtc</c> / <c>dateToUtc</c> (<c>ExaminedAtUtc</c> üzerinde).
+    /// Filtreler (hepsi AND): opsiyonel <c>clinicId</c>, <c>petId</c>, <c>appointmentId</c>,
+    /// <c>examinedOnLocalDate</c> (İstanbul takvim günü → UTC <c>[start,end)</c>) veya <c>dateFromUtc</c> (dahil) / <c>dateToUtc</c> (hariç) (<c>ExaminedAtUtc</c>).
     /// Metin araması: <c>search</c> veya <c>page.search</c> — başvuru nedeni, bulgular, değerlendirme, notlar; müşteri + hayvan metin eşlemesi ile pet id kümesi (hayvan listesi ile aynı örüntü). Arama doluysa mevcut LIKE/OR metin kuralları diğer filtrelerle AND birleşir.
     /// <c>sort</c>/<c>order</c> işlenmez.
     /// </summary>
@@ -155,6 +171,7 @@ public sealed class ExaminationsController : ControllerBase
         [FromQuery] Guid? clinicId = null,
         [FromQuery] Guid? petId = null,
         [FromQuery] Guid? appointmentId = null,
+        [FromQuery] DateOnly? examinedOnLocalDate = null,
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
         CancellationToken ct = default)
@@ -169,6 +186,7 @@ public sealed class ExaminationsController : ControllerBase
                 clinicId,
                 petId,
                 appointmentId,
+                examinedOnLocalDate,
                 dateFromUtc,
                 dateToUtc),
             ct);

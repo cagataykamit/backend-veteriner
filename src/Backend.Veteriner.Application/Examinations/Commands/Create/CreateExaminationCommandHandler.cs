@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations;
+using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Appointments;
@@ -16,7 +17,7 @@ using MediatR;
 
 namespace Backend.Veteriner.Application.Examinations.Commands.Create;
 
-public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExaminationCommand, Result<Guid>>
+public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExaminationCommand, Result<ExaminationWriteResultDto>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
@@ -50,22 +51,22 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         _examinationsWrite = examinationsWrite;
     }
 
-    public async Task<Result<Guid>> Handle(CreateExaminationCommand request, CancellationToken ct)
+    public async Task<Result<ExaminationWriteResultDto>> Handle(CreateExaminationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {
-            return Result<Guid>.Failure(
+            return Result<ExaminationWriteResultDto>.Failure(
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
-            return Result<Guid>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
+            return Result<ExaminationWriteResultDto>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
 
         if (!tenant.IsActive)
         {
-            return Result<Guid>.Failure(
+            return Result<ExaminationWriteResultDto>.Failure(
                 "Tenants.TenantInactive",
                 "Pasif kiracı için muayene kaydı oluşturulamaz.");
         }
@@ -74,7 +75,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         var window = ExaminationExaminedAtWindow.Validate(examinedUtc);
 
         if (!window.IsSuccess)
-            return Result<Guid>.Failure(window.Error);
+            return Result<ExaminationWriteResultDto>.Failure(window.Error);
 
         Guid clinicId;
         Guid petId;
@@ -86,7 +87,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
                 new AppointmentByIdSpec(tenantId, aid), ct);
             if (appt is null)
             {
-                return Result<Guid>.Failure(
+                return Result<ExaminationWriteResultDto>.Failure(
                     "Appointments.NotFound",
                     "Randevu bulunamadı veya kiracıya ait değil.");
             }
@@ -96,14 +97,14 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             // SaveChanges çağrılmaz.
             if (appt.Status == AppointmentStatus.Cancelled)
             {
-                return Result<Guid>.Failure(
+                return Result<ExaminationWriteResultDto>.Failure(
                     "Examinations.AppointmentCancelled",
                     "İptal edilmiş randevu için muayene kaydı oluşturulamaz.");
             }
 
             if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
             {
-                return Result<Guid>.Failure(
+                return Result<ExaminationWriteResultDto>.Failure(
                     "Examinations.ClinicContextMismatch",
                     "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
             }
@@ -113,7 +114,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
 
             if (clinicId != appt.ClinicId || petId != appt.PetId)
             {
-                return Result<Guid>.Failure(
+                return Result<ExaminationWriteResultDto>.Failure(
                     "Examinations.AppointmentPetClinicMismatch",
                     "Seçilen randevu ile klinik veya hayvan bilgisi uyuşmuyor.");
             }
@@ -124,7 +125,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             if (cid is not { } resolvedCid || resolvedCid == Guid.Empty
                 || request.PetId is not { } pid || pid == Guid.Empty)
             {
-                return Result<Guid>.Failure(
+                return Result<ExaminationWriteResultDto>.Failure(
                     "Examinations.Validation",
                     "AppointmentId yoksa ClinicId ve PetId zorunludur.");
             }
@@ -136,17 +137,17 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         var clinicAccess = await ExaminationClinicWriteScope.EnsureWriteAccessAsync(
             _clinicScopeResolver, tenantId, clinicId, ct);
         if (!clinicAccess.IsSuccess)
-            return Result<Guid>.Failure(clinicAccess.Error);
+            return Result<ExaminationWriteResultDto>.Failure(clinicAccess.Error);
 
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, clinicId), ct);
         if (clinic is null)
-            return Result<Guid>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
+            return Result<ExaminationWriteResultDto>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
 
         var pet = await _pets.FirstOrDefaultAsync(
             new PetByIdSpec(tenantId, petId), ct);
         if (pet is null)
-            return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
+            return Result<ExaminationWriteResultDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
         var examination = new Examination(
             tenantId,
@@ -157,7 +158,14 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             request.VisitReason,
             request.Findings,
             request.Assessment,
-            request.Notes);
+            request.Notes,
+            request.Anamnesis,
+            request.Plan,
+            request.WeightKg,
+            request.TemperatureC,
+            request.HeartRateBpm,
+            request.RespiratoryRatePerMin,
+            request.VitalsMeasuredAtUtc);
 
         await _examinationsWrite.AddAsync(examination, ct);
 
@@ -169,12 +177,13 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         {
             var completion = appt.Complete();
             if (!completion.IsSuccess)
-                return Result<Guid>.Failure(completion.Error);
+                return Result<ExaminationWriteResultDto>.Failure(completion.Error);
 
             await _appointmentsWrite.UpdateAsync(appt, ct);
         }
 
         await _examinationsWrite.SaveChangesAsync(ct);
-        return Result<Guid>.Success(examination.Id);
+        return Result<ExaminationWriteResultDto>.Success(
+            new ExaminationWriteResultDto(examination.Id, ExaminationRowVersion.Encode(examination.RowVersion)));
     }
 }
