@@ -8,3 +8,12 @@ namespace Backend.Veteriner.Application.Common.Abstractions;
 public interface ITransactionalRequest
 {
 }
+
+/// <summary>
+/// <see cref="ITransactionalRequest"/> gibi tek DB transaction içinde çalışır; ek olarak yanıt
+/// başarısız bir <c>Result</c> ise (iş kuralı hatası) transaction <b>geri alınır</b>.
+/// Birden fazla komutu sırayla çalıştıran ve yarım kayıt bırakmaması gereken orkestrasyonlar için.
+/// </summary>
+public interface ITransactionalRollbackOnFailureRequest : ITransactionalRequest
+{
+}
