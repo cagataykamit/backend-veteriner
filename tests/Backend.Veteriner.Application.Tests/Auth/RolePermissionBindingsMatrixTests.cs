@@ -77,6 +77,8 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Examinations.Read },
         new object[] { PermissionCatalog.Examinations.Create },
         new object[] { PermissionCatalog.Examinations.Update },
+        new object[] { PermissionCatalog.Examinations.Finalize },
+        new object[] { PermissionCatalog.Examinations.Addendum },
         new object[] { PermissionCatalog.Vaccinations.Read },
         new object[] { PermissionCatalog.Vaccinations.Create },
         new object[] { PermissionCatalog.Vaccinations.Update },
@@ -161,6 +163,8 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Examinations.Read },
         new object[] { PermissionCatalog.Examinations.Create },
         new object[] { PermissionCatalog.Examinations.Update },
+        new object[] { PermissionCatalog.Examinations.Finalize },
+        new object[] { PermissionCatalog.Examinations.Addendum },
         new object[] { PermissionCatalog.Vaccinations.Read },
         new object[] { PermissionCatalog.Vaccinations.Create },
         new object[] { PermissionCatalog.Vaccinations.Update },
@@ -228,6 +232,8 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Examinations.Read },
         new object[] { PermissionCatalog.Examinations.Create },
         new object[] { PermissionCatalog.Examinations.Update },
+        new object[] { PermissionCatalog.Examinations.Finalize },
+        new object[] { PermissionCatalog.Examinations.Addendum },
         new object[] { PermissionCatalog.Vaccinations.Read },
         new object[] { PermissionCatalog.Vaccinations.Create },
         new object[] { PermissionCatalog.Vaccinations.Update },
@@ -398,6 +404,8 @@ public sealed class RolePermissionBindingsMatrixTests
         sec.Should().NotContain(PermissionCatalog.Appointments.Complete, "Randevu tamamlama veteriner işi");
         sec.Should().NotContain(PermissionCatalog.Examinations.Create);
         sec.Should().NotContain(PermissionCatalog.Examinations.Update);
+        sec.Should().NotContain(PermissionCatalog.Examinations.Finalize);
+        sec.Should().NotContain(PermissionCatalog.Examinations.Addendum);
         sec.Should().NotContain(PermissionCatalog.Vaccinations.Create);
         sec.Should().NotContain(PermissionCatalog.Vaccinations.Update);
         sec.Should().NotContain(PermissionCatalog.VaccineDefinitions.Create);
