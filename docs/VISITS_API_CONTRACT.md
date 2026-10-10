@@ -228,6 +228,7 @@ Query:
 | `clinicId` | guid? | Klinik bağlamı yoksa zorunlu: `Visits.ClinicScopeRequired` |
 | `localDate` | date? | İstanbul takvim günü; varsayılan bugün (İstanbul). Gün sınırı `Europe/Istanbul` → UTC `[start,end)` (muayene `examinedOnLocalDate` ile aynı) |
 | `voided` | bool? | Varsayılan `false`. `true` ise **yalnızca** o günün yanlış geliş işaretli Visit'leri döner (madde 9.1) |
+| `responsibleVeterinarianUserId` | guid? | "Benim hastalarım" filtresi: yalnızca sorumlu hekimi bu kullanıcı olan Visit satırları (madde 9.2) |
 
 Yanıt `TodayDto`:
 
@@ -282,6 +283,16 @@ Resepsiyonun yanlış işaretlediği kaydı bulup `POST /visits/{id}/restore` il
 - **Sıra:** `arrivedAtUtc` azalan (en son gelen üstte). Gruplama yoktur.
 - **Yetki ve kapsam:** `Visits.Read`; klinik/kiracı kuralları normal Bugün ile aynıdır. Geri alma düğmesi `Visits.Correct` gerektirir (sunucu zaten 403 verir).
 - `careStatus` işaretlenmeden önceki bakım durumunu gösterir. 500 satır sınırı aynen geçerlidir.
+
+### 9.2) Benim hastalarım — `GET /visits/today?responsibleVeterinarianUserId={userId}`
+
+Hekimin yalnızca kendine atanmış satırları görmesi için sorumlu hekim filtresi. Varsayılanı ("hekim rolünde varsayılan Benim hastalarım, tümünü göster seçeneği") istemci yönetir: filtreyi yollamak "benim hastalarım", yollamamak "tümü"dür. Sunucu rol çıkarımı yapmaz.
+
+- **Doğrulama (mevcut hekim kuralıyla aynı, tek yerde):** `userId`, aktif klinikte (`clinicId`) hekim olmalıdır: kiracıda o kliniğe atanmış aktif ve `Veteriner` operasyon claim'li kullanıcı (madde 3.1, `IClinicVeterinarianReader`). Değilse (rol yok, başka klinik, bilinmeyen kimlik, `Guid.Empty`) → `400 Visits.Validation`; boş liste dönmez, çünkü yanlış kimlik sessizce "kimsenin hastası yok" göstermemeli.
+- **Kapsam:** Yalnızca `responsibleVeterinarianUserId` eşleşen Visit satırları (bugünün geliş kayıtları ve devralınanlar). Planlı (Visit'siz) randevu satırları dışlanır: randevu hekim alanı taşımaz (madde 3.1), dolayısıyla hekime atanmış sayılamaz. Sorumlu hekimi boş Visit'ler de dışlanır.
+- `activeHospitalizations` filtreden **etkilenmez** (klinik düzeyinde aktif yatış listesidir; yatış kaydı sorumlu hekim taşımaz).
+- `voided=true` ile birlikte kullanılabilir (yanlış işaretlenenler de aynı hekime göre süzülür). Diğer sıra/sınır kuralları aynen geçerlidir.
+- Yetki: `Visits.Read`; klinik/kiracı kuralları normal Bugün ile aynıdır. Hekim listesi için mevcut `GET /clinics/{clinicId}/veterinarians` kullanılır.
 
 ### `TodayHospitalizationDto`
 
