@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
@@ -20,6 +21,7 @@ public sealed class GetVisitsTodayQueryHandlerTests
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IVisitTodayReader> _reader = new();
+    private readonly Mock<IClinicVeterinarianReader> _veterinarians = new();
 
     // FixedNowUtc = 2026-10-10 09:00 UTC → İstanbul 12:00, takvim günü 2026-10-10.
     private static readonly DateOnly Today = new(2026, 10, 10);
@@ -37,6 +39,7 @@ public sealed class GetVisitsTodayQueryHandlerTests
             _clinicContext.Object,
             _scopeResolver.Object,
             _reader.Object,
+            _veterinarians.Object,
             VisitHandlerTestSupport.FixedClock);
 
     private void Returns(IReadOnlyList<TodayItemDto> items)
@@ -168,6 +171,43 @@ public sealed class GetVisitsTodayQueryHandlerTests
 
         result.Value!.Items.Select(i => i.PetName)
             .Should().Equal("w2u", "w3u", "w1", "ipu", "ip", "c2", "c1");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Pass_Responsible_Veterinarian_To_Reader_When_Clinic_Veterinarian()
+    {
+        var vetId = Guid.NewGuid();
+        _veterinarians.Setup(v => v.IsClinicVeterinarianAsync(vetId, _tenantId, _clinicId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var result = await CreateHandler().Handle(
+            new GetVisitsTodayQuery(_clinicId, null, ResponsibleVeterinarianUserId: vetId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _reader.Verify(r => r.GetAsync(
+            It.Is<VisitTodayReadRequest>(q => q.ResponsibleVeterinarianUserId == vetId && q.ClinicId == _clinicId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_Validation_When_Responsible_User_Is_Not_Clinic_Veterinarian()
+    {
+        var result = await CreateHandler().Handle(
+            new GetVisitsTodayQuery(_clinicId, null, ResponsibleVeterinarianUserId: Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.Error.Code.Should().Be("Visits.Validation");
+        _reader.Verify(r => r.GetAsync(It.IsAny<VisitTodayReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Not_Check_Veterinarian_Rule_Without_Filter()
+    {
+        var result = await CreateHandler().Handle(new GetVisitsTodayQuery(_clinicId, null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _veterinarians.Verify(v => v.IsClinicVeterinarianAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

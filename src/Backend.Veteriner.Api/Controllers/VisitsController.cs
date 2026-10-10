@@ -158,7 +158,7 @@ public sealed class VisitsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Günlük aksiyon yüzeyi: geliş sırası, planlı randevular ve aktif yatışlar (geçmişe dönük rapor değildir). <c>voided=true</c>: yalnızca o günün yanlış işaretlenen gelişleri.</summary>
+    /// <summary>Günlük aksiyon yüzeyi: geliş sırası, planlı randevular ve aktif yatışlar (geçmişe dönük rapor değildir). <c>voided=true</c>: yalnızca o günün yanlış işaretlenen gelişleri. <c>responsibleVeterinarianUserId</c>: "Benim hastalarım" süzgeci.</summary>
     [HttpGet("today")]
     [Authorize(Policy = PermissionCatalog.Visits.Read)]
     [ProducesResponseType(typeof(TodayDto), StatusCodes.Status200OK)]
@@ -168,12 +168,13 @@ public sealed class VisitsController : ControllerBase
         [FromQuery] Guid? clinicId,
         [FromQuery] DateOnly? localDate,
         [FromQuery] bool voided,
+        [FromQuery] Guid? responsibleVeterinarianUserId,
         CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new GetVisitsTodayQuery(clinicId, localDate, voided), ct);
+        var result = await _mediator.Send(new GetVisitsTodayQuery(clinicId, localDate, voided, responsibleVeterinarianUserId), ct);
         return result.ToActionResult(this);
     }
 

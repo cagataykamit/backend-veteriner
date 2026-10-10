@@ -22,7 +22,8 @@ public sealed record VisitTodayReadRequest(
     DateTime DayEndUtc,
     bool IncludeCarriedOver,
     int MaxItems,
-    bool OnlyVoided = false);
+    bool OnlyVoided = false,
+    Guid? ResponsibleVeterinarianUserId = null);
 
 public sealed record VisitTodayReadResult(
     IReadOnlyList<TodayItemDto> Items,

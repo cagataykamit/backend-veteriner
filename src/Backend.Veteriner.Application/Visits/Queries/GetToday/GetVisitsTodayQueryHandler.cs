@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
@@ -18,6 +19,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IVisitTodayReader _reader;
+    private readonly IClinicVeterinarianReader _veterinarians;
     private readonly TimeProvider _timeProvider;
 
     public GetVisitsTodayQueryHandler(
@@ -25,12 +27,14 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IVisitTodayReader reader,
+        IClinicVeterinarianReader veterinarians,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _reader = reader;
+        _veterinarians = veterinarians;
         _timeProvider = timeProvider;
     }
 
@@ -62,6 +66,14 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         if (!scope.IsSuccess)
             return Result<TodayDto>.Failure(scope.Error);
 
+        if (request.ResponsibleVeterinarianUserId is { } veterinarianId
+            && !await _veterinarians.IsClinicVeterinarianAsync(veterinarianId, tenantId, clinicId, ct))
+        {
+            return Result<TodayDto>.Failure(
+                "Visits.Validation",
+                "Sorumlu hekim bu kliniğe atanmış aktif bir hekim (Veteriner) olmalıdır.");
+        }
+
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var todayLocal = OperationDayBounds.ToLocalDate(nowUtc);
         var date = request.LocalDate ?? todayLocal;
@@ -76,7 +88,8 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
                 // Devralınan açık gelişler yalnızca bugünün görünümüne girer.
                 IncludeCarriedOver: date == todayLocal,
                 MaxItems,
-                request.Voided),
+                request.Voided,
+                request.ResponsibleVeterinarianUserId),
             ct);
 
         if (data.Items.Count > MaxItems)
