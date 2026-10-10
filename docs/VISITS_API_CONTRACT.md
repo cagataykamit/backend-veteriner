@@ -70,7 +70,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), b
 Kurallar:
 
 - **Acil (opsiyonel):** `isUrgent` verilmezse `false`. Yalnızca **yeni** kayıtta uygulanır; idempotent tekrar mevcut kaydı döndürür ve `isUrgent` değerini değiştirmez (sonradan işaretleme madde 4.4).
-- **Randevulu:** `appointmentId` dolu. `clinicId`/`petId` randevudan türetilir; gönderilirse randevu ile aynı olmalı, değilse `Visits.AppointmentPetClinicMismatch`. Randevu `Scheduled` olmalı: `Cancelled` → `Visits.AppointmentCancelled`; `Completed` ve o randevu için Visit yoksa → `Visits.AppointmentNotScheduled`.
+- **Randevulu:** `appointmentId` dolu. `clinicId`/`petId` randevudan türetilir; gönderilirse randevu ile aynı olmalı, değilse `Visits.AppointmentPetClinicMismatch`. Randevu `Scheduled` olmalı: `NoShow` (gelmedi) randevu için geliş engellenmez, randevu aynı işlemde `Scheduled`'a döner ve normal akış sürer (`APPOINTMENT_NOSHOW_API_CONTRACT.md` madde 4); `Cancelled` → `Visits.AppointmentCancelled`; `Completed` ve o randevu için Visit yoksa → `Visits.AppointmentNotScheduled`.
 - **Randevusuz:** `appointmentId` yok; `petId` ve aktif klinik (`clinicId` veya bağlam) zorunlu, aksi halde `Visits.Validation`. Randevu **oluşturulmaz**.
 - Hayvan ve klinik kiracıya ait olmalı (`Pets.NotFound`, `Clinics.NotFound`, `Appointments.NotFound`).
 
@@ -259,7 +259,7 @@ Randevulu Visit **tek satırdır** (randevu ayrıca satır üretmez). Satır kay
 | `scheduledAtUtc` | datetime? | Randevu varsa |
 | `arrivedAtUtc` | datetime? | Visit varsa |
 | `careStatus` | enum? | Visit varsa; planlı satırda `null` |
-| `appointmentStatus` | `Scheduled` \| `Completed` \| `Cancelled`? | Randevu varsa |
+| `appointmentStatus` | `Scheduled` \| `Completed` \| `Cancelled` \| `NoShow`? | Randevu varsa; `NoShow` (gelmedi) satırı Visit'siz planlı satırdır ve sırada en sonda ("Gelmedi" grubu) yer alır |
 | `responsibleVeterinarianUserId`, `responsibleVeterinarianName` | guid?, string? | Visit varsa, opsiyonel (madde 3.1) |
 | `isCarriedOver` | bool | |
 | `paymentIndicator` | `NoPaymentRecorded` \| `PaymentRecorded` | Aşağıya bakın |
