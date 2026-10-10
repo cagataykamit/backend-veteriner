@@ -7,7 +7,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA4_DISCOVERY.md` §5 dili
 | # | Karar | Sonuç |
 |---|---|---|
 | D2 | Kilo geçmişi | `Examination.WeightKg` + `VitalsMeasuredAtUtc`'den **türetilir**; ek tablo yok. `Pet.Weight` ayrı, tarihsiz "profil kilosu" olarak kalır. |
-| D3 | "Veri alınamadı" | **Tek özet ucu**, bölüm başına `state` ve kısmi yanıt. "Kayıt yok" (`empty`), "yetki yok" (`forbidden`), "okunamadı" (`unavailable`) ayrıdır. |
+| D3 | "Veri alınamadı" | **Tek özet ucu**, bölüm başına `state` ve kısmi yanıt. "Kayıt yok" (`Empty`), "yetki yok" (`Forbidden`), "okunamadı" (`Unavailable`) ayrıdır. |
 | D4 | Timeline kapsamı | muayene, tedavi, reçete, lab, **uygulanan** aşı, yatış (tek olay), geliş (Visit; randevu Visit içine katlanır). **Ödeme sonra eklenir** (Aşama 3 sonrası). İptal/yanlış işaretli kayıtlar varsayılan gizli, filtreyle açılır. |
 | — | Sayfalama | Opak imleç; offset ve toplam sayım **yok**. |
 
@@ -43,28 +43,28 @@ Yanıt (`200`):
   "petId": "…",
   "petAlerts": { "flags": ["Allergy"], "note": "Penisiline alerji" },
   "profileWeightKg": 4.2,
-  "activeHospitalization": { "state": "ok", "data": { "id": "…", "clinicId": "…", "clinicName": "…", "admittedAtUtc": "…", "plannedDischargeAtUtc": null, "reason": "…", "examinationId": null } },
-  "vaccinations": { "state": "ok", "data": {
+  "activeHospitalization": { "state": "Ok", "data": { "id": "…", "clinicId": "…", "clinicName": "…", "admittedAtUtc": "…", "plannedDischargeAtUtc": null, "reason": "…", "examinationId": null } },
+  "vaccinations": { "state": "Ok", "data": {
       "lastApplied": { "id": "…", "vaccineName": "…", "appliedAtUtc": "…", "clinicId": "…" },
       "nextDue": { "id": "…", "vaccineName": "…", "dueAtUtc": "…", "isOverdue": false, "clinicId": "…" } } },
-  "latestWeight": { "state": "ok", "data": { "weightKg": 4.4, "measuredAtUtc": "…", "source": "Examination", "examinationId": "…" } },
-  "lastVisit": { "state": "ok", "data": { "id": "…", "arrivedAtUtc": "…", "careStatus": "Completed", "clinicId": "…", "clinicName": "…" } },
-  "lastExamination": { "state": "ok", "data": { "id": "…", "examinedAtUtc": "…", "visitReason": "…", "clinicId": "…", "clinicName": "…" } }
+  "latestWeight": { "state": "Ok", "data": { "weightKg": 4.4, "measuredAtUtc": "…", "source": "Examination", "examinationId": "…" } },
+  "lastVisit": { "state": "Ok", "data": { "id": "…", "arrivedAtUtc": "…", "careStatus": "Completed", "clinicId": "…", "clinicName": "…" } },
+  "lastExamination": { "state": "Ok", "data": { "id": "…", "examinedAtUtc": "…", "visitReason": "…", "clinicId": "…", "clinicName": "…" } }
 }
 ```
 
-Bölüm zarfı: `{ "state": "ok" | "empty" | "forbidden" | "unavailable", "data": … }`.
+Bölüm zarfı: `{ "state": "Ok" | "Empty" | "Forbidden" | "Unavailable", "data": … }`.
 
 | `state` | Anlamı | `data` |
 |---|---|---|
-| `ok` | Kayıt var | dolu |
-| `empty` | Kayıt **yok** (sorgu başarılı) | `null` |
-| `forbidden` | Kullanıcıda ilgili `*.Read` izni yok | `null` |
-| `unavailable` | Bölüm sorgusu hata verdi; diğer bölümler yine döner | `null` |
+| `Ok` | Kayıt var | dolu |
+| `Empty` | Kayıt **yok** (sorgu başarılı) | `null` |
+| `Forbidden` | Kullanıcıda ilgili `*.Read` izni yok | `null` |
+| `Unavailable` | Bölüm sorgusu hata verdi; diğer bölümler yine döner | `null` |
 
 - `petAlerts` ve `profileWeightKg` `Pets.Read` altındadır ve bölüm zarfı taşımaz (ayrı sorgu değil, hayvan kaydıyla gelir). Uyarı yoksa `flags: []` ("uyarı yok"); `petAlerts` null olmaz. `profileWeightKg` tarihsizdir (`Pet.Weight`), tarih uydurulmaz.
 - `activeHospitalization`: `DischargedAtUtc == null` olan kayıt (`history-summary`'deki son 10 sınırından bağımsız, ayrı sorgu). Birden fazla klinikte aktif yatış nadir de olsa mümkünse en yeni `AdmittedAtUtc` döner. İzin: `Hospitalizations.Read`.
-- `vaccinations` (`Vaccinations.Read`): `lastApplied` = `Status=Applied` olanlar içinde en yeni `AppliedAtUtc`; `nextDue` = `Status=Scheduled` olanlar içinde **en erken** `DueAtUtc` (gecikmiş olabilir: `isOverdue = dueAtUtc < şimdi`). İkisi ayrı alandır; ikisi de yoksa `state: "empty"`, biri varsa `ok` ve diğeri `null`.
+- `vaccinations` (`Vaccinations.Read`): `lastApplied` = `Status=Applied` olanlar içinde en yeni `AppliedAtUtc`; `nextDue` = `Status=Scheduled` olanlar içinde **en erken** `DueAtUtc` (gecikmiş olabilir: `isOverdue = dueAtUtc < şimdi`). İkisi ayrı alandır; ikisi de yoksa `state: "Empty"`, biri varsa `Ok` ve diğeri `null`.
 - `latestWeight` (`Examinations.Read`): `WeightKg` dolu muayeneler içinde `VitalsMeasuredAtUtc` (yoksa `ExaminedAtUtc`) en yeni olan. `source` bugün hep `"Examination"`.
 - `lastVisit` (`Visits.Read`): yanlış işaretli (`VoidedAtUtc != null`) olmayan en yeni `ArrivedAtUtc`.
 - `lastExamination` (`Examinations.Read`): en yeni `ExaminedAtUtc`.
@@ -78,7 +78,7 @@ Sorgu parametreleri (hepsi opsiyonel):
 
 | Parametre | Tip | Anlamı |
 |---|---|---|
-| `types` | string, tekrarlı (`types=Visit&types=Examination`) | Yalnız bu türler. Bilinmeyen ad → `400 Pets.Validation`. Boş = yetkili tüm türler |
+| `types` | string, tekrarlı (`types=Visit&types=Examination`) | Yalnız bu türler. Bilinmeyen veya henüz desteklenmeyen ad (`Payment`, `Appointment`) → `400 Pets.Validation`. Boş = yetkili tüm türler |
 | `fromUtc` / `toUtc` | ISO-8601 | Olay tarihi aralığı: `fromUtc <= eventAtUtc < toUtc` (yarı açık). `fromUtc >= toUtc` → `400 Pets.Validation` |
 | `clinicId` | Guid | Klinik süzgeci (scope kuralı yukarıdaki gibi; erişilemeyen klinik `Clinics.AccessDenied`) |
 | `includeVoided` | bool, varsayılan `false` | `true`: yanlış işaretli geliş ve iptal edilmiş aşı da döner (`isVoided=true`) |
