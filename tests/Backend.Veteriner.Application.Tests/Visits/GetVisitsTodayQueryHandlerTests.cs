@@ -51,9 +51,9 @@ public sealed class GetVisitsTodayQueryHandlerTests
         => new(Guid.NewGuid(), null, Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
             scheduledAtUtc, arrivedAtUtc, status, null, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null, isUrgent);
 
-    private static TodayItemDto Planned(string pet, DateTime scheduledAtUtc)
+    private static TodayItemDto Planned(string pet, DateTime scheduledAtUtc, AppointmentStatus status = AppointmentStatus.Scheduled)
         => new(null, Guid.NewGuid(), Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
-            scheduledAtUtc, null, null, AppointmentStatus.Scheduled, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null, false);
+            scheduledAtUtc, null, null, status, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null, false);
 
     [Fact]
     public async Task Handle_Should_Fail_When_Tenant_Missing()
@@ -153,6 +153,21 @@ public sealed class GetVisitsTodayQueryHandlerTests
 
         result.Value!.Items.Select(i => i.PetName)
             .Should().Equal("w1", "w2", "ip", "p1", "p2", "c2", "c1");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Place_NoShow_Planned_Rows_Last_After_Completed()
+    {
+        var noShowLate = Planned("n2", T0.AddHours(-1), AppointmentStatus.NoShow);
+        var noShowEarly = Planned("n1", T0.AddHours(-3), AppointmentStatus.NoShow);
+        var planned = Planned("p1", T0.AddHours(2));
+        var completed = Visit("c1", VisitCareStatus.Completed, T0.AddMinutes(-60));
+        var waiting = Visit("w1", VisitCareStatus.Waiting, T0.AddMinutes(5));
+        Returns([noShowLate, completed, noShowEarly, planned, waiting]);
+
+        var result = await CreateHandler().Handle(new GetVisitsTodayQuery(_clinicId, null), CancellationToken.None);
+
+        result.Value!.Items.Select(i => i.PetName).Should().Equal("w1", "p1", "c1", "n1", "n2");
     }
 
     [Fact]

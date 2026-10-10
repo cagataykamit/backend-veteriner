@@ -337,6 +337,26 @@ public sealed class CreateExaminationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_AppointmentNoShow_And_Not_Change_It()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = CmdWithAppointmentOnly(Guid.NewGuid(), DateTime.UtcNow.AddMinutes(-10));
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        var appt = new Appointment(
+            tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddHours(-2), 30, AppointmentType.Other, AppointmentStatus.NoShow, null);
+        _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(appt);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.Error.Code.Should().Be("Examinations.AppointmentNoShow");
+        appt.Status.Should().Be(AppointmentStatus.NoShow);
+        _examinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Should_Fail_When_AppointmentCancelled()
     {
         var tid = Guid.NewGuid();

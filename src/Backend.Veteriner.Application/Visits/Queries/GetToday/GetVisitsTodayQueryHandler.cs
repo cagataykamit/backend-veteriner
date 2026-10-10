@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Visits;
 using MediatR;
 
@@ -108,7 +109,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     }
 
     /// <summary>
-    /// Bekliyor (önce acil, geliş artan) → Devam ediyor (önce acil, geliş artan) → planlı (randevu artan) → Tamamlandı (geliş azalan).
+    /// Bekliyor (önce acil, geliş artan) → Devam ediyor (önce acil, geliş artan) → planlı (randevu artan) → Tamamlandı (geliş azalan) → Gelmedi (randevu artan).
     /// </summary>
     private static IReadOnlyList<TodayItemDto> Order(IReadOnlyList<TodayItemDto> items)
         => items
@@ -121,7 +122,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         => group.Key switch
         {
             WaitingRank or InProgressRank => group.OrderByDescending(i => i.IsUrgent).ThenBy(i => i.ArrivedAtUtc),
-            PlannedRank => group.OrderBy(i => i.ScheduledAtUtc),
+            PlannedRank or NoShowRank => group.OrderBy(i => i.ScheduledAtUtc),
             _ => group.OrderByDescending(i => i.ArrivedAtUtc),
         };
 
@@ -129,6 +130,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private const int InProgressRank = 1;
     private const int PlannedRank = 2;
     private const int CompletedRank = 3;
+    private const int NoShowRank = 4;
 
     private static int GroupRank(TodayItemDto item)
         => item.CareStatus switch
@@ -136,6 +138,6 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             VisitCareStatus.Waiting => WaitingRank,
             VisitCareStatus.InProgress => InProgressRank,
             VisitCareStatus.Completed => CompletedRank,
-            _ => PlannedRank,
+            _ => item.AppointmentStatus == AppointmentStatus.NoShow ? NoShowRank : PlannedRank,
         };
 }

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
@@ -33,6 +34,8 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
     private readonly IReadRepository<Visit> _visitsRead;
     private readonly IRepository<Visit> _visitsWrite;
     private readonly TimeProvider _timeProvider;
+    private readonly IAppointmentProjectionSnapshotFactory _appointmentSnapshotFactory;
+    private readonly IAppointmentIntegrationEventOutbox _appointmentEventOutbox;
 
     public CreateVisitCommandHandler(
         ITenantContext tenantContext,
@@ -46,7 +49,9 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         IReadRepository<Appointment> appointments,
         IReadRepository<Visit> visitsRead,
         IRepository<Visit> visitsWrite,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IAppointmentProjectionSnapshotFactory appointmentSnapshotFactory,
+        IAppointmentIntegrationEventOutbox appointmentEventOutbox)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -60,6 +65,8 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         _visitsRead = visitsRead;
         _visitsWrite = visitsWrite;
         _timeProvider = timeProvider;
+        _appointmentSnapshotFactory = appointmentSnapshotFactory;
+        _appointmentEventOutbox = appointmentEventOutbox;
     }
 
     public async Task<Result<VisitCreateResultDto>> Handle(CreateVisitCommand request, CancellationToken ct)
@@ -155,7 +162,8 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
                     "İptal edilmiş randevu için geliş kaydı oluşturulamaz.");
             }
 
-            if (appointment.Status != AppointmentStatus.Scheduled)
+            // Gelmedi işaretli randevuya hasta geç geldi: işaret geliş kaydıyla aynı işlemde kalkar.
+            if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.NoShow))
             {
                 return Result<VisitCreateResultDto>.Failure(
                     "Visits.AppointmentNotScheduled",
@@ -183,6 +191,9 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
                 "Visits.Validation",
                 "Sorumlu hekim bu kliniğe atanmış aktif bir hekim (Veteriner) olmalıdır.");
         }
+
+        if (appointment is { Status: AppointmentStatus.NoShow })
+            await RevertNoShowOnArrivalAsync(appointment, ct);
 
         var visit = new Visit(
             tenantId,
@@ -213,6 +224,21 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         }
 
         return Result<VisitCreateResultDto>.Success(new VisitCreateResultDto(true, await visit.ToDtoAsync(_veterinarians, ct)));
+    }
+
+    private async Task RevertNoShowOnArrivalAsync(Appointment appointment, CancellationToken ct)
+    {
+        var previous = await _appointmentSnapshotFactory.CreateAsync(appointment, ct);
+        appointment.RevertNoShowOnArrival();
+        await _appointmentEventOutbox.EnqueueAsync(
+            AppointmentIntegrationEventTypes.Updated,
+            new AppointmentUpdatedIntegrationEvent(
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                appointment.MutationSequence,
+                previous,
+                _appointmentSnapshotFactory.CreateScalarsFromPrevious(appointment, previous)),
+            ct);
     }
 
     private async Task<Result<VisitCreateResultDto>> ExistingAsync(Visit visit, CancellationToken ct)
