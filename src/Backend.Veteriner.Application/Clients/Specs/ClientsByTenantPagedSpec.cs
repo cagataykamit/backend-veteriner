@@ -1,25 +1,18 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Clients;
-using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Clients.Specs;
 
 public sealed class ClientsByTenantPagedSpec : Specification<Client, ClientListItemDto>
 {
-    public ClientsByTenantPagedSpec(Guid tenantId, int page, int pageSize, string? searchContainsLikePattern)
+    public ClientsByTenantPagedSpec(Guid tenantId, int page, int pageSize, DailySearchTerm? searchTerm)
     {
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId);
-        if (searchContainsLikePattern is not null)
-        {
-            var p = searchContainsLikePattern;
-            Query.Where(c =>
-                EF.Functions.Like(c.FullName, p)
-                || (c.Email != null && EF.Functions.Like(c.Email, p))
-                || (c.Phone != null && EF.Functions.Like(c.Phone, p))
-                || (c.PhoneNormalized != null && EF.Functions.Like(c.PhoneNormalized, p)));
-        }
+        if (searchTerm is not null)
+            Query.WhereDailySearch(searchTerm);
 
         Query
             .OrderBy(c => c.FullName)

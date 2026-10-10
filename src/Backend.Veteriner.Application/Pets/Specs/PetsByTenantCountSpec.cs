@@ -1,6 +1,6 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Pets;
-using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Pets.Specs;
 
@@ -10,7 +10,7 @@ public sealed class PetsByTenantCountSpec : Specification<Pet>
         Guid tenantId,
         Guid? clientId,
         Guid? speciesId,
-        string? searchContainsLikePattern,
+        DailySearchTerm? searchTerm,
         Guid[] petIdsMatchingClientTextOrEmpty)
     {
         Query.AsNoTracking();
@@ -19,16 +19,7 @@ public sealed class PetsByTenantCountSpec : Specification<Pet>
             Query.Where(p => p.ClientId == clientId.Value);
         if (speciesId.HasValue)
             Query.Where(p => p.SpeciesId == speciesId.Value);
-        if (searchContainsLikePattern is not null)
-        {
-            var pat = searchContainsLikePattern;
-            var ownerPets = petIdsMatchingClientTextOrEmpty;
-            Query.Where(p =>
-                EF.Functions.Like(p.Name, pat)
-                || (p.Breed != null && EF.Functions.Like(p.Breed, pat))
-                || EF.Functions.Like(p.Species!.Name, pat)
-                || (p.BreedRef != null && EF.Functions.Like(p.BreedRef.Name, pat))
-                || (ownerPets.Length > 0 && ownerPets.Contains(p.Id)));
-        }
+        if (searchTerm is not null)
+            Query.WhereDailySearch(searchTerm, petIdsMatchingClientTextOrEmpty);
     }
 }
