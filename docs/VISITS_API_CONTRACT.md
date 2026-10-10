@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), backlog CHECKIN-006/007. Tüm endpoint'ler `api/v1` altında, JSON gövde/query, standart `ProblemDetails` + `extensions.code` hata zarfı (bkz. `EXAMINATIONS_WORKSPACE_API_CONTRACT.md`).
 
-> **Durum:** Sözleşme taslağı. Uygulama başlamadı. Madde 12'deki açık kararlar netleşmeden ilgili kısımlar kesin sayılmaz.
+> **Durum:** Sözleşme. Kararlar madde 12'de kayıtlı (D1 Query DB read modeli, K-A bağlama yok, S2 açık iş göstergesi yok, S3 `isVoided`). Uygulama bu sözleşmeye göre yapılır.
 
 ---
 
@@ -258,14 +258,17 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 
 ## 11) Veri ve okuma modeli
 
-- Visit **komut veritabanında** yazılır (`Visits` tablosu; tenant+klinik+hayvan+geliş zamanı, yukarıdaki filtreli benzersiz indeksler). Domain kuralları (`Visit` aggregate'i: geçişler, düzeltme, yanlış geliş) entity içindedir.
-- Bugün okuması için kaynak kararı **madde 12, D1**'de.
+- **Yazma:** Visit **komut veritabanında** (`Visits` tablosu; filtreli benzersiz indeksler madde 5). Domain kuralları `Visit` aggregate'i içindedir (geçişler, düzeltme, yanlış geliş).
+- **Okuma (Bugün):** Mevcut CQRS desenine uyar. Her Visit mutasyonu aynı transaction'da outbox'a `visit.*.v1` olayı yazar; projeksiyon işçisi Query DB `VisitReadModels` tablosunu doldurur (idempotent, `MutationSequence` ile eski olay koruması, backfill/rebuild yolu). Bugün sorgusu Query DB'de `VisitReadModels` ile `AppointmentReadModels`, `PetReadModels`, `ClientReadModels` ve `PaymentReadModels` tablolarını birleştirir.
+- **Tutarlılık:** Bugün nihai tutarlıdır (outbox işçi gecikmesi kadar). Yazma garantileri (tekrar tıklama, tek aktif Visit, geçiş kuralları) komut veritabanında olduğundan projeksiyon gecikmesinden etkilenmez; `POST`, `start`, `complete`, `corrections` yanıtları komut veritabanından döner.
+- **Randevu olayı düzeltmesi:** Muayene randevuyu `Completed` yaptığında `appointment.completed.v1` outbox olayı da üretilir (mevcut eksik). Aksi halde Bugün randevu durumunu yanlış gösterir.
+- **Komut veritabanından okunanlar:** (a) aktif yatışlar (Query DB'de yatış read modeli yok); (b) ödeme göstergesi için Visit'e bağlı muayene kimlikleri (`Examination.VisitId` Query DB'de yok).
 
 ---
 
-## 12) Açık kararlar (uygulamadan önce netleşmeli)
+## 12) Kararlar
 
-- **D1 — Bugün'ün okuma kaynağı.** İş tanımı "Query DB read modeli/projeksiyonu" istiyor. Koddan bulgular: (a) mevcut randevu projeksiyonu outbox + işçi + yeniden kurma yoluyla ~2.000 satır; Visit için aynısını kopyalamak büyük bir yinelenme olur. (b) Geliş → kuyrukta görünme anlık olmalı; projeksiyon gecikmesi "tekrar tıklama" ve "iki kullanıcı aynı kuyruğu görür" kabulünü zayıflatır. (c) `CreateExaminationCommandHandler` randevuyu `Completed` yapıyor ama randevu outbox olayı **göndermiyor**; Query DB randevu modeli muayeneden sonra `Scheduled` kalıyor (mevcut hata). **Öneri:** Bugün, Visit'leri komut veritabanından (indeksli, gün/klinik başına küçük küme), randevu ve hayvan/sahip bilgisini komut veritabanından aynı sorguda okur; Query DB'ye Visit projeksiyonu bu işe girmez, gerekirse ayrı karar. Karşı seçenek: Query DB read modeli (tutarlılık gecikmesi + K2-A olay eksiği düzeltmesi gerekir).
-- **K-A — Farklı niyetli tekrar geliş.** Hayvanın randevusuz aktif Visit'i varken aynı hayvanın randevusu için geliş denenirse bu taslak mevcut Visit'i döndürür (randevu bağlanmaz). Alternatif: mevcut Visit'e randevu bağlama düzeltmesi. Varsayılan: bağlama yok.
-- **S2 — Açık iş göstergesi.** Lab/tedavi/reçete kayıtlarında açık-kapalı durumu yok; bu sürümde alan yok. İstenirse önce ürün tanımı gerekir.
-- **S3 — Yanlış geliş modeli.** Bakım durumuna 4. durum eklemek yerine ayrı `isVoided` işareti seçildi (ADR "bakım durumu sade 3 durum" ile uyumlu).
+- **D1 — Bugün'ün okuma kaynağı: Query DB read modeli + projeksiyon.** Gerekçe: mevcut CQRS deseni; ADR-009 "Query DB read modeli ve projeksiyon/rebuild yolları güncellenmeli" der; Bugün yazma yükünden ayrışır. Maliyet: yeni projeksiyon hattı ve randevu olay eksiğinin düzeltilmesi.
+- **K-A — Farklı niyetli tekrar geliş:** Hayvanın randevusuz aktif Visit'i varken aynı hayvanın randevusu için geliş denenirse mevcut Visit döner; randevu bağlanmaz.
+- **S2 — Açık iş göstergesi:** Lab/tedavi/reçete kayıtlarında açık-kapalı durumu yok; bu sürümde alan yok, uydurulmaz. Önce ürün tanımı gerekir.
+- **S3 — Yanlış geliş modeli:** Bakım durumuna 4. durum eklenmez; ayrı `isVoided` işareti (ADR "bakım durumu sade 3 durum" ile uyumlu).
