@@ -723,6 +723,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime>("ExaminedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("FinalizedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("FinalizedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Findings")
                         .IsRequired()
                         .HasMaxLength(8000)
@@ -750,6 +756,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.Property<decimal?>("TemperatureC")
                         .HasPrecision(5, 2)
@@ -791,6 +802,44 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "VisitId");
 
                     b.ToTable("Examinations", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Examinations.ExaminationAddendum", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExaminationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ExaminationId", "CreatedAtUtc");
+
+                    b.ToTable("ExaminationAddenda", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.Hospitalization", b =>
