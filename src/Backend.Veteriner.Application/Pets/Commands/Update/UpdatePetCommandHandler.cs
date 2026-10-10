@@ -111,6 +111,10 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         if (duplicate is not null)
             return Result.Failure("Pets.DuplicatePet", "Bu musteri icin ayni isim ve turde bir hayvan kaydi zaten var.");
 
+        var alerts = pet.ApplyAlerts(request.AlertFlags, request.AlertNote);
+        if (!alerts.IsSuccess)
+            return Result.Failure(alerts.Error);
+
         pet.UpdateDetails(
             request.Name,
             request.SpeciesId,

@@ -46,14 +46,16 @@ public sealed class GetVisitsTodayQueryHandlerTests
         => _reader.Setup(r => r.GetAsync(It.IsAny<VisitTodayReadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new VisitTodayReadResult(items, []));
 
+    private static readonly Backend.Veteriner.Application.Pets.Contracts.Dtos.PetAlertsDto NoAlerts = new([], null);
+
     private static TodayItemDto Visit(
         string pet, VisitCareStatus status, DateTime arrivedAtUtc, DateTime? scheduledAtUtc = null, bool isUrgent = false)
         => new(Guid.NewGuid(), null, Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
-            scheduledAtUtc, arrivedAtUtc, status, null, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null, isUrgent);
+            scheduledAtUtc, arrivedAtUtc, status, null, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null, isUrgent, NoAlerts);
 
     private static TodayItemDto Planned(string pet, DateTime scheduledAtUtc, AppointmentStatus status = AppointmentStatus.Scheduled)
         => new(null, Guid.NewGuid(), Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
-            scheduledAtUtc, null, null, status, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null, false);
+            scheduledAtUtc, null, null, status, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null, false, NoAlerts);
 
     [Fact]
     public async Task Handle_Should_Fail_When_Tenant_Missing()

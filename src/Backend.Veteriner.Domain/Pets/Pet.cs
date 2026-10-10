@@ -10,6 +10,8 @@ namespace Backend.Veteriner.Domain.Pets;
 /// </summary>
 public sealed class Pet : AggregateRoot
 {
+    public const int MaxAlertNoteLength = 200;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClientId { get; private set; }
@@ -42,6 +44,12 @@ public sealed class Pet : AggregateRoot
 
     /// <summary>Kısırlaştırılmış mı; varsayılan false.</summary>
     public bool IsNeutered { get; private set; }
+
+    /// <summary>Kalıcı klinik güvenlik uyarıları; varsayılan <see cref="PetAlertFlags.None"/> (uyarı yok).</summary>
+    public PetAlertFlags AlertFlags { get; private set; }
+
+    /// <summary>Uyarılar için tek kısa not (ör. alerjinin ne olduğu); yalnızca en az bir bayrak varken dolu olabilir.</summary>
+    public string? AlertNote { get; private set; }
 
     /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
     public Species? Species { get; private set; }
@@ -128,6 +136,36 @@ public sealed class Pet : AggregateRoot
         PassportOrTagNumber = NormalizeOptionalIdentityNumber(passportOrTagNumber);
         SpecialProtocolNumber = NormalizeOptionalIdentityNumber(specialProtocolNumber);
         IsNeutered = isNeutered;
+    }
+
+    /// <summary>
+    /// Uyarıları günceller; <c>null</c> parametre mevcut değere dokunmaz (PUT tam değiştirme olduğu için eski istemci uyarıyı silmesin).
+    /// Boş küme notu temizler; bayraksız dolu not reddedilir. Kural yalnızca burada yaşar.
+    /// </summary>
+    public Result ApplyAlerts(IReadOnlyList<string>? flagNames, string? note)
+    {
+        var flags = AlertFlags;
+        if (flagNames is not null && !PetAlertFlagNames.TryParse(flagNames, out flags))
+            return Result.Failure("Pets.Validation", "Geçersiz uyarı bayrağı.");
+
+        var newNote = AlertNote;
+        if (note is not null)
+            newNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+
+        if (newNote is { Length: > MaxAlertNoteLength })
+            return Result.Failure("Pets.Validation", $"Uyarı notu en çok {MaxAlertNoteLength} karakter olabilir.");
+
+        if (flags == PetAlertFlags.None)
+        {
+            if (note is not null && !string.IsNullOrWhiteSpace(note))
+                return Result.Failure("Pets.Validation", "Not için en az bir uyarı bayrağı gerekir.");
+
+            newNote = null;
+        }
+
+        AlertFlags = flags;
+        AlertNote = newNote;
+        return Result.Success();
     }
 
     private static string? NormalizeOptionalIdentityNumber(string? value)

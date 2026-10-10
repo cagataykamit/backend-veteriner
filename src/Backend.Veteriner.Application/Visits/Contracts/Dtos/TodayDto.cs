@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Visits;
 
@@ -39,7 +40,8 @@ public sealed record TodayItemDto(
     bool HasActiveHospitalization,
     bool IsVoided,
     string? VoidReason,
-    bool IsUrgent);
+    bool IsUrgent,
+    PetAlertsDto PetAlerts);
 
 public sealed record TodayHospitalizationDto(
     Guid HospitalizationId,

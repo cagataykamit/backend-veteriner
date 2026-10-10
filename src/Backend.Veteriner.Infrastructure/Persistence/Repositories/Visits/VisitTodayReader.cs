@@ -1,7 +1,9 @@
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
+using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Visits;
 using Microsoft.EntityFrameworkCore;
 
@@ -93,7 +95,9 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     v.ArrivedAtUtc < start,
                     v.VoidedAtUtc != null,
                     v.VoidReason,
-                    v.IsUrgent))
+                    v.IsUrgent,
+                    p.AlertFlags,
+                    p.AlertNote))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -134,7 +138,9 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     false,
                     false,
                     null,
-                    false))
+                    false,
+                    p.AlertFlags,
+                    p.AlertNote))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -221,7 +227,9 @@ public sealed class VisitTodayReader : IVisitTodayReader
         bool IsCarriedOver,
         bool IsVoided,
         string? VoidReason,
-        bool IsUrgent)
+        bool IsUrgent,
+        PetAlertFlags AlertFlags,
+        string? AlertNote)
     {
         /// <summary>Satırı tekil tanımlar: Visit satırı Visit kimliğiyle, planlı satır randevu kimliğiyle.</summary>
         public string Key => VisitId.HasValue ? $"v:{VisitId}" : $"a:{AppointmentId}";
@@ -248,6 +256,7 @@ public sealed class VisitTodayReader : IVisitTodayReader
                 hasActiveHospitalization,
                 IsVoided,
                 VoidReason,
-                IsUrgent);
+                IsUrgent,
+                PetAlertsDto.From(AlertFlags, AlertNote));
     }
 }

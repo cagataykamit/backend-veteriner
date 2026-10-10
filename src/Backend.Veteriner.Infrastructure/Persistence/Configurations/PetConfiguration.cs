@@ -51,6 +51,14 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
             .IsRequired()
             .HasDefaultValue(false);
 
+        b.Property(x => x.AlertFlags)
+            .IsRequired()
+            .HasConversion<int>()
+            .HasDefaultValue(PetAlertFlags.None);
+
+        b.Property(x => x.AlertNote)
+            .HasMaxLength(Pet.MaxAlertNoteLength);
+
         b.Property(x => x.Gender)
             .HasConversion<int>();
 
