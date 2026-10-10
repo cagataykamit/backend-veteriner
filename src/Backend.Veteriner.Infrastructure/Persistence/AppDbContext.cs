@@ -7,6 +7,7 @@ using Backend.Veteriner.Domain.Authorization;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Tenants;
@@ -83,6 +84,7 @@ public class AppDbContext : DbContext
     public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
     public DbSet<VaccineDefinition> VaccineDefinitions => Set<VaccineDefinition>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Charge> Charges => Set<Charge>();
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<LabResult> LabResults => Set<LabResult>();
