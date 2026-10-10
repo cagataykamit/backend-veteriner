@@ -168,7 +168,7 @@ Kurallar:
   - Hasta tekrar seçilmez: yalnızca `visitId` + klinik içerik yeterlidir.
 - `GET /examinations/{id}` ve liste yanıtlarına `visitId` (guid?) eklenir. `PUT /examinations/{id}` `visitId`'yi **değiştirmez** (appointmentId gibi).
 - **K2-A korunur:** muayene bir randevuya bağlıysa ve randevu `Scheduled` ise muayene oluşturma randevuyu `Completed` yapmaya devam eder; Visit durumundan bağımsızdır. Randevu ile Visit durumları kısa süre ayrışabilir.
-- Randevu başına tek muayene kuralı bu işte **yoktur** (K4).
+- Randevu başına tek muayene kuralı bu işte **yoktur** (K4). **Mevcut davranış (belgelenmiş, entegrasyon testiyle doğrulandı):** aynı Visit’e ikinci `POST /examinations` **engellenmez**; `201` döner, Visit `InProgress` kalır ve `GET /examinations?clinicId=…&visitId=…` her iki muayeneyi listeler. İstemci, Visit’in mevcut muayenesini bu filtreyle bulup yeni muayene yerine onu açmalıdır. Sunucu tarafı “Visit başına tek muayene” kuralı ürün kararı gerektirir (K4) ve eklenmemiştir.
 
 ---
 
@@ -299,3 +299,4 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 - **Query DB read modeli yok:** Visit için projeksiyon ve Query DB okuması bu sürümde yoktur (D1); bayrakla ayrı iş olarak eklenecektir.
 - **Hekim adı ve seçimi:** Randevu hekim alanı taşımaz, bu yüzden randevudan varsayılan hekim türetilmez. Kullanıcıların gerçek adı yalnızca `PUT /me/display-name` ile girilir; girilmeyenlerde e-posta türevi ad görünür. Admin/davet akışında ad girişi yoktur. `GET /tenants/{id}/members` hâlâ e-posta türevi adı döner (bu işte değiştirilmedi).
 - **Ödeme göstergesi:** Yalnızca tahsilat kaydının varlığını söyler; borç/bakiye temel finans (Aşama 3) sonrasıdır.
+- **Visit başına çoklu muayene:** Aynı Visit’e (ve aynı randevuya) birden fazla muayene açılabilir; tek muayene kuralı ürün kararıdır (K4) ve eklenmemiştir. Çift kayıt riskini istemci `GET /examinations?visitId=` ile mevcut muayeneyi açarak azaltır.
