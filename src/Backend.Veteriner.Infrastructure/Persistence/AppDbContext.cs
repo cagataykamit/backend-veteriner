@@ -1,6 +1,7 @@
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Examinations;
+using Backend.Veteriner.Domain.Visits;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
 using Backend.Veteriner.Domain.Clinics;
@@ -78,6 +79,7 @@ public class AppDbContext : DbContext
     public DbSet<PetColor> PetColors => Set<PetColor>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Examination> Examinations => Set<Examination>();
+    public DbSet<Visit> Visits => Set<Visit>();
     public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
     public DbSet<VaccineDefinition> VaccineDefinitions => Set<VaccineDefinition>();
     public DbSet<Payment> Payments => Set<Payment>();

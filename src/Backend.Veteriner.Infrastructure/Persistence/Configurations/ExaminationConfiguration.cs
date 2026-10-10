@@ -16,6 +16,7 @@ public sealed class ExaminationConfiguration : IEntityTypeConfiguration<Examinat
         b.Property(x => x.ClinicId).IsRequired();
         b.Property(x => x.PetId).IsRequired();
         b.Property(x => x.AppointmentId);
+        b.Property(x => x.VisitId);
         b.Property(x => x.ExaminedAtUtc).IsRequired();
 
         b.Property(x => x.VisitReason).IsRequired().HasMaxLength(2000);
@@ -41,5 +42,6 @@ public sealed class ExaminationConfiguration : IEntityTypeConfiguration<Examinat
         b.HasIndex(x => new { x.TenantId, x.ClinicId });
         b.HasIndex(x => new { x.TenantId, x.PetId });
         b.HasIndex(x => new { x.TenantId, x.AppointmentId });
+        b.HasIndex(x => new { x.TenantId, x.VisitId });
     }
 }
