@@ -92,7 +92,7 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
         var tid = Guid.NewGuid();
         var clinicId = Guid.NewGuid();
         var clientId = Guid.NewGuid();
-        var paidAt = new DateTime(2026, 6, 20, 9, 30, 0, DateTimeKind.Utc);
+        var paidAt = DateTime.UtcNow.AddDays(-1);
         SetupActiveTenant(tid);
         SetupClinicClient(tid, clinicId, clientId);
 
@@ -183,7 +183,7 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
         var paymentId = Guid.NewGuid();
         var clinicId = Guid.NewGuid();
         var clientId = Guid.NewGuid();
-        var paidAt = new DateTime(2026, 6, 21, 14, 0, 0, DateTimeKind.Utc);
+        var paidAt = DateTime.UtcNow.AddDays(-1);
         SetupActiveTenant(tid);
         SetupClinicClient(tid, clinicId, clientId);
 
