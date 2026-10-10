@@ -74,6 +74,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Examinations.Read,
                 PermissionCatalog.Examinations.Create,
                 PermissionCatalog.Examinations.Update,
+                PermissionCatalog.Visits.Read,
+                PermissionCatalog.Visits.Create,
+                PermissionCatalog.Visits.Update,
+                PermissionCatalog.Visits.Correct,
 
                 PermissionCatalog.Vaccinations.Read,
                 PermissionCatalog.Vaccinations.Create,
@@ -160,6 +164,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Examinations.Read,
                 PermissionCatalog.Examinations.Create,
                 PermissionCatalog.Examinations.Update,
+                PermissionCatalog.Visits.Read,
+                PermissionCatalog.Visits.Create,
+                PermissionCatalog.Visits.Update,
+                PermissionCatalog.Visits.Correct,
 
                 PermissionCatalog.Vaccinations.Read,
                 PermissionCatalog.Vaccinations.Create,
@@ -253,6 +261,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Examinations.Read,
                 PermissionCatalog.Examinations.Create,
                 PermissionCatalog.Examinations.Update,
+                PermissionCatalog.Visits.Read,
+                PermissionCatalog.Visits.Create,
+                PermissionCatalog.Visits.Update,
+                PermissionCatalog.Visits.Correct,
 
                 PermissionCatalog.Vaccinations.Read,
                 PermissionCatalog.Vaccinations.Create,
@@ -329,6 +341,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.Examinations.Read,
                 PermissionCatalog.Examinations.Create,
                 PermissionCatalog.Examinations.Update,
+                PermissionCatalog.Visits.Read,
+                PermissionCatalog.Visits.Create,
+                PermissionCatalog.Visits.Update,
 
                 PermissionCatalog.Vaccinations.Read,
                 PermissionCatalog.Vaccinations.Create,
@@ -385,6 +400,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.Appointments.Reschedule,
 
                 PermissionCatalog.Examinations.Read,
+                PermissionCatalog.Visits.Read,
+                PermissionCatalog.Visits.Create,
+                PermissionCatalog.Visits.Update,
                 PermissionCatalog.Vaccinations.Read,
                 PermissionCatalog.VaccineDefinitions.Read,
                 PermissionCatalog.Treatments.Read,
