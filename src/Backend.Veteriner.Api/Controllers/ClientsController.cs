@@ -134,7 +134,7 @@ public sealed class ClientsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Sayfalı müşteri listesi. <c>search</c> (veya <c>page.search</c>) ad, e-posta ve telefon alanlarında arar. <c>sort</c>/<c>order</c> işlenmez.</summary>
+    /// <summary>Sayfalı müşteri listesi. <c>search</c> (veya <c>page.search</c>) ad, e-posta ve telefon alanlarında arar (Türkçe harf/ad sırası/telefon biçimi toleranslı, bkz. docs/SEARCH_API_CONTRACT.md). <c>sort</c>/<c>order</c> işlenmez.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Clients.Read)]
     [ProducesResponseType(typeof(PagedResult<ClientListItemDto>), StatusCodes.Status200OK)]

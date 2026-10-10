@@ -64,7 +64,8 @@ public sealed class GetPetsListQueryHandler
         }
 
         return await HandleFromCommandDbAsync(
-            tenantId, page, pageSize, request.ClientId, request.SpeciesId, searchPattern, ct);
+            tenantId, page, pageSize, request.ClientId, request.SpeciesId,
+            DailySearchTerm.Create(request.PageRequest.Search), ct);
     }
 
     private async Task<Result<PagedResult<PetListItemDto>>> HandleFromQueryReadModelAsync(
@@ -97,13 +98,13 @@ public sealed class GetPetsListQueryHandler
         int pageSize,
         Guid? clientId,
         Guid? speciesId,
-        string? searchPattern,
+        DailySearchTerm? searchTerm,
         CancellationToken ct)
     {
         Guid[] petIdsFromClientText = [];
-        if (searchPattern is not null)
+        if (searchTerm is not null)
         {
-            var matchedClients = await _clients.ListAsync(new ClientsByTenantTextSearchSpec(tenantId, searchPattern), ct);
+            var matchedClients = await _clients.ListAsync(new ClientsByTenantTextSearchSpec(tenantId, searchTerm), ct);
             var clientIds = matchedClients.Select(c => c.Id).Distinct().ToArray();
             if (clientIds.Length > 0)
             {
@@ -117,7 +118,7 @@ public sealed class GetPetsListQueryHandler
                 tenantId,
                 clientId,
                 speciesId,
-                searchPattern,
+                searchTerm,
                 petIdsFromClientText),
             ct);
         var rows = await _pets.ListAsync(
@@ -127,7 +128,7 @@ public sealed class GetPetsListQueryHandler
                 pageSize,
                 clientId,
                 speciesId,
-                searchPattern,
+                searchTerm,
                 petIdsFromClientText),
             ct);
 

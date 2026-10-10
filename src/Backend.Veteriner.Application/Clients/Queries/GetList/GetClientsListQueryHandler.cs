@@ -58,7 +58,8 @@ public sealed class GetClientsListQueryHandler
             return await HandleFromQueryReadModelAsync(tenantId, page, pageSize, searchPattern, ct);
         }
 
-        return await HandleFromCommandDbAsync(tenantId, page, pageSize, searchPattern, ct);
+        return await HandleFromCommandDbAsync(
+            tenantId, page, pageSize, DailySearchTerm.Create(request.PageRequest.Search), ct);
     }
 
     private async Task<Result<PagedResult<ClientListItemDto>>> HandleFromQueryReadModelAsync(
@@ -87,7 +88,7 @@ public sealed class GetClientsListQueryHandler
         Guid tenantId,
         int page,
         int pageSize,
-        string? searchPattern,
+        DailySearchTerm? searchTerm,
         CancellationToken ct)
     {
         var totalSw = Stopwatch.StartNew();
@@ -109,11 +110,11 @@ public sealed class GetClientsListQueryHandler
             stepSw.Restart();
         }
 
-        var total = await _clients.CountAsync(new ClientsByTenantCountSpec(tenantId, searchPattern), ct);
+        var total = await _clients.CountAsync(new ClientsByTenantCountSpec(tenantId, searchTerm), ct);
         MarkStep("clientsCount");
 
         var items = await _clients.ListAsync(
-            new ClientsByTenantPagedSpec(tenantId, page, pageSize, searchPattern),
+            new ClientsByTenantPagedSpec(tenantId, page, pageSize, searchTerm),
             ct);
         MarkStep("clientsPage");
 

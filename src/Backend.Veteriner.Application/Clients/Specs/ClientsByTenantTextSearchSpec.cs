@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Clients;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,5 +18,13 @@ public sealed class ClientsByTenantTextSearchSpec : Specification<Client>
                 || (c.Phone != null && EF.Functions.Like(c.Phone, containsLikePattern))
                 || (c.PhoneNormalized != null
                     && EF.Functions.Like(c.PhoneNormalized, containsLikePattern)));
+    }
+
+    /// <summary>Günlük arama (SEARCH-001): Türkçe harf, token ve telefon biçimi toleranslı.</summary>
+    public ClientsByTenantTextSearchSpec(Guid tenantId, DailySearchTerm term)
+    {
+        Query.AsNoTracking();
+        Query.Where(c => c.TenantId == tenantId);
+        Query.WhereDailySearch(term);
     }
 }
