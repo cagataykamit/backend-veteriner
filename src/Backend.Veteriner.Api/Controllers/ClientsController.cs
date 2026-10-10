@@ -2,6 +2,7 @@ using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clients.Commands.Create;
+using Backend.Veteriner.Application.Clients.Commands.QuickRegister;
 using Backend.Veteriner.Application.Clients.Commands.Update;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetById;
@@ -60,6 +61,38 @@ public sealed class ClientsController : ControllerBase
             {
                 version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0",
                 id = dto.Id
+            },
+            dto);
+    }
+
+    /// <summary>
+    /// Randevusuz gelişte müşteri + hayvan tek işlemde (telefon zorunlu). Visit açmaz; frontend sonra
+    /// <c>POST /visits</c> çağırır. <c>Clients.Create</c> ve <c>Pets.Create</c> ikisi de gerekir.
+    /// </summary>
+    [HttpPost("quick-register")]
+    [Authorize(Policy = PermissionCatalog.Clients.Create)]
+    [Authorize(Policy = PermissionCatalog.Pets.Create)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(QuickRegisterClientResultDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> QuickRegister([FromBody] QuickRegisterClientCommand cmd, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(cmd, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var dto = result.Value!;
+        return CreatedAtAction(
+            nameof(GetById),
+            new
+            {
+                version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0",
+                id = dto.ClientId
             },
             dto);
     }
