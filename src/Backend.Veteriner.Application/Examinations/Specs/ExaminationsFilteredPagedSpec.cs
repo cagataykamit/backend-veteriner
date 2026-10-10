@@ -11,7 +11,8 @@ public sealed record ExaminationListRow(
     Guid? AppointmentId,
     DateTime ExaminedAtUtc,
     string VisitReason,
-    Guid? VisitId = null);
+    Guid? VisitId = null,
+    ExaminationStatus Status = ExaminationStatus.Draft);
 
 public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, ExaminationListRow>
 {
@@ -76,6 +77,7 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, E
                 e.AppointmentId,
                 e.ExaminedAtUtc,
                 e.VisitReason,
-                e.VisitId));
+                e.VisitId,
+                e.Status));
     }
 }

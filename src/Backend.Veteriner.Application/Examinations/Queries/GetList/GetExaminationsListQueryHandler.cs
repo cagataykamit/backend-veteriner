@@ -201,7 +201,8 @@ public sealed class GetExaminationsListQueryHandler
                     e.AppointmentId,
                     e.ExaminedAtUtc,
                     e.VisitReason,
-                    e.VisitId);
+                    e.VisitId,
+                    e.Status);
             })
             .ToList();
 

@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
@@ -24,6 +25,7 @@ public sealed class GetExaminationByIdQueryHandler
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IClinicVeterinarianReader _userNames;
 
     public GetExaminationByIdQueryHandler(
         ITenantContext tenantContext,
@@ -33,7 +35,8 @@ public sealed class GetExaminationByIdQueryHandler
         IUserClinicRepository userClinics,
         IReadRepository<Examination> examinations,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IClinicVeterinarianReader userNames)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -43,6 +46,7 @@ public sealed class GetExaminationByIdQueryHandler
         _examinations = examinations;
         _pets = pets;
         _clients = clients;
+        _userNames = userNames;
     }
 
     public async Task<Result<ExaminationDetailDto>> Handle(GetExaminationByIdQuery request, CancellationToken ct)
@@ -89,6 +93,13 @@ public sealed class GetExaminationByIdQueryHandler
             clientName = client?.FullName ?? string.Empty;
         }
 
+        string? finalizedByName = null;
+        if (e.FinalizedByUserId is { } finalizedBy)
+        {
+            var names = await _userNames.GetNamesAsync([finalizedBy], ct);
+            names.TryGetValue(finalizedBy, out finalizedByName);
+        }
+
         var dto = new ExaminationDetailDto(
             e.Id,
             e.TenantId,
@@ -113,7 +124,11 @@ public sealed class GetExaminationByIdQueryHandler
             ExaminationRowVersion.Encode(e.RowVersion),
             e.CreatedAtUtc,
             e.UpdatedAtUtc,
-            e.VisitId);
+            e.VisitId,
+            e.Status,
+            e.FinalizedAtUtc,
+            e.FinalizedByUserId,
+            finalizedByName);
         return Result<ExaminationDetailDto>.Success(dto);
     }
 }
