@@ -96,6 +96,9 @@ public sealed class CreateChargeCommandHandler : IRequestHandler<CreateChargeCom
         if (!clinicAccess.IsSuccess)
             return Result<ChargeCreateResultDto>.Failure(clinicAccess.Error);
 
+        if (request.ClientId == Guid.Empty)
+            return Fail("Charges.Validation", "ClientId zorunludur.");
+
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, request.ClientId), ct);
         if (client is null)
             return Fail("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");

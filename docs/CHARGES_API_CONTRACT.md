@@ -22,7 +22,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-012 (vetinity-product, ka
 | `clinicId` | guid | |
 | `clientId` | guid | |
 | `clientName` | string | |
-| `petId` | guid? | `visitId` verilip `petId` verilmediyse Visit'in hayvanı yazılır |
+| `petId` | guid? | `petId` verilmediyse Visit.in (yoksa Muayene.nin) hayvanı yazılır |
 | `petName` | string? | |
 | `visitId` | guid? | |
 | `examinationId` | guid? | |
@@ -77,7 +77,7 @@ Kurallar:
 - `clientId` zorunlu ve kiracıya ait olmalı (`Clients.NotFound`). Boş/eksik → `Charges.Validation` (400).
 - `petId` verilirse hayvan kiracıya ait (`Pets.NotFound`) ve **bu müşterinin** olmalı (`Charges.PetClientMismatch`).
 - `visitId` verilirse: Visit kiracıya ait (`Visits.NotFound`), yanlış geliş değil (`Charges.VisitVoided`), aynı klinikte (`Charges.VisitClinicMismatch`), hayvanı bu müşterinin (`Charges.VisitClientMismatch`); `petId` de verildiyse Visit'in hayvanıyla aynı (`Charges.VisitPetMismatch`).
-- `examinationId` verilirse: muayene kiracıya ait (`Examinations.NotFound`), aynı klinikte (`Charges.ExaminationClinicMismatch`), hayvanı bu müşterinin (`Charges.ExaminationClientMismatch`); `petId` verildiyse (veya Visit'ten türediyse) muayenenin hayvanıyla aynı (`Charges.ExaminationPetMismatch`); `visitId` de verildiyse ve muayene başka bir Visit'e bağlıysa (`Examination.VisitId` dolu ve farklı) `Charges.ExaminationVisitMismatch`. Visit'e bağlı olmayan (eski) muayene kabul edilir.
+- `examinationId` verilirse: muayene kiracıya ait (`Examinations.NotFound`), aynı klinikte (`Charges.ExaminationClinicMismatch`), hayvanı bu müşterinin (`Charges.ExaminationClientMismatch`); `petId` verildiyse (veya Visit'ten türediyse) muayenenin hayvanıyla aynı (`Charges.ExaminationPetMismatch`); `petId` yoksa muayenenin hayvanı yazılır; `visitId` de verildiyse ve muayene başka bir Visit'e bağlıysa (`Examination.VisitId` dolu ve farklı) `Charges.ExaminationVisitMismatch`. Visit'e bağlı olmayan (eski) muayene kabul edilir.
 - `quantity`, `unitPrice`, `description` sınırları yukarıdaki tabloya göre; ihlal `Charges.Validation` (400). Tutar sıfıra yuvarlanıyorsa (`amount ≤ 0`) `Charges.Validation`.
 - Başarılı ve başarısız her çağrı audit'e yazılır (`Charge.Create`, hedef `ClientId=…`).
 
