@@ -26,7 +26,8 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, E
         int pageSize,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        Guid? visitId = null)
     {
         Query.AsNoTracking();
         Query.Where(e => e.TenantId == tenantId);
@@ -45,6 +46,8 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, E
             Query.Where(e => e.PetId == petId.Value);
         if (appointmentId.HasValue)
             Query.Where(e => e.AppointmentId == appointmentId.Value);
+        if (visitId.HasValue)
+            Query.Where(e => e.VisitId == visitId.Value);
         if (dateFromUtc.HasValue)
             Query.Where(e => e.ExaminedAtUtc >= dateFromUtc.Value);
         if (dateToUtc.HasValue)

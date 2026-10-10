@@ -157,7 +157,7 @@ public sealed class ExaminationsController : ControllerBase
 
     /// <summary>
     /// Sayfalı muayene listesi.
-    /// Filtreler (hepsi AND): opsiyonel <c>clinicId</c>, <c>petId</c>, <c>appointmentId</c>,
+    /// Filtreler (hepsi AND): opsiyonel <c>clinicId</c>, <c>petId</c>, <c>appointmentId</c>, <c>visitId</c>,
     /// <c>examinedOnLocalDate</c> (İstanbul takvim günü → UTC <c>[start,end)</c>) veya <c>dateFromUtc</c> (dahil) / <c>dateToUtc</c> (hariç) (<c>ExaminedAtUtc</c>).
     /// Metin araması: <c>search</c> veya <c>page.search</c> — başvuru nedeni, bulgular, değerlendirme, notlar; müşteri + hayvan metin eşlemesi ile pet id kümesi (hayvan listesi ile aynı örüntü). Arama doluysa mevcut LIKE/OR metin kuralları diğer filtrelerle AND birleşir.
     /// <c>sort</c>/<c>order</c> işlenmez.
@@ -172,6 +172,7 @@ public sealed class ExaminationsController : ControllerBase
         [FromQuery] Guid? clinicId = null,
         [FromQuery] Guid? petId = null,
         [FromQuery] Guid? appointmentId = null,
+        [FromQuery] Guid? visitId = null,
         [FromQuery] DateOnly? examinedOnLocalDate = null,
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
@@ -189,7 +190,8 @@ public sealed class ExaminationsController : ControllerBase
                 appointmentId,
                 examinedOnLocalDate,
                 dateFromUtc,
-                dateToUtc),
+                dateToUtc,
+                visitId),
             ct);
         return result.ToActionResult(this);
     }

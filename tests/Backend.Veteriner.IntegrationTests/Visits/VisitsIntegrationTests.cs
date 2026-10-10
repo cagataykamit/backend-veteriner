@@ -5,6 +5,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
@@ -677,6 +678,87 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         (await db2.Users.AsNoTracking().SingleAsync(u => u.Id == ctx.UserId)).DisplayName.Should().BeNull();
     }
 
+    // ---- Muayene listesi visitId filtresi / ikinci muayene ----
+
+    [Fact]
+    public async Task ExaminationsList_Should_Filter_By_VisitId()
+    {
+        var ctx = await SeedAsync();
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+        var otherPet = await ctx.SeedPetAsync();
+        var otherVisitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = otherPet })).Result!.Visit.Id;
+        var examinationId = await ctx.CreateExaminationAsync(visitId);
+        await ctx.CreateExaminationAsync(otherVisitId);
+        await ctx.CreateExaminationAsync(visitId: null, petId: ctx.PetId);
+
+        var page = await ctx.Http.GetFromJsonAsync<PagedResult<ExaminationListItemDto>>(
+            $"/api/v1/examinations?clinicId={ctx.ClinicId}&visitId={visitId}");
+
+        page!.Items.Should().ContainSingle();
+        page.Items[0].Id.Should().Be(examinationId);
+        page.Items[0].VisitId.Should().Be(visitId);
+        page.TotalItems.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ExaminationsList_Should_Return_Empty_For_Visit_Without_Examination_And_400_For_Empty_Guid()
+    {
+        var ctx = await SeedAsync();
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        var empty = await ctx.Http.GetFromJsonAsync<PagedResult<ExaminationListItemDto>>(
+            $"/api/v1/examinations?clinicId={ctx.ClinicId}&visitId={visitId}");
+        empty!.Items.Should().BeEmpty();
+
+        var invalid = await ctx.Http.GetAsync($"/api/v1/examinations?clinicId={ctx.ClinicId}&visitId={Guid.Empty}");
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ExaminationsList_VisitId_Filter_Should_Not_Leak_Examinations_From_Unassigned_Clinic()
+    {
+        var ctx = await SeedAsync();
+        var otherClinic = await ctx.SeedForeignAssignedClinicAsync();
+        Guid foreignVisitId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var petId = await IntegrationTestAuthHelper.SeedPetInClinicAsync(_factory.Services, otherClinic);
+            var visit = new Visit(ctx.TenantId, otherClinic, petId, null, null, ctx.UserId, DateTime.UtcNow);
+            db.Visits.Add(visit);
+            db.Examinations.Add(new Backend.Veteriner.Domain.Examinations.Examination(
+                ctx.TenantId, otherClinic, petId, null, DateTime.UtcNow.AddHours(-1), "Kontrol", "Bulgu", null, null,
+                visitId: visit.Id));
+            await db.SaveChangesAsync();
+            foreignVisitId = visit.Id;
+        }
+
+        var inOwnClinic = await ctx.Http.GetFromJsonAsync<PagedResult<ExaminationListItemDto>>(
+            $"/api/v1/examinations?clinicId={ctx.ClinicId}&visitId={foreignVisitId}");
+        inOwnClinic!.Items.Should().BeEmpty("başka klinikteki Visit'in muayeneleri kendi klinik kapsamında görünmez");
+
+        var inForeignClinic = await ctx.Http.GetAsync($"/api/v1/examinations?clinicId={otherClinic}&visitId={foreignVisitId}");
+        inForeignClinic.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Second_Examination_On_Same_Visit_Is_Currently_Allowed_Without_Product_Rule()
+    {
+        // K4 (randevu/Visit başına tek muayene kuralı) bu işin kapsamı dışıdır: mevcut davranış belgelenir.
+        var ctx = await SeedAsync();
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        var first = await ctx.CreateExaminationAsync(visitId);
+        var second = await ctx.CreateExaminationAsync(visitId);
+
+        second.Should().NotBe(first);
+        var page = await ctx.Http.GetFromJsonAsync<PagedResult<ExaminationListItemDto>>(
+            $"/api/v1/examinations?clinicId={ctx.ClinicId}&visitId={visitId}");
+        page!.Items.Select(i => i.Id).Should().BeEquivalentTo(new[] { first, second });
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{visitId}"))!
+            .CareStatus.Should().Be(VisitCareStatus.InProgress);
+    }
+
     // ---- Kurulum ----
 
     private async Task<VisitTestContext> SeedAsync(bool CorrectorOrNot = true)
@@ -773,6 +855,20 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             var response = await Http.GetAsync(url);
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
             return (await response.Content.ReadFromJsonAsync<TodayDto>())!;
+        }
+
+        public async Task<Guid> CreateExaminationAsync(Guid? visitId, Guid? petId = null)
+        {
+            var response = await Http.PostAsJsonAsync("/api/v1/examinations", new
+            {
+                visitId,
+                clinicId = visitId is null ? ClinicId : (Guid?)null,
+                petId,
+                examinedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+                visitReason = "Kontrol",
+            });
+            response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+            return (await response.Content.ReadFromJsonAsync<ExaminationWriteResultDto>())!.Id;
         }
 
         public async Task<Guid> SeedPetAsync()
