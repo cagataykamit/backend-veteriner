@@ -86,6 +86,7 @@ public static class PermissionCatalog
         public const string Read = "Appointments.Read";
         public const string Create = "Appointments.Create";
         public const string Cancel = "Appointments.Cancel";
+        public const string NoShow = "Appointments.NoShow";
         public const string Complete = "Appointments.Complete";
         public const string Reschedule = "Appointments.Reschedule";
     }
@@ -243,6 +244,7 @@ public static class PermissionCatalog
         new(Appointments.Read, "Randevuları listeleme ve görüntüleme yetkisi", "Appointments"),
         new(Appointments.Create, "Randevu oluşturma yetkisi", "Appointments"),
         new(Appointments.Cancel, "Planlanmış randevuyu iptal etme yetkisi", "Appointments"),
+        new(Appointments.NoShow, "Randevulu hastanın gelmediğini işaretleme ve geri alma yetkisi", "Appointments"),
         new(Appointments.Complete, "Planlanmış randevuyu tamamlama yetkisi", "Appointments"),
         new(Appointments.Reschedule, "Planlanmış randevuyu yeniden zamanlama yetkisi", "Appointments"),
 

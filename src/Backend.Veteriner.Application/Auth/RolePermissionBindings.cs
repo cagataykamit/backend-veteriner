@@ -68,6 +68,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Appointments.Read,
                 PermissionCatalog.Appointments.Create,
                 PermissionCatalog.Appointments.Cancel,
+                PermissionCatalog.Appointments.NoShow,
                 PermissionCatalog.Appointments.Complete,
                 PermissionCatalog.Appointments.Reschedule,
 
@@ -158,6 +159,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Appointments.Read,
                 PermissionCatalog.Appointments.Create,
                 PermissionCatalog.Appointments.Cancel,
+                PermissionCatalog.Appointments.NoShow,
                 PermissionCatalog.Appointments.Complete,
                 PermissionCatalog.Appointments.Reschedule,
 
@@ -244,6 +246,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Appointments.Read,
                 PermissionCatalog.Appointments.Create,
                 PermissionCatalog.Appointments.Cancel,
+                PermissionCatalog.Appointments.NoShow,
                 PermissionCatalog.Appointments.Complete,
                 PermissionCatalog.Appointments.Reschedule,
 
@@ -397,6 +400,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Appointments.Read,
                 PermissionCatalog.Appointments.Create,
                 PermissionCatalog.Appointments.Cancel,
+                PermissionCatalog.Appointments.NoShow,
                 PermissionCatalog.Appointments.Reschedule,
 
                 PermissionCatalog.Examinations.Read,
