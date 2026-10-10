@@ -286,7 +286,8 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 
 ## 13) Deploy notu
 
-- **İzinler:** Yeni `Visits.Read`, `Visits.Create`, `Visits.Update`, `Visits.Correct` izinleri seeder ile (`PermissionSeeder`, `RolePermissionBindingSeeder`) gelir ve varsayılan rollere bağlanır (madde 2). Mevcut **özel roller** bu izinleri otomatik almaz; yöneticiler elle atamalıdır.
+- **İzinler (seed adımı gerekir):** Yeni `Visits.Read`, `Visits.Create`, `Visits.Update`, `Visits.Correct` izinleri **API açılışında gelmez**: API ne migration ne seed çalıştırır. İzinler yalnızca `dotnet run --project src/Backend.Veteriner.DbMigrator -- seed` (veya `all`) ile `Permissions` tablosuna yazılır ve `RolePermissionBindingSeeder` ile varsayılan rollere (Admin, Owner, ClinicAdmin, Veteriner, Sekreter; madde 2) bağlanır. Seed idempotenttir (mevcut kayıtları çoğaltmaz). Mevcut **özel roller** bu izinleri otomatik almaz; yöneticiler elle atamalıdır.
+- **Oturum:** İzinler JWT'ye giriş (login), token yenileme (refresh) ve klinik seçimi (select-clinic) anında DB'den okunarak `permission` claim'i olarak eklenir. Seed sonrası mevcut oturumlar yeni izni **görmez**; kullanıcı çıkış-giriş yapmalıdır (frontend `Visits.Read` claim'ini bu yüzden bulamaz).
 - **Migration:** `AddVisits` (`Visits` tablosu, filtreli benzersiz indeksler, `Examinations.VisitId`) ve `AddUserDisplayName` (`Users.DisplayName`, nullable) komut veritabanına uygulanmalıdır. Query DB şeması değişmez.
 - **Yapılandırma:** Yeni bayrak veya ayar yoktur.
 
