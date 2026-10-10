@@ -9,6 +9,8 @@ using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Queries.GetById;
 using Backend.Veteriner.Application.Pets.Queries.GetHistorySummary;
 using Backend.Veteriner.Application.Pets.Queries.GetList;
+using Backend.Veteriner.Application.Pets.Queries.GetSummary;
+using Backend.Veteriner.Application.Pets.Queries.GetTimeline;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -99,8 +101,58 @@ public sealed class PetsController : ControllerBase
     }
 
     /// <summary>
+    /// Hasta özet kartı: uyarılar, aktif yatış, son/yaklaşan aşı, son kilo (muayene vitalinden), son geliş ve son muayene.
+    /// Her bölüm <c>state</c> taşır: Ok / Empty (kayıt yok) / Forbidden (izin yok) / Unavailable (okunamadı; kısmi yanıt).
+    /// Bkz. docs/PET_TIMELINE_API_CONTRACT.md.
+    /// </summary>
+    [HttpGet("{id:guid}/summary")]
+    [Authorize(Policy = PermissionCatalog.Pets.Read)]
+    [ProducesResponseType(typeof(PetSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSummary([FromRoute] Guid id, [FromQuery] Guid? clinicId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var result = await _mediator.Send(new GetPetSummaryQuery(id, clinicId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Birleşik zaman çizelgesi (geliş, muayene, tedavi, reçete, lab, uygulanan aşı, yatış). Opak imleçli; toplam sayı yok.
+    /// Türler kendi okuma iznine bağlıdır; yetkisiz türler <c>omittedTypes</c> ile bildirilir. <c>limit</c> en çok 50.
+    /// Bkz. docs/PET_TIMELINE_API_CONTRACT.md.
+    /// </summary>
+    [HttpGet("{id:guid}/timeline")]
+    [Authorize(Policy = PermissionCatalog.Pets.Read)]
+    [ProducesResponseType(typeof(PetTimelineDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetTimeline(
+        [FromRoute] Guid id,
+        [FromQuery] string[]? types,
+        [FromQuery] DateTime? fromUtc,
+        [FromQuery] DateTime? toUtc,
+        [FromQuery] Guid? clinicId,
+        [FromQuery] bool includeVoided,
+        [FromQuery] int? limit,
+        [FromQuery] string? cursor,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var result = await _mediator.Send(
+            new GetPetTimelineQuery(id, types, fromUtc, toUtc, clinicId, includeVoided, limit, cursor),
+            ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
     /// Pet detail için klinik geçmişi özeti: randevu, muayene, tedavi, reçete, lab, yatış ve ödeme blokları tek yanıtta; her blok en yeni tarih önce, üst sınırlı.
     /// Aktif klinik bağlamı varsa kayıtlar bu kliniğe indirgenir; yoksa tenant içindeki tüm klinikler.
+    /// Her blok kendi okuma iznine bağlıdır; izni olmayan blok boş döner ve <c>omittedBlocks</c> içinde listelenir.
     /// </summary>
     [HttpGet("{id:guid}/history-summary")]
     [Authorize(Policy = PermissionCatalog.Pets.Read)]
