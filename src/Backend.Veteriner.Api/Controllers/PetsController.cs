@@ -118,7 +118,7 @@ public sealed class PetsController : ControllerBase
     }
 
     /// <summary>
-    /// Sayfalı hayvan listesi. <c>search</c> (veya <c>page.search</c>) ad, tür adı, serbest ırk metni / katalog ırk adı ve müşteri bilgisinde arar.
+    /// Sayfalı hayvan listesi. <c>search</c> (veya <c>page.search</c>) ad, tür adı, serbest ırk metni / katalog ırk adı, mikroçip ve müşteri bilgisinde arar (Türkçe harf/ad sırası/telefon biçimi toleranslı, bkz. docs/SEARCH_API_CONTRACT.md).
     /// Opsiyonel <c>clientId</c>, <c>speciesId</c> ile AND. <c>sort</c>/<c>order</c> işlenmez.
     /// </summary>
     [HttpGet]
