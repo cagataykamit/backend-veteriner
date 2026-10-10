@@ -100,6 +100,7 @@ public sealed class GetAppointmentsReportQueryHandler
         var scheduled = 0;
         var completed = 0;
         var cancelled = 0;
+        var noShow = 0;
         foreach (var row in statusRows)
         {
             switch (row.Status)
@@ -113,16 +114,20 @@ public sealed class GetAppointmentsReportQueryHandler
                 case AppointmentStatus.Cancelled:
                     cancelled = row.Count;
                     break;
+                case AppointmentStatus.NoShow:
+                    noShow = row.Count;
+                    break;
             }
         }
 
-        var breakdownSum = scheduled + completed + cancelled;
+        var breakdownSum = scheduled + completed + cancelled + noShow;
         var total = request.Status.HasValue
             ? request.Status.Value switch
             {
                 AppointmentStatus.Scheduled => scheduled,
                 AppointmentStatus.Completed => completed,
                 AppointmentStatus.Cancelled => cancelled,
+                AppointmentStatus.NoShow => noShow,
                 _ => breakdownSum,
             }
             : breakdownSum;
@@ -148,7 +153,7 @@ public sealed class GetAppointmentsReportQueryHandler
 
         var items = await AppointmentsReportItemMapping.MapAsync(tenantId, rows, _clients, _pets, _clinics, ct);
 
-        var statusCounts = new AppointmentReportStatusCountsDto(scheduled, completed, cancelled);
+        var statusCounts = new AppointmentReportStatusCountsDto(scheduled, completed, cancelled, noShow);
 
         return Result<AppointmentReportResultDto>.Success(
             new AppointmentReportResultDto(total, items, statusCounts));

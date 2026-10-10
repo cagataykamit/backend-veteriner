@@ -10,6 +10,8 @@ public sealed class Appointment : AggregateRoot
     public const int MinDurationMinutes = 5;
     public const int MaxDurationMinutes = 240;
     public const int DefaultDurationMinutes = 30;
+    public const int MinNoShowRevertReasonLength = 5;
+    public const int MaxNoShowReasonLength = 500;
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
@@ -104,6 +106,84 @@ public sealed class Appointment : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>
+    /// Randevulu hasta gelmedi: yalnızca saati geçmiş <see cref="AppointmentStatus.Scheduled"/> randevu.
+    /// Zaten <see cref="AppointmentStatus.NoShow"/> ise değişiklik olmadan başarı (idempotent).
+    /// </summary>
+    public Result MarkNoShow(DateTime nowUtc, string? reason = null)
+    {
+        if (Status == AppointmentStatus.NoShow)
+            return Result.Success();
+
+        if (Status != AppointmentStatus.Scheduled)
+        {
+            return Result.Failure(
+                "Appointments.InvalidStatusTransition",
+                "Yalnızca planlanmış randevu gelmedi olarak işaretlenebilir.");
+        }
+
+        if (ScheduledAtUtc > NormalizeUtc(nowUtc))
+        {
+            return Result.Failure(
+                "Appointments.NoShowNotYetDue",
+                "Randevu saati henüz gelmedi; gelecek randevu gelmedi olarak işaretlenemez.");
+        }
+
+        Status = AppointmentStatus.NoShow;
+        AppendNote("Gelmedi", reason);
+        AdvanceMutationSequence();
+        return Result.Success();
+    }
+
+    /// <summary>Gelmedi işaretini gerekçeyle geri alır (<c>NoShow → Scheduled</c>). Gerekçe zorunludur.</summary>
+    public Result RevertNoShow(string? reason)
+    {
+        if (Status != AppointmentStatus.NoShow)
+        {
+            return Result.Failure(
+                "Appointments.InvalidStatusTransition",
+                "Yalnızca gelmedi işaretli randevu geri alınabilir.");
+        }
+
+        var length = reason?.Trim().Length ?? 0;
+        if (length < MinNoShowRevertReasonLength || length > MaxNoShowReasonLength)
+        {
+            return Result.Failure(
+                "Appointments.Validation",
+                $"Gerekçe {MinNoShowRevertReasonLength}-{MaxNoShowReasonLength} karakter olmalıdır.");
+        }
+
+        Status = AppointmentStatus.Scheduled;
+        AppendNote("Gelmedi geri alındı", reason);
+        AdvanceMutationSequence();
+        return Result.Success();
+    }
+
+    /// <summary>Hasta gelmedi işaretinden sonra geldi: işaret gerekçesiz kaldırılır; iz geliş (Visit) kaydıdır.</summary>
+    public Result RevertNoShowOnArrival()
+    {
+        if (Status != AppointmentStatus.NoShow)
+        {
+            return Result.Failure(
+                "Appointments.InvalidStatusTransition",
+                "Yalnızca gelmedi işaretli randevu için geçerlidir.");
+        }
+
+        Status = AppointmentStatus.Scheduled;
+        AppendNote("Gelmedi kaldırıldı", "hasta geç geldi");
+        AdvanceMutationSequence();
+        return Result.Success();
+    }
+
+    private void AppendNote(string label, string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        var line = $"{label}: {text.Trim()}";
+        Notes = string.IsNullOrWhiteSpace(Notes) ? line : $"{Notes}\n{line}";
+    }
+
     /// <summary>Yalnızca <see cref="AppointmentStatus.Scheduled"/> iken tamamlandı.</summary>
     public Result Complete()
     {
@@ -174,14 +254,14 @@ public sealed class Appointment : AggregateRoot
     }
 
     /// <summary>
-    /// Update/Write akışında istenen durumun mevcut durumdan kabul edilebilir bir geçiş olup olmadığını
+    /// Update/Write akışında istenen durumun mevcut durumla aynı olup olmadığını
     /// scheduling/working-hours doğrulamalarından <em>önce</em> kontrol etmek için ön-kontrol.
     /// </summary>
     /// <remarks>
     /// <list type="bullet">
     /// <item><description>Enum tanımsızsa <c>Appointments.Validation</c>.</description></item>
-    /// <item><description>Mevcut durum terminal (Completed/Cancelled) ve istenen durum farklıysa
-    /// <c>Appointments.InvalidStatusTransition</c>.</description></item>
+    /// <item><description>İstenen durum mevcut durumdan farklıysa <c>Appointments.InvalidStatusTransition</c>:
+    /// durum geçişleri yalnızca kendi izinli uçlarıyla (iptal, tamamlama, gelmedi) yapılır; Update/Create ile yapılamaz.</description></item>
     /// <item><description>Aksi halde başarı; gerçek mutasyon <see cref="ApplyWriteUpdate"/> içinde yapılır.</description></item>
     /// </list>
     /// </remarks>
@@ -190,11 +270,11 @@ public sealed class Appointment : AggregateRoot
         if (!Enum.IsDefined(requestedStatus))
             return Result.Failure("Appointments.Validation", "Randevu durumu geçersiz.");
 
-        if (Status != AppointmentStatus.Scheduled && requestedStatus != Status)
+        if (requestedStatus != Status)
         {
             return Result.Failure(
                 "Appointments.InvalidStatusTransition",
-                "Tamamlanmış veya iptal edilmiş randevunun durumu değiştirilemez.");
+                "Randevu durumu bu işlemle değiştirilemez; iptal, tamamlama ve gelmedi için ilgili uçları kullanın.");
         }
 
         return Result.Success();
@@ -202,7 +282,8 @@ public sealed class Appointment : AggregateRoot
 
     /// <summary>
     /// Create/Update write sözleşmesi: durum + zaman/tür alanları.
-    /// Tamamlanmış veya iptal edilmiş kayıtta yalnızca aynı durum (değişiklik yok) kabul edilir.
+    /// Durum değiştirilemez (yalnızca aynı durum kabul edilir); tamamlama, iptal ve gelmedi kendi uçlarıyla yapılır.
+    /// Planlanmış olmayan kayıtta değişiklik yapılmadan başarı döner.
     /// </summary>
     public Result ApplyWriteUpdate(
         AppointmentStatus requestedStatus,
@@ -216,32 +297,14 @@ public sealed class Appointment : AggregateRoot
         if (!Enum.IsDefined(requestedStatus))
             return Result.Failure("Appointments.Validation", "Randevu durumu geçersiz.");
 
+        var statusGuard = EnsureCanApplyStatus(requestedStatus);
+        if (!statusGuard.IsSuccess)
+            return statusGuard;
+
         if (Status != AppointmentStatus.Scheduled)
-        {
-            if (requestedStatus != Status)
-            {
-                return Result.Failure(
-                    "Appointments.InvalidStatusTransition",
-                    "Tamamlanmış veya iptal edilmiş randevunun durumu değiştirilemez.");
-            }
-
             return Result.Success();
-        }
 
-        if (requestedStatus == AppointmentStatus.Scheduled)
-            return UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes);
-
-        var details = UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes);
-        if (!details.IsSuccess)
-            return details;
-
-        if (requestedStatus == AppointmentStatus.Completed)
-            return Complete();
-
-        if (requestedStatus == AppointmentStatus.Cancelled)
-            return Cancel(null);
-
-        return Result.Failure("Appointments.Validation", "Randevu durumu geçersiz.");
+        return UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes);
     }
 
     private static DateTime NormalizeUtc(DateTime value)

@@ -1,9 +1,11 @@
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Visits;
 using MediatR;
 
@@ -18,6 +20,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IVisitTodayReader _reader;
+    private readonly IClinicVeterinarianReader _veterinarians;
     private readonly TimeProvider _timeProvider;
 
     public GetVisitsTodayQueryHandler(
@@ -25,12 +28,14 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IVisitTodayReader reader,
+        IClinicVeterinarianReader veterinarians,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _reader = reader;
+        _veterinarians = veterinarians;
         _timeProvider = timeProvider;
     }
 
@@ -62,6 +67,14 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         if (!scope.IsSuccess)
             return Result<TodayDto>.Failure(scope.Error);
 
+        if (request.ResponsibleVeterinarianUserId is { } veterinarianId
+            && !await _veterinarians.IsClinicVeterinarianAsync(veterinarianId, tenantId, clinicId, ct))
+        {
+            return Result<TodayDto>.Failure(
+                "Visits.Validation",
+                "Sorumlu hekim bu kliniğe atanmış aktif bir hekim (Veteriner) olmalıdır.");
+        }
+
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var todayLocal = OperationDayBounds.ToLocalDate(nowUtc);
         var date = request.LocalDate ?? todayLocal;
@@ -75,7 +88,9 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
                 dayEndUtc,
                 // Devralınan açık gelişler yalnızca bugünün görünümüne girer.
                 IncludeCarriedOver: date == todayLocal,
-                MaxItems),
+                MaxItems,
+                request.Voided,
+                request.ResponsibleVeterinarianUserId),
             ct);
 
         if (data.Items.Count > MaxItems)
@@ -89,12 +104,12 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             date,
             clinicId,
             nowUtc,
-            Order(data.Items),
+            request.Voided ? data.Items.OrderByDescending(i => i.ArrivedAtUtc).ToList() : Order(data.Items),
             data.ActiveHospitalizations));
     }
 
     /// <summary>
-    /// Bekliyor (geliş artan) → Devam ediyor (geliş artan) → planlı (randevu artan) → Tamamlandı (geliş azalan).
+    /// Bekliyor (önce acil, geliş artan) → Devam ediyor (önce acil, geliş artan) → planlı (randevu artan) → Tamamlandı (geliş azalan) → Gelmedi (randevu artan).
     /// </summary>
     private static IReadOnlyList<TodayItemDto> Order(IReadOnlyList<TodayItemDto> items)
         => items
@@ -106,8 +121,8 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private static IEnumerable<TodayItemDto> OrderWithinGroup(IGrouping<int, TodayItemDto> group)
         => group.Key switch
         {
-            WaitingRank or InProgressRank => group.OrderBy(i => i.ArrivedAtUtc),
-            PlannedRank => group.OrderBy(i => i.ScheduledAtUtc),
+            WaitingRank or InProgressRank => group.OrderByDescending(i => i.IsUrgent).ThenBy(i => i.ArrivedAtUtc),
+            PlannedRank or NoShowRank => group.OrderBy(i => i.ScheduledAtUtc),
             _ => group.OrderByDescending(i => i.ArrivedAtUtc),
         };
 
@@ -115,6 +130,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private const int InProgressRank = 1;
     private const int PlannedRank = 2;
     private const int CompletedRank = 3;
+    private const int NoShowRank = 4;
 
     private static int GroupRank(TodayItemDto item)
         => item.CareStatus switch
@@ -122,6 +138,6 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             VisitCareStatus.Waiting => WaitingRank,
             VisitCareStatus.InProgress => InProgressRank,
             VisitCareStatus.Completed => CompletedRank,
-            _ => PlannedRank,
+            _ => item.AppointmentStatus == AppointmentStatus.NoShow ? NoShowRank : PlannedRank,
         };
 }

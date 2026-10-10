@@ -140,6 +140,11 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             request.PassportOrTagNumber,
             request.SpecialProtocolNumber,
             request.IsNeutered);
+
+        var alerts = pet.ApplyAlerts(request.AlertFlags, request.AlertNote);
+        if (!alerts.IsSuccess)
+            return Result<Guid>.Failure(alerts.Error);
+
         await _petsWrite.AddAsync(pet, ct);
 
         // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).

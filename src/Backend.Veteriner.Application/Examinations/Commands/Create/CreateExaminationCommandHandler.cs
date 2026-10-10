@@ -139,6 +139,14 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
                     "İptal edilmiş randevu için muayene kaydı oluşturulamaz.");
             }
 
+            // Gelmedi işaretli randevuya doğrudan muayene açılmaz; hasta geldiyse önce geliş açılır (randevu Scheduled'a döner).
+            if (appt.Status == AppointmentStatus.NoShow)
+            {
+                return Result<ExaminationWriteResultDto>.Failure(
+                    "Examinations.AppointmentNoShow",
+                    "Gelmedi işaretli randevu için muayene kaydı oluşturulamaz; önce geliş kaydı açın veya işareti geri alın.");
+            }
+
             if (requestClinicId.HasValue && _clinicContext.ClinicId.HasValue && requestClinicId.Value != _clinicContext.ClinicId.Value)
             {
                 return Result<ExaminationWriteResultDto>.Failure(

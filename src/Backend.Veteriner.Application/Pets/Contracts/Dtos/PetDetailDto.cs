@@ -23,4 +23,5 @@ public sealed record PetDetailDto(
     string? MicrochipNumber,
     string? PassportOrTagNumber,
     string? SpecialProtocolNumber,
-    bool IsNeutered);
+    bool IsNeutered,
+    PetAlertsDto PetAlerts);

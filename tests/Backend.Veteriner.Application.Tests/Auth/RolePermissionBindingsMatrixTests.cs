@@ -71,6 +71,7 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Appointments.Read },
         new object[] { PermissionCatalog.Appointments.Create },
         new object[] { PermissionCatalog.Appointments.Cancel },
+        new object[] { PermissionCatalog.Appointments.NoShow },
         new object[] { PermissionCatalog.Appointments.Complete },
         new object[] { PermissionCatalog.Appointments.Reschedule },
         new object[] { PermissionCatalog.Examinations.Read },
@@ -154,6 +155,7 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Appointments.Read },
         new object[] { PermissionCatalog.Appointments.Create },
         new object[] { PermissionCatalog.Appointments.Cancel },
+        new object[] { PermissionCatalog.Appointments.NoShow },
         new object[] { PermissionCatalog.Appointments.Complete },
         new object[] { PermissionCatalog.Appointments.Reschedule },
         new object[] { PermissionCatalog.Examinations.Read },
@@ -271,6 +273,7 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Appointments.Read },
         new object[] { PermissionCatalog.Appointments.Create },
         new object[] { PermissionCatalog.Appointments.Cancel },
+        new object[] { PermissionCatalog.Appointments.NoShow },
         new object[] { PermissionCatalog.Appointments.Reschedule },
         new object[] { PermissionCatalog.Examinations.Read },
         new object[] { PermissionCatalog.Vaccinations.Read },
@@ -372,6 +375,7 @@ public sealed class RolePermissionBindingsMatrixTests
         vet.Should().NotContain(PermissionCatalog.Payments.Create, "Veteriner ödeme oluşturmaz");
         vet.Should().NotContain(PermissionCatalog.Payments.Update, "Veteriner ödeme güncellemez");
         vet.Should().NotContain(PermissionCatalog.Appointments.Cancel, "Randevu iptali resepsiyon/clinic admin işi");
+        vet.Should().NotContain(PermissionCatalog.Appointments.NoShow, "Gelmedi işaretleme resepsiyon/clinic admin işi");
         vet.Should().NotContain(PermissionCatalog.Clinics.Update, "Veteriner klinik profil güncellemez");
         vet.Should().NotContain(PermissionCatalog.VaccineDefinitions.Create);
         vet.Should().NotContain(PermissionCatalog.VaccineDefinitions.Update);

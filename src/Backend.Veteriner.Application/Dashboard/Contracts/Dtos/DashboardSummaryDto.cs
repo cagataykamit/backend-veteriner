@@ -18,4 +18,6 @@ public sealed record DashboardSummaryDto(
     // bugün dahil, oldest→newest sıralı, tam 7 eleman — boş günler 0 ile doldurulur.
     // Semantik §27.11: tüm statüler (Scheduled+Completed+Cancelled) dahil; TodayAppointmentsCount yalnız
     // Scheduled statüsü saydığı için bu iki alanın semantik tanımı farklıdır, çakışma değildir.
-    IReadOnlyList<DashboardDailyCountDto> Last7DaysAppointments);
+    IReadOnlyList<DashboardDailyCountDto> Last7DaysAppointments,
+    // CHECKIN-010: bugünün gelmedi (NoShow) randevu sayısı; Cancelled gibi ayrı sayılır.
+    int NoShowTodayCount = 0);

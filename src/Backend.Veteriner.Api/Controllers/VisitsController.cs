@@ -4,6 +4,8 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Visits.Commands.Correct;
 using Backend.Veteriner.Application.Visits.Commands.Create;
+using Backend.Veteriner.Application.Visits.Commands.Restore;
+using Backend.Veteriner.Application.Visits.Commands.SetUrgency;
 using Backend.Veteriner.Application.Visits.Commands.Transition;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Queries.GetById;
@@ -51,7 +53,7 @@ public sealed class VisitsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(
-            new CreateVisitCommand(body.ClinicId, body.PetId, body.AppointmentId, body.ResponsibleVeterinarianUserId),
+            new CreateVisitCommand(body.ClinicId, body.PetId, body.AppointmentId, body.ResponsibleVeterinarianUserId, body.IsUrgent),
             ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
@@ -106,6 +108,42 @@ public sealed class VisitsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Yanlış geliş işaretini gerekçeyle geri alır; aynı hayvan/randevu için başka geliş varsa 409, audit'e yazılır.</summary>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Policy = PermissionCatalog.Visits.Correct)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(VisitDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore([FromRoute] Guid id, [FromBody] RestoreVisitBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new RestoreVisitCommand(id, body.Reason ?? string.Empty), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Acil işaretini koyar/kaldırır (basit bayrak, triage skoru yok); aynı değer 200 ve mevcut kayıt.</summary>
+    [HttpPut("{id:guid}/urgency")]
+    [Authorize(Policy = PermissionCatalog.Visits.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(VisitDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SetUrgency([FromRoute] Guid id, [FromBody] SetVisitUrgencyBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new SetVisitUrgencyCommand(id, body.IsUrgent), ct);
+        return result.ToActionResult(this);
+    }
+
     [HttpGet("{id:guid}")]
     [Authorize(Policy = PermissionCatalog.Visits.Read)]
     [ProducesResponseType(typeof(VisitDto), StatusCodes.Status200OK)]
@@ -120,7 +158,7 @@ public sealed class VisitsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Günlük aksiyon yüzeyi: geliş sırası, planlı randevular ve aktif yatışlar (geçmişe dönük rapor değildir).</summary>
+    /// <summary>Günlük aksiyon yüzeyi: geliş sırası, planlı randevular ve aktif yatışlar (geçmişe dönük rapor değildir). <c>voided=true</c>: yalnızca o günün yanlış işaretlenen gelişleri. <c>responsibleVeterinarianUserId</c>: "Benim hastalarım" süzgeci.</summary>
     [HttpGet("today")]
     [Authorize(Policy = PermissionCatalog.Visits.Read)]
     [ProducesResponseType(typeof(TodayDto), StatusCodes.Status200OK)]
@@ -129,12 +167,14 @@ public sealed class VisitsController : ControllerBase
     public async Task<IActionResult> GetToday(
         [FromQuery] Guid? clinicId,
         [FromQuery] DateOnly? localDate,
+        [FromQuery] bool voided,
+        [FromQuery] Guid? responsibleVeterinarianUserId,
         CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new GetVisitsTodayQuery(clinicId, localDate), ct);
+        var result = await _mediator.Send(new GetVisitsTodayQuery(clinicId, localDate, voided, responsibleVeterinarianUserId), ct);
         return result.ToActionResult(this);
     }
 

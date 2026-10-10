@@ -328,6 +328,414 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         dto.CompletedAtUtc.Should().BeNull();
     }
 
+    // ---- Yanlış gelişi geri alma ----
+
+    private async Task<Guid> VoidAsync(VisitTestContext ctx, Guid visitId)
+    {
+        (await ctx.PostRawAsync($"/api/v1/visits/{visitId}/corrections", new { reason = Reason, markAsMistaken = true }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        return visitId;
+    }
+
+    [Fact]
+    public async Task Restore_Should_Require_Correct_Permission()
+    {
+        var ctx = await SeedAsync(CorrectorOrNot: false);
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        var response = await ctx.PostRawAsync($"/api/v1/visits/{visitId}/restore", new { reason = Reason });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Restore_Should_Bring_Back_Voided_Visit_Keep_Care_Status_And_Write_Audit()
+    {
+        var ctx = await SeedAsync();
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+        await ctx.PostRawAsync($"/api/v1/visits/{visitId}/start");
+        await VoidAsync(ctx, visitId);
+        (await ctx.GetTodayAsync()).Items.Should().BeEmpty();
+
+        var dto = await ctx.ReadVisitAsync(await ctx.PostRawAsync(
+            $"/api/v1/visits/{visitId}/restore", new { reason = "Yanlis isaretlenmisti" }));
+
+        dto.IsVoided.Should().BeFalse();
+        dto.VoidReason.Should().BeNull();
+        dto.CareStatus.Should().Be(VisitCareStatus.InProgress);
+        var today = await ctx.GetTodayAsync();
+        today.Items.Should().ContainSingle(i => i.VisitId == visitId && !i.IsVoided);
+        (await ctx.GetTodayAsync(voided: true)).Items.Should().BeEmpty();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var log = await db.AuditLogs.AsNoTracking()
+            .Where(a => a.Action == "Visit.Restore" && a.TargetId == $"VisitId={visitId}" && a.Success)
+            .SingleAsync();
+        log.ActorUserId.Should().Be(ctx.UserId);
+        log.RequestPayload.Should().Contain("Yanlis isaretlenmisti");
+    }
+
+    [Fact]
+    public async Task Restore_Should_Require_Reason_Reject_Non_Voided_And_Audit_Failed_Attempt()
+    {
+        var ctx = await SeedAsync();
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        var notVoided = await ctx.PostRawAsync($"/api/v1/visits/{visitId}/restore", new { reason = Reason });
+        notVoided.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(notVoided)).Should().Be("Visits.Validation");
+
+        await VoidAsync(ctx, visitId);
+        var noReason = await ctx.PostRawAsync($"/api/v1/visits/{visitId}/restore", new { reason = "x" });
+        noReason.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(noReason)).Should().Be("Visits.Validation");
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{visitId}"))!.IsVoided.Should().BeTrue();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.AuditLogs.AsNoTracking()
+            .AnyAsync(a => a.Action == "Visit.Restore" && a.TargetId == $"VisitId={visitId}" && !a.Success))
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Restore_Should_Return_409_When_Pet_Has_Another_Active_Visit()
+    {
+        var ctx = await SeedAsync();
+        var voidedId = await VoidAsync(ctx,
+            (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id);
+        var replacement = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        var response = await ctx.PostRawAsync($"/api/v1/visits/{voidedId}/restore", new { reason = Reason });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Visits.DuplicateActiveVisit");
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{voidedId}"))!.IsVoided.Should().BeTrue();
+        (await ctx.GetTodayAsync()).Items.Should().ContainSingle(i => i.VisitId == replacement);
+    }
+
+    [Fact]
+    public async Task Restore_Should_Return_409_When_Appointment_Has_Another_Visit()
+    {
+        var ctx = await SeedAsync();
+        var appointmentId = await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(30));
+        var first = (await ctx.PostVisitAsync(new { appointmentId })).Result!.Visit.Id;
+        await ctx.PostRawAsync($"/api/v1/visits/{first}/start");
+        await ctx.PostRawAsync($"/api/v1/visits/{first}/complete");
+        await VoidAsync(ctx, first);
+        // Tamamlanmış kayıt hayvan kuralına girmez; yalnızca randevu kuralı çakışmalıdır.
+        (await ctx.PostVisitAsync(new { appointmentId })).Response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var response = await ctx.PostRawAsync($"/api/v1/visits/{first}/restore", new { reason = Reason });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Visits.DuplicateAppointmentVisit");
+    }
+
+    [Fact]
+    public async Task Database_Should_Reject_Restore_That_Breaks_Either_Unique_Rule()
+    {
+        var ctx = await SeedAsync();
+        var appointmentId = await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(30));
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var voidedActive = ctx.NewVisit();
+        voidedActive.MarkAsMistaken(Reason, DateTime.UtcNow);
+        db.Visits.Add(voidedActive);
+        await db.SaveChangesAsync();
+        db.Visits.Add(ctx.NewVisit());
+        await db.SaveChangesAsync();
+
+        voidedActive.RestoreFromMistaken(Reason).IsSuccess.Should().BeTrue();
+        var perPet = () => db.SaveChangesAsync();
+        await perPet.Should().ThrowAsync<DbUpdateException>();
+        db.ChangeTracker.Clear();
+
+        // Randevu kuralı: tamamlanmış (hayvan kuralı dışı) iki kayıttan biri voided iken diğeri aynı randevuyla açıktır.
+        var voidedCompleted = ctx.NewVisit(appointmentId);
+        voidedCompleted.Start(DateTime.UtcNow);
+        voidedCompleted.Complete(DateTime.UtcNow);
+        voidedCompleted.MarkAsMistaken(Reason, DateTime.UtcNow);
+        db.Visits.Add(voidedCompleted);
+        await db.SaveChangesAsync();
+        var sibling = ctx.NewVisit(appointmentId);
+        sibling.Start(DateTime.UtcNow);
+        sibling.Complete(DateTime.UtcNow);
+        db.Visits.Add(sibling);
+        await db.SaveChangesAsync();
+
+        voidedCompleted.RestoreFromMistaken(Reason).IsSuccess.Should().BeTrue();
+        var perAppointment = () => db.SaveChangesAsync();
+        await perAppointment.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    [Fact]
+    public async Task Restore_Should_Not_Expose_Other_Tenant_Visit_And_Should_Block_Unassigned_Clinic()
+    {
+        var ctx = await SeedAsync();
+        Guid otherTenantVisitId;
+        Guid unassignedClinicVisitId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
+
+            var otherTenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20]);
+            db.Tenants.Add(otherTenant);
+            await db.SaveChangesAsync();
+            var otherClinic = new Clinic(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "Ankara");
+            var otherClient = new Client(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "905551110066");
+            db.AddRange(otherClinic, otherClient);
+            await db.SaveChangesAsync();
+            var otherPet = new Pet(otherTenant.Id, otherClient.Id, $"FPet-{Guid.NewGuid():N}"[..12], speciesId);
+            db.Pets.Add(otherPet);
+            await db.SaveChangesAsync();
+            var otherVisit = new Visit(otherTenant.Id, otherClinic.Id, otherPet.Id, null, null, ctx.UserId, DateTime.UtcNow);
+            otherVisit.MarkAsMistaken(Reason, DateTime.UtcNow);
+
+            var unassigned = await ctx.SeedForeignAssignedClinicAsync();
+            var sameTenantVisit = new Visit(ctx.TenantId, unassigned, ctx.PetId, null, null, ctx.UserId, DateTime.UtcNow);
+            sameTenantVisit.MarkAsMistaken(Reason, DateTime.UtcNow);
+            db.Visits.AddRange(otherVisit, sameTenantVisit);
+            await db.SaveChangesAsync();
+            otherTenantVisitId = otherVisit.Id;
+            unassignedClinicVisitId = sameTenantVisit.Id;
+        }
+
+        var crossTenant = await ctx.PostRawAsync($"/api/v1/visits/{otherTenantVisitId}/restore", new { reason = Reason });
+        crossTenant.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(crossTenant)).Should().Be("Visits.NotFound");
+
+        var unassignedClinic = await ctx.PostRawAsync($"/api/v1/visits/{unassignedClinicVisitId}/restore", new { reason = Reason });
+        unassignedClinic.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Concurrent_Restores_Should_Produce_Single_Active_Visit()
+    {
+        var ctx = await SeedAsync();
+        var visitId = await VoidAsync(ctx,
+            (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4)
+            .Select(_ => ctx.PostRawAsync($"/api/v1/visits/{visitId}/restore", new { reason = Reason })));
+
+        responses.Count(r => r.StatusCode == HttpStatusCode.OK).Should().Be(1);
+        responses.Where(r => r.StatusCode != HttpStatusCode.OK)
+            .Should().OnlyContain(r => r.StatusCode == HttpStatusCode.BadRequest || r.StatusCode == HttpStatusCode.Conflict);
+        (await ctx.GetTodayAsync()).Items.Should().ContainSingle(i => i.VisitId == visitId);
+    }
+
+    // ---- Acil işareti ----
+
+    private static Task<HttpResponseMessage> PutUrgencyAsync(VisitTestContext ctx, Guid visitId, bool isUrgent)
+        => ctx.Http.PutAsJsonAsync($"/api/v1/visits/{visitId}/urgency", new { isUrgent });
+
+    [Fact]
+    public async Task Create_Should_Default_To_Not_Urgent_And_Honor_IsUrgent_Only_For_New_Visit()
+    {
+        var ctx = await SeedAsync();
+
+        var urgent = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId, isUrgent = true })).Result!;
+        urgent.Created.Should().BeTrue();
+        urgent.Visit.IsUrgent.Should().BeTrue();
+
+        var repeat = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId, isUrgent = false })).Result!;
+        repeat.Created.Should().BeFalse();
+        repeat.Visit.IsUrgent.Should().BeTrue("idempotent tekrar mevcut kaydı değiştirmez");
+
+        var otherPet = await ctx.SeedPetAsync();
+        (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = otherPet })).Result!.Visit.IsUrgent
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Urgency_Should_Toggle_Persist_And_Be_Idempotent()
+    {
+        var ctx = await SeedAsync();
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        (await ctx.ReadVisitAsync(await PutUrgencyAsync(ctx, visitId, true))).IsUrgent.Should().BeTrue();
+        (await ctx.ReadVisitAsync(await PutUrgencyAsync(ctx, visitId, true))).IsUrgent.Should().BeTrue();
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{visitId}"))!.IsUrgent.Should().BeTrue();
+
+        (await ctx.ReadVisitAsync(await PutUrgencyAsync(ctx, visitId, false))).IsUrgent.Should().BeFalse();
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{visitId}"))!.IsUrgent.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Urgency_Should_Require_Update_Permission()
+    {
+        var ctx = await SeedAsync(permissions: [PermissionCatalog.Visits.Read, PermissionCatalog.Visits.Create]);
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        (await PutUrgencyAsync(ctx, visitId, true)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Urgency_Should_Reject_Change_On_Completed_And_Return_404_For_Voided()
+    {
+        var ctx = await SeedAsync();
+        var completedId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId, isUrgent = true })).Result!.Visit.Id;
+        await ctx.PostRawAsync($"/api/v1/visits/{completedId}/start");
+        await ctx.PostRawAsync($"/api/v1/visits/{completedId}/complete");
+
+        var change = await PutUrgencyAsync(ctx, completedId, false);
+        change.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(change)).Should().Be("Visits.NotOpen");
+        (await ctx.ReadVisitAsync(await PutUrgencyAsync(ctx, completedId, true))).IsUrgent.Should().BeTrue();
+
+        var voidedId = await VoidAsync(ctx,
+            (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id);
+        (await PutUrgencyAsync(ctx, voidedId, true)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Urgency_Should_Respect_Clinic_Assignment_And_Tenant_Isolation()
+    {
+        var ctx = await SeedAsync();
+        Guid otherTenantVisitId;
+        Guid unassignedClinicVisitId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
+            var otherTenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20]);
+            db.Tenants.Add(otherTenant);
+            await db.SaveChangesAsync();
+            var otherClinic = new Clinic(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "Ankara");
+            var otherClient = new Client(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "905551110067");
+            db.AddRange(otherClinic, otherClient);
+            await db.SaveChangesAsync();
+            var otherPet = new Pet(otherTenant.Id, otherClient.Id, $"FPet-{Guid.NewGuid():N}"[..12], speciesId);
+            db.Pets.Add(otherPet);
+            await db.SaveChangesAsync();
+            var otherVisit = new Visit(otherTenant.Id, otherClinic.Id, otherPet.Id, null, null, ctx.UserId, DateTime.UtcNow);
+            var unassigned = await ctx.SeedForeignAssignedClinicAsync();
+            var sameTenantVisit = new Visit(ctx.TenantId, unassigned, ctx.PetId, null, null, ctx.UserId, DateTime.UtcNow);
+            db.Visits.AddRange(otherVisit, sameTenantVisit);
+            await db.SaveChangesAsync();
+            otherTenantVisitId = otherVisit.Id;
+            unassignedClinicVisitId = sameTenantVisit.Id;
+        }
+
+        (await PutUrgencyAsync(ctx, otherTenantVisitId, true)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await PutUrgencyAsync(ctx, unassignedClinicVisitId, true)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Concurrent_Urgency_Requests_Should_All_Succeed()
+    {
+        var ctx = await SeedAsync();
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => PutUrgencyAsync(ctx, visitId, true)));
+
+        responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK);
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{visitId}"))!.IsUrgent.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Today_Should_List_Urgent_First_Within_Waiting_And_InProgress_Groups()
+    {
+        var ctx = await SeedAsync();
+        var pets = new[] { ctx.PetId, await ctx.SeedPetAsync(), await ctx.SeedPetAsync(), await ctx.SeedPetAsync() };
+        var ids = new List<Guid>();
+        foreach (var pet in pets)
+        {
+            ids.Add((await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = pet })).Result!.Visit.Id);
+            await Task.Delay(20); // arrivedAtUtc sırası belirgin olsun
+        }
+
+        // ids[0], ids[1] normal; ids[2] acil bekleyen; ids[3] acil ve devam ediyor
+        await PutUrgencyAsync(ctx, ids[2], true);
+        await PutUrgencyAsync(ctx, ids[3], true);
+        await ctx.PostRawAsync($"/api/v1/visits/{ids[3]}/start");
+        await ctx.PostRawAsync($"/api/v1/visits/{ids[1]}/start");
+
+        var today = await ctx.GetTodayAsync();
+
+        // Bekliyor: acil (ids[2]) önce, sonra ids[0]; Devam ediyor: acil (ids[3]) önce, sonra ids[1].
+        today.Items.Select(i => i.VisitId).Should().Equal(ids[2], ids[0], ids[3], ids[1]);
+        today.Items.Where(i => i.IsUrgent).Select(i => i.VisitId).Should().BeEquivalentTo(new Guid?[] { ids[2], ids[3] });
+    }
+
+    // ---- Benim hastalarım (sorumlu hekim filtresi) ----
+
+    [Fact]
+    public async Task Today_Should_Filter_By_Responsible_Veterinarian_And_Leave_Hospitalizations_Untouched()
+    {
+        var ctx = await SeedAsync();
+        var vet = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Ali Veli");
+        var otherVet = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Diger");
+        var pets = new[] { ctx.PetId, await ctx.SeedPetAsync(), await ctx.SeedPetAsync(), await ctx.SeedPetAsync() };
+
+        var mine = (await ctx.PostVisitAsync(new
+            { clinicId = ctx.ClinicId, petId = pets[0], responsibleVeterinarianUserId = vet.UserId })).Result!.Visit.Id;
+        await ctx.PostVisitAsync(new
+            { clinicId = ctx.ClinicId, petId = pets[1], responsibleVeterinarianUserId = otherVet.UserId });
+        await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = pets[2] });
+        await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(30), pets[3]);
+        await ctx.SeedActiveHospitalizationAsync(pets[1]);
+        Guid carriedOver;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var petId = await ctx.SeedPetAsync();
+            var old = new Visit(ctx.TenantId, ctx.ClinicId, petId, null, vet.UserId, ctx.UserId, DateTime.UtcNow.AddDays(-2));
+            db.Visits.Add(old);
+            await db.SaveChangesAsync();
+            carriedOver = old.Id;
+        }
+
+        var all = await ctx.GetTodayAsync();
+        all.Items.Should().HaveCount(5, "3 geliş + devralınan + 1 planlı randevu");
+
+        var filtered = await ctx.GetTodayAsync(responsibleVeterinarianUserId: vet.UserId);
+
+        filtered.Items.Select(i => i.VisitId).Should().BeEquivalentTo(new Guid?[] { mine, carriedOver });
+        filtered.Items.Should().OnlyContain(i => i.ResponsibleVeterinarianUserId == vet.UserId);
+        filtered.Items.Single(i => i.VisitId == mine).ResponsibleVeterinarianName.Should().Be("Dr. Ali Veli");
+        filtered.ActiveHospitalizations.Should().HaveCount(1, "yatış listesi klinik düzeyindedir");
+    }
+
+    [Fact]
+    public async Task Today_Should_Reject_Responsible_User_Who_Is_Not_An_Active_Clinic_Veterinarian()
+    {
+        var ctx = await SeedAsync();
+        var secretary = await ctx.SeedClinicUserAsync("Sekreter", "Ayse Sekreter");
+        var vetOtherClinic = await ctx.SeedClinicUserAsync("Veteriner", "Baska Klinik", assignToClinic: false);
+
+        foreach (var userId in new[] { secretary.UserId, vetOtherClinic.UserId, Guid.NewGuid(), Guid.Empty })
+        {
+            var response = await ctx.Http.GetAsync(
+                $"/api/v1/visits/today?clinicId={ctx.ClinicId}&responsibleVeterinarianUserId={userId}");
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, $"{userId} hekim değil");
+            (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Visits.Validation");
+        }
+    }
+
+    [Fact]
+    public async Task Today_Responsible_Filter_Should_Respect_Clinic_Assignment_And_Combine_With_Voided_View()
+    {
+        var ctx = await SeedAsync();
+        var vet = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Ali Veli");
+        var otherPet = await ctx.SeedPetAsync();
+        var mine = await VoidAsync(ctx, (await ctx.PostVisitAsync(new
+            { clinicId = ctx.ClinicId, petId = ctx.PetId, responsibleVeterinarianUserId = vet.UserId })).Result!.Visit.Id);
+        await VoidAsync(ctx, (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = otherPet })).Result!.Visit.Id);
+
+        var voidedMine = await ctx.GetTodayAsync(voided: true, responsibleVeterinarianUserId: vet.UserId);
+        voidedMine.Items.Should().ContainSingle(i => i.VisitId == mine && i.IsVoided);
+
+        var otherClinic = await ctx.SeedForeignAssignedClinicAsync();
+        (await ctx.Http.GetAsync(
+                $"/api/v1/visits/today?clinicId={otherClinic}&responsibleVeterinarianUserId={vet.UserId}"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     // ---- Muayene bağlantısı ----
 
     [Fact]
@@ -530,6 +938,49 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         await ctx.PostRawAsync($"/api/v1/visits/{id}/corrections", new { reason = Reason, markAsMistaken = true });
 
         (await ctx.GetTodayAsync()).Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Today_Voided_View_Should_List_Only_Voided_Visits_Of_The_Day_With_Reason()
+    {
+        var ctx = await SeedAsync();
+        var otherPet = await ctx.SeedPetAsync();
+        var voidedId = await VoidAsync(ctx,
+            (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id);
+        var activeId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = otherPet })).Result!.Visit.Id;
+        await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(30), otherPet);
+        await ctx.SeedActiveHospitalizationAsync(otherPet);
+
+        var voided = await ctx.GetTodayAsync(voided: true);
+
+        voided.Items.Should().ContainSingle();
+        voided.Items[0].VisitId.Should().Be(voidedId);
+        voided.Items[0].IsVoided.Should().BeTrue();
+        voided.Items[0].VoidReason.Should().Be(Reason);
+        voided.ActiveHospitalizations.Should().BeEmpty();
+        var normal = await ctx.GetTodayAsync();
+        normal.Items.Should().Contain(i => i.VisitId == activeId);
+        normal.Items.Should().OnlyContain(i => !i.IsVoided);
+    }
+
+    [Fact]
+    public async Task Today_Voided_View_Should_Not_Include_Previous_Days_And_Should_Respect_Clinic_Assignment()
+    {
+        var ctx = await SeedAsync();
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var old = ctx.NewVisit(arrivedAtUtc: DateTime.UtcNow.AddDays(-3));
+            old.MarkAsMistaken(Reason, DateTime.UtcNow);
+            db.Visits.Add(old);
+            await db.SaveChangesAsync();
+        }
+
+        (await ctx.GetTodayAsync(voided: true)).Items.Should().BeEmpty("devralınma voided görünümünde yoktur");
+
+        var otherClinic = await ctx.SeedForeignAssignedClinicAsync();
+        (await ctx.Http.GetAsync($"/api/v1/visits/today?clinicId={otherClinic}&voided=true"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -761,7 +1212,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
     // ---- Kurulum ----
 
-    private async Task<VisitTestContext> SeedAsync(bool CorrectorOrNot = true)
+    private async Task<VisitTestContext> SeedAsync(bool CorrectorOrNot = true, string[]? permissions = null)
     {
         var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
@@ -795,7 +1246,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         }
 
         var token = await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(
-            _factory.Services, email, CorrectorOrNot ? CorrectorPermissions : OperatorPermissions);
+            _factory.Services, email, permissions ?? (CorrectorOrNot ? CorrectorPermissions : OperatorPermissions));
         var http = _factory.CreateClient();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
@@ -846,11 +1297,16 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             return (await response.Content.ReadFromJsonAsync<VisitDto>())!;
         }
 
-        public async Task<TodayDto> GetTodayAsync(DateOnly? localDate = null)
+        public async Task<TodayDto> GetTodayAsync(
+            DateOnly? localDate = null, bool voided = false, Guid? responsibleVeterinarianUserId = null)
         {
             var url = $"/api/v1/visits/today?clinicId={ClinicId}";
             if (localDate is { } d)
                 url += $"&localDate={d:yyyy-MM-dd}";
+            if (voided)
+                url += "&voided=true";
+            if (responsibleVeterinarianUserId is { } vetId)
+                url += $"&responsibleVeterinarianUserId={vetId}";
 
             var response = await Http.GetAsync(url);
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());

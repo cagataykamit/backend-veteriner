@@ -886,10 +886,12 @@ FluentValidation → `400` `ValidationProblemDetails`.
 | `POST` | `/api/v1/appointments/{id}/cancel` | `Appointments.Cancel` | `204 NoContent` |
 | `POST` | `/api/v1/appointments/{id}/complete` | `Appointments.Complete` | `204 NoContent` |
 | `POST` | `/api/v1/appointments/{id}/reschedule` | `Appointments.Reschedule` | `204 NoContent` |
+| `POST` | `/api/v1/appointments/{id}/no-show` | `Appointments.NoShow` | `204 NoContent` (bkz. `APPOINTMENT_NOSHOW_API_CONTRACT.md`) |
+| `POST` | `/api/v1/appointments/{id}/no-show/revert` | `Appointments.NoShow` | `204 NoContent` |
 
 ### Enum contract (numeric)
 
-- `AppointmentStatus` JSON’da **numeric int**: `Scheduled=0`, `Completed=1`, `Cancelled=2`.
+- `AppointmentStatus` JSON’da **numeric int**: `Scheduled=0`, `Completed=1`, `Cancelled=2`, `NoShow=3`.
 - `AppointmentType` JSON’da **numeric int**: `Examination=0`, `Vaccination=1`, `Checkup=2`, `Surgery=3`, `Grooming=4`, `Consultation=5`, `Other=6`.
 - Create’te `status` opsiyoneldir; verilmezse `Scheduled` kabul edilir.
 - Update’te `status` zorunludur (`UpdateAppointmentCommand`).

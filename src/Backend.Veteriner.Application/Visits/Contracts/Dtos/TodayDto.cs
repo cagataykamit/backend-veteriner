@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Visits;
 
@@ -17,6 +18,7 @@ public enum TodayPaymentIndicator
 /// <summary>
 /// Bugün satırı: tek hasta gelişi veya (Visit'i olmayan) planlı randevu. Randevulu Visit tek satırdır.
 /// Planlı satırda <see cref="VisitId"/> ve <see cref="CareStatus"/> null'dır.
+/// <see cref="IsVoided"/> yalnızca yanlış işaretlenenler görünümünde (<c>voided=true</c>) doludur.
 /// </summary>
 public sealed record TodayItemDto(
     Guid? VisitId,
@@ -35,7 +37,11 @@ public sealed record TodayItemDto(
     string? ResponsibleVeterinarianName,
     bool IsCarriedOver,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] TodayPaymentIndicator PaymentIndicator,
-    bool HasActiveHospitalization);
+    bool HasActiveHospitalization,
+    bool IsVoided,
+    string? VoidReason,
+    bool IsUrgent,
+    PetAlertsDto PetAlerts);
 
 public sealed record TodayHospitalizationDto(
     Guid HospitalizationId,

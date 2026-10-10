@@ -19,5 +19,7 @@ public sealed record UpdatePetCommand(
     string? MicrochipNumber = null,
     string? PassportOrTagNumber = null,
     string? SpecialProtocolNumber = null,
-    bool IsNeutered = false)
+    bool IsNeutered = false,
+    IReadOnlyList<string>? AlertFlags = null,
+    string? AlertNote = null)
     : IRequest<Result>;

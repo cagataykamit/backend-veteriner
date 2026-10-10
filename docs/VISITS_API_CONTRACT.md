@@ -28,6 +28,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), b
 | `careStatus` | `Waiting` \| `InProgress` \| `Completed` | |
 | `startedAtUtc` | datetime? | `InProgress`'e ilk geçiş |
 | `completedAtUtc` | datetime? | `Completed`'a geçiş; düzeltmeyle geri alınırsa `null` |
+| `isUrgent` | bool | Acil işareti (madde 4.4); varsayılan `false`. Triage skoru yoktur, yalnızca bayrak |
 | `isVoided` | bool | |
 | `voidReason` | string? | `isVoided` ise dolu |
 | `createdByUserId` | guid | Geliş kaydını oluşturan kullanıcı |
@@ -44,7 +45,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), b
 | Geliş kaydı oluşturma | `Visits.Create` | Admin, Owner, ClinicAdmin, Veteriner, Sekreter |
 | Durum geçişi (başlat/tamamla) | `Visits.Update` | Admin, Owner, ClinicAdmin, Veteriner, Sekreter |
 | Okuma (detay, Bugün) | `Visits.Read` | Admin, Owner, ClinicAdmin, Veteriner, Sekreter |
-| Düzeltme (geri alma, yanlış geliş) | `Visits.Correct` | Admin, Owner, ClinicAdmin |
+| Düzeltme (durum düzeltme, yanlış geliş, yanlış gelişi geri alma) | `Visits.Correct` | Admin, Owner, ClinicAdmin |
 
 - `Visits.Read` Bugün yanıtındaki randevu, ödeme ve yatış göstergelerini de kapsar; ayrıca `Appointments.Read`/`Payments.Read` aranmaz.
 - Klinik kapsamı mevcut muayene/randevu kuralıyla aynıdır: JWT/header `clinic_id` ile istek `clinicId` uyumsuzsa `Visits.ClinicContextMismatch`; atanmamış klinik → `Clinics.AccessDenied`.
@@ -61,13 +62,15 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), b
   "clinicId": "guid?",
   "petId": "guid?",
   "appointmentId": "guid?",
-  "responsibleVeterinarianUserId": "guid?"
+  "responsibleVeterinarianUserId": "guid?",
+  "isUrgent": false
 }
 ```
 
 Kurallar:
 
-- **Randevulu:** `appointmentId` dolu. `clinicId`/`petId` randevudan türetilir; gönderilirse randevu ile aynı olmalı, değilse `Visits.AppointmentPetClinicMismatch`. Randevu `Scheduled` olmalı: `Cancelled` → `Visits.AppointmentCancelled`; `Completed` ve o randevu için Visit yoksa → `Visits.AppointmentNotScheduled`.
+- **Acil (opsiyonel):** `isUrgent` verilmezse `false`. Yalnızca **yeni** kayıtta uygulanır; idempotent tekrar mevcut kaydı döndürür ve `isUrgent` değerini değiştirmez (sonradan işaretleme madde 4.4).
+- **Randevulu:** `appointmentId` dolu. `clinicId`/`petId` randevudan türetilir; gönderilirse randevu ile aynı olmalı, değilse `Visits.AppointmentPetClinicMismatch`. Randevu `Scheduled` olmalı: `NoShow` (gelmedi) randevu için geliş engellenmez, randevu aynı işlemde `Scheduled`'a döner ve normal akış sürer (`APPOINTMENT_NOSHOW_API_CONTRACT.md` madde 4); `Cancelled` → `Visits.AppointmentCancelled`; `Completed` ve o randevu için Visit yoksa → `Visits.AppointmentNotScheduled`.
 - **Randevusuz:** `appointmentId` yok; `petId` ve aktif klinik (`clinicId` veya bağlam) zorunlu, aksi halde `Visits.Validation`. Randevu **oluşturulmaz**.
 - Hayvan ve klinik kiracıya ait olmalı (`Pets.NotFound`, `Clinics.NotFound`, `Appointments.NotFound`).
 
@@ -121,6 +124,20 @@ Her ikisi için:
 
 `POST /examinations` isteğine opsiyonel `visitId` eklenir (madde 7). Muayene başarıyla oluşunca Visit `Waiting` ise `InProgress` olur (aynı işlem/transaction). `InProgress` ise değişmez.
 
+### 4.4 Acil işareti — `PUT /api/v1/visits/{id}/urgency` (`Visits.Update`)
+
+Gelişte (`POST /visits` `isUrgent`) veya sonradan işaretlenir/kaldırılır. Triage skoru yoktur; yalnızca bayrak. İstek:
+
+```json
+{ "isUrgent": true }
+```
+
+- **Yetki:** `Visits.Update` (geliş açan `Visits.Create` ile aynı roller zaten bu izne sahiptir; yeni izin yok).
+- **Idempotent:** Değer zaten aynıysa `200` ve mevcut `VisitDto` (değişiklik yok). Eşzamanlı çift istekte kaybeden de başarı alır.
+- Yalnızca açık (`Waiting`/`InProgress`) kayıt için değiştirilebilir; `Completed` kayıtta değer değişecekse `Visits.NotOpen` (409). Yanlış geliş işaretli kayıt → `Visits.NotFound`.
+- `isUrgent` bakım durumunu değiştirmez; yalnızca Bugün sırasını etkiler (madde 9).
+- Yanıt: `200` + `VisitDto`.
+
 ---
 
 ## 5) Veritabanı düzeyinde benzersizlik
@@ -157,6 +174,28 @@ Kurallar:
 - Yanıt: `200` + `VisitDto`.
 - **Audit:** komut `IAuditableRequest` uygular (`AuditAction = "Visit.Correct"`, hedef `VisitId=...`); istek yükü (gerekçe, hedef durum) audit kaydına yazılır, başarısız denemeler de kaydedilir.
 
+### 6.1 Yanlış gelişi geri alma — `POST /api/v1/visits/{id}/restore`
+
+`Visits.Correct`. Yanlışlıkla `isVoided` işaretlenen geliş kaydını kuyruğa geri getirir. **Gerekçe zorunlu.** İstek:
+
+```json
+{ "reason": "string (zorunlu, 5-500 karakter, trim sonrası)" }
+```
+
+Neden ayrı uç: `corrections` isteği "hedef durum veya yanlış geliş işareti, tam olarak biri" kuralıyla çalışır; üçüncü bir seçenek bu kuralı bulandırır. Geri alma kendi gövdesi, kendi audit eylemi ve kendi çakışma kuralı olan ayrı bir işlemdir.
+
+Kurallar:
+
+- Yalnızca `isVoided = true` kayıt geri alınır; zaten geçerli kayıt için `Visits.Validation` (400). Başka kiracı veya klinik bağlamı → `Visits.NotFound` (404; varlık sızdırılmaz); kullanıcıya atanmamış klinik → `Clinics.AccessDenied` (403, düzeltme ucuyla aynı).
+- Geri alma `isVoided`/`voidReason` değerini temizler; **bakım durumu ve zaman damgaları olduğu gibi kalır** (kayıt, işaretlenmeden önceki durumuna döner). İşaretleme gerekçesi audit kaydında (`Visit.Correct`) korunur.
+- **Çakışma (409):** Madde 5'teki filtreli benzersiz indeks kurallarıyla aynı koşullar geri alma anında kontrol edilir:
+  - Kayıt `Completed` değilse ve hayvanın başka aktif Visit'i varsa → `Visits.DuplicateActiveVisit`.
+  - Kaydın `appointmentId` değeri doluysa ve aynı randevu için başka (yanlış geliş olmayan) Visit varsa → `Visits.DuplicateAppointmentVisit`.
+  - Kontrol ile kayıt arasında eşzamanlı bir geliş açılırsa filtreli benzersiz indeks işlemi reddeder; sonuç yine bu iki koddan biridir (bozulan kural yeniden okumayla belirlenir). İki kural hem uygulamada hem veritabanında korunur.
+- Yanıt: `200` + `VisitDto` (`isVoided: false`).
+- **Audit:** `AuditAction = "Visit.Restore"`, hedef `VisitId=...`; gerekçe audit yüküne yazılır, başarısız denemeler de kaydedilir.
+- `GET /visits/{id}` yanlış geliş işaretli kaydı zaten döndürür (madde 8); istemci geri alma düğmesi için `isVoided` alanına bakar.
+
 ---
 
 ## 7) Muayene bağlantısı
@@ -188,6 +227,8 @@ Query:
 |-----------|-----|-----|
 | `clinicId` | guid? | Klinik bağlamı yoksa zorunlu: `Visits.ClinicScopeRequired` |
 | `localDate` | date? | İstanbul takvim günü; varsayılan bugün (İstanbul). Gün sınırı `Europe/Istanbul` → UTC `[start,end)` (muayene `examinedOnLocalDate` ile aynı) |
+| `voided` | bool? | Varsayılan `false`. `true` ise **yalnızca** o günün yanlış geliş işaretli Visit'leri döner (madde 9.1) |
+| `responsibleVeterinarianUserId` | guid? | "Benim hastalarım" filtresi: yalnızca sorumlu hekimi bu kullanıcı olan Visit satırları (madde 9.2) |
 
 Yanıt `TodayDto`:
 
@@ -218,17 +259,40 @@ Randevulu Visit **tek satırdır** (randevu ayrıca satır üretmez). Satır kay
 | `scheduledAtUtc` | datetime? | Randevu varsa |
 | `arrivedAtUtc` | datetime? | Visit varsa |
 | `careStatus` | enum? | Visit varsa; planlı satırda `null` |
-| `appointmentStatus` | `Scheduled` \| `Completed` \| `Cancelled`? | Randevu varsa |
+| `appointmentStatus` | `Scheduled` \| `Completed` \| `Cancelled` \| `NoShow`? | Randevu varsa; `NoShow` (gelmedi) satırı Visit'siz planlı satırdır ve sırada en sonda ("Gelmedi" grubu) yer alır |
 | `responsibleVeterinarianUserId`, `responsibleVeterinarianName` | guid?, string? | Visit varsa, opsiyonel (madde 3.1) |
 | `isCarriedOver` | bool | |
 | `paymentIndicator` | `NoPaymentRecorded` \| `PaymentRecorded` | Aşağıya bakın |
 | `hasActiveHospitalization` | bool | Hayvanın açık yatışı var mı |
+| `isUrgent` | bool | Visit'in acil işareti; planlı (Visit'siz) satırda `false` |
+| `isVoided` | bool | Yalnızca `voided=true` yanıtında `true` olabilir; normal Bugün'de her zaman `false` |
+| `voidReason` | string? | `isVoided` ise dolu |
 
 **Ödeme göstergesi dürüstlüğü:** Mevcut ödeme verisi yalnızca *alınan tahsilatı* tutar; borç/bakiye/fatura yoktur. Bu yüzden gösterge "ödendi/borçlu" **demez**: Visit'in randevusuna veya Visit'e bağlı muayenelerine bağlı ödeme kaydı varsa `PaymentRecorded`, yoksa `NoPaymentRecorded`. Bakiye göstergesi Aşama 3 (temel finans) sonrasıdır. Bu alan `careStatus`'u hiçbir koşulda etkilemez.
 
-**Sıra (sunucu belirler):** `Waiting` (`arrivedAtUtc` artan) → `InProgress` (`arrivedAtUtc` artan) → planlı (`scheduledAtUtc` artan) → `Completed` (`arrivedAtUtc` azalan). İstemci gruplama kuralı: `careStatus` dolu ise o gruba; `null` ise "Planlı".
+**Sıra (sunucu belirler):** `Waiting` (önce acil, sonra `arrivedAtUtc` artan) → `InProgress` (önce acil, sonra `arrivedAtUtc` artan) → planlı (`scheduledAtUtc` artan) → `Completed` (`arrivedAtUtc` azalan). İstemci gruplama kuralı: `careStatus` dolu ise o gruba; `null` ise "Planlı".
 
 **Sınır:** Sayfalama yok; klinik/gün başına en fazla 500 satır. Aşılırsa fazlası kesilmez, `Visits.TodayLimitExceeded` (400) döner (gerçekçi olmayan senaryo; sessiz kesme yapılmaz).
+
+### 9.1) Yanlış işaretlenenler — `GET /visits/today?voided=true`
+
+Resepsiyonun yanlış işaretlediği kaydı bulup `POST /visits/{id}/restore` ile geri alması için görünüm.
+
+- **Tasarım gerekçesi:** Aynı uç, aynı `TodayItemDto` satırı ve aynı sorgu işleyicisi yeniden kullanılır (istemci aynı satır bileşenini çizer); yeni uç/DTO eklenmez. `includeVoided` gibi bir karışım bayrağı **seçilmedi**: yanlış geliş kayıtlarını normal kuyruğa karıştırmak Bugün'ün aksiyon yüzeyi niteliğini ve sıra/gruplama kurallarını bozar. `voided=true` ayrı bir görünümdür.
+- **Kapsam:** Yalnızca `arrivedAtUtc` seçilen gün aralığında olan, `isVoided = true` Visit'ler. Devralınan Visit yok, planlı (Visit'siz) randevu yok, `activeHospitalizations` her zaman boş liste.
+- **Sıra:** `arrivedAtUtc` azalan (en son gelen üstte). Gruplama yoktur.
+- **Yetki ve kapsam:** `Visits.Read`; klinik/kiracı kuralları normal Bugün ile aynıdır. Geri alma düğmesi `Visits.Correct` gerektirir (sunucu zaten 403 verir).
+- `careStatus` işaretlenmeden önceki bakım durumunu gösterir. 500 satır sınırı aynen geçerlidir.
+
+### 9.2) Benim hastalarım — `GET /visits/today?responsibleVeterinarianUserId={userId}`
+
+Hekimin yalnızca kendine atanmış satırları görmesi için sorumlu hekim filtresi. Varsayılanı ("hekim rolünde varsayılan Benim hastalarım, tümünü göster seçeneği") istemci yönetir: filtreyi yollamak "benim hastalarım", yollamamak "tümü"dür. Sunucu rol çıkarımı yapmaz.
+
+- **Doğrulama (mevcut hekim kuralıyla aynı, tek yerde):** `userId`, aktif klinikte (`clinicId`) hekim olmalıdır: kiracıda o kliniğe atanmış aktif ve `Veteriner` operasyon claim'li kullanıcı (madde 3.1, `IClinicVeterinarianReader`). Değilse (rol yok, başka klinik, bilinmeyen kimlik, `Guid.Empty`) → `400 Visits.Validation`; boş liste dönmez, çünkü yanlış kimlik sessizce "kimsenin hastası yok" göstermemeli.
+- **Kapsam:** Yalnızca `responsibleVeterinarianUserId` eşleşen Visit satırları (bugünün geliş kayıtları ve devralınanlar). Planlı (Visit'siz) randevu satırları dışlanır: randevu hekim alanı taşımaz (madde 3.1), dolayısıyla hekime atanmış sayılamaz. Sorumlu hekimi boş Visit'ler de dışlanır.
+- `activeHospitalizations` filtreden **etkilenmez** (klinik düzeyinde aktif yatış listesidir; yatış kaydı sorumlu hekim taşımaz).
+- `voided=true` ile birlikte kullanılabilir (yanlış işaretlenenler de aynı hekime göre süzülür). Diğer sıra/sınır kuralları aynen geçerlidir.
+- Yetki: `Visits.Read`; klinik/kiracı kuralları normal Bugün ile aynıdır. Hekim listesi için mevcut `GET /clinics/{clinicId}/veterinarians` kullanılır.
 
 ### `TodayHospitalizationDto`
 
@@ -255,7 +319,8 @@ Kliniğin tarihten bağımsız **aktif** (`dischargedAtUtc = null`) yatışları
 | `Visits.HasExaminations` | 400 | Muayeneli Visit yanlış geliş işaretlenemez |
 | `Visits.TodayLimitExceeded` | 400 | Bugün satır sınırı aşıldı |
 | `Visits.NotFound` | 404 | Visit yok / yabancı kiracı / yanlış geliş işaretli (geçiş uçlarında) |
-| `Visits.DuplicateActiveVisit` | 409 | Düzeltmeyle aynı hayvanda ikinci aktif Visit oluşacaktı |
+| `Visits.DuplicateActiveVisit` | 409 | Düzeltme veya geri almayla aynı hayvanda ikinci aktif Visit oluşacaktı |
+| `Visits.DuplicateAppointmentVisit` | 409 | Geri almayla aynı randevuda ikinci Visit oluşacaktı |
 | `Visits.NotOpen` | 409 | Tamamlanmış/yanlış geliş Visit'e muayene açılmaya çalışıldı |
 | `Visits.ConcurrencyConflict` | 409 | Eşzamanlı güncelleme çözülemedi; istek tekrarlanmalı |
 | `Examinations.VisitMismatch` | 400 | Muayene isteği Visit'in hayvanı/randevusuyla uyuşmuyor |
@@ -288,7 +353,7 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 
 - **İzinler (seed adımı gerekir):** Yeni `Visits.Read`, `Visits.Create`, `Visits.Update`, `Visits.Correct` izinleri **API açılışında gelmez**: API ne migration ne seed çalıştırır. İzinler yalnızca `dotnet run --project src/Backend.Veteriner.DbMigrator -- seed` (veya `all`) ile `Permissions` tablosuna yazılır ve `RolePermissionBindingSeeder` ile varsayılan rollere (Admin, Owner, ClinicAdmin, Veteriner, Sekreter; madde 2) bağlanır. Seed idempotenttir (mevcut kayıtları çoğaltmaz). Mevcut **özel roller** bu izinleri otomatik almaz; yöneticiler elle atamalıdır.
 - **Oturum:** İzinler JWT'ye giriş (login), token yenileme (refresh) ve klinik seçimi (select-clinic) anında DB'den okunarak `permission` claim'i olarak eklenir. Seed sonrası mevcut oturumlar yeni izni **görmez**; kullanıcı çıkış-giriş yapmalıdır (frontend `Visits.Read` claim'ini bu yüzden bulamaz).
-- **Migration:** `AddVisits` (`Visits` tablosu, filtreli benzersiz indeksler, `Examinations.VisitId`) ve `AddUserDisplayName` (`Users.DisplayName`, nullable) komut veritabanına uygulanmalıdır. Query DB şeması değişmez.
+- **Migration:** `AddVisits` (`Visits` tablosu, filtreli benzersiz indeksler, `Examinations.VisitId`), `AddUserDisplayName` (`Users.DisplayName`, nullable) ve `AddVisitUrgency` (`Visits.IsUrgent`, `bit NOT NULL`, mevcut kayıtlar `false`) komut veritabanına uygulanmalıdır. Query DB şeması değişmez.
 - **Yapılandırma:** Yeni bayrak veya ayar yoktur.
 
 ---

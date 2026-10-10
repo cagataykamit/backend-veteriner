@@ -6,4 +6,5 @@ namespace Backend.Veteriner.Application.Dashboard.Contracts;
 public readonly record struct DashboardTodayAppointmentStatusCounts(
     int Scheduled,
     int Completed,
-    int Cancelled);
+    int Cancelled,
+    int NoShow = 0);

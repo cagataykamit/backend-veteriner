@@ -357,6 +357,7 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
                 ScheduledCount = accumulator.ScheduledCount,
                 CompletedCount = accumulator.CompletedCount,
                 CancelledCount = accumulator.CancelledCount,
+                NoShowCount = accumulator.NoShowCount,
                 TotalCount = accumulator.TotalCount,
                 LastEventId = RebuildEventId,
                 LastProjectedAtUtc = projectedAtUtc
@@ -400,7 +401,7 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
 
         var invalidStats = await _queryDb.ClinicDailyAppointmentStatsReadModels
             .AnyAsync(x =>
-                x.ScheduledCount + x.CompletedCount + x.CancelledCount != x.TotalCount,
+                x.ScheduledCount + x.CompletedCount + x.CancelledCount + x.NoShowCount != x.TotalCount,
                 cancellationToken);
 
         if (invalidStats)
@@ -463,6 +464,7 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
         public int ScheduledCount { get; private set; }
         public int CompletedCount { get; private set; }
         public int CancelledCount { get; private set; }
+        public int NoShowCount { get; private set; }
         public int TotalCount { get; private set; }
 
         public void Increment(int status)
@@ -478,6 +480,9 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
                     break;
                 case (int)AppointmentStatus.Cancelled:
                     CancelledCount++;
+                    break;
+                case (int)AppointmentStatus.NoShow:
+                    NoShowCount++;
                     break;
             }
         }

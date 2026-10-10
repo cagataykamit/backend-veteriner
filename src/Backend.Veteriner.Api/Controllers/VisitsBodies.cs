@@ -10,6 +10,7 @@ public sealed class CreateVisitBody
     public Guid? PetId { get; init; }
     public Guid? AppointmentId { get; init; }
     public Guid? ResponsibleVeterinarianUserId { get; init; }
+    public bool IsUrgent { get; init; }
 }
 
 /// <summary>
@@ -24,4 +25,16 @@ public sealed class CorrectVisitBody
     public VisitCareStatus? TargetCareStatus { get; init; }
 
     public bool MarkAsMistaken { get; init; }
+}
+
+/// <summary>POST /visits/{id}/restore gövdesi; <see cref="Reason"/> zorunludur.</summary>
+/// <summary>PUT /visits/{id}/urgency gövdesi.</summary>
+public sealed class SetVisitUrgencyBody
+{
+    public bool IsUrgent { get; init; }
+}
+
+public sealed class RestoreVisitBody
+{
+    public string? Reason { get; init; }
 }

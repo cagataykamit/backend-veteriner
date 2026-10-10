@@ -406,7 +406,7 @@ public sealed class CreateAppointmentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_Create_WithStatusCompleted_WithoutSlotChecks()
+    public async Task Handle_Should_Reject_Create_With_NonScheduled_Status()
     {
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
@@ -429,11 +429,10 @@ public sealed class CreateAppointmentCommandHandlerTests
 
         var result = await handler.Handle(cmd, CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        captured!.Status.Should().Be(AppointmentStatus.Completed);
-        _appointmentsRead.Verify(
-            r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()),
-            Times.Never);
+        // İzin ayrımı: Create izniyle Completed/Cancelled/NoShow randevu açılamaz.
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.Validation");
+        captured.Should().BeNull();
     }
 
     [Fact]

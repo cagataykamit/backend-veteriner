@@ -3,6 +3,8 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Appointments.Commands.Cancel;
 using Backend.Veteriner.Application.Appointments.Commands.Complete;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
+using Backend.Veteriner.Application.Appointments.Commands.NoShow;
+using Backend.Veteriner.Application.Appointments.Commands.RevertNoShow;
 using Backend.Veteriner.Application.Appointments.Commands.Reschedule;
 using Backend.Veteriner.Application.Appointments.Commands.Update;
 using Backend.Veteriner.Application.Appointments.Contracts;
@@ -189,6 +191,48 @@ public sealed class AppointmentsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new CompleteAppointmentCommand(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Randevulu hasta gelmedi (saati geçmiş planlı randevu); idempotent.</summary>
+    [HttpPost("{id:guid}/no-show")]
+    [Authorize(Policy = PermissionCatalog.Appointments.NoShow)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> MarkNoShow(
+        [FromRoute] Guid id,
+        [FromBody] MarkAppointmentNoShowBody? body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new MarkAppointmentNoShowCommand(id, body?.Reason), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Gelmedi işaretini gerekçeyle geri alır (NoShow → Scheduled); audit'lidir.</summary>
+    [HttpPost("{id:guid}/no-show/revert")]
+    [Authorize(Policy = PermissionCatalog.Appointments.NoShow)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RevertNoShow(
+        [FromRoute] Guid id,
+        [FromBody] RevertAppointmentNoShowBody? body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new RevertAppointmentNoShowCommand(id, body?.Reason ?? string.Empty), ct);
         return result.ToActionResult(this);
     }
 

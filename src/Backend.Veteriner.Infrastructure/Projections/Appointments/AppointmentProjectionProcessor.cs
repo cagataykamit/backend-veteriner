@@ -640,6 +640,7 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         var scheduledCount = appointments.Count(a => a.Status == (int)AppointmentStatus.Scheduled);
         var completedCount = appointments.Count(a => a.Status == (int)AppointmentStatus.Completed);
         var cancelledCount = appointments.Count(a => a.Status == (int)AppointmentStatus.Cancelled);
+        var noShowCount = appointments.Count(a => a.Status == (int)AppointmentStatus.NoShow);
         var totalCount = appointments.Count;
 
         var existing = _queryDb.ClinicDailyAppointmentStatsReadModels
@@ -662,6 +663,7 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
                 ScheduledCount = scheduledCount,
                 CompletedCount = completedCount,
                 CancelledCount = cancelledCount,
+                NoShowCount = noShowCount,
                 TotalCount = totalCount,
                 LastEventId = eventId,
                 LastProjectedAtUtc = projectedAtUtc
@@ -672,6 +674,7 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
         existing.ScheduledCount = scheduledCount;
         existing.CompletedCount = completedCount;
         existing.CancelledCount = cancelledCount;
+        existing.NoShowCount = noShowCount;
         existing.TotalCount = totalCount;
         existing.LastEventId = eventId;
         existing.LastProjectedAtUtc = projectedAtUtc;

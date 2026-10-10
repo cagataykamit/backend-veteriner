@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
+using Backend.Veteriner.Application.Tests.Appointments;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -36,9 +38,12 @@ public sealed class CreateVisitCommandHandlerTests
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
     private readonly Mock<IReadRepository<Visit>> _visitsRead = new();
     private readonly Mock<IRepository<Visit>> _visitsWrite = new();
+    private readonly Mock<IAppointmentProjectionSnapshotFactory> _snapshotFactory = new();
+    private readonly Mock<IAppointmentIntegrationEventOutbox> _eventOutbox = new();
 
     public CreateVisitCommandHandlerTests()
     {
+        AppointmentHandlerOutboxTestSupport.SetupDefaultOutboxMocks(_snapshotFactory, _eventOutbox);
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _clientContext.SetupGet(c => c.UserId).Returns(_userId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -62,7 +67,9 @@ public sealed class CreateVisitCommandHandlerTests
             _appointments.Object,
             _visitsRead.Object,
             _visitsWrite.Object,
-            VisitHandlerTestSupport.FixedClock);
+            VisitHandlerTestSupport.FixedClock,
+            _snapshotFactory.Object,
+            _eventOutbox.Object);
 
     private Appointment ScheduledAppointment()
         => new(_tenantId, _clinicId, _petId, DateTime.UtcNow.AddHours(1), 30, AppointmentType.Other, null, null);
@@ -171,6 +178,47 @@ public sealed class CreateVisitCommandHandlerTests
         result.Value!.Created.Should().BeFalse();
         result.Value.Visit.Id.Should().Be(existing.Id);
         _visitsWrite.Verify(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Appointment_Should_Revert_NoShow_To_Scheduled_And_Enqueue_Event_When_Patient_Arrives_Late()
+    {
+        var appointment = new Appointment(
+            _tenantId, _clinicId, _petId, DateTime.UtcNow.AddHours(-2), 30, AppointmentType.Other, AppointmentStatus.NoShow, null);
+        ReturnAppointment(appointment);
+        ReturnVisitForAppointment(null);
+        ReturnActiveVisitForPet(null);
+
+        var result = await CreateHandler().Handle(
+            new CreateVisitCommand(null, null, appointment.Id, null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Created.Should().BeTrue();
+        appointment.Status.Should().Be(AppointmentStatus.Scheduled);
+        _eventOutbox.Verify(o => o.EnqueueAsync(
+            AppointmentIntegrationEventTypes.Updated,
+            It.IsAny<AppointmentUpdatedIntegrationEvent>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _visitsWrite.Verify(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Appointment_Should_Not_Touch_NoShow_When_Visit_Validation_Fails_Before_Create()
+    {
+        var appointment = new Appointment(
+            _tenantId, _clinicId, _petId, DateTime.UtcNow.AddHours(-2), 30, AppointmentType.Other, AppointmentStatus.NoShow, null);
+        ReturnAppointment(appointment);
+        ReturnVisitForAppointment(null);
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Pet?)null);
+
+        var result = await CreateHandler().Handle(
+            new CreateVisitCommand(null, null, appointment.Id, null), CancellationToken.None);
+
+        result.Error.Code.Should().Be("Pets.NotFound");
+        appointment.Status.Should().Be(AppointmentStatus.NoShow);
+        _eventOutbox.Verify(o => o.EnqueueAsync(
+            It.IsAny<string>(), It.IsAny<AppointmentUpdatedIntegrationEvent>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

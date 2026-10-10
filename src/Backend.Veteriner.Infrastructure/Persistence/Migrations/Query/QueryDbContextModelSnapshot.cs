@@ -244,6 +244,9 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Migrations.Query
                     b.Property<DateTime>("LastProjectedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("NoShowCount")
+                        .HasColumnType("int");
+
                     b.Property<int>("ScheduledCount")
                         .HasColumnType("int");
 

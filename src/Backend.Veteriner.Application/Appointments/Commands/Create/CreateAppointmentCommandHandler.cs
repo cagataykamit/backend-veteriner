@@ -75,6 +75,14 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         if (!Enum.IsDefined(effectiveStatus))
             return Result<Guid>.Failure("Appointments.Validation", "Randevu durumu geçersiz.");
 
+        // Tamamlama/iptal/gelmedi kendi izinli uçlarıyla yapılır; Create ile başka durumda randevu açılamaz.
+        if (effectiveStatus != AppointmentStatus.Scheduled)
+        {
+            return Result<Guid>.Failure(
+                "Appointments.Validation",
+                "Yeni randevu yalnızca Planlanmış (Scheduled) durumda oluşturulabilir.");
+        }
+
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
             return Result<Guid>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
