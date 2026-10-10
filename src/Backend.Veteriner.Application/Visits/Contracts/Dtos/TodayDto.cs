@@ -32,6 +32,7 @@ public sealed record TodayItemDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] VisitCareStatus? CareStatus,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] AppointmentStatus? AppointmentStatus,
     Guid? ResponsibleVeterinarianUserId,
+    string? ResponsibleVeterinarianName,
     bool IsCarriedOver,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] TodayPaymentIndicator PaymentIndicator,
     bool HasActiveHospitalization);

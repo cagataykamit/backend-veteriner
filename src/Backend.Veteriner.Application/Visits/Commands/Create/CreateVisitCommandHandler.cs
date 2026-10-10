@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -24,7 +25,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
     private readonly IClinicContext _clinicContext;
     private readonly IClientContext _clientContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
-    private readonly IUserClinicRepository _userClinics;
+    private readonly IClinicVeterinarianReader _veterinarians;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
@@ -38,7 +39,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         IClinicContext clinicContext,
         IClientContext clientContext,
         IClinicReadScopeResolver clinicScopeResolver,
-        IUserClinicRepository userClinics,
+        IClinicVeterinarianReader veterinarians,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
@@ -51,7 +52,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         _clinicContext = clinicContext;
         _clientContext = clientContext;
         _clinicScopeResolver = clinicScopeResolver;
-        _userClinics = userClinics;
+        _veterinarians = veterinarians;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
@@ -145,7 +146,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
             var existingForAppointment = await _visitsRead.FirstOrDefaultAsync(
                 new VisitByAppointmentIdSpec(tenantId, appointment.Id), ct);
             if (existingForAppointment is not null)
-                return Existing(existingForAppointment);
+                return await ExistingAsync(existingForAppointment, ct);
 
             if (appointment.Status == AppointmentStatus.Cancelled)
             {
@@ -173,14 +174,14 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         var existingActive = await _visitsRead.FirstOrDefaultAsync(
             new ActiveVisitByPetIdSpec(tenantId, petId), ct);
         if (existingActive is not null)
-            return Existing(existingActive);
+            return await ExistingAsync(existingActive, ct);
 
         if (request.ResponsibleVeterinarianUserId is { } vetId
-            && !await _userClinics.ExistsActiveInTenantAsync(vetId, tenantId, clinicId, ct))
+            && !await _veterinarians.IsClinicVeterinarianAsync(vetId, tenantId, clinicId, ct))
         {
             return Result<VisitCreateResultDto>.Failure(
                 "Visits.Validation",
-                "Sorumlu hekim bu kliniğe atanmış bir kullanıcı olmalıdır.");
+                "Sorumlu hekim bu kliniğe atanmış aktif bir hekim (Veteriner) olmalıdır.");
         }
 
         var visit = new Visit(
@@ -207,12 +208,12 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
             if (winner is null)
                 throw;
 
-            return Existing(winner);
+            return await ExistingAsync(winner, ct);
         }
 
-        return Result<VisitCreateResultDto>.Success(new VisitCreateResultDto(true, visit.ToDto()));
+        return Result<VisitCreateResultDto>.Success(new VisitCreateResultDto(true, await visit.ToDtoAsync(_veterinarians, ct)));
     }
 
-    private static Result<VisitCreateResultDto> Existing(Visit visit)
-        => Result<VisitCreateResultDto>.Success(new VisitCreateResultDto(false, visit.ToDto()));
+    private async Task<Result<VisitCreateResultDto>> ExistingAsync(Visit visit, CancellationToken ct)
+        => Result<VisitCreateResultDto>.Success(new VisitCreateResultDto(false, await visit.ToDtoAsync(_veterinarians, ct)));
 }

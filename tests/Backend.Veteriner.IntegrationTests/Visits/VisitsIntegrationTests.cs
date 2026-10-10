@@ -5,6 +5,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Domain.Appointments;
@@ -573,6 +574,109 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Visits.NotFound");
     }
 
+    // ---- Sorumlu hekim ----
+
+    [Fact]
+    public async Task Veterinarians_Endpoint_Should_List_Only_Clinic_Veterinarians_With_Display_Names()
+    {
+        var ctx = await SeedAsync();
+        var vet = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Ali Veli");
+        var vetWithoutName = await ctx.SeedClinicUserAsync("Veteriner", null);
+        await ctx.SeedClinicUserAsync("Sekreter", "Ayse Sekreter");
+        var vetOtherClinic = await ctx.SeedClinicUserAsync("Veteriner", "Baska Klinik", assignToClinic: false);
+
+        var response = await ctx.Http.GetAsync($"/api/v1/clinics/{ctx.ClinicId}/veterinarians");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var list = (await response.Content.ReadFromJsonAsync<List<ClinicVeterinarianDto>>())!;
+        list.Select(v => v.UserId).Should().BeEquivalentTo(new[] { vet.UserId, vetWithoutName.UserId });
+        list.Single(v => v.UserId == vet.UserId).Name.Should().Be("Dr. Ali Veli");
+        list.Single(v => v.UserId == vetWithoutName.UserId).Name.Should().Be(vetWithoutName.EmailLocalPart);
+        list.Should().NotContain(v => v.UserId == vetOtherClinic.UserId);
+    }
+
+    [Fact]
+    public async Task Veterinarians_Endpoint_Should_Return_403_For_Unassigned_Clinic()
+    {
+        var ctx = await SeedAsync();
+        var other = await ctx.SeedForeignAssignedClinicAsync();
+
+        var response = await ctx.Http.GetAsync($"/api/v1/clinics/{other}/veterinarians");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Visit_Should_Carry_Responsible_Veterinarian_Name_In_Create_Detail_And_Today()
+    {
+        var ctx = await SeedAsync();
+        var vet = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Ali Veli");
+
+        var created = await ctx.PostVisitAsync(new
+        {
+            clinicId = ctx.ClinicId,
+            petId = ctx.PetId,
+            responsibleVeterinarianUserId = vet.UserId,
+        });
+
+        created.Response.StatusCode.Should().Be(HttpStatusCode.Created);
+        created.Result!.Visit.ResponsibleVeterinarianUserId.Should().Be(vet.UserId);
+        created.Result.Visit.ResponsibleVeterinarianName.Should().Be("Dr. Ali Veli");
+
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{created.Result.Visit.Id}"))!
+            .ResponsibleVeterinarianName.Should().Be("Dr. Ali Veli");
+        (await ctx.GetTodayAsync()).Items.Single(i => i.VisitId == created.Result.Visit.Id)
+            .ResponsibleVeterinarianName.Should().Be("Dr. Ali Veli");
+    }
+
+    [Fact]
+    public async Task Visit_Should_Reject_Non_Veterinarian_And_Other_Clinic_Veterinarian()
+    {
+        var ctx = await SeedAsync();
+        var secretary = await ctx.SeedClinicUserAsync("Sekreter", "Ayse Sekreter");
+        var otherClinicVet = await ctx.SeedClinicUserAsync("Veteriner", "Baska Klinik", assignToClinic: false);
+
+        foreach (var invalid in new[] { secretary.UserId, otherClinicVet.UserId, Guid.NewGuid() })
+        {
+            var response = await ctx.PostVisitRawAsync(new
+            {
+                clinicId = ctx.ClinicId,
+                petId = ctx.PetId,
+                responsibleVeterinarianUserId = invalid,
+            });
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Visits.Validation");
+        }
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.Visits.CountAsync(v => v.PetId == ctx.PetId)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task MyDisplayName_Should_Be_Settable_And_Clearable_And_Show_In_Account_Summary()
+    {
+        var ctx = await SeedAsync();
+
+        (await ctx.Http.PutAsJsonAsync("/api/v1/me/display-name", new { displayName = "  Dr. Ayse  " }))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.Users.AsNoTracking().SingleAsync(u => u.Id == ctx.UserId)).DisplayName.Should().Be("Dr. Ayse");
+        }
+
+        var tooLong = await ctx.Http.PutAsJsonAsync("/api/v1/me/display-name", new { displayName = new string('a', 121) });
+        tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        (await ctx.Http.PutAsJsonAsync("/api/v1/me/display-name", new { displayName = "" }))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+        await using var scope2 = _factory.Services.CreateAsyncScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db2.Users.AsNoTracking().SingleAsync(u => u.Id == ctx.UserId)).DisplayName.Should().BeNull();
+    }
+
     // ---- Kurulum ----
 
     private async Task<VisitTestContext> SeedAsync(bool CorrectorOrNot = true)
@@ -725,6 +829,34 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
                 TenantId, ClinicId, petId, null, DateTime.UtcNow.AddHours(-3),
                 DateTime.UtcNow.AddDays(1), "Gozlem", null));
             await db.SaveChangesAsync();
+        }
+
+        public sealed record SeededUser(Guid UserId, string Email)
+        {
+            public string EmailLocalPart => Email[..Email.IndexOf('@')];
+        }
+
+        /// <summary>Verilen operasyon claim'li kullanıcı; isteğe bağlı olarak test kliniğine atanır.</summary>
+        public async Task<SeededUser> SeedClinicUserAsync(string claimName, string? displayName, bool assignToClinic = true)
+        {
+            await using var scope = _services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+            var claim = await db.OperationClaims.SingleAsync(c => c.Name == claimName);
+            var email = $"visit-{claimName.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com";
+            var user = new User(email, hasher.Hash("123456"));
+            user.SetDisplayName(displayName);
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
+
+            db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, TenantId));
+            if (assignToClinic)
+                db.UserClinics.Add(new UserClinic(user.Id, ClinicId));
+            await db.SaveChangesAsync();
+
+            return new SeededUser(user.Id, email);
         }
 
         /// <summary>Kullanıcıya atanmamış, aynı kiracıda ikinci klinik.</summary>

@@ -46,11 +46,11 @@ public sealed class GetVisitsTodayQueryHandlerTests
     private static TodayItemDto Visit(
         string pet, VisitCareStatus status, DateTime arrivedAtUtc, DateTime? scheduledAtUtc = null)
         => new(Guid.NewGuid(), null, Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
-            scheduledAtUtc, arrivedAtUtc, status, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false);
+            scheduledAtUtc, arrivedAtUtc, status, null, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false);
 
     private static TodayItemDto Planned(string pet, DateTime scheduledAtUtc)
         => new(null, Guid.NewGuid(), Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
-            scheduledAtUtc, null, null, AppointmentStatus.Scheduled, null, false, TodayPaymentIndicator.NoPaymentRecorded, false);
+            scheduledAtUtc, null, null, AppointmentStatus.Scheduled, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false);
 
     [Fact]
     public async Task Handle_Should_Fail_When_Tenant_Missing()

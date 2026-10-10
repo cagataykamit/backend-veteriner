@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Visits.Contracts;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
@@ -15,17 +16,20 @@ public sealed class GetVisitByIdQueryHandler : IRequestHandler<GetVisitByIdQuery
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Visit> _visits;
+    private readonly IClinicVeterinarianReader _veterinarians;
 
     public GetVisitByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
-        IReadRepository<Visit> visits)
+        IReadRepository<Visit> visits,
+        IClinicVeterinarianReader veterinarians)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _visits = visits;
+        _veterinarians = veterinarians;
     }
 
     public async Task<Result<VisitDto>> Handle(GetVisitByIdQuery request, CancellationToken ct)
@@ -50,7 +54,7 @@ public sealed class GetVisitByIdQueryHandler : IRequestHandler<GetVisitByIdQuery
         if (!scope.IsSuccess)
             return NotFound();
 
-        return Result<VisitDto>.Success(visit.ToDto());
+        return Result<VisitDto>.Success(await visit.ToDtoAsync(_veterinarians, ct));
     }
 
     private static Result<VisitDto> NotFound()

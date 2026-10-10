@@ -4,6 +4,8 @@ using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories.Clinics;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Visits;
 using Backend.Veteriner.Application.Auth.Contracts;                              // IPermissionReader
@@ -156,6 +158,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardTodayAppointmentStatusCountsReader, DashboardTodayAppointmentStatusCountsReader>();
         services.AddScoped<IDashboardClinicScopedReader, DashboardClinicScopedReader>();
         services.AddScoped<IVisitTodayReader, VisitTodayReader>();
+        services.AddScoped<IClinicVeterinarianReader, ClinicVeterinarianReader>();
         services.AddScoped<IDashboardFinancePaymentAggregatesReader, DashboardFinancePaymentAggregatesReader>();
         services.AddScoped<IAppointmentsReportStatusBreakdownReader, AppointmentsReportStatusBreakdownReader>();
         services.AddScoped<IOutbox, EfOutbox>();

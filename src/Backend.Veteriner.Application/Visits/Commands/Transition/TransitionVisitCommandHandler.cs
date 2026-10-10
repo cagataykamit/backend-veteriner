@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Visits.Contracts;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
@@ -18,6 +19,7 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
     private readonly IReadRepository<Visit> _visitsRead;
     private readonly IRepository<Visit> _visitsWrite;
     private readonly TimeProvider _timeProvider;
+    private readonly IClinicVeterinarianReader _veterinarians;
 
     public TransitionVisitCommandHandler(
         ITenantContext tenantContext,
@@ -25,7 +27,8 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Visit> visitsRead,
         IRepository<Visit> visitsWrite,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IClinicVeterinarianReader veterinarians)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -33,6 +36,7 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
         _visitsRead = visitsRead;
         _visitsWrite = visitsWrite;
         _timeProvider = timeProvider;
+        _veterinarians = veterinarians;
     }
 
     public async Task<Result<VisitDto>> Handle(TransitionVisitCommand request, CancellationToken ct)
@@ -65,7 +69,7 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
 
         // Hedef durumda zaten ise (tekrar istek) değişiklik/olay/yan etki yok.
         if (visit.MutationSequence == sequenceBefore)
-            return Result<VisitDto>.Success(visit.ToDto());
+            return Result<VisitDto>.Success(await visit.ToDtoAsync(_veterinarians, ct));
 
 
         try
@@ -78,14 +82,14 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
             var current = await _visitsRead.FirstOrDefaultAsync(
                 new VisitByIdSpec(tenantId, request.VisitId, asNoTracking: true), ct);
             if (current is { IsVoided: false } && current.CareStatus == request.Target)
-                return Result<VisitDto>.Success(current.ToDto());
+                return Result<VisitDto>.Success(await current.ToDtoAsync(_veterinarians, ct));
 
             return Result<VisitDto>.Failure(
                 "Visits.ConcurrencyConflict",
                 "Geliş kaydı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
         }
 
-        return Result<VisitDto>.Success(visit.ToDto());
+        return Result<VisitDto>.Success(await visit.ToDtoAsync(_veterinarians, ct));
     }
 
     private static Result<VisitDto> NotFound()

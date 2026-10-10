@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Appointments;
@@ -13,8 +14,13 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Repositories.Visits;
 public sealed class VisitTodayReader : IVisitTodayReader
 {
     private readonly AppDbContext _db;
+    private readonly IClinicVeterinarianReader _veterinarians;
 
-    public VisitTodayReader(AppDbContext db) => _db = db;
+    public VisitTodayReader(AppDbContext db, IClinicVeterinarianReader veterinarians)
+    {
+        _db = db;
+        _veterinarians = veterinarians;
+    }
 
     public async Task<VisitTodayReadResult> GetAsync(VisitTodayReadRequest request, CancellationToken ct = default)
     {
@@ -24,13 +30,18 @@ public sealed class VisitTodayReader : IVisitTodayReader
         var allRows = visitRows.Concat(plannedRows).ToList();
         var paymentRecorded = await ReadPaymentRecordedKeysAsync(request, allRows, ct);
 
+        var responsibleIds = allRows.Where(r => r.ResponsibleVeterinarianUserId.HasValue)
+            .Select(r => r.ResponsibleVeterinarianUserId!.Value).Distinct().ToList();
+        var names = await _veterinarians.GetNamesAsync(responsibleIds, ct);
+
         var activeHospitalizations = await ReadActiveHospitalizationsAsync(request, ct);
         var hospitalizedPetIds = activeHospitalizations.Select(h => h.PetId).ToHashSet();
 
         var items = allRows
             .Select(r => r.ToDto(
                 paymentRecorded.Contains(r.Key) ? TodayPaymentIndicator.PaymentRecorded : TodayPaymentIndicator.NoPaymentRecorded,
-                hospitalizedPetIds.Contains(r.PetId)))
+                hospitalizedPetIds.Contains(r.PetId),
+                r.ResponsibleVeterinarianUserId is { } id && names.TryGetValue(id, out var name) ? name : null))
             .ToList();
 
         return new VisitTodayReadResult(items, activeHospitalizations);
@@ -200,7 +211,8 @@ public sealed class VisitTodayReader : IVisitTodayReader
         /// <summary>Satırı tekil tanımlar: Visit satırı Visit kimliğiyle, planlı satır randevu kimliğiyle.</summary>
         public string Key => VisitId.HasValue ? $"v:{VisitId}" : $"a:{AppointmentId}";
 
-        public TodayItemDto ToDto(TodayPaymentIndicator payment, bool hasActiveHospitalization)
+        public TodayItemDto ToDto(
+            TodayPaymentIndicator payment, bool hasActiveHospitalization, string? responsibleName)
             => new(
                 VisitId,
                 AppointmentId,
@@ -215,6 +227,7 @@ public sealed class VisitTodayReader : IVisitTodayReader
                 CareStatus,
                 AppointmentStatus,
                 ResponsibleVeterinarianUserId,
+                responsibleName,
                 IsCarriedOver,
                 payment,
                 hasActiveHospitalization);

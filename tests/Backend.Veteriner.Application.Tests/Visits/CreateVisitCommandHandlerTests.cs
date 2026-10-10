@@ -29,7 +29,7 @@ public sealed class CreateVisitCommandHandlerTests
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IClientContext> _clientContext = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
-    private readonly Mock<IUserClinicRepository> _userClinics = new();
+    private readonly Mock<Backend.Veteriner.Application.Clinics.Veterinarians.IClinicVeterinarianReader> _veterinarians = VeterinarianReaderMock.Create();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
@@ -55,7 +55,7 @@ public sealed class CreateVisitCommandHandlerTests
             _clinicContext.Object,
             _clientContext.Object,
             _scopeResolver.Object,
-            _userClinics.Object,
+            _veterinarians.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
@@ -240,7 +240,7 @@ public sealed class CreateVisitCommandHandlerTests
     {
         ReturnActiveVisitForPet(null);
         var vetId = Guid.NewGuid();
-        _userClinics.Setup(r => r.ExistsActiveInTenantAsync(vetId, _tenantId, _clinicId, It.IsAny<CancellationToken>()))
+        _veterinarians.Setup(r => r.IsClinicVeterinarianAsync(vetId, _tenantId, _clinicId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
         var result = await CreateHandler().Handle(
@@ -248,6 +248,37 @@ public sealed class CreateVisitCommandHandlerTests
 
         result.Error.Code.Should().Be("Visits.Validation");
         _visitsWrite.Verify(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Return_Responsible_Veterinarian_Name_When_Clinic_Veterinarian_Selected()
+    {
+        ReturnActiveVisitForPet(null);
+        var vetId = Guid.NewGuid();
+        _veterinarians.Setup(r => r.IsClinicVeterinarianAsync(vetId, _tenantId, _clinicId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _veterinarians.Setup(r => r.GetNamesAsync(
+                It.Is<IReadOnlyCollection<Guid>>(ids => ids.Contains(vetId)), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, string?> { [vetId] = "Dr. Ali Veli" });
+
+        var result = await CreateHandler().Handle(
+            new CreateVisitCommand(_clinicId, _petId, null, vetId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Visit.ResponsibleVeterinarianUserId.Should().Be(vetId);
+        result.Value.Visit.ResponsibleVeterinarianName.Should().Be("Dr. Ali Veli");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Leave_Veterinarian_Empty_When_Not_Selected()
+    {
+        ReturnActiveVisitForPet(null);
+
+        var result = await CreateHandler().Handle(
+            new CreateVisitCommand(_clinicId, _petId, null, null), CancellationToken.None);
+
+        result.Value!.Visit.ResponsibleVeterinarianUserId.Should().BeNull();
+        result.Value.Visit.ResponsibleVeterinarianName.Should().BeNull();
     }
 
     [Fact]

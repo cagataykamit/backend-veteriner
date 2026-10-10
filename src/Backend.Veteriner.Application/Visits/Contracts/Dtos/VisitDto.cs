@@ -9,6 +9,7 @@ public sealed record VisitDto(
     Guid PetId,
     Guid? AppointmentId,
     Guid? ResponsibleVeterinarianUserId,
+    string? ResponsibleVeterinarianName,
     DateTime ArrivedAtUtc,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] VisitCareStatus CareStatus,
     DateTime? StartedAtUtc,

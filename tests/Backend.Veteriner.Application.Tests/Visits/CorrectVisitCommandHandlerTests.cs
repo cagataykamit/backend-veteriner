@@ -40,7 +40,8 @@ public sealed class CorrectVisitCommandHandlerTests
             _visitsRead.Object,
             _visitsWrite.Object,
             _examinations.Object,
-            VisitHandlerTestSupport.FixedClock);
+            VisitHandlerTestSupport.FixedClock,
+            VeterinarianReaderMock.Create().Object);
 
     private Visit CompletedVisit()
     {

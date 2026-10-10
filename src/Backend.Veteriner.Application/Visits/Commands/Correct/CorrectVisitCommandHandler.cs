@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Visits.Contracts;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
@@ -20,6 +21,7 @@ public sealed class CorrectVisitCommandHandler : IRequestHandler<CorrectVisitCom
     private readonly IRepository<Visit> _visitsWrite;
     private readonly IReadRepository<Examination> _examinations;
     private readonly TimeProvider _timeProvider;
+    private readonly IClinicVeterinarianReader _veterinarians;
 
     public CorrectVisitCommandHandler(
         ITenantContext tenantContext,
@@ -28,7 +30,8 @@ public sealed class CorrectVisitCommandHandler : IRequestHandler<CorrectVisitCom
         IReadRepository<Visit> visitsRead,
         IRepository<Visit> visitsWrite,
         IReadRepository<Examination> examinations,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IClinicVeterinarianReader veterinarians)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -37,6 +40,7 @@ public sealed class CorrectVisitCommandHandler : IRequestHandler<CorrectVisitCom
         _visitsWrite = visitsWrite;
         _examinations = examinations;
         _timeProvider = timeProvider;
+        _veterinarians = veterinarians;
     }
 
     public async Task<Result<VisitDto>> Handle(CorrectVisitCommand request, CancellationToken ct)
@@ -114,7 +118,7 @@ public sealed class CorrectVisitCommandHandler : IRequestHandler<CorrectVisitCom
             return DuplicateActiveVisit();
         }
 
-        return Result<VisitDto>.Success(visit.ToDto());
+        return Result<VisitDto>.Success(await visit.ToDtoAsync(_veterinarians, ct));
     }
 
     private async Task<bool> HasOtherActiveVisitAsync(Guid tenantId, Visit visit, CancellationToken ct)

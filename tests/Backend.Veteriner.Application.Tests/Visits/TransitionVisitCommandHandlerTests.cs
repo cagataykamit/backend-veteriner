@@ -33,7 +33,8 @@ public sealed class TransitionVisitCommandHandlerTests
             _scopeResolver.Object,
             _visitsRead.Object,
             _visitsWrite.Object,
-            VisitHandlerTestSupport.FixedClock);
+            VisitHandlerTestSupport.FixedClock,
+            VeterinarianReaderMock.Create().Object);
 
     private Visit WaitingVisit() => VisitHandlerTestSupport.NewVisit(_tenantId, _clinicId);
 
