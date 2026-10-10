@@ -6,7 +6,6 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Visits.Commands.Create;
-using Backend.Veteriner.Application.Visits.IntegrationEvents;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
@@ -37,7 +36,6 @@ public sealed class CreateVisitCommandHandlerTests
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
     private readonly Mock<IReadRepository<Visit>> _visitsRead = new();
     private readonly Mock<IRepository<Visit>> _visitsWrite = new();
-    private readonly Mock<IVisitIntegrationEventOutbox> _outbox = new();
 
     public CreateVisitCommandHandlerTests()
     {
@@ -64,7 +62,6 @@ public sealed class CreateVisitCommandHandlerTests
             _appointments.Object,
             _visitsRead.Object,
             _visitsWrite.Object,
-            _outbox.Object,
             VisitHandlerTestSupport.FixedClock);
 
     private Appointment ScheduledAppointment()
@@ -120,12 +117,6 @@ public sealed class CreateVisitCommandHandlerTests
         result.Value.Visit.CreatedByUserId.Should().Be(_userId);
         _visitsWrite.Verify(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()), Times.Once);
         _visitsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _outbox.Verify(
-            o => o.EnqueueAsync(
-                VisitIntegrationEventTypes.Created,
-                It.IsAny<VisitCreatedIntegrationEvent>(),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
         _appointments.Verify(
             r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -145,7 +136,6 @@ public sealed class CreateVisitCommandHandlerTests
         result.Value.Visit.Id.Should().Be(existing.Id);
         _visitsWrite.Verify(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()), Times.Never);
         _visitsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
-        _outbox.VerifyNoOtherCalls();
     }
 
     [Fact]

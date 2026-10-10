@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), backlog CHECKIN-006/007. Tüm endpoint'ler `api/v1` altında, JSON gövde/query, standart `ProblemDetails` + `extensions.code` hata zarfı (bkz. `EXAMINATIONS_WORKSPACE_API_CONTRACT.md`).
 
-> **Durum:** Sözleşme. Kararlar madde 12'de kayıtlı (D1 Query DB read modeli, K-A bağlama yok, S2 açık iş göstergesi yok, S3 `isVoided`). Uygulama bu sözleşmeye göre yapılır.
+> **Durum:** Sözleşme. Kararlar madde 12'de kayıtlı (D1 komut veritabanı okuması, K-A bağlama yok, S2 açık iş göstergesi yok, S3 `isVoided`, S4 hekim adı yok). Uygulama bu sözleşmeye göre yapılır.
 
 ---
 
@@ -210,7 +210,7 @@ Randevulu Visit **tek satırdır** (randevu ayrıca satır üretmez). Satır kay
 | `arrivedAtUtc` | datetime? | Visit varsa |
 | `careStatus` | enum? | Visit varsa; planlı satırda `null` |
 | `appointmentStatus` | `Scheduled` \| `Completed` \| `Cancelled`? | Randevu varsa |
-| `responsibleVeterinarianUserId`, `responsibleVeterinarianName` | | Visit varsa, opsiyonel |
+| `responsibleVeterinarianUserId` | guid? | Visit varsa, opsiyonel (S4: ad döndürülmez) |
 | `isCarriedOver` | bool | |
 | `paymentIndicator` | `NoPaymentRecorded` \| `PaymentRecorded` | Aşağıya bakın |
 | `hasActiveHospitalization` | bool | Hayvanın açık yatışı var mı |
@@ -258,17 +258,17 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 
 ## 11) Veri ve okuma modeli
 
-- **Yazma:** Visit **komut veritabanında** (`Visits` tablosu; filtreli benzersiz indeksler madde 5). Domain kuralları `Visit` aggregate'i içindedir (geçişler, düzeltme, yanlış geliş).
-- **Okuma (Bugün):** Mevcut CQRS desenine uyar. Her Visit mutasyonu aynı transaction'da outbox'a `visit.*.v1` olayı yazar; projeksiyon işçisi Query DB `VisitReadModels` tablosunu doldurur (idempotent, `MutationSequence` ile eski olay koruması, backfill/rebuild yolu). Bugün sorgusu Query DB'de `VisitReadModels` ile `AppointmentReadModels`, `PetReadModels`, `ClientReadModels` ve `PaymentReadModels` tablolarını birleştirir.
-- **Tutarlılık:** Bugün nihai tutarlıdır (outbox işçi gecikmesi kadar). Yazma garantileri (tekrar tıklama, tek aktif Visit, geçiş kuralları) komut veritabanında olduğundan projeksiyon gecikmesinden etkilenmez; `POST`, `start`, `complete`, `corrections` yanıtları komut veritabanından döner.
-- **Randevu olayı düzeltmesi:** Muayene randevuyu `Completed` yaptığında `appointment.completed.v1` outbox olayı da üretilir (mevcut eksik). Aksi halde Bugün randevu durumunu yanlış gösterir.
-- **Komut veritabanından okunanlar:** (a) aktif yatışlar (Query DB'de yatış read modeli yok); (b) ödeme göstergesi için Visit'e bağlı muayene kimlikleri (`Examination.VisitId` Query DB'de yok).
+- **Yazma ve okuma tek kaynaktan:** Visit **komut veritabanında** (`Visits` tablosu; filtreli benzersiz indeksler madde 5). Domain kuralları `Visit` aggregate'i içindedir. Bugün sorgusu da komut veritabanından okunur: `Visits`, `Appointments`, `Pets`, `Clients`, `Species`, `Payments`, `Examinations`, `Hospitalizations`.
+- **Neden Query DB read modeli yok:** Mevcut Query DB hattı her ortamda bayrakla kapalıdır (`QueryReadModels:*` hepsi `false`; `PetProjection` ve `PaymentProjection` `Enabled: false`; Staging'de `QueryConnection` boş). Bugün'ü bu hatta bağlamak dört projeksiyonun (randevu, hayvan, sahip, ödeme) açılıp backfill edilmesini zorunlu kılar ve varsayılan yapılandırmada Bugün'ü çalışmaz bırakır. Mevcut okuma yüzeylerinin deseni gibi komut veritabanı varsayılan yoldur; Query DB yolu ayrı bir iş olarak bayrakla eklenir (okuyucu arayüzü bunu mümkün kılar).
+- **Outbox olayı yok:** Visit bu sürümde projeksiyon tüketicisi olmadığı için outbox'a olay yazmaz (tüketicisiz olaylar `OutboxMessages` tablosunda işlenmeden birikir).
+- **Tutarlılık:** Bugün yazma ile aynı veritabanından okuduğu için geliş kaydı anında görünür.
 
 ---
 
 ## 12) Kararlar
 
-- **D1 — Bugün'ün okuma kaynağı: Query DB read modeli + projeksiyon.** Gerekçe: mevcut CQRS deseni; ADR-009 "Query DB read modeli ve projeksiyon/rebuild yolları güncellenmeli" der; Bugün yazma yükünden ayrışır. Maliyet: yeni projeksiyon hattı ve randevu olay eksiğinin düzeltilmesi.
+- **D1 — Bugün'ün okuma kaynağı: komut veritabanı.** Gerekçe madde 11. Query DB read modeli/projeksiyon (ADR-009 uygulama etkisi) bu işin kapsamından çıkarıldı; Query DB okuması açıldığında ayrı iş olarak eklenir. Not: muayene randevuyu `Completed` yaptığında randevu outbox olayının üretilmemesi mevcut bir hatadır (randevu Query DB read modeli `Scheduled` kalır); Bugün bundan etkilenmez, ayrıca ele alınmalıdır.
 - **K-A — Farklı niyetli tekrar geliş:** Hayvanın randevusuz aktif Visit'i varken aynı hayvanın randevusu için geliş denenirse mevcut Visit döner; randevu bağlanmaz.
 - **S2 — Açık iş göstergesi:** Lab/tedavi/reçete kayıtlarında açık-kapalı durumu yok; bu sürümde alan yok, uydurulmaz. Önce ürün tanımı gerekir.
 - **S3 — Yanlış geliş modeli:** Bakım durumuna 4. durum eklenmez; ayrı `isVoided` işareti (ADR "bakım durumu sade 3 durum" ile uyumlu).
+- **S4 — Sorumlu hekim etiketi:** Kullanıcı kaydında görünen ad alanı yoktur (yalnızca e-posta). Bugün satırı yalnızca `responsibleVeterinarianUserId` döner; istemci etiketi kullanıcı/klinik üyeleri listesinden çözer.

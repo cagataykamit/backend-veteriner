@@ -2,7 +2,6 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Visits.Commands.Transition;
-using Backend.Veteriner.Application.Visits.IntegrationEvents;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Visits;
 using FluentAssertions;
@@ -21,7 +20,6 @@ public sealed class TransitionVisitCommandHandlerTests
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Visit>> _visitsRead = new();
     private readonly Mock<IRepository<Visit>> _visitsWrite = new();
-    private readonly Mock<IVisitIntegrationEventOutbox> _outbox = new();
 
     public TransitionVisitCommandHandlerTests()
     {
@@ -35,7 +33,6 @@ public sealed class TransitionVisitCommandHandlerTests
             _scopeResolver.Object,
             _visitsRead.Object,
             _visitsWrite.Object,
-            _outbox.Object,
             VisitHandlerTestSupport.FixedClock);
 
     private Visit WaitingVisit() => VisitHandlerTestSupport.NewVisit(_tenantId, _clinicId);
@@ -56,12 +53,6 @@ public sealed class TransitionVisitCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.CareStatus.Should().Be(VisitCareStatus.InProgress);
         result.Value.StartedAtUtc.Should().Be(VisitHandlerTestSupport.FixedNowUtc);
-        _outbox.Verify(
-            o => o.EnqueueAsync(
-                VisitIntegrationEventTypes.Updated,
-                It.IsAny<VisitUpdatedIntegrationEvent>(),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
         _visitsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -77,7 +68,6 @@ public sealed class TransitionVisitCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.CareStatus.Should().Be(VisitCareStatus.InProgress);
-        _outbox.VerifyNoOtherCalls();
         _visitsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 

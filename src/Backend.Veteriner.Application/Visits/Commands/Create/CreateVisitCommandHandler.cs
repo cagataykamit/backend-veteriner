@@ -6,7 +6,6 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Visits.Contracts;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
-using Backend.Veteriner.Application.Visits.IntegrationEvents;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
@@ -32,7 +31,6 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Visit> _visitsRead;
     private readonly IRepository<Visit> _visitsWrite;
-    private readonly IVisitIntegrationEventOutbox _eventOutbox;
     private readonly TimeProvider _timeProvider;
 
     public CreateVisitCommandHandler(
@@ -47,7 +45,6 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         IReadRepository<Appointment> appointments,
         IReadRepository<Visit> visitsRead,
         IRepository<Visit> visitsWrite,
-        IVisitIntegrationEventOutbox eventOutbox,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -61,7 +58,6 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         _appointments = appointments;
         _visitsRead = visitsRead;
         _visitsWrite = visitsWrite;
-        _eventOutbox = eventOutbox;
         _timeProvider = timeProvider;
     }
 
@@ -197,7 +193,6 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
             _timeProvider.GetUtcNow().UtcDateTime);
 
         await _visitsWrite.AddAsync(visit, ct);
-        await _eventOutbox.EnqueueCreatedAsync(visit, ct);
 
         try
         {

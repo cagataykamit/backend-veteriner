@@ -2,7 +2,6 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Visits.Contracts;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
-using Backend.Veteriner.Application.Visits.IntegrationEvents;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Visits;
@@ -18,7 +17,6 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Visit> _visitsRead;
     private readonly IRepository<Visit> _visitsWrite;
-    private readonly IVisitIntegrationEventOutbox _eventOutbox;
     private readonly TimeProvider _timeProvider;
 
     public TransitionVisitCommandHandler(
@@ -27,7 +25,6 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Visit> visitsRead,
         IRepository<Visit> visitsWrite,
-        IVisitIntegrationEventOutbox eventOutbox,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -35,7 +32,6 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
         _clinicScopeResolver = clinicScopeResolver;
         _visitsRead = visitsRead;
         _visitsWrite = visitsWrite;
-        _eventOutbox = eventOutbox;
         _timeProvider = timeProvider;
     }
 
@@ -71,7 +67,6 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
         if (visit.MutationSequence == sequenceBefore)
             return Result<VisitDto>.Success(visit.ToDto());
 
-        await _eventOutbox.EnqueueUpdatedAsync(visit, ct);
 
         try
         {

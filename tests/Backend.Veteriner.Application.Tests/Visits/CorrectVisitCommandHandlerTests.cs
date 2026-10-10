@@ -2,7 +2,6 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Visits.Commands.Correct;
-using Backend.Veteriner.Application.Visits.IntegrationEvents;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Visits;
@@ -25,7 +24,6 @@ public sealed class CorrectVisitCommandHandlerTests
     private readonly Mock<IReadRepository<Visit>> _visitsRead = new();
     private readonly Mock<IRepository<Visit>> _visitsWrite = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
-    private readonly Mock<IVisitIntegrationEventOutbox> _outbox = new();
 
     public CorrectVisitCommandHandlerTests()
     {
@@ -42,7 +40,6 @@ public sealed class CorrectVisitCommandHandlerTests
             _visitsRead.Object,
             _visitsWrite.Object,
             _examinations.Object,
-            _outbox.Object,
             VisitHandlerTestSupport.FixedClock);
 
     private Visit CompletedVisit()
@@ -91,7 +88,6 @@ public sealed class CorrectVisitCommandHandlerTests
 
         result.Error.Code.Should().Be("Visits.Validation");
         _visitsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
-        _outbox.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -107,12 +103,6 @@ public sealed class CorrectVisitCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.CareStatus.Should().Be(VisitCareStatus.InProgress);
         result.Value.CompletedAtUtc.Should().BeNull();
-        _outbox.Verify(
-            o => o.EnqueueAsync(
-                VisitIntegrationEventTypes.Updated,
-                It.IsAny<VisitUpdatedIntegrationEvent>(),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
         _visitsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 

@@ -2,7 +2,6 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Visits.Contracts;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
-using Backend.Veteriner.Application.Visits.IntegrationEvents;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Shared;
@@ -20,7 +19,6 @@ public sealed class CorrectVisitCommandHandler : IRequestHandler<CorrectVisitCom
     private readonly IReadRepository<Visit> _visitsRead;
     private readonly IRepository<Visit> _visitsWrite;
     private readonly IReadRepository<Examination> _examinations;
-    private readonly IVisitIntegrationEventOutbox _eventOutbox;
     private readonly TimeProvider _timeProvider;
 
     public CorrectVisitCommandHandler(
@@ -30,7 +28,6 @@ public sealed class CorrectVisitCommandHandler : IRequestHandler<CorrectVisitCom
         IReadRepository<Visit> visitsRead,
         IRepository<Visit> visitsWrite,
         IReadRepository<Examination> examinations,
-        IVisitIntegrationEventOutbox eventOutbox,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -39,7 +36,6 @@ public sealed class CorrectVisitCommandHandler : IRequestHandler<CorrectVisitCom
         _visitsRead = visitsRead;
         _visitsWrite = visitsWrite;
         _examinations = examinations;
-        _eventOutbox = eventOutbox;
         _timeProvider = timeProvider;
     }
 
@@ -101,7 +97,6 @@ public sealed class CorrectVisitCommandHandler : IRequestHandler<CorrectVisitCom
         if (!correction.IsSuccess)
             return Result<VisitDto>.Failure(correction.Error);
 
-        await _eventOutbox.EnqueueUpdatedAsync(visit, ct);
 
         try
         {
