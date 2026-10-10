@@ -5,9 +5,11 @@ using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
 using Backend.Veteriner.Application.Dashboard.Queries.GetFinanceSummary;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Dashboard.ReadModels;
 using FluentAssertions;
@@ -61,7 +63,7 @@ internal static class DashboardFinanceQueryParityTestSupport
         var handler = new GetDashboardFinanceSummaryQueryHandler(
             new FixedTenantContext(tenantId),
             clinicId is { } id ? new FixedClinicContext(id) : new NullClinicContext(),
-            sp.GetRequiredService<IClinicReadScopeResolver>(),
+            await CreateScopeResolverAsync(sp),
             sp.GetRequiredService<IReadRepository<Payment>>(),
             sp.GetRequiredService<IReadRepository<Client>>(),
             sp.GetRequiredService<IReadRepository<Pet>>(),
@@ -72,4 +74,33 @@ internal static class DashboardFinanceQueryParityTestSupport
 
         return await handler.Handle(new GetDashboardFinanceSummaryQuery(), CancellationToken.None);
     }
+
+    /// <summary>
+    /// Handler HTTP bağlamı olmadan kurulduğundan kullanıcı bağlamı açıkça verilir (seed platform admin).
+    /// Üretim resolver'ı değişmez; yalnızca <see cref="IClientContext"/> sabitlenir.
+    /// </summary>
+    private static async Task<IClinicReadScopeResolver> CreateScopeResolverAsync(IServiceProvider sp)
+    {
+        var db = sp.GetRequiredService<AppDbContext>();
+        var userId = await db.Users
+            .Where(u => u.Email == AdminClaimSeeder.PlatformAdminUserEmail)
+            .Select(u => u.Id)
+            .SingleAsync();
+
+        return new ClinicReadScopeResolver(
+            new FixedClientContext(userId),
+            sp.GetRequiredService<IClinicAssignmentAccessGuard>(),
+            sp.GetRequiredService<IUserClinicRepository>(),
+            sp.GetRequiredService<IReadRepository<Clinic>>());
+    }
+}
+
+internal sealed class FixedClientContext(Guid userId) : IClientContext
+{
+    public Guid? UserId { get; } = userId;
+    public string? IpAddress => null;
+    public string? UserAgent => null;
+    public string? Path => null;
+    public string? Method => null;
+    public string? CorrelationId => null;
 }
