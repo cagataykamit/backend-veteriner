@@ -56,6 +56,7 @@ Yeni özet endpoint eklenmedi.
 | `clinicId` | uuid | Randevu yoksa evet* | - |
 | `petId` | uuid | Randevu yoksa evet* | - |
 | `appointmentId` | uuid | Hayır | omit/null |
+| `visitId` | uuid | Hayır | omit/null |
 | `examinedAtUtc` | datetime (ISO-8601) | Evet | - |
 | `visitReason` | string | Evet (boşluk olamaz) | - |
 | `complaint` | string | Hayır (legacy; `visitReason` boşsa kullanılır) | - |
@@ -103,6 +104,7 @@ Vital kuralları: değerler `> 0`; üst sınır/uyarı eşiği yok. İlk vital g
 `Location`: `GET /api/v1/examinations/{id}`
 
 **Randevu etkisi (mevcut davranış):** `appointmentId` ile oluşturma ve randevu `Scheduled` ise randevu `Complete()` ile tamamlanır; iptal randevuda `Examinations.AppointmentCancelled`.
+**Geliş (Visit) bağlantısı:** `visitId` verilirse klinik, hayvan ve randevu Visit'ten türetilir (hasta tekrar seçilmez); istekteki `clinicId`/`petId`/`appointmentId` Visit ile uyuşmazsa `400` + `Examinations.VisitMismatch`. Visit bulunamazsa `404` + `Visits.NotFound`; tamamlanmış veya yanlış geliş işaretli Visit için `409` + `Visits.NotOpen`. Visit `Waiting` ise muayene ile aynı işlemde `InProgress` olur. Randevuyu otomatik tamamlama davranışı Visit'ten bağımsız aynen sürer. `PUT` `visitId`'yi değiştirmez. Ayrıntı: `VISITS_API_CONTRACT.md`.
 
 ---
 
@@ -122,6 +124,7 @@ Vital kuralları: değerler `> 0`; üst sınır/uyarı eşiği yok. İlk vital g
   "clientId": "...",
   "clientName": "Ali Veli",
   "appointmentId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "visitId": null,
   "examinedAtUtc": "2026-10-08T10:30:00Z",
   "visitReason": "İştahsızlık",
   "anamnesis": "3 gündür az yiyor",
@@ -250,6 +253,7 @@ Sorgu: `page` (varsayılan `1`, en az 1), `pageSize` (varsayılan `20`, sunucuda
       "clientId": "...",
       "clientName": "Ali Veli",
       "appointmentId": null,
+      "visitId": null,
       "examinedAtUtc": "2026-10-08T10:30:00Z",
       "visitReason": "İştahsızlık"
     }
@@ -280,6 +284,10 @@ Liste öğesinde `rowVersion`, `findings` ve vital alanlar **yoktur**; düzenlem
 | 400 | `Examinations.DateFilterInvalid` | Tarih filtresi çakışması |
 | 403 | `Clinics.AccessDenied` | Klinik yazma/okuma |
 | 404 | `Examinations.NotFound` | IDOR-safe bulunamadı |
+| 400 | `Examinations.VisitMismatch` | `visitId` ile istekteki klinik/hayvan/randevu uyuşmuyor |
+| 404 | `Visits.NotFound` | `visitId` bulunamadı / kliniğe ait değil |
+| 409 | `Visits.NotOpen` | Visit tamamlanmış veya yanlış geliş işaretli |
+| 409 | `Visits.ConcurrencyConflict` | Visit eşzamanlı güncellendi; istek tekrarlanmalı |
 | 409 | `Examinations.ConcurrencyConflict` | Eski `rowVersion` |
 | 400 | `Examinations.AppointmentChangeNotAllowed` | Randevu değiştirme |
 | 400 | `Examinations.RouteIdMismatch` | PUT gövdesindeki `id` route `id` ile farklı |
