@@ -33,6 +33,7 @@ internal static class DashboardFinanceQueryParityTestSupport
         await using var scope = rootServices.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
         await queryDb.PaymentDailyContributionReadModels.ExecuteDeleteAsync();
         await queryDb.ClinicDailyPaymentStatsReadModels.ExecuteDeleteAsync();
