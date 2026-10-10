@@ -113,6 +113,9 @@ public class AppDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(200);
 
+            e.Property(x => x.DisplayName)
+                .HasMaxLength(User.MaxDisplayNameLength);
+
             e.Property(x => x.PasswordHash)
                 .IsRequired();
 
