@@ -54,6 +54,13 @@ try
             await RunSeedPipelineAsync(db, hasher, logger, CancellationToken.None);
             logger.LogInformation("Seed pipeline completed.");
             break;
+        case "seed-dev-veterinarian":
+            {
+                var seeded = await DevTestVeterinarianSeeder.SeedAsync(
+                    db, hasher, sp.GetRequiredService<IHostEnvironment>(), logger, CancellationToken.None);
+                logger.LogInformation("Dev test veterinarian seed finished (ready: {Ready}).", seeded);
+                break;
+            }
         case "all":
             await db.Database.MigrateAsync();
             await RunSeedPipelineAsync(db, hasher, logger, CancellationToken.None);
@@ -361,6 +368,7 @@ static void PrintHelp()
           migrate-query  — QueryDbContext MigrateAsync (QueryConnection)
           seed           — Permission/Data/AdminClaim/InviteAssignable seed zinciri
           all            — önce migrate, sonra seed
+          seed-dev-veterinarian — YALNIZCA Development: test hekim kullanıcısı (idempotent; kimlik bilgileri DevTestVeterinarianSeeder.cs)
           loadtest-seed  — yük testi sentetik veri (yalnızca VetinityCommandDb_LoadTest command DB; profil: small)
           rebuild-appointment-projections — Command DB randevularından Query read-model yeniden oluştur
                                             (--batch-size 1000 opsiyonel)
