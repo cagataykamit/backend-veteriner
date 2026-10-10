@@ -113,7 +113,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_Set_Completed_When_Requested()
+    public async Task Handle_Should_Reject_Status_Change_Via_Update_And_Not_Save()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -136,9 +136,11 @@ public sealed class UpdateAppointmentCommandHandlerTests
         var cmd = new UpdateAppointmentCommand(aid, cid, pid, when, AppointmentType.Examination, AppointmentStatus.Completed, null);
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        appt.Status.Should().Be(AppointmentStatus.Completed);
-        _appointmentsWrite.Verify(w => w.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        // İzin ayrımı: Reschedule izniyle Completed/Cancelled/NoShow geçişi yapılamaz.
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.InvalidStatusTransition");
+        appt.Status.Should().Be(AppointmentStatus.Scheduled);
+        _appointmentsWrite.Verify(w => w.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

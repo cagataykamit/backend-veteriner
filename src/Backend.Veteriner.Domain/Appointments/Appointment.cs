@@ -174,14 +174,14 @@ public sealed class Appointment : AggregateRoot
     }
 
     /// <summary>
-    /// Update/Write akışında istenen durumun mevcut durumdan kabul edilebilir bir geçiş olup olmadığını
+    /// Update/Write akışında istenen durumun mevcut durumla aynı olup olmadığını
     /// scheduling/working-hours doğrulamalarından <em>önce</em> kontrol etmek için ön-kontrol.
     /// </summary>
     /// <remarks>
     /// <list type="bullet">
     /// <item><description>Enum tanımsızsa <c>Appointments.Validation</c>.</description></item>
-    /// <item><description>Mevcut durum terminal (Completed/Cancelled) ve istenen durum farklıysa
-    /// <c>Appointments.InvalidStatusTransition</c>.</description></item>
+    /// <item><description>İstenen durum mevcut durumdan farklıysa <c>Appointments.InvalidStatusTransition</c>:
+    /// durum geçişleri yalnızca kendi izinli uçlarıyla (iptal, tamamlama, gelmedi) yapılır; Update/Create ile yapılamaz.</description></item>
     /// <item><description>Aksi halde başarı; gerçek mutasyon <see cref="ApplyWriteUpdate"/> içinde yapılır.</description></item>
     /// </list>
     /// </remarks>
@@ -190,11 +190,11 @@ public sealed class Appointment : AggregateRoot
         if (!Enum.IsDefined(requestedStatus))
             return Result.Failure("Appointments.Validation", "Randevu durumu geçersiz.");
 
-        if (Status != AppointmentStatus.Scheduled && requestedStatus != Status)
+        if (requestedStatus != Status)
         {
             return Result.Failure(
                 "Appointments.InvalidStatusTransition",
-                "Tamamlanmış veya iptal edilmiş randevunun durumu değiştirilemez.");
+                "Randevu durumu bu işlemle değiştirilemez; iptal, tamamlama ve gelmedi için ilgili uçları kullanın.");
         }
 
         return Result.Success();
@@ -202,7 +202,8 @@ public sealed class Appointment : AggregateRoot
 
     /// <summary>
     /// Create/Update write sözleşmesi: durum + zaman/tür alanları.
-    /// Tamamlanmış veya iptal edilmiş kayıtta yalnızca aynı durum (değişiklik yok) kabul edilir.
+    /// Durum değiştirilemez (yalnızca aynı durum kabul edilir); tamamlama, iptal ve gelmedi kendi uçlarıyla yapılır.
+    /// Planlanmış olmayan kayıtta değişiklik yapılmadan başarı döner.
     /// </summary>
     public Result ApplyWriteUpdate(
         AppointmentStatus requestedStatus,
@@ -216,32 +217,14 @@ public sealed class Appointment : AggregateRoot
         if (!Enum.IsDefined(requestedStatus))
             return Result.Failure("Appointments.Validation", "Randevu durumu geçersiz.");
 
+        var statusGuard = EnsureCanApplyStatus(requestedStatus);
+        if (!statusGuard.IsSuccess)
+            return statusGuard;
+
         if (Status != AppointmentStatus.Scheduled)
-        {
-            if (requestedStatus != Status)
-            {
-                return Result.Failure(
-                    "Appointments.InvalidStatusTransition",
-                    "Tamamlanmış veya iptal edilmiş randevunun durumu değiştirilemez.");
-            }
-
             return Result.Success();
-        }
 
-        if (requestedStatus == AppointmentStatus.Scheduled)
-            return UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes);
-
-        var details = UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes);
-        if (!details.IsSuccess)
-            return details;
-
-        if (requestedStatus == AppointmentStatus.Completed)
-            return Complete();
-
-        if (requestedStatus == AppointmentStatus.Cancelled)
-            return Cancel(null);
-
-        return Result.Failure("Appointments.Validation", "Randevu durumu geçersiz.");
+        return UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes);
     }
 
     private static DateTime NormalizeUtc(DateTime value)
