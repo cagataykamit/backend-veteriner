@@ -272,3 +272,21 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 - **S2 — Açık iş göstergesi:** Lab/tedavi/reçete kayıtlarında açık-kapalı durumu yok; bu sürümde alan yok, uydurulmaz. Önce ürün tanımı gerekir.
 - **S3 — Yanlış geliş modeli:** Bakım durumuna 4. durum eklenmez; ayrı `isVoided` işareti (ADR "bakım durumu sade 3 durum" ile uyumlu).
 - **S4 — Sorumlu hekim etiketi:** Kullanıcı kaydında görünen ad alanı yoktur (yalnızca e-posta). Bugün satırı yalnızca `responsibleVeterinarianUserId` döner; istemci etiketi kullanıcı/klinik üyeleri listesinden çözer.
+
+---
+
+## 13) Deploy notu
+
+- **İzinler:** Yeni `Visits.Read`, `Visits.Create`, `Visits.Update`, `Visits.Correct` izinleri seeder ile (`PermissionSeeder`, `RolePermissionBindingSeeder`) gelir ve varsayılan rollere bağlanır (madde 2). Mevcut **özel roller** bu izinleri otomatik almaz; yöneticiler elle atamalıdır.
+- **Migration:** `AddVisits` (`Visits` tablosu, filtreli benzersiz indeksler, `Examinations.VisitId`) komut veritabanına uygulanmalıdır. Query DB şeması değişmez.
+- **Yapılandırma:** Yeni bayrak veya ayar yoktur.
+
+---
+
+## 14) Bilinen eksikler
+
+- **Açık iş göstergesi yok:** Laboratuvar, tedavi ve reçete kayıtlarında açık/kapalı durumu tutulmadığı için Bugün'de gösterge yoktur (S2).
+- **Randevu outbox olayı yok:** Muayene randevuyu `Completed` yaptığında `appointment.completed.v1` olayı üretilmez; Query DB randevu read modeli `Scheduled` kalır. Bugün komut veritabanından okuduğu için etkilenmez; Query DB okuması açılmadan önce düzeltilmelidir.
+- **Query DB read modeli yok:** Visit için projeksiyon ve Query DB okuması bu sürümde yoktur (D1); bayrakla ayrı iş olarak eklenecektir.
+- **Hekim adı ve seçimi:** Kullanıcıda görünen ad alanı yoktur (yalnızca e-posta) ve klinikteki hekimleri listeleyen uç yoktur; Randevu hekim alanı da taşımaz. Bugün/Visit yalnızca `responsibleVeterinarianUserId` döner. Hekim seçimi için klinik hekim listesi ucu ve görünen ad kararı bekliyor (S4).
+- **Ödeme göstergesi:** Yalnızca tahsilat kaydının varlığını söyler; borç/bakiye temel finans (Aşama 3) sonrasıdır.
