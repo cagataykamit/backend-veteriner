@@ -11,6 +11,7 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
@@ -26,6 +27,11 @@ public sealed class CreatePaymentCommandHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClientContext> _clientContext = new();
+    private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
+    private readonly Mock<IRepository<Charge>> _chargesWrite = new();
+    private readonly Mock<IRepository<PaymentAllocation>> _allocationsWrite = new();
+    private readonly Mock<IReadRepository<Payment>> _paymentsRead = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
@@ -40,6 +46,7 @@ public sealed class CreatePaymentCommandHandlerTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _clientContext.Object,
             resolver ?? _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
@@ -47,7 +54,11 @@ public sealed class CreatePaymentCommandHandlerTests
             _pets.Object,
             _appointments.Object,
             _examinations.Object,
+            _paymentsRead.Object,
             _paymentsWrite.Object,
+            _chargesWrite.Object,
+            _allocationsWrite.Object,
+            TimeProvider.System,
             _eventOutbox.Object);
 
     private static CreatePaymentCommand Cmd(
@@ -68,10 +79,13 @@ public sealed class CreatePaymentCommandHandlerTests
             "TRY",
             PaymentMethod.Cash,
             paidAt ?? DateTime.UtcNow.AddHours(-1),
-            null);
+            null,
+            Guid.NewGuid(),
+            PaymentAllocationTestSupport.Lines(amount));
 
     private void SetupTenantClinicClient(Guid tid, Guid cid, Guid clientId)
     {
+        PaymentAllocationTestSupport.Setup(_chargesWrite, _clientContext, tid, cid, clientId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -330,7 +344,11 @@ public sealed class CreatePaymentCommandHandlerTests
         captured!.Amount.Should().Be(99.99m);
         captured.Currency.Should().Be("TRY");
         captured.Method.Should().Be(PaymentMethod.Cash);
-        _paymentsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _paymentsWrite.Verify(r => r.AddAsync(It.IsAny<Payment>(), It.IsAny<CancellationToken>()), Times.Once);
+        captured.AllocatedAmount.Should().Be(99.99m);
+        _allocationsWrite.Verify(
+            r => r.AddRangeAsync(It.Is<IEnumerable<PaymentAllocation>>(a => a.Count() == 1), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

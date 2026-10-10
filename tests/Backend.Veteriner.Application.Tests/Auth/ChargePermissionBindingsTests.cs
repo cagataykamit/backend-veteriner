@@ -45,4 +45,21 @@ public sealed class ChargePermissionBindingsTests
         PermissionCatalog.Contains(PermissionCatalog.Charges.Create).Should().BeTrue();
         PermissionCatalog.Contains(PermissionCatalog.Charges.Correct).Should().BeTrue();
     }
+
+    [Theory]
+    [InlineData("Admin")]
+    [InlineData("Owner")]
+    [InlineData("ClinicAdmin")]
+    public void Admin_Level_Role_Should_Correct_Payments(string role)
+        => Perms(role).Should().Contain(PermissionCatalog.Payments.Correct);
+
+    [Theory]
+    [InlineData("Sekreter")]
+    [InlineData("Veteriner")]
+    public void Sekreter_And_Veteriner_Should_Not_Correct_Payments(string role)
+        => Perms(role).Should().NotContain(PermissionCatalog.Payments.Correct);
+
+    [Fact]
+    public void Veteriner_Should_Not_Create_Payments()
+        => Perms("Veteriner").Should().NotContain(PermissionCatalog.Payments.Create);
 }

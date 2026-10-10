@@ -10,6 +10,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Payments;
@@ -22,8 +23,14 @@ namespace Backend.Veteriner.Application.Tests.Payments.IntegrationEvents;
 
 public sealed class PaymentCommandHandlerOutboxEmissionTests
 {
+    public PaymentCommandHandlerOutboxEmissionTests() => _permissions.Setup(p => p.HasPermission(It.IsAny<string>())).Returns(true);
+
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClientContext> _clientContext = new();
+    private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
+    private readonly Mock<IRepository<Charge>> _chargesWrite = new();
+    private readonly Mock<IRepository<PaymentAllocation>> _allocationsWrite = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
@@ -39,6 +46,7 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _clientContext.Object,
             _scopeResolver.Object,
             _tenantsRead.Object,
             _clinicsRead.Object,
@@ -46,13 +54,18 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
             _petsRead.Object,
             _appointmentsRead.Object,
             _examinationsRead.Object,
+            _paymentsRead.Object,
             _paymentsWrite.Object,
+            _chargesWrite.Object,
+            _allocationsWrite.Object,
+            TimeProvider.System,
             _eventOutbox.Object);
 
     private UpdatePaymentCommandHandler CreateUpdateHandler()
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _permissions.Object,
             _scopeResolver.Object,
             _tenantsRead.Object,
             _clinicsRead.Object,
@@ -95,6 +108,7 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
         var paidAt = DateTime.UtcNow.AddDays(-1);
         SetupActiveTenant(tid);
         SetupClinicClient(tid, clinicId, clientId);
+        PaymentAllocationTestSupport.Setup(_chargesWrite, _clientContext, tid, clinicId, clientId);
 
         Payment? captured = null;
         _paymentsWrite.Setup(r => r.AddAsync(It.IsAny<Payment>(), It.IsAny<CancellationToken>()))
@@ -119,7 +133,9 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
             "TRY",
             PaymentMethod.Card,
             paidAt,
-            "Not");
+            "Not",
+            Guid.NewGuid(),
+            PaymentAllocationTestSupport.Lines(250.75m));
 
         var result = await CreateCreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -146,7 +162,9 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
             PaymentIntegrationEventTypes.Created,
             It.IsAny<PaymentCreatedIntegrationEvent>(),
             It.IsAny<CancellationToken>()), Times.Once);
-        _paymentsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _allocationsWrite.Verify(
+            r => r.AddRangeAsync(It.IsAny<IEnumerable<PaymentAllocation>>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -224,7 +242,8 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
             "TRY",
             PaymentMethod.Transfer,
             paidAt,
-            "Güncellendi");
+            "Güncellendi",
+            "Test duzeltme gerekcesi");
 
         var result = await CreateUpdateHandler().Handle(cmd, CancellationToken.None);
 
