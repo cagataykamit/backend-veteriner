@@ -67,7 +67,8 @@ public sealed class ExaminationsController : ControllerBase
             body.TemperatureC,
             body.HeartRateBpm,
             body.RespiratoryRatePerMin,
-            body.VitalsMeasuredAtUtc);
+            body.VitalsMeasuredAtUtc,
+            body.VisitId);
 
         var result = await _mediator.Send(cmd, ct);
         if (!result.IsSuccess)

@@ -198,7 +198,8 @@ public sealed class GetExaminationsListQueryHandler
                     clientName,
                     e.AppointmentId,
                     e.ExaminedAtUtc,
-                    e.VisitReason);
+                    e.VisitReason,
+                    e.VisitId);
             })
             .ToList();
 

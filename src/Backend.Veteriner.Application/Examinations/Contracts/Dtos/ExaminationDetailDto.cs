@@ -23,4 +23,5 @@ public sealed record ExaminationDetailDto(
     string? Notes,
     string RowVersion,
     DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime? UpdatedAtUtc,
+    Guid? VisitId = null);

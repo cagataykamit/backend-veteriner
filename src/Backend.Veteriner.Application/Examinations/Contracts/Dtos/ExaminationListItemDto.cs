@@ -9,4 +9,5 @@ public sealed record ExaminationListItemDto(
     string ClientName,
     Guid? AppointmentId,
     DateTime ExaminedAtUtc,
-    string VisitReason);
+    string VisitReason,
+    Guid? VisitId = null);

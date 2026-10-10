@@ -19,5 +19,6 @@ public sealed record CreateExaminationCommand(
     decimal? TemperatureC = null,
     int? HeartRateBpm = null,
     int? RespiratoryRatePerMin = null,
-    DateTime? VitalsMeasuredAtUtc = null)
+    DateTime? VitalsMeasuredAtUtc = null,
+    Guid? VisitId = null)
     : IRequest<Result<ExaminationWriteResultDto>>;

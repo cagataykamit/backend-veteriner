@@ -7,13 +7,16 @@ using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Visits;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Examinations.Commands.Create;
 
@@ -27,6 +30,8 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IRepository<Appointment> _appointmentsWrite;
+    private readonly IReadRepository<Visit> _visits;
+    private readonly TimeProvider _timeProvider;
     private readonly IRepository<Examination> _examinationsWrite;
 
     public CreateExaminationCommandHandler(
@@ -38,7 +43,9 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         IReadRepository<Pet> pets,
         IReadRepository<Appointment> appointments,
         IRepository<Appointment> appointmentsWrite,
-        IRepository<Examination> examinationsWrite)
+        IRepository<Examination> examinationsWrite,
+        IReadRepository<Visit> visits,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -49,6 +56,8 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         _appointments = appointments;
         _appointmentsWrite = appointmentsWrite;
         _examinationsWrite = examinationsWrite;
+        _visits = visits;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Result<ExaminationWriteResultDto>> Handle(CreateExaminationCommand request, CancellationToken ct)
@@ -75,13 +84,41 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         var window = ExaminationExaminedAtWindow.Validate(examinedUtc);
 
         if (!window.IsSuccess)
+
             return Result<ExaminationWriteResultDto>.Failure(window.Error);
+        // Geliş (Visit) verilmişse hayvan/klinik/randevu ondan türetilir; hasta tekrar seçilmez.
+        var requestClinicId = request.ClinicId;
+        var requestPetId = request.PetId;
+        var requestAppointmentId = request.AppointmentId;
+
+        Visit? visit = null;
+        if (request.VisitId is { } visitId)
+        {
+            visit = await _visits.FirstOrDefaultAsync(new VisitByIdSpec(tenantId, visitId), ct);
+            if (visit is null
+                || (_clinicContext.ClinicId is { } contextClinicId && visit.ClinicId != contextClinicId))
+            {
+                return Result<ExaminationWriteResultDto>.Failure("Visits.NotFound", "Geliş kaydı bulunamadı.");
+            }
+
+            if (visit.IsVoided || visit.CareStatus == VisitCareStatus.Completed)
+            {
+                return Result<ExaminationWriteResultDto>.Failure(
+                    "Visits.NotOpen",
+                    "Tamamlanmış veya yanlış geliş işaretli kayıt için muayene açılamaz.");
+            }
+
+            requestClinicId ??= visit.ClinicId;
+            requestPetId ??= visit.PetId;
+            requestAppointmentId ??= visit.AppointmentId;
+        }
+
 
         Guid clinicId;
         Guid petId;
 
         Appointment? appt = null;
-        if (request.AppointmentId is { } aid)
+        if (requestAppointmentId is { } aid)
         {
             appt = await _appointments.FirstOrDefaultAsync(
                 new AppointmentByIdSpec(tenantId, aid), ct);
@@ -102,15 +139,15 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
                     "İptal edilmiş randevu için muayene kaydı oluşturulamaz.");
             }
 
-            if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+            if (requestClinicId.HasValue && _clinicContext.ClinicId.HasValue && requestClinicId.Value != _clinicContext.ClinicId.Value)
             {
                 return Result<ExaminationWriteResultDto>.Failure(
                     "Examinations.ClinicContextMismatch",
                     "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
             }
 
-            clinicId = _clinicContext.ClinicId ?? request.ClinicId ?? appt.ClinicId;
-            petId = request.PetId ?? appt.PetId;
+            clinicId = _clinicContext.ClinicId ?? requestClinicId ?? appt.ClinicId;
+            petId = requestPetId ?? appt.PetId;
 
             if (clinicId != appt.ClinicId || petId != appt.PetId)
             {
@@ -121,9 +158,9 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         }
         else
         {
-            var cid = _clinicContext.ClinicId ?? request.ClinicId;
+            var cid = _clinicContext.ClinicId ?? requestClinicId;
             if (cid is not { } resolvedCid || resolvedCid == Guid.Empty
-                || request.PetId is not { } pid || pid == Guid.Empty)
+                || requestPetId is not { } pid || pid == Guid.Empty)
             {
                 return Result<ExaminationWriteResultDto>.Failure(
                     "Examinations.Validation",
@@ -132,6 +169,14 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
 
             clinicId = resolvedCid;
             petId = pid;
+        }
+
+        if (visit is not null
+            && (clinicId != visit.ClinicId || petId != visit.PetId || requestAppointmentId != visit.AppointmentId))
+        {
+            return Result<ExaminationWriteResultDto>.Failure(
+                "Examinations.VisitMismatch",
+                "Muayene isteği geliş kaydının klinik, hayvan veya randevusuyla uyuşmuyor.");
         }
 
         var clinicAccess = await ExaminationClinicWriteScope.EnsureWriteAccessAsync(
@@ -153,7 +198,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             tenantId,
             clinicId,
             petId,
-            request.AppointmentId,
+            requestAppointmentId,
             examinedUtc,
             request.VisitReason,
             request.Findings,
@@ -165,9 +210,18 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             request.TemperatureC,
             request.HeartRateBpm,
             request.RespiratoryRatePerMin,
-            request.VitalsMeasuredAtUtc);
+            request.VitalsMeasuredAtUtc,
+            visit?.Id);
 
         await _examinationsWrite.AddAsync(examination, ct);
+
+        // Muayene başlayınca bekleyen geliş "Devam ediyor" olur (aynı SaveChanges; devam ediyorsa değişmez).
+        if (visit is { CareStatus: VisitCareStatus.Waiting })
+        {
+            var started = visit.Start(_timeProvider.GetUtcNow().UtcDateTime);
+            if (!started.IsSuccess)
+                return Result<ExaminationWriteResultDto>.Failure(started.Error);
+        }
 
         // Appointment lifecycle: muayene başarıyla eklendiyse ve akış bir randevuya
         // bağlıysa, planlanmış randevuyu otomatik olarak tamamla. Completed/Cancelled
@@ -182,7 +236,17 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             await _appointmentsWrite.UpdateAsync(appt, ct);
         }
 
-        await _examinationsWrite.SaveChangesAsync(ct);
+        try
+        {
+            await _examinationsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException) when (visit is not null)
+        {
+            return Result<ExaminationWriteResultDto>.Failure(
+                "Visits.ConcurrencyConflict",
+                "Geliş kaydı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
+        }
+
         return Result<ExaminationWriteResultDto>.Success(
             new ExaminationWriteResultDto(examination.Id, ExaminationRowVersion.Encode(examination.RowVersion)));
     }

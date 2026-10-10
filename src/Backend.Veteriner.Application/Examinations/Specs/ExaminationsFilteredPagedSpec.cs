@@ -10,7 +10,8 @@ public sealed record ExaminationListRow(
     Guid PetId,
     Guid? AppointmentId,
     DateTime ExaminedAtUtc,
-    string VisitReason);
+    string VisitReason,
+    Guid? VisitId = null);
 
 public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, ExaminationListRow>
 {
@@ -71,6 +72,7 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, E
                 e.PetId,
                 e.AppointmentId,
                 e.ExaminedAtUtc,
-                e.VisitReason));
+                e.VisitReason,
+                e.VisitId));
     }
 }

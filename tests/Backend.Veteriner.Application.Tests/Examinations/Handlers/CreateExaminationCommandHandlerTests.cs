@@ -12,6 +12,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Visits;
 using FluentAssertions;
 using Moq;
 
@@ -28,6 +29,7 @@ public sealed class CreateExaminationCommandHandlerTests
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
     private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
     private readonly Mock<IRepository<Examination>> _examinationsWrite = new();
+    private readonly Mock<IReadRepository<Visit>> _visits = new();
 
     private CreateExaminationCommandHandler CreateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -39,7 +41,9 @@ public sealed class CreateExaminationCommandHandlerTests
             _pets.Object,
             _appointments.Object,
             _appointmentsWrite.Object,
-            _examinationsWrite.Object);
+            _examinationsWrite.Object,
+            _visits.Object,
+            TimeProvider.System);
 
     private static CreateExaminationCommand Cmd(
         Guid tid,
