@@ -21,8 +21,8 @@ Yeni izin **`Appointments.NoShow`**; varsayılan rol bağları `Appointments.Can
 Gövde (opsiyonel): `{ "reason": "string? (en çok 500)" }`. `204 NoContent`.
 
 - Yalnızca `Scheduled` **ve** `scheduledAtUtc <=` şimdi. Gelecek randevu → `400 Appointments.NoShowNotYetDue`.
-- Randevu için yanlış geliş işaretsiz Visit varsa → `409 Appointments.HasVisit` (hasta gelmiş).
-- Zaten `NoShow` ise `204` (idempotent, olay üretilmez). `Completed`/`Cancelled` → `409 Appointments.InvalidStatusTransition`.
+- Randevu için yanlış geliş işaretsiz Visit varsa → `400 Appointments.HasVisit` (hasta gelmiş).
+- Zaten `NoShow` ise `204` (idempotent, olay üretilmez). `Completed`/`Cancelled` → `400 Appointments.InvalidStatusTransition`.
 - Diğer: `404 Appointments.NotFound` (yabancı kiracı/klinik bağlamı), `403 Clinics.AccessDenied` (atanmamış klinik), `409 Appointments.ConcurrencyConflict`.
 - Audit: `Appointment.NoShow` (gerekçe yüke yazılır).
 
@@ -30,7 +30,7 @@ Gövde (opsiyonel): `{ "reason": "string? (en çok 500)" }`. `204 NoContent`.
 
 Gövde: `{ "reason": "string (zorunlu, 5-500)" }`. `204 NoContent`. `NoShow → Scheduled`.
 
-- `NoShow` değilse `409 Appointments.InvalidStatusTransition`; gerekçe eksik/kısa `400 Appointments.Validation`.
+- `NoShow` değilse `400 Appointments.InvalidStatusTransition`; gerekçe eksik/kısa `400 Appointments.Validation`.
 - Geri alma zaman/çakışma kontrolü yapmaz (geçmiş saatli randevu; slot kuralı yalnızca yeni/yeniden zamanlanan randevuda işler).
 - Audit: `Appointment.NoShowRevert`.
 
@@ -42,7 +42,7 @@ Gövde: `{ "reason": "string (zorunlu, 5-500)" }`. `204 NoContent`. `NoShow → 
 
 `PUT /api/v1/appointments/{id}` (`Appointments.Reschedule`) ve `POST /api/v1/appointments` (`Appointments.Create`) artık `Status` ile geçiş yaptıramaz:
 
-- `PUT`: `status` mevcut durumla aynı olmalıdır (`Scheduled` kayıtta `Scheduled`); farklı değer → `409 Appointments.InvalidStatusTransition`. Tamamlama/iptal/gelmedi yalnızca kendi uçlarıyla.
+- `PUT`: `status` mevcut durumla aynı olmalıdır (`Scheduled` kayıtta `Scheduled`); farklı değer → `400 Appointments.InvalidStatusTransition`. Tamamlama/iptal/gelmedi yalnızca kendi uçlarıyla.
 - `POST`: `status` verilmezse veya `Scheduled` ise kabul; diğer değerler `400 Appointments.Validation`.
 
 ## 6) Tüketiciler
@@ -59,4 +59,4 @@ Gövde: `{ "reason": "string (zorunlu, 5-500)" }`. `204 NoContent`. `NoShow → 
 | Kod | HTTP | Durum |
 |-----|------|-------|
 | `Appointments.NoShowNotYetDue` | 400 | Henüz saati gelmemiş randevu |
-| `Appointments.HasVisit` | 409 | Randevuya bağlı geliş kaydı var |
+| `Appointments.HasVisit` | 400 | Randevuya bağlı geliş kaydı var |
