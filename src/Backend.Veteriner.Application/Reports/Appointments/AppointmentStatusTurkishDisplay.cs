@@ -11,6 +11,7 @@ internal static class AppointmentStatusTurkishDisplay
             AppointmentStatus.Scheduled => "Planlanmış",
             AppointmentStatus.Completed => "Tamamlandı",
             AppointmentStatus.Cancelled => "İptal",
+            AppointmentStatus.NoShow => "Gelmedi",
             _ => status.ToString(),
         };
 }

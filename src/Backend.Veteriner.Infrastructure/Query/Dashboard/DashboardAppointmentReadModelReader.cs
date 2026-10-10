@@ -117,7 +117,8 @@ public sealed class DashboardAppointmentReadModelReader : IDashboardAppointmentR
             {
                 Scheduled = g.Sum(x => x.ScheduledCount),
                 Completed = g.Sum(x => x.CompletedCount),
-                Cancelled = g.Sum(x => x.CancelledCount)
+                Cancelled = g.Sum(x => x.CancelledCount),
+                NoShow = g.Sum(x => x.NoShowCount)
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -126,7 +127,8 @@ public sealed class DashboardAppointmentReadModelReader : IDashboardAppointmentR
             : new DashboardTodayAppointmentStatusCounts(
                 aggregated.Scheduled,
                 aggregated.Completed,
-                aggregated.Cancelled);
+                aggregated.Cancelled,
+                aggregated.NoShow);
     }
 
     private async Task<int> GetUpcomingCountAsync(

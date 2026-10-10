@@ -51,6 +51,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReader : IDashboardToda
         var scheduled = 0;
         var completed = 0;
         var cancelled = 0;
+        var noShow = 0;
 
         foreach (var row in rows)
         {
@@ -67,12 +68,17 @@ public sealed class DashboardTodayAppointmentStatusCountsReader : IDashboardToda
                 case AppointmentStatus.Cancelled:
                     cancelled = row.Count;
                     break;
+
+                case AppointmentStatus.NoShow:
+                    noShow = row.Count;
+                    break;
             }
         }
 
         return new DashboardTodayAppointmentStatusCounts(
             scheduled,
             completed,
-            cancelled);
+            cancelled,
+            noShow);
     }
 }
