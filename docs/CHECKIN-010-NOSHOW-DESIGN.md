@@ -1,71 +1,73 @@
-# CHECKIN-010 — "Gelmedi" (no-show) tasarım önerisi
+# CHECKIN-010 — "Gelmedi" (no-show): uygulama planı (seçenek B)
 
-> **Durum:** Öneri. **Kod yazılmadı; onay bekliyor.** Ürün tarafı (ADR) kararı gerektirir (aşağıda "Karar gereken noktalar").
-> Kaynak: ADR-009 (Appointment plan olarak değişmez), `VISITS_API_CONTRACT.md`. Kod keşfi bu dalda yapıldı.
+> **Durum:** Plan. **Kod yazılmadı; onay bekliyor.**
+> Karar değişikliği: ürün canlıda değil, gerçek müşteri verisi yok; geriye uyum / veri taşıma riski yok. Bu yüzden önceki öneri (D, ayrı `AppointmentNoShow` kaydı) yerine **B: `AppointmentStatus.NoShow`** (tek doğruluk kaynağı) planlanıyor. A (Visit'te NoShow) ve C/D/E önceki gerekçelerle elendi (bkz. git geçmişi, `2ec225c`).
 
-## Sorun
+## 1) Enum değeri
 
-`AppointmentStatus` yalnızca `Scheduled / Completed / Cancelled`; `NoShow` bilinçli kaldırıldı. Randevusuna gelmeyen hasta bugün:
+- Eski `NoShow` **3** idi. Migration `20260321021818_AddSaaSCoreDomainTables` DB'deki 3'leri `Cancelled(2)` yapıp değeri temizledi. Kodda, testlerde, DTO ve projeksiyonlarda `3`/`NoShow` kalıntısı **yok** (aranıp doğrulandı; tek iz enum yorumu ve o migration yorumu).
+- Durum `int` olarak saklanıyor (`HasConversion<int>`, kontrol kısıtı yok); Query DB read model `Status` da `int`.
+- **Öneri: `NoShow = 3`** (tarihsel numara; çakışma yok, şema değişikliği gerekmez, migration gerekmez). Enum yorumu güncellenir.
 
-- Bugün'de (`Visits/today`) saati geçse de "Planlı" satırı olarak kalır.
-- Dashboard "gecikmiş planlı randevu" uyarısında (`DashboardOverdueScheduledAppointmentsCountSpec`: `Scheduled` ve `ScheduledAtUtc < now`) süresiz sayılır.
-- Raporlanabilir bir "gelmedi" bilgisi yoktur.
+## 2) Tüketici tablosu
 
-## Koddan çıkan bağımlılıklar (neyi bozmamalıyız)
-
-Aşağıdakilerin hepsi randevu durumunun üç değerli olduğunu varsayar:
-
-| Yer | Varsayım |
+| Tüketici | Değişiklik |
 |---|---|
-| Randevu raporu (`GetAppointmentsReportQueryHandler`, status breakdown, CSV/XLSX, `AppointmentStatusTurkishDisplay`) | `total = scheduled + completed + cancelled`; bilinmeyen durum toplama **sessizce girmez** |
-| Dashboard özet/uyarı sayıları (`Dashboard*CountSpec`, `DashboardTodayAppointmentStatusCountsReader`) | `Scheduled/Completed/Cancelled` ayrı sayılar |
-| Slot/çakışma (`AppointmentOverlappingAtClinicSpec`, `...ForPetSpec`) | yalnızca `Scheduled` slot tutar |
-| Hatırlatma (`ReminderProcessorService`) | `Scheduled` ve gelecekteki randevu |
-| Randevu yazma kuralları (`Appointment.Cancel/Complete/RescheduleTo/UpdateDetails`, `EnsureCanApplyStatus`) | yalnızca `Scheduled` değişebilir; diğerleri terminal |
-| Query DB projeksiyonları (`AppointmentProjectionProcessor`, rebuild, read model okuyucuları, dashboard read model) | üç durum sayılır |
-| Muayene oluşturma (`CreateExaminationCommandHandler`) | `Cancelled` reddeder, `Scheduled` ise `Completed` yapar |
-| Visit (`CreateVisitCommandHandler`, Bugün okuyucusu) | `Scheduled` randevuya geliş; Bugün planlı satırlar `!= Cancelled` ve Visit'siz |
+| **Domain (`Appointment`)** | Yeni `MarkNoShow(nowUtc)` ve `RevertNoShow()` (kural entity'de). `Cancel/Complete/RescheduleTo/UpdateDetails` yalnızca `Scheduled` kalır, NoShow terminal gibi reddeder. `EnsureCanApplyStatus` ve `ApplyWriteUpdate`: NoShow'a PUT ile geçiş **yok** (aşağıda bypass) |
+| **Randevu raporu** (`GetAppointmentsReportQueryHandler`, status breakdown, CSV/XLSX, `AppointmentStatusTurkishDisplay`) | `noShow` sayısı eklenir ve toplam `scheduled+completed+cancelled+noShow` olur (bugün bilinmeyen durum toplama sessizce girmez). Etiket "Gelmedi". Durum filtresi enum üzerinden zaten çalışır |
+| **Dashboard sayıları** (`DashboardTodayAppointmentStatusCounts`, `...CountsReader`, Query DB karşılığı) | Üçlü sayım dörtlüye; yeni alan eklenir. Mevcut alanlar değişmez |
+| **Gecikmiş planlı uyarısı** (`DashboardOverdueScheduledAppointmentsCountSpec`) | **Kod değişmez**: yalnızca `Scheduled` sayar, NoShow otomatik düşer. Asıl kazanç bu |
+| **Takvim / liste** (`AppointmentsCalendarSpec`, list specs, DTO'lar) | Sorgular durum filtrelemiyorsa değişmez; DTO enum'u zaten döner. Frontend `NoShow` değerini tanımalı (etiket/renk) |
+| **Slot / çakışma** (`AppointmentOverlapping*Spec`) | Değişmez: yalnızca `Scheduled` slot tutar, NoShow slotu serbest bırakır (geçmiş saatte zaten önemsiz) |
+| **Hatırlatma** (`ReminderProcessorService`) | Değişmez (`Scheduled` ve gelecek) |
+| **Query DB projeksiyonu** (`AppointmentProjectionProcessor`, `RebuildService`, `AppointmentReadModelReader`, dashboard read model) | Yeni outbox olayı `appointment.noshow.v1` (cancel/complete ile aynı snapshot yolu) ve işleyici; saymada (`:640`, rebuild `:473`) `NoShow` dalı. Okuma bayrakları kapalı; açılmadan parity testi. Read model'de ayrı sayaç kolonu gerekirse ayrı Query DB migration'ı (doğrulanacak, ilk adımda bakılır) |
+| **Muayene oluşturma** | `Cancelled` gibi reddedilir (`NoShow` randevuya doğrudan muayene açılmaz; hasta geldiyse önce geliş/geri alma). Visit üzerinden gelen akış etkilenmez (aşağıda) |
+| **Visit / Bugün** | `CreateVisit`: NoShow randevu için geliş açılırsa randevu aynı transaction'da `Scheduled`'a döner (aşağıda). Bugün planlı satırı `!= Cancelled` olduğu için NoShow satırı kendiliğinden gelir; `appointmentStatus=NoShow` ile **son grupta ("Gelmedi")** gösterilir ki aynı gün geri alınabilsin (`GroupRank`'e bir sıra eklenir) |
+| **`PUT /appointments/{id}` bypass'ı** | **Doğrulandı (kod okuyarak, HTTP denenmedi):** uç `Appointments.Reschedule` ister, ama gövdedeki `Status` ile `ApplyWriteUpdate` `Complete()`/`Cancel()` çağırıyor; `Cancel`/`Complete` izinleri dolanılıyor. `POST /appointments` de `Status` kabul ediyor (`Create` izniyle `Completed/Cancelled` açılabiliyor). **Çözüm:** PUT'ta `Status` yalnızca mevcut durumla aynı veya `Scheduled` olabilir, farklıysa `Appointments.InvalidStatusTransition`; create'te başlangıç durumu yalnızca `Scheduled`. Durum geçişleri yalnızca `/cancel`, `/complete`, `/no-show`, `/no-show/revert`. Bu bypass kapatması NoShow'dan bağımsız, aynı pakette yapılır |
 
-## Seçenekler
+## 3) Domain kuralı
 
-| # | Seçenek | Artı | Eksi |
+- **İşaretleme:** yalnızca `Scheduled` **ve** `ScheduledAtUtc <= şimdi` (geçmiş saatli; gelecek randevu NoShow olamaz → `Appointments.NoShowNotYetDue`). Randevu için (yanlış geliş olmayan) Visit varsa işaretlenemez (hasta gelmiş; `Appointments.HasVisit`, 409). Idempotent: zaten NoShow ise 200.
+- **Geç gelen hasta — iki seçenek:**
+  - **(1) Geliş engellenir:** basit ama resepsiyon önce ayrı geri alma yapmak zorunda; hasta kapıda beklerken ek adım. Gerçekte gelen hastayı reddetmek akışa ters.
+  - **(2) Geliş NoShow'u otomatik geri alır** (`NoShow → Scheduled`, sonra normal akış: muayene randevuyu `Completed` yapar): ek adım yok, gerçeklik (geliş) önceliklidir; tek yer `RevertNoShow()`.
+  - **Öneri: (2).**
+- **Geri alma (`NoShow → Scheduled`):** açık uçla da yapılır; **gerekçe zorunlu + audit** (`IAuditableRequest`, `Appointment.NoShowRevert`), çünkü rapor sayısını değiştirir. İşaretleme de audit'li (gerekçe opsiyonel). Otomatik (geliş) geri alma ayrı audit gerektirmez: Visit kaydı zaten iz bırakır.
+
+## 4) İzin
+
+- Randevu durum geçişleri bugün `Appointments.Cancel/Complete/Reschedule`. `Visits.Update` Visit içindir ve randevu durumunu yönetmez; kullanmak izin ayrımını yeniden bulandırır (az önce kapattığımız bypass'ın benzeri).
+- **Öneri: yeni `Appointments.NoShow`**, `Appointments.Cancel` ile aynı rollere bağlanır (seed adımı; canlı veri olmadığı için maliyeti düşük). Geri alma da aynı izin.
+
+## 5) Uçlar ve sözleşme taslağı
+
+| Uç | İzin | Gövde | Sonuç |
 |---|---|---|---|
-| A | **Visit'te `NoShow` bakım durumu** | Yeni tablo yok | Visit "gerçek geliş"tir; gelmeyen hasta için sahte `arrivedAtUtc` gerekir. Hayvan başına tek aktif Visit indeksi (`CareStatus <> Completed`) gelmeyeni "aktif" sayar ve hastanın gerçek gelişini engeller; randevu başına tek Visit indeksi geç gelişi engeller. Filtreli indeksler, Bugün, geçişler yeniden yazılır. ADR-009 modelini bozar. **Önerilmez.** |
-| B | **`AppointmentStatus.NoShow` geri getirmek** | En doğal raporlama | Yukarıdaki tablodaki tüm yerler (rapor toplamı, dashboard, projeksiyon, Query DB, CSV/XLSX, DTO enum'ları, yazma kuralları, `PUT /appointments` durum bypass'ı) değişir; ADR-009 K1-B'nin reddettiği yol. Eski `NoShow=3` kalıntısı riski geri döner. **Önerilmez.** |
-| C | **Appointment'a nullable işaret** (`NoShowMarkedAtUtc`, işaretleyen, gerekçe) | Tek tablo, basit sorgu | Appointment (plan) şeması ve mutasyon/projeksiyon hattı değişir; durum `Scheduled` kalır, yani her `Scheduled` tüketicisi (dashboard, Bugün, rapor) işareti ayrıca dışlamalıdır. Plan modelini kirletir |
-| D | **Ayrı kayıt `AppointmentNoShow`** (AppointmentId benzersiz; işaretlenme zamanı, işaretleyen, gerekçe) — **ÖNERİLEN** | Appointment ve Visit **hiç değişmez** (ADR-009 ilkesi: plan ≠ gerçeklik; Visit'in "gerçek geliş" örüntüsünün karşılığı olarak "gerçekleşmeyen geliş"). Varsayılan davranış korunur; işareti isteyen yerler kademeli eklenir. Geri alınabilir (kayıt silinir, audit'li) | Yeni tablo + migration. İşareti dışlaması istenen her yer (Bugün planlı satır, dashboard gecikmiş uyarısı, takvim) `NOT EXISTS` ile ayrıca bağlanmalı; unutulursa tutarsızlık |
-| E | Randevu notuna metin | Sıfır şema | Raporlanamaz, filtrelenemez, Bugün'e yansımaz. **Reddedildi** |
+| `POST /api/v1/appointments/{id}/no-show` | `Appointments.NoShow` | `{ "reason": "string?" }` | 204; zaten NoShow ise 204 (idempotent). Hatalar: `Appointments.NotFound` 404, `Appointments.NoShowNotYetDue` 400, `Appointments.HasVisit` 409, `Appointments.InvalidStatusTransition` 409 (Completed/Cancelled) |
+| `POST /api/v1/appointments/{id}/no-show/revert` | `Appointments.NoShow` | `{ "reason": "string (5-500)" }` | 204; NoShow değilse `Appointments.InvalidStatusTransition`. Audit'li |
 
-## Öneri: D
+- Kiracı ve klinik kapsamı mevcut randevu uçlarıyla aynı. `AppointmentStatus` JSON'da mevcut biçimiyle döner, yeni değer `NoShow`.
+- `VISITS_API_CONTRACT.md`: Bugün `appointmentStatus` alanına `NoShow` değeri ve "Gelmedi" grubu; `POST /visits` randevulu gelişte NoShow davranışı. Randevu sözleşmesi dokümanı (varsa) aynı pakette güncellenir.
 
-Kurallar (öneri):
+## 6) Test planı
 
-1. Yalnızca **`Scheduled`** randevu için işaretlenir; `ScheduledAtUtc` geçmiş olmalı (gelecekteki randevu "gelmedi" olamaz). `Completed/Cancelled` randevuda `Appointments.InvalidStatusTransition` benzeri hata.
-2. Randevu için (yanlış geliş olmayan) **Visit varsa işaretlenemez** (hasta zaten gelmiş) — `Visits` tarafı tek doğruluk.
-3. İşaretleme ve geri alma gerekçeli ve audit'li (`IAuditableRequest`); izin: mevcut `Visits.Update` (resepsiyon zaten kullanıyor) veya ayrı `Visits.NoShow` — onayınıza bırakıyorum, öneri `Visits.Update`.
-4. **Geç gelen hasta:** işaretli randevu için Visit açılırsa işaret aynı işlemde kaldırılır (geliş gerçeği önceliklidir). Alternatif: geliş reddedilir; hasta fiilen geldiği için önerilmez.
-5. Etkiler (kademeli, hepsi opsiyonel çıktı):
-   - **Bugün:** `TodayItemDto`'ya `isNoShow` (planlı satır gelmedi işaretliyse); sıralamada "Planlı"dan sonra veya ayrı grup (frontend karar).
-   - **Dashboard gecikmiş planlı uyarısı:** işaretli randevular dışlanır (aksi halde "gelmedi" süresiz uyarı olarak kalır).
-   - **Randevu raporu:** ayrı `noShowCount` alanı; mevcut `scheduled/completed/cancelled` ve toplam kuralı **değişmez** (gelmedi, `scheduled` içinde kalır ya da ayrılır — aşağıdaki karar 2).
-   - **Slot, hatırlatma, Appointment yazma kuralları, Query DB projeksiyonları:** değişmez.
-6. Randevu durumu `Scheduled` kalır; takvim geçmiş gün için `isNoShow` ile etiketleyebilir (isteğe bağlı, ayrı iş).
+- **Birim:** `Appointment.MarkNoShow/RevertNoShow` (gelecek randevu, Completed/Cancelled, idempotency); `ApplyWriteUpdate` yeni bypass kuralı; komut handler'ları (404, 409, yetki bağlama, audit); Bugün sıralama (Gelmedi grubu); rapor toplam/etiket; dashboard sayıları.
+- **LocalDB entegrasyon:** uç yetkisi (izinsiz 403), idempotency, `HasVisit` 409, gelecek randevu 400, geri alma gerekçesiz 400, audit kaydı, tenant/klinik izolasyonu, geç gelen hasta (Visit → randevu Scheduled), Bugün satırı, rapor `noShow` sayısı + CSV/XLSX, gecikmiş uyarıdan düşme, **PUT/POST ile Completed/Cancelled/NoShow geçişinin reddi**, eşzamanlı çift istek.
+- Query DB: projeksiyon işleyici birim testi ve rebuild testi (bayraklar kapalı; parity yalnızca proje açıldığında).
 
-## Karar gereken noktalar (ADR gerektirir)
+## 7) Büyüklük ve commit sırası
 
-Bu iş raporlama anlamını (dashboard/randevu raporu) ve klinik iş akışını etkilediği için kısa bir **ADR (öneri: ADR-010)** önerilir; WORKFLOW'a göre "birden fazla modülü etkileyen" karar.
+Tahmin: **orta** (yaklaşık 1,5–2 gün). Commit sırası:
+1. Sözleşme (randevu ve Visits dokümanları).
+2. Bypass kapatma (`PUT`/`POST` durum kuralı) + testler (bağımsız, ilk teslim edilebilir).
+3. Domain: enum + `MarkNoShow/RevertNoShow` + testler.
+4. İzin (`Appointments.NoShow`) + komutlar/uçlar + audit + testler.
+5. Tüketiciler: rapor + CSV/XLSX, dashboard, Bugün, muayene, Visit oluşturma + testler.
+6. Query DB olayı/projeksiyon/rebuild + testler.
 
-1. **Mimari:** D (öneri) mi, C mi? (A ve B önerilmez.)
-2. **Rapor semantiği:** "Gelmedi" `scheduled` sayısından ayrı mı sayılsın, yoksa `scheduled` içinde bir alt sayı mı? (Önerilen: ayrı `noShowCount`, mevcut üç sayı ve toplam kuralı aynı kalır, yani gelmedi `scheduled` içinde sayılmaya devam eder; böylece geçmiş raporlar bozulmaz.)
-3. **Slot:** Gelmedi işaretlenen randevu slotu serbest bırakmaz (geçmiş saatte anlamsız); onay?
-4. **Geç gelen hasta:** işaret otomatik kalkar (öneri) mı, geliş engellenir mi?
-5. **İzin:** `Visits.Update` mi, ayrı bir izin mi?
-6. **Otomasyon:** Otomatik "gün sonu gelmedi" **yapılmaz** (yalnızca açık işaretleme) — onay?
-7. **Müşteri düzeyi takip** (tekrar gelmeyen müşteri) bu kapsamda değil; ayrı backlog.
+## Karar gereken noktalar
 
-## Uygulama kapsamı (onaydan sonra, sırayla)
-
-1. Sözleşme: `VISITS_API_CONTRACT.md` ek bölümü (`POST /appointments/{id}/no-show`, `DELETE`/geri alma, Bugün `isNoShow`).
-2. Domain: `AppointmentNoShow` (kural entity içinde), konfigürasyon, benzersiz indeks, migration (dosya üretimi; uygulama onayla).
-3. Komutlar + validator + audit + izin; Bugün okuyucusu `isNoShow`; dashboard gecikmiş uyarısı dışlama; rapor `noShowCount`.
-4. Birim + LocalDB entegrasyon testleri (idempotency, 409, yetki, tenant/klinik izolasyonu).
+1. **B onayı** ve `NoShow = 3` numarası (öneri: evet).
+2. **Geç gelen hasta:** geliş randevuyu otomatik `Scheduled`'a döndürsün (öneri) mü, engellensin mi?
+3. **İzin:** yeni `Appointments.NoShow` (öneri) mü, mevcut bir izin mi?
+4. **Bypass kapatma kapsamı:** `PUT` ve `POST /appointments` üzerinden `Completed/Cancelled` verilemesin (öneri: evet; frontend bu alanı yolluyorsa birlikte güncellenir).
