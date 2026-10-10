@@ -27,7 +27,7 @@ Resepsiyon, randevusuz gelen yeni bir müşterinin sahibini ve hayvanını **tek
   "speciesId": "guid",
   "breedId": "guid?",
   "breed": "string?",
-  "gender": "Male | Female | Unknown ?",
+  "gender": "Male | Female ?",
   "birthDate": "2024-05-01?",
   "microchipNumber": "string?",
   "isNeutered": false
@@ -65,7 +65,8 @@ Müşteri ve hayvan aynı veritabanı transaction'ında oluşur. Hayvan adımı 
 | HTTP | Kod | Durum |
 |------|-----|-------|
 | 400 | `Validation.FluentValidation` | Eksik/geçersiz alan (telefon boş/geçersiz dahil); hata alan adları istekteki adlardır |
-| 400 | `Pets.SpeciesNotFound` / `Pets.BreedNotFound` / `Pets.BreedSpeciesMismatch` | Mevcut hayvan kuralları |
+| 404 | `Pets.SpeciesNotFound` / `Pets.BreedNotFound` | Tür/ırk yok veya pasif (mevcut hata eşlemesi); işlem geri alınır |
+| 400 | `Pets.BreedSpeciesMismatch` / `Pets.BirthDateInFuture` | Mevcut hayvan kuralları; işlem geri alınır |
 | 403 | — | `Clients.Create` veya `Pets.Create` yok |
 | 403 | `Tenants.TenantInactive` / abonelik yazma koruması | Mevcut müşteri/hayvan kuralları |
 | 409 | `Clients.DuplicateClient` | Madde 4 |
