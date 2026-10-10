@@ -107,6 +107,8 @@ public static class PermissionCatalog
         public const string Read = "Examinations.Read";
         public const string Create = "Examinations.Create";
         public const string Update = "Examinations.Update";
+        public const string Finalize = "Examinations.Finalize";
+        public const string Addendum = "Examinations.Addendum";
     }
 
     public static class Visits
@@ -256,6 +258,8 @@ public static class PermissionCatalog
         new(Examinations.Read, "Muayene kayıtlarını listeleme ve görüntüleme yetkisi", "Examinations"),
         new(Examinations.Create, "Muayene kaydı oluşturma yetkisi", "Examinations"),
         new(Examinations.Update, "Muayene kaydı güncelleme yetkisi", "Examinations"),
+        new(Examinations.Finalize, "Muayene kaydını kesinleştirme yetkisi", "Examinations"),
+        new(Examinations.Addendum, "Kesinleşmiş muayeneye ek not yazma yetkisi", "Examinations"),
 
         new(Visits.Read, "Geliş kayıtlarını ve Bugün görünümünü görüntüleme yetkisi", "Visits"),
         new(Visits.Create, "Geliş kaydı oluşturma yetkisi", "Visits"),
