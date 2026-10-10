@@ -169,7 +169,7 @@ Neden ayrı uç: `corrections` isteği "hedef durum veya yanlış geliş işaret
 
 Kurallar:
 
-- Yalnızca `isVoided = true` kayıt geri alınır; zaten geçerli kayıt için `Visits.Validation` (400). Başka kiracı/klinik bağlamı/atanmamış klinik → `Visits.NotFound` (404; varlık sızdırılmaz).
+- Yalnızca `isVoided = true` kayıt geri alınır; zaten geçerli kayıt için `Visits.Validation` (400). Başka kiracı veya klinik bağlamı → `Visits.NotFound` (404; varlık sızdırılmaz); kullanıcıya atanmamış klinik → `Clinics.AccessDenied` (403, düzeltme ucuyla aynı).
 - Geri alma `isVoided`/`voidReason` değerini temizler; **bakım durumu ve zaman damgaları olduğu gibi kalır** (kayıt, işaretlenmeden önceki durumuna döner). İşaretleme gerekçesi audit kaydında (`Visit.Correct`) korunur.
 - **Çakışma (409):** Madde 5'teki filtreli benzersiz indeks kurallarıyla aynı koşullar geri alma anında kontrol edilir:
   - Kayıt `Completed` değilse ve hayvanın başka aktif Visit'i varsa → `Visits.DuplicateActiveVisit`.
