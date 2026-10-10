@@ -17,4 +17,6 @@ public sealed record PaymentDetailDto(
     string Currency,
     PaymentMethod Method,
     DateTime PaidAtUtc,
-    string? Notes);
+    string? Notes,
+    decimal? AllocatedAmount = null,
+    decimal? UnallocatedAmount = null);

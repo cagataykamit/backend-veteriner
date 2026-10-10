@@ -91,6 +91,20 @@ public sealed class Payment : AggregateRoot
         RequestHash = requestHash;
     }
 
+    public const int MinCorrectionReasonLength = 5;
+    public const int MaxCorrectionReasonLength = 500;
+
+    /// <summary>Düzeltme gerekçesi zorunludur (5–500 karakter, boşluklar kırpılır).</summary>
+    public static Result ValidateCorrectionReason(string? reason)
+    {
+        var length = reason?.Trim().Length ?? 0;
+        return length is >= MinCorrectionReasonLength and <= MaxCorrectionReasonLength
+            ? Result.Success()
+            : Result.Failure(
+                "Payments.Validation",
+                $"Düzeltme gerekçesi {MinCorrectionReasonLength}-{MaxCorrectionReasonLength} karakter olmalıdır.");
+    }
+
     /// <summary>Yeni tahsilatlar yalnızca TRY kabul eder (ADR-012; çoklu para birimi FIN-006).</summary>
     public static bool IsSupportedCurrency(string? currency)
         => string.Equals(currency?.Trim(), Charge.DefaultCurrency, StringComparison.OrdinalIgnoreCase);

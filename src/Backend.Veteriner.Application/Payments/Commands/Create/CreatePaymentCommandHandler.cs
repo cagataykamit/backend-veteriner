@@ -1,14 +1,18 @@
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Payments.Access;
+using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
+using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
@@ -17,13 +21,15 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Payments.Commands.Create;
 
-public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentCommand, Result<Guid>>
+public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentCommand, Result<PaymentCreateResultDto>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClientContext _clientContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
@@ -31,12 +37,17 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Examination> _examinations;
+    private readonly IReadRepository<Payment> _paymentsRead;
     private readonly IRepository<Payment> _paymentsWrite;
+    private readonly IRepository<Charge> _chargesWrite;
+    private readonly IRepository<PaymentAllocation> _allocationsWrite;
+    private readonly TimeProvider _timeProvider;
     private readonly IPaymentIntegrationEventOutbox _eventOutbox;
 
     public CreatePaymentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClientContext clientContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
@@ -44,11 +55,16 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         IReadRepository<Pet> pets,
         IReadRepository<Appointment> appointments,
         IReadRepository<Examination> examinations,
+        IReadRepository<Payment> paymentsRead,
         IRepository<Payment> paymentsWrite,
+        IRepository<Charge> chargesWrite,
+        IRepository<PaymentAllocation> allocationsWrite,
+        TimeProvider timeProvider,
         IPaymentIntegrationEventOutbox eventOutbox)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clientContext = clientContext;
         _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
@@ -56,33 +72,37 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         _pets = pets;
         _appointments = appointments;
         _examinations = examinations;
+        _paymentsRead = paymentsRead;
         _paymentsWrite = paymentsWrite;
+        _chargesWrite = chargesWrite;
+        _allocationsWrite = allocationsWrite;
+        _timeProvider = timeProvider;
         _eventOutbox = eventOutbox;
     }
 
-    public async Task<Result<Guid>> Handle(CreatePaymentCommand request, CancellationToken ct)
+    public async Task<Result<PaymentCreateResultDto>> Handle(CreatePaymentCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {
-            return Result<Guid>.Failure(
+            return Result<PaymentCreateResultDto>.Failure(
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
-            return Result<Guid>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
+            return Result<PaymentCreateResultDto>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
 
         if (!tenant.IsActive)
         {
-            return Result<Guid>.Failure(
+            return Result<PaymentCreateResultDto>.Failure(
                 "Tenants.TenantInactive",
                 "Pasif kiracı için ödeme kaydı oluşturulamaz.");
         }
 
         if (request.Amount <= 0)
         {
-            return Result<Guid>.Failure(
+            return Result<PaymentCreateResultDto>.Failure(
                 "Payments.InvalidAmount",
                 "Tutar sıfırdan büyük olmalıdır.");
         }
@@ -90,11 +110,11 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         var paidUtc = PaymentPaidAtWindow.ToUtc(request.PaidAtUtc);
         var window = PaymentPaidAtWindow.Validate(paidUtc);
         if (!window.IsSuccess)
-            return Result<Guid>.Failure(window.Error);
+            return Result<PaymentCreateResultDto>.Failure(window.Error);
 
         if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
         {
-            return Result<Guid>.Failure(
+            return Result<PaymentCreateResultDto>.Failure(
                 "Payments.ClinicContextMismatch",
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
@@ -104,28 +124,38 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         var clinicAccess = await PaymentClinicWriteScope.EnsureWriteAccessAsync(
             _clinicScopeResolver, tenantId, effectiveClinicId, ct);
         if (!clinicAccess.IsSuccess)
-            return Result<Guid>.Failure(clinicAccess.Error);
+            return Result<PaymentCreateResultDto>.Failure(clinicAccess.Error);
+
+        // Tekrar istek: aynı RequestId aynı içerikle ilk ödemeyi döndürür; farklı içerikle çakışmadır.
+        var fingerprint = PaymentRequestFingerprint.Compute(request, effectiveClinicId, paidUtc);
+        if (request.RequestId != Guid.Empty)
+        {
+            var existing = await _paymentsRead.FirstOrDefaultAsync(
+                new PaymentByRequestIdSpec(tenantId, request.RequestId), ct);
+            if (existing is not null)
+                return Replay(existing, fingerprint);
+        }
 
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, effectiveClinicId), ct);
         if (clinic is null)
-            return Result<Guid>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
+            return Result<PaymentCreateResultDto>.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
 
         var client = await _clients.FirstOrDefaultAsync(
             new ClientByIdSpec(tenantId, request.ClientId), ct);
         if (client is null)
-            return Result<Guid>.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");
+            return Result<PaymentCreateResultDto>.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");
 
         string? petName = null;
         if (request.PetId is { } pid)
         {
             var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, pid), ct);
             if (pet is null)
-                return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
+                return Result<PaymentCreateResultDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
             if (pet.ClientId != request.ClientId)
             {
-                return Result<Guid>.Failure(
+                return Result<PaymentCreateResultDto>.Failure(
                     "Payments.PetClientMismatch",
                     "Seçilen hayvan bu müşteriye ait değil.");
             }
@@ -139,14 +169,14 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
                 new AppointmentByIdSpec(tenantId, aid), ct);
             if (appt is null)
             {
-                return Result<Guid>.Failure(
+                return Result<PaymentCreateResultDto>.Failure(
                     "Appointments.NotFound",
                     "Randevu bulunamadı veya kiracıya ait değil.");
             }
 
             if (appt.ClinicId != effectiveClinicId)
             {
-                return Result<Guid>.Failure(
+                return Result<PaymentCreateResultDto>.Failure(
                     "Payments.AppointmentClinicMismatch",
                     "Randevu ile klinik bilgisi uyuşmuyor.");
             }
@@ -154,14 +184,14 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
             var apptPet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, appt.PetId), ct);
             if (apptPet is null || apptPet.ClientId != request.ClientId)
             {
-                return Result<Guid>.Failure(
+                return Result<PaymentCreateResultDto>.Failure(
                     "Payments.AppointmentClientMismatch",
                     "Randevudaki hayvan bu müşteri ile eşleşmiyor.");
             }
 
             if (request.PetId.HasValue && appt.PetId != request.PetId.Value)
             {
-                return Result<Guid>.Failure(
+                return Result<PaymentCreateResultDto>.Failure(
                     "Payments.AppointmentPetMismatch",
                     "Randevu ile seçilen hayvan uyuşmuyor.");
             }
@@ -173,14 +203,14 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
                 new ExaminationByIdSpec(tenantId, eid), ct);
             if (exam is null)
             {
-                return Result<Guid>.Failure(
+                return Result<PaymentCreateResultDto>.Failure(
                     "Examinations.NotFound",
                     "Muayene bulunamadı veya kiracıya ait değil.");
             }
 
             if (exam.ClinicId != effectiveClinicId)
             {
-                return Result<Guid>.Failure(
+                return Result<PaymentCreateResultDto>.Failure(
                     "Payments.ExaminationClinicMismatch",
                     "Muayene ile klinik bilgisi uyuşmuyor.");
             }
@@ -188,18 +218,39 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
             var examPet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, exam.PetId), ct);
             if (examPet is null || examPet.ClientId != request.ClientId)
             {
-                return Result<Guid>.Failure(
+                return Result<PaymentCreateResultDto>.Failure(
                     "Payments.ExaminationClientMismatch",
                     "Muayenedeki hayvan bu müşteri ile eşleşmiyor.");
             }
 
             if (request.PetId.HasValue && exam.PetId != request.PetId.Value)
             {
-                return Result<Guid>.Failure(
+                return Result<PaymentCreateResultDto>.Failure(
                     "Payments.ExaminationPetMismatch",
                     "Muayene ile seçilen hayvan uyuşmuyor.");
             }
         }
+
+        if (request.RequestId == Guid.Empty)
+            return Fail("Payments.RequestIdRequired", "requestId zorunludur (çift istek koruması).");
+
+        if (request.Allocations is not { Count: > 0 } allocationLines)
+            return Fail("Payments.AllocationsRequired", "Ödeme en az bir ücrete tahsis edilmelidir.");
+
+        if (!Payment.IsSupportedCurrency(request.Currency))
+            return Fail("Payments.Validation", "Yeni ödemeler yalnızca TRY para biriminde kaydedilebilir.");
+
+        if (_clientContext.UserId is not { } userId)
+            return Fail("Auth.UserContextMissing", "Kullanıcı bağlamı bulunamadı.");
+
+        // İzlenen ücretler: tahsis sayacı concurrency token ile güncellenir (iki kullanıcı çakışması 409).
+        var chargeIds = allocationLines.Select(l => l.ChargeId).Distinct().ToArray();
+        var charges = await _chargesWrite.ListAsync(new ChargesByIdsForUpdateSpec(tenantId, chargeIds), ct);
+        if (charges.Count != chargeIds.Length)
+            return Fail("Charges.NotFound", "Ücret kaydı bulunamadı veya kiracıya ait değil.");
+
+        var chargeById = charges.ToDictionary(c => c.Id);
+        var lines = allocationLines.Select(l => (chargeById[l.ChargeId], l.Amount)).ToList();
 
         var payment = new Payment(
             tenantId,
@@ -212,20 +263,58 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
             request.Currency,
             request.Method,
             paidUtc,
-            request.Notes);
+            request.Notes,
+            request.RequestId,
+            fingerprint);
 
-        await _paymentsWrite.AddAsync(payment, ct);
+        var allocated = payment.AllocateFully(lines, userId, _timeProvider.GetUtcNow().UtcDateTime);
+        if (!allocated.IsSuccess)
+            return Result<PaymentCreateResultDto>.Failure(allocated.Error);
 
-        // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
-        await _eventOutbox.EnqueueAsync(
-            PaymentIntegrationEventTypes.Created,
-            new PaymentCreatedIntegrationEvent(
-                Guid.NewGuid(),
-                DateTime.UtcNow,
-                PaymentProjectionSnapshotFactory.Create(payment, client.FullName, clinic.Name, petName)),
-            ct);
+        try
+        {
+            // AddAsync ödemeyi ve izlenen ücret sayaçlarını tek SaveChanges ile yazar; ardından tahsis satırları + outbox.
+            await _paymentsWrite.AddAsync(payment, ct);
 
-        await _paymentsWrite.SaveChangesAsync(ct);
-        return Result<Guid>.Success(payment.Id);
+            // Outbox emission aynı transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
+            await _eventOutbox.EnqueueAsync(
+                PaymentIntegrationEventTypes.Created,
+                new PaymentCreatedIntegrationEvent(
+                    Guid.NewGuid(),
+                    DateTime.UtcNow,
+                    PaymentProjectionSnapshotFactory.Create(payment, client.FullName, clinic.Name, petName)),
+                ct);
+
+            await _allocationsWrite.AddRangeAsync(allocated.Value!, ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // İki kullanıcı aynı ücrete aynı anda tahsil etti; kaybeden geri alınır.
+            return Fail(
+                "Payments.ConcurrencyConflict",
+                "Ücret eşzamanlı olarak güncellendi; açık tutar yeniden okunup işlem tekrarlanmalı.");
+        }
+        catch (DbUpdateException)
+        {
+            // Eşzamanlı çift istek: filtreli benzersiz indeks kaybedene çarptı; kazanan ödeme döner.
+            var winner = await _paymentsRead.FirstOrDefaultAsync(
+                new PaymentByRequestIdSpec(tenantId, request.RequestId), ct);
+            if (winner is null)
+                throw;
+
+            return Replay(winner, fingerprint);
+        }
+
+        return Result<PaymentCreateResultDto>.Success(new PaymentCreateResultDto(payment.Id, true));
     }
+
+    private static Result<PaymentCreateResultDto> Replay(Payment existing, string fingerprint)
+        => string.Equals(existing.RequestHash, fingerprint, StringComparison.Ordinal)
+            ? Result<PaymentCreateResultDto>.Success(new PaymentCreateResultDto(existing.Id, false))
+            : Fail(
+                "Payments.DuplicateRequestMismatch",
+                "Bu requestId daha önce farklı bir ödeme isteği için kullanılmış.");
+
+    private static Result<PaymentCreateResultDto> Fail(string code, string message)
+        => Result<PaymentCreateResultDto>.Failure(code, message);
 }

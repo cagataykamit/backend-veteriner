@@ -3,10 +3,12 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Charges.Commands.Create;
 using Backend.Veteriner.Application.Charges.Contracts.Dtos;
+using Backend.Veteriner.Application.Charges.Queries.GetAllocations;
 using Backend.Veteriner.Application.Charges.Queries.GetById;
 using Backend.Veteriner.Application.Charges.Queries.GetList;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -83,6 +85,20 @@ public sealed class ChargesController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetChargeByIdQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Ücretin ödemelerden tahsisleri (hangi tahsilattan ne kadar).</summary>
+    [HttpGet("{id:guid}/allocations")]
+    [Authorize(Policy = PermissionCatalog.Charges.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<ChargeAllocationItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAllocations([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetChargeAllocationsQuery(id), ct);
         return result.ToActionResult(this);
     }
 

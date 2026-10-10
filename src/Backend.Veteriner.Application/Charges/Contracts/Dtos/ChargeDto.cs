@@ -16,7 +16,9 @@ public sealed record ChargeDto(
     decimal Amount,
     string Currency,
     Guid CreatedByUserId,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    decimal AllocatedAmount,
+    decimal OutstandingAmount);
 
 /// <summary>Ücret ekleme sonucu; <see cref="Created"/> false ise aynı <c>requestId</c> ile tekrar istek ilk kaydı döndürmüştür.</summary>
 public sealed record ChargeCreateResultDto(bool Created, ChargeDto Charge);

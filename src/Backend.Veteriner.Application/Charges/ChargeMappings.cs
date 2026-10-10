@@ -21,5 +21,7 @@ internal static class ChargeMappings
             c.Amount,
             c.Currency,
             c.CreatedByUserId,
-            c.CreatedAtUtc);
+            c.CreatedAtUtc,
+            c.AllocatedAmount,
+            c.OutstandingAmount);
 }

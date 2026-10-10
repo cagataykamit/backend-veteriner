@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
@@ -18,6 +19,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Payments.Commands.Update;
 
@@ -25,6 +27,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
@@ -39,6 +42,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
     public UpdatePaymentCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        ICurrentUserPermissionChecker permissions,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
@@ -52,6 +56,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _permissions = permissions;
         _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
@@ -219,6 +224,26 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
             }
         }
 
+        if (payment.IsCorrection(effectiveClinicId, request.ClientId, request.Amount, request.Currency))
+        {
+            if (!_permissions.HasPermission(PermissionCatalog.Payments.Correct))
+            {
+                return Result.Failure(
+                    "Payments.CorrectionForbidden",
+                    "Tutar, müşteri, klinik veya para birimi düzeltmesi için Payments.Correct yetkisi gerekir.");
+            }
+
+            var reason = Payment.ValidateCorrectionReason(request.Reason);
+            if (!reason.IsSuccess)
+                return reason;
+
+            if (!string.Equals(request.Currency?.Trim(), payment.Currency, StringComparison.OrdinalIgnoreCase)
+                && !Payment.IsSupportedCurrency(request.Currency))
+            {
+                return Result.Failure("Payments.Validation", "Ödeme yalnızca TRY para birimine düzeltilebilir.");
+            }
+        }
+
         var domain = payment.UpdateDetails(
             effectiveClinicId,
             request.ClientId,
@@ -234,18 +259,28 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
 
-        await _paymentsWrite.UpdateAsync(payment, ct);
+        try
+        {
+            await _paymentsWrite.UpdateAsync(payment, ct);
 
-        // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
-        await _eventOutbox.EnqueueAsync(
-            PaymentIntegrationEventTypes.Updated,
-            new PaymentUpdatedIntegrationEvent(
-                Guid.NewGuid(),
-                DateTime.UtcNow,
-                PaymentProjectionSnapshotFactory.Create(payment, client.FullName, clinic.Name, petName)),
-            ct);
+            // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
+            await _eventOutbox.EnqueueAsync(
+                PaymentIntegrationEventTypes.Updated,
+                new PaymentUpdatedIntegrationEvent(
+                    Guid.NewGuid(),
+                    DateTime.UtcNow,
+                    PaymentProjectionSnapshotFactory.Create(payment, client.FullName, clinic.Name, petName)),
+                ct);
 
-        await _paymentsWrite.SaveChangesAsync(ct);
+            await _paymentsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(
+                "Payments.ConcurrencyConflict",
+                "Ödeme eşzamanlı olarak güncellendi; yeniden okunup işlem tekrarlanmalı.");
+        }
+
         return Result.Success();
     }
 }

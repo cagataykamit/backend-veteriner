@@ -24,4 +24,7 @@ public sealed class UpdatePaymentBody
     public PaymentMethod Method { get; init; }
     public DateTime PaidAtUtc { get; init; }
     public string? Notes { get; init; }
+
+    /// <summary>Tutar, müşteri, klinik veya para birimi değişiyorsa zorunlu (5-500 karakter); Payments.Correct ister.</summary>
+    public string? Reason { get; init; }
 }
