@@ -21,7 +21,8 @@ public sealed record VisitTodayReadRequest(
     DateTime DayStartUtc,
     DateTime DayEndUtc,
     bool IncludeCarriedOver,
-    int MaxItems);
+    int MaxItems,
+    bool OnlyVoided = false);
 
 public sealed record VisitTodayReadResult(
     IReadOnlyList<TodayItemDto> Items,

@@ -25,3 +25,9 @@ public sealed class CorrectVisitBody
 
     public bool MarkAsMistaken { get; init; }
 }
+
+/// <summary>POST /visits/{id}/restore gövdesi; <see cref="Reason"/> zorunludur.</summary>
+public sealed class RestoreVisitBody
+{
+    public string? Reason { get; init; }
+}

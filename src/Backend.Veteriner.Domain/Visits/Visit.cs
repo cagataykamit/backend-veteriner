@@ -171,6 +171,25 @@ public sealed class Visit : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>
+    /// Yanlış geliş işaretini geri alır; bakım durumu ve zaman damgaları korunur. Gerekçe zorunludur.
+    /// Aynı hayvan/randevu için başka geliş olup olmadığı uygulama katmanında kontrol edilir.
+    /// </summary>
+    public Result RestoreFromMistaken(string? reason)
+    {
+        if (!IsVoided)
+            return Result.Failure("Visits.Validation", "Geliş kaydı yanlış geliş olarak işaretli değil.");
+
+        var reasonCheck = ValidateReason(reason);
+        if (!reasonCheck.IsSuccess)
+            return reasonCheck;
+
+        VoidedAtUtc = null;
+        VoidReason = null;
+        AdvanceMutationSequence();
+        return Result.Success();
+    }
+
     /// <summary>Düzeltme gerekçesi için tek doğrulama kuralı (domain ve validator paylaşır).</summary>
     public static Result ValidateReason(string? reason)
     {

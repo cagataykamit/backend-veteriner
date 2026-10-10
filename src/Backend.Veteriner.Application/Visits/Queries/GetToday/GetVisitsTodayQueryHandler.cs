@@ -75,7 +75,8 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
                 dayEndUtc,
                 // Devralınan açık gelişler yalnızca bugünün görünümüne girer.
                 IncludeCarriedOver: date == todayLocal,
-                MaxItems),
+                MaxItems,
+                request.Voided),
             ct);
 
         if (data.Items.Count > MaxItems)
@@ -89,7 +90,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             date,
             clinicId,
             nowUtc,
-            Order(data.Items),
+            request.Voided ? data.Items.OrderByDescending(i => i.ArrivedAtUtc).ToList() : Order(data.Items),
             data.ActiveHospitalizations));
     }
 

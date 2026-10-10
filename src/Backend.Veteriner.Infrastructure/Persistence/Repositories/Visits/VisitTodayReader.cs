@@ -25,7 +25,7 @@ public sealed class VisitTodayReader : IVisitTodayReader
     public async Task<VisitTodayReadResult> GetAsync(VisitTodayReadRequest request, CancellationToken ct = default)
     {
         var visitRows = await ReadVisitRowsAsync(request, ct);
-        var plannedRows = await ReadPlannedRowsAsync(request, ct);
+        var plannedRows = request.OnlyVoided ? new List<Row>() : await ReadPlannedRowsAsync(request, ct);
 
         var allRows = visitRows.Concat(plannedRows).ToList();
         var paymentRecorded = await ReadPaymentRecordedKeysAsync(request, allRows, ct);
@@ -34,7 +34,7 @@ public sealed class VisitTodayReader : IVisitTodayReader
             .Select(r => r.ResponsibleVeterinarianUserId!.Value).Distinct().ToList();
         var names = await _veterinarians.GetNamesAsync(responsibleIds, ct);
 
-        var activeHospitalizations = await ReadActiveHospitalizationsAsync(request, ct);
+        var activeHospitalizations = request.OnlyVoided ? new List<TodayHospitalizationDto>() : await ReadActiveHospitalizationsAsync(request, ct);
         var hospitalizedPetIds = activeHospitalizations.Select(h => h.PetId).ToHashSet();
 
         var items = allRows
@@ -51,13 +51,14 @@ public sealed class VisitTodayReader : IVisitTodayReader
     {
         var start = request.DayStartUtc;
         var end = request.DayEndUtc;
-        var includeCarriedOver = request.IncludeCarriedOver;
+        var onlyVoided = request.OnlyVoided;
+        var includeCarriedOver = request.IncludeCarriedOver && !onlyVoided;
 
         // Devralınan: önceki günlerden kalan, tamamlanmamış gelişler (yalnızca bugünün görünümünde).
         var visits = _db.Visits.AsNoTracking()
             .Where(v => v.TenantId == request.TenantId
                         && v.ClinicId == request.ClinicId
-                        && v.VoidedAtUtc == null
+                        && (v.VoidedAtUtc != null) == onlyVoided
                         && ((v.ArrivedAtUtc >= start && v.ArrivedAtUtc < end)
                             || (includeCarriedOver
                                 && v.ArrivedAtUtc < start
@@ -84,7 +85,9 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     v.CareStatus,
                     a != null ? a.Status : (AppointmentStatus?)null,
                     v.ResponsibleVeterinarianUserId,
-                    v.ArrivedAtUtc < start))
+                    v.ArrivedAtUtc < start,
+                    v.VoidedAtUtc != null,
+                    v.VoidReason))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -122,7 +125,9 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     null,
                     a.Status,
                     null,
-                    false))
+                    false,
+                    false,
+                    null))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -206,7 +211,9 @@ public sealed class VisitTodayReader : IVisitTodayReader
         VisitCareStatus? CareStatus,
         AppointmentStatus? AppointmentStatus,
         Guid? ResponsibleVeterinarianUserId,
-        bool IsCarriedOver)
+        bool IsCarriedOver,
+        bool IsVoided,
+        string? VoidReason)
     {
         /// <summary>Satırı tekil tanımlar: Visit satırı Visit kimliğiyle, planlı satır randevu kimliğiyle.</summary>
         public string Key => VisitId.HasValue ? $"v:{VisitId}" : $"a:{AppointmentId}";
@@ -230,6 +237,8 @@ public sealed class VisitTodayReader : IVisitTodayReader
                 responsibleName,
                 IsCarriedOver,
                 payment,
-                hasActiveHospitalization);
+                hasActiveHospitalization,
+                IsVoided,
+                VoidReason);
     }
 }

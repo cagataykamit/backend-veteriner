@@ -242,4 +242,48 @@ public sealed class VisitTests
         visit.Complete(Now).Error.Code.Should().Be("Visits.NotFound");
         visit.CorrectCareStatus(VisitCareStatus.Completed, Reason, Now).Error.Code.Should().Be("Visits.NotFound");
     }
+
+    [Fact]
+    public void RestoreFromMistaken_Should_Clear_Void_And_Keep_Care_Status()
+    {
+        var visit = CreateWaiting();
+        visit.Start(Now);
+        visit.MarkAsMistaken(Reason, Now);
+        var sequence = visit.MutationSequence;
+
+        var result = visit.RestoreFromMistaken(Reason);
+
+        result.IsSuccess.Should().BeTrue();
+        visit.IsVoided.Should().BeFalse();
+        visit.VoidReason.Should().BeNull();
+        visit.CareStatus.Should().Be(VisitCareStatus.InProgress);
+        visit.StartedAtUtc.Should().Be(Now);
+        visit.MutationSequence.Should().Be(sequence + 1);
+    }
+
+    [Fact]
+    public void RestoreFromMistaken_Should_Fail_When_Not_Voided()
+    {
+        var visit = CreateWaiting();
+
+        var result = visit.RestoreFromMistaken(Reason);
+
+        result.Error.Code.Should().Be("Visits.Validation");
+        visit.MutationSequence.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("  ")]
+    [InlineData("abc")]
+    public void RestoreFromMistaken_Should_Require_Reason_And_Stay_Voided(string? reason)
+    {
+        var visit = CreateWaiting();
+        visit.MarkAsMistaken(Reason, Now);
+
+        var result = visit.RestoreFromMistaken(reason);
+
+        result.Error.Code.Should().Be("Visits.Validation");
+        visit.IsVoided.Should().BeTrue();
+    }
 }

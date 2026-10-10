@@ -46,11 +46,11 @@ public sealed class GetVisitsTodayQueryHandlerTests
     private static TodayItemDto Visit(
         string pet, VisitCareStatus status, DateTime arrivedAtUtc, DateTime? scheduledAtUtc = null)
         => new(Guid.NewGuid(), null, Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
-            scheduledAtUtc, arrivedAtUtc, status, null, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false);
+            scheduledAtUtc, arrivedAtUtc, status, null, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null);
 
     private static TodayItemDto Planned(string pet, DateTime scheduledAtUtc)
         => new(null, Guid.NewGuid(), Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
-            scheduledAtUtc, null, null, AppointmentStatus.Scheduled, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false);
+            scheduledAtUtc, null, null, AppointmentStatus.Scheduled, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null);
 
     [Fact]
     public async Task Handle_Should_Fail_When_Tenant_Missing()
@@ -163,5 +163,20 @@ public sealed class GetVisitsTodayQueryHandlerTests
         var result = await CreateHandler().Handle(new GetVisitsTodayQuery(_clinicId, null), CancellationToken.None);
 
         result.Error.Code.Should().Be("Visits.TodayLimitExceeded");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Pass_Voided_Flag_And_Order_Voided_By_Arrival_Descending()
+    {
+        var older = Visit("v1", VisitCareStatus.Completed, T0.AddMinutes(-30));
+        var newer = Visit("v2", VisitCareStatus.Waiting, T0.AddMinutes(-5));
+        Returns([older, newer]);
+
+        var result = await CreateHandler().Handle(
+            new GetVisitsTodayQuery(_clinicId, null, Voided: true), CancellationToken.None);
+
+        result.Value!.Items.Select(i => i.PetName).Should().Equal("v2", "v1");
+        _reader.Verify(r => r.GetAsync(
+            It.Is<VisitTodayReadRequest>(q => q.OnlyVoided), It.IsAny<CancellationToken>()), Times.Once);
     }
 }
