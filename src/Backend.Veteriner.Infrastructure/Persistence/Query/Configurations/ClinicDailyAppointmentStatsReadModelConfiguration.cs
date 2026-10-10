@@ -16,6 +16,7 @@ public sealed class ClinicDailyAppointmentStatsReadModelConfiguration
         b.Property(x => x.ScheduledCount).IsRequired();
         b.Property(x => x.CompletedCount).IsRequired();
         b.Property(x => x.CancelledCount).IsRequired();
+        b.Property(x => x.NoShowCount).IsRequired();
         b.Property(x => x.TotalCount).IsRequired();
         b.Property(x => x.LastEventId).IsRequired();
         b.Property(x => x.LastProjectedAtUtc).IsRequired();
