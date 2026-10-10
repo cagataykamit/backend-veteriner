@@ -143,7 +143,8 @@ public sealed class GetExaminationsListQueryHandler
                 dateToUtcExclusive,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                request.VisitId),
             ct);
         MarkStep("examinationsCount");
 
@@ -159,7 +160,8 @@ public sealed class GetExaminationsListQueryHandler
                 pageSize,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                request.VisitId),
             ct);
         MarkStep("examinationsPage");
 
@@ -198,7 +200,8 @@ public sealed class GetExaminationsListQueryHandler
                     clientName,
                     e.AppointmentId,
                     e.ExaminedAtUtc,
-                    e.VisitReason);
+                    e.VisitReason,
+                    e.VisitId);
             })
             .ToList();
 

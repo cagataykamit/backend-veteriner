@@ -19,6 +19,11 @@ public class User : AggregateRoot
 
     public bool EmailConfirmed { get; private set; }
 
+    /// <summary>Kullanicinin gorunen adi (opsiyonel). Bos ise e-postadan turetilen ad kullanilir.</summary>
+    public string? DisplayName { get; private set; }
+
+    public const int MaxDisplayNameLength = 120;
+
     /// <summary>
     /// Kullan?c?n?n olu�turulma zaman? (UTC).
     /// Admin listeleme, audit ve raporlama i�in kritik metadatad?r.
@@ -45,6 +50,18 @@ public class User : AggregateRoot
         UpdatedAtUtc = null;
 
         AddDomainEvent(new UserCreatedDomainEvent(Id, Email));
+    }
+
+    /// <summary>Gorunen adi ayarlar; bos/bosluk adi temizler. Uzunluk siniri asilirsa Result.Failure.</summary>
+    public Result SetDisplayName(string? displayName)
+    {
+        var normalized = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+        if (normalized is { Length: > MaxDisplayNameLength })
+            return Result.Failure("Users.Validation", $"Gorunen ad en fazla {MaxDisplayNameLength} karakter olabilir.");
+
+        DisplayName = normalized;
+        UpdatedAtUtc = DateTime.UtcNow;
+        return Result.Success();
     }
 
     public void ConfirmEmail()

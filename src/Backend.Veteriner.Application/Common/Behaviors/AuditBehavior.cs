@@ -45,7 +45,7 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         {
             var response = await next();
 
-            var (success, failureReason) = TryGetResultOutcome(response);
+            var (success, failureReason) = ResultOutcome.Of(response);
 
             await _auditLogWriter.WriteAsync(
                 new AuditLogEntry(
@@ -89,50 +89,6 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
 
             throw;
         }
-    }
-
-    /// <summary>
-    /// When TResponse is Result or Result{T}, returns (IsSuccess, FailureReason).
-    /// Otherwise returns (true, null) so non-Result responses are audited as success.
-    /// </summary>
-    private static (bool success, string? failureReason) TryGetResultOutcome(TResponse? response)
-    {
-        if (response is null)
-            return (true, null);
-
-        var type = response.GetType();
-
-        if (type == typeof(Result))
-        {
-            var r = (Result)(object)response;
-            if (r.IsSuccess) return (true, null);
-            return (false, FormatFailureReason(r.Error));
-        }
-
-        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Result<>))
-        {
-            var isSuccessProp = type.GetProperty("IsSuccess");
-            var errorProp = type.GetProperty("Error");
-            if (isSuccessProp is null || errorProp is null) return (true, null);
-
-            var isSuccess = (bool)isSuccessProp.GetValue(response)!;
-            if (isSuccess) return (true, null);
-
-            var error = errorProp.GetValue(response);
-            if (error is null) return (false, "Business rule violation");
-            return (false, FormatFailureReason((Error)error));
-        }
-
-        return (true, null);
-    }
-
-    private static string FormatFailureReason(Error error)
-    {
-        if (string.IsNullOrWhiteSpace(error.Code))
-            return string.IsNullOrWhiteSpace(error.Message) ? "Business rule violation" : error.Message;
-        return string.IsNullOrWhiteSpace(error.Message)
-            ? error.Code
-            : $"{error.Code}: {error.Message}";
     }
 
     private static string? SerializeSafely(TRequest request)

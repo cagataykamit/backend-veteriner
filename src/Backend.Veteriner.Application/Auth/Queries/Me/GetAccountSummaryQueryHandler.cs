@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Users.Common;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -81,7 +82,7 @@ public sealed class GetAccountSummaryQueryHandler
             .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var displayName = TenantMemberDisplayName.DeriveFromEmail(user.Email);
+        var displayName = UserDisplayName.Resolve(user.DisplayName, user.Email);
 
         return Result<AccountSummaryDto>.Success(new AccountSummaryDto(
             user.Id,

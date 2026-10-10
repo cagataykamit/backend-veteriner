@@ -761,6 +761,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("VisitId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("VisitReason")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -784,6 +787,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "ExaminedAtUtc");
 
                     b.HasIndex("TenantId", "PetId");
+
+                    b.HasIndex("TenantId", "VisitId");
 
                     b.ToTable("Examinations", (string)null);
                 });
@@ -1946,6 +1951,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -2033,6 +2042,75 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "Status");
 
                     b.ToTable("Vaccinations", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Visits.Visit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AppointmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ArrivedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CareStatus")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("MutationSequence")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ResponsibleVeterinarianUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("VoidedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "AppointmentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Visits_TenantId_AppointmentId")
+                        .HasFilter("[AppointmentId] IS NOT NULL AND [VoidedAtUtc] IS NULL");
+
+                    b.HasIndex("TenantId", "PetId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Visits_TenantId_PetId_Active")
+                        .HasFilter("[CareStatus] <> 2 AND [VoidedAtUtc] IS NULL");
+
+                    b.HasIndex("TenantId", "ClinicId", "ArrivedAtUtc");
+
+                    b.ToTable("Visits", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Infrastructure.Persistence.Entities.AuditLog", b =>

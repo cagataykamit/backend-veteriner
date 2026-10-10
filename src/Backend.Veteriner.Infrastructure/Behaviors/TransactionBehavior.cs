@@ -53,6 +53,14 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
 
             var response = await next();
 
+            // Başarısız Result dönen orkestrasyonlarda (yarım kayıt riski) iş kuralı hatası da geri alır.
+            if (request is ITransactionalRollbackOnFailureRequest && !ResultOutcome.Of(response).Success)
+            {
+                await tx.RollbackAsync(ct);
+                _logger.LogInformation("TRANSACTION ROLLBACK (failed result) {RequestName}", requestName);
+                return response;
+            }
+
             // Commit burada transaction commit'i yapar.
             // SaveChanges handler içinde UoW ile zaten çağrılmış olmalı.
             await tx.CommitAsync(ct);

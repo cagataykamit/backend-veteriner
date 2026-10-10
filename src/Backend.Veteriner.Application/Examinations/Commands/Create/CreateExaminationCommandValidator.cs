@@ -16,9 +16,14 @@ public sealed class CreateExaminationCommandValidator : AbstractValidator<Create
 
         RuleFor(x => x)
             .Must(x =>
-                x.AppointmentId is { } aid && aid != Guid.Empty
+                x.VisitId is { } vid && vid != Guid.Empty
+                || x.AppointmentId is { } aid && aid != Guid.Empty
                 || (x.ClinicId is { } cid && cid != Guid.Empty) && (x.PetId is { } pid && pid != Guid.Empty))
-            .WithMessage("AppointmentId veya ClinicId+PetId zorunludur.");
+            .WithMessage("VisitId, AppointmentId veya ClinicId+PetId zorunludur.");
+
+        RuleFor(x => x.VisitId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("VisitId gecersiz.");
 
         RuleFor(x => x.AppointmentId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)

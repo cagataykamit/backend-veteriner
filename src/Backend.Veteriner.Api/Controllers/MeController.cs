@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Users.Commands.SetDisplayName;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth.Commands.ChangePassword;
 using Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeAllMy;
@@ -48,6 +49,20 @@ public sealed class MeController : ControllerBase
     public async Task<IActionResult> GetAccountSummary(CancellationToken ct)
     {
         var result = await _mediator.Send(new GetAccountSummaryQuery(), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Oturum açmış kullanıcının görünen adını ayarlar (hekim listesi, geliş ve Bugün'de görünür). Boş değer adı temizler.
+    /// </summary>
+    [HttpPut("display-name")]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SetDisplayName([FromBody] SetMyDisplayNameBody body, CancellationToken ct)
+    {
+        var result = await _mediator.Send(new SetMyDisplayNameCommand(body.DisplayName), ct);
         return result.ToActionResult(this);
     }
 

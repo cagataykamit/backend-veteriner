@@ -28,6 +28,10 @@ public sealed class GetExaminationsListQueryValidator : AbstractValidator<GetExa
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("appointmentId is invalid.");
 
+        RuleFor(x => x.VisitId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("visitId is invalid.");
+
         RuleFor(x => x)
             .Must(x => !x.ExaminedOnLocalDate.HasValue || (!x.DateFromUtc.HasValue && !x.DateToUtc.HasValue))
             .WithMessage("examinedOnLocalDate ile dateFromUtc/dateToUtc birlikte kullanılamaz.");

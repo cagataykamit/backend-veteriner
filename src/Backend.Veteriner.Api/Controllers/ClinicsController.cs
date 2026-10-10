@@ -14,6 +14,7 @@ using Backend.Veteriner.Application.Clinics.Queries.AppointmentSettings.GetClini
 using Backend.Veteriner.Application.Clinics.Queries.GetById;
 using Backend.Veteriner.Application.Clinics.Queries.GetList;
 using Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkingHours;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Shared;
@@ -168,6 +169,24 @@ public sealed class ClinicsController : ControllerBase
             body.DefaultAppointmentDurationMinutes,
             body.SlotIntervalMinutes,
             body.AllowOverlappingAppointments), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Geliş açarken sorumlu hekim seçimi: kliniğe atanmış, aktif ve <c>Veteriner</c> rolündeki kullanıcılar.
+    /// Geliş doğrulaması (<c>responsibleVeterinarianUserId</c>) aynı kuralı kullanır.
+    /// </summary>
+    [HttpGet("{id:guid}/veterinarians")]
+    [Authorize(Policy = PermissionCatalog.Visits.Create)]
+    [ProducesResponseType(typeof(IReadOnlyList<ClinicVeterinarianDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetVeterinarians([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var result = await _mediator.Send(new GetClinicVeterinariansQuery(id), ct);
         return result.ToActionResult(this);
     }
 

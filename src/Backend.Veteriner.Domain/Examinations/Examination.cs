@@ -15,6 +15,9 @@ public sealed class Examination : AggregateRoot
     public Guid ClinicId { get; private set; }
     public Guid PetId { get; private set; }
     public Guid? AppointmentId { get; private set; }
+
+    /// <summary>Bağlı geliş (Visit); eski kayıtlarda ve gelişsiz muayenede null. Oluşturulduktan sonra değişmez.</summary>
+    public Guid? VisitId { get; private set; }
     public DateTime ExaminedAtUtc { get; private set; }
 
     /// <summary>Başvuru nedeni / şikayet (vizit özeti).</summary>
@@ -75,7 +78,8 @@ public sealed class Examination : AggregateRoot
         decimal? temperatureC = null,
         int? heartRateBpm = null,
         int? respiratoryRatePerMin = null,
-        DateTime? vitalsMeasuredAtUtc = null)
+        DateTime? vitalsMeasuredAtUtc = null,
+        Guid? visitId = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -95,6 +99,7 @@ public sealed class Examination : AggregateRoot
         ClinicId = clinicId;
         PetId = petId;
         AppointmentId = appointmentId;
+        VisitId = visitId;
         ExaminedAtUtc = NormalizeUtc(examinedAtUtc);
         VisitReason = visitReason.Trim();
         Anamnesis = NormalizeOptional(anamnesis);

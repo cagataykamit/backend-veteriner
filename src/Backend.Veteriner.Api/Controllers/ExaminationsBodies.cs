@@ -12,6 +12,9 @@ public sealed class CreateExaminationBody
     public Guid? ClinicId { get; init; }
     public Guid? PetId { get; init; }
     public Guid? AppointmentId { get; init; }
+
+    /// <summary>Geliş (Visit) kimliği; verilirse hayvan/klinik/randevu Visit'ten türetilir.</summary>
+    public Guid? VisitId { get; init; }
     public DateTime ExaminedAtUtc { get; init; }
 
     /// <summary>Başvuru nedeni (canonical).</summary>

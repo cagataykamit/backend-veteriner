@@ -112,7 +112,8 @@ public sealed class GetExaminationByIdQueryHandler
             e.Notes,
             ExaminationRowVersion.Encode(e.RowVersion),
             e.CreatedAtUtc,
-            e.UpdatedAtUtc);
+            e.UpdatedAtUtc,
+            e.VisitId);
         return Result<ExaminationDetailDto>.Success(dto);
     }
 }

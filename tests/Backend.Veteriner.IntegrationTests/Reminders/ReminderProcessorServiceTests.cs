@@ -1,3 +1,4 @@
+using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -16,8 +17,21 @@ using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.IntegrationTests.Reminders;
 
-public sealed class ReminderProcessorServiceTests
+public sealed class ReminderProcessorServiceTests : IAsyncLifetime
 {
+    private const string CommandDatabasePrefix = "VetinityCommandDb_ReminderProcessor_";
+
+    // Test başına açılan izole LocalDB veritabanları; test bitince (başarılı/başarısız) silinir, .mdf/.ldf kalmaz.
+    private readonly List<string> _connectionStrings = new();
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        foreach (var connectionString in _connectionStrings)
+            await IntegrationTestDatabaseReset.EnsureDroppedAsync(connectionString);
+    }
+
     [Fact]
     public async Task ProcessOnce_Should_NoOp_When_Disabled()
     {
@@ -968,10 +982,12 @@ public sealed class ReminderProcessorServiceTests
         return (row.Id, row.Name);
     }
 
-    private static async Task<AppDbContext> CreateDbContextAsync()
+    private async Task<AppDbContext> CreateDbContextAsync()
     {
-        var commandDbName = $"VetinityCommandDb_ReminderProcessor_{Guid.NewGuid():N}";
+        var commandDbName = $"{CommandDatabasePrefix}{Guid.NewGuid():N}";
         var connectionString = $"Server=(localdb)\\mssqllocaldb;Database={commandDbName};Trusted_Connection=True;MultipleActiveResultSets=true";
+        IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: CommandDatabasePrefix);
+        _connectionStrings.Add(connectionString);
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlServer(connectionString)
             .Options;
