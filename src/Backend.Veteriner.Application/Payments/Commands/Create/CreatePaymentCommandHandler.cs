@@ -267,15 +267,29 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
             request.RequestId,
             fingerprint);
 
+        // 1) Önce yalnızca ödeme yazılır: RequestId benzersiz indeksi çift isteği burada eler ve ücretlere dokunulmamış olur.
+        try
+        {
+            await _paymentsWrite.AddAsync(payment, ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Eşzamanlı çift istek: kazanan ödeme döner.
+            var winner = await _paymentsRead.FirstOrDefaultAsync(
+                new PaymentByRequestIdSpec(tenantId, request.RequestId), ct);
+            if (winner is null)
+                throw;
+
+            return Replay(winner, fingerprint);
+        }
+
+        // 2) Tahsis kuralları domain'de; hata dönerse işlem geri alınır (ITransactionalRollbackOnFailureRequest) ve ödeme kalmaz.
         var allocated = payment.AllocateFully(lines, userId, _timeProvider.GetUtcNow().UtcDateTime);
         if (!allocated.IsSuccess)
             return Result<PaymentCreateResultDto>.Failure(allocated.Error);
 
         try
         {
-            // AddAsync ödemeyi ve izlenen ücret sayaçlarını tek SaveChanges ile yazar; ardından tahsis satırları + outbox.
-            await _paymentsWrite.AddAsync(payment, ct);
-
             // Outbox emission aynı transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
             await _eventOutbox.EnqueueAsync(
                 PaymentIntegrationEventTypes.Created,
@@ -285,24 +299,14 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
                     PaymentProjectionSnapshotFactory.Create(payment, client.FullName, clinic.Name, petName)),
                 ct);
 
+            // Tahsis satırları + ödeme/ücret sayaçları + outbox tek SaveChanges'te; sayaç token'ları iki kullanıcı çakışmasını yakalar.
             await _allocationsWrite.AddRangeAsync(allocated.Value!, ct);
         }
         catch (DbUpdateConcurrencyException)
         {
-            // İki kullanıcı aynı ücrete aynı anda tahsil etti; kaybeden geri alınır.
             return Fail(
                 "Payments.ConcurrencyConflict",
                 "Ücret eşzamanlı olarak güncellendi; açık tutar yeniden okunup işlem tekrarlanmalı.");
-        }
-        catch (DbUpdateException)
-        {
-            // Eşzamanlı çift istek: filtreli benzersiz indeks kaybedene çarptı; kazanan ödeme döner.
-            var winner = await _paymentsRead.FirstOrDefaultAsync(
-                new PaymentByRequestIdSpec(tenantId, request.RequestId), ct);
-            if (winner is null)
-                throw;
-
-            return Replay(winner, fingerprint);
         }
 
         return Result<PaymentCreateResultDto>.Success(new PaymentCreateResultDto(payment.Id, true));
