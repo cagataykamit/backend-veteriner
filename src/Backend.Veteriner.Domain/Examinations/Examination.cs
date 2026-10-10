@@ -54,6 +54,15 @@ public sealed class Examination : AggregateRoot
     public string? Plan { get; private set; }
 
     public string? Notes { get; private set; }
+
+    /// <summary>Taslak düzenlenebilir; kesinleşmiş içerik değişmez (düzeltme yalnız <see cref="AddAddendum"/> ile).</summary>
+    public ExaminationStatus Status { get; private set; } = ExaminationStatus.Draft;
+
+    public DateTime? FinalizedAtUtc { get; private set; }
+    public Guid? FinalizedByUserId { get; private set; }
+
+    public bool IsFinalized => Status == ExaminationStatus.Finalized;
+
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
@@ -119,6 +128,9 @@ public sealed class Examination : AggregateRoot
     /// </summary>
     public Result UpdateClinicalContent(ExaminationClinicalUpdate update)
     {
+        if (IsFinalized)
+            return Result.Failure("Examinations.Finalized", "Kesinleşmiş muayene düzenlenemez; ek not ekleyin.");
+
         if (string.IsNullOrWhiteSpace(update.VisitReason))
             return Result.Failure("Examinations.Validation", "VisitReason bos olamaz.");
 
@@ -148,6 +160,39 @@ public sealed class Examination : AggregateRoot
         ApplyVitals(weightKg, temperatureC, heartRateBpm, respiratoryRatePerMin, update.VitalsMeasuredAtUtc);
         UpdatedAtUtc = DateTime.UtcNow;
         return Result.Success();
+    }
+
+    /// <summary>Taslak → Kesinleşti. Kesinleştiren ve zaman ilk kesinleştirmede sabitlenir; geri dönüş yoktur.</summary>
+    public Result Finalize(Guid userId, DateTime nowUtc)
+    {
+        if (userId == Guid.Empty)
+            return Result.Failure("Examinations.Validation", "Kullanıcı geçersiz.");
+
+        if (IsFinalized)
+            return Result.Failure("Examinations.AlreadyFinalized", "Muayene zaten kesinleştirilmiş.");
+
+        Status = ExaminationStatus.Finalized;
+        FinalizedAtUtc = NormalizeUtc(nowUtc);
+        FinalizedByUserId = userId;
+        UpdatedAtUtc = FinalizedAtUtc;
+        return Result.Success();
+    }
+
+    /// <summary>Kesinleşmiş muayeneye gerekçeli, değişmez ek not üretir; muayene satırı değişmez.</summary>
+    public Result<ExaminationAddendum> AddAddendum(Guid userId, string? reason, string? text, DateTime nowUtc)
+    {
+        if (userId == Guid.Empty)
+            return Result<ExaminationAddendum>.Failure("Examinations.Validation", "Kullanıcı geçersiz.");
+
+        if (!IsFinalized)
+            return Result<ExaminationAddendum>.Failure("Examinations.NotFinalized", "Ek not yalnızca kesinleşmiş muayeneye eklenebilir.");
+
+        var content = ExaminationAddendum.Validate(reason, text);
+        if (!content.IsSuccess)
+            return Result<ExaminationAddendum>.Failure(content.Error);
+
+        return Result<ExaminationAddendum>.Success(
+            new ExaminationAddendum(this, content.Value.Reason, content.Value.Text, userId, NormalizeUtc(nowUtc)));
     }
 
     /// <summary>
