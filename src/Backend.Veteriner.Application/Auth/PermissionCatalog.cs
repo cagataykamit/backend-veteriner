@@ -136,6 +136,7 @@ public static class PermissionCatalog
         public const string Read = "Payments.Read";
         public const string Create = "Payments.Create";
         public const string Update = "Payments.Update";
+        public const string Correct = "Payments.Correct";
     }
 
     public static class Charges
@@ -280,6 +281,7 @@ public static class PermissionCatalog
         new(Payments.Read, "Ödeme kayıtlarını listeleme ve görüntüleme yetkisi", "Payments"),
         new(Payments.Create, "Ödeme kaydı oluşturma yetkisi", "Payments"),
         new(Payments.Update, "Ödeme kaydı güncelleme yetkisi", "Payments"),
+        new(Payments.Correct, "Ödeme tutarı/müşteri/klinik/para birimi düzeltme yetkisi (gerekçeli)", "Payments"),
 
         new(Charges.Read, "Ücret kayıtlarını listeleme ve görüntüleme yetkisi", "Charges"),
         new(Charges.Create, "Ücret kaydı oluşturma yetkisi", "Charges"),

@@ -91,6 +91,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Read,
                 PermissionCatalog.Payments.Create,
                 PermissionCatalog.Payments.Update,
+                PermissionCatalog.Payments.Correct,
 
                 PermissionCatalog.Charges.Read,
                 PermissionCatalog.Charges.Create,
@@ -186,6 +187,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Read,
                 PermissionCatalog.Payments.Create,
                 PermissionCatalog.Payments.Update,
+                PermissionCatalog.Payments.Correct,
 
                 PermissionCatalog.Charges.Read,
                 PermissionCatalog.Charges.Create,
@@ -288,6 +290,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Read,
                 PermissionCatalog.Payments.Create,
                 PermissionCatalog.Payments.Update,
+                PermissionCatalog.Payments.Correct,
 
                 PermissionCatalog.Charges.Read,
                 PermissionCatalog.Charges.Create,
