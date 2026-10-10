@@ -24,6 +24,7 @@ public sealed class Visit : AggregateRoot
     public DateTime? CompletedAtUtc { get; private set; }
     public DateTime? VoidedAtUtc { get; private set; }
     public string? VoidReason { get; private set; }
+    public bool IsUrgent { get; private set; }
     public Guid CreatedByUserId { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
 
@@ -44,7 +45,8 @@ public sealed class Visit : AggregateRoot
         Guid? appointmentId,
         Guid? responsibleVeterinarianUserId,
         Guid createdByUserId,
-        DateTime arrivedAtUtc)
+        DateTime arrivedAtUtc,
+        bool isUrgent = false)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -68,6 +70,7 @@ public sealed class Visit : AggregateRoot
         ArrivedAtUtc = NormalizeUtc(arrivedAtUtc);
         CreatedAtUtc = ArrivedAtUtc;
         CareStatus = VisitCareStatus.Waiting;
+        IsUrgent = isUrgent;
     }
 
     /// <summary>Bekliyor → Devam ediyor. Zaten devam ediyorsa değişiklik olmadan başarı (idempotent).</summary>
@@ -186,6 +189,29 @@ public sealed class Visit : AggregateRoot
 
         VoidedAtUtc = null;
         VoidReason = null;
+        AdvanceMutationSequence();
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Acil işareti (basit öncelik bayrağı, triage skoru yok). Yalnızca açık geliş değiştirilir; aynı değer idempotent başarıdır.
+    /// </summary>
+    public Result SetUrgent(bool isUrgent)
+    {
+        if (IsVoided)
+            return VoidedFailure();
+
+        if (IsUrgent == isUrgent)
+            return Result.Success();
+
+        if (CareStatus == VisitCareStatus.Completed)
+        {
+            return Result.Failure(
+                "Visits.NotOpen",
+                "Tamamlanmış gelişin acil işareti değiştirilemez.");
+        }
+
+        IsUrgent = isUrgent;
         AdvanceMutationSequence();
         return Result.Success();
     }

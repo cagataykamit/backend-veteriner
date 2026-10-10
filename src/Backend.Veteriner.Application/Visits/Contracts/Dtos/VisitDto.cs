@@ -17,4 +17,5 @@ public sealed record VisitDto(
     bool IsVoided,
     string? VoidReason,
     Guid CreatedByUserId,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    bool IsUrgent);

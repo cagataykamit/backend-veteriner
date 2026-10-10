@@ -12,5 +12,6 @@ public sealed record CreateVisitCommand(
     Guid? ClinicId,
     Guid? PetId,
     Guid? AppointmentId,
-    Guid? ResponsibleVeterinarianUserId)
+    Guid? ResponsibleVeterinarianUserId,
+    bool IsUrgent = false)
     : IRequest<Result<VisitCreateResultDto>>;

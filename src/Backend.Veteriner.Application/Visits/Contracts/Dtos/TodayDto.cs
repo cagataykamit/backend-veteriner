@@ -38,7 +38,8 @@ public sealed record TodayItemDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] TodayPaymentIndicator PaymentIndicator,
     bool HasActiveHospitalization,
     bool IsVoided,
-    string? VoidReason);
+    string? VoidReason,
+    bool IsUrgent);
 
 public sealed record TodayHospitalizationDto(
     Guid HospitalizationId,

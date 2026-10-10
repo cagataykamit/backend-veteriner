@@ -33,6 +33,7 @@ public sealed class VisitConfiguration : IEntityTypeConfiguration<Visit>
         b.Property(x => x.CompletedAtUtc);
         b.Property(x => x.VoidedAtUtc);
         b.Property(x => x.VoidReason).HasMaxLength(Visit.MaxCorrectionReasonLength);
+        b.Property(x => x.IsUrgent).IsRequired().HasDefaultValue(false);
         b.Property(x => x.CreatedByUserId).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
 

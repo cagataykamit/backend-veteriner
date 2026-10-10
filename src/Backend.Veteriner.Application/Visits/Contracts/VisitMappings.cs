@@ -27,6 +27,7 @@ public static class VisitMappings
             v.IsVoided,
             v.VoidReason,
             v.CreatedByUserId,
-            v.CreatedAtUtc);
+            v.CreatedAtUtc,
+            v.IsUrgent);
     }
 }

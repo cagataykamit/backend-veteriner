@@ -244,6 +244,56 @@ public sealed class VisitTests
     }
 
     [Fact]
+    public void New_Visit_Should_Default_To_Not_Urgent_And_Honor_Initial_Flag()
+    {
+        CreateWaiting().IsUrgent.Should().BeFalse();
+
+        var urgent = new Visit(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, Guid.NewGuid(), Now, isUrgent: true);
+        urgent.IsUrgent.Should().BeTrue();
+        urgent.MutationSequence.Should().Be(0);
+    }
+
+    [Fact]
+    public void SetUrgent_Should_Toggle_On_Open_Visit_And_Be_Idempotent()
+    {
+        var visit = CreateWaiting();
+
+        visit.SetUrgent(true).IsSuccess.Should().BeTrue();
+        visit.IsUrgent.Should().BeTrue();
+        visit.MutationSequence.Should().Be(1);
+
+        visit.SetUrgent(true).IsSuccess.Should().BeTrue();
+        visit.MutationSequence.Should().Be(1, "aynı değer değişiklik sayılmaz");
+
+        visit.Start(Now);
+        visit.SetUrgent(false).IsSuccess.Should().BeTrue();
+        visit.IsUrgent.Should().BeFalse();
+        visit.CareStatus.Should().Be(VisitCareStatus.InProgress);
+    }
+
+    [Fact]
+    public void SetUrgent_Should_Reject_Change_On_Completed_But_Allow_Same_Value()
+    {
+        var visit = CreateWaiting();
+        visit.SetUrgent(true);
+        visit.Start(Now);
+        visit.Complete(Now);
+
+        visit.SetUrgent(false).Error.Code.Should().Be("Visits.NotOpen");
+        visit.IsUrgent.Should().BeTrue();
+        visit.SetUrgent(true).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SetUrgent_Should_Return_NotFound_For_Voided_Visit()
+    {
+        var visit = CreateWaiting();
+        visit.MarkAsMistaken(Reason, Now);
+
+        visit.SetUrgent(true).Error.Code.Should().Be("Visits.NotFound");
+    }
+
+    [Fact]
     public void RestoreFromMistaken_Should_Clear_Void_And_Keep_Care_Status()
     {
         var visit = CreateWaiting();

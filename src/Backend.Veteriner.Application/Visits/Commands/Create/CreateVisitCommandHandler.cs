@@ -191,7 +191,8 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
             appointment?.Id,
             request.ResponsibleVeterinarianUserId,
             userId,
-            _timeProvider.GetUtcNow().UtcDateTime);
+            _timeProvider.GetUtcNow().UtcDateTime,
+            request.IsUrgent);
 
         try
         {

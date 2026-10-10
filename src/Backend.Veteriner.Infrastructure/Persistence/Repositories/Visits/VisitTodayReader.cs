@@ -87,7 +87,8 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     v.ResponsibleVeterinarianUserId,
                     v.ArrivedAtUtc < start,
                     v.VoidedAtUtc != null,
-                    v.VoidReason))
+                    v.VoidReason,
+                    v.IsUrgent))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -127,7 +128,8 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     null,
                     false,
                     false,
-                    null))
+                    null,
+                    false))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -213,7 +215,8 @@ public sealed class VisitTodayReader : IVisitTodayReader
         Guid? ResponsibleVeterinarianUserId,
         bool IsCarriedOver,
         bool IsVoided,
-        string? VoidReason)
+        string? VoidReason,
+        bool IsUrgent)
     {
         /// <summary>Satırı tekil tanımlar: Visit satırı Visit kimliğiyle, planlı satır randevu kimliğiyle.</summary>
         public string Key => VisitId.HasValue ? $"v:{VisitId}" : $"a:{AppointmentId}";
@@ -239,6 +242,7 @@ public sealed class VisitTodayReader : IVisitTodayReader
                 payment,
                 hasActiveHospitalization,
                 IsVoided,
-                VoidReason);
+                VoidReason,
+                IsUrgent);
     }
 }

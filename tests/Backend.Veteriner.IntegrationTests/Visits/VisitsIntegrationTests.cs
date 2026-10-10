@@ -528,6 +528,140 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         (await ctx.GetTodayAsync()).Items.Should().ContainSingle(i => i.VisitId == visitId);
     }
 
+    // ---- Acil işareti ----
+
+    private static Task<HttpResponseMessage> PutUrgencyAsync(VisitTestContext ctx, Guid visitId, bool isUrgent)
+        => ctx.Http.PutAsJsonAsync($"/api/v1/visits/{visitId}/urgency", new { isUrgent });
+
+    [Fact]
+    public async Task Create_Should_Default_To_Not_Urgent_And_Honor_IsUrgent_Only_For_New_Visit()
+    {
+        var ctx = await SeedAsync();
+
+        var urgent = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId, isUrgent = true })).Result!;
+        urgent.Created.Should().BeTrue();
+        urgent.Visit.IsUrgent.Should().BeTrue();
+
+        var repeat = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId, isUrgent = false })).Result!;
+        repeat.Created.Should().BeFalse();
+        repeat.Visit.IsUrgent.Should().BeTrue("idempotent tekrar mevcut kaydı değiştirmez");
+
+        var otherPet = await ctx.SeedPetAsync();
+        (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = otherPet })).Result!.Visit.IsUrgent
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Urgency_Should_Toggle_Persist_And_Be_Idempotent()
+    {
+        var ctx = await SeedAsync();
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        (await ctx.ReadVisitAsync(await PutUrgencyAsync(ctx, visitId, true))).IsUrgent.Should().BeTrue();
+        (await ctx.ReadVisitAsync(await PutUrgencyAsync(ctx, visitId, true))).IsUrgent.Should().BeTrue();
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{visitId}"))!.IsUrgent.Should().BeTrue();
+
+        (await ctx.ReadVisitAsync(await PutUrgencyAsync(ctx, visitId, false))).IsUrgent.Should().BeFalse();
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{visitId}"))!.IsUrgent.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Urgency_Should_Require_Update_Permission()
+    {
+        var ctx = await SeedAsync(permissions: [PermissionCatalog.Visits.Read, PermissionCatalog.Visits.Create]);
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        (await PutUrgencyAsync(ctx, visitId, true)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Urgency_Should_Reject_Change_On_Completed_And_Return_404_For_Voided()
+    {
+        var ctx = await SeedAsync();
+        var completedId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId, isUrgent = true })).Result!.Visit.Id;
+        await ctx.PostRawAsync($"/api/v1/visits/{completedId}/start");
+        await ctx.PostRawAsync($"/api/v1/visits/{completedId}/complete");
+
+        var change = await PutUrgencyAsync(ctx, completedId, false);
+        change.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(change)).Should().Be("Visits.NotOpen");
+        (await ctx.ReadVisitAsync(await PutUrgencyAsync(ctx, completedId, true))).IsUrgent.Should().BeTrue();
+
+        var voidedId = await VoidAsync(ctx,
+            (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id);
+        (await PutUrgencyAsync(ctx, voidedId, true)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Urgency_Should_Respect_Clinic_Assignment_And_Tenant_Isolation()
+    {
+        var ctx = await SeedAsync();
+        Guid otherTenantVisitId;
+        Guid unassignedClinicVisitId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
+            var otherTenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20]);
+            db.Tenants.Add(otherTenant);
+            await db.SaveChangesAsync();
+            var otherClinic = new Clinic(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "Ankara");
+            var otherClient = new Client(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "905551110067");
+            db.AddRange(otherClinic, otherClient);
+            await db.SaveChangesAsync();
+            var otherPet = new Pet(otherTenant.Id, otherClient.Id, $"FPet-{Guid.NewGuid():N}"[..12], speciesId);
+            db.Pets.Add(otherPet);
+            await db.SaveChangesAsync();
+            var otherVisit = new Visit(otherTenant.Id, otherClinic.Id, otherPet.Id, null, null, ctx.UserId, DateTime.UtcNow);
+            var unassigned = await ctx.SeedForeignAssignedClinicAsync();
+            var sameTenantVisit = new Visit(ctx.TenantId, unassigned, ctx.PetId, null, null, ctx.UserId, DateTime.UtcNow);
+            db.Visits.AddRange(otherVisit, sameTenantVisit);
+            await db.SaveChangesAsync();
+            otherTenantVisitId = otherVisit.Id;
+            unassignedClinicVisitId = sameTenantVisit.Id;
+        }
+
+        (await PutUrgencyAsync(ctx, otherTenantVisitId, true)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await PutUrgencyAsync(ctx, unassignedClinicVisitId, true)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Concurrent_Urgency_Requests_Should_All_Succeed()
+    {
+        var ctx = await SeedAsync();
+        var visitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => PutUrgencyAsync(ctx, visitId, true)));
+
+        responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK);
+        (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{visitId}"))!.IsUrgent.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Today_Should_List_Urgent_First_Within_Waiting_And_InProgress_Groups()
+    {
+        var ctx = await SeedAsync();
+        var pets = new[] { ctx.PetId, await ctx.SeedPetAsync(), await ctx.SeedPetAsync(), await ctx.SeedPetAsync() };
+        var ids = new List<Guid>();
+        foreach (var pet in pets)
+        {
+            ids.Add((await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = pet })).Result!.Visit.Id);
+            await Task.Delay(20); // arrivedAtUtc sırası belirgin olsun
+        }
+
+        // ids[0], ids[1] normal; ids[2] acil bekleyen; ids[3] acil ve devam ediyor
+        await PutUrgencyAsync(ctx, ids[2], true);
+        await PutUrgencyAsync(ctx, ids[3], true);
+        await ctx.PostRawAsync($"/api/v1/visits/{ids[3]}/start");
+        await ctx.PostRawAsync($"/api/v1/visits/{ids[1]}/start");
+
+        var today = await ctx.GetTodayAsync();
+
+        // Bekliyor: acil (ids[2]) önce, sonra ids[0]; Devam ediyor: acil (ids[3]) önce, sonra ids[1].
+        today.Items.Select(i => i.VisitId).Should().Equal(ids[2], ids[0], ids[3], ids[1]);
+        today.Items.Where(i => i.IsUrgent).Select(i => i.VisitId).Should().BeEquivalentTo(new Guid?[] { ids[2], ids[3] });
+    }
+
     // ---- Muayene bağlantısı ----
 
     [Fact]
@@ -1004,7 +1138,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
     // ---- Kurulum ----
 
-    private async Task<VisitTestContext> SeedAsync(bool CorrectorOrNot = true)
+    private async Task<VisitTestContext> SeedAsync(bool CorrectorOrNot = true, string[]? permissions = null)
     {
         var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
@@ -1038,7 +1172,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         }
 
         var token = await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(
-            _factory.Services, email, CorrectorOrNot ? CorrectorPermissions : OperatorPermissions);
+            _factory.Services, email, permissions ?? (CorrectorOrNot ? CorrectorPermissions : OperatorPermissions));
         var http = _factory.CreateClient();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 

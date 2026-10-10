@@ -95,7 +95,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     }
 
     /// <summary>
-    /// Bekliyor (geliş artan) → Devam ediyor (geliş artan) → planlı (randevu artan) → Tamamlandı (geliş azalan).
+    /// Bekliyor (önce acil, geliş artan) → Devam ediyor (önce acil, geliş artan) → planlı (randevu artan) → Tamamlandı (geliş azalan).
     /// </summary>
     private static IReadOnlyList<TodayItemDto> Order(IReadOnlyList<TodayItemDto> items)
         => items
@@ -107,7 +107,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private static IEnumerable<TodayItemDto> OrderWithinGroup(IGrouping<int, TodayItemDto> group)
         => group.Key switch
         {
-            WaitingRank or InProgressRank => group.OrderBy(i => i.ArrivedAtUtc),
+            WaitingRank or InProgressRank => group.OrderByDescending(i => i.IsUrgent).ThenBy(i => i.ArrivedAtUtc),
             PlannedRank => group.OrderBy(i => i.ScheduledAtUtc),
             _ => group.OrderByDescending(i => i.ArrivedAtUtc),
         };

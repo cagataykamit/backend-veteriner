@@ -44,13 +44,13 @@ public sealed class GetVisitsTodayQueryHandlerTests
             .ReturnsAsync(new VisitTodayReadResult(items, []));
 
     private static TodayItemDto Visit(
-        string pet, VisitCareStatus status, DateTime arrivedAtUtc, DateTime? scheduledAtUtc = null)
+        string pet, VisitCareStatus status, DateTime arrivedAtUtc, DateTime? scheduledAtUtc = null, bool isUrgent = false)
         => new(Guid.NewGuid(), null, Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
-            scheduledAtUtc, arrivedAtUtc, status, null, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null);
+            scheduledAtUtc, arrivedAtUtc, status, null, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null, isUrgent);
 
     private static TodayItemDto Planned(string pet, DateTime scheduledAtUtc)
         => new(null, Guid.NewGuid(), Guid.NewGuid(), pet, null, Guid.NewGuid(), "Sahip", null,
-            scheduledAtUtc, null, null, AppointmentStatus.Scheduled, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null);
+            scheduledAtUtc, null, null, AppointmentStatus.Scheduled, null, null, false, TodayPaymentIndicator.NoPaymentRecorded, false, false, null, false);
 
     [Fact]
     public async Task Handle_Should_Fail_When_Tenant_Missing()
@@ -150,6 +150,24 @@ public sealed class GetVisitsTodayQueryHandlerTests
 
         result.Value!.Items.Select(i => i.PetName)
             .Should().Equal("w1", "w2", "ip", "p1", "p2", "c2", "c1");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Put_Urgent_First_Within_Waiting_And_InProgress_Only()
+    {
+        var waitingEarly = Visit("w1", VisitCareStatus.Waiting, T0.AddMinutes(5));
+        var waitingUrgentLate = Visit("w2u", VisitCareStatus.Waiting, T0.AddMinutes(20), isUrgent: true);
+        var waitingUrgentLater = Visit("w3u", VisitCareStatus.Waiting, T0.AddMinutes(30), isUrgent: true);
+        var inProgress = Visit("ip", VisitCareStatus.InProgress, T0.AddMinutes(1));
+        var inProgressUrgent = Visit("ipu", VisitCareStatus.InProgress, T0.AddMinutes(9), isUrgent: true);
+        var completedOld = Visit("c1", VisitCareStatus.Completed, T0.AddMinutes(-60), isUrgent: true);
+        var completedNew = Visit("c2", VisitCareStatus.Completed, T0.AddMinutes(-10));
+        Returns([completedOld, waitingEarly, inProgress, waitingUrgentLater, completedNew, inProgressUrgent, waitingUrgentLate]);
+
+        var result = await CreateHandler().Handle(new GetVisitsTodayQuery(_clinicId, null), CancellationToken.None);
+
+        result.Value!.Items.Select(i => i.PetName)
+            .Should().Equal("w2u", "w3u", "w1", "ipu", "ip", "c2", "c1");
     }
 
     [Fact]

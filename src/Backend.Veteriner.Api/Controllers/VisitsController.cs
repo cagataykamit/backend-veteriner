@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Visits.Commands.Correct;
 using Backend.Veteriner.Application.Visits.Commands.Create;
 using Backend.Veteriner.Application.Visits.Commands.Restore;
+using Backend.Veteriner.Application.Visits.Commands.SetUrgency;
 using Backend.Veteriner.Application.Visits.Commands.Transition;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Queries.GetById;
@@ -52,7 +53,7 @@ public sealed class VisitsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(
-            new CreateVisitCommand(body.ClinicId, body.PetId, body.AppointmentId, body.ResponsibleVeterinarianUserId),
+            new CreateVisitCommand(body.ClinicId, body.PetId, body.AppointmentId, body.ResponsibleVeterinarianUserId, body.IsUrgent),
             ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
@@ -122,6 +123,24 @@ public sealed class VisitsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new RestoreVisitCommand(id, body.Reason ?? string.Empty), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Acil işaretini koyar/kaldırır (basit bayrak, triage skoru yok); aynı değer 200 ve mevcut kayıt.</summary>
+    [HttpPut("{id:guid}/urgency")]
+    [Authorize(Policy = PermissionCatalog.Visits.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(VisitDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SetUrgency([FromRoute] Guid id, [FromBody] SetVisitUrgencyBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new SetVisitUrgencyCommand(id, body.IsUrgent), ct);
         return result.ToActionResult(this);
     }
 
