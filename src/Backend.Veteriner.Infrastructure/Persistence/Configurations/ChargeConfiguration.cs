@@ -14,6 +14,7 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
         b.ToTable("Charges", t =>
         {
             t.HasCheckConstraint("CK_Charges_Amount_Positive", "[Amount] > 0");
+            t.HasCheckConstraint("CK_Charges_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
         });
 
         b.HasKey(x => x.Id);
@@ -34,6 +35,9 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
         b.Property(x => x.CreatedByUserId).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.RequestId);
+
+        b.Property(x => x.AllocatedAmount).HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
+        b.Property(x => x.MutationSequence).IsRequired().HasDefaultValue(0L).IsConcurrencyToken();
 
         b.HasIndex(x => new { x.TenantId, x.ClientId });
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.CreatedAtUtc });

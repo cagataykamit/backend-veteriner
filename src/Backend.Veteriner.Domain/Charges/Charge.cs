@@ -30,6 +30,15 @@ public sealed class Charge : AggregateRoot
     public decimal Amount { get; private set; }
 
     public string Currency { get; private set; } = DefaultCurrency;
+
+    /// <summary>Ödemelerden tahsis edilen toplam; <c>0 ≤ AllocatedAmount ≤ Amount</c>. Yalnızca <see cref="ApplyAllocation"/> değiştirir.</summary>
+    public decimal AllocatedAmount { get; private set; }
+
+    public decimal OutstandingAmount => Amount - AllocatedAmount;
+
+    /// <summary>Başarılı mutasyon sayacı; optimistic concurrency token. Her tahsis 1 artırır.</summary>
+    public long MutationSequence { get; private set; }
+
     public Guid CreatedByUserId { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
 
@@ -95,6 +104,24 @@ public sealed class Charge : AggregateRoot
             CreatedAtUtc = NormalizeUtc(createdAtUtc),
             RequestId = requestId,
         });
+    }
+
+    /// <summary>Tahsis sayacını artırır; açık tutarı aşamaz.</summary>
+    public Result ApplyAllocation(decimal amount)
+    {
+        if (amount <= 0)
+            return Result.Failure("Charges.Validation", "Tahsis tutarı 0'dan büyük olmalıdır.");
+
+        if (amount > OutstandingAmount)
+        {
+            return Result.Failure(
+                "PaymentAllocations.ExceedsOutstanding",
+                $"Tahsis tutarı ücretin açık tutarını aşıyor (ChargeId={Id}, açık tutar={OutstandingAmount:0.00}).");
+        }
+
+        AllocatedAmount += amount;
+        MutationSequence++;
+        return Result.Success();
     }
 
     private static Result<Charge> Invalid(string message)

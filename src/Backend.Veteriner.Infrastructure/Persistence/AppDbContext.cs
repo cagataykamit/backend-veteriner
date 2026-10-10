@@ -85,6 +85,7 @@ public class AppDbContext : DbContext
     public DbSet<VaccineDefinition> VaccineDefinitions => Set<VaccineDefinition>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Charge> Charges => Set<Charge>();
+    public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<LabResult> LabResults => Set<LabResult>();

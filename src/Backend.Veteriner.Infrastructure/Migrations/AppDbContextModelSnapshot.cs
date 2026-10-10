@@ -497,6 +497,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal>("AllocatedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -525,6 +531,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<Guid?>("ExaminationId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("MutationSequence")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
 
                     b.Property<Guid?>("PetId")
                         .HasColumnType("uniqueidentifier");
@@ -563,6 +575,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.ToTable("Charges", null, t =>
                         {
+                            t.HasCheckConstraint("CK_Charges_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
+
                             t.HasCheckConstraint("CK_Charges_Amount_Positive", "[Amount] > 0");
                         });
                 });
@@ -996,6 +1010,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal>("AllocatedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -1020,6 +1040,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int>("Method")
                         .HasColumnType("int");
 
+                    b.Property<long>("MutationSequence")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
@@ -1028,6 +1054,13 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<Guid?>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RequestHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid?>("RequestId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("TenantId")
@@ -1047,7 +1080,59 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "PetId");
 
-                    b.ToTable("Payments", (string)null);
+                    b.HasIndex("TenantId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Payments_TenantId_RequestId")
+                        .HasFilter("[RequestId] IS NOT NULL");
+
+                    b.ToTable("Payments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Payments_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
+                        });
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Payments.PaymentAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ChargeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChargeId");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("TenantId", "ChargeId");
+
+                    b.HasIndex("TenantId", "PaymentId");
+
+                    b.ToTable("PaymentAllocations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PaymentAllocations_Amount_Positive", "[Amount] > 0");
+                        });
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Pets.Pet", b =>
@@ -2474,6 +2559,21 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Clinic");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Payments.PaymentAllocation", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Charges.Charge", null)
+                        .WithMany()
+                        .HasForeignKey("ChargeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Payments.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Pets.Pet", b =>
