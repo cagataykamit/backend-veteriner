@@ -192,11 +192,10 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
             userId,
             _timeProvider.GetUtcNow().UtcDateTime);
 
-        await _visitsWrite.AddAsync(visit, ct);
-
         try
         {
-            await _visitsWrite.SaveChangesAsync(ct);
+            // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir).
+            await _visitsWrite.AddAsync(visit, ct);
         }
         catch (DbUpdateException)
         {

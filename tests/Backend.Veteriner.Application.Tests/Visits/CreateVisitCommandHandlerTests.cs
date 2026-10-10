@@ -116,7 +116,6 @@ public sealed class CreateVisitCommandHandlerTests
         result.Value.Visit.ArrivedAtUtc.Should().Be(VisitHandlerTestSupport.FixedNowUtc);
         result.Value.Visit.CreatedByUserId.Should().Be(_userId);
         _visitsWrite.Verify(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()), Times.Once);
-        _visitsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _appointments.Verify(
             r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -258,7 +257,7 @@ public sealed class CreateVisitCommandHandlerTests
         _visitsRead.SetupSequence(r => r.FirstOrDefaultAsync(It.IsAny<ActiveVisitByPetIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Visit?)null)
             .ReturnsAsync(winner);
-        _visitsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+        _visitsWrite.Setup(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("duplicate"));
 
         var result = await CreateHandler().Handle(
@@ -273,7 +272,7 @@ public sealed class CreateVisitCommandHandlerTests
     public async Task Handle_Should_Rethrow_When_Save_Fails_And_No_Winner_Exists()
     {
         ReturnActiveVisitForPet(null);
-        _visitsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+        _visitsWrite.Setup(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("other failure"));
 
         var act = () => CreateHandler().Handle(

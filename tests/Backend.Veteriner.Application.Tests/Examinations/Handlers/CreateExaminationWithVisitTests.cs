@@ -213,7 +213,7 @@ public sealed class CreateExaminationWithVisitTests
     {
         var visit = WaitingVisit();
         ReturnVisit(visit);
-        _examinationsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+        _examinationsWrite.Setup(r => r.AddAsync(It.IsAny<Examination>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateConcurrencyException());
 
         var result = await CreateHandler().Handle(VisitOnly(visit.Id), CancellationToken.None);

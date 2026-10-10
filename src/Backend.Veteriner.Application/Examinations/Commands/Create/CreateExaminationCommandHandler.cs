@@ -213,14 +213,24 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             request.VitalsMeasuredAtUtc,
             visit?.Id);
 
-        await _examinationsWrite.AddAsync(examination, ct);
-
-        // Muayene başlayınca bekleyen geliş "Devam ediyor" olur (aynı SaveChanges; devam ediyorsa değişmez).
+        // Muayene başlayınca bekleyen geliş "Devam ediyor" olur. Repository AddAsync kaydı hemen kalıcılaştırdığı
+        // (SaveChanges) için geliş geçişi AddAsync öncesinde yapılır; muayene ve geliş tek SaveChanges'te atomiktir.
         if (visit is { CareStatus: VisitCareStatus.Waiting })
         {
             var started = visit.Start(_timeProvider.GetUtcNow().UtcDateTime);
             if (!started.IsSuccess)
                 return Result<ExaminationWriteResultDto>.Failure(started.Error);
+        }
+
+        try
+        {
+            await _examinationsWrite.AddAsync(examination, ct);
+        }
+        catch (DbUpdateConcurrencyException) when (visit is not null)
+        {
+            return Result<ExaminationWriteResultDto>.Failure(
+                "Visits.ConcurrencyConflict",
+                "Geliş kaydı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
         }
 
         // Appointment lifecycle: muayene başarıyla eklendiyse ve akış bir randevuya
@@ -236,17 +246,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             await _appointmentsWrite.UpdateAsync(appt, ct);
         }
 
-        try
-        {
-            await _examinationsWrite.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateConcurrencyException) when (visit is not null)
-        {
-            return Result<ExaminationWriteResultDto>.Failure(
-                "Visits.ConcurrencyConflict",
-                "Geliş kaydı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
-        }
-
+        await _examinationsWrite.SaveChangesAsync(ct);
         return Result<ExaminationWriteResultDto>.Success(
             new ExaminationWriteResultDto(examination.Id, ExaminationRowVersion.Encode(examination.RowVersion)));
     }
