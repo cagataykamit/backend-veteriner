@@ -63,7 +63,8 @@ Kesinleştirmeden sonra istemci yeni `rowVersion`'ı kullanır (ek not yazarken 
 | Durum | `code` | HTTP |
 |-------|--------|------|
 | `rowVersion` eksik/geçersiz | `Examinations.Validation` | 400 |
-| Muayene yok / başka kiracı / başka klinik bağlamı | `Examinations.NotFound` | 404 |
+| Muayene yok / başka kiracı | `Examinations.NotFound` | 404 |
+| Aktif klinik bağlamı muayene kliniğinden farklı | `Examinations.ClinicContextMismatch` | 400 (mevcut `PUT` ile aynı kod) |
 | Zaten kesinleşmiş | `Examinations.AlreadyFinalized` | **409** |
 | Sürüm çakışması (arada düzenlendi) | `Examinations.ConcurrencyConflict` | 409 |
 | Klinik erişimi yok | `Clinics.AccessDenied` | 403 |
@@ -102,7 +103,8 @@ Yeni durum alanlarını `PUT` değiştirmez (gövdede alan yok).
 |-------|--------|------|
 | `reason`/`text` eksik veya sınır dışı | `Examinations.Validation` | 400 |
 | Muayene `Draft` | `Examinations.NotFinalized` | **409** (taslak düzenlenir, ek not gerekmez) |
-| Muayene yok / başka kiracı / başka klinik bağlamı | `Examinations.NotFound` | 404 |
+| Muayene yok / başka kiracı | `Examinations.NotFound` | 404 |
+| Aktif klinik bağlamı muayene kliniğinden farklı | `Examinations.ClinicContextMismatch` | 400 (mevcut `PUT` ile aynı kod) |
 | Klinik erişimi yok | `Clinics.AccessDenied` | 403 |
 
 Ek not eklemek muayenenin `rowVersion`'ını **değiştirmez** ve `updatedAtUtc`'yi güncellemez.
@@ -111,7 +113,7 @@ Ek not eklemek muayenenin `rowVersion`'ını **değiştirmez** ve `updatedAtUtc`
 
 ## 6) Ek notları listele — `GET /api/v1/examinations/{id}/addenda`
 
-`Examinations.Read`. Sayfalama yok (hayvan başına ek not sayısı küçüktür). `createdAtUtc` artan (en eski önce), eşitse `id`. Muayene yok/erişilemez → `404 Examinations.NotFound`. Taslak muayenede boş liste döner.
+`Examinations.Read`. Sayfalama yok (hayvan başına ek not sayısı küçüktür). `createdAtUtc` artan (en eski önce), eşitse `id`. Muayene yok, başka kiracıya ait veya aktif klinik bağlamı farklıysa `404 Examinations.NotFound` (detay ucu ile aynı); atanmamış klinik `403 Clinics.AccessDenied`. Taslak muayenede boş liste döner.
 
 ```json
 [
