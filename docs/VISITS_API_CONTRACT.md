@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), backlog CHECKIN-006/007. Tüm endpoint'ler `api/v1` altında, JSON gövde/query, standart `ProblemDetails` + `extensions.code` hata zarfı (bkz. `EXAMINATIONS_WORKSPACE_API_CONTRACT.md`).
 
-> **Durum:** Sözleşme. Kararlar madde 12'de kayıtlı (D1 komut veritabanı okuması, K-A bağlama yok, S2 açık iş göstergesi yok, S3 `isVoided`, S4 hekim adı yok). Uygulama bu sözleşmeye göre yapılır.
+> **Durum:** Sözleşme. Kararlar madde 12'de kayıtlı (D1 komut veritabanı okuması, K-A bağlama yok, S2 açık iş göstergesi yok, S3 `isVoided`, S4 sorumlu hekim seçimi ve görünen ad (madde 3.1)). Uygulama bu sözleşmeye göre yapılır.
 
 ---
 
@@ -22,7 +22,8 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), b
 | `clinicId` | guid | |
 | `petId` | guid | |
 | `appointmentId` | guid? | Randevusuz geliş: `null` |
-| `responsibleVeterinarianUserId` | guid? | Opsiyonel; verilirse kiracı üyesi ve o kliniğe atanmış kullanıcı olmalı |
+| `responsibleVeterinarianUserId` | guid? | Opsiyonel; verilirse o kliniğin aktif hekimi olmalı (madde 3.1) |
+| `responsibleVeterinarianName` | string? | Hekimin görünen adı; hekim yoksa `null` |
 | `arrivedAtUtc` | datetime (UTC, `Z`) | Sunucu saatiyle atanır; istemci göndermez |
 | `careStatus` | `Waiting` \| `InProgress` \| `Completed` | |
 | `startedAtUtc` | datetime? | `InProgress`'e ilk geçiş |
@@ -69,6 +70,14 @@ Kurallar:
 - **Randevulu:** `appointmentId` dolu. `clinicId`/`petId` randevudan türetilir; gönderilirse randevu ile aynı olmalı, değilse `Visits.AppointmentPetClinicMismatch`. Randevu `Scheduled` olmalı: `Cancelled` → `Visits.AppointmentCancelled`; `Completed` ve o randevu için Visit yoksa → `Visits.AppointmentNotScheduled`.
 - **Randevusuz:** `appointmentId` yok; `petId` ve aktif klinik (`clinicId` veya bağlam) zorunlu, aksi halde `Visits.Validation`. Randevu **oluşturulmaz**.
 - Hayvan ve klinik kiracıya ait olmalı (`Pets.NotFound`, `Clinics.NotFound`, `Appointments.NotFound`).
+
+### 3.1) Sorumlu hekim: seçim ve doğrulama
+
+- **Opsiyonel** (randevulu ve randevusuz gelişte). Randevu hekim alanı taşımadığı için randevudan varsayılan türetilmez; seçilmezse `null` kalır.
+- **Hekim tanımı:** kiracıdaki **aktif** kliniğe atanmış (`UserClinic`) ve `Veteriner` operasyon claim'ine sahip kullanıcı. Aynı kural hekim listesi, geliş doğrulaması ve görünen ad çözümünde kullanılır (tek yerde: `IClinicVeterinarianReader`).
+- **Seçim listesi:** `GET /api/v1/clinics/{clinicId}/veterinarians` (`Visits.Create`; atanmamış klinik → `403 Clinics.AccessDenied`). Yanıt: `[{ "userId": "guid", "name": "string?" }]`, ada göre sıralı.
+- **Doğrulama:** seçilen kullanıcı o klinikte aktif hekim değilse (rol yok, başka klinik, bilinmeyen kimlik) → `400 Visits.Validation`; geliş oluşmaz.
+- **Görünen ad:** kullanıcının kayıtlı adı (`PUT /api/v1/me/display-name`, gövde `{ "displayName": "string?" }`, en çok 120 karakter, boş değer adı temizler, `204`); yoksa e-postadan türetilen ad (örn. `ali.veli@…` → `ali.veli`). Aynı kural `GET /me/account-summary` `displayName` alanında da geçerlidir.
 
 ### Idempotency (tekrar tıklama)
 
@@ -210,7 +219,7 @@ Randevulu Visit **tek satırdır** (randevu ayrıca satır üretmez). Satır kay
 | `arrivedAtUtc` | datetime? | Visit varsa |
 | `careStatus` | enum? | Visit varsa; planlı satırda `null` |
 | `appointmentStatus` | `Scheduled` \| `Completed` \| `Cancelled`? | Randevu varsa |
-| `responsibleVeterinarianUserId` | guid? | Visit varsa, opsiyonel (S4: ad döndürülmez) |
+| `responsibleVeterinarianUserId`, `responsibleVeterinarianName` | guid?, string? | Visit varsa, opsiyonel (madde 3.1) |
 | `isCarriedOver` | bool | |
 | `paymentIndicator` | `NoPaymentRecorded` \| `PaymentRecorded` | Aşağıya bakın |
 | `hasActiveHospitalization` | bool | Hayvanın açık yatışı var mı |
@@ -271,14 +280,14 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 - **K-A — Farklı niyetli tekrar geliş:** Hayvanın randevusuz aktif Visit'i varken aynı hayvanın randevusu için geliş denenirse mevcut Visit döner; randevu bağlanmaz.
 - **S2 — Açık iş göstergesi:** Lab/tedavi/reçete kayıtlarında açık-kapalı durumu yok; bu sürümde alan yok, uydurulmaz. Önce ürün tanımı gerekir.
 - **S3 — Yanlış geliş modeli:** Bakım durumuna 4. durum eklenmez; ayrı `isVoided` işareti (ADR "bakım durumu sade 3 durum" ile uyumlu).
-- **S4 — Sorumlu hekim etiketi:** Kullanıcı kaydında görünen ad alanı yoktur (yalnızca e-posta). Bugün satırı yalnızca `responsibleVeterinarianUserId` döner; istemci etiketi kullanıcı/klinik üyeleri listesinden çözer.
+- **S4 — Sorumlu hekim:** Opsiyonel; kiracıdaki aktif kliniğe atanmış `Veteriner` rolündeki kullanıcı. Görünen ad için `User.DisplayName` eklendi (boşsa e-posta türevi). Ayrıntı madde 3.1.
 
 ---
 
 ## 13) Deploy notu
 
 - **İzinler:** Yeni `Visits.Read`, `Visits.Create`, `Visits.Update`, `Visits.Correct` izinleri seeder ile (`PermissionSeeder`, `RolePermissionBindingSeeder`) gelir ve varsayılan rollere bağlanır (madde 2). Mevcut **özel roller** bu izinleri otomatik almaz; yöneticiler elle atamalıdır.
-- **Migration:** `AddVisits` (`Visits` tablosu, filtreli benzersiz indeksler, `Examinations.VisitId`) komut veritabanına uygulanmalıdır. Query DB şeması değişmez.
+- **Migration:** `AddVisits` (`Visits` tablosu, filtreli benzersiz indeksler, `Examinations.VisitId`) ve `AddUserDisplayName` (`Users.DisplayName`, nullable) komut veritabanına uygulanmalıdır. Query DB şeması değişmez.
 - **Yapılandırma:** Yeni bayrak veya ayar yoktur.
 
 ---
@@ -288,5 +297,5 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 - **Açık iş göstergesi yok:** Laboratuvar, tedavi ve reçete kayıtlarında açık/kapalı durumu tutulmadığı için Bugün'de gösterge yoktur (S2).
 - **Randevu outbox olayı yok:** Muayene randevuyu `Completed` yaptığında `appointment.completed.v1` olayı üretilmez; Query DB randevu read modeli `Scheduled` kalır. Bugün komut veritabanından okuduğu için etkilenmez; Query DB okuması açılmadan önce düzeltilmelidir.
 - **Query DB read modeli yok:** Visit için projeksiyon ve Query DB okuması bu sürümde yoktur (D1); bayrakla ayrı iş olarak eklenecektir.
-- **Hekim adı ve seçimi:** Kullanıcıda görünen ad alanı yoktur (yalnızca e-posta) ve klinikteki hekimleri listeleyen uç yoktur; Randevu hekim alanı da taşımaz. Bugün/Visit yalnızca `responsibleVeterinarianUserId` döner. Hekim seçimi için klinik hekim listesi ucu ve görünen ad kararı bekliyor (S4).
+- **Hekim adı ve seçimi:** Randevu hekim alanı taşımaz, bu yüzden randevudan varsayılan hekim türetilmez. Kullanıcıların gerçek adı yalnızca `PUT /me/display-name` ile girilir; girilmeyenlerde e-posta türevi ad görünür. Admin/davet akışında ad girişi yoktur. `GET /tenants/{id}/members` hâlâ e-posta türevi adı döner (bu işte değiştirilmedi).
 - **Ödeme göstergesi:** Yalnızca tahsilat kaydının varlığını söyler; borç/bakiye temel finans (Aşama 3) sonrasıdır.
