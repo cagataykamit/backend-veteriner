@@ -92,6 +92,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Create,
                 PermissionCatalog.Payments.Update,
 
+                PermissionCatalog.Charges.Read,
+                PermissionCatalog.Charges.Create,
+                PermissionCatalog.Charges.Correct,
+
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
                 PermissionCatalog.Treatments.Update,
@@ -182,6 +186,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Read,
                 PermissionCatalog.Payments.Create,
                 PermissionCatalog.Payments.Update,
+
+                PermissionCatalog.Charges.Read,
+                PermissionCatalog.Charges.Create,
+                PermissionCatalog.Charges.Correct,
 
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
@@ -281,6 +289,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Create,
                 PermissionCatalog.Payments.Update,
 
+                PermissionCatalog.Charges.Read,
+                PermissionCatalog.Charges.Create,
+                PermissionCatalog.Charges.Correct,
+
                 PermissionCatalog.Prescriptions.Read,
                 PermissionCatalog.Prescriptions.Create,
                 PermissionCatalog.Prescriptions.Update,
@@ -373,6 +385,8 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Payments.Read,
 
+                PermissionCatalog.Charges.Read,
+
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
 
@@ -417,6 +431,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Read,
                 PermissionCatalog.Payments.Create,
                 PermissionCatalog.Payments.Update,
+
+                PermissionCatalog.Charges.Read,
+                PermissionCatalog.Charges.Create,
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
