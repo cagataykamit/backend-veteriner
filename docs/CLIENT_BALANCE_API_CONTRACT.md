@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-012 (kabul edildi), backlog FIN-003; ilgili: `CHARGES_API_CONTRACT.md` (Dilim 1), `PAYMENT_ALLOCATION_API_CONTRACT.md` (Dilim 2), `FIN_DISCOVERY.md`. Hata zarfı standart `ProblemDetails` + `extensions.code`.
 
-> **Durum:** Sözleşme (uygulanıyor). Salt okuma ucu; **migration yok**, yeni izin yok. Bugün satırına ücret/ödenen/kalan alanları (Dilim 4) **bu sözleşmede yoktur**; öneri bölüm 7'dedir.
+> **Durum:** Sözleşme (uygulandı: bakiye ucu ve Bugün alanları). Salt okuma; **migration yok**, yeni izin yok.
 
 ---
 
@@ -102,11 +102,23 @@ Gruplama: ücretin `petId`'si (Dilim 1 kuralıyla Visit/Muayene'den türetilmiş
 
 Domain/uygulama: toplamlar, hayvan/ziyaret gruplama, ziyaretsiz/hayvansız ücret, kapalı ücretin listeden çıkması, eski ödemenin borç üretmemesi, TRY dışı eski ödeme, klinik kapsamı (tek/çoklu/boş), müşteri yok. Entegrasyon (LocalDB): 1000/400/600 kabul senaryosu, `Σ PaymentAllocations` = sayaç doğrulaması, kiracı ve klinik izolasyonu, `Charges.Read` olmadan 403, Veteriner okuyabilir.
 
-## 7) Öneri: Bugün satırı ve müşteri listesi (Dilim 4 hazırlığı; **bu dilimde uygulanmaz**)
+## 7) Bugün satırında ücret/ödenen/kalan (Dilim 4 hazırlığı; kullanıcı kararlarıyla kesinleşti)
 
-Kullanıcıya bildirilen kapsam, ayrı küçük dilim olarak onay bekler.
+`GET /api/v1/visits/today` yanıtındaki her `TodayItemDto` satırına dört **eklenen** alan gelir; `paymentIndicator` ve diğer alanlar aynen kalır (geriye uyumlu, kırıcı değişiklik yok). Yetki politikası değişmez (`Visits.Read`); tutarlar ayrıca `Charges.Read` ister.
 
-- **`GET /visits/today` (`TodayItemDto`):** `PaymentIndicator` aynen kalır (geriye uyum). Eklenecek alanlar: `chargedAmount`, `allocatedAmount`, `outstandingAmount` (`decimal?`). Ziyaret bazında anlamı: o `VisitId`'ye bağlı ücretlerin toplamı; Visit'siz randevu satırında `null`. Tek `Charges` sorgusuyla (`VisitId IN (...)` toplamı) gelir; Bugün sorgusu zaten Command DB'dendir, N+1 yok. `Charges.Read` olmayan kullanıcıya (Visits.Read-only rol) alanlar `null` döner (yetkiye göre süzme), böylece Bugün yetkisi para verisi sızdırmaz.
-- **Müşteri bakiyesi (müşteri bazlı borç) Bugün satırında:** ziyaretin değil müşterinin toplam açık borcu için ayrı `clientOutstandingAmount` alanı önerilir; böylece resepsiyon "bu ziyaret 500 TL, müşterinin toplam borcu 1.200 TL" ayrımını görür. Aynı tek sorgu `ClientId IN (...)` ile gruplanır.
-- **`GET /clients` (liste):** şimdilik **önerilmez** (arama/performans yüzeyi; bakiye listede istenirse ayrı filtre "borcu olanlar" ürün kararıdır). Müşteri detayında `GET /clients/{id}/balance` kullanılır.
-- Açık sorular: (1) Veteriner Bugün'de tutar görsün mü (`Charges.Read` var; öneri: görsün)? (2) `clientOutstandingAmount` ilk sürümde gerekli mi, yoksa yalnız ziyaret tutarları mı?
+| Alan | Tip | Anlam |
+|---|---|---|
+| `chargedAmount` | decimal? | Bu **ziyarete** (`visitId`) bağlı ücretlerin `amount` toplamı |
+| `allocatedAmount` | decimal? | Bu ziyaretin ücretlerine tahsis edilen toplam |
+| `outstandingAmount` | decimal? | `chargedAmount − allocatedAmount` (ziyaret bazında kalan) |
+| `clientOutstandingAmount` | decimal? | Satırdaki **müşterinin** bu klinikteki toplam açık borcu (ziyaretten bağımsız; muayenesiz/gelişsiz ücretler dahil) |
+
+Kurallar:
+
+- **`null` ne zaman:** kullanıcıda `Charges.Read` yoksa dört alan da `null`. Ziyaretsiz (yalnız randevulu, `visitId = null`) satırda ziyaret alanları (`chargedAmount`, `allocatedAmount`, `outstandingAmount`) `null`; `clientOutstandingAmount` yine dolu. `Charges.Read` varsa ve ziyaretin ücreti yoksa ziyaret alanları `0`'dır (null değil): "ücret yazılmamış" ile "yetkisiz" ayrılır.
+- Kapsam Bugün'ün kliniğidir (tek klinik). `clientOutstandingAmount` yalnızca o klinikteki ücretleri sayar; `GET /clients/{id}/balance` bağlam yoksa erişilebilir tüm klinikleri toplar, bu yüzden iki değer farklı olabilir. Yalnızca TRY. Diğer kiracı ve klinikler görünmez.
+- Bağlanmamış (eski) ödemeler bu alanları etkilemez; `outstandingAmount` ücret sayaçlarından gelir (bölüm 1).
+- Yanlış işaretli (`isVoided`) gelişlerde de ziyaret tutarları döner; ücret yine borçtur (ücret iptali Dilim 5).
+- Hesap `Charge` sayaçlarından yapılır. Tek `Charges` sorgusu satırlardaki müşteri kümesiyle (`ClientId IN …`, en çok 500 satır) çekilir; ziyaret toplamı aynı satırlardan `VisitId` ile ayrılır (N+1 yok).
+- `paymentIndicator` hâlâ "ödeme kaydı var/yok" bilgisidir ve bu alanlardan türetilmez.
+- Müşteri listesinde (`GET /clients`) borç alanı veya "borcu olanlar" filtresi **bu sözleşmede yoktur** (kullanıcı kararı).
