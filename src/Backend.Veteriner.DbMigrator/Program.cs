@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Outbox;
 using Backend.Veteriner.Infrastructure;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
@@ -59,6 +60,13 @@ try
                 var seeded = await DevTestVeterinarianSeeder.SeedAsync(
                     db, hasher, sp.GetRequiredService<IHostEnvironment>(), logger, CancellationToken.None);
                 logger.LogInformation("Dev test veterinarian seed finished (ready: {Ready}).", seeded);
+                break;
+            }
+        case "seed-dev-sample-data":
+            {
+                var summary = await DevSampleDataSeeder.SeedAsync(
+                    db, sp.GetRequiredService<IOutboxBuffer>(), sp.GetRequiredService<IHostEnvironment>(), logger, CancellationToken.None);
+                logger.LogInformation("Dev sample data seed finished (ready: {Ready}).", summary is not null);
                 break;
             }
         case "all":
@@ -369,6 +377,7 @@ static void PrintHelp()
           seed           — Permission/Data/AdminClaim/InviteAssignable seed zinciri
           all            — önce migrate, sonra seed
           seed-dev-veterinarian — YALNIZCA Development: test hekim kullanıcısı (idempotent; kimlik bilgileri DevTestVeterinarianSeeder.cs)
+          seed-dev-sample-data  — YALNIZCA Development: örnek randevu/ücret/ödeme (idempotent; DevSampleDataSeeder.cs; kimlik bilgisi yok)
           loadtest-seed  — yük testi sentetik veri (yalnızca VetinityCommandDb_LoadTest command DB; profil: small)
           rebuild-appointment-projections — Command DB randevularından Query read-model yeniden oluştur
                                             (--batch-size 1000 opsiyonel)
