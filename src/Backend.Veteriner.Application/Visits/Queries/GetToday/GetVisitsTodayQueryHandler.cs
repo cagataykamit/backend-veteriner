@@ -1,9 +1,12 @@
+using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Visits;
@@ -20,6 +23,8 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IVisitTodayReader _reader;
+    private readonly IReadRepository<Charge> _charges;
+    private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IClinicVeterinarianReader _veterinarians;
     private readonly TimeProvider _timeProvider;
 
@@ -28,6 +33,8 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IVisitTodayReader reader,
+        IReadRepository<Charge> charges,
+        ICurrentUserPermissionChecker permissions,
         IClinicVeterinarianReader veterinarians,
         TimeProvider timeProvider)
     {
@@ -35,6 +42,8 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _reader = reader;
+        _charges = charges;
+        _permissions = permissions;
         _veterinarians = veterinarians;
         _timeProvider = timeProvider;
     }
@@ -100,12 +109,53 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
                 $"Bugün görünümü en çok {MaxItems} satır gösterebilir.");
         }
 
+        var items = await WithChargeAmountsAsync(tenantId, clinicId, data.Items, ct);
+
         return Result<TodayDto>.Success(new TodayDto(
             date,
             clinicId,
             nowUtc,
-            request.Voided ? data.Items.OrderByDescending(i => i.ArrivedAtUtc).ToList() : Order(data.Items),
+            request.Voided ? items.OrderByDescending(i => i.ArrivedAtUtc).ToList() : Order(items),
             data.ActiveHospitalizations));
+    }
+
+    /// <summary>
+    /// Ücret tutarlarını ekler: ziyaret bazında ve müşterinin bu klinikteki toplam açık borcu.
+    /// <c>Charges.Read</c> yoksa satırlara dokunmaz (alanlar null).
+    /// </summary>
+    private async Task<IReadOnlyList<TodayItemDto>> WithChargeAmountsAsync(
+        Guid tenantId, Guid clinicId, IReadOnlyList<TodayItemDto> items, CancellationToken ct)
+    {
+        if (items.Count == 0 || !_permissions.HasPermission(PermissionCatalog.Charges.Read))
+            return items;
+
+        var clientIds = items.Select(i => i.ClientId).Distinct().ToArray();
+        var rows = await _charges.ListAsync(new ChargeAmountsForClientsSpec(tenantId, clinicId, clientIds), ct);
+
+        var clientOutstanding = rows
+            .GroupBy(r => r.ClientId)
+            .ToDictionary(g => g.Key, g => g.Sum(r => r.Amount - r.AllocatedAmount));
+        var visitTotals = rows
+            .Where(r => r.VisitId.HasValue)
+            .GroupBy(r => r.VisitId!.Value)
+            .ToDictionary(g => g.Key, g => (Charged: g.Sum(r => r.Amount), Allocated: g.Sum(r => r.AllocatedAmount)));
+
+        return items
+            .Select(i =>
+            {
+                var withClient = i with { ClientOutstandingAmount = clientOutstanding.GetValueOrDefault(i.ClientId) };
+                if (i.VisitId is not { } visitId)
+                    return withClient;
+
+                var (charged, allocated) = visitTotals.GetValueOrDefault(visitId);
+                return withClient with
+                {
+                    ChargedAmount = charged,
+                    AllocatedAmount = allocated,
+                    OutstandingAmount = charged - allocated,
+                };
+            })
+            .ToList();
     }
 
     /// <summary>
