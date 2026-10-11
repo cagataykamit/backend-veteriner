@@ -5,6 +5,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
@@ -25,7 +26,7 @@ namespace Backend.IntegrationTests.Clients;
 /// <summary>
 /// GET /clients/{id}/balance uçtan uca: HTTP + gerçek SQL Server (LocalDB, izole test veritabanı).
 /// Kabul senaryosu (1.000 TL / 400 + 600), hasta-ziyaret kırılımı, bağlanmamış eski ödeme, sayaç–tahsis tutarlılığı,
-/// klinik ve kiracı izolasyonu, yetki.
+/// klinik ve kiracı izolasyonu, yetki. Ayrıca GET /visits/today satırlarındaki ücret/ödenen/kalan alanları.
 /// </summary>
 [Collection("pilot-smoke-api")]
 public sealed class ClientBalanceIntegrationTests : IClassFixture<CustomWebApplicationFactory>
@@ -36,6 +37,7 @@ public sealed class ClientBalanceIntegrationTests : IClassFixture<CustomWebAppli
         PermissionCatalog.Payments.Create,
         PermissionCatalog.Charges.Read,
         PermissionCatalog.Charges.Create,
+        PermissionCatalog.Visits.Read,
     ];
 
     private readonly CustomWebApplicationFactory _factory;
@@ -184,6 +186,74 @@ public sealed class ClientBalanceIntegrationTests : IClassFixture<CustomWebAppli
         (await ok.Content.ReadFromJsonAsync<ClientBalanceDto>())!.OutstandingAmount.Should().Be(10m);
     }
 
+    // ---- Bugün satırı ----
+
+    [Fact]
+    public async Task Today_Should_Show_Partially_Paid_And_Unpaid_Visit_Amounts_And_Client_Outstanding()
+    {
+        var ctx = await SeedAsync();
+        var pet1 = await ctx.SeedPetAsync();
+        var pet2 = await ctx.SeedPetAsync();
+        var visit1 = await ctx.SeedVisitAsync(pet1);
+        var visit2 = await ctx.SeedVisitAsync(pet2);
+        var charge1 = await ctx.SeedChargeAsync(1000m, pet1, visit1);
+        await ctx.SeedChargeAsync(90m, pet2, visit2);
+        await ctx.SeedChargeAsync(50m, null, null);
+        (await ctx.PayAsync(400m, charge1)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var today = await ctx.GetTodayAsync();
+
+        var partial = today.Items.Single(i => i.VisitId == visit1);
+        (partial.ChargedAmount, partial.AllocatedAmount, partial.OutstandingAmount).Should().Be((1000m, 400m, 600m));
+        partial.ClientOutstandingAmount.Should().Be(740m);
+        var unpaid = today.Items.Single(i => i.VisitId == visit2);
+        (unpaid.ChargedAmount, unpaid.AllocatedAmount, unpaid.OutstandingAmount).Should().Be((90m, 0m, 90m));
+        unpaid.ClientOutstandingAmount.Should().Be(740m);
+        // Mevcut gösterge aynen kalır (alanlar eklemedir).
+        Enum.IsDefined(partial.PaymentIndicator).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Today_Visit_Without_Charges_Should_Show_Zero_Amounts()
+    {
+        var ctx = await SeedAsync();
+        var visitId = await ctx.SeedVisitAsync(await ctx.SeedPetAsync());
+
+        var item = (await ctx.GetTodayAsync()).Items.Single(i => i.VisitId == visitId);
+
+        (item.ChargedAmount, item.AllocatedAmount, item.OutstandingAmount, item.ClientOutstandingAmount)
+            .Should().Be((0m, 0m, 0m, 0m));
+    }
+
+    [Fact]
+    public async Task Today_Client_Outstanding_Should_Ignore_Other_Clinic_Charges()
+    {
+        var ctx = await SeedAsync();
+        var visitId = await ctx.SeedVisitAsync(await ctx.SeedPetAsync());
+        await ctx.SeedChargeAsync(100m, null, null);
+        var otherClinicId = await ctx.SeedForeignClinicAsync();
+        await ctx.SeedChargeAsync(900m, null, null, otherClinicId);
+
+        var item = (await ctx.GetTodayAsync()).Items.Single(i => i.VisitId == visitId);
+
+        item.ClientOutstandingAmount.Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task Today_Without_Charges_Read_Should_Return_Null_Amounts()
+    {
+        var ctx = await SeedAsync();
+        var visitId = await ctx.SeedVisitAsync(await ctx.SeedPetAsync());
+        await ctx.SeedChargeAsync(100m, null, visitId);
+        var noCharges = await ctx.NewHttpForAnotherUserAsync([PermissionCatalog.Visits.Read]);
+
+        var today = await noCharges.GetFromJsonAsync<TodayDto>($"/api/v1/visits/today?clinicId={ctx.ClinicId}");
+
+        var item = today!.Items.Single(i => i.VisitId == visitId);
+        (item.ChargedAmount, item.AllocatedAmount, item.OutstandingAmount, item.ClientOutstandingAmount)
+            .Should().Be(((decimal?)null, (decimal?)null, (decimal?)null, (decimal?)null));
+    }
+
     // ---- Kurulum ----
 
     private async Task<BalanceTestContext> SeedAsync()
@@ -274,6 +344,9 @@ public sealed class ClientBalanceIntegrationTests : IClassFixture<CustomWebAppli
 
         public async Task<ClientBalanceDto> GetBalanceAsync()
             => (await Http.GetFromJsonAsync<ClientBalanceDto>($"/api/v1/clients/{ClientId}/balance"))!;
+
+        public async Task<TodayDto> GetTodayAsync()
+            => (await Http.GetFromJsonAsync<TodayDto>($"/api/v1/visits/today?clinicId={ClinicId}"))!;
 
         public Task<HttpResponseMessage> PayAsync(decimal amount, Guid chargeId)
             => Http.PostAsJsonAsync("/api/v1/payments", new
