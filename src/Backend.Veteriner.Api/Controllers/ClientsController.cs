@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Clients.Commands.QuickRegister;
 using Backend.Veteriner.Application.Clients.Commands.Update;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetById;
+using Backend.Veteriner.Application.Clients.Queries.GetBalance;
 using Backend.Veteriner.Application.Clients.Queries.GetList;
 using Backend.Veteriner.Application.Clients.Queries.GetPaymentSummary;
 using Backend.Veteriner.Application.Clients.Queries.GetRecentSummary;
@@ -164,6 +165,24 @@ public sealed class ClientsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetClientPaymentSummaryQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Müşteri bakiyesi: ücret toplamı, tahsis edilen, açık kalan; hasta/ziyaret kırılımı ve bağlanmamış eski ödemeler (aktif klinik bağlamı varsa bu kliniğe indirgenir).
+    /// </summary>
+    [HttpGet("{id:guid}/balance")]
+    [Authorize(Policy = PermissionCatalog.Charges.Read)]
+    [ProducesResponseType(typeof(ClientBalanceDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBalance([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClientBalanceQuery(id), ct);
         return result.ToActionResult(this);
     }
 
