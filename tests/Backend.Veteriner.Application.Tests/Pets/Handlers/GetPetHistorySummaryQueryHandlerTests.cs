@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Queries.GetHistorySummary;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -25,6 +26,7 @@ public sealed class GetPetHistorySummaryQueryHandlerTests
     private readonly Mock<ITenantContext> _tenant = new();
     private readonly Mock<IClinicContext> _clinic = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
+    private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
@@ -36,11 +38,17 @@ public sealed class GetPetHistorySummaryQueryHandlerTests
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizations = new();
     private readonly Mock<IReadRepository<Payment>> _payments = new();
 
+    public GetPetHistorySummaryQueryHandlerTests()
+    {
+        _permissions.Setup(p => p.HasPermission(It.IsAny<string>())).Returns(true);
+    }
+
     private GetPetHistorySummaryQueryHandler CreateHandler(Mock<IClinicReadScopeResolver>? scopeResolver = null)
         => new(
             _tenant.Object,
             _clinic.Object,
             (scopeResolver ?? _scopeResolver).Object,
+            _permissions.Object,
             _pets.Object,
             _clients.Object,
             _clinics.Object,
@@ -181,5 +189,83 @@ public sealed class GetPetHistorySummaryQueryHandlerTests
         _appointments.Verify(
             r => r.ListAsync(It.IsAny<AppointmentsForPetRecentSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_AllPermissions_Should_ReturnNoOmittedBlocks()
+    {
+        var tid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        SetupPet(tid, Guid.NewGuid(), petId);
+
+        var result = await CreateHandler().Handle(new GetPetHistorySummaryQuery(petId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.OmittedBlocks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_PetsReadOnlyUser_Should_OmitClinicalBlocksWithoutQueryingThem()
+    {
+        var tid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        SetupPet(tid, Guid.NewGuid(), petId);
+        _permissions.Reset();
+        _permissions.Setup(p => p.HasPermission(PermissionCatalog.Pets.Read)).Returns(true);
+
+        var result = await CreateHandler().Handle(new GetPetHistorySummaryQuery(petId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.OmittedBlocks.Should().BeEquivalentTo(
+            "Appointments", "Examinations", "Treatments", "Prescriptions", "LabResults", "Hospitalizations", "Payments");
+        _payments.Verify(
+            r => r.ListAsync(It.IsAny<PaymentsForPetRecentSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _labResults.Verify(
+            r => r.ListAsync(It.IsAny<LabResultsForPetRecentSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_OnlyPaymentsDenied_Should_OmitOnlyPayments_AndStillLoadOthers()
+    {
+        var tid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        SetupPet(tid, Guid.NewGuid(), petId);
+        _permissions.Setup(p => p.HasPermission(PermissionCatalog.Payments.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetPetHistorySummaryQuery(petId), CancellationToken.None);
+
+        result.Value!.OmittedBlocks.Should().Equal("Payments");
+        _examinations.Verify(
+            r => r.ListAsync(It.IsAny<ExaminationsForPetRecentSpec>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _payments.Verify(
+            r => r.ListAsync(It.IsAny<PaymentsForPetRecentSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_NoClinicAssignments_Should_StillReportOmittedBlocks()
+    {
+        var tid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var scope = new Mock<IClinicReadScopeResolver>();
+        scope.Setup(r => r.ResolveAsync(tid, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<ClinicReadScope>.Success(new ClinicReadScope(null, Array.Empty<Guid>())));
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        SetupPet(tid, Guid.NewGuid(), petId);
+        _permissions.Setup(p => p.HasPermission(PermissionCatalog.Payments.Read)).Returns(false);
+
+        var result = await CreateHandler(scope).Handle(new GetPetHistorySummaryQuery(petId), CancellationToken.None);
+
+        result.Value!.OmittedBlocks.Should().Equal("Payments");
     }
 }

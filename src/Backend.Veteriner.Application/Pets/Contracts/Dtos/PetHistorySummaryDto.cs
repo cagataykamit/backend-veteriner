@@ -3,6 +3,7 @@ using Backend.Veteriner.Domain.Payments;
 
 namespace Backend.Veteriner.Application.Pets.Contracts.Dtos;
 
+/// <param name="OmittedBlocks">Yetki yok nedeniyle boş bırakılan bloklar; boş blok + listede yok = kayıt yok.</param>
 public sealed record PetHistorySummaryDto(
     Guid PetId,
     string PetName,
@@ -14,7 +15,8 @@ public sealed record PetHistorySummaryDto(
     IReadOnlyList<PetHistoryPrescriptionItemDto> RecentPrescriptions,
     IReadOnlyList<PetHistoryLabResultItemDto> RecentLabResults,
     IReadOnlyList<PetHistoryHospitalizationItemDto> RecentHospitalizations,
-    IReadOnlyList<PetHistoryPaymentItemDto> RecentPayments);
+    IReadOnlyList<PetHistoryPaymentItemDto> RecentPayments,
+    IReadOnlyList<string> OmittedBlocks);
 
 public sealed record PetHistoryAppointmentItemDto(
     Guid Id,
@@ -30,7 +32,9 @@ public sealed record PetHistoryExaminationItemDto(
     DateTime ExaminedAtUtc,
     Guid ClinicId,
     string ClinicName,
-    string VisitReason);
+    string VisitReason,
+    Guid? VisitId,
+    DateTime? UpdatedAtUtc);
 
 public sealed record PetHistoryTreatmentItemDto(
     Guid Id,
@@ -38,7 +42,8 @@ public sealed record PetHistoryTreatmentItemDto(
     Guid ClinicId,
     string ClinicName,
     string Title,
-    Guid? ExaminationId);
+    Guid? ExaminationId,
+    DateTime? UpdatedAtUtc);
 
 public sealed record PetHistoryPrescriptionItemDto(
     Guid Id,
@@ -47,7 +52,8 @@ public sealed record PetHistoryPrescriptionItemDto(
     string ClinicName,
     string Title,
     Guid? ExaminationId,
-    Guid? TreatmentId);
+    Guid? TreatmentId,
+    DateTime? UpdatedAtUtc);
 
 public sealed record PetHistoryLabResultItemDto(
     Guid Id,
@@ -55,7 +61,8 @@ public sealed record PetHistoryLabResultItemDto(
     Guid ClinicId,
     string ClinicName,
     string TestName,
-    Guid? ExaminationId);
+    Guid? ExaminationId,
+    DateTime? UpdatedAtUtc);
 
 public sealed record PetHistoryHospitalizationItemDto(
     Guid Id,
@@ -64,7 +71,9 @@ public sealed record PetHistoryHospitalizationItemDto(
     string ClinicName,
     string Reason,
     DateTime? DischargedAtUtc,
-    bool IsActive);
+    bool IsActive,
+    Guid? ExaminationId,
+    DateTime? UpdatedAtUtc);
 
 public sealed record PetHistoryPaymentItemDto(
     Guid Id,

@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Pets.Access;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Appointments;
@@ -22,9 +23,21 @@ namespace Backend.Veteriner.Application.Pets.Queries.GetHistorySummary;
 public sealed class GetPetHistorySummaryQueryHandler
     : IRequestHandler<GetPetHistorySummaryQuery, Result<PetHistorySummaryDto>>
 {
+    private static readonly (PetRecordKind Kind, string Name)[] HistoryBlocks =
+    [
+        (PetRecordKind.Appointment, "Appointments"),
+        (PetRecordKind.Examination, "Examinations"),
+        (PetRecordKind.Treatment, "Treatments"),
+        (PetRecordKind.Prescription, "Prescriptions"),
+        (PetRecordKind.LabResult, "LabResults"),
+        (PetRecordKind.Hospitalization, "Hospitalizations"),
+        (PetRecordKind.Payment, "Payments")
+    ];
+
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
+    private readonly ICurrentUserPermissionChecker _permissionChecker;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Clinic> _clinics;
@@ -40,6 +53,7 @@ public sealed class GetPetHistorySummaryQueryHandler
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
+        ICurrentUserPermissionChecker permissionChecker,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
         IReadRepository<Clinic> clinics,
@@ -54,6 +68,7 @@ public sealed class GetPetHistorySummaryQueryHandler
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
+        _permissionChecker = permissionChecker;
         _pets = pets;
         _clients = clients;
         _clinics = clinics;
@@ -89,24 +104,26 @@ public sealed class GetPetHistorySummaryQueryHandler
         var singleClinicId = scopeResult.Value!.SingleClinicId;
         var accessibleClinicIds = scopeResult.Value.AccessibleClinicIds;
 
+        var omittedBlocks = OmittedBlocks();
+
         if (accessibleClinicIds is { Count: 0 })
-            return EmptyHistory(pet, clientName);
+            return EmptyHistory(pet, clientName, omittedBlocks);
 
         var take = PetHistorySummaryConstants.RecentItemsTake;
 
-        var appts = await _appointments.ListAsync(
+        var appts = !CanRead(PetRecordKind.Appointment) ? [] : await _appointments.ListAsync(
             new AppointmentsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
-        var exams = await _examinations.ListAsync(
+        var exams = !CanRead(PetRecordKind.Examination) ? [] : await _examinations.ListAsync(
             new ExaminationsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
-        var treatments = await _treatments.ListAsync(
+        var treatments = !CanRead(PetRecordKind.Treatment) ? [] : await _treatments.ListAsync(
             new TreatmentsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
-        var rx = await _prescriptions.ListAsync(
+        var rx = !CanRead(PetRecordKind.Prescription) ? [] : await _prescriptions.ListAsync(
             new PrescriptionsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
-        var labs = await _labResults.ListAsync(
+        var labs = !CanRead(PetRecordKind.LabResult) ? [] : await _labResults.ListAsync(
             new LabResultsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
-        var hosp = await _hospitalizations.ListAsync(
+        var hosp = !CanRead(PetRecordKind.Hospitalization) ? [] : await _hospitalizations.ListAsync(
             new HospitalizationsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
-        var pays = await _payments.ListAsync(
+        var pays = !CanRead(PetRecordKind.Payment) ? [] : await _payments.ListAsync(
             new PaymentsForPetRecentSpec(tenantId, singleClinicId, request.PetId, take, accessibleClinicIds), ct);
 
         var clinicIds = new HashSet<Guid>();
@@ -143,7 +160,9 @@ public sealed class GetPetHistorySummaryQueryHandler
                 e.ExaminedAtUtc,
                 e.ClinicId,
                 ClinicName(e.ClinicId),
-                e.VisitReason))
+                e.VisitReason,
+                e.VisitId,
+                e.UpdatedAtUtc))
             .ToList();
 
         var recentTreatments = treatments
@@ -153,7 +172,8 @@ public sealed class GetPetHistorySummaryQueryHandler
                 t.ClinicId,
                 ClinicName(t.ClinicId),
                 t.Title,
-                t.ExaminationId))
+                t.ExaminationId,
+                t.UpdatedAtUtc))
             .ToList();
 
         var recentRx = rx
@@ -164,7 +184,8 @@ public sealed class GetPetHistorySummaryQueryHandler
                 ClinicName(p.ClinicId),
                 p.Title,
                 p.ExaminationId,
-                p.TreatmentId))
+                p.TreatmentId,
+                p.UpdatedAtUtc))
             .ToList();
 
         var recentLabs = labs
@@ -174,7 +195,8 @@ public sealed class GetPetHistorySummaryQueryHandler
                 l.ClinicId,
                 ClinicName(l.ClinicId),
                 l.TestName,
-                l.ExaminationId))
+                l.ExaminationId,
+                l.UpdatedAtUtc))
             .ToList();
 
         var recentHosp = hosp
@@ -185,7 +207,9 @@ public sealed class GetPetHistorySummaryQueryHandler
                 ClinicName(h.ClinicId),
                 h.Reason,
                 h.DischargedAtUtc,
-                h.DischargedAtUtc is null))
+                h.DischargedAtUtc is null,
+                h.ExaminationId,
+                h.UpdatedAtUtc))
             .ToList();
 
         var recentPays = pays
@@ -210,10 +234,17 @@ public sealed class GetPetHistorySummaryQueryHandler
             recentRx,
             recentLabs,
             recentHosp,
-            recentPays));
+            recentPays,
+            omittedBlocks));
     }
 
-    private static Result<PetHistorySummaryDto> EmptyHistory(Pet pet, string clientName)
+    private bool CanRead(PetRecordKind kind) => _permissionChecker.CanRead(kind);
+
+    // Yetkisiz blok boş liste döner; omittedBlocks "kayıt yok" ile "yetki yok" ayrımını taşır.
+    private IReadOnlyList<string> OmittedBlocks()
+        => HistoryBlocks.Where(b => !CanRead(b.Kind)).Select(b => b.Name).ToList();
+
+    private static Result<PetHistorySummaryDto> EmptyHistory(Pet pet, string clientName, IReadOnlyList<string> omittedBlocks)
         => Result<PetHistorySummaryDto>.Success(new PetHistorySummaryDto(
             pet.Id,
             pet.Name,
@@ -225,5 +256,6 @@ public sealed class GetPetHistorySummaryQueryHandler
             [],
             [],
             [],
-            []));
+            [],
+            omittedBlocks));
 }
