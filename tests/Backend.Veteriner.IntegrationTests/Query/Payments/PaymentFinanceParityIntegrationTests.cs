@@ -29,6 +29,7 @@ public sealed class PaymentFinanceParityIntegrationTests
 
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+        await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
 
         var (tenantId, clinicId, _) =
@@ -59,6 +60,7 @@ public sealed class PaymentFinanceParityIntegrationTests
 
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+        await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
 
         var (tenantId, clinicId, _) =
@@ -84,6 +86,7 @@ public sealed class PaymentFinanceParityIntegrationTests
 
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+        await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
 
         var (tenantA, clinicA, _) =

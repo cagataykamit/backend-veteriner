@@ -13,6 +13,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
@@ -27,8 +28,14 @@ namespace Backend.Veteriner.Application.Tests.Payments.Handlers;
 /// <summary>IDOR-7H: payment write clinic assignment enforcement unit tests.</summary>
 public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
 {
+    public PaymentWriteClinicAssignmentCommandHandlerTests() => _permissions.Setup(p => p.HasPermission(It.IsAny<string>())).Returns(true);
+
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClientContext> _clientContext = new();
+    private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
+    private readonly Mock<IRepository<Charge>> _chargesWrite = new();
+    private readonly Mock<IRepository<PaymentAllocation>> _allocationsWrite = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
@@ -44,6 +51,7 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _clientContext.Object,
             resolver ?? _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
@@ -51,13 +59,18 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
             _pets.Object,
             _appointments.Object,
             _examinations.Object,
+            _paymentsRead.Object,
             _paymentsWrite.Object,
+            _chargesWrite.Object,
+            _allocationsWrite.Object,
+            TimeProvider.System,
             _eventOutbox.Object);
 
     private UpdatePaymentCommandHandler CreateUpdateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _permissions.Object,
             resolver ?? _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
@@ -71,6 +84,7 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
 
     private void SetupTenantClinicClient(Guid tid, Guid cid, Guid clientId)
     {
+        PaymentAllocationTestSupport.Setup(_chargesWrite, _clientContext, tid, cid, clientId);
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
@@ -98,7 +112,9 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
             "TRY",
             PaymentMethod.Cash,
             DateTime.UtcNow.AddHours(-1),
-            null);
+            null,
+            Guid.NewGuid(),
+            PaymentAllocationTestSupport.Lines(150.50m));
 
     private static UpdatePaymentCommand UpdateCmd(
         Guid id,
@@ -118,7 +134,8 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
             "TRY",
             PaymentMethod.Cash,
             DateTime.UtcNow.AddHours(-1),
-            null);
+            null,
+            "Test duzeltme gerekcesi");
 
     private static Payment ExistingRow(Guid tid, Guid cid, Guid clientId, decimal amount = 50m)
     {

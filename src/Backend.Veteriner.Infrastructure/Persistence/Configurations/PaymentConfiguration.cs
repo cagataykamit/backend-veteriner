@@ -6,9 +6,15 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Configurations;
 
 public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 {
+    /// <summary>Aynı istemci isteği (RequestId) kiracıda en fazla bir ödeme üretir.</summary>
+    public const string RequestIdIndexName = "UX_Payments_TenantId_RequestId";
+
     public void Configure(EntityTypeBuilder<Payment> b)
     {
-        b.ToTable("Payments");
+        b.ToTable("Payments", t =>
+        {
+            t.HasCheckConstraint("CK_Payments_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
+        });
 
         b.HasKey(x => x.Id);
 
@@ -28,11 +34,21 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.Property(x => x.PaidAtUtc).IsRequired();
         b.Property(x => x.Notes).HasMaxLength(4000);
 
+        b.Property(x => x.AllocatedAmount).HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
+        b.Property(x => x.RequestId);
+        b.Property(x => x.RequestHash).HasMaxLength(64);
+        b.Property(x => x.MutationSequence).IsRequired().HasDefaultValue(0L).IsConcurrencyToken();
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ClinicId });
         b.HasIndex(x => new { x.TenantId, x.ClientId });
         b.HasIndex(x => new { x.TenantId, x.PetId });
         b.HasIndex(x => new { x.TenantId, x.PaidAtUtc });
         b.HasIndex(x => new { x.TenantId, x.Method });
+
+        b.HasIndex(x => new { x.TenantId, x.RequestId })
+            .IsUnique()
+            .HasFilter("[RequestId] IS NOT NULL")
+            .HasDatabaseName(RequestIdIndexName);
     }
 }

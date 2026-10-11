@@ -1,9 +1,12 @@
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Payments;
 
 /// <summary>
 /// Klinik tahsilat kaydı (sade çekirdek). Fatura / iade / kasa kapanışı bu aggregate dışındadır.
+/// Yeni tahsilat bir veya daha fazla ücrete tam olarak tahsis edilir (<see cref="AllocateFully"/>);
+/// eski kayıtlar <see cref="AllocatedAmount"/> = 0 ile "bağlanmamış" kalır.
 /// </summary>
 public sealed class Payment : AggregateRoot
 {
@@ -18,12 +21,28 @@ public sealed class Payment : AggregateRoot
     /// <summary>Tutar; para birimi <see cref="Currency"/> ile birlikte yorumlanır.</summary>
     public decimal Amount { get; private set; }
 
-    /// <summary>ISO 4217 alpha-3 (örn. TRY). Tek kiracılık TR operasyonu için varsayılan TRY.</summary>
+    /// <summary>ISO 4217 alpha-3 (örn. TRY). Yeni tahsilatlar yalnızca TRY (<see cref="IsSupportedCurrency"/>).</summary>
     public string Currency { get; private set; } = default!;
 
     public PaymentMethod Method { get; private set; }
     public DateTime PaidAtUtc { get; private set; }
     public string? Notes { get; private set; }
+
+    /// <summary>Ücretlere tahsis edilen toplam; <c>0 ≤ AllocatedAmount ≤ Amount</c>. Yalnızca <see cref="ApplyAllocation"/> değiştirir.</summary>
+    public decimal AllocatedAmount { get; private set; }
+
+    public decimal UnallocatedAmount => Amount - AllocatedAmount;
+
+    /// <summary>İstemci tekrar koruması anahtarı (eski kayıtlarda null); kiracıda benzersizdir.</summary>
+    public Guid? RequestId { get; private set; }
+
+    /// <summary>İstek içeriğinin özeti; aynı <see cref="RequestId"/> farklı içerikle gelirse çakışma ayırt edilir.</summary>
+    public string? RequestHash { get; private set; }
+
+    /// <summary>
+    /// Başarılı mutasyon sayacı; optimistic concurrency token. Yeni kayıt 0 ile başlar, her mutasyon 1 artırır.
+    /// </summary>
+    public long MutationSequence { get; private set; }
 
     private Payment() { }
 
@@ -38,7 +57,9 @@ public sealed class Payment : AggregateRoot
         string currency,
         PaymentMethod method,
         DateTime paidAtUtc,
-        string? notes)
+        string? notes,
+        Guid? requestId = null,
+        string? requestHash = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -66,7 +87,37 @@ public sealed class Payment : AggregateRoot
         Method = method;
         PaidAtUtc = NormalizeUtc(paidAtUtc);
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        RequestId = requestId;
+        RequestHash = requestHash;
     }
+
+    public const int MinCorrectionReasonLength = 5;
+    public const int MaxCorrectionReasonLength = 500;
+
+    /// <summary>Düzeltme gerekçesi zorunludur (5–500 karakter, boşluklar kırpılır).</summary>
+    public static Result ValidateCorrectionReason(string? reason)
+    {
+        var length = reason?.Trim().Length ?? 0;
+        return length is >= MinCorrectionReasonLength and <= MaxCorrectionReasonLength
+            ? Result.Success()
+            : Result.Failure(
+                "Payments.Validation",
+                $"Düzeltme gerekçesi {MinCorrectionReasonLength}-{MaxCorrectionReasonLength} karakter olmalıdır.");
+    }
+
+    /// <summary>Yeni tahsilatlar yalnızca TRY kabul eder (ADR-012; çoklu para birimi FIN-006).</summary>
+    public static bool IsSupportedCurrency(string? currency)
+        => string.Equals(currency?.Trim(), Charge.DefaultCurrency, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Verilen değerler tutar, müşteri, klinik veya para biriminden birini değiştiriyorsa true:
+    /// bu bir düzeltmedir (yönetici yetkisi + gerekçe ister).
+    /// </summary>
+    public bool IsCorrection(Guid clinicId, Guid clientId, decimal amount, string currency)
+        => clinicId != ClinicId
+           || clientId != ClientId
+           || amount != Amount
+           || !string.Equals(currency?.Trim(), Currency, StringComparison.OrdinalIgnoreCase);
 
     public Result UpdateDetails(
         Guid clinicId,
@@ -93,6 +144,13 @@ public sealed class Payment : AggregateRoot
         if (c.Length != 3)
             return Result.Failure("Payments.Validation", "Para birimi ISO 4217 alpha-3 (3 harf) olmalidir.");
 
+        if (AllocatedAmount > 0 && IsCorrection(clinicId, clientId, amount, c))
+        {
+            return Result.Failure(
+                "Payments.UpdateBlockedByAllocation",
+                "Ücrete tahsis edilmiş ödemenin tutarı, müşterisi, kliniği veya para birimi değiştirilemez.");
+        }
+
         ClinicId = clinicId;
         ClientId = clientId;
         PetId = petId;
@@ -103,8 +161,97 @@ public sealed class Payment : AggregateRoot
         Method = method;
         PaidAtUtc = NormalizeUtc(paidAtUtc);
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        MutationSequence++;
         return Result.Success();
     }
+
+    /// <summary>
+    /// Yeni tahsilatı verilen ücretlere tam olarak tahsis eder: toplam tutara eşit olmalı, her tahsis ücretin açık
+    /// tutarını aşamaz, ücretler aynı kiracı/klinik/müşteri/para biriminde olmalı. Başarısızsa hiçbir şey değişmez.
+    /// Dönen satırlar kalıcılaştırılmalıdır.
+    /// </summary>
+    public Result<IReadOnlyList<PaymentAllocation>> AllocateFully(
+        IReadOnlyList<(Charge Charge, decimal Amount)> lines,
+        Guid createdByUserId,
+        DateTime nowUtc)
+    {
+        if (lines.Count == 0)
+            return Fail("Payments.AllocationsRequired", "Ödeme en az bir ücrete tahsis edilmelidir.");
+
+        if (AllocatedAmount != 0)
+            return Fail("Payments.Validation", "Ödeme zaten tahsis edilmiş.");
+
+        if (lines.Select(l => l.Charge.Id).Distinct().Count() != lines.Count)
+            return Fail("Payments.Validation", "Aynı ücret birden fazla kez tahsis edilemez.");
+
+        foreach (var (charge, amount) in lines)
+        {
+            if (amount <= 0 || decimal.Round(amount, 2) != amount)
+                return Fail("Payments.Validation", "Tahsis tutarı 0'dan büyük ve en fazla 2 ondalıklı olmalıdır.");
+
+            if (charge.TenantId != TenantId || charge.ClinicId != ClinicId)
+                return Fail("PaymentAllocations.ChargeClinicMismatch", "Ücret bu ödemeyle aynı klinikte değil.");
+
+            if (charge.ClientId != ClientId)
+                return Fail("PaymentAllocations.ChargeClientMismatch", "Ücret bu ödemeyle aynı müşteriye ait değil.");
+
+            if (!string.Equals(charge.Currency, Currency, StringComparison.OrdinalIgnoreCase))
+                return Fail("Payments.Validation", "Ücret ve ödeme para birimi aynı olmalıdır.");
+        }
+
+        if (lines.Sum(l => l.Amount) != Amount)
+        {
+            return Fail(
+                "Payments.AllocationSumMismatch",
+                "Tahsis tutarları toplamı ödeme tutarına eşit olmalıdır; ödeme açık tutar kadar kaydedilir.");
+        }
+
+        foreach (var (charge, amount) in lines)
+        {
+            if (amount > charge.OutstandingAmount)
+            {
+                return Fail(
+                    "PaymentAllocations.ExceedsOutstanding",
+                    $"Tahsis tutarı ücretin açık tutarını aşıyor (ChargeId={charge.Id}, açık tutar={charge.OutstandingAmount:0.00}).");
+            }
+        }
+
+        var allocations = new List<PaymentAllocation>(lines.Count);
+        foreach (var (charge, amount) in lines)
+        {
+            var applied = charge.ApplyAllocation(amount);
+            if (!applied.IsSuccess)
+                return Result<IReadOnlyList<PaymentAllocation>>.Failure(applied.Error);
+
+            allocations.Add(PaymentAllocation.Create(TenantId, ClinicId, Id, charge.Id, amount, createdByUserId, nowUtc));
+        }
+
+        var self = ApplyAllocation(lines.Sum(l => l.Amount));
+        return self.IsSuccess
+            ? Result<IReadOnlyList<PaymentAllocation>>.Success(allocations)
+            : Result<IReadOnlyList<PaymentAllocation>>.Failure(self.Error);
+    }
+
+    /// <summary>Tahsis sayacını artırır; <c>AllocatedAmount ≤ Amount</c> değişmezini korur.</summary>
+    public Result ApplyAllocation(decimal amount)
+    {
+        if (amount <= 0)
+            return Result.Failure("Payments.Validation", "Tahsis tutarı 0'dan büyük olmalıdır.");
+
+        if (amount > UnallocatedAmount)
+        {
+            return Result.Failure(
+                "PaymentAllocations.ExceedsOutstanding",
+                "Tahsis tutarı ödemenin bağlanmamış tutarını aşıyor.");
+        }
+
+        AllocatedAmount += amount;
+        MutationSequence++;
+        return Result.Success();
+    }
+
+    private static Result<IReadOnlyList<PaymentAllocation>> Fail(string code, string message)
+        => Result<IReadOnlyList<PaymentAllocation>>.Failure(code, message);
 
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch

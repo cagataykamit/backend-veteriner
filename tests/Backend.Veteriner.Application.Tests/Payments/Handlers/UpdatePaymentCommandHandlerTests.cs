@@ -12,6 +12,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
@@ -25,8 +26,14 @@ namespace Backend.Veteriner.Application.Tests.Payments.Handlers;
 
 public sealed class UpdatePaymentCommandHandlerTests
 {
+    public UpdatePaymentCommandHandlerTests() => _permissions.Setup(p => p.HasPermission(It.IsAny<string>())).Returns(true);
+
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
+    private readonly Mock<IClientContext> _clientContext = new();
+    private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
+    private readonly Mock<IRepository<Charge>> _chargesWrite = new();
+    private readonly Mock<IRepository<PaymentAllocation>> _allocationsWrite = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
@@ -42,6 +49,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _permissions.Object,
             resolver ?? _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
@@ -73,7 +81,8 @@ public sealed class UpdatePaymentCommandHandlerTests
             "TRY",
             PaymentMethod.Cash,
             paidAt ?? DateTime.UtcNow.AddHours(-1),
-            null);
+            null,
+            "Test duzeltme gerekcesi");
 
     private static Payment PaymentWithId(Guid id, Guid tid, Guid cid, Guid clientId)
     {

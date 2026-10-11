@@ -107,7 +107,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         {
             if (context.Type == typeof(CreatePaymentCommand))
             {
-                MarkRequired(schema, "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc");
+                MarkRequired(schema, "clinicId", "clientId", "amount", "currency", "method", "paidAtUtc", "requestId", "allocations");
                 SetNullable(schema, "currency", false);
                 SetNullable(schema, "petId", true);
                 SetNullable(schema, "appointmentId", true);
@@ -121,6 +121,8 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 Describe(schema, "appointmentId", "Opsiyonel; doluysa klinik/müşteri/hayvan ile tutarlı olmalıdır.");
                 Describe(schema, "examinationId", "Opsiyonel; doluysa klinik/müşteri/hayvan ile tutarlı olmalıdır.");
                 Describe(schema, "notes", "Opsiyonel; en fazla 4000 karakter.");
+                Describe(schema, "requestId", "Zorunlu. Çift istek koruması; aynı anahtar aynı içerikle ilk ödemeyi döndürür.");
+                Describe(schema, "allocations", "Zorunlu, boş olamaz. Tahsis edilen ücretler; toplam tutar ödeme tutarına eşit olmalıdır.");
                 return;
             }
 
@@ -137,6 +139,8 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 Describe(schema, "currency", "Zorunlu. ISO 4217 alpha-3.");
                 Describe(schema, "method", "Zorunlu. 0=Cash, 1=Card, 2=Transfer.");
                 Describe(schema, "notes", "Opsiyonel.");
+                SetNullable(schema, "reason", true);
+                Describe(schema, "reason", "Tutar, müşteri, klinik veya para birimi değişiyorsa zorunlu (5-500 karakter); Payments.Correct yetkisi ister.");
                 return;
             }
 

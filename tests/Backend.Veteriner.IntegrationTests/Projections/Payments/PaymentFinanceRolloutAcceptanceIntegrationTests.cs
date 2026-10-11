@@ -56,6 +56,7 @@ public sealed class PaymentFinanceRolloutAcceptanceIntegrationTests
 
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+        await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
 
         var (tenantId, clinicId, _) = await PaymentFinanceTestSupport.SeedTenantWithTwoClinicsAsync(commandDb);

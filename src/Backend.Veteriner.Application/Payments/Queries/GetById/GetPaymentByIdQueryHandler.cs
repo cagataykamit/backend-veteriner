@@ -140,7 +140,9 @@ public sealed class GetPaymentByIdQueryHandler
             p.Currency,
             p.Method,
             p.PaidAtUtc,
-            p.Notes);
+            p.Notes,
+            p.AllocatedAmount,
+            p.UnallocatedAmount);
         return Result<PaymentDetailDto>.Success(dto);
     }
 

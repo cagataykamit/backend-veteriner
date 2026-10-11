@@ -149,6 +149,7 @@ public sealed class PaymentReadModelParityIntegrationTests
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+        await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
     }
 

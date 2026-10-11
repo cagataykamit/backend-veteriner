@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Infrastructure.Persistence;
 using FluentAssertions;
@@ -70,7 +71,8 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
 
         var (email, _, assignedClinicId, _) =
             await IntegrationTestAuthHelper.SeedPaymentWriterUserAsync(_factory.Services, hasher);
-        var (clientId, _) = await SeedClientInClinicAsync(assignedClinicId);
+        var (clientId, clientTenantId) = await SeedClientInClinicAsync(assignedClinicId);
+        var chargeId = await SeedChargeAsync(clientTenantId, assignedClinicId, clientId, 150m);
 
         var token = await IssuePaymentWriteTokenAsync(email);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -83,6 +85,8 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
             Currency = "TRY",
             Method = PaymentMethod.Cash,
             PaidAtUtc = ValidPaidAtUtc,
+            RequestId = Guid.NewGuid(),
+            Allocations = new[] { new { ChargeId = chargeId, Amount = 150m } },
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -218,7 +222,8 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
 
         var (email, password, extraClinicId) =
             await IntegrationTestAuthHelper.SeedTenantAdminUserAsync(_factory.Services, hasher);
-        var (clientId, _) = await SeedClientInClinicAsync(extraClinicId);
+        var (clientId, clientTenantId) = await SeedClientInClinicAsync(extraClinicId);
+        var chargeId = await SeedChargeAsync(clientTenantId, extraClinicId, clientId, 200m);
 
         var login = await IntegrationTestAuthHelper.LoginAsync(client, _factory.Services, email, password);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
@@ -231,6 +236,8 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
             Currency = "TRY",
             Method = PaymentMethod.Cash,
             PaidAtUtc = ValidPaidAtUtc,
+            RequestId = Guid.NewGuid(),
+            Allocations = new[] { new { ChargeId = chargeId, Amount = 200m } },
         });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var paymentId = await createResponse.Content.ReadFromJsonAsync<Guid>();
@@ -239,7 +246,7 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
         {
             ClinicId = extraClinicId,
             ClientId = clientId,
-            Amount = 220m,
+            Amount = 200m,
             Currency = "TRY",
             Method = PaymentMethod.Cash,
             PaidAtUtc = ValidPaidAtUtc,
@@ -304,6 +311,19 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    private async Task<Guid> SeedChargeAsync(Guid tenantId, Guid clinicId, Guid clientId, decimal amount)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var charge = Charge.Create(
+                tenantId, clinicId, clientId, null, null, null, "Seed ucret", 1m, amount,
+                Guid.NewGuid(), DateTime.UtcNow, null)
+            .Value!;
+        db.Charges.Add(charge);
+        await db.SaveChangesAsync();
+        return charge.Id;
     }
 
     private async Task<(Guid ClientId, Guid TenantId)> SeedClientInClinicAsync(Guid clinicId)

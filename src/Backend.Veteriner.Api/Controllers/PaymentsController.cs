@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Commands.Update;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Application.Payments.Queries.GetAllocations;
 using Backend.Veteriner.Application.Payments.Queries.GetById;
 using Backend.Veteriner.Application.Payments.Queries.GetList;
 using Backend.Veteriner.Domain.Payments;
@@ -39,6 +40,8 @@ public sealed class PaymentsController : ControllerBase
     [Authorize(Policy = PermissionCatalog.Payments.Create)]
     [Consumes("application/json")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -51,11 +54,32 @@ public sealed class PaymentsController : ControllerBase
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
-        var id = result.Value;
+        var created = result.Value!;
+        if (!created.Created)
+        {
+            // Aynı requestId + aynı içerik: ilk ödeme döner, ikinci kayıt yazılmaz.
+            Response.Headers["Idempotency-Replayed"] = "true";
+            return Ok(created.Id);
+        }
+
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
-            id);
+            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id = created.Id },
+            created.Id);
+    }
+
+    /// <summary>Ödemenin ücretlere tahsisleri (hangi ücretten ne kadar).</summary>
+    [HttpGet("{id:guid}/allocations")]
+    [Authorize(Policy = PermissionCatalog.Payments.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<PaymentAllocationItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAllocations([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetPaymentAllocationsQuery(id), ct);
+        return result.ToActionResult(this);
     }
 
     [HttpPut("{id:guid}")]
@@ -84,7 +108,8 @@ public sealed class PaymentsController : ControllerBase
             body.Currency,
             body.Method,
             body.PaidAtUtc,
-            body.Notes);
+            body.Notes,
+            body.Reason);
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);
