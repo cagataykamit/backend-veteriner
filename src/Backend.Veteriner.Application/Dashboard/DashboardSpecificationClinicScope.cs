@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.LabResults;
@@ -62,6 +63,23 @@ internal static class DashboardSpecificationClinicScope
             return query.Where(_ => false);
 
         return query.Where(p => accessibleClinicIds.Contains(p.ClinicId));
+    }
+
+    internal static ISpecificationBuilder<Charge> ApplyToCharge(
+        ISpecificationBuilder<Charge> query,
+        Guid? clinicId,
+        IReadOnlyCollection<Guid>? accessibleClinicIds)
+    {
+        if (clinicId.HasValue)
+            return query.Where(c => c.ClinicId == clinicId.Value);
+
+        if (accessibleClinicIds is null)
+            return query;
+
+        if (accessibleClinicIds.Count == 0)
+            return query.Where(_ => false);
+
+        return query.Where(c => accessibleClinicIds.Contains(c.ClinicId));
     }
 
     internal static ISpecificationBuilder<Examination> ApplyToExamination(
