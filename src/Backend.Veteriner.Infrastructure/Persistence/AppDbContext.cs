@@ -80,6 +80,7 @@ public class AppDbContext : DbContext
     public DbSet<PetColor> PetColors => Set<PetColor>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Examination> Examinations => Set<Examination>();
+    public DbSet<ExaminationAddendum> ExaminationAddenda => Set<ExaminationAddendum>();
     public DbSet<Visit> Visits => Set<Visit>();
     public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
     public DbSet<VaccineDefinition> VaccineDefinitions => Set<VaccineDefinition>();

@@ -4,9 +4,12 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Examinations;
+using Backend.Veteriner.Application.Examinations.Commands.AddAddendum;
 using Backend.Veteriner.Application.Examinations.Commands.Create;
+using Backend.Veteriner.Application.Examinations.Commands.Finalize;
 using Backend.Veteriner.Application.Examinations.Commands.Update;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
+using Backend.Veteriner.Application.Examinations.Queries.GetAddenda;
 using Backend.Veteriner.Application.Examinations.Queries.GetById;
 using Backend.Veteriner.Application.Examinations.Queries.GetList;
 using Backend.Veteriner.Application.Examinations.Queries.GetRelatedSummary;
@@ -121,6 +124,65 @@ public sealed class ExaminationsController : ControllerBase
             body.ClearVitals);
 
         var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Muayeneyi kesinleştirir (Taslak → Kesinleşti); sonrasında içerik salt okunurdur, düzeltme yalnız ek not ile yapılır.
+    /// </summary>
+    [HttpPost("{id:guid}/finalize")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Finalize)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ExaminationFinalizeResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Finalize([FromRoute] Guid id, [FromBody] FinalizeExaminationBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new FinalizeExaminationCommand(id, body.RowVersion), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Kesinleşmiş muayeneye gerekçeli, değişmez ek not ekler.</summary>
+    [HttpPost("{id:guid}/addenda")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Addendum)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ExaminationAddendumDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AddAddendum([FromRoute] Guid id, [FromBody] AddExaminationAddendumBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new AddExaminationAddendumCommand(id, body.Reason, body.Text), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        return CreatedAtAction(
+            nameof(GetAddenda),
+            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
+            result.Value);
+    }
+
+    /// <summary>Muayenenin ek notları, eskiden yeniye (sayfalama yok).</summary>
+    [HttpGet("{id:guid}/addenda")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<ExaminationAddendumDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAddenda([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetExaminationAddendaQuery(id), ct);
         return result.ToActionResult(this);
     }
 

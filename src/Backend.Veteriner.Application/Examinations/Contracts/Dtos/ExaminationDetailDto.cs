@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using Backend.Veteriner.Domain.Examinations;
+
 namespace Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 
 public sealed record ExaminationDetailDto(
@@ -24,4 +27,8 @@ public sealed record ExaminationDetailDto(
     string RowVersion,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
-    Guid? VisitId = null);
+    Guid? VisitId = null,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] ExaminationStatus Status = ExaminationStatus.Draft,
+    DateTime? FinalizedAtUtc = null,
+    Guid? FinalizedByUserId = null,
+    string? FinalizedByName = null);

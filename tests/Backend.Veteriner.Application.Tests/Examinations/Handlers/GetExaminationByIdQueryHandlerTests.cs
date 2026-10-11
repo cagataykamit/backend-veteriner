@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Queries.GetById;
 using Backend.Veteriner.Application.Clients.Specs;
@@ -22,6 +23,7 @@ public sealed class GetExaminationByIdQueryHandlerTests
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IClinicVeterinarianReader> _userNames = new();
 
     private readonly Guid _userId = Guid.NewGuid();
 
@@ -42,7 +44,8 @@ public sealed class GetExaminationByIdQueryHandlerTests
             _userClinics.Object,
             _examinations.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            _userNames.Object);
 
     private void SetupTenant(Guid tenantId) => _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
 
@@ -257,6 +260,53 @@ public sealed class GetExaminationByIdQueryHandlerTests
         result.Value.ClientName.Should().Be("Ali Veli");
         result.Value.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10));
         result.Value.UpdatedAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnDraftStatus_Without_FinalizeInfo_For_NewExamination()
+    {
+        var tid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        SetupTenant(tid);
+        SetupTenantWideRole("PlatformAdmin");
+        var entity = BuildExamination(tid, Guid.NewGuid(), petId);
+        SetupExaminationFound(entity);
+        SetupDetailGraph(tid, petId, Guid.NewGuid());
+
+        var result = await CreateHandler().Handle(new GetExaminationByIdQuery(entity.Id), CancellationToken.None);
+
+        result.Value!.Status.Should().Be(ExaminationStatus.Draft);
+        result.Value.FinalizedAtUtc.Should().BeNull();
+        result.Value.FinalizedByUserId.Should().BeNull();
+        result.Value.FinalizedByName.Should().BeNull();
+        _userNames.Verify(
+            r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFinalizeInfo_With_Name_When_Finalized()
+    {
+        var tid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var vetId = Guid.NewGuid();
+        var finalizedAt = new DateTime(2026, 10, 11, 9, 30, 0, DateTimeKind.Utc);
+        SetupTenant(tid);
+        SetupTenantWideRole("PlatformAdmin");
+        var entity = BuildExamination(tid, Guid.NewGuid(), petId);
+        entity.Finalize(vetId, finalizedAt);
+        SetupExaminationFound(entity);
+        SetupDetailGraph(tid, petId, Guid.NewGuid());
+        _userNames
+            .Setup(r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, string?> { [vetId] = "Dr. Ayşe" });
+
+        var result = await CreateHandler().Handle(new GetExaminationByIdQuery(entity.Id), CancellationToken.None);
+
+        result.Value!.Status.Should().Be(ExaminationStatus.Finalized);
+        result.Value.FinalizedAtUtc.Should().Be(finalizedAt);
+        result.Value.FinalizedByUserId.Should().Be(vetId);
+        result.Value.FinalizedByName.Should().Be("Dr. Ayşe");
     }
 
     [Fact]

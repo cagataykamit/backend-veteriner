@@ -30,6 +30,12 @@ public sealed class ExaminationConfiguration : IEntityTypeConfiguration<Examinat
         b.Property(x => x.Assessment).HasMaxLength(4000);
         b.Property(x => x.Plan).HasMaxLength(4000);
         b.Property(x => x.Notes).HasMaxLength(4000);
+        b.Property(x => x.Status)
+            .IsRequired()
+            .HasConversion<int>()
+            .HasDefaultValue(ExaminationStatus.Draft);
+        b.Property(x => x.FinalizedAtUtc);
+        b.Property(x => x.FinalizedByUserId);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
 

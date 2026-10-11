@@ -97,7 +97,7 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
-        if (normalized.Contains("sameplan") || normalized.Contains("notopen"))
+        if (normalized.Contains("sameplan") || normalized.Contains("notopen") || normalized.Contains("finalized"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }

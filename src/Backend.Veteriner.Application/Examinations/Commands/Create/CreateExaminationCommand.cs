@@ -1,24 +1,31 @@
+using System.Text.Json.Serialization;
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
 namespace Backend.Veteriner.Application.Examinations.Commands.Create;
 
+/// <summary>Klinik metin alanları audit yüküne yazılmaz (<c>JsonIgnore</c>).</summary>
 public sealed record CreateExaminationCommand(
     Guid? ClinicId,
     Guid? PetId,
     Guid? AppointmentId,
     DateTime ExaminedAtUtc,
-    string VisitReason,
-    string Findings,
-    string? Assessment,
-    string? Notes,
-    string? Anamnesis = null,
-    string? Plan = null,
+    [property: JsonIgnore] string VisitReason,
+    [property: JsonIgnore] string Findings,
+    [property: JsonIgnore] string? Assessment,
+    [property: JsonIgnore] string? Notes,
+    [property: JsonIgnore] string? Anamnesis = null,
+    [property: JsonIgnore] string? Plan = null,
     decimal? WeightKg = null,
     decimal? TemperatureC = null,
     int? HeartRateBpm = null,
     int? RespiratoryRatePerMin = null,
     DateTime? VitalsMeasuredAtUtc = null,
     Guid? VisitId = null)
-    : IRequest<Result<ExaminationWriteResultDto>>;
+    : IRequest<Result<ExaminationWriteResultDto>>, IAuditableRequest
+{
+    public string AuditAction => "Examination.Create";
+    public string? AuditTarget => $"PetId={PetId}";
+}

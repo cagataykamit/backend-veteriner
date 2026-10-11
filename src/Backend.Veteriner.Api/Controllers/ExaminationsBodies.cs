@@ -69,3 +69,16 @@ public sealed class UpdateExaminationBody
 
     public string? RowVersion { get; init; }
 }
+
+/// <summary>POST /examinations/{id}/finalize gövdesi. <see cref="RowVersion"/>: istemcinin gördüğü sürüm (Base64); zorunlu.</summary>
+public sealed class FinalizeExaminationBody
+{
+    public string? RowVersion { get; init; }
+}
+
+/// <summary>POST /examinations/{id}/addenda gövdesi. Gerekçe ve metin zorunludur.</summary>
+public sealed class AddExaminationAddendumBody
+{
+    public string? Reason { get; init; }
+    public string? Text { get; init; }
+}
