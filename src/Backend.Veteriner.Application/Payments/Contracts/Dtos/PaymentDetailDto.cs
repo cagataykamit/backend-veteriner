@@ -19,4 +19,5 @@ public sealed record PaymentDetailDto(
     DateTime PaidAtUtc,
     string? Notes,
     decimal? AllocatedAmount = null,
-    decimal? UnallocatedAmount = null);
+    decimal? UnallocatedAmount = null,
+    int? PetCount = null);

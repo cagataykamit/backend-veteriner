@@ -288,15 +288,18 @@ public sealed class ReverseStockMovementCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_Fail_When_Product_Inactive()
+    public async Task Handle_Should_Reverse_Even_When_Product_Inactive()
     {
         var original = Movement(StockMovementType.Out);
         SetupMovementById(original);
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, 6m, 0);
+        SetupStock(stock);
         _product.Deactivate();
 
         var result = await CreateHandler().Handle(Cmd(original.Id), CancellationToken.None);
 
-        result.Error!.Code.Should().Be("Products.Inactive");
+        result.IsSuccess.Should().BeTrue();
+        stock.QuantityOnHand.Should().Be(6m + original.Quantity);
     }
 
     [Fact]

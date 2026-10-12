@@ -30,6 +30,7 @@ public sealed class GetPaymentByIdQueryHandler
     private readonly IPaymentGetByIdReadModelReader _getByIdReadModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetPaymentByIdQueryHandler>? _logger;
+    private readonly IPaymentPetCountReader? _petCountReader;
 
     public GetPaymentByIdQueryHandler(
         ITenantContext tenantContext,
@@ -42,7 +43,8 @@ public sealed class GetPaymentByIdQueryHandler
         IReadRepository<Client> clients,
         IPaymentGetByIdReadModelReader getByIdReadModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
-        ILogger<GetPaymentByIdQueryHandler>? logger = null)
+        ILogger<GetPaymentByIdQueryHandler>? logger = null,
+        IPaymentPetCountReader? petCountReader = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -55,6 +57,7 @@ public sealed class GetPaymentByIdQueryHandler
         _getByIdReadModelReader = getByIdReadModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger;
+        _petCountReader = petCountReader;
     }
 
     public async Task<Result<PaymentDetailDto>> Handle(GetPaymentByIdQuery request, CancellationToken ct)
@@ -126,6 +129,13 @@ public sealed class GetPaymentByIdQueryHandler
             petName = pet?.Name ?? string.Empty;
         }
 
+        int? petCount = null;
+        if (_petCountReader is not null)
+        {
+            var counts = await _petCountReader.CountDistinctPetsAsync(tenantId, [p.Id], ct);
+            petCount = PaymentPetCount.Resolve(p.PetId, counts.GetValueOrDefault(p.Id));
+        }
+
         var dto = new PaymentDetailDto(
             p.Id,
             p.TenantId,
@@ -142,7 +152,8 @@ public sealed class GetPaymentByIdQueryHandler
             p.PaidAtUtc,
             p.Notes,
             p.AllocatedAmount,
-            p.UnallocatedAmount);
+            p.UnallocatedAmount,
+            petCount);
         return Result<PaymentDetailDto>.Success(dto);
     }
 

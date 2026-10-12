@@ -107,9 +107,7 @@ public sealed class ReverseStockMovementCommandHandler
             return AlreadyReversed();
         }
 
-        if (!product.IsActive)
-            return Fail("Products.Inactive", "Pasif ürün için stok hareketi oluşturulamaz.");
-
+        // Pasif ürün ters hareketi engellemez (ADR-013): stok iadesi/geri alma ürün pasif yapıldıktan sonra da yazılabilmelidir.
         var stock = await _productStocksWrite.FirstOrDefaultAsync(
             new ProductStockForUpdateSpec(tenantId, original.ClinicId, original.ProductId), ct);
         if (stock is null && original.ReversalIncreasesStock)

@@ -24,6 +24,9 @@ internal static class AdministrationMappings
             a.VoidedAtUtc,
             a.VoidedByUserId,
             a.VoidReason,
+            a.VoidStockOutcome?.ToString(),
+            a.AddedAfterFinalization,
+            a.LateEntryReason,
             a.CreatedByUserId,
             a.CreatedAtUtc,
             a.RequestId);
