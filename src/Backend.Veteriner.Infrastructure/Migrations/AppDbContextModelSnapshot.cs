@@ -1113,6 +1113,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<bool>("InterpretationRequired")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
