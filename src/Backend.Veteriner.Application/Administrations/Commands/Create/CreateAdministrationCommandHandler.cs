@@ -2,7 +2,6 @@ using Backend.Veteriner.Application.Administrations.Contracts.Dtos;
 using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
-using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.ProductStocks.Specs;
@@ -136,6 +135,7 @@ public sealed class CreateAdministrationCommandHandler
             return Fail("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
         var examinationId = request.ExaminationId;
+        var addedAfterFinalization = false;
         if (request.TreatmentId is { } treatmentId)
         {
             var treatment = await _treatments.FirstOrDefaultAsync(new TreatmentByIdSpec(tenantId, treatmentId), ct);
@@ -170,9 +170,8 @@ public sealed class CreateAdministrationCommandHandler
             if (exam.PetId != request.PetId)
                 return Fail("Administrations.ExaminationPetMismatch", "Muayene ile seçilen hayvan uyuşmuyor.");
 
-            var locked = exam.EnsureAcceptsLinkedRecords();
-            if (!locked.IsSuccess)
-                return Result<AdministrationCreateResultDto>.Failure(locked.Error);
+            // Kesinleşmiş muayene uygulamayı reddetmez (ADR-013): sonradan ekleme olarak gerekçeyle kaydedilir.
+            addedAfterFinalization = exam.IsFinalized;
         }
 
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
@@ -191,6 +190,8 @@ public sealed class CreateAdministrationCommandHandler
             request.Quantity,
             administeredAtUtc,
             request.Notes,
+            addedAfterFinalization,
+            request.LateEntryReason,
             userId,
             nowUtc,
             request.RequestId);

@@ -10,6 +10,8 @@ namespace Backend.Veteriner.Application.Examinations.Access;
 /// Tedavi, reçete ve aşı gibi muayeneye bağlı kayıtların yazma handler'ları için ortak kilit denetimi:
 /// ilgili muayenelerden biri kesinleşmişse yazma reddedilir (kural <see cref="Examination.EnsureAcceptsLinkedRecords"/>).
 /// Hem hedef hem mevcut (taşınan/ayrılan) muayene verilmelidir; muayenesi bulunamayanlar burada atlanır, varlık denetimi çağıranındır.
+/// Kontrollü istisna (ADR-013): uygulama kaydı (administration) bu kilide takılmaz; kesinleşmiş muayeneye gerekçeli "sonradan ekleme" olarak
+/// yazılır (kural <c>CreateAdministrationCommandHandler</c> ve <c>Administration.Create</c> içinde), tedavi/reçete/aşı/yatış kilidi değişmez.
 /// </summary>
 internal static class ExaminationLinkedRecordLock
 {

@@ -15,7 +15,8 @@ public sealed class AdministrationConfiguration : IEntityTypeConfiguration<Admin
         b.ToTable("Administrations", t =>
         {
             t.HasCheckConstraint("CK_Administrations_Quantity_Positive", "[Quantity] > 0");
-            t.HasCheckConstraint("CK_Administrations_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
+            t.HasCheckConstraint("CK_Administrations_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL AND [VoidStockOutcome] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL AND [VoidStockOutcome] IS NOT NULL)");
+            t.HasCheckConstraint("CK_Administrations_LateEntry_Consistent", "([AddedAfterFinalization] = 0 AND [LateEntryReason] IS NULL) OR ([AddedAfterFinalization] = 1 AND [LateEntryReason] IS NOT NULL)");
         });
 
         b.HasKey(x => x.Id);
@@ -34,10 +35,18 @@ public sealed class AdministrationConfiguration : IEntityTypeConfiguration<Admin
         b.Property(x => x.VoidedAtUtc);
         b.Property(x => x.VoidedByUserId);
         b.Property(x => x.VoidReason).HasMaxLength(CorrectionReason.MaxLength);
+        b.Property(x => x.VoidStockOutcome);
+
+        b.Property(x => x.AddedAfterFinalization).IsRequired();
+        b.Property(x => x.LateEntryReason).HasMaxLength(CorrectionReason.MaxLength);
 
         b.Property(x => x.CreatedByUserId).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.RequestId);
+
+        b.Property(x => x.RowVersion)
+            .IsRowVersion()
+            .IsConcurrencyToken();
 
         b.HasIndex(x => new { x.TenantId, x.PetId });
         b.HasIndex(x => new { x.TenantId, x.ExaminationId });
