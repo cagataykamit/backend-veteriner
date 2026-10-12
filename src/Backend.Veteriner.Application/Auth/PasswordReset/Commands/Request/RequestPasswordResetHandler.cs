@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Diagnostics;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
@@ -40,13 +41,13 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
     public async Task<Unit> Handle(RequestPasswordResetCommand request, CancellationToken ct)
     {
         var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();
-        _logger.LogInformation("PasswordReset: START for {Email}", email);
+        _logger.LogInformation("PasswordReset: START for {Email}", LogMasking.MaskEmail(email));
 
         // 1) Kullan�c�y� bul
         var user = await _users.FirstOrDefaultAsync(new UserByEmailSpec(email), ct);
         if (user is null)
         {
-            _logger.LogWarning("PasswordReset: user NOT FOUND for {Email}", email);
+            _logger.LogWarning("PasswordReset: user NOT FOUND for {Email}", LogMasking.MaskEmail(email));
             return Unit.Value; // bilgi s�zd�rma yok
         }
 
@@ -112,7 +113,7 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
         // 5) Tek commit � hem active'in MarkUsed() de�i�ikli�i hem yeni token hem de Outbox persist olur
         await _repo.SaveChangesAsync(ct);
 
-        _logger.LogInformation("PasswordReset: DONE for {Email}", email);
+        _logger.LogInformation("PasswordReset: DONE for {Email}", LogMasking.MaskEmail(email));
         return Unit.Value;
     }
 

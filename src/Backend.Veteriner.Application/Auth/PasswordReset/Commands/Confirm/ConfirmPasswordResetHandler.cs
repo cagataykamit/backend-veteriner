@@ -53,9 +53,8 @@ public sealed class ConfirmPasswordResetHandler : IRequestHandler<ConfirmPasswor
         // Debug seviyesinde k�smi log (prod�da hassas veri i�ermiyor)
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            var tokenShort = raw.Length > 4 ? raw[..4] + "â€¦" : raw;
             var hashShort = tokenHash.Length > 12 ? tokenHash[..12] + "â€¦" : tokenHash;
-            _logger.LogDebug("ConfirmPR: token='{TokenShort}' hash='{HashShort}'", tokenShort, hashShort);
+            _logger.LogDebug("ConfirmPR: hash='{HashShort}'", hashShort);
         }
 
         var vt = await _verRepo.GetActiveByHashAsync(tokenHash, VerificationPurpose.PasswordReset, ct)

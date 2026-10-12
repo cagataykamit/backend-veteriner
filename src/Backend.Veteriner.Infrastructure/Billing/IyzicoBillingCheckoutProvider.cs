@@ -1,5 +1,6 @@
 using System.Globalization;
 using Backend.Veteriner.Application.Common.Billing;
+using Backend.Veteriner.Application.Common.Diagnostics;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Tenants;
@@ -236,22 +237,13 @@ public sealed class IyzicoBillingCheckoutProvider : IBillingCheckoutProvider
             request.Currency,
             priceMatch,
             !string.IsNullOrWhiteSpace(buyerEmail),
-            MaskEmailForLog(buyerEmail),
+            LogMasking.MaskEmail(buyerEmail),
             string.IsNullOrWhiteSpace(buyerIp) ? "(empty)" : IsLoopbackIp(buyerIp) ? $"{buyerIp} (loopback)" : "set",
             !string.IsNullOrWhiteSpace(request.Buyer?.City),
             !string.IsNullOrWhiteSpace(request.Buyer?.Country),
             !string.IsNullOrWhiteSpace(request.BillingAddress?.City),
             !string.IsNullOrWhiteSpace(request.ShippingAddress?.City),
             !string.IsNullOrWhiteSpace(request.CallbackUrl));
-    }
-
-    private static string MaskEmailForLog(string email)
-    {
-        var t = email.Trim();
-        var at = t.IndexOf('@');
-        if (at <= 0 || at >= t.Length - 1)
-            return "(invalid)";
-        return t[0] + "***@" + t[(at + 1)..];
     }
 
     /// <summary>
