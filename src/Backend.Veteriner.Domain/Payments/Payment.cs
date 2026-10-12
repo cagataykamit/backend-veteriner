@@ -44,6 +44,12 @@ public sealed class Payment : AggregateRoot
     /// </summary>
     public long MutationSequence { get; private set; }
 
+    /// <summary>İptal edilmiş ödeme "hiç alınmamış" sayılır; kayıt silinmez, okuma yüzeylerinden düşer.</summary>
+    public DateTime? VoidedAtUtc { get; private set; }
+    public Guid? VoidedByUserId { get; private set; }
+    public string? VoidReason { get; private set; }
+    public bool IsVoided => VoidedAtUtc.HasValue;
+
     private Payment() { }
 
     public Payment(
@@ -91,19 +97,9 @@ public sealed class Payment : AggregateRoot
         RequestHash = requestHash;
     }
 
-    public const int MinCorrectionReasonLength = 5;
-    public const int MaxCorrectionReasonLength = 500;
-
     /// <summary>Düzeltme gerekçesi zorunludur (5–500 karakter, boşluklar kırpılır).</summary>
     public static Result ValidateCorrectionReason(string? reason)
-    {
-        var length = reason?.Trim().Length ?? 0;
-        return length is >= MinCorrectionReasonLength and <= MaxCorrectionReasonLength
-            ? Result.Success()
-            : Result.Failure(
-                "Payments.Validation",
-                $"Düzeltme gerekçesi {MinCorrectionReasonLength}-{MaxCorrectionReasonLength} karakter olmalıdır.");
-    }
+        => CorrectionReason.Validate(reason, "Payments.Validation");
 
     /// <summary>Yeni tahsilatlar yalnızca TRY kabul eder (ADR-012; çoklu para birimi FIN-006).</summary>
     public static bool IsSupportedCurrency(string? currency)
@@ -131,6 +127,9 @@ public sealed class Payment : AggregateRoot
         DateTime paidAtUtc,
         string? notes)
     {
+        if (IsVoided)
+            return Result.Failure("Payments.AlreadyVoided", "İptal edilmiş ödeme güncellenemez.");
+
         if (clinicId == Guid.Empty)
             return Result.Failure("Payments.Validation", "ClinicId gecersiz.");
         if (clientId == Guid.Empty)
@@ -232,9 +231,58 @@ public sealed class Payment : AggregateRoot
             : Result<IReadOnlyList<PaymentAllocation>>.Failure(self.Error);
     }
 
+    /// <summary>
+    /// Ödemeyi iptal eder ("hiç alınmamış" sayılır): her aktif tahsis geri alınır, ücret sayaçları düşer, ödeme sayacı 0 olur.
+    /// <paramref name="activeAllocations"/> ödemenin tüm aktif tahsislerini ve karşılık gelen ücretleri içermelidir.
+    /// Başarısızsa hiçbir şey değişmez.
+    /// </summary>
+    public Result Void(
+        IReadOnlyList<(PaymentAllocation Allocation, Charge Charge)> activeAllocations,
+        Guid voidedByUserId,
+        string? reason,
+        DateTime nowUtc)
+    {
+        if (IsVoided)
+            return Result.Failure("Payments.AlreadyVoided", "Ödeme zaten iptal edilmiş.");
+
+        if (voidedByUserId == Guid.Empty)
+            return Result.Failure("Payments.Validation", "İptal eden kullanıcı geçersiz.");
+
+        var reasonCheck = ValidateCorrectionReason(reason);
+        if (!reasonCheck.IsSuccess)
+            return reasonCheck;
+
+        if (activeAllocations.Sum(x => x.Allocation.Amount) != AllocatedAmount
+            || activeAllocations.Any(x => x.Allocation.PaymentId != Id
+                                          || x.Allocation.ChargeId != x.Charge.Id
+                                          || x.Allocation.IsReversed))
+        {
+            return Result.Failure("Payments.Validation", "Ödemenin tahsis kayıtları sayaçla tutarsız; iptal yapılamadı.");
+        }
+
+        foreach (var (allocation, charge) in activeAllocations)
+        {
+            var released = charge.ReleaseAllocation(allocation.Amount);
+            if (!released.IsSuccess)
+                return released;
+
+            allocation.Reverse(nowUtc);
+        }
+
+        AllocatedAmount = 0;
+        VoidedAtUtc = NormalizeUtc(nowUtc);
+        VoidedByUserId = voidedByUserId;
+        VoidReason = reason!.Trim();
+        MutationSequence++;
+        return Result.Success();
+    }
+
     /// <summary>Tahsis sayacını artırır; <c>AllocatedAmount ≤ Amount</c> değişmezini korur.</summary>
     public Result ApplyAllocation(decimal amount)
     {
+        if (IsVoided)
+            return Result.Failure("Payments.AlreadyVoided", "İptal edilmiş ödemeye tahsis yapılamaz.");
+
         if (amount <= 0)
             return Result.Failure("Payments.Validation", "Tahsis tutarı 0'dan büyük olmalıdır.");
 
