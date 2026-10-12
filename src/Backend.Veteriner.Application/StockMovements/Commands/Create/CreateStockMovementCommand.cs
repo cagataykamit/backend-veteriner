@@ -16,5 +16,6 @@ public sealed record CreateStockMovementCommand(
     string? ReferenceType,
     Guid? ReferenceId,
     DateTime? OccurredAtUtc,
-    string? Notes)
-    : IRequest<Result<StockMovementDto>>, ITransactionalRequest;
+    string? Notes,
+    Guid? RequestId = null)
+    : IRequest<Result<StockMovementCreateResult>>, ITransactionalRequest;

@@ -19,6 +19,20 @@ public sealed class CreateStockMovementCommandValidator : AbstractValidator<Crea
             .Must(mt => Enum.IsDefined(typeof(StockMovementType), mt))
             .WithMessage("MovementType geçersiz.");
 
+        RuleFor(x => x.MovementType)
+            .NotEqual(StockMovementType.Reversal)
+            .WithMessage("Reversal tipi bu uçla oluşturulamaz; geri alma ucunu kullanın.");
+
+        RuleFor(x => x.ReferenceId)
+            .NotEmpty()
+            .When(x => !string.IsNullOrWhiteSpace(x.ReferenceType))
+            .WithMessage("ReferenceType verilirse ReferenceId de verilmelidir.");
+
+        RuleFor(x => x.ReferenceType)
+            .NotEmpty()
+            .When(x => x.ReferenceId.HasValue && x.ReferenceId.Value != Guid.Empty)
+            .WithMessage("ReferenceId verilirse ReferenceType de verilmelidir.");
+
         RuleFor(x => x.Quantity)
             .GreaterThan(0)
             .When(x => x.MovementType != StockMovementType.Adjustment)

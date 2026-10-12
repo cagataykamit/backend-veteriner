@@ -150,7 +150,9 @@ public sealed class GetStockMovementsByProductIdQueryHandler
                 m.OccurredAtUtc,
                 m.CreatedByUserId,
                 m.Notes,
-                m.CreatedAtUtc);
+                m.CreatedAtUtc,
+                m.RequestId,
+                m.ReversesMovementId);
         }).ToList();
 
         return Result<PagedResult<StockMovementDto>>.Success(

@@ -94,7 +94,8 @@ public static class ResultExtensions
         // Ödeme tahsisi: açık tutar aşımı, tahsisli kaydın kilitli alanları/iptali ve zaten iptal edilmiş kayıt (durum çakışması).
         if (normalized.Contains("exceedsoutstanding") || normalized.Contains("updateblockedbyallocation")
             || normalized.Contains("voidblockedbyallocation") || normalized.Contains("correctionbelowallocated")
-            || normalized.Contains("alreadyvoided") || normalized.Contains("requestidvoided"))
+            || normalized.Contains("alreadyvoided") || normalized.Contains("requestidvoided")
+            || normalized.Contains("alreadyreversed"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }

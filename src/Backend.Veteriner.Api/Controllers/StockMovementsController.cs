@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.StockMovements.Commands.Create;
+using Backend.Veteriner.Application.StockMovements.Commands.Reverse;
 using Backend.Veteriner.Application.StockMovements.Contracts.Dtos;
 using Backend.Veteriner.Application.StockMovements.Queries.GetList;
 using Backend.Veteriner.Domain.Products;
@@ -63,25 +64,65 @@ public sealed class StockMovementsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>
+    /// Stok hareketi ekler. Yeni kayıt 201; aynı <c>requestId</c> ile tekrar istek 200 ve ilk hareket (stok değişmez).
+    /// </summary>
     [HttpPost]
     [Authorize(Policy = PermissionCatalog.StockMovements.Create)]
     [Consumes("application/json")]
     [ProducesResponseType(typeof(StockMovementDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(StockMovementDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateStockMovementCommand cmd, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
         var result = await _mediator.Send(cmd, ct);
+        return ToCreatedResponse(result);
+    }
+
+    /// <summary>
+    /// Hareketi geri alır (ters hareket yazar). Yeni kayıt 201; aynı <c>requestId</c> ile tekrar istek 200.
+    /// </summary>
+    [HttpPost("{id:guid}/reverse")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Create)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(StockMovementDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(StockMovementDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Reverse(
+        [FromRoute] Guid id,
+        [FromBody] ReverseStockMovementBody body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new ReverseStockMovementCommand(id, body.Reason ?? string.Empty, body.Notes, body.RequestId),
+            ct);
+        return ToCreatedResponse(result);
+    }
+
+    private IActionResult ToCreatedResponse(Result<StockMovementCreateResult> result)
+    {
         if (!result.IsSuccess)
             return result.ToActionResult(this);
+
+        var created = result.Value!;
+        if (!created.Created)
+            return Ok(created.Movement);
 
         return CreatedAtAction(
             nameof(GetList),
             new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0" },
-            result.Value);
+            created.Movement);
     }
 }
