@@ -1,12 +1,10 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
-using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.LabResults.Access;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
-using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -23,7 +21,6 @@ public sealed class CancelLabResultCommandHandler
     private readonly IClientContext _clientContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
-    private readonly IReadRepository<Examination> _examinations;
     private readonly IRepository<LabResult> _labResultsWrite;
 
     public CancelLabResultCommandHandler(
@@ -32,7 +29,6 @@ public sealed class CancelLabResultCommandHandler
         IClientContext clientContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
-        IReadRepository<Examination> examinations,
         IRepository<LabResult> labResultsWrite)
     {
         _tenantContext = tenantContext;
@@ -40,7 +36,6 @@ public sealed class CancelLabResultCommandHandler
         _clientContext = clientContext;
         _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
-        _examinations = examinations;
         _labResultsWrite = labResultsWrite;
     }
 
@@ -78,10 +73,6 @@ public sealed class CancelLabResultCommandHandler
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
             return Fail("LabResults.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
-
-        var locked = await ExaminationLinkedRecordLock.EnsureLabCancellableAsync(_examinations, tenantId, existing, ct);
-        if (!locked.IsSuccess)
-            return Result<LabResultWriteResultDto>.Failure(locked.Error);
 
         var cancelled = existing.Cancel(userId, request.Reason);
         if (!cancelled.IsSuccess)
