@@ -207,6 +207,9 @@ public sealed class CreateChargeCommandHandler : IRequestHandler<CreateChargeCom
     private async Task<Result<ChargeCreateResultDto>> ExistingAsync(
         Charge existing, Guid clinicId, Client client, CancellationToken ct)
     {
+        if (existing.IsVoided)
+            return Fail("Charges.RequestIdVoided", "Bu requestId ile kaydedilen ücret iptal edilmiş; yeni bir requestId kullanılmalı.");
+
         if (existing.ClinicId != clinicId || existing.ClientId != client.Id)
             return Fail("Charges.Validation", "RequestId başka bir ücret isteği için kullanılmış.");
 

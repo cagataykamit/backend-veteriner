@@ -15,3 +15,18 @@ public sealed class CreateChargeBody
     public decimal UnitPrice { get; init; }
     public Guid? RequestId { get; init; }
 }
+
+/// <summary>PUT /charges/{id} gövdesi. Açıklama, miktar ve birim fiyat düzeltilir; tutar yeniden hesaplanır. <see cref="Reason"/> zorunludur (5-500 karakter).</summary>
+public sealed class CorrectChargeBody
+{
+    public string? Description { get; init; }
+    public decimal Quantity { get; init; }
+    public decimal UnitPrice { get; init; }
+    public string? Reason { get; init; }
+}
+
+/// <summary>POST /charges/{id}/void ve POST /payments/{id}/void gövdesi. <see cref="Reason"/> zorunludur (5-500 karakter).</summary>
+public sealed class VoidRecordBody
+{
+    public string? Reason { get; init; }
+}

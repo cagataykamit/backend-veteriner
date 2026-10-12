@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Commands.Update;
+using Backend.Veteriner.Application.Payments.Commands.Void;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Application.Payments.Queries.GetAllocations;
@@ -112,6 +113,27 @@ public sealed class PaymentsController : ControllerBase
             body.Reason);
 
         var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Ödemeyi iptal eder (silmez): "hiç alınmamış" sayılır, tahsisleri geri alınır, ücretlerin açık tutarı artar.
+    /// Yönetici düzeyi; gerekçe zorunlu.
+    /// </summary>
+    [HttpPost("{id:guid}/void")]
+    [Authorize(Policy = PermissionCatalog.Payments.Correct)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Void([FromRoute] Guid id, [FromBody] VoidRecordBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new VoidPaymentCommand(id, body.Reason), ct);
         return result.ToActionResult(this);
     }
 
