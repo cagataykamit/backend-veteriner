@@ -10,16 +10,15 @@ Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA6_DISCOVERY.md` (D1, D2,
 
 - **Tek kayıt, durum alanı (D1).** Mevcut `LabResult` kaydı istek ve sonucu birlikte taşır; ayrı istem varlığı yoktur.
 - **Durumlar (D3):** `Requested` (İstendi) → `Resulted` (Sonuçlandı); ikisinden de `Cancelled` (İptal). `Cancelled` son durumdur.
-- **"Değerlendirme bekliyor" durum değildir.** `awaitingInterpretation` türetilmiş bayraktır: `status = Resulted` **ve** `interpretation` boş. Durum makinesine girmez; hekim yorum yazınca kalkar.
+- **"Değerlendirme bekliyor" durum değildir.** `awaitingInterpretation` türetilmiş bayraktır: `status = Resulted` **ve** kayıtta `interpretationRequired = true` **ve** `interpretation` boş. Durum makinesine girmez; hekim yorum yazınca kalkar. `interpretationRequired` kayıtta saklanan açık alandır (API ile yazılmaz): yeni kayıtlarda her zaman `true`, migration ile gelen eski kayıtlarda `false` (yorum gerekmiyor sayılır; eski kayıtlarda rozet çıkmaz).
 - **Sonuç alanları (`resultText`, `resultDateUtc`) `Requested` durumunda boştur**, `Resulted` durumunda ikisi de dolu olmalıdır (ikisi birlikte verilir/verilmez).
-- **İstek zamanı sunucuda atanır** (`requestedAtUtc = şimdi`), istemci veremez. `requestedByUserId` oturumdaki kullanıcıdır.
+- **İstek zamanı sunucuda atanır** (istemci veremez). İstem sonuçsuz oluşturulursa `requestedAtUtc = şimdi` ve sonuç sonradan girilince değişmez. **Doğrudan sonuçlu `POST` (istem + sonuç birlikte) kaydında `requestedAtUtc = girilen sonuç tarihi`** olur (en çok 7 gün geçmiş kuralı korunur); böylece liste ve timeline klinik gerçek tarihe göre sıralanır. `requestedByUserId` oturumdaki kullanıcıdır.
 - **Geliş bağı (`visitId`).** Opsiyonel. `visitId` verilmezse ve muayenenin gelişi varsa muayeneden miras alınır.
 
 ## 2) Geriye uyumlu dönüşüm (migration)
 
-Mevcut tüm kayıtlar `Resulted` olur. `requestedAtUtc` = eski `resultDateUtc` (eski timeline konumu değişmez), `requestedByUserId` = null, `visitId` = null, iptal alanları null. `rowVersion` otomatik dolar. Eski `POST` gövdesi (sonuç metni + tarih dolu) aynen `Resulted` kayıt üretir.
+Mevcut tüm kayıtlar `Resulted` olur, `interpretationRequired = false` (eski kayıtlarda `awaitingInterpretation` asla true dönmez). `requestedAtUtc` = eski `resultDateUtc` (eski timeline konumu değişmez), `requestedByUserId` = null, `visitId` = null, iptal alanları null. `rowVersion` otomatik dolar. Eski `POST` gövdesi (sonuç metni + tarih dolu) aynen `Resulted` kayıt üretir.
 
-> Not: Mevcut kayıtlarda `interpretation` boşsa `awaitingInterpretation = true` döner (eski veride "değerlendirme bekliyor" ayrımı yapılamaz). İstemci bunu eski kayıtlarda göstermek istemiyorsa karar gerekir (açık soru).
 
 ---
 
@@ -78,8 +77,7 @@ Kesinleşmiş muayene kilidi (Dilim 0) aynen geçerlidir: yalnız sonuç alanlar
 Yanıt 200 + `{ id, rowVersion }`. Kurallar:
 - Gerekçe `CorrectionReason` kuralı (5–500, kırpılmış) → `LabResults.Validation`.
 - Zaten iptalse 409 `LabResults.AlreadyCancelled`.
-- `Requested` kaydı iptali kesinleşmiş muayenede de serbesttir (henüz sonuç yazılmadı, klinik içerik değişmez).
-- `Resulted` kaydı iptali, kayıt kesinleşmiş muayeneye bağlıysa reddedilir (`409 Examinations.Finalized`): girilmiş klinik sonuç kilitli muayeneden kaldırılamaz. Muayenesiz/taslak muayeneli kayıtta serbesttir.
+- Kesinleşmiş muayenede de **`Requested` ve `Resulted` kayıt** gerekçeli iptal edilebilir (ADR-013 ilkeleri: silme yok, orijinal korunur, iptal eden/zaman/gerekçe denetim izi olarak okunur). İptal dışındaki lab alanları kilitli kalır (Dilim 0 kısmi kilit).
 - İptal kaydı silmez; `cancelledAtUtc/cancelledByUserId/cancelReason` dolar.
 
 ### Eşzamanlılık
@@ -120,10 +118,11 @@ Eklenen: `status`, `requestedAtUtc`, `awaitingInterpretation`; `resultDateUtc` n
 
 ## 6) Veri modeli ve migration
 
-`LabResults` tablosu: `Status` (int, zorunlu; backfill `Resulted`), `RequestedAtUtc` (zorunlu; backfill = `ResultDateUtc`), `RequestedByUserId?`, `VisitId?`, `CancelledAtUtc?`, `CancelledByUserId?`, `CancelReason?` (500), `RowVersion` (rowversion). `ResultDateUtc` ve `ResultText` **nullable** olur. Yeni indeks `(TenantId, Status)`; `(TenantId, ResultDateUtc)` indeksi yerine `(TenantId, RequestedAtUtc)`. `VisitId` FK tanımlanmaz (mevcut desen: yalnız Guid).
+`LabResults` tablosu: `Status` (int, zorunlu; backfill `Resulted`), `InterpretationRequired` (bool, zorunlu; backfill `false`, yeni kayıtlar `true`), `RequestedAtUtc` (zorunlu; backfill = `ResultDateUtc`), `RequestedByUserId?`, `VisitId?`, `CancelledAtUtc?`, `CancelledByUserId?`, `CancelReason?` (500), `RowVersion` (rowversion). `ResultDateUtc` ve `ResultText` **nullable** olur. Yeni indeks `(TenantId, Status)`; `(TenantId, ResultDateUtc)` indeksi yerine `(TenantId, RequestedAtUtc)`. `VisitId` FK tanımlanmaz (mevcut desen: yalnız Guid).
 
 ## 7) Kullanım etkisi (frontend, bu görevde değiştirilmedi)
 
 - PUT artık `rowVersion` ister ve 200 + `{id,rowVersion}` döner; mevcut düzenleme formu güncellenmeli (aksi halde 400).
 - `resultDateUtc/resultText` nullable: liste/detay şablonları null güvenli olmalı.
-- Rozetler: `status` ve `awaitingInterpretation`.
+- Rozetler: `status` ve `awaitingInterpretation` (yalnız yeni kayıtlarda, yorum boşken true; eski kayıtlarda hiç true dönmez).
+- **Dilim 1b değişiklikleri (2026-10-12 kararları):** (1) eski kayıtlarda `awaitingInterpretation` false; (2) doğrudan sonuçlu POST kaydında `requestedAtUtc` = sonuç tarihi (liste/timeline sırası değişir); (3) kesinleşmiş muayenede `Resulted` lab kaydı artık gerekçeli iptal edilebilir (`POST /lab-results/{id}/cancel` bu durumda `Examinations.Finalized` dönmez; arayüzde iptal düğmesi kesinleşmiş muayenede de açık olmalı).
