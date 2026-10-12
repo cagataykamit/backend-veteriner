@@ -97,7 +97,7 @@ Ters hareket: aynı klinik/ürün/miktar/`unitCost`, `movementType: 4`, `reverse
 Kurallar:
 
 - Hareket kiracıya ait olmalı; yoksa `StockMovements.NotFound` (404). Klinik kapsamı mevcut kuralla: aktif klinik bağlamı varsa hareketin kliniğiyle uyuşmalı (`StockMovements.ClinicContextMismatch`), atanmamış klinik `Clinics.AccessDenied` (403).
-- Pasif ürün için geri alma da reddedilir (`Products.Inactive`; oluşturma ile aynı kural).
+- Geri alma pasif ürüne de yazılır (ADR-013): `Products.Inactive` kuralı yalnız yeni hareket oluşturmada geçerlidir; ters hareket stok iadesini engellemez.
 - Zaten geri alınmışsa `StockMovements.AlreadyReversed` (409). Eşzamanlı iki geri alma isteğinde DB benzersiz kuralı kaybedene aynı kodu (409) döner.
 - Stok satırı eşzamanlı değişirse `StockMovements.ConcurrencyConflict` (409); yeniden deneme güvenlidir.
 - Kimin/neden: `createdByUserId`, `reason`, `reversesMovementId`. (Stok komutları audit pipeline'ına bağlı değildir; bu dilimde eklenmez.)
