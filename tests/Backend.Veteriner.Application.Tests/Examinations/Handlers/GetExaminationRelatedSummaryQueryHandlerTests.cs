@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Queries.GetRelatedSummary;
@@ -34,12 +35,14 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
     private readonly Mock<IReadRepository<LabResult>> _labResults = new();
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizations = new();
     private readonly Mock<IReadRepository<Payment>> _payments = new();
+    private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
 
     private readonly Guid _userId = Guid.NewGuid();
 
     public GetExaminationRelatedSummaryQueryHandlerTests()
     {
         _clientContext.SetupGet(x => x.UserId).Returns(_userId);
+        _permissions.Setup(x => x.HasPermission(It.IsAny<string>())).Returns(true);
         _userOperationClaims
             .Setup(x => x.GetOperationClaimNamesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<string>());
@@ -60,7 +63,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             _prescriptions.Object,
             _labResults.Object,
             _hospitalizations.Object,
-            _payments.Object);
+            _payments.Object,
+            _permissions.Object);
 
     private void SetupTenant(Guid tenantId) => _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
 
@@ -233,6 +237,57 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.PetName.Should().Be("Minnoş");
         _userClinics.Verify(x => x.ExistsAsync(_userId, clinicId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_OmitRecordKinds_When_UserLacksTheirReadPermission()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        SetupTenant(tid);
+        SetupAssignment(clinicId, assigned: true);
+        SetupExaminationFound(BuildExamination(tid, clinicId, petId, examId));
+        SetupSuccessGraph(tid, clinicId, petId, examId);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Treatments.Read)).Returns(false);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Prescriptions.Read)).Returns(false);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.LabResults.Read)).Returns(false);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Hospitalizations.Read)).Returns(false);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Payments.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetExaminationRelatedSummaryQuery(examId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Treatments.Should().BeEmpty();
+        result.Value.Prescriptions.Should().BeEmpty();
+        result.Value.LabResults.Should().BeEmpty();
+        result.Value.Hospitalizations.Should().BeEmpty();
+        result.Value.Payments.Should().BeEmpty();
+        _treatments.Verify(r => r.ListAsync(It.IsAny<TreatmentsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+        _prescriptions.Verify(r => r.ListAsync(It.IsAny<PrescriptionsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+        _labResults.Verify(r => r.ListAsync(It.IsAny<LabResultsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+        _hospitalizations.Verify(r => r.ListAsync(It.IsAny<HospitalizationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+        _payments.Verify(r => r.ListAsync(It.IsAny<PaymentsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnOnlyPermittedKinds_When_UserHasPartialPermissions()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        SetupTenant(tid);
+        SetupAssignment(clinicId, assigned: true);
+        SetupExaminationFound(BuildExamination(tid, clinicId, petId, examId));
+        SetupSuccessGraph(tid, clinicId, petId, examId);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Payments.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetExaminationRelatedSummaryQuery(examId), CancellationToken.None);
+
+        result.Value!.Treatments.Should().ContainSingle();
+        _payments.Verify(r => r.ListAsync(It.IsAny<PaymentsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

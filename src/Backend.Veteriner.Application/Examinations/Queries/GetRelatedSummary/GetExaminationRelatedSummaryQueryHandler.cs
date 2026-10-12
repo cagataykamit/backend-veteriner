@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.Pets.Access;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -36,6 +37,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
     private readonly IReadRepository<LabResult> _labResults;
     private readonly IReadRepository<Hospitalization> _hospitalizations;
     private readonly IReadRepository<Payment> _payments;
+    private readonly ICurrentUserPermissionChecker _permissionChecker;
 
     public GetExaminationRelatedSummaryQueryHandler(
         ITenantContext tenantContext,
@@ -51,7 +53,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         IReadRepository<Prescription> prescriptions,
         IReadRepository<LabResult> labResults,
         IReadRepository<Hospitalization> hospitalizations,
-        IReadRepository<Payment> payments)
+        IReadRepository<Payment> payments,
+        ICurrentUserPermissionChecker permissionChecker)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -67,6 +70,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         _labResults = labResults;
         _hospitalizations = hospitalizations;
         _payments = payments;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<Result<ExaminationRelatedSummaryDto>> Handle(
@@ -118,15 +122,15 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         var clinicId = _clinicContext.ClinicId;
         var take = ExaminationRelatedSummaryConstants.RelatedItemsTake;
 
-        var treatments = await _treatments.ListAsync(
+        var treatments = !CanRead(PetRecordKind.Treatment) ? [] : await _treatments.ListAsync(
             new TreatmentsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
-        var prescriptions = await _prescriptions.ListAsync(
+        var prescriptions = !CanRead(PetRecordKind.Prescription) ? [] : await _prescriptions.ListAsync(
             new PrescriptionsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
-        var labs = await _labResults.ListAsync(
+        var labs = !CanRead(PetRecordKind.LabResult) ? [] : await _labResults.ListAsync(
             new LabResultsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
-        var hosp = await _hospitalizations.ListAsync(
+        var hosp = !CanRead(PetRecordKind.Hospitalization) ? [] : await _hospitalizations.ListAsync(
             new HospitalizationsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
-        var pays = await _payments.ListAsync(
+        var pays = !CanRead(PetRecordKind.Payment) ? [] : await _payments.ListAsync(
             new PaymentsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
 
         var clinicIds = new HashSet<Guid>();
@@ -211,4 +215,6 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
 
         return Result<ExaminationRelatedSummaryDto>.Success(dto);
     }
+
+    private bool CanRead(PetRecordKind kind) => _permissionChecker.CanRead(kind);
 }
