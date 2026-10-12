@@ -1,4 +1,4 @@
-using Backend.Veteriner.Application.Tests;
+﻿using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -319,6 +319,51 @@ public sealed class CreatePaymentCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Payments.PaidTooFarInFuture");
+    }
+
+    [Fact]
+    public async Task Handle_Should_DerivePetAndExamination_FromAllocatedCharge_When_RequestOmitsThem()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var chargePetId = Guid.NewGuid();
+        var chargeExaminationId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+        PaymentAllocationTestSupport.Setup(_chargesWrite, _clientContext, tid, cid, clientId, chargePetId, chargeExaminationId);
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, clientId, "Mavis", TestSpeciesIds.Cat, null, null));
+
+        Payment? captured = null;
+        _paymentsWrite.Setup(r => r.AddAsync(It.IsAny<Payment>(), It.IsAny<CancellationToken>()))
+            .Callback<Payment, CancellationToken>((p, _) => captured = p);
+
+        var result = await CreateHandler().Handle(Cmd(cid, clientId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.PetId.Should().Be(chargePetId);
+        captured.ExaminationId.Should().Be(chargeExaminationId);
+    }
+
+    [Fact]
+    public async Task Handle_Should_LeavePetEmpty_When_AllocatedChargeHasNoPet()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        SetupTenantClinicClient(tid, cid, clientId);
+
+        Payment? captured = null;
+        _paymentsWrite.Setup(r => r.AddAsync(It.IsAny<Payment>(), It.IsAny<CancellationToken>()))
+            .Callback<Payment, CancellationToken>((p, _) => captured = p);
+
+        var result = await CreateHandler().Handle(Cmd(cid, clientId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.PetId.Should().BeNull();
+        captured.ExaminationId.Should().BeNull();
     }
 
     [Fact]

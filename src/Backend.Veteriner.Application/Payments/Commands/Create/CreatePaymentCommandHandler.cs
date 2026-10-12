@@ -1,4 +1,4 @@
-using Backend.Veteriner.Application.Appointments.Specs;
+﻿using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -252,13 +252,21 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         var chargeById = charges.ToDictionary(c => c.Id);
         var lines = allocationLines.Select(l => (chargeById[l.ChargeId], l.Amount)).ToList();
 
+        // Hayvan/muayene istekte yoksa tahsis edilen ücretlerin ortak bağlamından türetilir (ADR-012).
+        var petId = request.PetId ?? PaymentChargeContext.CommonPetId(charges);
+        if (petName is null && petId is { } derivedPetId)
+        {
+            var derivedPet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, derivedPetId), ct);
+            petName = derivedPet?.Name;
+        }
+
         var payment = new Payment(
             tenantId,
             effectiveClinicId,
             request.ClientId,
-            request.PetId,
+            petId,
             request.AppointmentId,
-            request.ExaminationId,
+            request.ExaminationId ?? PaymentChargeContext.CommonExaminationId(charges),
             request.Amount,
             request.Currency,
             request.Method,
