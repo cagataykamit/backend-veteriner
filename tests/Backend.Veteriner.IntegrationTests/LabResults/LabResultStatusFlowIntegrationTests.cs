@@ -4,7 +4,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Domain.Examinations;
+using Backend.Veteriner.Infrastructure.Persistence;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.LabResults;
@@ -124,5 +127,94 @@ public sealed class LabResultStatusFlowIntegrationTests : IClassFixture<CustomWe
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("LabResults.Validation");
+    }
+
+    [Fact]
+    public async Task Post_With_Result_Should_Set_RequestedAt_To_ResultDate_And_Await_Interpretation()
+    {
+        var (client, clinicId, petId) = await AdminClientAsync();
+        var resultDate = DateTime.UtcNow.AddDays(-3);
+
+        var create = await client.PostAsJsonAsync("/api/v1/lab-results", new { ClinicId = clinicId, PetId = petId, TestName = "CBC", ResultDateUtc = resultDate, ResultText = "Normal" });
+        var id = await create.Content.ReadFromJsonAsync<Guid>();
+
+        var detail = await GetAsync(client, id);
+        detail.GetProperty("requestedAtUtc").GetDateTime().Should().BeCloseTo(resultDate, TimeSpan.FromSeconds(1));
+        detail.GetProperty("awaitingInterpretation").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Requested_Then_Resulted_Should_Keep_Server_RequestedAt()
+    {
+        var (client, clinicId, petId) = await AdminClientAsync();
+        var create = await client.PostAsJsonAsync("/api/v1/lab-results", new { ClinicId = clinicId, PetId = petId, TestName = "CBC" });
+        var id = await create.Content.ReadFromJsonAsync<Guid>();
+        var requested = await GetAsync(client, id);
+
+        var put = await client.PutAsJsonAsync($"/api/v1/lab-results/{id}", new
+        {
+            ClinicId = clinicId,
+            PetId = petId,
+            TestName = "CBC",
+            ResultDateUtc = DateTime.UtcNow.AddDays(-2),
+            ResultText = "Normal",
+            RowVersion = requested.GetProperty("rowVersion").GetString(),
+        });
+        put.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var after = await GetAsync(client, id);
+        after.GetProperty("requestedAtUtc").GetDateTime().Should().Be(requested.GetProperty("requestedAtUtc").GetDateTime());
+    }
+
+    [Fact]
+    public async Task Legacy_Record_Without_Interpretation_Should_Not_Await_Interpretation()
+    {
+        var (client, clinicId, petId) = await AdminClientAsync();
+        var create = await client.PostAsJsonAsync("/api/v1/lab-results", new { ClinicId = clinicId, PetId = petId, TestName = "CBC", ResultDateUtc = DateTime.UtcNow.AddHours(-1), ResultText = "Normal" });
+        var id = await create.Content.ReadFromJsonAsync<Guid>();
+
+        // Migration ile gelen eski kayit: yorum gerekmiyor (InterpretationRequired = false).
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE [LabResults] SET [InterpretationRequired] = 0 WHERE [Id] = {id}");
+        }
+
+        var detail = await GetAsync(client, id);
+        detail.GetProperty("interpretation").ValueKind.Should().Be(JsonValueKind.Null);
+        detail.GetProperty("awaitingInterpretation").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Cancel_Should_Allow_Resulted_Record_On_Finalized_Examination_And_Keep_Original()
+    {
+        var (client, clinicId, petId) = await AdminClientAsync();
+        var examinationId = await SeedFinalizedExaminationAsync(clinicId, petId);
+        var create = await client.PostAsJsonAsync("/api/v1/lab-results", new { ClinicId = clinicId, PetId = petId, ExaminationId = examinationId, TestName = "CBC", ResultDateUtc = DateTime.UtcNow.AddHours(-1), ResultText = "Yanlış hayvana ait sonuç" });
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = await create.Content.ReadFromJsonAsync<Guid>();
+        var version = (await GetAsync(client, id)).GetProperty("rowVersion").GetString();
+
+        var cancel = await client.PostAsJsonAsync($"/api/v1/lab-results/{id}/cancel", new { Reason = "Yanlış hayvana girilmiş", RowVersion = version });
+
+        cancel.StatusCode.Should().Be(HttpStatusCode.OK);
+        var detail = await GetAsync(client, id);
+        detail.GetProperty("status").GetString().Should().Be("Cancelled");
+        detail.GetProperty("resultText").GetString().Should().Be("Yanlış hayvana ait sonuç");
+        detail.GetProperty("cancelReason").GetString().Should().Be("Yanlış hayvana girilmiş");
+        detail.GetProperty("cancelledByUserId").ValueKind.Should().Be(JsonValueKind.String);
+        detail.GetProperty("cancelledAtUtc").ValueKind.Should().Be(JsonValueKind.String);
+    }
+
+    private async Task<Guid> SeedFinalizedExaminationAsync(Guid clinicId, Guid petId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tenantId = (await db.Clinics.SingleAsync(c => c.Id == clinicId)).TenantId;
+        var exam = new Examination(tenantId, clinicId, petId, appointmentId: null, DateTime.UtcNow.AddHours(-2), "Kontrol", "Bulgu", null, null);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        db.Examinations.Add(exam);
+        await db.SaveChangesAsync();
+        return exam.Id;
     }
 }
