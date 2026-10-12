@@ -1,0 +1,124 @@
+using Backend.Veteriner.Domain.Shared;
+
+namespace Backend.Veteriner.Domain.Administrations;
+
+/// <summary>
+/// Hastaya klinikte fiilen uygulanan katalog ürünü (uygulama kaydı). Reçeteden ayrıdır; stok düşümü
+/// (<c>Out</c> hareketi, kaynak = bu kaydın kimliği) uygulama katmanında aynı transaction'da yazılır.
+/// Düzenlenmez: yanlış kayıt gerekçeyle iptal edilir (<see cref="Void"/>).
+/// </summary>
+public sealed class Administration : AggregateRoot
+{
+    public const decimal MaxQuantity = 100_000m;
+    public const int QuantityDecimals = 3;
+    public const int MaxNotesLength = 2000;
+
+    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid TenantId { get; private set; }
+    public Guid ClinicId { get; private set; }
+    public Guid PetId { get; private set; }
+    public Guid? ExaminationId { get; private set; }
+    public Guid? TreatmentId { get; private set; }
+    public Guid ProductId { get; private set; }
+
+    /// <summary>Ürünün stok birimi cinsinden miktar (birim dönüşümü yoktur).</summary>
+    public decimal Quantity { get; private set; }
+
+    public DateTime AdministeredAtUtc { get; private set; }
+    public string? Notes { get; private set; }
+
+    /// <summary>İptal edilmiş uygulama silinmez; stok ters hareketle geri verilmiştir.</summary>
+    public DateTime? VoidedAtUtc { get; private set; }
+    public Guid? VoidedByUserId { get; private set; }
+    public string? VoidReason { get; private set; }
+    public bool IsVoided => VoidedAtUtc.HasValue;
+
+    public Guid CreatedByUserId { get; private set; }
+    public DateTime CreatedAtUtc { get; private set; }
+
+    /// <summary>İstemci tekrar koruması anahtarı; aynı kiracıda benzersizdir, verilmeyebilir.</summary>
+    public Guid? RequestId { get; private set; }
+
+    private Administration() { }
+
+    public static Result<Administration> Create(
+        Guid tenantId,
+        Guid clinicId,
+        Guid petId,
+        Guid? examinationId,
+        Guid? treatmentId,
+        Guid productId,
+        decimal quantity,
+        DateTime administeredAtUtc,
+        string? notes,
+        Guid createdByUserId,
+        DateTime createdAtUtc,
+        Guid? requestId)
+    {
+        if (tenantId == Guid.Empty)
+            return Invalid("TenantId geçersiz.");
+        if (clinicId == Guid.Empty)
+            return Invalid("ClinicId geçersiz.");
+        if (petId == Guid.Empty)
+            return Invalid("PetId zorunludur.");
+        if (productId == Guid.Empty)
+            return Invalid("ProductId zorunludur.");
+        if (examinationId == Guid.Empty || treatmentId == Guid.Empty || requestId == Guid.Empty)
+            return Invalid("ExaminationId, TreatmentId ve RequestId verilirse geçerli bir kimlik olmalıdır.");
+        if (createdByUserId == Guid.Empty)
+            return Invalid("Oluşturan kullanıcı geçersiz.");
+
+        if (quantity <= 0 || quantity > MaxQuantity || decimal.Round(quantity, QuantityDecimals) != quantity)
+            return Invalid($"Miktar 0'dan büyük, en fazla {MaxQuantity:0} ve en fazla {QuantityDecimals} ondalıklı olmalıdır.");
+
+        var text = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        if (text is not null && text.Length > MaxNotesLength)
+            return Invalid($"Not en fazla {MaxNotesLength} karakter olabilir.");
+
+        return Result<Administration>.Success(new Administration
+        {
+            TenantId = tenantId,
+            ClinicId = clinicId,
+            PetId = petId,
+            ExaminationId = examinationId,
+            TreatmentId = treatmentId,
+            ProductId = productId,
+            Quantity = quantity,
+            AdministeredAtUtc = NormalizeUtc(administeredAtUtc),
+            Notes = text,
+            CreatedByUserId = createdByUserId,
+            CreatedAtUtc = NormalizeUtc(createdAtUtc),
+            RequestId = requestId,
+        });
+    }
+
+    /// <summary>Uygulamayı gerekçeyle iptal eder. Stok iadesi (ters hareket) çağıranın sorumluluğudur.</summary>
+    public Result Void(Guid voidedByUserId, string? reason, DateTime nowUtc)
+    {
+        if (IsVoided)
+            return Result.Failure("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.");
+
+        if (voidedByUserId == Guid.Empty)
+            return Result.Failure("Administrations.Validation", "İptal eden kullanıcı geçersiz.");
+
+        var reasonCheck = CorrectionReason.Validate(reason, "Administrations.Validation");
+        if (!reasonCheck.IsSuccess)
+            return reasonCheck;
+
+        VoidedAtUtc = NormalizeUtc(nowUtc);
+        VoidedByUserId = voidedByUserId;
+        VoidReason = reason!.Trim();
+        return Result.Success();
+    }
+
+    private static Result<Administration> Invalid(string message)
+        => Result<Administration>.Failure("Administrations.Validation", message);
+
+    private static DateTime NormalizeUtc(DateTime value)
+        => value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
+}
