@@ -93,6 +93,8 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-012 (kabul edildi), backl
 | `GET /charges/{id}` ve `GET /charges` | `ChargeDto`'ya `allocatedAmount`, `outstandingAmount` | `Charges.Read` |
 | `GET /charges/{id}/allocations` | `[ { id, paymentId, paidAtUtc, method, amount, createdAtUtc, createdByUserId } ]` | `Charges.Read` |
 
+**`petCount` (Command DB yolu):** `GET /payments` liste öğesine ve `GET /payments/{id}`'ye eklenen `petCount` (`int?`), ödemenin bağlı olduğu **farklı hayvan** sayısıdır: tahsis edilen ücretlerin farklı `petId` sayısı; tahsis yoksa (eski ödeme) `petId` doluysa 1, değilse 0. `petCount > 1` ise `petId` null olur ve istemci "Birden fazla hayvan" gösterir; `0` hayvansız ödemedir. Query DB yolu (liste/detay okuma bayrakları açık) tahsisleri bilmediği için `null` döner; istemci `null`'ı bilinmiyor sayar ve mevcut `petName` davranışına düşer. Şema değişmez, alan eklemedir.
+
 Command DB'den okunur; klinik kapsamı mevcut ödeme/ücret kuralıyla aynıdır (kapsam dışı klinikte 404, varlık sızdırmaz). Alanlar eklemedir; ödeme listesi (`GET /payments`) bu dilimde değişmez.
 
 ## 5) Yetkiler
