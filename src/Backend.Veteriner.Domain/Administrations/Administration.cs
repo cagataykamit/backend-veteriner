@@ -12,6 +12,7 @@ public sealed class Administration : AggregateRoot
     public const decimal MaxQuantity = 100_000m;
     public const int QuantityDecimals = 3;
     public const int MaxNotesLength = 2000;
+    public const string LateEntryReasonRequiredCode = "Administrations.LateEntryReasonRequired";
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
@@ -33,11 +34,23 @@ public sealed class Administration : AggregateRoot
     public string? VoidReason { get; private set; }
     public bool IsVoided => VoidedAtUtc.HasValue;
 
+    /// <summary>İptalin stok sonucu (yalnız iptal edilmişse dolu); <see cref="AdministrationVoidStockOutcome.WrittenOff"/> zarar işaretidir.</summary>
+    public AdministrationVoidStockOutcome? VoidStockOutcome { get; private set; }
+
+    /// <summary>Bağlı muayene kayıt anında kesinleşmişse true (sonradan ekleme); ekleyen ve zaman <see cref="CreatedByUserId"/>/<see cref="CreatedAtUtc"/>.</summary>
+    public bool AddedAfterFinalization { get; private set; }
+
+    /// <summary>Yalnız <see cref="AddedAfterFinalization"/> iken dolu zorunlu gerekçe.</summary>
+    public string? LateEntryReason { get; private set; }
+
     public Guid CreatedByUserId { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
 
     /// <summary>İstemci tekrar koruması anahtarı; aynı kiracıda benzersizdir, verilmeyebilir.</summary>
     public Guid? RequestId { get; private set; }
+
+    /// <summary>Eşzamanlı iptalleri ayırt eden belirteç (iptal stok iadesi yazmasa da tek kazanan olur).</summary>
+    public byte[] RowVersion { get; private set; } = default!;
 
     private Administration() { }
 
@@ -51,6 +64,8 @@ public sealed class Administration : AggregateRoot
         decimal quantity,
         DateTime administeredAtUtc,
         string? notes,
+        bool addedAfterFinalization,
+        string? lateEntryReason,
         Guid createdByUserId,
         DateTime createdAtUtc,
         Guid? requestId)
@@ -75,6 +90,17 @@ public sealed class Administration : AggregateRoot
         if (text is not null && text.Length > MaxNotesLength)
             return Invalid($"Not en fazla {MaxNotesLength} karakter olabilir.");
 
+        // Gerekçe yalnız sonradan eklemede zorunlu ve saklanır; aksi hâlde yok sayılır.
+        string? lateReason = null;
+        if (addedAfterFinalization)
+        {
+            var reasonCheck = CorrectionReason.Validate(lateEntryReason, LateEntryReasonRequiredCode);
+            if (!reasonCheck.IsSuccess)
+                return Result<Administration>.Failure(reasonCheck.Error);
+
+            lateReason = lateEntryReason!.Trim();
+        }
+
         return Result<Administration>.Success(new Administration
         {
             TenantId = tenantId,
@@ -86,14 +112,19 @@ public sealed class Administration : AggregateRoot
             Quantity = quantity,
             AdministeredAtUtc = NormalizeUtc(administeredAtUtc),
             Notes = text,
+            AddedAfterFinalization = addedAfterFinalization,
+            LateEntryReason = lateReason,
             CreatedByUserId = createdByUserId,
             CreatedAtUtc = NormalizeUtc(createdAtUtc),
             RequestId = requestId,
         });
     }
 
-    /// <summary>Uygulamayı gerekçeyle iptal eder. Stok iadesi (ters hareket) çağıranın sorumluluğudur.</summary>
-    public Result Void(Guid voidedByUserId, string? reason, DateTime nowUtc)
+    /// <summary>
+    /// Uygulamayı gerekçe ve stok sonucuyla iptal eder. <see cref="AdministrationVoidStockOutcome.StockReturned"/> için
+    /// stok iadesi (ters hareket) çağıranın sorumluluğudur; <see cref="AdministrationVoidStockOutcome.WrittenOff"/> stoğa dokunmaz.
+    /// </summary>
+    public Result Void(Guid voidedByUserId, string? reason, AdministrationVoidStockOutcome stockOutcome, DateTime nowUtc)
     {
         if (IsVoided)
             return Result.Failure("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.");
@@ -108,6 +139,7 @@ public sealed class Administration : AggregateRoot
         VoidedAtUtc = NormalizeUtc(nowUtc);
         VoidedByUserId = voidedByUserId;
         VoidReason = reason!.Trim();
+        VoidStockOutcome = stockOutcome;
         return Result.Success();
     }
 
