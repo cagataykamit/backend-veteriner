@@ -184,4 +184,19 @@ public sealed class ExaminationFinalizeTests
         publicMethods.Should().BeEmpty();
         publicSetters.Should().BeEmpty();
     }
+
+    [Fact]
+    public void EnsureAcceptsLinkedRecords_succeeds_for_draft()
+    {
+        CreateDraft().EnsureAcceptsLinkedRecords().IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void EnsureAcceptsLinkedRecords_fails_for_finalized()
+    {
+        var result = CreateFinalized().EnsureAcceptsLinkedRecords();
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+    }
 }
