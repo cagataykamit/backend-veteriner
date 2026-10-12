@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Payments;
 
 namespace Backend.Veteriner.Application.Pets.Contracts.Dtos;
@@ -57,12 +59,15 @@ public sealed record PetHistoryPrescriptionItemDto(
 
 public sealed record PetHistoryLabResultItemDto(
     Guid Id,
-    DateTime ResultDateUtc,
+    DateTime? ResultDateUtc,
     Guid ClinicId,
     string ClinicName,
     string TestName,
     Guid? ExaminationId,
-    DateTime? UpdatedAtUtc);
+    DateTime? UpdatedAtUtc,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] LabResultStatus Status,
+    DateTime RequestedAtUtc,
+    bool AwaitingInterpretation);
 
 public sealed record PetHistoryHospitalizationItemDto(
     Guid Id,

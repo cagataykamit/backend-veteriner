@@ -196,7 +196,10 @@ public sealed class GetPetHistorySummaryQueryHandler
                 ClinicName(l.ClinicId),
                 l.TestName,
                 l.ExaminationId,
-                l.UpdatedAtUtc))
+                l.UpdatedAtUtc,
+                l.Status,
+                l.RequestedAtUtc,
+                l.AwaitingInterpretation))
             .ToList();
 
         var recentHosp = hosp

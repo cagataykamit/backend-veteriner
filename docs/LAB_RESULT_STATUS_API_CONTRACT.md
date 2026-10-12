@@ -67,7 +67,7 @@ Gövde POST ile aynı alanlar + `rowVersion` (GET'ten alınan Base64, zorunlu) +
 | `Cancelled` | herhangi | 409 `LabResults.AlreadyCancelled`. |
 
 Kesinleşmiş muayene kilidi (Dilim 0) aynen geçerlidir: yalnız sonuç alanları (`resultDateUtc`, `resultText`, `interpretation`, `notes`) serbest; `testName`, `petId`, `clinicId`, `examinationId` değişimi `409 Examinations.Finalized`. **Sonuç girişi (`Requested`→`Resulted`) kesinleşmiş muayenede serbesttir** (D2).
-`visitId` PUT'ta verilmezse mevcut bağ korunur; verilirse doğrulanır ve değiştirilebilir. Muayenenin gelişi ile `visitId` çelişirse `LabResults.ExaminationVisitMismatch` (400).
+`visitId` PUT'ta verilmezse: muayene değişmediyse mevcut bağ korunur, muayene değiştiyse yeni muayenenin gelişi miras alınır; verilirse doğrulanır ve değiştirilebilir. Muayenenin gelişi ile `visitId` çelişirse `LabResults.ExaminationVisitMismatch` (400).
 
 ### `POST /lab-results/{id}/cancel`
 
@@ -84,7 +84,7 @@ Yanıt 200 + `{ id, rowVersion }`. Kurallar:
 
 ### Eşzamanlılık
 
-`rowVersion` SQL Server `rowversion` (8 bayt) Base64 metnidir. PUT/cancel'da gönderilen sürüm veritabanındakiyle uyuşmazsa **409 `LabResults.ConcurrencyConflict`**; istemci formu yenileyip tekrar dener (iki sekmede son yazan kazanmaz). `rowVersion` eksik/geçersiz → 400 `LabResults.Validation`.
+`rowVersion` SQL Server `rowversion` (8 bayt) Base64 metnidir. PUT/cancel'da gönderilen sürüm veritabanındakiyle uyuşmazsa **409 `LabResults.ConcurrencyConflict`**; istemci formu yenileyip tekrar dener (iki sekmede son yazan kazanmaz). `rowVersion` eksik/geçersiz → 400 `LabResults.Validation` (kayıt bulunması ve klinik yetkisi denetimlerinden **sonra** doğrulanır; yetkisiz istek 403/404 alır).
 
 ---
 

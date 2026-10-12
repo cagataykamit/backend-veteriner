@@ -36,7 +36,7 @@ internal static class ExaminationLinkedRecordLock
     /// <summary>
     /// Lab sonucu için kısmi kilit: geç gelen sonuç yazılabilsin diye kesinleşmiş muayenede yalnız sonuç alanları (tarih, metin, yorum, not)
     /// serbesttir; test adı, hayvan, klinik veya muayene bağı değişiyorsa mevcut/hedef muayene açık olmalıdır.
-    /// Yeni lab kaydı eklemek kilitli değildir, bu yüzden Create handler'ı bu denetimi çağırmaz.
+    /// Yeni lab kaydı eklemek ve istenmiş kayda sonuç girmek kilitli değildir, bu yüzden Create handler'ı bu denetimi çağırmaz.
     /// </summary>
     public static async Task<Result> EnsureLabIdentityEditableAsync(
         IReadRepository<Examination> examinations,
@@ -49,5 +49,18 @@ internal static class ExaminationLinkedRecordLock
         CancellationToken ct)
         => existing.ChangesIdentity(clinicId, petId, examinationId, testName)
             ? await EnsureOpenAsync(examinations, tenantId, [examinationId, existing.ExaminationId], ct)
+            : Result.Success();
+
+    /// <summary>
+    /// Lab iptali: henüz sonuçlanmamış (istenmiş) kayıt kesinleşmiş muayenede de iptal edilebilir (klinik içerik değişmez);
+    /// sonuçlanmış kayıt kesinleşmiş muayeneden kaldırılamaz.
+    /// </summary>
+    public static async Task<Result> EnsureLabCancellableAsync(
+        IReadRepository<Examination> examinations,
+        Guid tenantId,
+        LabResult existing,
+        CancellationToken ct)
+        => existing.Status == LabResultStatus.Resulted
+            ? await EnsureOpenAsync(examinations, tenantId, [existing.ExaminationId], ct)
             : Result.Success();
 }

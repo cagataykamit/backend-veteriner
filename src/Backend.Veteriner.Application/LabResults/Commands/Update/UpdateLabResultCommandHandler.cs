@@ -1,9 +1,11 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.LabResults.Access;
+using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -13,11 +15,14 @@ using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Visits;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.LabResults.Commands.Update;
 
-public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabResultCommand, Result>
+public sealed class UpdateLabResultCommandHandler
+    : IRequestHandler<UpdateLabResultCommand, Result<LabResultWriteResultDto>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
@@ -26,7 +31,7 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Examination> _examinations;
-    private readonly IReadRepository<LabResult> _labResultsRead;
+    private readonly IReadRepository<Visit> _visits;
     private readonly IRepository<LabResult> _labResultsWrite;
 
     public UpdateLabResultCommandHandler(
@@ -37,7 +42,7 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
-        IReadRepository<LabResult> labResultsRead,
+        IReadRepository<Visit> visits,
         IRepository<LabResult> labResultsWrite)
     {
         _tenantContext = tenantContext;
@@ -47,38 +52,38 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
         _clinics = clinics;
         _pets = pets;
         _examinations = examinations;
-        _labResultsRead = labResultsRead;
+        _visits = visits;
         _labResultsWrite = labResultsWrite;
     }
 
-    public async Task<Result> Handle(UpdateLabResultCommand request, CancellationToken ct)
+    public async Task<Result<LabResultWriteResultDto>> Handle(UpdateLabResultCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {
-            return Result.Failure(
+            return Fail(
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
-            return Result.Failure("Tenants.NotFound", "Tenant bulunamadı.");
+            return Fail("Tenants.NotFound", "Tenant bulunamadı.");
 
         if (!tenant.IsActive)
         {
-            return Result.Failure(
+            return Fail(
                 "Tenants.TenantInactive",
                 "Pasif kiracı için laboratuvar sonucu güncellenemez.");
         }
 
-        var existing = await _labResultsRead.FirstOrDefaultAsync(
-            new LabResultByIdSpec(tenantId, request.Id), ct);
+        var existing = await _labResultsWrite.FirstOrDefaultAsync(
+            new LabResultForUpdateByIdSpec(tenantId, request.Id), ct);
         if (existing is null)
-            return Result.Failure("LabResults.NotFound", "Laboratuvar sonucu bulunamadı.");
+            return Fail("LabResults.NotFound", "Laboratuvar sonucu bulunamadı.");
 
         if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
         {
-            return Result.Failure(
+            return Fail(
                 "LabResults.ClinicContextMismatch",
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
@@ -88,68 +93,88 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
             effectiveClinicId = existing.ClinicId;
 
         if (effectiveClinicId == Guid.Empty)
-            return Result.Failure("LabResults.Validation", "ClinicId is required.");
+            return Fail("LabResults.Validation", "ClinicId is required.");
 
         var clinicAccess = await LabResultClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
             _clinicScopeResolver, tenantId, existing.ClinicId, effectiveClinicId, ct);
         if (!clinicAccess.IsSuccess)
-            return clinicAccess;
+            return Result<LabResultWriteResultDto>.Failure(clinicAccess.Error);
 
         if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
         {
-            return Result.Failure(
+            return Fail(
                 "LabResults.ClinicContextMismatch",
                 "Laboratuvar sonucu sadece aktif clinic bağlamında güncellenebilir.");
         }
 
-        var resultUtc = ResultDateUtcWindow.ToUtc(request.ResultDateUtc);
-        var window = ResultDateUtcWindow.Validate(resultUtc);
-        if (!window.IsSuccess)
-            return window;
+        if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
+            return Fail("LabResults.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+
+        DateTime? resultUtc = null;
+        if (request.ResultDateUtc is { } resultDate)
+        {
+            resultUtc = ResultDateUtcWindow.ToUtc(resultDate);
+            var window = ResultDateUtcWindow.Validate(resultUtc.Value);
+            if (!window.IsSuccess)
+                return Result<LabResultWriteResultDto>.Failure(window.Error);
+        }
 
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, effectiveClinicId), ct);
         if (clinic is null)
-            return Result.Failure("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
+            return Fail("Clinics.NotFound", "Klinik bulunamadı veya kiracıya ait değil.");
 
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, request.PetId), ct);
         if (pet is null)
-            return Result.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
+            return Fail("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        Examination? exam = null;
         if (request.ExaminationId is { } examId)
         {
-            var exam = await _examinations.FirstOrDefaultAsync(new ExaminationByIdSpec(tenantId, examId), ct);
+            exam = await _examinations.FirstOrDefaultAsync(new ExaminationByIdSpec(tenantId, examId), ct);
             if (exam is null)
             {
-                return Result.Failure(
+                return Fail(
                     "Examinations.NotFound",
                     "Muayene bulunamadı veya kiracıya ait değil.");
             }
 
             if (exam.ClinicId != effectiveClinicId)
             {
-                return Result.Failure(
+                return Fail(
                     "LabResults.ExaminationClinicMismatch",
                     "Examination clinic does not match lab result clinic.");
             }
 
             if (exam.PetId != request.PetId)
             {
-                return Result.Failure(
+                return Fail(
                     "LabResults.ExaminationPetMismatch",
                     "Examination pet does not match lab result pet.");
             }
         }
 
+        // İptal edilmiş kayıt hiçbir alanı değişmez; kilit hatası yerine durum hatası dönmeli.
+        if (existing.Status == LabResultStatus.Cancelled)
+            return Fail("LabResults.AlreadyCancelled", "Laboratuvar kaydı iptal edilmiş; değiştirilemez.");
+
         var locked = await ExaminationLinkedRecordLock.EnsureLabIdentityEditableAsync(
             _examinations, tenantId, existing, effectiveClinicId, request.PetId, request.ExaminationId, request.TestName, ct);
         if (!locked.IsSuccess)
-            return locked;
+            return Result<LabResultWriteResultDto>.Failure(locked.Error);
+
+        var visitHint = request.VisitId
+            ?? (request.ExaminationId == existing.ExaminationId ? existing.VisitId : null);
+        var visit = await LabResultVisitResolver.ResolveAsync(
+            _visits, tenantId, effectiveClinicId, request.PetId, exam, visitHint, ct);
+        if (!visit.IsSuccess)
+            return Result<LabResultWriteResultDto>.Failure(visit.Error);
 
         var update = existing.UpdateDetails(
             effectiveClinicId,
             request.PetId,
             request.ExaminationId,
+            visit.Value,
             resultUtc,
             request.TestName,
             request.ResultText,
@@ -157,10 +182,26 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
             request.Notes);
 
         if (!update.IsSuccess)
-            return update;
+            return Result<LabResultWriteResultDto>.Failure(update.Error);
 
-        await _labResultsWrite.UpdateAsync(existing, ct);
-        await _labResultsWrite.SaveChangesAsync(ct);
-        return Result.Success();
+        existing.SetExpectedRowVersion(expectedRowVersion);
+
+        try
+        {
+            await _labResultsWrite.UpdateAsync(existing, ct);
+            await _labResultsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Fail(
+                "LabResults.ConcurrencyConflict",
+                "Laboratuvar kaydı eşzamanlı olarak güncellendi; formu yenileyip tekrar deneyin.");
+        }
+
+        return Result<LabResultWriteResultDto>.Success(
+            new LabResultWriteResultDto(existing.Id, ExaminationRowVersion.Encode(existing.RowVersion)));
     }
+
+    private static Result<LabResultWriteResultDto> Fail(string code, string message)
+        => Result<LabResultWriteResultDto>.Failure(code, message);
 }

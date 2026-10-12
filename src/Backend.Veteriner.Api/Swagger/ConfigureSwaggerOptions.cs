@@ -340,7 +340,8 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
 
             if (context.Type == typeof(ExaminationRelatedLabResultItemDto))
             {
-                MarkRequired(schema, "id", "resultDateUtc", "clinicId", "clinicName", "testName");
+                MarkRequired(schema, "id", "clinicId", "clinicName", "testName", "status", "requestedAtUtc", "awaitingInterpretation");
+                SetNullable(schema, "resultDateUtc", true);
                 return;
             }
 
@@ -523,8 +524,11 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         {
             if (context.Type == typeof(CreateLabResultCommand))
             {
-                MarkRequired(schema, "clinicId", "petId", "resultDateUtc", "testName", "resultText");
+                MarkRequired(schema, "clinicId", "petId", "testName");
                 SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "visitId", true);
+                SetNullable(schema, "resultDateUtc", true);
+                SetNullable(schema, "resultText", true);
                 SetNullable(schema, "interpretation", true);
                 SetNullable(schema, "notes", true);
                 return;
@@ -532,9 +536,12 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
 
             if (context.Type == typeof(UpdateLabResultBody))
             {
-                MarkRequired(schema, "clinicId", "petId", "resultDateUtc", "testName", "resultText");
+                MarkRequired(schema, "clinicId", "petId", "testName", "rowVersion");
                 SetNullable(schema, "id", true);
                 SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "visitId", true);
+                SetNullable(schema, "resultDateUtc", true);
+                SetNullable(schema, "resultText", true);
                 SetNullable(schema, "interpretation", true);
                 SetNullable(schema, "notes", true);
                 return;
@@ -544,18 +551,26 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 MarkRequired(schema,
                     "id", "tenantId", "clinicId", "petId", "petName", "clientId", "clientName",
-                    "resultDateUtc", "testName", "resultText", "createdAtUtc");
+                    "testName", "createdAtUtc", "status", "requestedAtUtc", "awaitingInterpretation", "rowVersion");
                 SetNullable(schema, "examinationId", true);
+                SetNullable(schema, "resultDateUtc", true);
+                SetNullable(schema, "resultText", true);
                 SetNullable(schema, "interpretation", true);
                 SetNullable(schema, "notes", true);
                 SetNullable(schema, "updatedAtUtc", true);
+                SetNullable(schema, "requestedByUserId", true);
+                SetNullable(schema, "visitId", true);
+                SetNullable(schema, "cancelledAtUtc", true);
+                SetNullable(schema, "cancelledByUserId", true);
+                SetNullable(schema, "cancelReason", true);
                 return;
             }
 
             if (context.Type == typeof(LabResultListItemDto))
             {
                 MarkRequired(schema,
-                    "id", "clinicId", "petId", "petName", "clientId", "clientName", "resultDateUtc", "testName");
+                    "id", "clinicId", "petId", "petName", "clientId", "clientName", "testName", "status", "requestedAtUtc", "awaitingInterpretation");
+                SetNullable(schema, "resultDateUtc", true);
                 SetNullable(schema, "examinationId", true);
             }
         }
@@ -694,7 +709,8 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
 
             if (context.Type == typeof(PetHistoryLabResultItemDto))
             {
-                MarkRequired(schema, "id", "resultDateUtc", "clinicId", "clinicName", "testName");
+                MarkRequired(schema, "id", "clinicId", "clinicName", "testName", "status", "requestedAtUtc", "awaitingInterpretation");
+                SetNullable(schema, "resultDateUtc", true);
                 SetNullable(schema, "examinationId", true);
                 return;
             }

@@ -13,9 +13,9 @@ public sealed class LabResultsForPetRecentSpec : Specification<LabResult>
         int take,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
-        Query.Where(x => x.TenantId == tenantId && x.PetId == petId);
+        Query.Where(x => x.TenantId == tenantId && x.PetId == petId && x.Status != LabResultStatus.Cancelled);
         DashboardSpecificationClinicScope.ApplyToLabResult(Query, clinicId, accessibleClinicIds);
-        Query.OrderByDescending(x => x.ResultDateUtc)
+        Query.OrderByDescending(x => x.RequestedAtUtc)
             .ThenByDescending(x => x.Id)
             .Take(take);
     }

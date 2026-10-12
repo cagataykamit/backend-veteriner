@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
+using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -10,5 +11,6 @@ public sealed record GetLabResultsListQuery(
     Guid? ClinicId = null,
     Guid? PetId = null,
     DateTime? DateFromUtc = null,
-    DateTime? DateToUtc = null)
+    DateTime? DateToUtc = null,
+    LabResultStatus? Status = null)
     : IRequest<Result<PagedResult<LabResultListItemDto>>>;
