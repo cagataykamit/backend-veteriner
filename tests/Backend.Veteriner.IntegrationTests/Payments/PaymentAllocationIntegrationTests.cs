@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Backend.IntegrationTests.Infrastructure;
@@ -11,6 +11,7 @@ using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.Persistence;
@@ -99,6 +100,25 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         (await ctx.GetChargeAsync(a)).OutstandingAmount.Should().Be(0m);
         (await ctx.GetChargeAsync(b)).OutstandingAmount.Should().Be(0m);
         await ctx.AssertCountersMatchAllocationsAsync();
+    }
+
+    [Fact]
+    public async Task Payment_Without_Pet_Should_Show_Pet_Of_Allocated_Charge_In_Detail_And_Pet_Filter()
+    {
+        var ctx = await SeedAsync();
+        var pet = await ctx.SeedPetAsync();
+        var chargeId = await ctx.SeedChargeAsync(300m, petId: pet.Id);
+
+        var created = await ctx.PostPaymentAsync(ctx.Body(300m, chargeId));
+
+        created.Response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var detail = await ctx.Http.GetFromJsonAsync<PaymentDetailDto>($"/api/v1/payments/{created.Id}");
+        detail!.PetId.Should().Be(pet.Id);
+        detail.PetName.Should().Be(pet.Name);
+        var listResponse = await ctx.Http.GetAsync($"/api/v1/payments?Page=1&PageSize=25&ClinicId={ctx.ClinicId}&PetId={pet.Id}");
+        var list = await listResponse.Content.ReadAsStringAsync();
+        listResponse.StatusCode.Should().Be(HttpStatusCode.OK, list);
+        list.Should().Contain(created.Id.ToString());
     }
 
     // ---- Fazla ödeme / toplam eşitliği / zorunlu alanlar ----
@@ -630,12 +650,12 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
             return client.Id;
         }
 
-        public async Task<Guid> SeedChargeAsync(decimal amount, Guid? clientId = null, Guid? clinicId = null)
+        public async Task<Guid> SeedChargeAsync(decimal amount, Guid? clientId = null, Guid? clinicId = null, Guid? petId = null)
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var charge = Charge.Create(
-                    TenantId, clinicId ?? ClinicId, clientId ?? ClientId, null, null, null,
+                    TenantId, clinicId ?? ClinicId, clientId ?? ClientId, petId, null, null,
                     "Seed ucret", 1m, amount, UserId, DateTime.UtcNow, null)
                 .Value!;
             db.Charges.Add(charge);
@@ -643,8 +663,18 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
             return charge.Id;
         }
 
-        public async Task<Guid> SeedLegacyPaymentAsync(decimal amount)
+        public async Task<(Guid Id, string Name)> SeedPetAsync()
         {
+            await using var scope = _services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+            var pet = new Pet(TenantId, ClientId, $"APet-{Guid.NewGuid():N}"[..10], speciesId);
+            db.Pets.Add(pet);
+            await db.SaveChangesAsync();
+            return (pet.Id, pet.Name);
+        }
+
+        public async Task<Guid> SeedLegacyPaymentAsync(decimal amount)        {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var payment = new Payment(
