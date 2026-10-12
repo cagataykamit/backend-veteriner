@@ -16,6 +16,7 @@ public static class PetTimelineConstants
         PetRecordKind.Prescription,
         PetRecordKind.LabResult,
         PetRecordKind.Vaccination,
-        PetRecordKind.Hospitalization
+        PetRecordKind.Hospitalization,
+        PetRecordKind.Administration
     ];
 }
