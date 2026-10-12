@@ -220,6 +220,9 @@ public sealed class LabResultWriteClinicAssignmentIdorIntegrationTests : IClassF
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var labResultId = await createResponse.Content.ReadFromJsonAsync<Guid>();
 
+        var detail = await client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/api/v1/lab-results/{labResultId}");
+        var rowVersion = detail.GetProperty("rowVersion").GetString();
+
         var updateResponse = await client.PutAsJsonAsync($"/api/v1/lab-results/{labResultId}", new
         {
             ClinicId = extraClinicId,
@@ -227,8 +230,9 @@ public sealed class LabResultWriteClinicAssignmentIdorIntegrationTests : IClassF
             ResultDateUtc = ValidResultDateUtc,
             TestName = "Admin update",
             ResultText = "Updated",
+            RowVersion = rowVersion,
         });
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -293,6 +297,6 @@ public sealed class LabResultWriteClinicAssignmentIdorIntegrationTests : IClassF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.LabResults.AsNoTracking().SingleAsync(lr => lr.Id == labResultId);
-        return (row.ClinicId, row.PetId, row.TestName, row.ResultDateUtc);
+        return (row.ClinicId, row.PetId, row.TestName, row.ResultDateUtc!.Value);
     }
 }

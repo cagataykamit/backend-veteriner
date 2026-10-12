@@ -14,6 +14,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Visits;
 using FluentAssertions;
 using Moq;
 
@@ -29,18 +30,26 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
-    private readonly Mock<IReadRepository<LabResult>> _labResultsRead = new();
+    private readonly Mock<IReadRepository<Visit>> _visits = new();
+    private readonly Mock<IClientContext> _clientContext = new();
     private readonly Mock<IRepository<LabResult>> _labResultsWrite = new();
+
+    public LabResultWriteClinicAssignmentCommandHandlerTests()
+    {
+        _clientContext.SetupGet(c => c.UserId).Returns(Guid.NewGuid());
+    }
 
     private CreateLabResultCommandHandler CreateCreateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _clientContext.Object,
             resolver ?? _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
             _examinations.Object,
+            _visits.Object,
             _labResultsWrite.Object);
 
     private UpdateLabResultCommandHandler CreateUpdateHandler(IClinicReadScopeResolver? resolver = null)
@@ -52,7 +61,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
             _clinics.Object,
             _pets.Object,
             _examinations.Object,
-            _labResultsRead.Object,
+            _visits.Object,
             _labResultsWrite.Object);
 
     private void SetupTenant(Guid tid, Guid cid, Guid petId)
@@ -95,13 +104,16 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
             "Güncel test",
             "Güncel sonuç",
             null,
-            null);
+            null,
+            Convert.ToBase64String([1, 2, 3, 4, 5, 6, 7, 8]));
 
     private static LabResult ExistingRow(Guid tid, Guid cid, Guid petId, string testName = "Eski test")
         => new(
             tid,
             cid,
             petId,
+            null,
+            null,
             null,
             DateTime.UtcNow.AddDays(-2),
             testName,
@@ -274,7 +286,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
         SetupTenant(tid, cid, petId);
 
         var existing = ExistingRow(tid, cid, petId);
-        _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
+        _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         _labResultsWrite.Setup(r => r.UpdateAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _labResultsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -301,7 +313,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var existing = ExistingRow(tid, entityCid, petId);
-        _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
+        _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
@@ -328,7 +340,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var existing = ExistingRow(tid, assignedCid, petId);
-        _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
+        _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
@@ -354,7 +366,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var existing = ExistingRow(tid, entityCid, petId);
-        _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
+        _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
@@ -376,7 +388,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
         SetupTenant(tid, targetCid, petId);
 
         var existing = ExistingRow(tid, entityCid, petId);
-        _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
+        _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         _labResultsWrite.Setup(r => r.UpdateAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _labResultsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -396,7 +408,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
-        _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
+        _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((LabResult?)null);
 
         var result = await CreateUpdateHandler().Handle(
@@ -417,7 +429,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
         SetupTenant(tid, cid, petId);
 
         var existing = ExistingRow(tid, cid, petId);
-        _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
+        _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null);

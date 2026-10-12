@@ -441,6 +441,8 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
                 clinic.Id,
                 pet.Id,
                 examinationId: null,
+                visitId: null,
+                requestedByUserId: null,
                 baseDate.AddDays(i),
                 $"Test-{i}",
                 "Normal",

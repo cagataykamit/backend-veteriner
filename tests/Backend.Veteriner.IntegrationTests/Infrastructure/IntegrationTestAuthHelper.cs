@@ -1183,6 +1183,8 @@ internal static class IntegrationTestAuthHelper
             clinic.Id,
             pet.Id,
             examinationId: null,
+            visitId: null,
+            requestedByUserId: null,
             resultDate,
             testName: "IDOR Test CBC",
             resultText: "Normal",

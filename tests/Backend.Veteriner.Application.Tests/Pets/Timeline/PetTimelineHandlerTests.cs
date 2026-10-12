@@ -345,6 +345,25 @@ public sealed class PetTimelineHandlerTests
         shown.Value.Items.Count(i => i.IsVoided).Should().Be(2);
     }
 
+[Fact]
+    public async Task LabResult_Should_Be_Single_Row_At_RequestTime_With_Status_And_Cancelled_Hidden_By_Default()
+    {
+        var requested = new LabResult(_tenantId, _clinicId, _petId, null, null, null, null, "Kan sayımı", null, null, null);
+        var resulted = new LabResult(_tenantId, _clinicId, _petId, null, Guid.NewGuid(), null, T0, "Biyokimya", "Normal", null, null);
+        var cancelled = new LabResult(_tenantId, _clinicId, _petId, null, null, null, null, "İdrar", null, null, null);
+        cancelled.Cancel(Guid.NewGuid(), "Yanlış hasta için istendi").IsSuccess.Should().BeTrue();
+        _labs.AddRange([requested, resulted, cancelled]);
+
+        var hidden = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+        var shown = await CreateHandler().Handle(new GetPetTimelineQuery(_petId, IncludeVoided: true), CancellationToken.None);
+
+        hidden.Value!.Items.Select(i => i.Status).Should().BeEquivalentTo(["Requested", "Resulted"]);
+        hidden.Value.Items.Single(i => i.Status == "Requested").EventAtUtc.Should().Be(requested.RequestedAtUtc);
+        hidden.Value.Items.Single(i => i.Status == "Resulted").RelatedVisitId.Should().Be(resulted.VisitId);
+        shown.Value!.Items.Should().HaveCount(3);
+        shown.Value.Items.Single(i => i.Status == "Cancelled").IsVoided.Should().BeTrue();
+    }
+
     [Fact]
     public async Task Scheduled_Vaccination_Should_Never_Be_On_Timeline()
     {
@@ -558,4 +577,5 @@ public sealed class PetRecordPermissionsTests
         foreach (var kind in Enum.GetValues<PetRecordKind>())
             PetRecordPermissions.RequiredPermission(kind).Should().EndWith(".Read");
     }
+
 }

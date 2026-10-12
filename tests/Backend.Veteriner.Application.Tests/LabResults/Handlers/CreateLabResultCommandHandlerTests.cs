@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.LabResults.Commands.Create;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
@@ -12,6 +13,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Visits;
 using FluentAssertions;
 using Moq;
 
@@ -26,17 +28,26 @@ public sealed class CreateLabResultCommandHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
+    private readonly Mock<IReadRepository<Visit>> _visits = new();
+    private readonly Mock<IClientContext> _clientContext = new();
     private readonly Mock<IRepository<LabResult>> _labResultsWrite = new();
+
+    public CreateLabResultCommandHandlerTests()
+    {
+        _clientContext.SetupGet(c => c.UserId).Returns(Guid.NewGuid());
+    }
 
     private CreateLabResultCommandHandler CreateHandler()
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
+            _clientContext.Object,
             _scopeResolver.Object,
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
             _examinations.Object,
+            _visits.Object,
             _labResultsWrite.Object);
 
     private static CreateLabResultCommand Cmd(
@@ -349,5 +360,102 @@ public sealed class CreateLabResultCommandHandlerTests
         added!.ExaminationId.Should().Be(examId);
         _labResultsWrite.Verify(r => r.AddAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>()), Times.Once);
         _labResultsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_CreateRequested_When_NoResult_And_AssignRequester()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _clientContext.SetupGet(c => c.UserId).Returns(userId);
+        SetupTenantClinicPetSafe(tid, cid, petId);
+        LabResult? saved = null;
+        _labResultsWrite.Setup(r => r.AddAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>()))
+            .Callback<LabResult, CancellationToken>((l, _) => saved = l)
+            .ReturnsAsync((LabResult l, CancellationToken _) => l);
+        _labResultsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await CreateHandler().Handle(
+            new CreateLabResultCommand(cid, petId, null, null, "Kan sayımı", null, null, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        saved!.Status.Should().Be(LabResultStatus.Requested);
+        saved.RequestedByUserId.Should().Be(userId);
+        saved.ResultDateUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_OnlyResultTextGiven()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupTenantClinicPetSafe(tid, cid, petId);
+
+        var result = await CreateHandler().Handle(
+            new CreateLabResultCommand(cid, petId, null, null, "Kan sayımı", "Sonuç", null, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("LabResults.Validation");
+        _labResultsWrite.Verify(r => r.AddAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_InheritVisit_FromExamination()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        var visitId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupTenantClinicPetSafe(tid, cid, petId);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, visitId: visitId);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+        _visits.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VisitByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Visit(tid, cid, petId, null, null, Guid.NewGuid(), DateTime.UtcNow));
+        LabResult? saved = null;
+        _labResultsWrite.Setup(r => r.AddAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>()))
+            .Callback<LabResult, CancellationToken>((l, _) => saved = l)
+            .ReturnsAsync((LabResult l, CancellationToken _) => l);
+        _labResultsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await CreateHandler().Handle(
+            new CreateLabResultCommand(cid, petId, examId, null, "Kan sayımı", null, null, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        saved!.VisitId.Should().Be(visitId);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_VisitBelongsToOtherPet()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupTenantClinicPetSafe(tid, cid, petId);
+        _visits.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VisitByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Visit(tid, cid, Guid.NewGuid(), null, null, Guid.NewGuid(), DateTime.UtcNow));
+
+        var result = await CreateHandler().Handle(
+            new CreateLabResultCommand(cid, petId, null, null, "Kan sayımı", null, null, null, VisitId: Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("LabResults.VisitPetMismatch");
     }
 }
