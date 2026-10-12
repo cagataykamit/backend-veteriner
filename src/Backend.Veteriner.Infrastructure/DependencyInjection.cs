@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
+using Backend.Veteriner.Application.Payments.Queries;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Clinics;
@@ -39,6 +40,7 @@ using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;                 // EfRepository, EfReadRepository, UserRepository, RefreshTokenRepository, VerificationTokenRepository
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories.Payments;
 using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
@@ -160,6 +162,7 @@ public static class DependencyInjection
         services.AddScoped<IVisitTodayReader, VisitTodayReader>();
         services.AddScoped<IClinicVeterinarianReader, ClinicVeterinarianReader>();
         services.AddScoped<IDashboardFinancePaymentAggregatesReader, DashboardFinancePaymentAggregatesReader>();
+        services.AddScoped<IPaymentPetCountReader, PaymentPetCountReader>();
         services.AddScoped<IAppointmentsReportStatusBreakdownReader, AppointmentsReportStatusBreakdownReader>();
         services.AddScoped<IOutbox, EfOutbox>();
 

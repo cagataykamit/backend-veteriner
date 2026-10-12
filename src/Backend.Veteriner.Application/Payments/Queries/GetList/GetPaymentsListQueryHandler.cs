@@ -36,6 +36,7 @@ public sealed class GetPaymentsListQueryHandler
     private readonly IPaymentsListReadModelReader _paymentsListReadModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetPaymentsListQueryHandler> _logger;
+    private readonly IPaymentPetCountReader? _petCountReader;
 
     public GetPaymentsListQueryHandler(
         ITenantContext tenantContext,
@@ -48,7 +49,8 @@ public sealed class GetPaymentsListQueryHandler
         IPetReadModelLookupReader petLookupReader,
         IPaymentsListReadModelReader paymentsListReadModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
-        ILogger<GetPaymentsListQueryHandler>? logger = null)
+        ILogger<GetPaymentsListQueryHandler>? logger = null,
+        IPaymentPetCountReader? petCountReader = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -61,6 +63,7 @@ public sealed class GetPaymentsListQueryHandler
         _paymentsListReadModelReader = paymentsListReadModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetPaymentsListQueryHandler>.Instance;
+        _petCountReader = petCountReader;
     }
 
     public async Task<Result<PagedResult<PaymentListItemDto>>> Handle(
@@ -249,6 +252,12 @@ public sealed class GetPaymentsListQueryHandler
 
         var petNameById = pets.ToDictionary(x => x.Id, x => x.Name);
 
+        var petCounts = _petCountReader is null
+            ? null
+            : await _petCountReader.CountDistinctPetsAsync(tenantId, rows.Select(x => x.Id).ToArray(), ct);
+        if (petCounts is not null)
+            MarkStep("petCounts");
+
         var items = rows
             .Select(p =>
             {
@@ -265,7 +274,8 @@ public sealed class GetPaymentsListQueryHandler
                     p.Amount,
                     p.Currency,
                     p.Method,
-                    p.PaidAtUtc);
+                    p.PaidAtUtc,
+                    petCounts is null ? null : PaymentPetCount.Resolve(p.PetId, petCounts.GetValueOrDefault(p.Id)));
             })
             .ToList();
 

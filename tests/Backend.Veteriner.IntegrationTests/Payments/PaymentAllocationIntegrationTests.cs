@@ -115,10 +115,46 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         var detail = await ctx.Http.GetFromJsonAsync<PaymentDetailDto>($"/api/v1/payments/{created.Id}");
         detail!.PetId.Should().Be(pet.Id);
         detail.PetName.Should().Be(pet.Name);
+        detail.PetCount.Should().Be(1);
         var listResponse = await ctx.Http.GetAsync($"/api/v1/payments?Page=1&PageSize=25&ClinicId={ctx.ClinicId}&PetId={pet.Id}");
         var list = await listResponse.Content.ReadAsStringAsync();
         listResponse.StatusCode.Should().Be(HttpStatusCode.OK, list);
         list.Should().Contain(created.Id.ToString());
+    }
+
+    [Fact]
+    public async Task Payment_Across_Two_Pets_Should_Have_No_PetId_And_PetCount_2_In_Detail_And_List()
+    {
+        var ctx = await SeedAsync();
+        var petA = await ctx.SeedPetAsync();
+        var petB = await ctx.SeedPetAsync();
+        var a = await ctx.SeedChargeAsync(100m, petId: petA.Id);
+        var b = await ctx.SeedChargeAsync(100m, petId: petB.Id);
+
+        var created = await ctx.PostPaymentAsync(ctx.Body(200m, (a, 100m), (b, 100m)));
+
+        created.Response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var detail = await ctx.Http.GetFromJsonAsync<PaymentDetailDto>($"/api/v1/payments/{created.Id}");
+        detail!.PetId.Should().BeNull();
+        detail.PetCount.Should().Be(2);
+        var list = await ctx.Http.GetFromJsonAsync<System.Text.Json.JsonElement>(
+            $"/api/v1/payments?Page=1&PageSize=25&ClinicId={ctx.ClinicId}");
+        var item = list.GetProperty("items").EnumerateArray()
+            .Single(i => i.GetProperty("id").GetGuid() == created.Id);
+        item.GetProperty("petCount").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Payment_Without_Any_Pet_Should_Have_PetCount_0()
+    {
+        var ctx = await SeedAsync();
+        var chargeId = await ctx.SeedChargeAsync(50m);
+
+        var created = await ctx.PostPaymentAsync(ctx.Body(50m, chargeId));
+
+        var detail = await ctx.Http.GetFromJsonAsync<PaymentDetailDto>($"/api/v1/payments/{created.Id}");
+        detail!.PetId.Should().BeNull();
+        detail.PetCount.Should().Be(0);
     }
 
     // ---- Fazla ödeme / toplam eşitliği / zorunlu alanlar ----
