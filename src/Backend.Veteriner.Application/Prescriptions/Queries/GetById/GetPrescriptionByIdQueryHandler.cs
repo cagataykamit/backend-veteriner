@@ -103,7 +103,11 @@ public sealed class GetPrescriptionByIdQueryHandler
             p.Notes,
             p.FollowUpDateUtc,
             p.CreatedAtUtc,
-            p.UpdatedAtUtc);
+            p.UpdatedAtUtc,
+            p.Items
+                .OrderBy(i => i.SortOrder)
+                .Select(i => new PrescriptionItemDto(i.Id, i.SortOrder, i.Name, i.ProductId, i.Instructions, i.Quantity))
+                .ToList());
 
         return Result<PrescriptionDetailDto>.Success(dto);
     }

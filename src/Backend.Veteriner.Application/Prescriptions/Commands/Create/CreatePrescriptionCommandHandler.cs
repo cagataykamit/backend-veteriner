@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Prescriptions.Access;
+using Backend.Veteriner.Application.Prescriptions.Items;
 using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -10,6 +11,7 @@ using Backend.Veteriner.Application.Treatments.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -28,6 +30,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Treatment> _treatments;
+    private readonly IReadRepository<Product> _products;
     private readonly IRepository<Prescription> _prescriptionsWrite;
 
     public CreatePrescriptionCommandHandler(
@@ -39,6 +42,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
         IReadRepository<Treatment> treatments,
+        IReadRepository<Product> products,
         IRepository<Prescription> prescriptionsWrite)
     {
         _tenantContext = tenantContext;
@@ -49,6 +53,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
         _pets = pets;
         _examinations = examinations;
         _treatments = treatments;
+        _products = products;
         _prescriptionsWrite = prescriptionsWrite;
     }
 
@@ -175,6 +180,16 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
         if (!locked.IsSuccess)
             return Result<Guid>.Failure(locked.Error);
 
+        IReadOnlyList<PrescriptionItemDraft>? itemDrafts = null;
+        if (request.Items is { Count: > 0 } itemRequests)
+        {
+            var resolved = await PrescriptionItemResolver.ResolveAsync(_products, tenantId, itemRequests, ct);
+            if (!resolved.IsSuccess)
+                return Result<Guid>.Failure(resolved.Error);
+
+            itemDrafts = resolved.Value!;
+        }
+
         var prescription = new Prescription(
             tenantId,
             effectiveClinicId,
@@ -186,6 +201,13 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             request.Content,
             request.Notes,
             request.FollowUpDateUtc);
+
+        if (itemDrafts is not null)
+        {
+            var itemsResult = prescription.ReplaceItems(itemDrafts);
+            if (!itemsResult.IsSuccess)
+                return Result<Guid>.Failure(itemsResult.Error);
+        }
 
         await _prescriptionsWrite.AddAsync(prescription, ct);
         await _prescriptionsWrite.SaveChangesAsync(ct);

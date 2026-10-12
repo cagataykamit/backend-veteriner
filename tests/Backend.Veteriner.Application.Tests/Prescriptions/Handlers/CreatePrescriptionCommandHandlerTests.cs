@@ -11,6 +11,7 @@ using Backend.Veteriner.Application.Treatments.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
@@ -29,6 +30,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
     private readonly Mock<IReadRepository<Treatment>> _treatments = new();
+    private readonly Mock<IReadRepository<Product>> _products = new();
     private readonly Mock<IRepository<Prescription>> _prescriptionsWrite = new();
 
     private CreatePrescriptionCommandHandler CreateHandler(IClinicReadScopeResolver? resolver = null)
@@ -41,6 +43,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
             _pets.Object,
             _examinations.Object,
             _treatments.Object,
+            _products.Object,
             _prescriptionsWrite.Object);
 
     private static CreatePrescriptionCommand Cmd(

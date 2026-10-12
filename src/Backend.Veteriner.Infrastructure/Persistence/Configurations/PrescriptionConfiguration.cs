@@ -26,6 +26,12 @@ public sealed class PrescriptionConfiguration : IEntityTypeConfiguration<Prescri
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
 
+        b.HasMany(x => x.Items)
+            .WithOne()
+            .HasForeignKey(i => i.PrescriptionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.PrescribedAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ClinicId });

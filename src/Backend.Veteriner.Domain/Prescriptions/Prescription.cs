@@ -21,6 +21,11 @@ public sealed class Prescription : AggregateRoot
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
+    private readonly List<PrescriptionItem> _items = new();
+
+    /// <summary>Yapılandırılmış reçete satırları; eski (serbest metin) reçetelerde boştur.</summary>
+    public IReadOnlyList<PrescriptionItem> Items => _items;
+
     private Prescription() { }
 
     public Prescription(
@@ -90,6 +95,30 @@ public sealed class Prescription : AggregateRoot
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         FollowUpDateUtc = followUpDateUtc.HasValue ? NormalizeUtc(followUpDateUtc.Value) : null;
         UpdatedAtUtc = DateTime.UtcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Tüm satırları verilen liste ile değiştirir (boş liste = hepsini siler); sıra dizideki sıradır.</summary>
+    public Result ReplaceItems(IReadOnlyList<PrescriptionItemDraft> drafts)
+    {
+        if (drafts.Count > PrescriptionItem.MaxPerPrescription)
+        {
+            return Result.Failure(
+                "Prescriptions.Validation",
+                $"A prescription can have at most {PrescriptionItem.MaxPerPrescription} items.");
+        }
+
+        foreach (var draft in drafts)
+        {
+            var valid = PrescriptionItem.Validate(draft);
+            if (!valid.IsSuccess)
+                return valid;
+        }
+
+        _items.Clear();
+        for (var i = 0; i < drafts.Count; i++)
+            _items.Add(new PrescriptionItem(Id, i + 1, drafts[i]));
+
         return Result.Success();
     }
 

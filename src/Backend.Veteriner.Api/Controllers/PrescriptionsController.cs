@@ -80,7 +80,8 @@ public sealed class PrescriptionsController : ControllerBase
             body.Title,
             body.Content,
             body.Notes,
-            body.FollowUpDateUtc);
+            body.FollowUpDateUtc,
+            body.Items);
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);

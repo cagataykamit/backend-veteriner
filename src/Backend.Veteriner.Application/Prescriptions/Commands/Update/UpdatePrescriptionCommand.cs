@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -13,5 +14,6 @@ public sealed record UpdatePrescriptionCommand(
     string Title,
     string Content,
     string? Notes,
-    DateTime? FollowUpDateUtc)
+    DateTime? FollowUpDateUtc,
+    IReadOnlyList<PrescriptionItemRequest>? Items = null)
     : IRequest<Result>;

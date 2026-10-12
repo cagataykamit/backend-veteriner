@@ -16,4 +16,5 @@ public sealed record PrescriptionDetailDto(
     string? Notes,
     DateTime? FollowUpDateUtc,
     DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime? UpdatedAtUtc,
+    IReadOnlyList<PrescriptionItemDto> Items);
