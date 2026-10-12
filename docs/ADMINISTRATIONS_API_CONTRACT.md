@@ -37,7 +37,6 @@ Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA5_DISCOVERY.md` (D1, D3,
 | `voidedAtUtc` | datetime? | Yalnız `Voided` |
 | `voidedByUserId` | guid? | Yalnız `Voided` |
 | `voidReason` | string? | Yalnız `Voided` |
-| `stockMovementId` | guid | Düşümü yapan `Out` hareketi |
 | `createdByUserId` | guid | Uygulamayı kaydeden (klinik uygulayıcı) |
 | `createdAtUtc` | datetime | |
 | `requestId` | guid? | Verilmişse kaydedilen değer |
@@ -96,7 +95,7 @@ Kurallar:
    - `examinationId` verilirse muayene aynı klinik ve aynı hasta olmalı (`Examinations.NotFound`, `Administrations.ExaminationClinicMismatch`, `Administrations.ExaminationPetMismatch`).
    - Tedavi bir muayeneye bağlıysa ve istekte `examinationId` yoksa uygulama o muayeneye bağlanır; ikisi de varsa aynı olmalı (`Administrations.TreatmentExaminationMismatch`).
 5. **Kesinleşmiş muayene kilidi (Dilim 0):** bağlanan (etkin) muayene kesinleşmişse `Examinations.Finalized` (409); kayıt ve stok değişmez.
-6. **Zaman:** `administeredAtUtc` verilmezse şimdi. Tedavi tarihi penceresiyle aynı kural: en çok 7 gün geriye, en çok 2 yıl ileriye (`Administrations.DateTooFarInPast`, `Administrations.DateTooFarInFuture`, 400). Stok hareketinin `occurredAtUtc` değeri budur.
+6. **Zaman:** `administeredAtUtc` verilmezse şimdi. Tedavi tarihi penceresiyle aynı kural: en çok 7 gün geriye, en çok 2 yıl ileriye (tedavi ile ortak kural: `Treatments.DateTooFarInPast`, `Treatments.DateTooFarInFuture`, 400). Stok hareketinin `occurredAtUtc` değeri budur.
 7. **Miktar:** `quantity` 0'dan büyük, en çok 3 ondalık, en çok 100000 (`Administrations.Validation`, 400).
 8. **Stok (D7):** klinikte yeterli eldeki miktar yoksa (stok satırı olmaması dâhil) `Administrations.InsufficientStock` (400); hiçbir şey yazılmaz.
 9. Stok satırı eşzamanlı değişirse `StockMovements.ConcurrencyConflict` (409); **aynı gövde ve aynı `requestId` ile yeniden denemek güvenlidir.**
@@ -109,7 +108,7 @@ Etki: `Out` hareketi (`quantity`, `reason: "Uygulama"`, `referenceType: "Adminis
 
 `Administrations.Correct`. İstek: `{ "reason": "string" }` — gerekçe zorunlu, 5–500 karakter (`CorrectionReason`). Yanıt **200** + güncel `AdministrationDto` (`status: "Voided"`).
 
-Etki (tek transaction): uygulama iptal edilir; `Out` hareketi Dilim 1 ters hareketiyle geri alınır (`Reversal`, `reversesMovementId = stockMovementId`, aynı kaynak izi, stok miktar kadar **artar**).
+Etki (tek transaction): uygulama iptal edilir; `Out` hareketi Dilim 1 ters hareketiyle geri alınır (`Reversal`, `reversesMovementId` = uygulamanın `Out` hareketi (kaynak izinden bulunur), aynı kaynak izi, stok miktar kadar **artar**).
 
 Kurallar:
 
@@ -138,15 +137,15 @@ Liste/detay stok bilgisi taşımaz (`stock` yalnız oluşturma yanıtındadır).
 | Kod | HTTP |
 |---|---|
 | `Administrations.DuplicateRequestId`, `Administrations.RequestIdVoided`, `Administrations.AlreadyVoided`, `Examinations.Finalized`, `StockMovements.ConcurrencyConflict` | 409 |
-| `Administrations.Validation`, `Administrations.InsufficientStock`, `Administrations.ClinicContextMismatch`, `Administrations.ClinicScopeRequired`, `Administrations.TreatmentClinicMismatch`, `Administrations.TreatmentPetMismatch`, `Administrations.ExaminationClinicMismatch`, `Administrations.ExaminationPetMismatch`, `Administrations.TreatmentExaminationMismatch`, `Administrations.DateTooFarInPast`, `Administrations.DateTooFarInFuture`, `Products.Inactive` | 400 |
-| `Administrations.NotFound`, `Pets.NotFound`, `Products.NotFound`, `Treatments.NotFound`, `Examinations.NotFound` | 404 |
+| `Administrations.Validation`, `Administrations.InsufficientStock`, `Administrations.ClinicContextMismatch`, `Administrations.ClinicScopeRequired`, `Administrations.TreatmentClinicMismatch`, `Administrations.TreatmentPetMismatch`, `Administrations.ExaminationClinicMismatch`, `Administrations.ExaminationPetMismatch`, `Administrations.TreatmentExaminationMismatch`, `Treatments.DateTooFarInPast`, `Treatments.DateTooFarInFuture`, `Products.Inactive` | 400 |
+| `Administrations.NotFound`, `Administrations.StockMovementNotFound`, `Pets.NotFound`, `Products.NotFound`, `Treatments.NotFound`, `Examinations.NotFound` | 404 |
 | `Clinics.AccessDenied`, `Tenants.TenantInactive` | 403 |
 
 ---
 
 ## 7) Uygulama notları
 
-- Veri modeli: yeni `Administrations` tablosu. Üç benzersiz/ilişkisel kural: `(TenantId, RequestId)` filtreli benzersiz indeks (`RequestId IS NOT NULL`); `StockMovementId` benzersiz; iptal alanları tutarlılık CHECK'i (`VoidedAtUtc`, `VoidedByUserId`, `VoidReason` ya hep dolu ya hep boş). Okuma yardımı: `(TenantId, PetId)`, `(TenantId, ExaminationId)`, `(TenantId, TreatmentId)`, `(TenantId, ClinicId, AdministeredAtUtc)` indeksleri. Silme ucu yoktur.
+- Veri modeli: yeni `Administrations` tablosu. Benzersiz kural: `(TenantId, RequestId)` filtreli benzersiz indeks (`RequestId IS NOT NULL`); düşümün hareket kimliği saklanmaz, `Out` hareketi kaynak izinden bulunur (`Administrations.StockMovementNotFound`, 404: veri bozukluğu). İptal alanları tutarlılık CHECK'i (`VoidedAtUtc`, `VoidedByUserId`, `VoidReason` ya hep dolu ya hep boş). Okuma yardımı: `(TenantId, PetId)`, `(TenantId, ExaminationId)`, `(TenantId, TreatmentId)`, `(TenantId, ClinicId, AdministeredAtUtc)` indeksleri. Silme ucu yoktur.
 - Komutlar `ITransactionalRollbackOnFailureRequest`tir. Yazma sırası: önce uygulama kaydı (`requestId` benzersizliği hiçbir şey yazılmadan eler), sonra aynı transaction'da mevcut `CreateStockMovementCommand` / `ReverseStockMovementCommand` gönderilir; stok tarafı başarısız sonuç dönerse işlem geri alınır ve uygulama kaydı kalmaz. Stok kuralları tek yerde (Dilim 1 handler'ları) yaşar, burada kopyalanmaz.
 - Reçete ve tedavi komutları stok değiştirmez (K3); bu dilimde de değişmez. Uygulama yalnız bu ucun yan etkisidir.
 - Tedavi/muayene/aşı yazma uçlarına dokunulmaz; Dilim 3 (`PrescriptionItem`) `Prescription` alanındadır ve bu dilimle kesişmez. Ortak dosyalar (izin kataloğu, `AppDbContext`, model snapshot) iki dilimde de değişir; migration birleştirmeden önce güncel `main` üzerinde yeniden üretilir.
