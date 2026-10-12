@@ -101,31 +101,43 @@ public sealed class PetProjectionHealthIntegrationTests
     }
 
     [Fact]
-    public async Task Evaluate_Should_BeDegraded_WhenPendingAgeExceedsDegradedThreshold()
+    public async Task Evaluate_Should_BeHealthy_WhenProjectionDisabledEvenIfPendingAgeExceedsThresholds()
     {
-        await ResetBaselineAsync();
-
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        commandDb.OutboxMessages.Add(new OutboxMessage
-        {
-            Type = PetIntegrationEventTypes.Created,
-            Payload = "{}",
-            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-15)
-        });
-        await commandDb.SaveChangesAsync();
-
-        var status = await scope.ServiceProvider
-            .GetRequiredService<IPetProjectionStatusReader>()
-            .GetStatusAsync(CancellationToken.None);
+        var status = await GetStatusWithPendingEventAsync(ageSeconds: 45);
+        status.ProjectionEnabled.Should().BeFalse();
 
         var evaluation = PetProjectionHealthEvaluator.Evaluate(
             status,
             new PetProjectionHealthOptions { DegradedAfterSeconds = 10, UnhealthyAfterSeconds = 30 },
             new QueryReadModelsOptions { PetsEnabled = false });
 
+        evaluation.Level.Should().Be(PetProjectionHealthLevel.Healthy);
+    }
+
+    [Fact]
+    public async Task Evaluate_Should_BeDegraded_WhenProjectionEnabledAndPendingAgeExceedsDegradedThreshold()
+    {
+        var status = await GetStatusWithPendingEventAsync(ageSeconds: 15);
+
+        var evaluation = PetProjectionHealthEvaluator.Evaluate(
+            status with { ProjectionEnabled = true },
+            new PetProjectionHealthOptions { DegradedAfterSeconds = 10, UnhealthyAfterSeconds = 30 },
+            new QueryReadModelsOptions { PetsEnabled = true });
+
         evaluation.Level.Should().Be(PetProjectionHealthLevel.Degraded);
+    }
+
+    [Fact]
+    public async Task Evaluate_Should_BeUnhealthy_WhenProjectionEnabledAndPendingAgeExceedsUnhealthyThreshold()
+    {
+        var status = await GetStatusWithPendingEventAsync(ageSeconds: 45);
+
+        var evaluation = PetProjectionHealthEvaluator.Evaluate(
+            status with { ProjectionEnabled = true },
+            new PetProjectionHealthOptions { DegradedAfterSeconds = 10, UnhealthyAfterSeconds = 30 },
+            new QueryReadModelsOptions { PetsEnabled = true });
+
+        evaluation.Level.Should().Be(PetProjectionHealthLevel.Unhealthy);
     }
 
     [Fact]
@@ -177,6 +189,26 @@ public sealed class PetProjectionHealthIntegrationTests
         evaluation.Level.Should().Be(PetProjectionHealthLevel.Degraded);
         evaluation.Data["projectionEnabled"].Should().Be(false);
         evaluation.Data["petsReadEnabled"].Should().Be(true);
+    }
+
+    private async Task<PetProjectionStatus> GetStatusWithPendingEventAsync(int ageSeconds)
+    {
+        await ResetBaselineAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        commandDb.OutboxMessages.Add(new OutboxMessage
+        {
+            Type = PetIntegrationEventTypes.Created,
+            Payload = "{}",
+            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-ageSeconds)
+        });
+        await commandDb.SaveChangesAsync();
+
+        return await scope.ServiceProvider
+            .GetRequiredService<IPetProjectionStatusReader>()
+            .GetStatusAsync(CancellationToken.None);
     }
 
     private async Task ResetBaselineAsync()
