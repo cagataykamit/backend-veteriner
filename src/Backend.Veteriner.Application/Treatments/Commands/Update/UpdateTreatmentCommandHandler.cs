@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Treatments.Access;
+using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -144,6 +145,11 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
                     "Examination pet does not match treatment pet.");
             }
         }
+
+        var locked = await ExaminationLinkedRecordLock.EnsureOpenAsync(
+            _examinations, tenantId, [request.ExaminationId, t.ExaminationId], ct);
+        if (!locked.IsSuccess)
+            return locked;
 
         var update = t.UpdateDetails(
             effectiveClinicId,
