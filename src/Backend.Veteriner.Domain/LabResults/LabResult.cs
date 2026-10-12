@@ -88,6 +88,13 @@ public sealed class LabResult : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>Test adı, hayvan, klinik veya muayene bağı değişiyor mu; sonuç alanları (tarih, metin, yorum, not) kimlik sayılmaz.</summary>
+    public bool ChangesIdentity(Guid clinicId, Guid petId, Guid? examinationId, string testName)
+        => ClinicId != clinicId
+           || PetId != petId
+           || ExaminationId != examinationId
+           || !string.Equals(TestName, testName?.Trim(), StringComparison.Ordinal);
+
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch
         {

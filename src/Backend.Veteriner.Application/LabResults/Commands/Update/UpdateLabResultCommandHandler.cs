@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.LabResults.Access;
 using Backend.Veteriner.Application.LabResults.Specs;
@@ -139,6 +140,11 @@ public sealed class UpdateLabResultCommandHandler : IRequestHandler<UpdateLabRes
                     "Examination pet does not match lab result pet.");
             }
         }
+
+        var locked = await ExaminationLinkedRecordLock.EnsureLabIdentityEditableAsync(
+            _examinations, tenantId, existing, effectiveClinicId, request.PetId, request.ExaminationId, request.TestName, ct);
+        if (!locked.IsSuccess)
+            return locked;
 
         var update = existing.UpdateDetails(
             effectiveClinicId,
