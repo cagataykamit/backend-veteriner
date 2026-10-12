@@ -12,6 +12,7 @@ public sealed class PaymentIntegrationEventTypeRegistry
         {
             [PaymentIntegrationEventTypes.Created] = typeof(PaymentCreatedIntegrationEvent),
             [PaymentIntegrationEventTypes.Updated] = typeof(PaymentUpdatedIntegrationEvent),
+            [PaymentIntegrationEventTypes.Voided] = typeof(PaymentVoidedIntegrationEvent),
         };
 
     public static bool TryResolvePayloadType(string eventType, out Type payloadType)

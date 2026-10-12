@@ -70,6 +70,84 @@ public sealed class PaymentProjectionIntegrationTests
     }
 
     [Fact]
+    public async Task VoidedEvent_Should_RemoveContributionAndReadModel_And_RecomputeDailyTotal()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
+
+        await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var keptId = Guid.NewGuid();
+        var voidedId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var paidAtUtc = new DateTime(2026, 6, 19, 12, 0, 0, DateTimeKind.Utc);
+        var localDate = OperationDayBounds.ToLocalDate(paidAtUtc);
+
+        var kept = PaymentProjectionTestSupport.CreateSnapshot(keptId, tenantId, clinicId, amount: 100m, paidAtUtc: paidAtUtc);
+        var voided = PaymentProjectionTestSupport.CreateSnapshot(voidedId, tenantId, clinicId, amount: 250m, paidAtUtc: paidAtUtc);
+
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Created,
+            new PaymentCreatedIntegrationEvent(Guid.NewGuid(), new DateTime(2026, 6, 19, 9, 0, 0, DateTimeKind.Utc), kept));
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Created,
+            new PaymentCreatedIntegrationEvent(Guid.NewGuid(), new DateTime(2026, 6, 19, 9, 5, 0, DateTimeKind.Utc), voided));
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Voided,
+            new PaymentVoidedIntegrationEvent(Guid.NewGuid(), new DateTime(2026, 6, 19, 11, 0, 0, DateTimeKind.Utc), voided));
+
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        (await queryDb.PaymentDailyContributionReadModels.AnyAsync(x => x.PaymentId == voidedId)).Should().BeFalse();
+        (await queryDb.PaymentReadModels.AnyAsync(x => x.PaymentId == voidedId)).Should().BeFalse();
+        (await queryDb.PaymentReadModels.AnyAsync(x => x.PaymentId == keptId)).Should().BeTrue();
+
+        var stats = await PaymentProjectionTestSupport.FindDailyStatsAsync(queryDb, tenantId, clinicId, localDate, "TRY");
+        stats!.PaidTotalAmount.Should().Be(100m);
+        stats.PaidCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task VoidedEvent_ForLastPayment_Should_RemoveDailyStatsRow()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
+
+        await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var paymentId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var paidAtUtc = new DateTime(2026, 6, 19, 12, 0, 0, DateTimeKind.Utc);
+        var localDate = OperationDayBounds.ToLocalDate(paidAtUtc);
+        var snapshot = PaymentProjectionTestSupport.CreateSnapshot(paymentId, tenantId, clinicId, amount: 80m, paidAtUtc: paidAtUtc);
+
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Created,
+            new PaymentCreatedIntegrationEvent(Guid.NewGuid(), new DateTime(2026, 6, 19, 9, 0, 0, DateTimeKind.Utc), snapshot));
+        await PaymentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb,
+            PaymentIntegrationEventTypes.Voided,
+            new PaymentVoidedIntegrationEvent(Guid.NewGuid(), new DateTime(2026, 6, 19, 10, 0, 0, DateTimeKind.Utc), snapshot));
+
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        (await PaymentProjectionTestSupport.FindDailyStatsAsync(queryDb, tenantId, clinicId, localDate, "TRY")).Should().BeNull();
+        (await queryDb.PaymentDailyContributionReadModels.AnyAsync(x => x.PaymentId == paymentId)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task UpdatedEvent_AmountChange_Should_RecomputeDailyTotal()
     {
         await using var scope = _factory.Services.CreateAsyncScope();
