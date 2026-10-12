@@ -112,26 +112,15 @@ public sealed class ReverseStockMovementCommandHandler
 
         var stock = await _productStocksWrite.FirstOrDefaultAsync(
             new ProductStockForUpdateSpec(tenantId, original.ClinicId, original.ProductId), ct);
+        if (stock is null && original.ReversalIncreasesStock)
+            return Fail("StockMovements.StockNotFound", "Hareketin stok satırı bulunamadı.");
 
-        var stockIsNew = false;
         if (original.ReversalIncreasesStock)
-        {
-            if (stock is null)
-            {
-                stockIsNew = true;
-                stock = new ProductStock(tenantId, original.ClinicId, original.ProductId, original.Quantity, 0);
-                await _productStocksWrite.AddAsync(stock, ct);
-            }
-            else
-                stock.IncreaseQuantity(original.Quantity);
-        }
+            stock!.IncreaseQuantity(original.Quantity);
+        else if (stock is null || stock.QuantityOnHand < original.Quantity)
+            return Fail("StockMovements.InsufficientStock", "Geri alma için yeterli stok yok.");
         else
-        {
-            if (stock is null || stock.QuantityOnHand < original.Quantity)
-                return Fail("StockMovements.InsufficientStock", "Geri alma için yeterli stok yok.");
-
             stock.DecreaseQuantity(original.Quantity);
-        }
 
         var reversal = original.CreateReversal(
             request.Reason,
@@ -139,11 +128,11 @@ public sealed class ReverseStockMovementCommandHandler
             DateTime.UtcNow,
             _clientContext.UserId,
             request.RequestId);
-        await _stockMovementsWrite.AddAsync(reversal, ct);
 
+        // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir): ters hareket ve stok değişimi tek toplu yazımdır.
         try
         {
-            await _uow.SaveChangesAsync(ct);
+            await _stockMovementsWrite.AddAsync(reversal, ct);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -151,7 +140,7 @@ public sealed class ReverseStockMovementCommandHandler
         }
         catch (DbUpdateException)
         {
-            // Benzersiz kural kaybedene çarptı; nedeni yeniden sorgulayarak ayırt et.
+            // Benzersiz kural kaybedene çarptı; nedeni yeniden sorgulayarak ayırt et. Hiçbir şey yazılmadı.
             if (request.RequestId is { } winnerRequestId && winnerRequestId != Guid.Empty)
             {
                 var winner = await _stockMovementsWrite.FirstOrDefaultAsync(
@@ -166,14 +155,16 @@ public sealed class ReverseStockMovementCommandHandler
                 return AlreadyReversed();
             }
 
-            if (stockIsNew
-                && await _productStocksWrite.FirstOrDefaultAsync(
-                    new ProductStockForUpdateSpec(tenantId, original.ClinicId, original.ProductId), ct) is not null)
-            {
-                return ConcurrencyConflict();
-            }
-
             throw;
+        }
+
+        try
+        {
+            await _uow.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ConcurrencyConflict();
         }
 
         return Result<StockMovementCreateResult>.Success(

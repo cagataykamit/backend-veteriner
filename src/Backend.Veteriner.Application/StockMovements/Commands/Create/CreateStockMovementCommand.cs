@@ -18,4 +18,4 @@ public sealed record CreateStockMovementCommand(
     DateTime? OccurredAtUtc,
     string? Notes,
     Guid? RequestId = null)
-    : IRequest<Result<StockMovementCreateResult>>, ITransactionalRequest;
+    : IRequest<Result<StockMovementCreateResult>>, ITransactionalRollbackOnFailureRequest;

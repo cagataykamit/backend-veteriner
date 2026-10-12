@@ -134,8 +134,10 @@ public sealed class CreateStockMovementCommandHandler
             new ProductStockForUpdateSpec(tenantId, request.ClinicId, request.ProductId),
             ct);
 
-        StockMovement movement = default!;
-        var stockIsNew = false;
+        // Yeni stok satırı, hareketten sonra yazılır: hareketin benzersiz kuralları (requestId, kaynak) önce eler
+        // ve satır kalıcılaşmadan işlem sonlanır. Mevcut satırdaki değişiklik hareketle aynı SaveChanges'te gider.
+        ProductStock? newStock = null;
+        StockMovement movement;
 
         switch (request.MovementType)
         {
@@ -147,9 +149,7 @@ public sealed class CreateStockMovementCommandHandler
                         "Bu ürün için bu klinikte stok satırı zaten var; Initial kullanılamaz.");
                 }
 
-                stock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
-                stockIsNew = true;
-                await _productStocksWrite.AddAsync(stock, ct);
+                newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
                 movement = CreateMovementEntity(
                     tenantId,
                     request,
@@ -158,16 +158,11 @@ public sealed class CreateStockMovementCommandHandler
                     referenceId,
                     StockMovementType.Initial,
                     request.Quantity);
-                await _stockMovementsWrite.AddAsync(movement, ct);
                 break;
 
             case StockMovementType.In:
                 if (stock is null)
-                {
-                    stock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
-                    stockIsNew = true;
-                    await _productStocksWrite.AddAsync(stock, ct);
-                }
+                    newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
                 else
                     stock.IncreaseQuantity(request.Quantity);
 
@@ -179,7 +174,6 @@ public sealed class CreateStockMovementCommandHandler
                     referenceId,
                     StockMovementType.In,
                     request.Quantity);
-                await _stockMovementsWrite.AddAsync(movement, ct);
                 break;
 
             case StockMovementType.Out:
@@ -199,7 +193,6 @@ public sealed class CreateStockMovementCommandHandler
                     referenceId,
                     StockMovementType.Out,
                     request.Quantity);
-                await _stockMovementsWrite.AddAsync(movement, ct);
                 break;
 
             case StockMovementType.Adjustment:
@@ -213,13 +206,8 @@ public sealed class CreateStockMovementCommandHandler
                         "Hedef stok miktarı mevcut ile aynı; kayıt oluşturulmadı.");
                 }
 
-                var movementQty = Math.Abs(delta);
                 if (stock is null)
-                {
-                    stock = new ProductStock(tenantId, request.ClinicId, request.ProductId, targetQty, 0);
-                    stockIsNew = true;
-                    await _productStocksWrite.AddAsync(stock, ct);
-                }
+                    newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, targetQty, 0);
                 else
                     stock.SetAbsoluteQuantity(targetQty);
 
@@ -230,8 +218,7 @@ public sealed class CreateStockMovementCommandHandler
                     createdBy,
                     referenceId,
                     StockMovementType.Adjustment,
-                    movementQty);
-                await _stockMovementsWrite.AddAsync(movement, ct);
+                    Math.Abs(delta));
                 break;
 
             default:
@@ -240,9 +227,10 @@ public sealed class CreateStockMovementCommandHandler
                     "Desteklenmeyen hareket tipi.");
         }
 
+        // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); işlem sınırı TransactionBehavior'dadır.
         try
         {
-            await _uow.SaveChangesAsync(ct);
+            await _stockMovementsWrite.AddAsync(movement, ct);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -250,7 +238,7 @@ public sealed class CreateStockMovementCommandHandler
         }
         catch (DbUpdateException)
         {
-            // Benzersiz kural kaybedene çarptı; nedeni yeniden sorgulayarak ayırt et.
+            // Benzersiz kural kaybedene çarptı; nedeni yeniden sorgulayarak ayırt et. Hiçbir şey yazılmadı.
             if (request.RequestId is { } winnerRequestId && winnerRequestId != Guid.Empty)
             {
                 var winner = await _stockMovementsWrite.FirstOrDefaultAsync(
@@ -268,20 +256,41 @@ public sealed class CreateStockMovementCommandHandler
                 return DuplicateReference();
             }
 
-            // Stok satırı yokken eşzamanlı ilk giriş: satırı başka istek oluşturdu.
-            if (stockIsNew
-                && await _productStocksWrite.FirstOrDefaultAsync(
-                    new ProductStockForUpdateSpec(tenantId, request.ClinicId, request.ProductId), ct) is not null)
-            {
-                return ConcurrencyConflict();
-            }
-
             throw;
+        }
+
+        if (newStock is not null)
+        {
+            try
+            {
+                await _productStocksWrite.AddAsync(newStock, ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Satır yokken eşzamanlı ilk giriş: satırı başka istek oluşturdu; işlem geri alınır, yeniden denenebilir.
+                if (await StockRowExistsAsync(tenantId, request.ClinicId, request.ProductId, ct))
+                    return ConcurrencyConflict();
+
+                throw;
+            }
+        }
+
+        try
+        {
+            await _uow.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ConcurrencyConflict();
         }
 
         return Result<StockMovementCreateResult>.Success(
             new StockMovementCreateResult(movement.ToDto(product, categoryName, clinic.Name), true));
     }
+
+    private async Task<bool> StockRowExistsAsync(Guid tenantId, Guid clinicId, Guid productId, CancellationToken ct)
+        => await _productStocksWrite.FirstOrDefaultAsync(
+            new ProductStockForUpdateSpec(tenantId, clinicId, productId), ct) is not null;
 
     private static Result<StockMovementCreateResult> ConcurrencyConflict()
         => Result<StockMovementCreateResult>.Failure(

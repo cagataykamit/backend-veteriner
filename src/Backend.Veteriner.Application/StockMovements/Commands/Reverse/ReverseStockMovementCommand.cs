@@ -10,4 +10,4 @@ public sealed record ReverseStockMovementCommand(
     string Reason,
     string? Notes,
     Guid? RequestId)
-    : IRequest<Result<StockMovementCreateResult>>, ITransactionalRequest;
+    : IRequest<Result<StockMovementCreateResult>>, ITransactionalRollbackOnFailureRequest;
