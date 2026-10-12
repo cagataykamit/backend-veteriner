@@ -1,4 +1,4 @@
-using Backend.Veteriner.Application.Charges.Specs;
+﻿using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Domain.Charges;
@@ -15,10 +15,13 @@ internal static class PaymentAllocationTestSupport
 
     public static IReadOnlyList<PaymentAllocationLineDto> Lines(decimal amount) => [new(ChargeId, amount)];
 
-    public static Charge NewCharge(Guid tenantId, Guid clinicId, Guid clientId, decimal unitPrice = 1_000_000m)
+    public static Charge NewCharge(Guid tenantId, Guid clinicId, Guid clientId,
+        decimal unitPrice = 1_000_000m,
+        Guid? petId = null,
+        Guid? examinationId = null)
     {
         var charge = Charge.Create(
-                tenantId, clinicId, clientId, null, null, null, "Muayene", 1m, unitPrice,
+                tenantId, clinicId, clientId, petId, null, examinationId, "Muayene", 1m, unitPrice,
                 Guid.NewGuid(), DateTime.UtcNow, null)
             .Value!;
         typeof(Charge).GetProperty(nameof(Charge.Id))!.SetValue(charge, ChargeId);
@@ -30,11 +33,13 @@ internal static class PaymentAllocationTestSupport
         Mock<IClientContext> clientContext,
         Guid tenantId,
         Guid clinicId,
-        Guid clientId)
+        Guid clientId,
+        Guid? chargePetId = null,
+        Guid? chargeExaminationId = null)
     {
         clientContext.SetupGet(c => c.UserId).Returns(Guid.NewGuid());
         chargesWrite
             .Setup(r => r.ListAsync(It.IsAny<ChargesByIdsForUpdateSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([NewCharge(tenantId, clinicId, clientId)]);
+            .ReturnsAsync([NewCharge(tenantId, clinicId, clientId, petId: chargePetId, examinationId: chargeExaminationId)]);
     }
 }

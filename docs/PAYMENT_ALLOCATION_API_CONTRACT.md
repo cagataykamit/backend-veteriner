@@ -47,6 +47,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-012 (kabul edildi), backl
 - Her ücret aynı kiracıda (`Charges.NotFound`), aynı klinikte (`PaymentAllocations.ChargeClinicMismatch`), aynı müşteride (`PaymentAllocations.ChargeClientMismatch`) olmalı.
 - Her tahsis işlem anındaki açık tutarı aşamaz → `PaymentAllocations.ExceedsOutstanding` (409; ilgili ücret ve açık tutar `detail` metnindedir).
 - `currency` yalnızca `TRY` (`Payments.Validation`). Eski kayıtlar etkilenmez.
+- **Hayvan / muayene bağlamı (türetme):** `petId` veya `examinationId` istekte verilmezse, tahsis edilen ücretlerin **tamamı aynı** `petId` (`examinationId`) değerini taşıyorsa ödeme o değerle kaydedilir; ücretler farklı ya da bağlamsızsa (ör. çoklu hayvan, hayvansız ücret) alan `null` kalır, tek hayvana indirgenmez. Açıkça verilen değer her zaman önceliklidir. Böylece `GET /payments` (liste, `petId` süzgeci, `petName`), `GET /payments/{id}` ve hayvan detayındaki "Son ödemeler" tahsis edilen ücretin hayvanını/muayenesini gösterir. Şema ve yanıt biçimi değişmez; bu davranıştan önce kaydedilmiş ödemeler etkilenmez.
 - **Yanıt (geriye uyumlu):** 201, gövde yalnızca `Guid`, `Location` başlığı. Tekrar isteği 200, aynı `Guid` ve `Idempotency-Replayed: true` başlığı.
 - Başarılı oluşturma bugünkü gibi `payment.created.v1` olayını üretir (tahsis bilgisi olaya girmez). Komut tek veritabanı işleminde çalışır; herhangi bir adım başarısız olursa hiçbir şey yazılmaz.
 
