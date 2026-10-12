@@ -1,6 +1,7 @@
 namespace Backend.Veteriner.Application.Administrations.Contracts.Dtos;
 
-/// <summary>Uygulama kaydı. <see cref="Status"/>: <c>Active</c> veya <c>Voided</c>; iptal alanları yalnız <c>Voided</c> iken dolu.</summary>
+/// <summary>Uygulama kaydı. <see cref="Status"/>: <c>Active</c> veya <c>Voided</c>; iptal alanları (<see cref="VoidStockOutcome"/>: <c>StockReturned</c>/<c>WrittenOff</c> dahil) yalnız <c>Voided</c> iken dolu;
+/// <see cref="LateEntryReason"/> yalnız <see cref="AddedAfterFinalization"/> iken dolu.</summary>
 public sealed record AdministrationDto(
     Guid Id,
     Guid ClinicId,
@@ -18,6 +19,9 @@ public sealed record AdministrationDto(
     DateTime? VoidedAtUtc,
     Guid? VoidedByUserId,
     string? VoidReason,
+    string? VoidStockOutcome,
+    bool AddedAfterFinalization,
+    string? LateEntryReason,
     Guid CreatedByUserId,
     DateTime CreatedAtUtc,
     Guid? RequestId);

@@ -11,12 +11,14 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Administrations.Commands.Void;
 
 /// <summary>
-/// Uygulamayı iptal eder ve stoğu mevcut <see cref="ReverseStockMovementCommand"/> ile aynı transaction'da geri verir
-/// (ters hareket kuralları tek yerde yaşar). Stok adımı başarısız olursa iptal geri alınır.
+/// Uygulamayı iptal eder. Stoğa iade seçilirse stoğu mevcut <see cref="ReverseStockMovementCommand"/> ile aynı transaction'da geri verir
+/// (ters hareket kuralları tek yerde yaşar; pasif ürün de dahil) ve stok adımı başarısız olursa iptal geri alınır.
+/// Zarar/imha seçilirse stok hareketi yazılmaz; orijinal çıkış hareketi geçerli kalır.
 /// </summary>
 public sealed class VoidAdministrationCommandHandler
     : IRequestHandler<VoidAdministrationCommand, Result<AdministrationDto>>
@@ -93,9 +95,19 @@ public sealed class VoidAdministrationCommandHandler
         if (product is null)
             return Fail("Products.NotFound", "Ürün bulunamadı veya kiracıya ait değil.");
 
-        var voided = administration.Void(userId, request.Reason, _timeProvider.GetUtcNow().UtcDateTime);
+        var stockOutcome = AdministrationVoidStockOutcome.StockReturned;
+        if (!string.IsNullOrWhiteSpace(request.StockOutcome)
+            && (!Enum.TryParse(request.StockOutcome, ignoreCase: true, out stockOutcome) || !Enum.IsDefined(stockOutcome)))
+        {
+            return Fail("Administrations.Validation", "stockOutcome StockReturned veya WrittenOff olmalıdır.");
+        }
+
+        var voided = administration.Void(userId, request.Reason, stockOutcome, _timeProvider.GetUtcNow().UtcDateTime);
         if (!voided.IsSuccess)
             return Result<AdministrationDto>.Failure(voided.Error);
+
+        if (stockOutcome == AdministrationVoidStockOutcome.WrittenOff)
+            return await SaveWrittenOffAsync(administration, product, ct);
 
         var outMovement = await _stockMovements.FirstOrDefaultAsync(
             new StockMovementByReferenceSpec(
@@ -119,6 +131,22 @@ public sealed class VoidAdministrationCommandHandler
             return reversal.Error.Code == "StockMovements.AlreadyReversed"
                 ? Fail("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.")
                 : Result<AdministrationDto>.Failure(reversal.Error);
+        }
+
+        return Result<AdministrationDto>.Success(administration.ToDto(product));
+    }
+
+    private async Task<Result<AdministrationDto>> SaveWrittenOffAsync(
+        Administration administration, Product product, CancellationToken ct)
+    {
+        try
+        {
+            await _administrations.UpdateAsync(administration, ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Eşzamanlı iptal kazandı (RowVersion): hiçbir şey yazılmadı.
+            return Fail("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.");
         }
 
         return Result<AdministrationDto>.Success(administration.ToDto(product));
