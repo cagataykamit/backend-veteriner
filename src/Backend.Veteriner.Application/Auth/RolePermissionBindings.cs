@@ -99,6 +99,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Charges.Create,
                 PermissionCatalog.Charges.Correct,
 
+                PermissionCatalog.Administrations.Read,
+                PermissionCatalog.Administrations.Create,
+                PermissionCatalog.Administrations.Correct,
+
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
                 PermissionCatalog.Treatments.Update,
@@ -196,6 +200,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Charges.Read,
                 PermissionCatalog.Charges.Create,
                 PermissionCatalog.Charges.Correct,
+
+                PermissionCatalog.Administrations.Read,
+                PermissionCatalog.Administrations.Create,
+                PermissionCatalog.Administrations.Correct,
 
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
@@ -306,6 +314,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Prescriptions.Create,
                 PermissionCatalog.Prescriptions.Update,
 
+                PermissionCatalog.Administrations.Read,
+                PermissionCatalog.Administrations.Create,
+                PermissionCatalog.Administrations.Correct,
+
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
                 PermissionCatalog.Treatments.Update,
@@ -377,6 +389,10 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.VaccineDefinitions.Read,
 
+                PermissionCatalog.Administrations.Read,
+                PermissionCatalog.Administrations.Create,
+                PermissionCatalog.Administrations.Correct,
+
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
                 PermissionCatalog.Treatments.Update,
@@ -434,6 +450,8 @@ public static class RolePermissionBindings
                 PermissionCatalog.Visits.Update,
                 PermissionCatalog.Vaccinations.Read,
                 PermissionCatalog.VaccineDefinitions.Read,
+                PermissionCatalog.Administrations.Read,
+
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Prescriptions.Read,
                 PermissionCatalog.LabResults.Read,
