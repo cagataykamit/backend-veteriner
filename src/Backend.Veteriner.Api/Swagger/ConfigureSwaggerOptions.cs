@@ -321,7 +321,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 MarkRequired(schema,
                     "examinationId", "petId", "petName", "clientId", "clientName",
-                    "treatments", "prescriptions", "labResults", "hospitalizations", "payments");
+                    "treatments", "prescriptions", "labResults", "hospitalizations", "administrations", "payments");
                 return;
             }
 
@@ -349,6 +349,13 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 MarkRequired(schema, "id", "admittedAtUtc", "clinicId", "clinicName", "reason", "isActive");
                 SetNullable(schema, "dischargedAtUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(ExaminationRelatedAdministrationItemDto))
+            {
+                MarkRequired(schema, "id", "administeredAtUtc", "clinicId", "clinicName", "productName", "unit", "quantity", "addedAfterFinalization");
+                SetNullable(schema, "lateEntryReason", true);
                 return;
             }
 
