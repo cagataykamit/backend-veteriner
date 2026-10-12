@@ -58,7 +58,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
             migrationBuilder.AddCheckConstraint(
                 name: "CK_Payments_Void_Consistent",
                 table: "Payments",
-                sql: "([VoidedAtUtc] IS NULL) = ([VoidReason] IS NULL) AND ([VoidedAtUtc] IS NULL) = ([VoidedByUserId] IS NULL)");
+                sql: "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
 
             migrationBuilder.AddCheckConstraint(
                 name: "CK_Payments_Voided_Unallocated",
@@ -68,7 +68,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
             migrationBuilder.AddCheckConstraint(
                 name: "CK_Charges_Void_Consistent",
                 table: "Charges",
-                sql: "([VoidedAtUtc] IS NULL) = ([VoidReason] IS NULL) AND ([VoidedAtUtc] IS NULL) = ([VoidedByUserId] IS NULL)");
+                sql: "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
 
             migrationBuilder.AddCheckConstraint(
                 name: "CK_Charges_Voided_Unallocated",

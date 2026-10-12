@@ -16,7 +16,7 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
         {
             t.HasCheckConstraint("CK_Charges_Amount_Positive", "[Amount] > 0");
             t.HasCheckConstraint("CK_Charges_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
-            t.HasCheckConstraint("CK_Charges_Void_Consistent", "([VoidedAtUtc] IS NULL) = ([VoidReason] IS NULL) AND ([VoidedAtUtc] IS NULL) = ([VoidedByUserId] IS NULL)");
+            t.HasCheckConstraint("CK_Charges_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
             t.HasCheckConstraint("CK_Charges_Voided_Unallocated", "[VoidedAtUtc] IS NULL OR [AllocatedAmount] = 0");
         });
 
