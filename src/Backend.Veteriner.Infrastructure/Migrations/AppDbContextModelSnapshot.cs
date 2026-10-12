@@ -1363,6 +1363,42 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Prescriptions", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Prescriptions.PrescriptionItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("PrescriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PrescriptionId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("PrescriptionItems", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Products.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2702,6 +2738,20 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Species");
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Prescriptions.PrescriptionItem", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Prescriptions.Prescription", null)
+                        .WithMany("Items")
+                        .HasForeignKey("PrescriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Products.Product", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Products.ProductCategory", "Category")
@@ -2860,6 +2910,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("VaccineDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Prescriptions.Prescription", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Products.Product", b =>
