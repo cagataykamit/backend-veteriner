@@ -1,5 +1,6 @@
 using Backend.Veteriner.Api.Auth;
 using Backend.Veteriner.Application.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Veteriner.Api.Controllers.Admin;
@@ -10,6 +11,7 @@ namespace Backend.Veteriner.Api.Controllers.Admin;
 public sealed class PingController : ControllerBase
 {
     [HttpGet]
+    [Authorize]
     [Produces("application/json")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public IActionResult Ping()

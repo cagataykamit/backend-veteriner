@@ -131,8 +131,8 @@ public static class WebApplicationBuilderExtensions
             opt.ForwardLimit = null;
         });
 
-        var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
-                             ?? new[] { "http://localhost:4200" };
+        var allowedOrigins = HostSecurityConfiguration.ResolveAllowedOrigins(builder.Configuration, builder.Environment);
+        HostSecurityConfiguration.EnsureAllowedHostsRestricted(builder.Configuration, builder.Environment);
 
         builder.Services.AddCors(options =>
         {

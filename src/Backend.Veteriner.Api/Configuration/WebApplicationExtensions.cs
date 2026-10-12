@@ -42,18 +42,26 @@ public static class WebApplicationExtensions
             });
         }
 
-        app.UseSwagger();
-        app.UseSwaggerUI(c =>
-        {
-            var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-            foreach (var desc in provider.ApiVersionDescriptions)
-            {
-                c.SwaggerEndpoint($"/swagger/{desc.GroupName}/swagger.json", $"Backend Veteriner API {desc.GroupName}");
-            }
+        app.UseSecurityHeaders();
 
-            c.DisplayRequestDuration();
-            c.EnablePersistAuthorization();
-        });
+        if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled"))
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
+            {
+                var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+                foreach (var desc in provider.ApiVersionDescriptions)
+                {
+                    c.SwaggerEndpoint($"/swagger/{desc.GroupName}/swagger.json", $"Backend Veteriner API {desc.GroupName}");
+                }
+
+                c.DisplayRequestDuration();
+                c.EnablePersistAuthorization();
+            });
+        }
+
+        if (!app.Environment.IsDevelopment())
+            app.UseHsts();
 
         app.UseHttpsRedirection();
 
