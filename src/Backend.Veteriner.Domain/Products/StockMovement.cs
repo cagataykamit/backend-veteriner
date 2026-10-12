@@ -3,6 +3,9 @@ namespace Backend.Veteriner.Domain.Products;
 /// <summary>Eklenebilir stok defteri kaydı (append-only).</summary>
 public sealed class StockMovement
 {
+    /// <summary>Tek hareketteki miktar üst sınırı (anlamsız değer ve SQL taşması koruması).</summary>
+    public const decimal MaxQuantity = 1_000_000m;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }

@@ -10,6 +10,9 @@ namespace Backend.Veteriner.Domain.Payments;
 /// </summary>
 public sealed class Payment : AggregateRoot
 {
+    /// <summary>Tek tahsilat tutarı üst sınırı (anlamsız değer ve SQL taşması koruması).</summary>
+    public const decimal MaxAmount = 1_000_000_000m;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }

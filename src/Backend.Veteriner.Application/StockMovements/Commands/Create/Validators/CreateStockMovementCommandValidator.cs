@@ -43,6 +43,10 @@ public sealed class CreateStockMovementCommandValidator : AbstractValidator<Crea
             .When(x => x.MovementType == StockMovementType.Adjustment)
             .WithMessage("Adjustment için Quantity (hedef stok) negatif olamaz.");
 
+        RuleFor(x => x.Quantity)
+            .LessThanOrEqualTo(StockMovement.MaxQuantity)
+            .WithMessage($"Quantity en fazla {StockMovement.MaxQuantity:0} olabilir.");
+
         RuleFor(x => x.UnitCost)
             .Must(uc => !uc.HasValue || uc.Value >= 0)
             .WithMessage("UnitCost negatif olamaz.");

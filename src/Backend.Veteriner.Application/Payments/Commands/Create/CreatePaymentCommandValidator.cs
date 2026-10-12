@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Payments;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Payments.Commands.Create;
@@ -9,7 +10,7 @@ public sealed class CreatePaymentCommandValidator : AbstractValidator<CreatePaym
         RuleFor(x => x.ClinicId).NotEmpty();
         RuleFor(x => x.ClientId).NotEmpty();
 
-        RuleFor(x => x.Amount).GreaterThan(0);
+        RuleFor(x => x.Amount).GreaterThan(0).LessThanOrEqualTo(Payment.MaxAmount);
 
         RuleFor(x => x.Currency)
             .NotEmpty()

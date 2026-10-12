@@ -119,6 +119,21 @@ public sealed class StockMovementValidatorsTests
         r.Errors.Should().Contain(e => e.PropertyName == nameof(CreateStockMovementCommand.Quantity));
     }
 
+
+    [Theory]
+    [InlineData(StockMovementType.In)]
+    [InlineData(StockMovementType.Adjustment)]
+    public void Create_Should_Fail_When_Quantity_ExceedsMax(StockMovementType type)
+    {
+        var r = _createValidator.Validate(CreateCmd(type: type, qty: StockMovement.MaxQuantity + 1));
+
+        r.IsValid.Should().BeFalse();
+        r.Errors.Should().Contain(e => e.PropertyName == nameof(CreateStockMovementCommand.Quantity));
+    }
+
+    [Fact]
+    public void Create_Should_Allow_Quantity_AtMax()
+        => _createValidator.Validate(CreateCmd(qty: StockMovement.MaxQuantity)).IsValid.Should().BeTrue();
     [Fact]
     public void Create_Should_Allow_Adjustment_Quantity_Zero()
     {
