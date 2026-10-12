@@ -326,4 +326,142 @@ public sealed class UpdatePrescriptionCommandHandlerTests
         _prescriptionsWrite.Verify(r => r.UpdateAsync(rx, It.IsAny<CancellationToken>()), Times.Once);
         _prescriptionsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TargetExaminationFinalized()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        var rx = ExistingPrescription(tid, cid, petId);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(rx);
+        SetupTenantClinicPet(tid, cid, petId);
+
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+
+        var result = await CreateHandler().Handle(
+            Cmd(rx.Id, cid, petId, examinationId: examId),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+        rx.ExaminationId.Should().BeNull();
+        _prescriptionsWrite.Verify(r => r.UpdateAsync(It.IsAny<Prescription>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExistingExaminationFinalized_And_RecordDetached()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        var rx = new Prescription(tid, cid, petId, examId, null, DateTime.UtcNow.AddDays(-2), "Eski", "Eski içerik", null, null);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(rx);
+        SetupTenantClinicPet(tid, cid, petId);
+
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+
+        var result = await CreateHandler().Handle(
+            Cmd(rx.Id, cid, petId, examinationId: null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+        rx.ExaminationId.Should().Be(examId);
+        _prescriptionsWrite.Verify(r => r.UpdateAsync(It.IsAny<Prescription>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_TreatmentBelongsToFinalizedExamination()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        var treatmentId = Guid.NewGuid();
+        var rx = ExistingPrescription(tid, cid, petId);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(rx);
+        SetupTenantClinicPet(tid, cid, petId);
+
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+
+        var treatment = new Treatment(tid, cid, petId, examId, DateTime.UtcNow, "T", "D", null, null);
+        typeof(Treatment).GetProperty(nameof(Treatment.Id))!.SetValue(treatment, treatmentId);
+        _treatments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TreatmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(treatment);
+
+        var result = await CreateHandler().Handle(
+            Cmd(rx.Id, cid, petId, treatmentId: treatmentId),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+        _prescriptionsWrite.Verify(r => r.UpdateAsync(It.IsAny<Prescription>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Handle_Should_ReturnFailure_When_TreatmentClinicOrPetMismatch(bool clinicMismatch)
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var treatmentId = Guid.NewGuid();
+        var rx = ExistingPrescription(tid, cid, petId);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(rx);
+        SetupTenantClinicPet(tid, cid, petId);
+
+        var treatment = new Treatment(
+            tid,
+            clinicMismatch ? Guid.NewGuid() : cid,
+            clinicMismatch ? petId : Guid.NewGuid(),
+            null, DateTime.UtcNow, "T", "D", null, null);
+        typeof(Treatment).GetProperty(nameof(Treatment.Id))!.SetValue(treatment, treatmentId);
+        _treatments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TreatmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(treatment);
+
+        var result = await CreateHandler().Handle(
+            Cmd(rx.Id, cid, petId, treatmentId: treatmentId),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be(
+            clinicMismatch ? "Prescriptions.TreatmentClinicMismatch" : "Prescriptions.TreatmentPetMismatch");
+        _prescriptionsWrite.Verify(r => r.UpdateAsync(It.IsAny<Prescription>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

@@ -798,4 +798,36 @@ public sealed class CreateVaccinationCommandHandlerTests
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
     }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationFinalized()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var eid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cmd = new CreateVaccinationCommand(
+            cid,
+            pid,
+            eid,
+            TestDefinition.Id,
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        SetupTenantClinicPet(tid, cid, pid);
+        var exam = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Şikayet", "Bulgu", null, null);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+        _vaccinationsWrite.Verify(r => r.AddAsync(It.IsAny<Vaccination>(), It.IsAny<CancellationToken>()), Times.Never);
+        _vaccinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

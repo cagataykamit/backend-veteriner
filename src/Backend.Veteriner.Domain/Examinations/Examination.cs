@@ -162,6 +162,12 @@ public sealed class Examination : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>Kesinleşmiş muayeneye bağlı tedavi/reçete/aşı eklenemez veya değiştirilemez; kilit kuralının tek yeri.</summary>
+    public Result EnsureAcceptsLinkedRecords()
+        => IsFinalized
+            ? Result.Failure("Examinations.Finalized", "Kesinleşmiş muayeneye bağlı kayıt eklenemez veya değiştirilemez.")
+            : Result.Success();
+
     /// <summary>Taslak → Kesinleşti. Kesinleştiren ve zaman ilk kesinleştirmede sabitlenir; geri dönüş yoktur.</summary>
     public Result Finalize(Guid userId, DateTime nowUtc)
     {

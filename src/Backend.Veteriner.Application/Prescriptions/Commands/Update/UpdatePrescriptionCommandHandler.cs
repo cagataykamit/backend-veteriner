@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Prescriptions.Access;
+using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Prescriptions.Specs;
@@ -150,9 +151,11 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
             }
         }
 
+        Guid? linkedTreatmentExaminationId = null;
         if (request.TreatmentId is { } treatmentId)
         {
             var treatment = await _treatments.FirstOrDefaultAsync(new TreatmentByIdSpec(tenantId, treatmentId), ct);
+            linkedTreatmentExaminationId = treatment?.ExaminationId;
             if (treatment is null)
             {
                 return Result.Failure(
@@ -184,6 +187,11 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
                 }
             }
         }
+
+        var locked = await ExaminationLinkedRecordLock.EnsureOpenAsync(
+            _examinations, tenantId, [request.ExaminationId, p.ExaminationId, linkedTreatmentExaminationId], ct);
+        if (!locked.IsSuccess)
+            return locked;
 
         var update = p.UpdateDetails(
             effectiveClinicId,

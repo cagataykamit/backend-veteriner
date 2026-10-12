@@ -341,4 +341,29 @@ public sealed class CreateTreatmentCommandHandlerTests
         _treatmentsWrite.Verify(r => r.AddAsync(It.IsAny<Treatment>(), It.IsAny<CancellationToken>()), Times.Once);
         _treatmentsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationFinalized()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupTenantClinicPetSafe(tid, cid, petId);
+
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+
+        var result = await CreateHandler().Handle(Cmd(cid, petId, examinationId: examId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+        _treatmentsWrite.Verify(r => r.AddAsync(It.IsAny<Treatment>(), It.IsAny<CancellationToken>()), Times.Never);
+        _treatmentsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
 }
