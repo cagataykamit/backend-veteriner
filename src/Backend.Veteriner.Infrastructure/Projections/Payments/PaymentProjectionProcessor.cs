@@ -14,7 +14,7 @@ using Microsoft.Extensions.Options;
 namespace Backend.Veteriner.Infrastructure.Projections.Payments;
 
 /// <summary>
-/// Payment integration event'lerini (<c>payment.created.v1</c> / <c>payment.updated.v1</c>) Query DB finance
+/// Payment integration event'lerini (<c>payment.created.v1</c> / <c>payment.updated.v1</c> / <c>payment.voided.v1</c>) Query DB finance
 /// read-model'lerine project eder.
 ///
 /// Tasarım kararları:
@@ -96,10 +96,10 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
         {
             try
             {
-                var (snapshot, eventId, occurredAtUtc) =
+                var (snapshot, eventId, occurredAtUtc, voided) =
                     DeserializeIntegrationEvent(claimedMessage.Type, claimedMessage.Payload);
                 var applyResult = await ApplyTransactionallyAsync(
-                    snapshot, eventId, occurredAtUtc, cancellationToken);
+                    snapshot, eventId, occurredAtUtc, voided, cancellationToken);
 
                 if (applyResult.IsDuplicate)
                 {
@@ -247,9 +247,9 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
         {
             try
             {
-                var (snapshot, eventId, occurredAtUtc) = DeserializeIntegrationEvent(msg.Type, msg.Payload);
+                var (snapshot, eventId, occurredAtUtc, voided) = DeserializeIntegrationEvent(msg.Type, msg.Payload);
                 var applyResult = await ApplyTransactionallyAsync(
-                    snapshot, eventId, occurredAtUtc, cancellationToken);
+                    snapshot, eventId, occurredAtUtc, voided, cancellationToken);
 
                 OutboxRetryHelper.ApplySuccess(msg);
                 await _commandDb.SaveChangesAsync(cancellationToken);
@@ -313,6 +313,7 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
         PaymentProjectionSnapshot snapshot,
         Guid eventId,
         DateTime occurredAtUtc,
+        bool voided,
         CancellationToken cancellationToken)
     {
         var fastPathDuplicate = await _queryDb.ProcessedProjectionEvents
@@ -337,12 +338,12 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
                 return PaymentProjectionApplyResult.DuplicateSkipped();
             }
 
-            var stale = await ApplySnapshotChangeAsync(snapshot, occurredAtUtc, eventId, projectedAtUtc, cancellationToken);
+            var stale = await ApplySnapshotChangeAsync(snapshot, occurredAtUtc, eventId, voided, projectedAtUtc, cancellationToken);
 
             // Aynı transaction içinde list read-model upsert. Finance stale ise read-model de korunur
             // (tek ordering otoritesi: contribution LastEventOccurredAtUtc).
             if (!stale)
-                ApplyReadModelChange(snapshot, eventId, occurredAtUtc, projectedAtUtc);
+                ApplyReadModelChange(snapshot, eventId, occurredAtUtc, voided, projectedAtUtc);
 
             await _queryDb.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -390,6 +391,7 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
         PaymentProjectionSnapshot snapshot,
         DateTime occurredAtUtc,
         Guid eventId,
+        bool voided,
         DateTime projectedAtUtc,
         CancellationToken cancellationToken)
     {
@@ -404,8 +406,28 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
                 return true;
         }
 
+        // İptal: katkı satırı silinir, eski günün özeti yeniden hesaplanır (ödeme hiç alınmamış sayılır).
+        if (voided)
+        {
+            if (existing is not null && oldBucket is { } voidedBucket)
+            {
+                _queryDb.PaymentDailyContributionReadModels.Remove(existing);
+                await _queryDb.SaveChangesAsync(cancellationToken);
+                RecalculateDailyStats(
+                    voidedBucket.TenantId,
+                    voidedBucket.ClinicId,
+                    voidedBucket.LocalDate,
+                    voidedBucket.Currency,
+                    eventId,
+                    occurredAtUtc,
+                    projectedAtUtc);
+            }
+
+            return false;
+        }
+
         var newLocalDate = OperationDayBounds.ToLocalDate(snapshot.PaidAtUtc);
-        var newBucket = new DailyBucketKey(snapshot.TenantId, snapshot.ClinicId, newLocalDate, snapshot.Currency);
+        var newBucket =new DailyBucketKey(snapshot.TenantId, snapshot.ClinicId, newLocalDate, snapshot.Currency);
 
         if (existing is null)
         {
@@ -466,6 +488,7 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
         PaymentProjectionSnapshot snapshot,
         Guid eventId,
         DateTime occurredAtUtc,
+        bool voided,
         DateTime projectedAtUtc)
     {
         var existing = _queryDb.PaymentReadModels.Find(snapshot.PaymentId);
@@ -473,6 +496,14 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
         // Defensive ordering guard; finance gate ile lockstep olduğundan normalde tetiklenmez.
         if (existing is not null && occurredAtUtc < existing.LastEventOccurredAtUtc)
             return;
+
+        // İptal edilen ödeme "hiç alınmamış" sayılır: list/search satırı kaldırılır.
+        if (voided)
+        {
+            if (existing is not null)
+                _queryDb.PaymentReadModels.Remove(existing);
+            return;
+        }
 
         var clientName = string.IsNullOrWhiteSpace(snapshot.ClientName)
             ? string.Empty
@@ -605,7 +636,7 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
         existing.LastProjectedAtUtc = projectedAtUtc;
     }
 
-    private static (PaymentProjectionSnapshot Snapshot, Guid EventId, DateTime OccurredAtUtc) DeserializeIntegrationEvent(
+    private static (PaymentProjectionSnapshot Snapshot, Guid EventId, DateTime OccurredAtUtc, bool Voided) DeserializeIntegrationEvent(
         string type, string payload)
     {
         var payloadType = PaymentIntegrationEventTypeRegistry.ResolvePayloadType(type);
@@ -615,9 +646,11 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
         return deserialized switch
         {
             PaymentCreatedIntegrationEvent created =>
-                (created.Current, created.EventId, created.OccurredAtUtc),
+                (created.Current, created.EventId, created.OccurredAtUtc, false),
             PaymentUpdatedIntegrationEvent updated =>
-                (updated.Current, updated.EventId, updated.OccurredAtUtc),
+                (updated.Current, updated.EventId, updated.OccurredAtUtc, false),
+            PaymentVoidedIntegrationEvent voided =>
+                (voided.Current, voided.EventId, voided.OccurredAtUtc, true),
             _ => throw new UnknownPaymentIntegrationEventTypeException(type)
         };
     }

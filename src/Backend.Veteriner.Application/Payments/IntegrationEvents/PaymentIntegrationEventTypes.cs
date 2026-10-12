@@ -9,6 +9,7 @@ public static class PaymentIntegrationEventTypes
 {
     public const string Created = "payment.created.v1";
     public const string Updated = "payment.updated.v1";
+    public const string Voided = "payment.voided.v1";
 
     public const int SchemaVersion = 1;
     public const int MaxTypeLength = 64;
@@ -16,7 +17,8 @@ public static class PaymentIntegrationEventTypes
     public static IReadOnlyList<string> All { get; } =
     [
         Created,
-        Updated
+        Updated,
+        Voided
     ];
 
     public static bool IsKnown(string eventType)

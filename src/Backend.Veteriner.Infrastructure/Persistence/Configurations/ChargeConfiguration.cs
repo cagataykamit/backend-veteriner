@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -15,6 +16,8 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
         {
             t.HasCheckConstraint("CK_Charges_Amount_Positive", "[Amount] > 0");
             t.HasCheckConstraint("CK_Charges_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
+            t.HasCheckConstraint("CK_Charges_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
+            t.HasCheckConstraint("CK_Charges_Voided_Unallocated", "[VoidedAtUtc] IS NULL OR [AllocatedAmount] = 0");
         });
 
         b.HasKey(x => x.Id);
@@ -38,6 +41,13 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
 
         b.Property(x => x.AllocatedAmount).HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
         b.Property(x => x.MutationSequence).IsRequired().HasDefaultValue(0L).IsConcurrencyToken();
+
+        b.Property(x => x.VoidedAtUtc);
+        b.Property(x => x.VoidedByUserId);
+        b.Property(x => x.VoidReason).HasMaxLength(CorrectionReason.MaxLength);
+
+        // İptal edilen ücret tüm okuma yüzeylerinden tek yerde düşer; iptal ucu ve requestId araması IgnoreQueryFilters kullanır.
+        b.HasQueryFilter(x => x.VoidedAtUtc == null);
 
         b.HasIndex(x => new { x.TenantId, x.ClientId });
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.CreatedAtUtc });

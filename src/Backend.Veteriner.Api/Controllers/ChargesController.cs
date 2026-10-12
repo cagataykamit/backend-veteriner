@@ -2,6 +2,8 @@ using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Charges.Commands.Create;
+using Backend.Veteriner.Application.Charges.Commands.Correct;
+using Backend.Veteriner.Application.Charges.Commands.Void;
 using Backend.Veteriner.Application.Charges.Contracts.Dtos;
 using Backend.Veteriner.Application.Charges.Queries.GetAllocations;
 using Backend.Veteriner.Application.Charges.Queries.GetById;
@@ -73,6 +75,48 @@ public sealed class ChargesController : ControllerBase
             nameof(GetById),
             new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id = created.Charge.Id },
             created);
+    }
+
+    /// <summary>
+    /// Ücreti düzeltir (açıklama, miktar, birim fiyat). Yönetici düzeyi; gerekçe zorunlu. Yeni tutar tahsis edilen tutarın altına inemez.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = PermissionCatalog.Charges.Correct)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ChargeDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Correct([FromRoute] Guid id, [FromBody] CorrectChargeBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new CorrectChargeCommand(id, body.Description, body.Quantity, body.UnitPrice, body.Reason),
+            ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Ücreti iptal eder (silmez). Yönetici düzeyi; gerekçe zorunlu. Ödemeyle karşılanmış ücret önce ödeme iptal edilmeden iptal edilemez.
+    /// </summary>
+    [HttpPost("{id:guid}/void")]
+    [Authorize(Policy = PermissionCatalog.Charges.Correct)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Void([FromRoute] Guid id, [FromBody] VoidRecordBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new VoidChargeCommand(id, body.Reason), ct);
+        return result.ToActionResult(this);
     }
 
     [HttpGet("{id:guid}")]

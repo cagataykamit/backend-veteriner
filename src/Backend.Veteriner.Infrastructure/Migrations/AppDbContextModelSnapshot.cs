@@ -558,6 +558,16 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("VisitId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("VoidedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("VoidedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "ClientId");
@@ -578,6 +588,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_Charges_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
 
                             t.HasCheckConstraint("CK_Charges_Amount_Positive", "[Amount] > 0");
+
+                            t.HasCheckConstraint("CK_Charges_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Charges_Voided_Unallocated", "[VoidedAtUtc] IS NULL OR [AllocatedAmount] = 0");
                         });
                 });
 
@@ -1115,6 +1129,16 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("VoidedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("VoidedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId");
@@ -1137,6 +1161,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Payments", null, t =>
                         {
                             t.HasCheckConstraint("CK_Payments_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
+
+                            t.HasCheckConstraint("CK_Payments_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Payments_Voided_Unallocated", "[VoidedAtUtc] IS NULL OR [AllocatedAmount] = 0");
                         });
                 });
 
@@ -1164,6 +1192,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<Guid>("PaymentId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ReversedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");

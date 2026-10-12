@@ -23,6 +23,10 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
         b.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
         b.Property(x => x.CreatedByUserId).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
+        b.Property(x => x.ReversedAtUtc);
+
+        // Geri alınan (iptal edilen ödemenin) tahsisleri geçmişte kalır, aktif tahsis sorgularında görünmez.
+        b.HasQueryFilter(x => x.ReversedAtUtc == null);
 
         b.HasOne<Payment>().WithMany().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Charge>().WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);

@@ -313,11 +313,20 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
     }
 
     private static Result<PaymentCreateResultDto> Replay(Payment existing, string fingerprint)
-        => string.Equals(existing.RequestHash, fingerprint, StringComparison.Ordinal)
+    {
+        if (existing.IsVoided)
+        {
+            return Fail(
+                "Payments.RequestIdVoided",
+                "Bu requestId ile kaydedilen ödeme iptal edilmiş; yeni bir requestId kullanılmalı.");
+        }
+
+        return string.Equals(existing.RequestHash, fingerprint, StringComparison.Ordinal)
             ? Result<PaymentCreateResultDto>.Success(new PaymentCreateResultDto(existing.Id, false))
             : Fail(
                 "Payments.DuplicateRequestMismatch",
                 "Bu requestId daha önce farklı bir ödeme isteği için kullanılmış.");
+    }
 
     private static Result<PaymentCreateResultDto> Fail(string code, string message)
         => Result<PaymentCreateResultDto>.Failure(code, message);
