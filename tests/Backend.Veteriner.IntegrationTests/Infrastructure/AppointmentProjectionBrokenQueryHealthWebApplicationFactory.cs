@@ -18,7 +18,7 @@ namespace Backend.IntegrationTests.Infrastructure;
 public sealed class AppointmentProjectionBrokenQueryReadEnabledWebApplicationFactory
     : WebApplicationFactory<global::Program>
 {
-    public const string CommandConnection = AppointmentProjectionWebApplicationFactory.CommandConnection;
+    public static readonly string CommandConnection = AppointmentProjectionWebApplicationFactory.CommandConnection;
 
     public const string InvalidQueryConnection =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_AppointmentProjectionBroken;Trusted_Connection=True;Connect Timeout=1;MultipleActiveResultSets=true";
@@ -91,7 +91,7 @@ public sealed class AppointmentProjectionBrokenQueryReadEnabledWebApplicationFac
 public sealed class AppointmentProjectionBrokenQueryReadDisabledWebApplicationFactory
     : WebApplicationFactory<global::Program>
 {
-    public const string CommandConnection = AppointmentProjectionWebApplicationFactory.CommandConnection;
+    public static readonly string CommandConnection = AppointmentProjectionWebApplicationFactory.CommandConnection;
 
     public const string InvalidQueryConnection =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_AppointmentProjectionBrokenOff;Trusted_Connection=True;Connect Timeout=1;MultipleActiveResultSets=true";

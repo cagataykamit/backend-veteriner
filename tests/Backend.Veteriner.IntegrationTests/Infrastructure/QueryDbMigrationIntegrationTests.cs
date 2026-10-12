@@ -313,8 +313,8 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
         var commandDatabaseName = new SqlConnectionStringBuilder(appDb.Database.GetConnectionString()!).InitialCatalog;
         var queryDatabaseName = new SqlConnectionStringBuilder(queryDb.Database.GetConnectionString()!).InitialCatalog;
 
-        commandDatabaseName.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsCommandDatabaseName);
-        queryDatabaseName.Should().Be(IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName);
+        commandDatabaseName.Should().Be(IntegrationTestDatabaseGuard.CommandDatabaseName);
+        queryDatabaseName.Should().Be(IntegrationTestDatabaseGuard.QueryDatabaseName);
         commandDatabaseName.Should().NotBe(queryDatabaseName);
     }
 

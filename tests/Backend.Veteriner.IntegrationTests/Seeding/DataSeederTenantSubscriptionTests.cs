@@ -19,8 +19,8 @@ public sealed class DataSeederTenantSubscriptionSeedCollection;
 [Collection("data-seeder-tenant-subscription")]
 public sealed class DataSeederTenantSubscriptionTests
 {
-    private const string ConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_DataSeederTenantSubscription;Trusted_Connection=True;MultipleActiveResultSets=true";
+    private static readonly string ConnectionString =
+        IntegrationTestDatabaseNames.ConnectionString(IntegrationTestDatabaseNames.Command("DataSeederTenantSubscription"));
 
     private static DbContextOptions<AppDbContext> CreateOptions() =>
         new DbContextOptionsBuilder<AppDbContext>()

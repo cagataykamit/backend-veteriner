@@ -22,14 +22,14 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class PetProjectionWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    public const string CommandDatabaseName = "VetinityCommandDb_PetProjectionTests";
-    public const string QueryDatabaseName = "VetinityQueryDb_PetProjectionTests";
+    public static readonly string CommandDatabaseName = IntegrationTestDatabaseNames.Command("PetProjectionTests");
+    public static readonly string QueryDatabaseName = IntegrationTestDatabaseNames.Query("PetProjectionTests");
 
-    public const string CommandConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_PetProjectionTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+    public static readonly string CommandConnection =
+        IntegrationTestDatabaseNames.ConnectionString(CommandDatabaseName);
 
-    public const string QueryConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_PetProjectionTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+    public static readonly string QueryConnection =
+        IntegrationTestDatabaseNames.ConnectionString(QueryDatabaseName);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

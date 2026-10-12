@@ -23,8 +23,8 @@ public sealed class AdminSeedOrchestrationCollection;
 [Collection("admin-seed-orchestration")]
 public sealed class AdminSeedingOrchestrationTests
 {
-    private const string ConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_AdminSeedOrchestration;Trusted_Connection=True;MultipleActiveResultSets=true";
+    private static readonly string ConnectionString =
+        IntegrationTestDatabaseNames.ConnectionString(IntegrationTestDatabaseNames.Command("AdminSeedOrchestration"));
 
     private static DbContextOptions<AppDbContext> CreateOptions()
     {

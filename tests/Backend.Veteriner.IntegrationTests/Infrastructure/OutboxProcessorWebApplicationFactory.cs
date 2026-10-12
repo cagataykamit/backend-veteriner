@@ -16,14 +16,14 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    private const string OutboxProcessorCommandDatabaseName = "VetinityCommandDb_OutboxProcessorTests";
-    private const string OutboxProcessorQueryDatabaseName = "VetinityQueryDb_OutboxProcessorTests";
+    private static readonly string OutboxProcessorCommandDatabaseName = IntegrationTestDatabaseNames.Command("OutboxProcessorTests");
+    private static readonly string OutboxProcessorQueryDatabaseName = IntegrationTestDatabaseNames.Query("OutboxProcessorTests");
 
-    private const string OutboxProcessorCommandConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+    private static readonly string OutboxProcessorCommandConnection =
+        IntegrationTestDatabaseNames.ConnectionString(OutboxProcessorCommandDatabaseName);
 
-    private const string OutboxProcessorQueryConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_OutboxProcessorTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+    private static readonly string OutboxProcessorQueryConnection =
+        IntegrationTestDatabaseNames.ConnectionString(OutboxProcessorQueryDatabaseName);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

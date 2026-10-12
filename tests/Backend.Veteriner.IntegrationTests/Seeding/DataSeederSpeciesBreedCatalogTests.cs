@@ -14,8 +14,8 @@ public sealed class DataSeederSpeciesBreedCatalogSeedCollection;
 [Collection("data-seeder-species-breed-catalog")]
 public sealed class DataSeederSpeciesBreedCatalogTests
 {
-    private const string ConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_DataSeederSpeciesBreed;Trusted_Connection=True;MultipleActiveResultSets=true";
+    private static readonly string ConnectionString =
+        IntegrationTestDatabaseNames.ConnectionString(IntegrationTestDatabaseNames.Command("DataSeederSpeciesBreed"));
 
     private static DbContextOptions<AppDbContext> CreateOptions() =>
         new DbContextOptionsBuilder<AppDbContext>()

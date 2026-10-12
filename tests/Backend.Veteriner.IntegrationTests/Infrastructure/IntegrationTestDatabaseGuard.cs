@@ -15,19 +15,27 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// </summary>
 internal static class IntegrationTestDatabaseGuard
 {
-    /// <summary>İzin verilen command-side integration test veritabanı adı (prefix de kabul edilir).</summary>
+    /// <summary>İzin verilen command-side integration test veritabanı adı prefix'i.</summary>
     public const string IntegrationTestsCommandDatabaseName = "VetinityCommandDb_IntegrationTests";
 
-    /// <summary>Source-controlled, dedicated command test connection string (LocalDB).</summary>
-    public const string DedicatedConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_IntegrationTests;Trusted_Connection=True;MultipleActiveResultSets=true";
-
-    /// <summary>İzin verilen query-side integration test veritabanı adı (prefix de kabul edilir).</summary>
+    /// <summary>İzin verilen query-side integration test veritabanı adı prefix'i.</summary>
     public const string IntegrationTestsQueryDatabaseName = "VetinityQueryDb_IntegrationTests";
 
-    /// <summary>Source-controlled, dedicated query test connection string (LocalDB).</summary>
-    public const string DedicatedQueryConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_IntegrationTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+    /// <summary>Bu koşuya özgü command test veritabanı adı (<see cref="IntegrationTestDatabaseNames"/>).</summary>
+    public static string CommandDatabaseName { get; } =
+        IntegrationTestDatabaseNames.WithRunId(IntegrationTestsCommandDatabaseName);
+
+    /// <summary>Bu koşuya özgü query test veritabanı adı (<see cref="IntegrationTestDatabaseNames"/>).</summary>
+    public static string QueryDatabaseName { get; } =
+        IntegrationTestDatabaseNames.WithRunId(IntegrationTestsQueryDatabaseName);
+
+    /// <summary>Bu koşuya özgü command test connection string'i (LocalDB).</summary>
+    public static string DedicatedConnectionString { get; } =
+        IntegrationTestDatabaseNames.ConnectionString(CommandDatabaseName);
+
+    /// <summary>Bu koşuya özgü query test connection string'i (LocalDB).</summary>
+    public static string DedicatedQueryConnectionString { get; } =
+        IntegrationTestDatabaseNames.ConnectionString(QueryDatabaseName);
 
     /// <summary>Her koşulda yasak veritabanı adları (tam eşleşme, case-insensitive). Legacy isimler test güvenliği için korunur.</summary>
     private static readonly string[] ForbiddenExactNames =
