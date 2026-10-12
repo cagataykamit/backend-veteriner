@@ -317,6 +317,157 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
     }
 
     [Fact]
+    public async Task Post_SameRequestId_Twice_Should_Return200_And_NotChangeStockAgain()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[] { "StockMovements.Create", "Products.Read" });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        await PostMovementAsync(client, ctx, StockMovementType.Initial, 10m);
+
+        var requestId = Guid.NewGuid();
+        var first = await PostMovementAsync(client, ctx, StockMovementType.Out, 3m, requestId: requestId);
+        var second = await PostMovementAsync(client, ctx, StockMovementType.Out, 3m, requestId: requestId);
+
+        first.StatusCode.Should().Be(HttpStatusCode.Created);
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        var firstJson = await first.Content.ReadFromJsonAsync<JsonElement>();
+        var secondJson = await second.Content.ReadFromJsonAsync<JsonElement>();
+        secondJson.GetProperty("id").GetGuid().Should().Be(firstJson.GetProperty("id").GetGuid());
+        secondJson.GetProperty("requestId").GetGuid().Should().Be(requestId);
+        (await GetQuantityOnHandAsync(client, ctx)).Should().Be(7m);
+
+        var otherType = await PostMovementAsync(client, ctx, StockMovementType.In, 3m, requestId: requestId);
+        otherType.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(otherType)).Should().Be("StockMovements.DuplicateRequestId");
+    }
+
+    [Fact]
+    public async Task Post_SameReference_Twice_Should_Return409_DuplicateReference()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[] { "StockMovements.Create", "Products.Read" });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        await PostMovementAsync(client, ctx, StockMovementType.Initial, 10m);
+
+        var referenceId = Guid.NewGuid();
+        (await PostMovementAsync(client, ctx, StockMovementType.Out, 2m, referenceType: "Administration", referenceId: referenceId))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var duplicate = await PostMovementAsync(
+            client, ctx, StockMovementType.Out, 2m, referenceType: "Administration", referenceId: referenceId);
+
+        duplicate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(duplicate)).Should().Be("StockMovements.DuplicateReference");
+        (await GetQuantityOnHandAsync(client, ctx)).Should().Be(8m);
+
+        var incomplete = await PostMovementAsync(client, ctx, StockMovementType.Out, 1m, referenceType: "Administration");
+        incomplete.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Reverse_Out_Should_RestoreStock_Once_And_Replay_With_SameRequestId()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[] { "StockMovements.Create", "Products.Read" });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        await PostMovementAsync(client, ctx, StockMovementType.Initial, 10m);
+        var outResponse = await PostMovementAsync(client, ctx, StockMovementType.Out, 4m);
+        var outId = (await outResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        (await GetQuantityOnHandAsync(client, ctx)).Should().Be(6m);
+
+        var requestId = Guid.NewGuid();
+        var reverse = await client.PostAsJsonAsync(
+            $"/api/v1/stock-movements/{outId}/reverse", new { reason = "Yanlış ürün", requestId });
+        reverse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var reverseJson = await reverse.Content.ReadFromJsonAsync<JsonElement>();
+        reverseJson.GetProperty("reversesMovementId").GetGuid().Should().Be(outId);
+        reverseJson.GetProperty("movementType").GetInt32().Should().Be((int)StockMovementType.Reversal);
+        (await GetQuantityOnHandAsync(client, ctx)).Should().Be(10m);
+
+        var replay = await client.PostAsJsonAsync(
+            $"/api/v1/stock-movements/{outId}/reverse", new { reason = "Yanlış ürün", requestId });
+        replay.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await GetQuantityOnHandAsync(client, ctx)).Should().Be(10m);
+
+        var again = await client.PostAsJsonAsync($"/api/v1/stock-movements/{outId}/reverse", new { reason = "Tekrar" });
+        again.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(again)).Should().Be("StockMovements.AlreadyReversed");
+        (await GetQuantityOnHandAsync(client, ctx)).Should().Be(10m);
+    }
+
+    [Fact]
+    public async Task Reverse_Should_Reject_Adjustment_Missing_Reason_And_Unknown_Movement()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[] { "StockMovements.Create", "Products.Read" });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        await PostMovementAsync(client, ctx, StockMovementType.Initial, 10m);
+        var adjustment = await PostMovementAsync(client, ctx, StockMovementType.Adjustment, 7m);
+        var adjustmentId = (await adjustment.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var notReversible = await client.PostAsJsonAsync(
+            $"/api/v1/stock-movements/{adjustmentId}/reverse", new { reason = "Düzelt" });
+        notReversible.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(notReversible)).Should().Be("StockMovements.NotReversible");
+
+        (await client.PostAsJsonAsync($"/api/v1/stock-movements/{adjustmentId}/reverse", new { reason = "" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var missing = await client.PostAsJsonAsync($"/api/v1/stock-movements/{Guid.NewGuid()}/reverse", new { reason = "x" });
+        missing.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var reversalType = await PostMovementAsync(client, ctx, StockMovementType.Reversal, 1m);
+        reversalType.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Post_Concurrent_FirstEntries_Should_NeverReturn500_And_Keep_Stock_Consistent()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[] { "StockMovements.Create", "Products.Read" });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+            PostMovementAsync(client, ctx, StockMovementType.In, 1m, requestId: Guid.NewGuid())));
+
+        responses.Select(r => r.StatusCode).Should().OnlyContain(
+            s => s == HttpStatusCode.Created || s == HttpStatusCode.Conflict);
+        var created = responses.Count(r => r.StatusCode == HttpStatusCode.Created);
+        created.Should().BeGreaterThan(0);
+        foreach (var conflict in responses.Where(r => r.StatusCode == HttpStatusCode.Conflict))
+            (await ReadProblemCodeAsync(conflict)).Should().Be("StockMovements.ConcurrencyConflict");
+        (await GetQuantityOnHandAsync(client, ctx)).Should().Be(created);
+    }
+
+    private static Task<HttpResponseMessage> PostMovementAsync(
+        HttpClient client,
+        MutationSeedCtx ctx,
+        StockMovementType type,
+        decimal quantity,
+        Guid? requestId = null,
+        string? referenceType = null,
+        Guid? referenceId = null)
+        => client.PostAsJsonAsync("/api/v1/stock-movements", new
+        {
+            clinicId = ctx.ClinicId,
+            productId = ctx.ProductId,
+            movementType = (int)type,
+            quantity,
+            requestId,
+            referenceType,
+            referenceId
+        });
+
+    private static async Task<decimal> GetQuantityOnHandAsync(HttpClient client, MutationSeedCtx ctx)
+    {
+        var list = await client.GetAsync(
+            $"/api/v1/product-stocks?page=1&pageSize=10&clinicId={ctx.ClinicId:D}&productId={ctx.ProductId}");
+        list.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await list.Content.ReadFromJsonAsync<JsonElement>();
+        return json.GetProperty("items")[0].GetProperty("quantityOnHand").GetDecimal();
+    }
+
+    [Fact]
     public async Task Post_Should_BeBlocked_When_TenantReadOnly()
     {
         var (_, token) = await SeedTenantAndIssueTokenAsync(
