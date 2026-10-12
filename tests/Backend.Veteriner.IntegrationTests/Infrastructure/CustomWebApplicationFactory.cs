@@ -51,6 +51,13 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
 
             // Suite başında bir kere: EnsureDeleted + Migrate + Seed (sonraki sınıflar tekrar etmez).
             IntegrationTestDatabaseInitializer.EnsureResetMigratedAndSeeded(db, hasher, commandDatabaseName);
+
+            // Query DB koşuya özgü adla sıfırdan gelir; okuma yolu kullanan testler için migrate edilmiş olmalı.
+            var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+            var queryDatabaseName = IntegrationTestDatabaseGuard.EnsureSafeDatabase(
+                queryDb.Database.GetConnectionString(),
+                allowedPrefix: IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName);
+            IntegrationTestDatabaseInitializer.EnsureQueryResetAndMigrated(queryDb, queryDatabaseName);
         });
     }
 }
