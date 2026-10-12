@@ -14,6 +14,7 @@ public sealed record ExaminationRelatedSummaryDto(
     IReadOnlyList<ExaminationRelatedPrescriptionItemDto> Prescriptions,
     IReadOnlyList<ExaminationRelatedLabResultItemDto> LabResults,
     IReadOnlyList<ExaminationRelatedHospitalizationItemDto> Hospitalizations,
+    IReadOnlyList<ExaminationRelatedAdministrationItemDto> Administrations,
     IReadOnlyList<ExaminationRelatedPaymentItemDto> Payments);
 
 public sealed record ExaminationRelatedTreatmentItemDto(
@@ -49,6 +50,18 @@ public sealed record ExaminationRelatedHospitalizationItemDto(
     string Reason,
     DateTime? DischargedAtUtc,
     bool IsActive);
+
+/// <summary>İptal edilmemiş uygulama; <see cref="AddedAfterFinalization"/> "kesinleştirmeden sonra eklendi" rozetidir.</summary>
+public sealed record ExaminationRelatedAdministrationItemDto(
+    Guid Id,
+    DateTime AdministeredAtUtc,
+    Guid ClinicId,
+    string ClinicName,
+    string ProductName,
+    string Unit,
+    decimal Quantity,
+    bool AddedAfterFinalization,
+    string? LateEntryReason);
 
 public sealed record ExaminationRelatedPaymentItemDto(
     Guid Id,
