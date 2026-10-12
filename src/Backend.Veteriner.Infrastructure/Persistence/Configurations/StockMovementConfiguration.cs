@@ -31,11 +31,31 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
         b.Property(x => x.OccurredAtUtc).IsRequired();
         b.Property(x => x.CreatedByUserId);
         b.Property(x => x.Notes).HasMaxLength(4000);
+        b.Property(x => x.RequestId);
+        b.Property(x => x.ReversesMovementId);
         b.Property(x => x.CreatedAtUtc).IsRequired();
 
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.OccurredAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.ProductId, x.OccurredAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ProductId });
+
+        // Aynı istemci isteği (RequestId) kiracıda en fazla bir hareket üretir.
+        b.HasIndex(x => new { x.TenantId, x.RequestId })
+            .IsUnique()
+            .HasFilter("[RequestId] IS NOT NULL")
+            .HasDatabaseName("UX_StockMovements_TenantId_RequestId");
+
+        // Aynı kaynak, klinik+ürün+hareket tipi başına en fazla bir hareket üretir.
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.ProductId, x.ReferenceType, x.ReferenceId, x.MovementType })
+            .IsUnique()
+            .HasFilter("[ReferenceType] IS NOT NULL AND [ReferenceId] IS NOT NULL")
+            .HasDatabaseName("UX_StockMovements_Reference");
+
+        // Her hareket en fazla bir kez geri alınır.
+        b.HasIndex(x => new { x.TenantId, x.ReversesMovementId })
+            .IsUnique()
+            .HasFilter("[ReversesMovementId] IS NOT NULL")
+            .HasDatabaseName("UX_StockMovements_TenantId_ReversesMovementId");
 
         b.HasOne(x => x.Product)
             .WithMany(p => p.Movements)

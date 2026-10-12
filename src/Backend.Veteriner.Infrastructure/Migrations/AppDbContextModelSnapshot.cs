@@ -1562,6 +1562,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReversesMovementId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1577,9 +1583,24 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "ProductId");
 
+                    b.HasIndex("TenantId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StockMovements_TenantId_RequestId")
+                        .HasFilter("[RequestId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ReversesMovementId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StockMovements_TenantId_ReversesMovementId")
+                        .HasFilter("[ReversesMovementId] IS NOT NULL");
+
                     b.HasIndex("TenantId", "ClinicId", "OccurredAtUtc");
 
                     b.HasIndex("TenantId", "ClinicId", "ProductId", "OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "ClinicId", "ProductId", "ReferenceType", "ReferenceId", "MovementType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StockMovements_Reference")
+                        .HasFilter("[ReferenceType] IS NOT NULL AND [ReferenceId] IS NOT NULL");
 
                     b.ToTable("StockMovements", (string)null);
                 });
