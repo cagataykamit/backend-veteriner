@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Domain.Examinations;
+using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Examinations.Access;
@@ -31,4 +32,22 @@ internal static class ExaminationLinkedRecordLock
 
         return Result.Success();
     }
+
+    /// <summary>
+    /// Lab sonucu için kısmi kilit: geç gelen sonuç yazılabilsin diye kesinleşmiş muayenede yalnız sonuç alanları (tarih, metin, yorum, not)
+    /// serbesttir; test adı, hayvan, klinik veya muayene bağı değişiyorsa mevcut/hedef muayene açık olmalıdır.
+    /// Yeni lab kaydı eklemek kilitli değildir, bu yüzden Create handler'ı bu denetimi çağırmaz.
+    /// </summary>
+    public static async Task<Result> EnsureLabIdentityEditableAsync(
+        IReadRepository<Examination> examinations,
+        Guid tenantId,
+        LabResult existing,
+        Guid clinicId,
+        Guid petId,
+        Guid? examinationId,
+        string testName,
+        CancellationToken ct)
+        => existing.ChangesIdentity(clinicId, petId, examinationId, testName)
+            ? await EnsureOpenAsync(examinations, tenantId, [examinationId, existing.ExaminationId], ct)
+            : Result.Success();
 }
