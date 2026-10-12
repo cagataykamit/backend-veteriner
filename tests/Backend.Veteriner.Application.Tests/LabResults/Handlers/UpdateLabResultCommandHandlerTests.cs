@@ -245,6 +245,102 @@ public sealed class UpdateLabResultCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_UpdateResultFields_When_ExaminationFinalized()
+    {
+        var (tid, cid, petId, row, _) = SetupFinalizedLinkedLab();
+
+        var cmd = new UpdateLabResultCommand(
+            row.Id, cid, petId, row.ExaminationId, DateTime.UtcNow.AddHours(-1), "Test adı", "Geç gelen sonuç", "Yorum", "Not");
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        row.ResultText.Should().Be("Geç gelen sonuç");
+        _labResultsWrite.Verify(r => r.UpdateAsync(row, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationFinalized_And_TestNameChanges()
+    {
+        var (_, cid, petId, row, _) = SetupFinalizedLinkedLab();
+
+        var cmd = new UpdateLabResultCommand(
+            row.Id, cid, petId, row.ExaminationId, DateTime.UtcNow.AddHours(-1), "Başka test", "Sonuç", null, null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+        _labResultsWrite.Verify(r => r.UpdateAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationFinalized_And_DetachedFromExamination()
+    {
+        var (_, cid, petId, row, _) = SetupFinalizedLinkedLab();
+
+        var cmd = new UpdateLabResultCommand(
+            row.Id, cid, petId, null, DateTime.UtcNow.AddHours(-1), "Test adı", "Sonuç", null, null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_MovedToFinalizedExamination()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        var row = ExistingLabResult(tid, cid, petId);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(row);
+        SetupTenantClinicPet(tid, cid, petId);
+
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+
+        var result = await CreateHandler().Handle(
+            new UpdateLabResultCommand(row.Id, cid, petId, examId, DateTime.UtcNow.AddHours(-1), "Eski test", "Sonuç", null, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+    }
+
+    // Kesinleşmiş muayeneye bağlı "Test adı" kaydı; ExaminationId'yi Update'in döndüreceği muayene ile eşler.
+    private (Guid Tid, Guid Cid, Guid PetId, LabResult Row, Examination Exam) SetupFinalizedLinkedLab()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        var row = new LabResult(tid, cid, petId, examId, DateTime.UtcNow.AddDays(-2), "Test adı", "Eski sonuç", null, null);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _labResultsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(row);
+        SetupTenantClinicPet(tid, cid, petId);
+
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+        _labResultsWrite.Setup(r => r.UpdateAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _labResultsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        return (tid, cid, petId, row, exam);
+    }
+
+    [Fact]
     public async Task Handle_Should_Update_When_Valid()
     {
         var tid = Guid.NewGuid();
