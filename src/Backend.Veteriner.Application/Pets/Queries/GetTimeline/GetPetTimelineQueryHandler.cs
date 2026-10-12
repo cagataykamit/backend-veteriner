@@ -1,11 +1,13 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Access;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Pets.Timeline;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
@@ -21,6 +23,7 @@ public sealed class GetPetTimelineQueryHandler
     private readonly ICurrentUserPermissionChecker _permissionChecker;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IReadRepository<Examination> _examinations;
     private readonly IReadOnlyDictionary<PetRecordKind, IPetTimelineSource> _sources;
 
     public GetPetTimelineQueryHandler(
@@ -30,6 +33,7 @@ public sealed class GetPetTimelineQueryHandler
         ICurrentUserPermissionChecker permissionChecker,
         IReadRepository<Pet> pets,
         IReadRepository<Clinic> clinics,
+        IReadRepository<Examination> examinations,
         IEnumerable<IPetTimelineSource> sources)
     {
         _tenantContext = tenantContext;
@@ -38,6 +42,7 @@ public sealed class GetPetTimelineQueryHandler
         _permissionChecker = permissionChecker;
         _pets = pets;
         _clinics = clinics;
+        _examinations = examinations;
         _sources = sources.ToDictionary(s => s.Kind);
     }
 
@@ -88,6 +93,8 @@ public sealed class GetPetTimelineQueryHandler
 
         var (page, hasMore) = PetTimelineMerger.Page(lists, limit);
 
+        var visitExaminationIds = await ResolveVisitExaminationIdsAsync(page, tenantId, scope, ct);
+
         var clinicIds = page.Select(r => r.ClinicId).Distinct().ToArray();
         var clinicNameById = clinicIds.Length == 0
             ? new Dictionary<Guid, string>()
@@ -106,7 +113,7 @@ public sealed class GetPetTimelineQueryHandler
                 r.Status,
                 r.IsVoided,
                 new PetTimelineLinkRefDto(r.Kind, r.SourceId),
-                r.RelatedExaminationId,
+                r.Kind == PetRecordKind.Visit && visitExaminationIds.TryGetValue(r.SourceId, out var examinationId) ? examinationId : r.RelatedExaminationId,
                 r.RelatedVisitId,
                 r.RelatedAppointmentId,
                 r.UpdatedAtUtc))
@@ -114,6 +121,30 @@ public sealed class GetPetTimelineQueryHandler
 
         var nextCursor = hasMore && page.Count > 0 ? PetTimelineMerger.CursorOf(page[^1]).Encode() : null;
         return Result<PetTimelineDto>.Success(new PetTimelineDto(items, nextCursor, omittedTypes));
+    }
+
+    /// <summary>
+    /// Geliş satırlarının bağlı muayenesi (birden fazlaysa en yenisi). Muayene okuma izni yoksa hiç sorgulanmaz;
+    /// doldurma <c>types</c> süzgecinden bağımsızdır, klinik kapsamı muayene kaynağıyla aynıdır.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<Guid, Guid>> ResolveVisitExaminationIdsAsync(
+        IReadOnlyList<PetTimelineRow> page,
+        Guid tenantId,
+        ClinicReadScope scope,
+        CancellationToken ct)
+    {
+        var visitIds = page.Where(r => r.Kind == PetRecordKind.Visit).Select(r => r.SourceId).ToArray();
+        if (visitIds.Length == 0 || !_permissionChecker.CanRead(PetRecordKind.Examination))
+            return new Dictionary<Guid, Guid>();
+
+        var examinations = await _examinations.ListAsync(
+            new ExaminationsByVisitIdsSpec(tenantId, visitIds, scope.SingleClinicId, scope.AccessibleClinicIds), ct);
+
+        // Liste en yeniden eskiye sıralı; her geliş için ilk muayene kazanır.
+        var result = new Dictionary<Guid, Guid>();
+        foreach (var e in examinations)
+            result.TryAdd(e.VisitId!.Value, e.Id);
+        return result;
     }
 
     private static Result<ParsedRequest> ParseRequest(GetPetTimelineQuery request)
