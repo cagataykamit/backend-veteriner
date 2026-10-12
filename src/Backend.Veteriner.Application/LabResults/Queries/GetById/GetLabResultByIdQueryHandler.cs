@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -102,7 +103,16 @@ public sealed class GetLabResultByIdQueryHandler
             row.Interpretation,
             row.Notes,
             row.CreatedAtUtc,
-            row.UpdatedAtUtc);
+            row.UpdatedAtUtc,
+            row.Status,
+            row.RequestedAtUtc,
+            row.RequestedByUserId,
+            row.VisitId,
+            row.AwaitingInterpretation,
+            row.CancelledAtUtc,
+            row.CancelledByUserId,
+            row.CancelReason,
+            ExaminationRowVersion.Encode(row.RowVersion));
 
         return Result<LabResultDetailDto>.Success(dto);
     }

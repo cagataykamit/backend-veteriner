@@ -207,6 +207,8 @@ public sealed class GetLabResultsListQueryHandlerTests
             clinicId,
             petId,
             examId,
+            null,
+            null,
             DateTime.UtcNow.AddDays(-1),
             "Biyokimya",
             "Değerler normal",

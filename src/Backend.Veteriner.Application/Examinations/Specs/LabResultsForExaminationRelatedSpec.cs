@@ -7,10 +7,11 @@ public sealed class LabResultsForExaminationRelatedSpec : Specification<LabResul
 {
     public LabResultsForExaminationRelatedSpec(Guid tenantId, Guid? clinicId, Guid examinationId, int take)
     {
-        Query.Where(l => l.TenantId == tenantId && l.ExaminationId == examinationId);
+        Query.Where(l => l.TenantId == tenantId && l.ExaminationId == examinationId
+            && l.Status != LabResultStatus.Cancelled);
         if (clinicId.HasValue)
             Query.Where(l => l.ClinicId == clinicId.Value);
-        Query.OrderByDescending(l => l.ResultDateUtc)
+        Query.OrderByDescending(l => l.RequestedAtUtc)
             .ThenByDescending(l => l.Id)
             .Take(take);
     }

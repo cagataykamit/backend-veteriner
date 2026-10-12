@@ -111,7 +111,8 @@ public sealed class GetLabResultsListQueryHandler
                 request.DateToUtc,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                request.Status),
             ct);
 
         var rows = await _labResults.ListAsync(
@@ -125,7 +126,8 @@ public sealed class GetLabResultsListQueryHandler
                 pageSize,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                request.Status),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
@@ -159,7 +161,10 @@ public sealed class GetLabResultsListQueryHandler
                     clientName,
                     lr.ResultDateUtc,
                     lr.TestName,
-                    lr.ExaminationId);
+                    lr.ExaminationId,
+                    lr.Status,
+                    lr.RequestedAtUtc,
+                    lr.AwaitingInterpretation);
             })
             .ToList();
 

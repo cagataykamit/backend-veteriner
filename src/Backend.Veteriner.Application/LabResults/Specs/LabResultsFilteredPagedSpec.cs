@@ -16,7 +16,8 @@ public sealed class LabResultsFilteredPagedSpec : Specification<LabResult>
         int pageSize,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        LabResultStatus? status = null)
     {
         Query.Where(x => x.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -32,10 +33,14 @@ public sealed class LabResultsFilteredPagedSpec : Specification<LabResult>
         }
         if (petId.HasValue)
             Query.Where(x => x.PetId == petId.Value);
+        if (status.HasValue)
+            Query.Where(x => x.Status == status.Value);
+        else
+            Query.Where(x => x.Status != LabResultStatus.Cancelled);
         if (dateFromUtc.HasValue)
-            Query.Where(x => x.ResultDateUtc >= dateFromUtc.Value);
+            Query.Where(x => x.RequestedAtUtc >= dateFromUtc.Value);
         if (dateToUtc.HasValue)
-            Query.Where(x => x.ResultDateUtc <= dateToUtc.Value);
+            Query.Where(x => x.RequestedAtUtc <= dateToUtc.Value);
 
         if (searchContainsLikePattern is not null)
         {
@@ -43,13 +48,13 @@ public sealed class LabResultsFilteredPagedSpec : Specification<LabResult>
             var pids = searchPetIds;
             Query.Where(x =>
                 EF.Functions.Like(x.TestName, pat)
-                || EF.Functions.Like(x.ResultText, pat)
+                || (x.ResultText != null && EF.Functions.Like(x.ResultText, pat))
                 || (x.Interpretation != null && EF.Functions.Like(x.Interpretation, pat))
                 || (x.Notes != null && EF.Functions.Like(x.Notes, pat))
                 || (pids.Length > 0 && pids.Contains(x.PetId)));
         }
 
-        Query.OrderByDescending(x => x.ResultDateUtc)
+        Query.OrderByDescending(x => x.RequestedAtUtc)
             .ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize);

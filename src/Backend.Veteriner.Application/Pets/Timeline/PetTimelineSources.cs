@@ -145,12 +145,14 @@ internal sealed class LabResultTimelineSource(IReadRepository<LabResult> reposit
 {
     public override PetRecordKind Kind => PetRecordKind.LabResult;
 
-    protected override Expression<Func<LabResult, DateTime>> EventAt => l => l.ResultDateUtc;
+    protected override Expression<Func<LabResult, DateTime>> EventAt => l => l.RequestedAtUtc;
 
     protected override Expression<Func<LabResult, Guid>> Id => l => l.Id;
 
     protected override Expression<Func<LabResult, bool>> Filter(PetTimelineSourceQuery q)
-        => l => l.TenantId == q.TenantId && l.PetId == q.PetId;
+        => q.IncludeVoided
+            ? l => l.TenantId == q.TenantId && l.PetId == q.PetId
+            : l => l.TenantId == q.TenantId && l.PetId == q.PetId && l.Status != LabResultStatus.Cancelled;
 
     protected override ISpecificationBuilder<LabResult> ApplyClinicScope(ISpecificationBuilder<LabResult> builder, PetTimelineSourceQuery q)
         => DashboardSpecificationClinicScope.ApplyToLabResult(builder, q.SingleClinicId, q.AccessibleClinicIds);
@@ -159,14 +161,14 @@ internal sealed class LabResultTimelineSource(IReadRepository<LabResult> reposit
         => new(
             Kind,
             l.Id,
-            l.ResultDateUtc,
+            l.RequestedAtUtc,
             l.ClinicId,
             l.TestName,
             Summary: null,
-            Status: null,
-            IsVoided: false,
+            Status: l.Status.ToString(),
+            IsVoided: l.Status == LabResultStatus.Cancelled,
             RelatedExaminationId: l.ExaminationId,
-            RelatedVisitId: null,
+            RelatedVisitId: l.VisitId,
             RelatedAppointmentId: null,
             UpdatedAtUtc: l.UpdatedAtUtc);
 }

@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using Backend.Veteriner.Domain.LabResults;
+
 namespace Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 
 public sealed record LabResultListItemDto(
@@ -7,6 +10,9 @@ public sealed record LabResultListItemDto(
     string PetName,
     Guid ClientId,
     string ClientName,
-    DateTime ResultDateUtc,
+    DateTime? ResultDateUtc,
     string TestName,
-    Guid? ExaminationId);
+    Guid? ExaminationId,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] LabResultStatus Status,
+    DateTime RequestedAtUtc,
+    bool AwaitingInterpretation);

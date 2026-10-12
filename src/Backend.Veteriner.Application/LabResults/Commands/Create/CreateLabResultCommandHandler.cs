@@ -11,6 +11,7 @@ using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Visits;
 using MediatR;
 
 namespace Backend.Veteriner.Application.LabResults.Commands.Create;
@@ -19,30 +20,36 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
+    private readonly IClientContext _clientContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Examination> _examinations;
+    private readonly IReadRepository<Visit> _visits;
     private readonly IRepository<LabResult> _labResultsWrite;
 
     public CreateLabResultCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
+        IClientContext clientContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
+        IReadRepository<Visit> visits,
         IRepository<LabResult> labResultsWrite)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
+        _clientContext = clientContext;
         _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _clinics = clinics;
         _pets = pets;
         _examinations = examinations;
+        _visits = visits;
         _labResultsWrite = labResultsWrite;
     }
 
@@ -54,6 +61,9 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
+
+        if (_clientContext.UserId is not { } userId)
+            return Result<Guid>.Failure("Auth.UserContextMissing", "Kullanıcı bağlamı bulunamadı.");
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)
@@ -82,10 +92,14 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
         if (!clinicAccess.IsSuccess)
             return Result<Guid>.Failure(clinicAccess.Error);
 
-        var resultUtc = ResultDateUtcWindow.ToUtc(request.ResultDateUtc);
-        var window = ResultDateUtcWindow.Validate(resultUtc);
-        if (!window.IsSuccess)
-            return Result<Guid>.Failure(window.Error);
+        DateTime? resultUtc = null;
+        if (request.ResultDateUtc is { } resultDate)
+        {
+            resultUtc = ResultDateUtcWindow.ToUtc(resultDate);
+            var window = ResultDateUtcWindow.Validate(resultUtc.Value);
+            if (!window.IsSuccess)
+                return Result<Guid>.Failure(window.Error);
+        }
 
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, effectiveClinicId), ct);
@@ -96,9 +110,10 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
         if (pet is null)
             return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        Examination? exam = null;
         if (request.ExaminationId is { } examId)
         {
-            var exam = await _examinations.FirstOrDefaultAsync(new ExaminationByIdSpec(tenantId, examId), ct);
+            exam = await _examinations.FirstOrDefaultAsync(new ExaminationByIdSpec(tenantId, examId), ct);
             if (exam is null)
             {
                 return Result<Guid>.Failure(
@@ -121,11 +136,22 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
             }
         }
 
+        var visit = await LabResultVisitResolver.ResolveAsync(
+            _visits, tenantId, effectiveClinicId, request.PetId, exam, request.VisitId, ct);
+        if (!visit.IsSuccess)
+            return Result<Guid>.Failure(visit.Error);
+
+        var resultCheck = LabResult.ValidateResult(resultUtc, request.ResultText, request.Interpretation);
+        if (!resultCheck.IsSuccess)
+            return Result<Guid>.Failure(resultCheck.Error);
+
         var entity = new LabResult(
             tenantId,
             effectiveClinicId,
             request.PetId,
             request.ExaminationId,
+            visit.Value,
+            userId,
             resultUtc,
             request.TestName,
             request.ResultText,

@@ -169,7 +169,10 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 l.ResultDateUtc,
                 l.ClinicId,
                 ClinicName(l.ClinicId),
-                l.TestName))
+                l.TestName,
+                l.Status,
+                l.RequestedAtUtc,
+                l.AwaitingInterpretation))
             .ToList();
 
         var hospDtos = hosp

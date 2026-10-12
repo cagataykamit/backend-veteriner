@@ -3,11 +3,13 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.LabResults.Commands.Cancel;
 using Backend.Veteriner.Application.LabResults.Commands.Create;
 using Backend.Veteriner.Application.LabResults.Commands.Update;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Queries.GetById;
 using Backend.Veteriner.Application.LabResults.Queries.GetList;
+using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -58,10 +60,11 @@ public sealed class LabResultsController : ControllerBase
     [HttpPut("{id:guid}")]
     [Authorize(Policy = PermissionCatalog.LabResults.Update)]
     [Consumes("application/json")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(LabResultWriteResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateLabResultBody body, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -79,9 +82,29 @@ public sealed class LabResultsController : ControllerBase
             body.TestName,
             body.ResultText,
             body.Interpretation,
-            body.Notes);
+            body.Notes,
+            body.RowVersion,
+            body.VisitId);
 
         var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Lab kaydını gerekçeyle iptal eder (silmez); iptal kaydı değiştirilemez.</summary>
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = PermissionCatalog.LabResults.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(LabResultWriteResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Cancel([FromRoute] Guid id, [FromBody] CancelLabResultBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CancelLabResultCommand(id, body.Reason, body.RowVersion), ct);
         return result.ToActionResult(this);
     }
 
@@ -118,6 +141,7 @@ public sealed class LabResultsController : ControllerBase
         [FromQuery] Guid? petId = null,
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
+        [FromQuery] LabResultStatus? status = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -130,7 +154,8 @@ public sealed class LabResultsController : ControllerBase
                 clinicId,
                 petId,
                 dateFromUtc,
-                dateToUtc),
+                dateToUtc,
+                status),
             ct);
         return result.ToActionResult(this);
     }

@@ -59,6 +59,8 @@ public sealed class GetLabResultByIdQueryHandlerTests
             clinicId,
             petId,
             examinationId,
+            null,
+            null,
             DateTime.UtcNow.AddDays(-1),
             "Test adı",
             "Sonuç metni",

@@ -12,9 +12,16 @@ public sealed class UpdateLabResultCommandValidator : AbstractValidator<UpdateLa
         RuleFor(x => x.ExaminationId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("ExaminationId is invalid.");
-        RuleFor(x => x.ResultDateUtc).NotEqual(default(DateTime));
+        RuleFor(x => x.VisitId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("VisitId is invalid.");
+        RuleFor(x => x.ResultDateUtc)
+            .NotEqual(default(DateTime))
+            .When(x => x.ResultDateUtc.HasValue);
         RuleFor(x => x.TestName).NotEmpty().MaximumLength(500);
-        RuleFor(x => x.ResultText).NotEmpty().MaximumLength(8000);
+        RuleFor(x => x.ResultText)
+            .MaximumLength(8000)
+            .When(x => !string.IsNullOrEmpty(x.ResultText));
         RuleFor(x => x.Interpretation)
             .MaximumLength(4000)
             .When(x => !string.IsNullOrEmpty(x.Interpretation));
