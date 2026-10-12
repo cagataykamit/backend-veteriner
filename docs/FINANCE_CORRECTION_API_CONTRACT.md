@@ -28,19 +28,19 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-012 (kabul edildi; karar 
 
 | Tablo | Değişiklik |
 |---|---|
-| `Payments` | `VoidedAtUtc datetime2 NULL`, `VoidedByUserId uniqueidentifier NULL`, `VoidReason nvarchar(500) NULL`. `CHECK ((VoidedAtUtc IS NULL) = (VoidReason IS NULL) AND (VoidedAtUtc IS NULL) = (VoidedByUserId IS NULL))`; `CHECK (VoidedAtUtc IS NULL OR AllocatedAmount = 0)` |
+| `Payments` | `VoidedAtUtc datetime2 NULL`, `VoidedByUserId uniqueidentifier NULL`, `VoidReason nvarchar(500) NULL`. `CHECK` (üç iptal alanı ya birlikte NULL ya birlikte dolu); `CHECK (VoidedAtUtc IS NULL OR AllocatedAmount = 0)` |
 | `Charges` | Aynı üç kolon ve aynı iki `CHECK` |
 | `PaymentAllocations` | `ReversedAtUtc datetime2 NULL` (iptalde dolar; aktif tahsis sorguları `ReversedAtUtc IS NULL` süzer) |
 
 - Mevcut satırlar için yeni kolonlar `NULL` kalır; veri taşıma yoktur.
-- `Payment` ve `Charge` için **EF global query filter** `VoidedAtUtc IS NULL` tanımlanır: iptal edilenlerin dışlanması tek yerde yaşar, ayrı okuma yüzeylerinde tek tek süzme yoktur. İptal ucu ve `requestId` tekrar araması `IgnoreQueryFilters` kullanır (bölüm 4).
+- `Payment` ve `Charge` için **EF global query filter** `VoidedAtUtc IS NULL` tanımlanır: iptal edilenlerin dışlanması tek yerde yaşar, ayrı okuma yüzeylerinde tek tek süzme yoktur. İptal ucu ve `requestId` tekrar araması `IgnoreQueryFilters` kullanır (bölüm 4). Aynı filtre `PaymentAllocation` üzerinde `ReversedAtUtc IS NULL` olarak tanımlıdır: tahsis sorguları yalnız aktif tahsisleri görür.
 - Eşzamanlılık belirteci mevcut `MutationSequence`'tır (Dilim 2); iptal ve düzeltme sayacı 1 artırır. Yeni belirteç yoktur.
 
 ---
 
 ## 3) Uçlar
 
-Tümü `api/v1`, klinik kapsamı ve kiracı bağlamı mevcut ödeme/ücret yazma kurallarıyla aynıdır (kapsam dışı klinikte 404, varlık sızdırmaz; pasif kiracı `Tenants.TenantInactive`).
+Tümü `api/v1`, klinik kapsamı ve kiracı bağlamı mevcut ödeme/ücret yazma kurallarıyla aynıdır (aktif klinik bağlamı dışındaki kayıt 404, varlık sızdırmaz; kullanıcıya atanmamış klinik `Clinics.AccessDenied` 403; pasif kiracı `Tenants.TenantInactive`).
 
 ### 3.1 `PUT /api/v1/charges/{id}` — ücret düzeltme
 
@@ -54,6 +54,7 @@ Tümü `api/v1`, klinik kapsamı ve kiracı bağlamı mevcut ödeme/ücret yazma
 - `description`/`quantity`/`unitPrice` Dilim 1 doğrulamalarıyla aynı (`Charges.Validation`). Hiçbir alan mevcut değerden farklı değilse `Charges.Validation` (400; "değişiklik yok"), kayıt ve audit "başarısız" yazılır.
 - Yeni `amount < allocatedAmount` ise 409 `Charges.CorrectionBelowAllocated` (yetkili olsa da). Eşitlik serbesttir (ücret tam ödenmiş sayılır).
 - Başarılı yanıt **200**, gövde güncel `ChargeDto`. Eşzamanlı tahsis/iptal/düzeltme çakışırsa 409 `Charges.ConcurrencyConflict`; istemci yeniden okur. Hiçbir şey yazılmadığı için aynı istek güvenle tekrarlanır.
+- İptal edilmiş ücret düzeltilemez: 409 `Charges.AlreadyVoided` (iptal uçları gibi kayıt `IgnoreQueryFilters` ile okunur). Kayıt yoksa 404.
 
 ### 3.2 `POST /api/v1/charges/{id}/void` — ücret iptali
 
@@ -102,14 +103,14 @@ Global query filter ile Command DB'deki tüm okuma yolları iptal edileni dışl
 
 DTO değişikliği: yeni alan yoktur (iptal edilenler dönmez). Tahsis DTO'larında (`PaymentAllocationItemDto`, `ChargeAllocationItemDto`) değişiklik yoktur.
 
-`IgnoreQueryFilters` yalnızca iki yerde kullanılır: iptal uçları (zaten iptal edilmiş kaydı `AlreadyVoided` ile ayırt etmek için) ve `requestId` tekrar araması (`RequestIdVoided`).
+`IgnoreQueryFilters` yalnızca iki yerde kullanılır: iptal ve düzeltme uçları (zaten iptal edilmiş kaydı `AlreadyVoided` ile ayırt etmek için) ve `requestId` tekrar araması (`RequestIdVoided`).
 
 ---
 
 ## 5) Query DB, rapor ve olaylar
 
 - Yeni outbox olayı **`payment.voided.v1`**: `PaymentProjectionSnapshot` (mevcut şema) taşır. Create/updated olayları değişmez. Olay tipi `PaymentIntegrationEventTypes.All` ve Infrastructure tip kaydına eklenir (bilinmeyen tip dead-letter olur).
-- `PaymentProjectionProcessor` olayı işleyince ödemenin `PaymentReadModels` satırını ve `PaymentDailyContributionReadModels` kaydını siler, günlük özeti (`ClinicDailyPaymentStats`) mevcut recompute yoluyla günceller. Aynı `EventId` tekrar gelirse mevcut idempotency (`ProcessedProjectionEvents`) çalışır; stale koruması contribution `LastEventOccurredAtUtc` üzerinden devam eder. Önce `voided`, sonra gelen eski `updated` olayı yok sayılır (satır yeniden doğmaz).
+- `PaymentProjectionProcessor` olayı işleyince ödemenin `PaymentReadModels` satırını ve `PaymentDailyContributionReadModels` kaydını siler, günlük özeti (`ClinicDailyPaymentStats`) mevcut recompute yoluyla günceller. Aynı `EventId` tekrar gelirse mevcut idempotency (`ProcessedProjectionEvents`) çalışır; stale koruması contribution `LastEventOccurredAtUtc` üzerinden devam eder. Bilinen sınır: iptal bir "tombstone" bırakmaz; olaylar outbox sırasıyla işlendiği sürece (mevcut davranış) iptalden sonra eski bir `updated` olayı gelmez. Sıra dışı işleme olursa satır yeniden doğabilir (backfill/parity bunu yakalar, çünkü Command DB iptal edilenleri dışlar).
 - Backfill/parity servisleri Command DB'den okuduğu için global filtre iptal edilenleri zaten dışlar.
 - Ücret iptali/düzeltmesi olay üretmez (ücret Query DB'ye taşınmaz).
 - Query DB bayrakları her ortamda kapalıdır; açıldığında iptal edilen ödemenin gecikmeyle düşmesi (eventual consistency) beklenir. Bakiye ve Bugün tutarları Command DB'den okunur, gecikmesizdir.
