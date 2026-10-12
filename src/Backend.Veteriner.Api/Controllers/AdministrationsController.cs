@@ -62,6 +62,7 @@ public sealed class AdministrationsController : ControllerBase
                 body.Quantity,
                 body.AdministeredAtUtc,
                 body.Notes,
+                body.LateEntryReason,
                 body.RequestId),
             ct);
         if (!result.IsSuccess)
@@ -78,7 +79,7 @@ public sealed class AdministrationsController : ControllerBase
     }
 
     /// <summary>
-    /// Uygulamayı iptal eder (silmez) ve stoğu ters hareketle geri verir. Gerekçe zorunludur (5-500 karakter).
+    /// Uygulamayı iptal eder (silmez). Gerekçe zorunludur (5-500 karakter); <c>stockOutcome</c>: <c>StockReturned</c> (varsayılan, ters hareketle stok iadesi) veya <c>WrittenOff</c> (zarar/imha, stok artmaz).
     /// Kesinleşmiş muayeneye bağlı uygulama da iptal edilebilir.
     /// </summary>
     [HttpPost("{id:guid}/void")]
@@ -89,12 +90,12 @@ public sealed class AdministrationsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Void([FromRoute] Guid id, [FromBody] VoidRecordBody body, CancellationToken ct)
+    public async Task<IActionResult> Void([FromRoute] Guid id, [FromBody] VoidAdministrationBody body, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new VoidAdministrationCommand(id, body.Reason), ct);
+        var result = await _mediator.Send(new VoidAdministrationCommand(id, body.Reason, body.StockOutcome), ct);
         return result.ToActionResult(this);
     }
 
