@@ -116,6 +116,8 @@ Genel ilke: ADR-009/012 ve Aşama 5 desenleri (kural domain'de, `RowVersion`, `R
 
 ## 4. Kullanıcıya sorulacak ürün kararları
 
+**Karar durumu: D1–D12 önerildiği gibi Kabul edildi (kullanıcı, 2026-10-12; koordinatör oturumu aktardı).** Aşağıdaki "Öneri ve gerekçe" sütunu kabul edilen karardır. D8 için: yükleyenin yalnız klinik personeli olduğu varsayımı bu kararla kabul edilmiş sayılır.
+
 | # | Soru | Seçenekler | Öneri ve gerekçe |
 |---|---|---|---|
 | D1 | Lab istem şekli | **a)** Mevcut `LabResult`'ı duruma çevir (tek kayıt: İstendi → Sonuçlandı). **b)** Ayrı `LabRequest` + `LabResult` iki varlık. **c)** Yalnız bekleyen not | **a** — plan #2/#4 tek kayıt/tek kaynak; "hasta geçmişi ve ilgili işlem aynı kaydı gösterir" (kabul). b gereksiz bağ ve eşitleme yükü. Mevcut kayıtlar "Sonuçlandı" olur. |
