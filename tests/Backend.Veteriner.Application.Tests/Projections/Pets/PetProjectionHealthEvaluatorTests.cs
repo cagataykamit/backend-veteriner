@@ -130,6 +130,20 @@ public sealed class PetProjectionHealthEvaluatorTests
     }
 
     [Fact]
+    public void Evaluate_Should_BeHealthy_WhenProjectionDisabledReadFlagOffAndOldPendingExists()
+    {
+        var status = CreateStatus(
+            projectionEnabled: false,
+            pendingCount: 13,
+            oldestPendingAge: TimeSpan.FromDays(2));
+
+        var result = PetProjectionHealthEvaluator.Evaluate(status, DefaultHealth, FlagOff);
+
+        result.Level.Should().Be(PetProjectionHealthLevel.Healthy);
+        result.Data["pendingCount"].Should().Be(13);
+    }
+
+    [Fact]
     public void Evaluate_Should_IncludeOperationalDataPayload()
     {
         var status = CreateStatus(
