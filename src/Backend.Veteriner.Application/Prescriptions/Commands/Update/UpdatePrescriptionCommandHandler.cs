@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Prescriptions.Access;
+using Backend.Veteriner.Application.Prescriptions.Items;
 using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -11,6 +12,7 @@ using Backend.Veteriner.Application.Treatments.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -29,6 +31,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Treatment> _treatments;
+    private readonly IReadRepository<Product> _products;
     private readonly IReadRepository<Prescription> _prescriptionsRead;
     private readonly IRepository<Prescription> _prescriptionsWrite;
 
@@ -41,6 +44,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
         IReadRepository<Treatment> treatments,
+        IReadRepository<Product> products,
         IReadRepository<Prescription> prescriptionsRead,
         IRepository<Prescription> prescriptionsWrite)
     {
@@ -52,6 +56,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         _pets = pets;
         _examinations = examinations;
         _treatments = treatments;
+        _products = products;
         _prescriptionsRead = prescriptionsRead;
         _prescriptionsWrite = prescriptionsWrite;
     }
@@ -193,6 +198,16 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         if (!locked.IsSuccess)
             return locked;
 
+        IReadOnlyList<PrescriptionItemDraft>? itemDrafts = null;
+        if (request.Items is { } itemRequests)
+        {
+            var resolved = await PrescriptionItemResolver.ResolveAsync(_products, tenantId, itemRequests, ct);
+            if (!resolved.IsSuccess)
+                return Result.Failure(resolved.Error);
+
+            itemDrafts = resolved.Value!;
+        }
+
         var update = p.UpdateDetails(
             effectiveClinicId,
             request.PetId,
@@ -206,6 +221,13 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
 
         if (!update.IsSuccess)
             return update;
+
+        if (itemDrafts is not null)
+        {
+            var itemsResult = p.ReplaceItems(itemDrafts);
+            if (!itemsResult.IsSuccess)
+                return itemsResult;
+        }
 
         await _prescriptionsWrite.UpdateAsync(p, ct);
         await _prescriptionsWrite.SaveChangesAsync(ct);

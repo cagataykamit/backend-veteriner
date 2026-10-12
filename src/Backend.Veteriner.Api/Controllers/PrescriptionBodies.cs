@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
+
 namespace Backend.Veteriner.Api.Controllers;
 
 /// <summary>PUT /api/v1/prescriptions/{id} body; route id is source of truth.</summary>
@@ -15,4 +17,7 @@ public sealed class UpdatePrescriptionBody
     public string Content { get; init; } = default!;
     public string? Notes { get; init; }
     public DateTime? FollowUpDateUtc { get; init; }
+
+    /// <summary>null = satırlara dokunma; [] = tümünü sil; dolu dizi = tümünü değiştir.</summary>
+    public IReadOnlyList<PrescriptionItemRequest>? Items { get; init; }
 }

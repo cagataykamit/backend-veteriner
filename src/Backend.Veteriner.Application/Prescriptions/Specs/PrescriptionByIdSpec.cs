@@ -7,6 +7,7 @@ public sealed class PrescriptionByIdSpec : Specification<Prescription>
 {
     public PrescriptionByIdSpec(Guid tenantId, Guid id)
     {
-        Query.Where(p => p.TenantId == tenantId && p.Id == id);
+        Query.Where(p => p.TenantId == tenantId && p.Id == id)
+            .Include(p => p.Items);
     }
 }

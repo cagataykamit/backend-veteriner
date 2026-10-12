@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.Prescriptions.Items;
+using Backend.Veteriner.Domain.Prescriptions;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Prescriptions.Commands.Create;
@@ -20,5 +22,12 @@ public sealed class CreatePrescriptionCommandValidator : AbstractValidator<Creat
         RuleFor(x => x.Notes)
             .MaximumLength(4000)
             .When(x => !string.IsNullOrEmpty(x.Notes));
+
+        RuleFor(x => x.Items)
+            .Must(items => items!.Count <= PrescriptionItem.MaxPerPrescription)
+            .WithMessage($"A prescription can have at most {PrescriptionItem.MaxPerPrescription} items.")
+            .When(x => x.Items is not null);
+        RuleForEach(x => x.Items).NotNull().SetValidator(new PrescriptionItemRequestValidator())
+            .When(x => x.Items is not null);
     }
 }
