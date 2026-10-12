@@ -8,5 +8,7 @@ public enum StockMovementType
     Initial = 0,
     In = 1,
     Out = 2,
-    Adjustment = 3
+    Adjustment = 3,
+    /// <summary>Önceki bir hareketin etkisini geri alır (<c>ReversesMovementId</c> dolu).</summary>
+    Reversal = 4
 }

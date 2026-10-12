@@ -21,4 +21,6 @@ public sealed record StockMovementDto(
     DateTime OccurredAtUtc,
     Guid? CreatedByUserId,
     string? Notes,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    Guid? RequestId,
+    Guid? ReversesMovementId);

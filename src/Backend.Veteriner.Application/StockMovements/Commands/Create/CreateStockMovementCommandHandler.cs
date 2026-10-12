@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Application.ProductStocks.Specs;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Application.StockMovements.Contracts.Dtos;
+using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
@@ -14,7 +15,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.Veteriner.Application.StockMovements.Commands.Create;
 
 public sealed class CreateStockMovementCommandHandler
-    : IRequestHandler<CreateStockMovementCommand, Result<StockMovementDto>>
+    : IRequestHandler<CreateStockMovementCommand, Result<StockMovementCreateResult>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
@@ -51,32 +52,32 @@ public sealed class CreateStockMovementCommandHandler
         _uow = uow;
     }
 
-    public async Task<Result<StockMovementDto>> Handle(CreateStockMovementCommand request, CancellationToken ct)
+    public async Task<Result<StockMovementCreateResult>> Handle(CreateStockMovementCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {
-            return Result<StockMovementDto>.Failure(
+            return Result<StockMovementCreateResult>.Failure(
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
         {
-            return Result<StockMovementDto>.Failure(
+            return Result<StockMovementCreateResult>.Failure(
                 "StockMovements.ClinicContextMismatch",
                 "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
         }
 
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, request.ClinicId, ct);
         if (!scopeResult.IsSuccess)
-            return Result<StockMovementDto>.Failure(scopeResult.Error);
+            return Result<StockMovementCreateResult>.Failure(scopeResult.Error);
 
         var clinic = await _clinicsRead.FirstOrDefaultAsync(
             new ClinicByIdSpec(tenantId, request.ClinicId),
             ct);
         if (clinic is null)
         {
-            return Result<StockMovementDto>.Failure(
+            return Result<StockMovementCreateResult>.Failure(
                 "Clinics.NotFound",
                 "Klinik bulunamadı veya kiracıya ait değil.");
         }
@@ -84,16 +85,9 @@ public sealed class CreateStockMovementCommandHandler
         var product = await _productsRead.FirstOrDefaultAsync(new ProductByIdSpec(tenantId, request.ProductId), ct);
         if (product is null)
         {
-            return Result<StockMovementDto>.Failure(
+            return Result<StockMovementCreateResult>.Failure(
                 "Products.NotFound",
                 "Ürün bulunamadı veya kiracıya ait değil.");
-        }
-
-        if (!product.IsActive)
-        {
-            return Result<StockMovementDto>.Failure(
-                "Products.Inactive",
-                "Pasif ürün için stok hareketi oluşturulamaz.");
         }
 
         string? categoryName = null;
@@ -105,28 +99,57 @@ public sealed class CreateStockMovementCommandHandler
             categoryName = category?.Name;
         }
 
+        // Tekrar istek: aynı RequestId ilk hareketi döndürür, stok değişmez.
+        if (request.RequestId is { } requestId && requestId != Guid.Empty)
+        {
+            var existing = await _stockMovementsWrite.FirstOrDefaultAsync(
+                new StockMovementByRequestIdSpec(tenantId, requestId), ct);
+            if (existing is not null)
+                return Replay(existing, request, product, categoryName, clinic.Name);
+        }
+
+        if (!product.IsActive)
+        {
+            return Result<StockMovementCreateResult>.Failure(
+                "Products.Inactive",
+                "Pasif ürün için stok hareketi oluşturulamaz.");
+        }
+
         var occurredAtUtc = request.OccurredAtUtc ?? DateTime.UtcNow;
         var createdBy = _clientContext.UserId;
         var referenceId = request.ReferenceId is { } rid && rid != Guid.Empty ? rid : (Guid?)null;
+        var referenceType = string.IsNullOrWhiteSpace(request.ReferenceType) ? null : request.ReferenceType.Trim();
+
+        // Aynı kaynak, aynı klinik+ürün+tip için ikinci kez stok değiştiremez.
+        if (referenceType is not null && referenceId is not null
+            && await _stockMovementsWrite.FirstOrDefaultAsync(
+                new StockMovementByReferenceSpec(
+                    tenantId, request.ClinicId, request.ProductId, referenceType, referenceId.Value, request.MovementType),
+                ct) is not null)
+        {
+            return DuplicateReference();
+        }
 
         var stock = await _productStocksWrite.FirstOrDefaultAsync(
             new ProductStockForUpdateSpec(tenantId, request.ClinicId, request.ProductId),
             ct);
 
-        StockMovement movement = default!;
+        // Yeni stok satırı, hareketten sonra yazılır: hareketin benzersiz kuralları (requestId, kaynak) önce eler
+        // ve satır kalıcılaşmadan işlem sonlanır. Mevcut satırdaki değişiklik hareketle aynı SaveChanges'te gider.
+        ProductStock? newStock = null;
+        StockMovement movement;
 
         switch (request.MovementType)
         {
             case StockMovementType.Initial:
                 if (stock is not null)
                 {
-                    return Result<StockMovementDto>.Failure(
+                    return Result<StockMovementCreateResult>.Failure(
                         "StockMovements.StockAlreadyInitialized",
                         "Bu ürün için bu klinikte stok satırı zaten var; Initial kullanılamaz.");
                 }
 
-                stock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
-                await _productStocksWrite.AddAsync(stock, ct);
+                newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
                 movement = CreateMovementEntity(
                     tenantId,
                     request,
@@ -135,15 +158,11 @@ public sealed class CreateStockMovementCommandHandler
                     referenceId,
                     StockMovementType.Initial,
                     request.Quantity);
-                await _stockMovementsWrite.AddAsync(movement, ct);
                 break;
 
             case StockMovementType.In:
                 if (stock is null)
-                {
-                    stock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
-                    await _productStocksWrite.AddAsync(stock, ct);
-                }
+                    newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
                 else
                     stock.IncreaseQuantity(request.Quantity);
 
@@ -155,13 +174,12 @@ public sealed class CreateStockMovementCommandHandler
                     referenceId,
                     StockMovementType.In,
                     request.Quantity);
-                await _stockMovementsWrite.AddAsync(movement, ct);
                 break;
 
             case StockMovementType.Out:
                 if (stock is null || stock.QuantityOnHand < request.Quantity)
                 {
-                    return Result<StockMovementDto>.Failure(
+                    return Result<StockMovementCreateResult>.Failure(
                         "StockMovements.InsufficientStock",
                         "Çıkış için yeterli stok yok.");
                 }
@@ -175,7 +193,6 @@ public sealed class CreateStockMovementCommandHandler
                     referenceId,
                     StockMovementType.Out,
                     request.Quantity);
-                await _stockMovementsWrite.AddAsync(movement, ct);
                 break;
 
             case StockMovementType.Adjustment:
@@ -184,17 +201,13 @@ public sealed class CreateStockMovementCommandHandler
                 var delta = targetQty - oldQty;
                 if (delta == 0)
                 {
-                    return Result<StockMovementDto>.Failure(
+                    return Result<StockMovementCreateResult>.Failure(
                         "StockMovements.AdjustmentUnchanged",
                         "Hedef stok miktarı mevcut ile aynı; kayıt oluşturulmadı.");
                 }
 
-                var movementQty = Math.Abs(delta);
                 if (stock is null)
-                {
-                    stock = new ProductStock(tenantId, request.ClinicId, request.ProductId, targetQty, 0);
-                    await _productStocksWrite.AddAsync(stock, ct);
-                }
+                    newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, targetQty, 0);
                 else
                     stock.SetAbsoluteQuantity(targetQty);
 
@@ -205,14 +218,61 @@ public sealed class CreateStockMovementCommandHandler
                     createdBy,
                     referenceId,
                     StockMovementType.Adjustment,
-                    movementQty);
-                await _stockMovementsWrite.AddAsync(movement, ct);
+                    Math.Abs(delta));
                 break;
 
             default:
-                return Result<StockMovementDto>.Failure(
+                return Result<StockMovementCreateResult>.Failure(
                     "StockMovements.InvalidMovementType",
                     "Desteklenmeyen hareket tipi.");
+        }
+
+        // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); işlem sınırı TransactionBehavior'dadır.
+        try
+        {
+            await _stockMovementsWrite.AddAsync(movement, ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ConcurrencyConflict();
+        }
+        catch (DbUpdateException)
+        {
+            // Benzersiz kural kaybedene çarptı; nedeni yeniden sorgulayarak ayırt et. Hiçbir şey yazılmadı.
+            if (request.RequestId is { } winnerRequestId && winnerRequestId != Guid.Empty)
+            {
+                var winner = await _stockMovementsWrite.FirstOrDefaultAsync(
+                    new StockMovementByRequestIdSpec(tenantId, winnerRequestId), ct);
+                if (winner is not null)
+                    return Replay(winner, request, product, categoryName, clinic.Name);
+            }
+
+            if (referenceType is not null && referenceId is not null
+                && await _stockMovementsWrite.FirstOrDefaultAsync(
+                    new StockMovementByReferenceSpec(
+                        tenantId, request.ClinicId, request.ProductId, referenceType, referenceId.Value, request.MovementType),
+                    ct) is not null)
+            {
+                return DuplicateReference();
+            }
+
+            throw;
+        }
+
+        if (newStock is not null)
+        {
+            try
+            {
+                await _productStocksWrite.AddAsync(newStock, ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Satır yokken eşzamanlı ilk giriş: satırı başka istek oluşturdu; işlem geri alınır, yeniden denenebilir.
+                if (await StockRowExistsAsync(tenantId, request.ClinicId, request.ProductId, ct))
+                    return ConcurrencyConflict();
+
+                throw;
+            }
         }
 
         try
@@ -221,13 +281,45 @@ public sealed class CreateStockMovementCommandHandler
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Result<StockMovementDto>.Failure(
-                "StockMovements.ConcurrencyConflict",
-                "Stok satırı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
+            return ConcurrencyConflict();
         }
 
-        return Result<StockMovementDto>.Success(
-            MapDto(movement, product, categoryName, clinic.Name));
+        return Result<StockMovementCreateResult>.Success(
+            new StockMovementCreateResult(movement.ToDto(product, categoryName, clinic.Name), true));
+    }
+
+    private async Task<bool> StockRowExistsAsync(Guid tenantId, Guid clinicId, Guid productId, CancellationToken ct)
+        => await _productStocksWrite.FirstOrDefaultAsync(
+            new ProductStockForUpdateSpec(tenantId, clinicId, productId), ct) is not null;
+
+    private static Result<StockMovementCreateResult> ConcurrencyConflict()
+        => Result<StockMovementCreateResult>.Failure(
+            "StockMovements.ConcurrencyConflict",
+            "Stok satırı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
+
+    private static Result<StockMovementCreateResult> DuplicateReference()
+        => Result<StockMovementCreateResult>.Failure(
+            "StockMovements.DuplicateReference",
+            "Bu kaynak için aynı ürün, klinik ve hareket tipiyle stok hareketi zaten kayıtlı.");
+
+    private static Result<StockMovementCreateResult> Replay(
+        StockMovement existing,
+        CreateStockMovementCommand request,
+        Product product,
+        string? categoryName,
+        string clinicName)
+    {
+        if (existing.ClinicId != request.ClinicId
+            || existing.ProductId != request.ProductId
+            || existing.MovementType != request.MovementType)
+        {
+            return Result<StockMovementCreateResult>.Failure(
+                "StockMovements.DuplicateRequestId",
+                "Bu requestId başka bir stok hareketi isteği için kullanılmış.");
+        }
+
+        return Result<StockMovementCreateResult>.Success(
+            new StockMovementCreateResult(existing.ToDto(product, categoryName, clinicName), false));
     }
 
     private static StockMovement CreateMovementEntity(
@@ -250,30 +342,6 @@ public sealed class CreateStockMovementCommandHandler
             request.ReferenceType,
             referenceId,
             createdByUserId,
-            request.Notes);
-
-    private static StockMovementDto MapDto(
-        StockMovement movement,
-        Product product,
-        string? productCategoryName,
-        string clinicName)
-        => new(
-            movement.Id,
-            movement.ProductId,
-            product.Name,
-            product.Sku,
-            product.ProductCategoryId,
-            productCategoryName,
-            movement.ClinicId,
-            clinicName,
-            movement.MovementType,
-            movement.Quantity,
-            movement.UnitCost,
-            movement.Reason,
-            movement.ReferenceType,
-            movement.ReferenceId,
-            movement.OccurredAtUtc,
-            movement.CreatedByUserId,
-            movement.Notes,
-            movement.CreatedAtUtc);
+            request.Notes,
+            request.RequestId);
 }
