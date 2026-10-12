@@ -237,7 +237,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
             if (!reason.IsSuccess)
                 return reason;
 
-            if (!string.Equals(request.Currency?.Trim(), payment.Currency, StringComparison.OrdinalIgnoreCase)
+            if (!string.Equals(request.Currency.Trim(), payment.Currency, StringComparison.OrdinalIgnoreCase)
                 && !Payment.IsSupportedCurrency(request.Currency))
             {
                 return Result.Failure("Payments.Validation", "Ödeme yalnızca TRY para birimine düzeltilebilir.");
