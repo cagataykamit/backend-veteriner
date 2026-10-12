@@ -110,7 +110,7 @@ Kurallar:
 |---|---|
 | `StockMovements.DuplicateRequestId`, `StockMovements.DuplicateReference`, `StockMovements.AlreadyReversed`, `StockMovements.ConcurrencyConflict` | 409 |
 | `StockMovements.NotReversible`, `StockMovements.InsufficientStock`, doğrulama hataları (yarım kaynak, `Reversal` tipi, boş `reason`) | 400 |
-| `StockMovements.NotFound` | 404 |
+| `StockMovements.NotFound`, `StockMovements.StockNotFound` (geri alınan `Out` hareketinin stok satırı yok; veri bozukluğu) | 404 |
 | `StockMovements.ClinicContextMismatch` | 400 |
 | `Clinics.AccessDenied` | 403 |
 
@@ -121,6 +121,7 @@ Mevcut kodlar (`StockMovements.StockAlreadyInitialized`, `AdjustmentUnchanged`, 
 ## 6) Uygulama notları
 
 - Veri modeli: `StockMovements` tablosuna `RequestId` (nullable guid) ve `ReversesMovementId` (nullable guid) eklenir. Üç filtreli benzersiz indeks: `(TenantId, RequestId)` (`RequestId IS NOT NULL`), `(TenantId, ClinicId, ProductId, ReferenceType, ReferenceId, MovementType)` (`ReferenceType IS NOT NULL AND ReferenceId IS NOT NULL`), `(TenantId, ReversesMovementId)` (`ReversesMovementId IS NOT NULL`). Mevcut satırlar bu alanları doldurmaz; keşifte `ReferenceType/ReferenceId` hiçbir yerde doldurulmuyordu (uygulamadan önce hedef DB'de çift kaynak olmadığı kontrol edilir).
-- Benzersiz ihlali (`DbUpdateException`) SQL hata numarasına bağlı kalmadan, yeniden sorgulayarak sınıflandırılır: önce `requestId` kazananı, sonra kaynak çakışması, sonra (yeni stok satırı denendiyse) satırın artık var olması; hiçbiri değilse hata olduğu gibi yükselir.
+- Yazma sırası: önce hareket (mevcut stok satırı değişimiyle tek `SaveChanges`), yeni stok satırı **hareketten sonra**. Böylece `requestId`/kaynak/geri-alma benzersiz kuralları hiçbir şey yazılmadan eler. Komutlar `ITransactionalRollbackOnFailureRequest`tir: başarısız sonuçta (ör. satır yarışı kaybı) işlem geri alınır, hareket kalmaz. Repository `AddAsync` kaydı hemen kalıcılaştırır; bu yüzden tek `SaveChanges` varsayılmaz.
+- Benzersiz ihlali (`DbUpdateException`) SQL hata numarasına bağlı kalmadan, yeniden sorgulayarak sınıflandırılır: hareket yazımında `requestId` kazananı (tekrar, 200) ve kaynak çakışması (409); stok satırı yazımında satırın artık var olması (`ConcurrencyConflict`, 409). Hiçbiri değilse hata olduğu gibi yükselir.
 - Reçete/tedavi kayıtları stok hareketi üretmez; bu dilimde bu davranış değişmez (K3, Dilim 2'de testle korunur).
 - Okuma modeli (Query DB) yoktur; stok Command DB'dedir.
