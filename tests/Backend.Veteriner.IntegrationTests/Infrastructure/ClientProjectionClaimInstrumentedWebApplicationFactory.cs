@@ -22,14 +22,14 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class ClientProjectionClaimInstrumentedWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    public const string CommandDatabaseName = "VetinityCommandDb_ClientProjectionClaimInstrumentedTests";
-    public const string QueryDatabaseName = "VetinityQueryDb_ClientProjectionClaimInstrumentedTests";
+    public static readonly string CommandDatabaseName = IntegrationTestDatabaseNames.Command("ClientProjectionClaimInstrumentedTests");
+    public static readonly string QueryDatabaseName = IntegrationTestDatabaseNames.Query("ClientProjectionClaimInstrumentedTests");
 
-    public const string CommandConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_ClientProjectionClaimInstrumentedTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+    public static readonly string CommandConnection =
+        IntegrationTestDatabaseNames.ConnectionString(CommandDatabaseName);
 
-    public const string QueryConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_ClientProjectionClaimInstrumentedTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+    public static readonly string QueryConnection =
+        IntegrationTestDatabaseNames.ConnectionString(QueryDatabaseName);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

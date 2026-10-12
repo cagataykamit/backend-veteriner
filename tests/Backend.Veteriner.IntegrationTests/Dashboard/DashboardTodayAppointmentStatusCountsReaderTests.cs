@@ -28,7 +28,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
     /// </summary>
     public async Task InitializeAsync()
     {
-        var commandDbName = $"{CommandDatabasePrefix}{Guid.NewGuid():N}";
+        var commandDbName = IntegrationTestDatabaseNames.WithRunId($"{CommandDatabasePrefix}{Guid.NewGuid():N}");
         var connectionString =
             $"Server=(localdb)\\mssqllocaldb;Database={commandDbName};Trusted_Connection=True;MultipleActiveResultSets=true";
 

@@ -44,4 +44,25 @@ internal static class IntegrationTestDatabaseInitializer
             Gate.Release();
         }
     }
+
+    /// <summary>
+    /// Query DB'yi (adına göre) suite başında bir kere sıfırlayıp migrate eder. Koşuya özgü ad her koşuda
+    /// sıfırdan oluştuğundan, Query DB okuyan testler önceki koşudan kalan veritabanına güvenemez.
+    /// </summary>
+    public static void EnsureQueryResetAndMigrated(QueryDbContext queryDb, string databaseName)
+    {
+        Gate.Wait();
+        try
+        {
+            if (InitializedDatabases.Contains(databaseName))
+                return;
+
+            IntegrationTestDatabaseReset.ResetAndMigrateAsync(queryDb).GetAwaiter().GetResult();
+            InitializedDatabases.Add(databaseName);
+        }
+        finally
+        {
+            Gate.Release();
+        }
+    }
 }

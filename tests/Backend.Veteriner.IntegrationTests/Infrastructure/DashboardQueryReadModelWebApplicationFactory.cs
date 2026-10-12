@@ -17,8 +17,8 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class DashboardQueryReadModelWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    public const string CommandConnection = AppointmentProjectionWebApplicationFactory.CommandConnection;
-    public const string QueryConnection = AppointmentProjectionWebApplicationFactory.QueryConnection;
+    public static readonly string CommandConnection = AppointmentProjectionWebApplicationFactory.CommandConnection;
+    public static readonly string QueryConnection = AppointmentProjectionWebApplicationFactory.QueryConnection;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

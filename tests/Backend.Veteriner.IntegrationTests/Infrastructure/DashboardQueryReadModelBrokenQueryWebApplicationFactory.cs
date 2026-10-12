@@ -17,7 +17,7 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class DashboardQueryReadModelBrokenQueryWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    public const string CommandConnection = DashboardQueryReadModelWebApplicationFactory.CommandConnection;
+    public static readonly string CommandConnection = DashboardQueryReadModelWebApplicationFactory.CommandConnection;
 
     public const string InvalidQueryConnection =
         "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_DashboardBroken_Invalid;Trusted_Connection=True;Connect Timeout=1;MultipleActiveResultSets=true";

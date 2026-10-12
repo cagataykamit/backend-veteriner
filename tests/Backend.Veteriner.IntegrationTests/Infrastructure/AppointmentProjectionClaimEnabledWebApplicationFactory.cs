@@ -19,14 +19,14 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// </summary>
 public sealed class AppointmentProjectionClaimEnabledWebApplicationFactory : WebApplicationFactory<global::Program>
 {
-    public const string CommandDatabaseName = "VetinityCommandDb_AppointmentProjectionClaimTests";
-    public const string QueryDatabaseName = "VetinityQueryDb_AppointmentProjectionClaimTests";
+    public static readonly string CommandDatabaseName = IntegrationTestDatabaseNames.Command("AppointmentProjectionClaimTests");
+    public static readonly string QueryDatabaseName = IntegrationTestDatabaseNames.Query("AppointmentProjectionClaimTests");
 
-    public const string CommandConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_AppointmentProjectionClaimTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+    public static readonly string CommandConnection =
+        IntegrationTestDatabaseNames.ConnectionString(CommandDatabaseName);
 
-    public const string QueryConnection =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityQueryDb_AppointmentProjectionClaimTests;Trusted_Connection=True;MultipleActiveResultSets=true";
+    public static readonly string QueryConnection =
+        IntegrationTestDatabaseNames.ConnectionString(QueryDatabaseName);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

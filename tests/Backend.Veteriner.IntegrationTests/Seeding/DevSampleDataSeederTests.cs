@@ -19,8 +19,8 @@ namespace Backend.IntegrationTests.Seeding;
 [Collection("admin-seed-orchestration")]
 public sealed class DevSampleDataSeederTests
 {
-    private const string ConnectionString =
-        "Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_DevSampleDataSeed;Trusted_Connection=True;MultipleActiveResultSets=true";
+    private static readonly string ConnectionString =
+        IntegrationTestDatabaseNames.ConnectionString(IntegrationTestDatabaseNames.Command("DevSampleDataSeed"));
 
     private static DbContextOptions<AppDbContext> CreateOptions()
         => new DbContextOptionsBuilder<AppDbContext>()

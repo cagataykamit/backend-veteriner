@@ -20,9 +20,33 @@ public sealed class IntegrationTestDatabaseGuardTests
         var commandDatabaseName = IntegrationTestDatabaseGuard.EnsureSafeDatabase(
             IntegrationTestDatabaseGuard.DedicatedConnectionString);
 
-        commandDatabaseName.Should().Be("VetinityCommandDb_IntegrationTests");
+        commandDatabaseName.Should().Be(IntegrationTestDatabaseGuard.CommandDatabaseName);
     }
 
+    [Fact]
+    public void RunSpecificDatabaseNames_Should_BeAllowed_And_NeverCollideWithDevDatabases()
+    {
+        var runId = IntegrationTestDatabaseNames.RunId;
+        runId.Should().MatchRegex("^[A-Za-z0-9]+$");
+
+        var command = IntegrationTestDatabaseGuard.EnsureSafeDatabase(IntegrationTestDatabaseGuard.DedicatedConnectionString);
+        var query = IntegrationTestDatabaseGuard.EnsureSafeDatabase(
+            IntegrationTestDatabaseGuard.DedicatedQueryConnectionString,
+            IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName);
+
+        command.Should().Be($"{IntegrationTestDatabaseGuard.IntegrationTestsCommandDatabaseName}_{runId}");
+        query.Should().Be($"{IntegrationTestDatabaseGuard.IntegrationTestsQueryDatabaseName}_{runId}");
+        new[] { command, query }.Should().NotContain(new[] { "VetinityCommandDb", "VetinityQueryDb" });
+    }
+
+    [Fact]
+    public void ScopedDatabaseNames_Should_CarryRunId_And_PassGuardWithScopePrefix()
+    {
+        var name = IntegrationTestDatabaseNames.Command("SomeScope");
+
+        name.Should().Be($"VetinityCommandDb_SomeScope_{IntegrationTestDatabaseNames.RunId}");
+        IntegrationTestDatabaseGuard.EnsureSafeDatabase(Conn(name), "VetinityCommandDb_SomeScope").Should().Be(name);
+    }
     [Fact]
     public void CommandIntegrationTestsDatabaseRunPrefix_Should_BeAllowed()
     {
@@ -102,7 +126,7 @@ public sealed class IntegrationTestEffectiveCommandDatabaseTests : IClassFixture
     public IntegrationTestEffectiveCommandDatabaseTests(CustomWebApplicationFactory factory) => _factory = factory;
 
     [Fact]
-    public void EffectiveCommandDatabaseName_Should_Be_VetinityCommandDbIntegrationTests()
+    public void EffectiveCommandDatabaseName_Should_Be_RunSpecificIntegrationTestsDatabase()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -111,6 +135,6 @@ public sealed class IntegrationTestEffectiveCommandDatabaseTests : IClassFixture
         connectionString.Should().NotBeNullOrWhiteSpace();
 
         var commandDatabaseName = new SqlConnectionStringBuilder(connectionString!).InitialCatalog;
-        commandDatabaseName.Should().Be("VetinityCommandDb_IntegrationTests");
+        commandDatabaseName.Should().Be(IntegrationTestDatabaseGuard.CommandDatabaseName);
     }
 }
