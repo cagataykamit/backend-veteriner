@@ -33,6 +33,9 @@ public static class PetProjectionHealthEvaluator
             return Degraded("Query read flag enabled but pet projection disabled.", data);
         }
 
+        if (!status.ProjectionEnabled)
+            return Healthy("Pet projection disabled; queue signals exposed for pre-rollout observability.", data);
+
         if (status.PendingCount > 0 && status.OldestPendingAge is { } age)
         {
             var ageSeconds = age.TotalSeconds;
