@@ -62,7 +62,7 @@ dotnet test Veteriner.sln -c Debug
 ```
 
 - **Birim / uygulama testleri:** `tests/Backend.Veteriner.Application.Tests`, `tests/Backend.Veteriner.Domain.Tests`
-- **Entegrasyon testleri:** `tests/Backend.Veteriner.IntegrationTests` (`appsettings.IntegrationTests.json` → LocalDB, varsayılan DB adları **`VetinityCommandDb_IntegrationTests`** / **`VetinityQueryDb_IntegrationTests`**)
+- **Entegrasyon testleri:** `tests/Backend.Veteriner.IntegrationTests` (`appsettings.IntegrationTests.json` → LocalDB, DB adları koşuya özgüdür: **`VetinityCommandDb_IntegrationTests_<koşu kimliği>`** / **`VetinityQueryDb_IntegrationTests_<koşu kimliği>`**; kimlik `INTEGRATION_TEST_RUN_ID` ortam değişkeni, verilmezse `p<süreç kimliği>`; böylece eşzamanlı koşular çakışmaz. Koşu sonunda bu koşunun veritabanları ve `.mdf/.ldf` dosyaları silinir, sahibi çalışmayan `p<pid>` artıkları süpürülür. Eski sabit adlı artıklar (`VetinityCommandDb_IntegrationTests` vb.) elle `DROP DATABASE` ile silinir. Kural: `tests/Backend.Veteriner.IntegrationTests/Infrastructure/IntegrationTestDatabaseNames.cs`)
 
 IDOR / clinic isolation regression komutları (Quick Smoke, Full Regression, Release Safety Set): [`docs/security/idor-regression.md`](docs/security/idor-regression.md).
 
