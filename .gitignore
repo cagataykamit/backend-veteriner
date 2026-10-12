@@ -366,3 +366,6 @@ _local_backup/
 tests/load/.tokens/
 tests/load/results/
 
+
+# Yerel gelistirme ayarlari (gizli bilgi icerebilir); sablon: appsettings.Development.json.example
+src/Backend.Veteriner.Api/appsettings.Development.json
