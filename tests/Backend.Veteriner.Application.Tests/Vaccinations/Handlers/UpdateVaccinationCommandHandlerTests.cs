@@ -559,4 +559,64 @@ public sealed class UpdateVaccinationCommandHandlerTests
         result.Error.Code.Should().Be("Vaccinations.ScheduledRequiresDueAt");
         _vaccinationsWrite.Verify(r => r.UpdateAsync(It.IsAny<Vaccination>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Handle_Should_ReturnFailure_When_ExaminationFinalized(bool targetExamination)
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var vaccinationId = Guid.NewGuid();
+        var examinationId = Guid.NewGuid();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+
+        // targetExamination: kayıt kesinleşmiş muayeneye taşınmak isteniyor; aksi: kayıt kesinleşmiş muayeneden ayrılmak isteniyor.
+        var existing = new Vaccination(
+            tid,
+            petId,
+            clinicId,
+            targetExamination ? null : examinationId,
+            TestDefinition.Id,
+            TestDefinition.Name,
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(5),
+            null);
+        typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
+        _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+
+        var exam = new Examination(tid, clinicId, petId, null, DateTime.UtcNow.AddHours(-1), "Şikayet", "Bulgu", null, null);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+
+        var cmd = new UpdateVaccinationCommand(
+            vaccinationId,
+            clinicId,
+            petId,
+            targetExamination ? examinationId : null,
+            TestDefinition.Id,
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+        existing.ExaminationId.Should().Be(targetExamination ? null : examinationId);
+        _vaccinationsWrite.Verify(r => r.UpdateAsync(It.IsAny<Vaccination>(), It.IsAny<CancellationToken>()), Times.Never);
+        _vaccinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

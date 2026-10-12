@@ -6,7 +6,7 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Application.Examinations.Access;
 
 /// <summary>
-/// Tedavi/reçete gibi muayeneye bağlı kayıtların yazma handler'ları için ortak kilit denetimi:
+/// Tedavi, reçete ve aşı gibi muayeneye bağlı kayıtların yazma handler'ları için ortak kilit denetimi:
 /// ilgili muayenelerden biri kesinleşmişse yazma reddedilir (kural <see cref="Examination.EnsureAcceptsLinkedRecords"/>).
 /// Hem hedef hem mevcut (taşınan/ayrılan) muayene verilmelidir; muayenesi bulunamayanlar burada atlanır, varlık denetimi çağıranındır.
 /// </summary>

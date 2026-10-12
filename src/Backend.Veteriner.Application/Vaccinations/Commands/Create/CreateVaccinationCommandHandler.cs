@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Vaccinations.Access;
+using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -148,6 +149,11 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
                     "Seçilen muayene ile klinik veya hayvan bilgisi uyuşmuyor.");
             }
         }
+
+        var locked = await ExaminationLinkedRecordLock.EnsureOpenAsync(
+            _examinations, tenantId, [request.ExaminationId], ct);
+        if (!locked.IsSuccess)
+            return Result<Guid>.Failure(locked.Error);
 
         var vaccination = new Vaccination(
             tenantId,
