@@ -111,6 +111,8 @@ Dalları ayrı ayrı çalıştırırken `AppDbContextModelSnapshot` çakışmas�
 
 ## 4. Kullanıcıya sorulacak ürün kararları
 
+**Karar durumu: D1–D9 önerildiği gibi Kabul edildi (kullanıcı, 2026-10-12).** Aşağıdaki "Öneri" sütunu kabul edilen karardır.
+
 | # | Soru | Seçenekler | Öneri ve gerekçe |
 |---|---|---|---|
 | D1 | Klinik uygulama kaydının şekli | **a)** Yeni "Uygulama" varlığı (tedavi opsiyonel bağ; ürün+miktar). **b)** Tedaviye ürün satırı (Treatment satırları). **c)** Mevcut `StockMovement` + `ReferenceType` ile yetinmek | **a** — ana plan #3/#4 (reçeteyle uygulama ayrı), geri alma/tekrar koruması için kaynak varlığı gerekir; b tedaviyi şişirir, c idempotency/geri alma/ücret önerisi için yetersiz. |
