@@ -64,6 +64,7 @@ public sealed class PetTimelineHandlerTests
             _permissions.Object,
             _pets.Object,
             _clinics.Object,
+            InMemory(_exams).Object,
             [
                 new VisitTimelineSource(InMemory(_visits).Object),
                 new ExaminationTimelineSource(InMemory(_exams).Object),
@@ -261,6 +262,70 @@ public sealed class PetTimelineHandlerTests
             new GetPetTimelineQuery(_petId, ClinicId: Guid.NewGuid()), CancellationToken.None);
 
         result.Error.Code.Should().Be("Clinics.AccessDenied");
+    }
+
+    // ---- Geliş satırında bağlı muayene ----
+
+    [Fact]
+    public async Task Visit_Row_Should_Link_Latest_Linked_Examination()
+    {
+        var visit = NewVisit(T0);
+        NewExam(T0.AddMinutes(10), visitId: visit.Id);
+        var latest = NewExam(T0.AddMinutes(30), visitId: visit.Id);
+        NewExam(T0.AddMinutes(20), visitId: visit.Id);
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        result.Value!.Items.Single(i => i.Type == PetRecordKind.Visit).RelatedExaminationId.Should().Be(latest.Id);
+    }
+
+    [Fact]
+    public async Task Visit_Row_Without_Linked_Examination_Should_Have_Null()
+    {
+        NewVisit(T0);
+        NewExam(T0.AddMinutes(10));
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        result.Value!.Items.Single(i => i.Type == PetRecordKind.Visit).RelatedExaminationId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Visit_Row_Should_Link_Examination_Even_When_Only_Visit_Type_Requested()
+    {
+        var visit = NewVisit(T0);
+        var exam = NewExam(T0.AddMinutes(10), visitId: visit.Id);
+
+        var result = await CreateHandler().Handle(
+            new GetPetTimelineQuery(_petId, Types: ["Visit"]), CancellationToken.None);
+
+        result.Value!.Items.Should().ContainSingle().Which.RelatedExaminationId.Should().Be(exam.Id);
+    }
+
+    [Fact]
+    public async Task Visit_Row_Should_Not_Expose_Examination_Without_Examinations_Read()
+    {
+        var visit = NewVisit(T0);
+        NewExam(T0.AddMinutes(10), visitId: visit.Id);
+        _permissions.Setup(p => p.HasPermission(PermissionCatalog.Examinations.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        result.Value!.OmittedTypes.Should().Equal("Examination");
+        result.Value.Items.Should().ContainSingle().Which.RelatedExaminationId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Visit_Row_Should_Ignore_Examination_Outside_Clinic_Scope()
+    {
+        var otherClinic = Guid.NewGuid();
+        var visit = NewVisit(T0);
+        NewExam(T0.AddMinutes(10), visitId: visit.Id, clinicId: otherClinic);
+        var scope = ClinicReadScopeResolverMock.ForClinicAdmin([_clinicId]);
+
+        var result = await CreateHandler(scope).Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        result.Value!.Items.Single(i => i.Type == PetRecordKind.Visit).RelatedExaminationId.Should().BeNull();
     }
 
     // ---- Kapsam: iptal/yanlış işaretli, planlı aşı, randevu katlama ----

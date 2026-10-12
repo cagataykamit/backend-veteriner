@@ -121,7 +121,7 @@ Alanlar:
 - `summary`: kısa ek metin (nullable). Bugün yalnız acil gelişte `"Acil"`; diğer türlerde `null`. Klinik serbest metin (bulgu, sonuç, reçete içeriği) **timeline'a konmaz**; ayrıntı için `linkRef` ile kaynak uca gidilir.
 - `isVoided`: yanlış işaretli geliş veya iptal aşı; varsayılan olarak gizlidir, `includeVoided=true` ile gelir.
 - `linkRef { type, id }`: kaynak kaydı ifade eder; **backend URL üretmez**, frontend `type` → rota eşlemesi yapar.
-- `relatedExaminationId`: Treatment/Prescription/LabResult/Hospitalization/Vaccination için bağlı muayene (yoksa `null`); Visit ve Examination satırlarında `null`.
+- `relatedExaminationId`: Treatment/Prescription/LabResult/Hospitalization/Vaccination için bağlı muayene (yoksa `null`); Examination satırında `null`. **Visit satırında** gelişe bağlı muayene (`Examination.VisitId`): birden fazla muayene bağlıysa **en yenisi** (`ExaminedAtUtc` DESC, eşitse `Id` DESC); bağlı muayene yoksa `null`. Muayene bağı klinik kapsamına uyar (kapsam dışı klinikteki muayene sayılmaz). Kullanıcıda `Examinations.Read` yoksa Visit satırında **her zaman `null`** döner (izin süzmesiyle tutarlı; muayene kimliği sızmaz). Doldurma `types` süzgecinden bağımsızdır (`types=Visit` ile de gelir). Gelişin tüm muayeneleri için istemci `relatedVisitId` ile Examination satırlarını gruplar.
 - `relatedVisitId`: yalnız Examination; muayenenin bağlı olduğu geliş (`Examination.VisitId`, yoksa `null`). Muayeneleri geliş altında gruplamak istemcidedir.
 - `relatedAppointmentId`: yalnız Visit; randevulu gelişte randevu kimliği (randevu **ayrı satır olmaz**, Visit içine katlanır). Randevunun içeriği döndürülmez (`Appointments.Read` gerektirir).
 - `updatedAtUtc`: kayıt güncelleme tarihi (varsa); Visit için `null`.
