@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Payments;
+using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -14,6 +15,8 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.ToTable("Payments", t =>
         {
             t.HasCheckConstraint("CK_Payments_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
+            t.HasCheckConstraint("CK_Payments_Void_Consistent", "([VoidedAtUtc] IS NULL) = ([VoidReason] IS NULL) AND ([VoidedAtUtc] IS NULL) = ([VoidedByUserId] IS NULL)");
+            t.HasCheckConstraint("CK_Payments_Voided_Unallocated", "[VoidedAtUtc] IS NULL OR [AllocatedAmount] = 0");
         });
 
         b.HasKey(x => x.Id);
@@ -38,6 +41,13 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.Property(x => x.RequestId);
         b.Property(x => x.RequestHash).HasMaxLength(64);
         b.Property(x => x.MutationSequence).IsRequired().HasDefaultValue(0L).IsConcurrencyToken();
+
+        b.Property(x => x.VoidedAtUtc);
+        b.Property(x => x.VoidedByUserId);
+        b.Property(x => x.VoidReason).HasMaxLength(CorrectionReason.MaxLength);
+
+        // İptal edilen ödeme tüm okuma yüzeylerinden tek yerde düşer; iptal ucu ve requestId araması IgnoreQueryFilters kullanır.
+        b.HasQueryFilter(x => x.VoidedAtUtc == null);
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ClinicId });
