@@ -20,7 +20,7 @@ namespace Backend.IntegrationTests.Administrations;
 
 /// <summary>
 /// Uygulama kaydı (Aşama 5 Dilim 2): gerçek SQL Server/LocalDB üzerinde stok düşümü + kayıt atomikliği,
-/// requestId tekrarı/yarışı, yetersiz stok geri alma, kesinleşmiş muayene kilidi ve iptal ile stok iadesi.
+/// requestId tekrarı/yarışı, yetersiz stok geri alma, kesinleşmiş muayeneye gerekçeli sonradan ekleme ve iptal (stok iadesi / zarar, pasif ürün).
 /// </summary>
 [Collection("products-api")]
 public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplicationFactory>
@@ -183,22 +183,85 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
     }
 
     [Fact]
-    public async Task Post_Should_Reject_FinalizedExamination_And_Inherit_Examination_From_Treatment()
+    public async Task Post_Should_Require_LateEntryReason_On_FinalizedExamination_Without_Side_Effects()
     {
         var ctx = await SeedAsync(stock: 10m, withExamination: true, withTreatment: true);
         await FinalizeExaminationAsync(ctx.ExaminationId!.Value);
         var client = ClientFor(ctx);
 
         var direct = await PostAsync(client, ctx, 1m, examinationId: ctx.ExaminationId);
-        direct.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await ReadProblemCodeAsync(direct)).Should().Be("Examinations.Finalized");
+        direct.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(direct)).Should().Be("Administrations.LateEntryReasonRequired");
 
-        var viaTreatment = await PostAsync(client, ctx, 1m, treatmentId: ctx.TreatmentId);
-        viaTreatment.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await ReadProblemCodeAsync(viaTreatment)).Should().Be("Examinations.Finalized");
+        var tooShort = await PostAsync(client, ctx, 1m, treatmentId: ctx.TreatmentId, lateEntryReason: "abc");
+        tooShort.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(tooShort)).Should().Be("Administrations.LateEntryReasonRequired");
 
         (await GetStockAsync(ctx)).Should().Be(10m);
         (await AdministrationCountAsync(ctx)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Post_Should_Add_Late_Entry_To_FinalizedExamination_Drop_Stock_And_Show_Marker_On_Reads()
+    {
+        var ctx = await SeedAsync(stock: 10m, withExamination: true, withTreatment: true);
+        await FinalizeExaminationAsync(ctx.ExaminationId!.Value);
+        var client = ClientFor(ctx);
+
+        var direct = await PostAsync(client, ctx, 2m, examinationId: ctx.ExaminationId, lateEntryReason: "  Muayene sonrası uygulandı, unutulmuştu  ");
+        direct.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = (await direct.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("administration");
+        created.GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+        created.GetProperty("lateEntryReason").GetString().Should().Be("Muayene sonrası uygulandı, unutulmuştu");
+        created.GetProperty("createdByUserId").GetGuid().Should().NotBeEmpty();
+        var id = created.GetProperty("id").GetGuid();
+
+        // Tedavi üzerinden miras alınan kesinleşmiş muayene de aynı kurala tabidir.
+        var viaTreatment = await PostAsync(client, ctx, 1m, treatmentId: ctx.TreatmentId, lateEntryReason: "Tedaviye bağlı geç kayıt");
+        viaTreatment.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await viaTreatment.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("administration")
+            .GetProperty("examinationId").GetGuid().Should().Be(ctx.ExaminationId!.Value);
+
+        (await GetStockAsync(ctx)).Should().Be(7m);
+        (await MovementsForAsync(id)).Should().ContainSingle(m => m.MovementType == StockMovementType.Out);
+
+        var detail = await (await client.GetAsync($"/api/v1/administrations/{id}")).Content.ReadFromJsonAsync<JsonElement>();
+        detail.GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+        detail.GetProperty("lateEntryReason").GetString().Should().Be("Muayene sonrası uygulandı, unutulmuştu");
+
+        var list = await (await client.GetAsync($"/api/v1/administrations?clinicId={ctx.ClinicId:D}&examinationId={ctx.ExaminationId:D}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        list.GetProperty("items").EnumerateArray().Should().OnlyContain(e => e.GetProperty("addedAfterFinalization").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Post_Should_Not_Mark_Or_Store_Reason_On_Draft_Examination()
+    {
+        var ctx = await SeedAsync(stock: 10m, withExamination: true);
+
+        var response = await PostAsync(ClientFor(ctx), ctx, 1m, examinationId: ctx.ExaminationId, lateEntryReason: "Taslakta gerekmeyen gerekçe");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var admin = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("administration");
+        admin.GetProperty("addedAfterFinalization").GetBoolean().Should().BeFalse();
+        admin.GetProperty("lateEntryReason").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Post_Late_Entry_Should_Replay_On_Same_RequestId_Without_Second_Drop()
+    {
+        var ctx = await SeedAsync(stock: 10m, withExamination: true);
+        await FinalizeExaminationAsync(ctx.ExaminationId!.Value);
+        var client = ClientFor(ctx);
+        var requestId = Guid.NewGuid();
+
+        var first = await PostAsync(client, ctx, 2m, requestId: requestId, examinationId: ctx.ExaminationId, lateEntryReason: "Geç kayıt gerekçesi");
+        var second = await PostAsync(client, ctx, 2m, requestId: requestId, examinationId: ctx.ExaminationId, lateEntryReason: "Geç kayıt gerekçesi");
+
+        first.StatusCode.Should().Be(HttpStatusCode.Created);
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await GetStockAsync(ctx)).Should().Be(8m);
+        (await AdministrationCountAsync(ctx)).Should().Be(1);
     }
 
     [Fact]
@@ -305,6 +368,102 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
     }
 
     [Fact]
+    public async Task Void_Should_Default_To_StockReturned_And_Work_When_Product_Became_Inactive()
+    {
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+        var id = await CreateAdministrationAsync(client, ctx, 4m);
+        await DeactivateProductAsync(ctx.ProductId);
+
+        var voided = await client.PostAsJsonAsync($"/api/v1/administrations/{id}/void", new { reason = "Ürün pasifken iptal" });
+
+        voided.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await voided.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("voidStockOutcome").GetString().Should().Be("StockReturned");
+        (await GetStockAsync(ctx)).Should().Be(10m);
+        (await MovementsForAsync(id)).Select(m => m.MovementType)
+            .Should().BeEquivalentTo(new[] { StockMovementType.Out, StockMovementType.Reversal });
+
+        // Pasif ürün yeni uygulamada reddedilmeye devam eder.
+        var again = await PostAsync(client, ctx, 1m);
+        (await ReadProblemCodeAsync(again)).Should().Be("Products.Inactive");
+        (await GetStockAsync(ctx)).Should().Be(10m);
+    }
+
+    [Fact]
+    public async Task Void_WrittenOff_Should_Not_Return_Stock_Or_Write_Reversal_And_Mark_Loss()
+    {
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+        var id = await CreateAdministrationAsync(client, ctx, 4m);
+        await DeactivateProductAsync(ctx.ProductId);
+
+        var voided = await client.PostAsJsonAsync($"/api/v1/administrations/{id}/void", new { reason = "Şişe kırıldı, imha edildi", stockOutcome = "WrittenOff" });
+
+        voided.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await voided.Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("status").GetString().Should().Be("Voided");
+        dto.GetProperty("voidStockOutcome").GetString().Should().Be("WrittenOff");
+        dto.GetProperty("voidReason").GetString().Should().Be("Şişe kırıldı, imha edildi");
+        (await GetStockAsync(ctx)).Should().Be(6m);
+        (await MovementsForAsync(id)).Should().ContainSingle().Which.MovementType.Should().Be(StockMovementType.Out);
+
+        var read = await client.GetAsync($"/api/v1/administrations?clinicId={ctx.ClinicId:D}&includeVoided=true");
+        (await read.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("items").EnumerateArray()
+            .Single().GetProperty("voidStockOutcome").GetString().Should().Be("WrittenOff");
+
+        var second = await client.PostAsJsonAsync($"/api/v1/administrations/{id}/void", new { reason = "Tekrar iptal denemesi", stockOutcome = "StockReturned" });
+        second.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(second)).Should().Be("Administrations.AlreadyVoided");
+        (await GetStockAsync(ctx)).Should().Be(6m);
+    }
+
+    [Fact]
+    public async Task Void_Should_Reject_Unknown_StockOutcome_Without_Side_Effects()
+    {
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+        var id = await CreateAdministrationAsync(client, ctx, 4m);
+
+        foreach (var outcome in new[] { "Lost", "0", "5" })
+        {
+            var response = await client.PostAsJsonAsync($"/api/v1/administrations/{id}/void", new { reason = "Geçersiz sonuç denemesi", stockOutcome = outcome });
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await ReadProblemCodeAsync(response)).Should().Be("Administrations.Validation");
+        }
+
+        (await GetStockAsync(ctx)).Should().Be(6m);
+        (await AdministrationCountAsync(ctx)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Void_Concurrent_Mixed_Outcomes_Should_Apply_Exactly_One_Without_500()
+    {
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+        var id = await CreateAdministrationAsync(client, ctx, 4m);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(i =>
+            client.PostAsJsonAsync($"/api/v1/administrations/{id}/void",
+                new { reason = "Yarışan iptal isteği", stockOutcome = i % 2 == 0 ? "WrittenOff" : "StockReturned" })));
+
+        responses.Should().OnlyContain(r => (int)r.StatusCode < 500);
+        var winners = responses.Where(r => r.StatusCode == HttpStatusCode.OK).ToList();
+        winners.Should().ContainSingle();
+        var outcome = (await winners[0].Content.ReadFromJsonAsync<JsonElement>()).GetProperty("voidStockOutcome").GetString();
+        var reversals = (await MovementsForAsync(id)).Count(m => m.MovementType == StockMovementType.Reversal);
+        if (outcome == "WrittenOff")
+        {
+            reversals.Should().Be(0);
+            (await GetStockAsync(ctx)).Should().Be(6m);
+        }
+        else
+        {
+            reversals.Should().Be(1);
+            (await GetStockAsync(ctx)).Should().Be(10m);
+        }
+    }
+
+    [Fact]
     public async Task Void_Should_Return403_Without_Correct_And_404_For_Unknown_Id()
     {
         var ctx = await SeedAsync(stock: 10m);
@@ -367,7 +526,8 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
         decimal quantity,
         Guid? requestId = null,
         Guid? examinationId = null,
-        Guid? treatmentId = null)
+        Guid? treatmentId = null,
+        string? lateEntryReason = null)
         => client.PostAsJsonAsync("/api/v1/administrations", new
         {
             clinicId = ctx.ClinicId,
@@ -377,12 +537,20 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
             requestId,
             examinationId,
             treatmentId,
+            lateEntryReason,
         });
 
     private static async Task<string?> ReadProblemCodeAsync(HttpResponseMessage response)
     {
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         return json.TryGetProperty("code", out var code) ? code.GetString() : null;
+    }
+
+    private static async Task<Guid> CreateAdministrationAsync(HttpClient client, SeedCtx ctx, decimal quantity)
+    {
+        var created = await PostAsync(client, ctx, quantity);
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        return (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("administration").GetProperty("id").GetGuid();
     }
 
     private async Task<decimal> GetStockAsync(SeedCtx ctx)
