@@ -34,7 +34,13 @@ $env:VETINITY_FIRST_ADMIN_PASSWORD = "<güçlü parola>"   # verilmezse konsolda
 dotnet run --project src/Backend.Veteriner.DbMigrator -- create-platform-admin --email <e-posta>
 ```
 
-Parola kuralları kullanıcı parolasıyla aynıdır; parola loglanmaz, mevcut bir e-postaya dokunulmaz. Hesap, girişte tek kiracı üyeliği zorunlu olduğundan "Varsayılan Kiracı"ya bağlanır (abonelik ve klinik oluşturulmaz). Development'ta `seed` davranışı değişmedi (dev kimlikleri `DevTestVeterinarianSeeder` ayrı kalır).
+Parola kuralları kullanıcı parolasıyla aynıdır; parola loglanmaz, mevcut bir e-postaya dokunulmaz. Girişte tek kiracı üyeliği zorunlu olduğundan hesap, müşteri kiracılarından ayrı, içi boş **"Platform" kiracısına** (`Tenant.PlatformTenantName`) bağlanır; kiracı yoksa oluşturulur, varsa yeniden kullanılır (klinik, abonelik, müşteri oluşturulmaz). "Platform" adlı kiracıda klinik veya abonelik varsa komut müşteri kiracısı olabileceği için durur. Müşteri kiracısı bu adı alamaz (kayıt, kiracı oluşturma ve kurum adı güncelleme doğrulayıcıları reddeder). Development'ta `seed` davranışı değişmedi (dev kimlikleri `DevTestVeterinarianSeeder` ayrı kalır).
+
+**Platform yöneticisi müşteri verisine kendiliğinden erişemez.** PlatformAdmin yetkileri yalnız oturumdaki kiracı bağlamında geçerlidir (JWT `tenant_id` = "Platform"); başka kiracının klinik/verisi `404` döner (`ClinicsGetByIdIdorIntegrationTests`). Platform kiracısı abonelikli olmadığından yazma komutları (klinik, müşteri, davet vb.) `Subscriptions.NotFound` ile reddedilir. `platform_admin` claim'i JWT'ye yazılır ama API'de başka yerde okunmaz (kodda doğrulandı).
+
+**Destek erişimi:** Hesap tek kiracılıdır; platform yöneticisi hesabı müşteri kiracısına davet edilemez (`Invites.UserBelongsToAnotherTenant`). Destek gerekirse klinik sahibi, destek için ayrı bir e-posta hesabını mevcut davet akışıyla (`CreateInvite`, atanabilir rol) üye yapar, iş bitince `RemoveMember` ile çıkarır; davet kayıtları izdir. Uç nokta yolları ve arayüz adımları bu belgede doğrulanmadı — doğrulanacak.
+
+**Geçiş notu (önceki sürüm):** Önceki sürümde `create-platform-admin` ile "Varsayılan Kiracı"ya bağlanmış bir platform yöneticisi (geliştirme ortamı) olabilir. Komut var olan e-postaya dokunmadığı için o hesap otomatik taşınmaz; yeni "Platform" kiracısına geçmek için hesap silinip komut yeniden çalıştırılır ya da `UserTenants` satırı elle yeni kiracıya çevrilir (üretimde bu sürümden önce komut çalıştırılmadıysa geçiş gerekmez).
 
 ## Günlük (log) ve telemetri — karar
 
