@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Backend.Veteriner.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261012233120_AddLabResultInterpretationRequired")]
+    [Migration("20261013000011_AddLabResultInterpretationRequired")]
     partial class AddLabResultInterpretationRequired
     {
         /// <inheritdoc />
@@ -31,6 +31,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("AddedAfterFinalization")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime>("AdministeredAtUtc")
                         .HasColumnType("datetime2");
 
@@ -45,6 +48,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<Guid?>("ExaminationId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LateEntryReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
@@ -63,6 +70,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("RequestId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -72,6 +85,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<string>("VoidReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("VoidStockOutcome")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("VoidedAtUtc")
                         .HasColumnType("datetime2");
@@ -96,9 +112,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.ToTable("Administrations", null, t =>
                         {
+                            t.HasCheckConstraint("CK_Administrations_LateEntry_Consistent", "([AddedAfterFinalization] = 0 AND [LateEntryReason] IS NULL) OR ([AddedAfterFinalization] = 1 AND [LateEntryReason] IS NOT NULL)");
+
                             t.HasCheckConstraint("CK_Administrations_Quantity_Positive", "[Quantity] > 0");
 
-                            t.HasCheckConstraint("CK_Administrations_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
+                            t.HasCheckConstraint("CK_Administrations_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL AND [VoidStockOutcome] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL AND [VoidStockOutcome] IS NOT NULL)");
                         });
                 });
 
