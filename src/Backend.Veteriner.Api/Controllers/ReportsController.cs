@@ -10,6 +10,10 @@ using Backend.Veteriner.Application.Reports.Vaccinations.Queries.ExportVaccinati
 using Backend.Veteriner.Application.Reports.Vaccinations.Queries.GetVaccinationReport;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
 using Backend.Veteriner.Application.Reports.Payments.Queries.GetPaymentReport;
+using Backend.Veteriner.Application.Reports.OutstandingBalances;
+using Backend.Veteriner.Application.Reports.OutstandingBalances.Contracts.Dtos;
+using Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.ExportOutstandingBalancesReport;
+using Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.GetOutstandingBalancesReport;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -19,7 +23,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Veteriner.Api.Controllers;
 
-/// <summary>Panel raporlama uçları (dashboard’dan ayrıdır). Ödeme, randevu, muayene ve aşı raporları.</summary>
+/// <summary>Panel raporlama uçları (dashboard’dan ayrıdır). Ödeme, randevu, muayene, aşı ve borç raporları.</summary>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/reports")]
@@ -396,6 +400,77 @@ public sealed class ReportsController : ControllerBase
         var query = new ExportVaccinationsReportXlsxQuery(
             from, to, clinicId, status, clientId, petId, search);
         var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
+    }
+
+    /// <summary>
+    /// Borç / açık bakiye raporu (sayfalı): müşteri bazlı <b>şu anki</b> kalan tutar (tarih parametresi yok), kalan tutara göre azalan.
+    /// Kural <c>GET /clients/{id}/balance</c> ile aynıdır; klinik kapsamı <c>payments</c> raporu ile aynı çözümleyicidir.
+    /// </summary>
+    [HttpGet("outstanding-balances")]
+    [Authorize(Policy = PermissionCatalog.Charges.Read)]
+    [ProducesResponseType(typeof(OutstandingBalancesReportResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetOutstandingBalancesReport(
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = OutstandingBalancesReportConstants.DefaultPageSize,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new GetOutstandingBalancesReportQuery(clinicId, minAmount, search, page, pageSize);
+        var result = await _mediator.Send(query, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Borç raporu CSV (sayfa yok; UTF-8 BOM; ayırıcı <c>;</c>, Excel TR). Filtre ve sıralama JSON rapor ile aynıdır.</summary>
+    [HttpGet("outstanding-balances/export")]
+    [Authorize(Policy = PermissionCatalog.Charges.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportOutstandingBalancesReport(
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ExportOutstandingBalancesReportQuery(clinicId, minAmount, search), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.ContentUtf8Bom, ReportFileContentTypes.CsvUtf8, v.FileDownloadName);
+    }
+
+    /// <summary>Borç raporu Excel (tarih/tutar hücre biçimi). Filtreler CSV ile aynı; sayfa yok.</summary>
+    [HttpGet("outstanding-balances/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.Charges.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportOutstandingBalancesReportXlsx(
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ExportOutstandingBalancesReportXlsxQuery(clinicId, minAmount, search), ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
