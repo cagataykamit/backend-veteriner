@@ -11,16 +11,17 @@ internal static class StockBatchMocks
 {
     public static Mock<IRepository<StockBatch>> EmptyRepository() => WithBatches();
 
-    /// <summary>Verilen partileri döndüren depo: liste = hepsi, tekil sorgu = kimliğe göre ilk eşleşen (yoksa null).</summary>
+    /// <summary>Verilen partileri döndüren depo: spesifikasyonla filtrelenir.</summary>
     public static Mock<IRepository<StockBatch>> WithBatches(params StockBatch[] batches)
     {
         var mock = new Mock<IRepository<StockBatch>>();
+        // Spesifikasyon bellekte değerlendirilir (kimlik/kalan filtresi gerçek sorgudaki gibi uygulanır).
         mock
             .Setup(r => r.ListAsync(It.IsAny<ISpecification<StockBatch>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(batches.ToList());
+            .ReturnsAsync((ISpecification<StockBatch> s, CancellationToken _) => s.Evaluate(batches).ToList());
         mock
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<StockBatch>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(batches.FirstOrDefault());
+            .ReturnsAsync((ISpecification<StockBatch> s, CancellationToken _) => s.Evaluate(batches).FirstOrDefault());
         return mock;
     }
 
