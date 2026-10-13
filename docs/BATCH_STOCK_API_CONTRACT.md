@@ -214,3 +214,21 @@ Mevcut kodlar değişmedi.
 - Uygulama komutu partiyi önce seçer, uygulamayı yazar, sonra seçilen `batchId` ile mevcut `CreateStockMovementCommand`'ı çağırır; stok kuralları (yetersiz bakiye, eşzamanlılık) tek yerde (stok handler'ı) yaşar.
 - Defter türetimi (sonraki dilim) bu veriden yapılır: Aşı/İlaç giriş defteri = `In`/`Initial` hareketleri + parti; narkotik/psikotropik stok ve sarf defteri = parti hareketleri (`In`/`Out`/`Reversal`/`Adjustment`) + `batchBalanceAfter` + belge no (`invoiceNumber`, uygulamada `referenceId`); Aşı Bilgi raporu = uygulama + `lotNumber`/`expiryDate`. Partisiz eski bakiye devir satırı olarak türetilir.
 - Açık / ertelenen: bölünmüş düşüm (iki partiden tek uygulama), açıkça "partisiz bakiyeyi seç" seçeneği, partiyi iade/devir (tedarikçiye iade) hareketi, geçmiş SKT girişini engelleme, aşı uygulamasının (`Vaccination`) partiye bağlanması (D6: aşı kaydı hâlâ stok düşmez), sınıfı değişen ürünün mevcut partileri için uyarı.
+
+---
+
+## 10) Frontend için değişenler (özet)
+
+Hepsi geriye uyumludur: mevcut istemci hiçbir değişiklik yapmadan çalışır (yeni alanlar opsiyonel, yeni hata kodları yalnız yeni alanlar kullanılınca çıkar; tek istisna: sınıfı `Vaccine`/kontrollü yapılan ürünün girişi artık `batch.lotNumber` + `batch.expiryDate` ister).
+
+| Ekran | Değişiklik |
+|---|---|
+| Ürün formu / listesi | `kind`, `controlledClass`, `pharmacologicalForm`, `presentationForm`, `packaging` alanları (string enum). Mevcut ürünler `Other`/`None`; aşı ve kontrollü ürünlerin sınıfı elle atanmalı |
+| Stok girişi formu | `batch` bloğu: seri/lot no, SKT, firma, fatura no/tarihi, geliş/teslim tarihi, depo çıkış tarihi, nakil şekli, soğuk zincir izleme cihazı. Aşı/kontrollü üründe lot+SKT zorunlu (`StockBatches.LotAndExpiryRequired`) |
+| Stok çıkışı / sayım | İsteğe bağlı `batchId` (yoksa FEFO). Sayımda `batchId` verilirse `quantity` o partinin hedef kalanıdır |
+| Uygulama formu | Parti seçimi: `GET /products/{id}/stock-batches?clinicId=` (FEFO sıralı, `isExpired`, `unbatchedQuantity`); seçilmezse FEFO. Hatalar: `Administrations.BatchExpired`, `Administrations.InsufficientStock` |
+| Uygulama yanıtı / listesi | `batchId`, `lotNumber`, `expiryDate` |
+| Stok hareketi listesi | `batchId`, `batchBalanceAfter` |
+| Yeni liste ekranı | `GET /stock-batches` (SKT yaklaşan / süresi geçmiş: `expiresBeforeDate`, `expired`) |
+
+Yeni izin yoktur; `DbMigrator seed` gerekmez.
