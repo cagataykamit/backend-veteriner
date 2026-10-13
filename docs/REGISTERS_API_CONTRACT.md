@@ -1,12 +1,12 @@
-# Kayıt defterleri API sözleşmesi: Muayene ve Reçete defterleri
+# Kayıt defterleri API sözleşmesi: Muayene, Reçete, Aşı, İlaç, Narkotik/Psikotropik defterleri ve Aşı Bilgi raporu
 
 Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-015 (parti bazlı stok ve kayıt defterleri), `KAYIT-DEFTERLERI-RAKIP-BICIMI.md` (ürün deposu). İlgili: `OUTSTANDING_BALANCE_REPORT_API_CONTRACT.md` (rapor ucu deseni), `EXAMINATIONS_WORKSPACE_API_CONTRACT.md`, `PRESCRIPTION_ITEMS_API_CONTRACT.md`, `ADMINISTRATIONS_API_CONTRACT.md`. Hata zarfı standart `ProblemDetails` + `extensions.code`.
 
-> **Durum:** Sözleşme. Salt okuma; **migration yok**, yeni izin yok.
+> **Durum:** Sözleşme. Salt okuma; **migration yok**, yeni izin yok. Bölüm 1–11: Muayene ve Reçete defterleri. **Bölüm 12–18: parti (lot) verisinden türetilen dört çıktı** (Aşı Kayıt Defteri, İlaç Kayıt Defteri, Narkotik ve Psikotropik Ürünler Stok ve Sarf Defteri, Aşı Bilgi Raporu); ortak kurallar (bölüm 1, 6) bunlar için de geçerlidir, farklar bölüm 12'de listelenir.
 >
 > **Resmî biçime uygunluk doğrulanmadı.** Sütunlar bir rakip yazılımın ekran görüntülerinden alınmıştır; yasal dayanak ve resmî biçim (sütun seti, üstbilgi, imza alanı, sayfa numarası) doğrulanmamıştır. Biçim doğrulanınca yalnız sütun tanımı (bölüm 6) ve üstbilgi/imza alanı güncellenir. Bu not arayüzde ve çıktıda görünür olmalıdır.
 
-Kapsam: yalnız **Muayene** ve **Reçete** defterleri. Aşı, ilaç, narkotik/psikotropik defterleri parti (lot) bazlı stok gerektirir (ADR-015) ve ayrı iştir.
+Kapsam (bölüm 1–11): **Muayene** ve **Reçete** defterleri. Aşı, ilaç, narkotik/psikotropik defterleri ve Aşı Bilgi raporu parti (lot) bazlı stoktan türetilir (ADR-015, `BATCH_STOCK_API_CONTRACT.md`); bölüm 12–18.
 
 ---
 
@@ -185,3 +185,217 @@ Defter sayfaları `Examinations.Read` / `Prescriptions.Read` ile görünür. Sü
 
 - Application: tarih aralığı doğrulaması (eksik, ters, 366 gün), klinik bağlam uyuşmazlığı, dışa aktarma tavanı, sütun tanımı ↔ başlık/değer, yaş ve hücre biçimleri, CSV/XLSX içerik.
 - Entegrasyon (LocalDB, kendi kiracısıyla): İstanbul gün sınırı (gece yarısı iki yanı), sıra no ve sıralama, sayfalama (kesişme/atlama yok), sonradan eklenen işareti, iptal edilen uygulamanın varsayılan gizliliği ve `includeVoided`, eksik alanların boşluğu, reçete başına tek satır ve ilaçların tek hücrede birleşmesi, satırsız reçete, ekran ≡ CSV ≡ XLSX, klinik kapsamı, başka kiracı (IDOR), `Examinations.Read` / `Prescriptions.Read` olmadan 403, token olmadan 401.
+
+---
+
+# Bölüm II: parti (lot) verisinden türetilen çıktılar (ADR-015 dilim c)
+
+Veri kaynağı `BATCH_STOCK_API_CONTRACT.md`'dir (parti, stok hareketi, uygulama). Bu bölüm yeni veri **tutmaz**; salt okuma, **migration yok, yeni izin yok, seed gerekmez**. **Resmî biçime uygunluk doğrulanmadı** (başlık notu geçerli): sütunlar `KAYIT-DEFTERLERI-RAKIP-BICIMI.md` (kullanıcı doğrulaması: gizli sağ sütun yok) listesidir.
+
+## 12) Ortak kurallar ve bölüm 1'den farklar
+
+### Uçlar ve izinler
+
+| Çıktı | Liste (JSON, sayfalı) | CSV | XLSX | İzin (hepsi **birlikte** gerekir) |
+|---|---|---|---|---|
+| Aşı Kayıt Defteri | `GET /api/v1/reports/registers/vaccines` | `…/vaccines/export` | `…/vaccines/export-xlsx` | `StockMovements.Read` |
+| İlaç Kayıt Defteri | `…/registers/medications` | `…/medications/export` | `…/medications/export-xlsx` | `StockMovements.Read` |
+| Narkotik ve Psikotropik Ürünler Stok ve Sarf Defteri | `…/registers/controlled-substances` | `…/export` | `…/export-xlsx` | `StockMovements.Read` + `Administrations.Read` |
+| Aşı Bilgi Raporu | `…/registers/vaccine-info` | `…/export` | `…/export-xlsx` | `Administrations.Read` + `Vaccinations.Read` + `Products.Read` |
+
+İzin gerekçeleri (yeni izin yok; birden çok `[Authorize(Policy=…)]` birbirine **VE** ile bağlanır):
+
+- **Aşı / İlaç giriş defterleri:** satırlar ürün, firma, fatura, seri/SKT içerir; parti okuma uçlarıyla (`/stock-batches`) aynı veri olduğundan aynı izin, `StockMovements.Read`. Hayvan/sahip verisi yoktur.
+- **Narkotik/psikotropik defteri (en sıkı kombinasyon):** stok hareketlerini gösterir (`StockMovements.Read`) ve çıkış satırlarında uygulamanın **hasta ve sahip adını** taşır; bu veri `Administrations.Read` ile korunduğundan o da gerekir. Kontrollü ürün verisi bu iki iznin kesişimine bağlıdır; biri eksikse 403. Varsayılan rollerde ikisi de Admin, Owner, ClinicAdmin, Veteriner, Sekreter'dedir (Sekreter yalnız okur); özel rollerde elle verilmelidir. Yeni kısıtlayıcı izin (örn. `ControlledSubstances.Read`) **eklenmedi**; istenirse ayrı karar + seed gerekir (açık soru S4, bölüm 17).
+- **Aşı Bilgi Raporu:** hayvan bazlı aşı uygulaması (`Administrations.Read`), aşı alanı (`Vaccinations.Read`), sütunlarda ürün **fiyatı** (`Products.Read`). Sahip adı/çip no bu uçta `Clients.Read` istemez (bölüm 1 ilkesi: defter, klinik kaydı okuyabilene açıktır).
+
+Yetki yoksa 403; token yoksa 401.
+
+### Ortak sorgu parametreleri
+
+Bölüm 1 ile aynıdır (`from`, `to`, `clinicId`, `page`, `pageSize`; İstanbul günü, ≤ 366 gün, klinik kapsamı, kiracı bağlamı, tavan, hata kodları bölüm 8). Farklar:
+
+| Parametre | Uç | Anlam |
+|---|---|---|
+| `includeVoided` | vaccines, medications | **İptal edilen (geri alınan) girişler** de gelsin (varsayılan `false`) |
+| `includeVoided` | vaccine-info | İptal edilen uygulamalar da gelsin (varsayılan `false`) |
+| `includeVoided` | controlled-substances | **Yoktur** (hareket defteri: geri alma kendi satırıdır, hiçbir şey gizlenmez) |
+| `productId` (guid?) | vaccine-info | Ürün süzgeci |
+| `veterinarianId` (guid?) | vaccine-info | Veteriner (uygulamayı kaydeden kullanıcı) süzgeci |
+
+Kiracıda olmayan `productId`/`veterinarianId` hata vermez, satır da eşleşmez (IDOR yok).
+
+### Tarih ve sıra kuralı (tek yerde)
+
+- **Aşı, İlaç, Narkotik/Psikotropik:** defterin tarihi **stok hareketinin zamanı** (`StockMovement.OccurredAtUtc`) olup süzgeç ve sıralama onunla yapılır: `[from 00:00, to+1 00:00)` İstanbul. Sıra: `OccurredAtUtc`, `CreatedAtUtc`, hareket `Id` artan. Sıra No bölüm 1'deki gibidir (süzgece göreceli, sayfalar kesişmez, ekran = CSV = XLSX). *Gerekçe:* hareket zamanı her satırda vardır, veritabanında doğrudan karşılaştırılır ve ölçüt tek yerdedir; `batch.receivedDate` (geliş/teslim) **isteğe bağlıdır** ve kullanıcı geçmiş tarihli teslimi sonradan girebilir. Geliş/teslim tarihi ayrı **sütunda** gösterilir (`receivedDate`, yoksa hareketin İstanbul günü). Sonuç: geçmişe dönük girilmiş bir teslim, girildiği günün aralığında görünür; teslim tarihine göre listelemek ürün kararıdır (S1, bölüm 17).
+- **Aşı Bilgi Raporu:** uygulamanın zamanı (`Administration.AdministeredAtUtc`); sıra `AdministeredAtUtc`, `CreatedAtUtc`, `Id` artan.
+
+### Tarih tipleri
+
+`expiryDate`, `receivedDate`, `invoiceDate`, `dispatchedDate`, `deliveredDate` ve narkotik defterindeki alınan/çıkış tarihleri **takvim günüdür** (`yyyy-MM-dd`, saat dilimi yok; CSV `dd.MM.yyyy`, XLSX tarih hücresi). `…Utc` alanları an'dır (dosyada İstanbul günü).
+
+### Sütun tanımı ve dışa aktarma
+
+Her çıktı kendi sütun tanım listesine sahiptir (`VaccineRegisterColumns`, `MedicationRegisterColumns`, `ControlledSubstanceRegisterColumns`, `VaccineInfoRegisterColumns`; bölüm 6 ile aynı tek-yer kuralı, ortak CSV/XLSX yazıcıları). Dosya adları: `asi-kayit-defteri-`, `ilac-kayit-defteri-`, `narkotik-psikotropik-defteri-`, `asi-bilgi-raporu-` + `yyyyMMdd` (`.csv|.xlsx`). XLSX sayfa adları: "Aşı Kayıt Defteri", "İlaç Kayıt Defteri", "Narkotik-Psikotropik", "Aşı Bilgi Raporu". Tavan ve boş-hücre kuralı bölüm 1'deki gibi; ekran–CSV–XLSX eşitliği testle kanıtlanır. Gruplu başlıklar yalnız narkotik defterindedir (iki katmanlı XLSX başlığı, CSV'de `Grup · Sütun`).
+
+## 13) Aşı Kayıt Defteri: `GET /api/v1/reports/registers/vaccines`
+
+**Satır = bir aşı stok girişi** (`In`/`Initial` hareketi). Yalnız `Product.kind = Vaccine`. Partili girişte parti alanları dolar. Partisiz giriş (parti öncesi eski stok) da satırdır; seri/SKT/firma sütunları boş kalır (`isBatched = false`). Aşı ürünü yeni girişte lot+SKT zorunlu olduğundan partisiz satır yalnız eski veridir.
+
+**Geri alınan giriş** (`Reversal` ile geri alınmış): varsayılan gizli, `includeVoided=true` ile `isReversed = true` görünür; dosyada ticari adın sonuna ` (iptal)` eklenir.
+
+`VaccineRegisterItemDto`:
+
+| Alan | Tip | Defter sütunu | Kaynak |
+|---|---|---|---|
+| `rowNumber` | int | Sıra No | |
+| `movementId`, `productId` | guid | | Dosyada yok |
+| `tradeName` | string | Ticari Adı | `Product.Name` |
+| `lotNumber` | string? | Seri No | `StockBatch.LotNumber` |
+| `expiryDate` | date? | Son Kullanma Tarihi | `StockBatch.ExpiryDate` |
+| `totalQuantity` | decimal | Toplam Miktar (Doz) | Giriş hareketinin miktarı (= partinin `initialQuantity`'si; kalan değil) |
+| `supplierName` | string? | Satın Alınan Firma | |
+| `transportMethod` | string? | Nakil Şekli (Soğuk Zincir) | |
+| `coldChainMonitor` | string? | Nakilde Kullanılan İzleme Cihazı (Soğuk Zincir İndikatörü) | |
+| `dispatchedDate` | date? | Depo Çıkış Tarihi | |
+| `deliveredDate` | date | Teslim Tarihi | `receivedDate`, yoksa hareketin İstanbul günü (hiç boş değil) |
+| `invoiceDate` | date? | Fatura Tarihi | |
+| `invoiceNumber` | string? | Fatura No | |
+| `isBatched`, `isReversed` | bool | | Dosyada yok |
+
+## 14) İlaç Kayıt Defteri: `GET /api/v1/reports/registers/medications`
+
+Aşı defteriyle aynı kaynak ve kurallar (giriş hareketi başına satır, partisiz giriş satırdır, geri alınan giriş gizli/`includeVoided`), süzgeç `Product.kind = Medicine` (**aşılar ve `Other` hariç**). Kontrollü bir ilaç hem bu defterde hem narkotik defterinde görünür (ayrı yasal defterler).
+
+`MedicationRegisterItemDto`:
+
+| Alan | Tip | Defter sütunu | Kaynak |
+|---|---|---|---|
+| `rowNumber` | int | Sıra No | |
+| `movementId`, `productId` | guid | | Dosyada yok |
+| `productName` | string | Ürün | `Product.Name` (+ iptalde ` (iptal)`) |
+| `pharmacologicalForm` | string? | Farmakolojik Şekli | `Product` |
+| `presentationForm` | string? | Takdim Şekli | `Product` |
+| `quantity` | decimal | Adet | Giriş miktarı (ürünün stok birimi cinsinden) |
+| `unit` | string | Birim | `Product.Unit` |
+| `supplierName` | string? | Firma Adı | |
+| `receivedDate` | date | Geldiği Tarih | `receivedDate`, yoksa hareketin İstanbul günü |
+| `invoiceDate` | date? | Fatura Tarihi | |
+| `invoiceNumber` | string? | Fatura No | |
+| `lotNumber` | string? | Seri No | |
+| `isBatched`, `isReversed` | bool | | Dosyada yok |
+
+## 15) Narkotik ve Psikotropik Ürünler Stok ve Sarf Defteri: `GET /api/v1/reports/registers/controlled-substances`
+
+Kapsam: `Product.controlledClass ≠ None` olan (narkotik, psikotropik) ürünlerin **bütün stok hareketleri**. Defterde ayrı kalan/bakiye sütunu yoktur.
+
+### Satır kuralı: **hareket başına bir satır** (parti başına değil)
+
+*Gerekçe:* defterin yapısı "alınan" ve "çıkış yapılan" olarak iki ayrı taraf taşır ve her biri kendi tarih/belge/yer bilgisine sahiptir. Bir parti bir kez alınır ama birçok kez harcanır; parti başına tek satır bu çıkışları yutar ve çıkış tarihi/belgesi için yer bırakmaz. Hareket tabanı denetimi de sağlar: stok defteri (`StockMovement`) append-only'dir; giriş ve her sarf, iade, geri alma, düzeltme kendi satırıdır. Bir satırda **yalnız bir taraf** dolu olur (Alınan **veya** Çıkış); `Miktar` hareketin (her zaman pozitif) miktarıdır. İstenirse bakiye, satırlar toplanarak türetilir (alınanlar − çıkışlar); parti kalanı için bkz. `/stock-batches`.
+
+### Taraf ve içerik kuralları (tek yerde: `ControlledSubstanceRegisterMapper`)
+
+| Hareket | Taraf | Yer | Tarih | Belge No |
+|---|---|---|---|---|
+| `In` / `Initial`, partili | Alınan | `supplierName`; yoksa `Initial` için `Devir`, `In` için boş | `receivedDate`, yoksa hareketin İstanbul günü | `invoiceNumber` |
+| `In` / `Initial`, **partisiz** (eski devir) | Alınan | `Initial` için `Devir`, `In` için boş | hareketin İstanbul günü | boş |
+| `Out`, kaynak `Administration` | Çıkış | `Uygulama: {hasta adı} ({sahip adı})` | hareketin İstanbul günü | boş (eksik alan) |
+| `Out`, diğer (manuel çıkış, imha vb.) | Çıkış | hareketin `reason` metni; yoksa `Stok çıkışı` | hareketin İstanbul günü | boş |
+| `Reversal` (geri alınan `Out`: stok **artar**, iade) | Alınan | `Geri alma: {reason}` | hareketin İstanbul günü | boş |
+| `Reversal` (geri alınan `In`/`Initial`: stok **azalır**) | Çıkış | `Geri alma: {reason}` | hareketin İstanbul günü | boş |
+| `Adjustment`, partili, kalan arttı | Alınan | `Sayım düzeltmesi (artış)` | hareketin İstanbul günü | boş |
+| `Adjustment`, partili, kalan azaldı | Çıkış | `Sayım düzeltmesi (azalış)` | hareketin İstanbul günü | boş |
+| `Adjustment`, **partisiz** | Belirsiz | iki tarafın yer hücresi de `Sayım düzeltmesi (yön belirlenemedi)` | hareketin İstanbul günü (iki tarafta) | boş |
+
+- **Adjustment yönü saklanmaz** (`BATCH_STOCK_API_CONTRACT.md` bölüm 1): partili düzeltmede yön, aynı partinin bir önceki hareketinin `batchBalanceAfter` değeriyle karşılaştırılarak türetilir (sıra: `CreatedAtUtc`, `Id`; giriş hareketinin `batchBalanceAfter`'ı giriş miktarıdır, bu nedenle partili düzeltmenin her zaman bir öncüsü vardır). **Partisiz düzeltmenin yönü türetilemez** (yön ve geçmiş toplam saklanmıyor); satır `direction = Undetermined` ile gösterilir ve yön uydurulmaz. Kontrollü ürünün yeni girişi lot ister; bu durum yalnız sınıfı sonradan kontrollü yapılmış eski stokta oluşur. Yön saklaması bir migration işidir (S2, bölüm 17).
+- **Eski partisiz "devir" bakiyesi:** ayrı sentetik "devir" satırı **üretilmez**. Stok satırı yalnız hareketle oluştuğundan (`Initial`/`In`), eski bakiye zaten kendi giriş hareketiyle bir satırdır: Seri No boş, `Initial` ise Alındığı Yer = `Devir`. Aralık dışındaki eski devir aralığın dışında kalır (defter tarih aralıklıdır; açılış bakiyesi satırı yoktur). *Gerekçe:* hareketten bağımsız bir "devir bakiyesi" satırı türetilmiş bir kalem olurdu ve defterin "her satır gerçek bir kayıt" ilkesini bozardı.
+- Aynı hareket iki gruba ikilenmez; **Belirsiz** düzeltme istisnadır (iki taraf da aynı metni taşır ki satır görünmez kalmasın).
+- Uygulamanın iptali `StockReturned` ise geri alma hareketi (`Reversal`) alınan tarafta görünür; `WrittenOff` ise ek hareket yoktur, orijinal çıkış satırı kalır.
+
+`ControlledSubstanceRegisterItemDto`:
+
+| Alan | Tip | Defter sütunu / not |
+|---|---|---|
+| `rowNumber` | int | Sıra No |
+| `movementId`, `productId` | guid | Dosyada yok |
+| `movementType` | string | `Initial` \| `In` \| `Out` \| `Adjustment` \| `Reversal` (dosyada yok) |
+| `direction` | string | `Received` \| `Issued` \| `Undetermined` (dosyada yok) |
+| `productName` | string | Ürün Adı, Ticari Adı ve Farmakolojik Şekli: dosyada tek hücre `Ad (farmakolojik şekil)` (şekil boşsa yalnız ad) |
+| `pharmacologicalForm` | string? | JSON'da ayrıca |
+| `commercialPresentation` | string? | Ticari Takdim Şekli: `presentationForm` ve `packaging` birleşik, `, ` ile (biri boşsa dolu olan) |
+| `quantity` | decimal | Miktar |
+| `lotNumber` | string? | Seri No (hareketin `batchId` partisinin lot'u) |
+| `receivedFrom` / `receivedDate` / `receivedDocumentNumber` | string? / date? / string? | SATIN/İADE/DEVİR ALINAN ÜRÜNÜN: Alındığı Yer / Tarih / Belge No (yalnız Alınan veya Belirsiz) |
+| `issuedTo` / `issuedDate` / `issuedDocumentNumber` | string? / date? / string? | SATILAN/İADE VEYA DEVREDİLEN ÜRÜNÜN: Çıkış Yapılan Yer / Tarih / Reçete/Belge No (yalnız Çıkış veya Belirsiz) |
+| `isBatched` | bool | Dosyada yok |
+
+İade ve devir **hareketleri** (tedarikçiye iade, başka kliniğe devir) bugün sistemde **yoktur** (`BATCH_STOCK_API_CONTRACT.md` bölüm 9, ertelendi); bu tür çıkışlar manuel `Out` olarak, gerekçe metniyle girilirse "Çıkış Yapılan Yer" olarak o metin görünür. Ayrı tip gelince yalnız mapper kuralı değişir.
+
+## 16) Aşı Bilgi Raporu: `GET /api/v1/reports/registers/vaccine-info`
+
+**Satır = bir aşı uygulaması** (`Administration`, hayvan bazlı). Yalnız `Product.kind = Vaccine` ürünlerin uygulamaları. Süzgeç: tarih aralığı, `productId`, `veterinarianId`, `clinicId`, `includeVoided`.
+
+- **Veteriner** = uygulamayı kaydeden kullanıcı (`Administration.CreatedByUserId`; "klinik uygulayıcı"). Uygulamanın ayrı bir hekim alanı yoktur. Sonradan eklemede kaydı ekleyen kullanıcıdır.
+- **İptal edilen uygulamalar** varsayılan gizli (`includeVoided=false`); `true` iken `isVoided = true` ve dosyada ürün hücresinde ` (iptal)`.
+- **Sonradan eklenen** (ADR-013, `AddedAfterFinalization`): `addedAfterFinalization = true`; dosyada ürün hücresinde ` (sonradan eklendi)`. Gerekçe deftere yazılmaz.
+- **Seri No / S.K.T:** uygulamanın partisinden (`Administration.BatchId`); partisiz bakiyeden düşülen (eski) uygulamada boş.
+- **Fiyat / Toplam:** `Product.UnitPrice` (**ürünün güncel katalog fiyatı**) ve `Toplam = round(Miktar × Fiyat, 2)`; para birimi `currency` (JSON). **Uyarı:** uygulama kaydı bir ücret satırına (`Charge`) bağlı değildir ve uygulama anında fiyat saklanmaz; bu nedenle tutar, fiilen tahsil edilen değil, **rapor anındaki katalog fiyatı**dır. Ücret–uygulama bağı (ücret önerisi) gelince kaynak değişir (S3, bölüm 17).
+- **T.C.:** müşteri kimlik no alanı **yok** (`Client`'ta T.C. kimlik no yok); `clientIdentityNumber` her zaman null, sütun boş (eksik alan).
+- **Kapsam dışı:** `Vaccination` (aşı takvimi/kaydı) varlığı stok düşmez ve partiye bağlı değildir (Administrations sözleşmesi D6); bu rapor yalnız ürün stoğundan düşen aşı uygulamalarını kapsar. Rakipteki "doğrudan satış" satırı bizde yoktur (doğrudan satış modülü yok).
+
+`VaccineInfoRegisterItemDto`:
+
+| Alan | Tip | Defter sütunu | Kaynak |
+|---|---|---|---|
+| `rowNumber` | int | # | |
+| `administrationId` | guid | | Dosyada yok |
+| `administeredAtUtc` | datetime | Tarih | Dosyada İstanbul günü |
+| `ownerName` | string | Hasta Sahibi | `Client.FullName` |
+| `clientIdentityNumber` | string? | T.C. | **Her zaman null** |
+| `petName` | string | Hasta | |
+| `species` | string | Tür | |
+| `microchipNumber` | string? | Çip No | |
+| `productName` | string | Ürün | `Product.Name` (+ ek işaretler) |
+| `lotNumber` | string? | Seri No | Partiden |
+| `expiryDate` | date? | S.K.T | Partiden |
+| `unit` | string | Birim | `Product.Unit` |
+| `quantity` | decimal | Miktar | |
+| `unitPrice` | decimal | Fiyat | Bkz. uyarı |
+| `totalPrice` | decimal | Toplam | |
+| `currency` | string | | Dosyada yok |
+| `addedAfterFinalization`, `isVoided` | bool | | Dosyada yok |
+
+## 17) Eksik alanlar ve açık sorular
+
+| Konu | Durum |
+|---|---|
+| T.C. kimlik no (Aşı Bilgi) | Boş; müşteri kimlik no alanı migration'lı iş, KVKK değerlendirmesi gerekir |
+| Belge no, uygulama çıkışı (narkotik) | Boş; kalıcı kayıt/belge sıra numarası işi (bölüm 7 "Cilt/Sıra No") ile çözülür |
+| Reçete no, narkotik çıkış | Uygulama ile reçete ilişkisi yok; boş |
+| Aşı/ilaç/kontrollü ürün sınıfı ataması | Mevcut ürünler `Other`/`None`; sınıflar elle atanmadıkça defterlerde satır çıkmaz (`BATCH_STOCK_API_CONTRACT.md` bölüm 2) |
+| Aşı Bilgi fiyatı | Güncel katalog fiyatı (bölüm 16) |
+
+Açık sorular (ürün kararı):
+
+- **S1.** Aşı/ilaç/narkotik tarih süzgeci stok hareketi zamanına göredir (bölüm 12). Teslim/geliş tarihine göre mi olsun? (`receivedDate` boş olabildiği için "geliş tarihi, yoksa hareket günü" hibrit sıralaması gerekir.)
+- **S2.** Partisiz stok düzeltmesinin yönünü saklayalım mı (hareket alanı, migration)? Aksi hâlde narkotik defterinde bu satırlar "yön belirlenemedi" kalır.
+- **S3.** Aşı Bilgi `Fiyat/Toplam`: katalog fiyatı mı kalsın, yoksa uygulama–ücret bağı gelene kadar sütun boş mu bırakılsın?
+- **S4.** Narkotik defteri için ayrı izin (`ControlledSubstances.Read`) istenir mi?
+
+## 18) Frontend için (Rapor Merkezi yeni kartları)
+
+Dört yeni kart (bölüm 10 ile aynı sayfa deseni: tarih aralığı + klinik + "Filtrele", sayfalama, CSV/XLSX, yazdırma görünümü, "resmî biçime uygunluk doğrulanmadı" notu):
+
+| Kart | Uç | Görünürlük (hepsi gerekir) | Ek süzgeç |
+|---|---|---|---|
+| Aşı Kayıt Defteri | `/reports/registers/vaccines` | `StockMovements.Read` | "İptal edilen girişleri göster" |
+| İlaç Kayıt Defteri | `/reports/registers/medications` | `StockMovements.Read` | "İptal edilen girişleri göster" |
+| Narkotik ve Psikotropik Ürünler Stok ve Sarf Defteri | `/reports/registers/controlled-substances` | `StockMovements.Read` + `Administrations.Read` | Yok. İki gruplu başlık (Alınan / Çıkış) |
+| Aşı Bilgi Raporu | `/reports/registers/vaccine-info` | `Administrations.Read` + `Vaccinations.Read` + `Products.Read` | Ürün, Veteriner (kullanıcı listesinden), "İptal edilenleri göster"; sonradan eklenenler rozetli |
+
+Ekran notları: `…Utc` dışındaki tarihler takvim günüdür (saat dilimi dönüşümü yapılmaz); narkotik defterinde boş taraf hücreleri boş bırakılır ve `direction = Undetermined` satırı vurgulanabilir; Aşı Bilgi'de "Fiyat = güncel katalog fiyatı" ipucu gösterilir; T.C. sütunu boş gelir.
+
+## 19) Test odağı (bölüm II)
+
+- Application: sütun tanımı ↔ başlık/değer (4 çıktı), narkotik mapper (her hareket tipi × taraf, Adjustment yönü, Belirsiz), hücre biçimleri, takvim günü (`DateOnly`) sütun tipi (CSV/XLSX).
+- Entegrasyon (LocalDB, kendi kiracısı): her çıktı için İstanbul gün sınırı, sıra no + sayfalama, geri alınan girişin gizliliği/`includeVoided`, partisiz giriş, ürün sınıfı süzgeci (aşı/ilaç/diğer/kontrollü), ekran ≡ CSV ≡ XLSX, klinik kapsamı, başka kiracı (IDOR), `productId`/`veterinarianId` süzgeci, iptal/sonradan eklenen işaretleri, izin kombinasyonu (tek izin eksikse 403) ve token yok 401.
