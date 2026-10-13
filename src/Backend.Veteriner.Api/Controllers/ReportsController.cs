@@ -15,11 +15,16 @@ using Backend.Veteriner.Application.Reports.OutstandingBalances.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.ExportOutstandingBalancesReport;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.GetOutstandingBalancesReport;
 using Backend.Veteriner.Application.Reports.Registers;
+using Backend.Veteriner.Application.Reports.Registers.ControlledSubstances;
 using Backend.Veteriner.Application.Reports.Registers.Examinations;
+using Backend.Veteriner.Application.Reports.Registers.Medications;
 using Backend.Veteriner.Application.Reports.Registers.Prescriptions;
+using Backend.Veteriner.Application.Reports.Registers.VaccineInfo;
+using Backend.Veteriner.Application.Reports.Registers.Vaccines;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Vaccinations;
+using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -622,5 +627,251 @@ public sealed class ReportsController : ControllerBase
 
         var v = result.Value!;
         return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
+    }
+
+    // ---- Parti (lot) verisinden türetilen defterler ve Aşı Bilgi raporu (REGISTERS_API_CONTRACT.md bölüm II) ----
+
+    /// <summary>
+    /// Aşı kayıt defteri (aşı stok girişleri, sayfalı). <c>from</c>/<c>to</c>: İstanbul takvim günleri, ikisi dahil (en çok 366 gün);
+    /// tarih stok hareketinin zamanıdır. Geri alınan girişler <c>includeVoided=true</c> olmadıkça gelmez. Resmî biçime uygunluk doğrulanmadı.
+    /// </summary>
+    [HttpGet("registers/vaccines")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(RegisterReadResult<VaccineRegisterItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> GetVaccineRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
+        CancellationToken ct = default)
+        => SendRegisterAsync(new GetVaccineRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), page, pageSize), ct);
+
+    /// <summary>Aşı kayıt defteri CSV (UTF-8 BOM, <c>;</c>, Excel TR). Süzgeçler JSON ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/vaccines/export")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportVaccineRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportVaccineRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), RegisterExportFormat.Csv), ct);
+
+    /// <summary>Aşı kayıt defteri Excel (tarih/sayı hücre biçimi). Süzgeçler CSV ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/vaccines/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportVaccineRegisterXlsx(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportVaccineRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), RegisterExportFormat.Xlsx), ct);
+
+    /// <summary>
+    /// İlaç kayıt defteri (ilaç stok girişleri; aşılar hariç, sayfalı). Tarih ve süzgeç kuralları aşı kayıt defteriyle aynıdır.
+    /// Resmî biçime uygunluk doğrulanmadı.
+    /// </summary>
+    [HttpGet("registers/medications")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(RegisterReadResult<MedicationRegisterItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> GetMedicationRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
+        CancellationToken ct = default)
+        => SendRegisterAsync(new GetMedicationRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), page, pageSize), ct);
+
+    /// <summary>İlaç kayıt defteri CSV (UTF-8 BOM, <c>;</c>, Excel TR). Süzgeçler JSON ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/medications/export")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportMedicationRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportMedicationRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), RegisterExportFormat.Csv), ct);
+
+    /// <summary>İlaç kayıt defteri Excel (tarih/sayı hücre biçimi). Süzgeçler CSV ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/medications/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportMedicationRegisterXlsx(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportMedicationRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), RegisterExportFormat.Xlsx), ct);
+
+    /// <summary>
+    /// Narkotik ve psikotropik ürünler stok ve sarf defteri (kontrollü ürünlerin stok hareketleri, hareket başına bir satır, sayfalı).
+    /// Satırlar uygulama çıkışlarında hasta ve sahip adını taşıdığından <c>StockMovements.Read</c> ve <c>Administrations.Read</c>
+    /// birlikte gerekir. Resmî biçime uygunluk doğrulanmadı.
+    /// </summary>
+    [HttpGet("registers/controlled-substances")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [Authorize(Policy = PermissionCatalog.Administrations.Read)]
+    [ProducesResponseType(typeof(RegisterReadResult<ControlledSubstanceRegisterItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> GetControlledSubstanceRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
+        CancellationToken ct = default)
+        => SendRegisterAsync(
+            new GetControlledSubstanceRegisterQuery(new RegisterQuery(from, to, clinicId, IncludeVoided: false), page, pageSize), ct);
+
+    /// <summary>Narkotik ve psikotropik defteri CSV (UTF-8 BOM, <c>;</c>, Excel TR; iki katmanlı başlık tek satırda <c>Grup · Sütun</c>).</summary>
+    [HttpGet("registers/controlled-substances/export")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [Authorize(Policy = PermissionCatalog.Administrations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportControlledSubstanceRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportControlledSubstanceRegisterQuery(new RegisterQuery(from, to, clinicId, IncludeVoided: false), RegisterExportFormat.Csv), ct);
+
+    /// <summary>Narkotik ve psikotropik defteri Excel (gruplu başlık, tarih/sayı hücre biçimi).</summary>
+    [HttpGet("registers/controlled-substances/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [Authorize(Policy = PermissionCatalog.Administrations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportControlledSubstanceRegisterXlsx(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportControlledSubstanceRegisterQuery(new RegisterQuery(from, to, clinicId, IncludeVoided: false), RegisterExportFormat.Xlsx), ct);
+
+    /// <summary>
+    /// Aşı bilgi raporu (hayvan bazlı aşı uygulamaları, sayfalı). Süzgeçler: tarih aralığı, <c>productId</c>, <c>veterinarianId</c>
+    /// (uygulamayı kaydeden kullanıcı). İptal edilenler <c>includeVoided=true</c> olmadıkça gelmez, sonradan eklenenler işaretlidir.
+    /// Fiyat, ürünün güncel katalog fiyatıdır. Resmî biçime uygunluk doğrulanmadı.
+    /// </summary>
+    [HttpGet("registers/vaccine-info")]
+    [Authorize(Policy = PermissionCatalog.Administrations.Read)]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [Authorize(Policy = PermissionCatalog.Products.Read)]
+    [ProducesResponseType(typeof(RegisterReadResult<VaccineInfoRegisterItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> GetVaccineInfoRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? productId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] bool includeVoided = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
+        CancellationToken ct = default)
+        => SendRegisterAsync(
+            new GetVaccineInfoRegisterQuery(
+                new RegisterQuery(from, to, clinicId, includeVoided, productId, veterinarianId), page, pageSize),
+            ct);
+
+    /// <summary>Aşı bilgi raporu CSV (UTF-8 BOM, <c>;</c>, Excel TR). Süzgeçler JSON ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/vaccine-info/export")]
+    [Authorize(Policy = PermissionCatalog.Administrations.Read)]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [Authorize(Policy = PermissionCatalog.Products.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportVaccineInfoRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? productId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportVaccineInfoRegisterQuery(
+                new RegisterQuery(from, to, clinicId, includeVoided, productId, veterinarianId), RegisterExportFormat.Csv),
+            ct);
+
+    /// <summary>Aşı bilgi raporu Excel (tarih/sayı hücre biçimi). Süzgeçler CSV ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/vaccine-info/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.Administrations.Read)]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [Authorize(Policy = PermissionCatalog.Products.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportVaccineInfoRegisterXlsx(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? productId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportVaccineInfoRegisterQuery(
+                new RegisterQuery(from, to, clinicId, includeVoided, productId, veterinarianId), RegisterExportFormat.Xlsx),
+            ct);
+
+    private async Task<IActionResult> SendRegisterAsync<T>(IRequest<Result<RegisterReadResult<T>>> request, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(request, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>CSV/XLSX dışa aktarma: dosya içerik türü, istekteki biçime göre seçilir.</summary>
+    private async Task<IActionResult> SendRegisterExportAsync(IRequest<Result<RegisterExportResult>> request, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(request, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var file = result.Value!;
+        return File(
+            file.Content,
+            file.FileDownloadName.EndsWith(".xlsx", StringComparison.Ordinal) ? ReportFileContentTypes.Xlsx : ReportFileContentTypes.CsvUtf8,
+            file.FileDownloadName);
     }
 }
