@@ -62,7 +62,7 @@ Backend PDF üretmez; projede PDF paketi yoktur (yalnız ClosedXML) ve yeni pake
 
 Her satır **bir muayene**dir. Taslak ve kesinleşmiş muayeneler birlikte gelir (`isFinalized` ile ayırt edilir).
 
-Yanıt `ExaminationRegisterResultDto`: `totalCount` (süzgece uyan muayene sayısı, tüm sayfalar), `items`.
+Yanıt `{ totalCount, items }`: `totalCount` süzgece uyan muayene sayısı (tüm sayfalar), `items` sayfadaki satırlar.
 
 `ExaminationRegisterItemDto`:
 
@@ -129,7 +129,7 @@ Sayfalama ve sayım **reçete** bazlıdır (bir reçete sayfaya bölünmez); `to
 
 `PrescriptionRegisterItemDto`: `name` (İlacın Adı), `pharmacologicalForm` (Farmakolojik Şekli; **her zaman null**), `packaging` (Ambalajı; **her zaman null**), `quantity` (Adedi, ondalık?).
 
-Dosya başlıkları iki katmanlıdır: XLSX'te ilk satır grup başlığı (REÇETENİN / VETERİNER HEKİMİN / HAYVAN SAHİBİNİN / HAYVANIN / İLAÇ), ikinci satır sütun başlığı (grup hücreleri birleştirilir); CSV'de tek başlık satırı `Grup · Sütun` biçimindedir (CSV iki satırlı başlığı güvenle taşımaz).
+Gruplu sütunlarda (reçete defterinde Sıra No hariç tümü; muayene defterinde "Hasta") XLSX başlığı iki katmanlıdır: ilk satır grup başlığı (aynı gruptaki bitişik sütunlar birleştirilir, grupsuz sütun iki satırı kaplar), ikinci satır sütun başlığı; CSV iki satırlı başlığı güvenle taşımadığından tek başlık satırı `Grup · Sütun` biçimindedir. Reçete grupları: Reçetenin, Veteriner Hekimin, Hayvan Sahibinin, Hayvanın, İlaç.
 
 Sıralama: `prescribedAtUtc`, `createdAtUtc`, `id` artan; reçete içinde `SortOrder`.
 
