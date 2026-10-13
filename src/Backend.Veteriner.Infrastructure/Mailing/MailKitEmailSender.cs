@@ -92,16 +92,13 @@ public sealed class MailKitEmailSender : IEmailSenderImmediate
         };
 
         var hasPassword = !string.IsNullOrWhiteSpace(_opt.Pass);
-        var passwordLength = _opt.Pass?.Length ?? 0;
         Log.Debug(
-            "SMTP runtime options Host={Host} Port={Port} User={User} From={From} Secure={Secure} PasswordPresent={PasswordPresent} PasswordLength={PasswordLength}",
+            "SMTP runtime options Host={Host} Port={Port} UserPresent={UserPresent} Secure={Secure} PasswordPresent={PasswordPresent}",
             _opt.Host,
             _opt.Port,
-            _opt.User ?? string.Empty,
-            _opt.From,
+            !string.IsNullOrWhiteSpace(_opt.User),
             secure,
-            hasPassword,
-            passwordLength);
+            hasPassword);
 
         await client.ConnectAsync(_opt.Host, _opt.Port, secure, ct);
 

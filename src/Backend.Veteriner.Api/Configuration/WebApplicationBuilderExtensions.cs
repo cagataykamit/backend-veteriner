@@ -65,7 +65,9 @@ public static class WebApplicationBuilderExtensions
     {
         const string serviceName = "Backend.Veteriner.Api";
         const string serviceVersion = "1.0.0";
-        var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317";
+        // OTLP dışa aktarımı yalnız endpoint tanımlıysa açılır (Development: yerel collector varsayılanı).
+        var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]
+                           ?? (builder.Environment.IsDevelopment() ? "http://localhost:4317" : null);
 
         builder.Services.AddControllers()
             .ConfigureApiBehaviorOptions(o =>
@@ -159,20 +161,7 @@ public static class WebApplicationBuilderExtensions
         var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()
                   ?? throw new InvalidOperationException("Jwt ayarlar\uFFFD (appsettings:Jwt) bulunamad\uFFFD.");
 
-        if (builder.Environment.IsDevelopment())
-        {
-            if (string.IsNullOrWhiteSpace(jwt.Key))
-                throw new InvalidOperationException("Jwt:Key bo\uFFFD. User-Secrets \uFFFDzerinden set edilmelidir.");
-
-            if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("DefaultConnection")))
-                throw new InvalidOperationException("ConnectionStrings:DefaultConnection bo\uFFFD. User-Secrets \uFFFDzerinden set edilmelidir.");
-
-            if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("QueryConnection")))
-                throw new InvalidOperationException("ConnectionStrings:QueryConnection bo\uFFFD. User-Secrets \uFFFDzerinden set edilmelidir.");
-
-            if (string.IsNullOrWhiteSpace(builder.Configuration["Smtp:Pass"]))
-                throw new InvalidOperationException("Smtp:Pass bo\uFFFD. User-Secrets \uFFFDzerinden set edilmelidir.");
-        }
+        StartupConfigurationValidator.EnsureRequiredSettings(builder.Configuration, builder.Environment);
 
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(opt =>
@@ -208,7 +197,9 @@ public static class WebApplicationBuilderExtensions
                     new KeyValuePair<string, object>("deployment.environment", builder.Environment.EnvironmentName),
                     new KeyValuePair<string, object>("service.instance.id", Environment.MachineName)
                 }))
-            .WithTracing(t => t
+            .WithTracing(t =>
+            {
+                t
                 .AddAspNetCoreInstrumentation(o =>
                 {
                     o.RecordException = true;
@@ -227,25 +218,35 @@ public static class WebApplicationBuilderExtensions
                 .AddSqlClientInstrumentation(o => o.RecordException = true)
                 .AddEntityFrameworkCoreInstrumentation()
                 .AddSource("Backend.Veteriner.Outbox")
-                .AddSource("Backend.Veteriner.Mailing")
-                .AddOtlpExporter(o =>
+                .AddSource("Backend.Veteriner.Mailing");
+
+                if (otlpEndpoint is not null)
                 {
-                    o.Endpoint = new Uri(otlpEndpoint);
-                    o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
-                })
-            )
-            .WithMetrics(m => m
+                    t.AddOtlpExporter(o =>
+                    {
+                        o.Endpoint = new Uri(otlpEndpoint);
+                        o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                    });
+                }
+            })
+            .WithMetrics(m =>
+            {
+                m
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddMeter("Backend.Veteriner.Outbox")
-                .AddMeter(AppointmentProjectionMetrics.MeterName)
-                .AddOtlpExporter(o =>
+                .AddMeter(AppointmentProjectionMetrics.MeterName);
+
+                if (otlpEndpoint is not null)
                 {
-                    o.Endpoint = new Uri(otlpEndpoint);
-                    o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
-                })
-            );
+                    m.AddOtlpExporter(o =>
+                    {
+                        o.Endpoint = new Uri(otlpEndpoint);
+                        o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                    });
+                }
+            });
 
         return builder;
     }
