@@ -143,7 +143,10 @@ public sealed class ExaminationDetailIdorIntegrationTests : IClassFixture<Custom
             assignedClinicId,
             includeRelatedTreatment: true);
 
-        var token = await IssueExaminationReadTokenAsync(email);
+        var token = await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(
+            _factory.Services,
+            email,
+            new[] { PermissionCatalog.Examinations.Read, PermissionCatalog.Treatments.Read });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await client.GetAsync($"/api/v1/examinations/{seed.ExaminationId}/related-summary");
@@ -152,6 +155,30 @@ public sealed class ExaminationDetailIdorIntegrationTests : IClassFixture<Custom
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         json.GetProperty("treatments").GetArrayLength().Should().Be(1);
         json.GetProperty("treatments")[0].GetProperty("title").GetString().Should().Be("İlgili Tedavi");
+    }
+
+    [Fact]
+    public async Task GetExaminationRelatedSummary_Should_OmitRecordKinds_When_UserLacksTheirReadPermission()
+    {
+        var client = _factory.CreateClient();
+        var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
+
+        var (email, _, assignedClinicId, _) =
+            await IntegrationTestAuthHelper.SeedExaminationReaderUserAsync(_factory.Services, hasher);
+        var seed = await IntegrationTestAuthHelper.SeedExaminationInClinicAsync(
+            _factory.Services,
+            assignedClinicId,
+            includeRelatedTreatment: true);
+
+        var token = await IssueExaminationReadTokenAsync(email);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.GetAsync($"/api/v1/examinations/{seed.ExaminationId}/related-summary");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("treatments").GetArrayLength().Should().Be(0);
+        json.GetProperty("payments").GetArrayLength().Should().Be(0);
     }
 
     [Fact]
