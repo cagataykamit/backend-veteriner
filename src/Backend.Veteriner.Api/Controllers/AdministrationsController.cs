@@ -63,7 +63,8 @@ public sealed class AdministrationsController : ControllerBase
                 body.AdministeredAtUtc,
                 body.Notes,
                 body.LateEntryReason,
-                body.RequestId),
+                body.RequestId,
+                body.BatchId),
             ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);

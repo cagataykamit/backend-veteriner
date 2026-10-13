@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Application.Administrations;
 
 internal static class AdministrationMappings
 {
-    public static AdministrationDto ToDto(this Administration a, Product product)
+    public static AdministrationDto ToDto(this Administration a, Product product, StockBatch? batch = null)
         => new(
             a.Id,
             a.ClinicId,
@@ -29,7 +29,10 @@ internal static class AdministrationMappings
             a.LateEntryReason,
             a.CreatedByUserId,
             a.CreatedAtUtc,
-            a.RequestId);
+            a.RequestId,
+            a.BatchId,
+            batch?.LotNumber,
+            batch?.ExpiryDate);
 
     public static AdministrationStockDto ToDto(this ProductStock stock)
         => new(stock.QuantityOnHand, stock.MinimumStockLevel, stock.QuantityOnHand < stock.MinimumStockLevel);

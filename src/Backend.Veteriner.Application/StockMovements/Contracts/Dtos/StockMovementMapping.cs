@@ -29,5 +29,7 @@ internal static class StockMovementMapping
             movement.Notes,
             movement.CreatedAtUtc,
             movement.RequestId,
-            movement.ReversesMovementId);
+            movement.ReversesMovementId,
+            movement.BatchId,
+            movement.BatchBalanceAfter);
 }

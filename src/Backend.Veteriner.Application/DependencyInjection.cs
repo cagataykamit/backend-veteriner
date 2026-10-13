@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Pets.Timeline;
+using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Billing;
 using Backend.Veteriner.Application.Tenants.Invites;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<ISubscriptionCheckoutActivationService, SubscriptionCheckoutActivationService>();
         services.AddScoped<IClinicAssignmentAccessGuard, ClinicAssignmentAccessGuard>();
         services.AddScoped<IClinicReadScopeResolver, ClinicReadScopeResolver>();
+        services.AddScoped<StockBatchResolver>();
 
         // Pet timeline: her kayıt türü kendi okuyucusuyla bağlanır (ödeme okuyucusu Aşama 3 sonrası eklenecek).
         services.AddScoped<IPetTimelineSource, VisitTimelineSource>();

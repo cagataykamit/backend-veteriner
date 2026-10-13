@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Products.Specs;
+using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
@@ -19,19 +20,22 @@ public sealed class GetAdministrationsListQueryHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Administration> _administrations;
     private readonly IReadRepository<Product> _products;
+    private readonly IReadRepository<StockBatch> _batches;
 
     public GetAdministrationsListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Administration> administrations,
-        IReadRepository<Product> products)
+        IReadRepository<Product> products,
+        IReadRepository<StockBatch> batches)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _administrations = administrations;
         _products = products;
+        _batches = batches;
     }
 
     public async Task<Result<PagedResult<AdministrationDto>>> Handle(
@@ -79,9 +83,15 @@ public sealed class GetAdministrationsListQueryHandler
             : (await _products.ListAsync(new ProductsByIdsSpec(tenantId, productIds), ct))
                 .ToDictionary(p => p.Id);
 
+        var batchIds = rows.Where(r => r.BatchId.HasValue).Select(r => r.BatchId!.Value).Distinct().ToArray();
+        var batches = batchIds.Length == 0
+            ? new Dictionary<Guid, StockBatch>()
+            : (await _batches.ListAsync(new StockBatchesByIdsSpec(tenantId, batchIds), ct))
+                .ToDictionary(b => b.Id);
+
         var items = rows
             .Where(r => products.ContainsKey(r.ProductId))
-            .Select(r => r.ToDto(products[r.ProductId]))
+            .Select(r => r.ToDto(products[r.ProductId], r.BatchId is { } id && batches.TryGetValue(id, out var batch) ? batch : null))
             .ToList();
 
         return Result<PagedResult<AdministrationDto>>.Success(

@@ -10,6 +10,8 @@ using Backend.Veteriner.Application.Products.Commands.Update;
 using Backend.Veteriner.Application.Products.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductStocks.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductStocks.Queries.GetByProductId;
+using Backend.Veteriner.Application.StockBatches.Contracts.Dtos;
+using Backend.Veteriner.Application.StockBatches.Queries.GetProductBalance;
 using Backend.Veteriner.Application.StockMovements.Contracts.Dtos;
 using Backend.Veteriner.Application.StockMovements.Queries.GetByProductId;
 using Backend.Veteriner.Application.Products.Queries.GetById;
@@ -81,6 +83,25 @@ public sealed class ProductsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetProductStocksByProductIdQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Ürün bazlı parti bakiyesi (FEFO sıralı partiler + partisiz bakiye). Klinik kapsamı zorunlu: <c>clinicId</c> veya aktif klinik bağlamı.</summary>
+    [HttpGet("{id:guid}/stock-batches")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(ProductBatchBalanceDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStockBatchesByProductId(
+        [FromRoute] Guid id,
+        [FromQuery] Guid? clinicId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetProductBatchBalanceQuery(id, clinicId), ct);
         return result.ToActionResult(this);
     }
 

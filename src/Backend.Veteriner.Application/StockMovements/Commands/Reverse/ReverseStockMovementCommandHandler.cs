@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Application.ProductStocks.Specs;
 using Backend.Veteriner.Application.Products.Specs;
+using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Application.StockMovements.Contracts.Dtos;
 using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Domain.Clinics;
@@ -26,6 +27,7 @@ public sealed class ReverseStockMovementCommandHandler
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<ProductStock> _productStocksWrite;
     private readonly IRepository<StockMovement> _stockMovementsWrite;
+    private readonly StockBatchResolver _batchResolver;
     private readonly IUnitOfWork _uow;
 
     public ReverseStockMovementCommandHandler(
@@ -38,6 +40,7 @@ public sealed class ReverseStockMovementCommandHandler
         IReadRepository<Clinic> clinicsRead,
         IRepository<ProductStock> productStocksWrite,
         IRepository<StockMovement> stockMovementsWrite,
+        StockBatchResolver batchResolver,
         IUnitOfWork uow)
     {
         _tenantContext = tenantContext;
@@ -49,6 +52,7 @@ public sealed class ReverseStockMovementCommandHandler
         _clinicsRead = clinicsRead;
         _productStocksWrite = productStocksWrite;
         _stockMovementsWrite = stockMovementsWrite;
+        _batchResolver = batchResolver;
         _uow = uow;
     }
 
@@ -113,12 +117,35 @@ public sealed class ReverseStockMovementCommandHandler
         if (stock is null && original.ReversalIncreasesStock)
             return Fail("StockMovements.StockNotFound", "Hareketin stok satırı bulunamadı.");
 
-        if (original.ReversalIncreasesStock)
-            stock!.IncreaseQuantity(original.Quantity);
-        else if (stock is null || stock.QuantityOnHand < original.Quantity)
+        if (!original.ReversalIncreasesStock && (stock is null || stock.QuantityOnHand < original.Quantity))
             return Fail("StockMovements.InsufficientStock", "Geri alma için yeterli stok yok.");
+
+        // Ters hareket orijinalin partisine uygulanır (null = partisiz bakiye).
+        StockBatch? batch = null;
+        if (original.BatchId is { } batchId)
+        {
+            batch = await _batchResolver.FindAsync(tenantId, original.ClinicId, original.ProductId, batchId, ct);
+            if (batch is null)
+                return Fail("StockBatches.NotFound", "Hareketin partisi bulunamadı.");
+        }
+
+        if (original.ReversalIncreasesStock)
+        {
+            batch?.Increase(original.Quantity);
+            stock!.IncreaseQuantity(original.Quantity);
+        }
         else
-            stock.DecreaseQuantity(original.Quantity);
+        {
+            // Giriş geri alınırken o partinin (partisizse partisiz bakiyenin) kalanı miktarı karşılamalı.
+            var available = batch?.RemainingQuantity
+                ?? await _batchResolver.GetUnbatchedQuantityAsync(
+                    tenantId, original.ClinicId, original.ProductId, stock!.QuantityOnHand, ct);
+            if (available < original.Quantity)
+                return Fail("StockMovements.InsufficientStock", "Geri alma için yeterli stok yok.");
+
+            batch?.Decrease(original.Quantity);
+            stock!.DecreaseQuantity(original.Quantity);
+        }
 
         var reversal = original.CreateReversal(
             request.Reason,
@@ -126,6 +153,8 @@ public sealed class ReverseStockMovementCommandHandler
             DateTime.UtcNow,
             _clientContext.UserId,
             request.RequestId);
+        if (batch is not null)
+            reversal.LinkBatch(batch);
 
         // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir): ters hareket ve stok değişimi tek toplu yazımdır.
         try

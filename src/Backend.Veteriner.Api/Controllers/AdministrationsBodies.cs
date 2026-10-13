@@ -15,6 +15,7 @@ public sealed class CreateAdministrationBody
     public string? Notes { get; init; }
     public string? LateEntryReason { get; init; }
     public Guid? RequestId { get; init; }
+    public Guid? BatchId { get; init; }
 }
 
 /// <summary>POST /administrations/{id}/void gövdesi. <c>StockOutcome</c> verilmezse <c>StockReturned</c>.</summary>

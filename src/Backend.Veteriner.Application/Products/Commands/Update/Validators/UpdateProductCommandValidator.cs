@@ -14,5 +14,10 @@ public sealed class UpdateProductCommandValidator : AbstractValidator<UpdateProd
         RuleFor(x => x.Sku).MaximumLength(100);
         RuleFor(x => x.Barcode).MaximumLength(100);
         RuleFor(x => x.Description).MaximumLength(4000);
+        RuleFor(x => x.Kind).IsInEnum().When(x => x.Kind.HasValue);
+        RuleFor(x => x.ControlledClass).IsInEnum().When(x => x.ControlledClass.HasValue);
+        RuleFor(x => x.PharmacologicalForm).MaximumLength(100);
+        RuleFor(x => x.PresentationForm).MaximumLength(100);
+        RuleFor(x => x.Packaging).MaximumLength(100);
     }
 }

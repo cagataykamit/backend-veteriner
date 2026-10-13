@@ -59,18 +59,7 @@ public sealed class GetProductsListQueryHandler
                 ? name
                 : null;
 
-            return new ProductDto(
-                x.Id,
-                x.ProductCategoryId,
-                categoryName,
-                x.Name,
-                x.Sku,
-                x.Barcode,
-                x.Description,
-                x.Unit,
-                x.UnitPrice,
-                x.Currency,
-                x.IsActive);
+            return x.ToDto(categoryName);
         }).ToList();
 
         return Result<PagedResult<ProductDto>>.Success(PagedResult<ProductDto>.Create(items, total, page, pageSize));

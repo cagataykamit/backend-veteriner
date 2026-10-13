@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Products.Specs;
+using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
@@ -18,19 +19,22 @@ public sealed class GetAdministrationByIdQueryHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Administration> _administrations;
     private readonly IReadRepository<Product> _products;
+    private readonly IReadRepository<StockBatch> _batches;
 
     public GetAdministrationByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Administration> administrations,
-        IReadRepository<Product> products)
+        IReadRepository<Product> products,
+        IReadRepository<StockBatch> batches)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _administrations = administrations;
         _products = products;
+        _batches = batches;
     }
 
     public async Task<Result<AdministrationDto>> Handle(GetAdministrationByIdQuery request, CancellationToken ct)
@@ -59,7 +63,11 @@ public sealed class GetAdministrationByIdQueryHandler
         if (product is null)
             return NotFound();
 
-        return Result<AdministrationDto>.Success(administration.ToDto(product));
+        var batch = administration.BatchId is { } batchId
+            ? await _batches.FirstOrDefaultAsync(new StockBatchByIdSpec(tenantId, batchId), ct)
+            : null;
+
+        return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
     }
 
     private static Result<AdministrationDto> NotFound()

@@ -5,7 +5,10 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.ProductStocks.Specs;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Products.Specs;
+using Backend.Veteriner.Application.StockBatches;
+using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Application.StockMovements.Commands.Create;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Treatments;
@@ -42,6 +45,7 @@ public sealed class CreateAdministrationCommandHandler
     private readonly IReadRepository<Treatment> _treatments;
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<ProductStock> _stocks;
+    private readonly IReadRepository<StockBatch> _batches;
     private readonly IReadRepository<Administration> _administrationsRead;
     private readonly IRepository<Administration> _administrationsWrite;
     private readonly ISender _sender;
@@ -58,6 +62,7 @@ public sealed class CreateAdministrationCommandHandler
         IReadRepository<Treatment> treatments,
         IReadRepository<Examination> examinations,
         IReadRepository<ProductStock> stocks,
+        IReadRepository<StockBatch> batches,
         IReadRepository<Administration> administrationsRead,
         IRepository<Administration> administrationsWrite,
         ISender sender,
@@ -73,6 +78,7 @@ public sealed class CreateAdministrationCommandHandler
         _treatments = treatments;
         _examinations = examinations;
         _stocks = stocks;
+        _batches = batches;
         _administrationsRead = administrationsRead;
         _administrationsWrite = administrationsWrite;
         _sender = sender;
@@ -226,16 +232,28 @@ public sealed class CreateAdministrationCommandHandler
                 ReferenceType: StockReferenceType,
                 ReferenceId: administration.Id,
                 OccurredAtUtc: administeredAtUtc,
-                Notes: null),
+                Notes: null,
+                BatchId: request.BatchId,
+                // Uygulama süresi geçmiş partiden düşemez; manuel çıkış (imha) bu kısıtı taşımaz.
+                NotExpiredOn: OperationDayBounds.ToLocalDate(administeredAtUtc)),
             ct);
         if (!stockMovement.IsSuccess)
             return Result<AdministrationCreateResultDto>.Failure(MapStockError(stockMovement.Error));
+
+        // Stok adımında seçilen parti (null = partisiz bakiye) uygulamaya bağlanır; aynı transaction'da yazılır.
+        StockBatch? batch = null;
+        if (stockMovement.Value!.Movement.BatchId is { } batchId)
+        {
+            batch = await _batches.FirstOrDefaultAsync(new StockBatchByIdSpec(tenantId, batchId), ct);
+            administration.LinkBatch(batchId);
+            await _administrationsWrite.UpdateAsync(administration, ct);
+        }
 
         var stock = await _stocks.FirstOrDefaultAsync(
             new ProductStockForUpdateSpec(tenantId, clinicId, request.ProductId), ct);
 
         return Result<AdministrationCreateResultDto>.Success(
-            new AdministrationCreateResultDto(true, administration.ToDto(product), stock!.ToDto()));
+            new AdministrationCreateResultDto(true, administration.ToDto(product, batch), stock!.ToDto()));
     }
 
     private async Task<Result<AdministrationCreateResultDto>> ExistingAsync(
@@ -255,24 +273,31 @@ public sealed class CreateAdministrationCommandHandler
         if (existing.ClinicId != clinicId
             || existing.PetId != request.PetId
             || existing.ProductId != request.ProductId
-            || existing.Quantity != request.Quantity)
+            || existing.Quantity != request.Quantity
+            || (request.BatchId.HasValue && existing.BatchId != request.BatchId))
         {
             return Fail(
                 "Administrations.DuplicateRequestId",
                 "Bu requestId başka bir uygulama isteği için kullanılmış.");
         }
 
+        var batch = existing.BatchId is { } existingBatchId
+            ? await _batches.FirstOrDefaultAsync(new StockBatchByIdSpec(existing.TenantId, existingBatchId), ct)
+            : null;
         var stock = await _stocks.FirstOrDefaultAsync(
             new ProductStockForUpdateSpec(existing.TenantId, existing.ClinicId, existing.ProductId), ct);
 
         return Result<AdministrationCreateResultDto>.Success(
-            new AdministrationCreateResultDto(false, existing.ToDto(product), stock!.ToDto()));
+            new AdministrationCreateResultDto(false, existing.ToDto(product, batch), stock!.ToDto()));
     }
 
     private static Error MapStockError(Error error)
-        => error.Code == "StockMovements.InsufficientStock"
-            ? new Error("Administrations.InsufficientStock", "Uygulama için yeterli stok yok.")
-            : error;
+        => error.Code switch
+        {
+            StockBatchResolver.InsufficientStockCode => new Error("Administrations.InsufficientStock", "Uygulama için yeterli stok yok."),
+            StockBatchResolver.ExpiredCode => new Error("Administrations.BatchExpired", error.Message),
+            _ => error,
+        };
 
     private static Result<AdministrationCreateResultDto> Fail(string code, string message)
         => Result<AdministrationCreateResultDto>.Failure(code, message);

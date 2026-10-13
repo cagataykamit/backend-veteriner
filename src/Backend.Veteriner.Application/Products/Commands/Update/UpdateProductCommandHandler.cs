@@ -69,7 +69,12 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
             request.Currency,
             request.Sku,
             request.Barcode,
-            request.Description);
+            request.Description,
+            request.Kind ?? product.Kind,
+            request.ControlledClass ?? product.ControlledClass,
+            request.PharmacologicalForm ?? product.PharmacologicalForm,
+            request.PresentationForm ?? product.PresentationForm,
+            request.Packaging ?? product.Packaging);
 
         await _productsWrite.SaveChangesAsync(ct);
         return Result.Success();

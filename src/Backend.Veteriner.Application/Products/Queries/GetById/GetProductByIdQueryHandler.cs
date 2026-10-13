@@ -44,20 +44,6 @@ public sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQ
             categoryName = category?.Name;
         }
 
-        return Result<ProductDto>.Success(ToDto(product, categoryName));
+        return Result<ProductDto>.Success(product.ToDto(categoryName));
     }
-
-    private static ProductDto ToDto(Product p, string? categoryName)
-        => new(
-            p.Id,
-            p.ProductCategoryId,
-            categoryName,
-            p.Name,
-            p.Sku,
-            p.Barcode,
-            p.Description,
-            p.Unit,
-            p.UnitPrice,
-            p.Currency,
-            p.IsActive);
 }

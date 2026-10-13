@@ -117,27 +117,7 @@ public sealed class GetStockMovementsListQueryHandler
             clinicNameById.TryGetValue(m.ClinicId, out var clinicName);
             clinicName ??= string.Empty;
 
-            return new StockMovementDto(
-                m.Id,
-                m.ProductId,
-                product.Name,
-                product.Sku,
-                product.ProductCategoryId,
-                categoryName,
-                m.ClinicId,
-                clinicName,
-                m.MovementType,
-                m.Quantity,
-                m.UnitCost,
-                m.Reason,
-                m.ReferenceType,
-                m.ReferenceId,
-                m.OccurredAtUtc,
-                m.CreatedByUserId,
-                m.Notes,
-                m.CreatedAtUtc,
-                m.RequestId,
-                m.ReversesMovementId);
+            return m.ToDto(product, categoryName, clinicName);
         }).ToList();
 
         return Result<PagedResult<StockMovementDto>>.Success(

@@ -51,6 +51,30 @@ public sealed class CreateStockMovementCommandValidator : AbstractValidator<Crea
             .Must(uc => !uc.HasValue || uc.Value >= 0)
             .WithMessage("UnitCost negatif olamaz.");
 
+        RuleFor(x => x.Batch)
+            .Null()
+            .When(x => x.MovementType is StockMovementType.Out or StockMovementType.Adjustment)
+            .WithMessage("Parti bilgisi yalnız stok girişinde (In/Initial) verilir; çıkış ve sayımda batchId kullanın.");
+
+        RuleFor(x => x.BatchId)
+            .Null()
+            .When(x => x.MovementType is StockMovementType.In or StockMovementType.Initial)
+            .WithMessage("Giriş her zaman yeni parti açar; batchId yalnız Out/Adjustment için verilir.");
+
+        RuleFor(x => x.BatchId)
+            .NotEqual(Guid.Empty)
+            .When(x => x.BatchId.HasValue)
+            .WithMessage("BatchId geçersiz.");
+
+        When(x => x.Batch is not null, () =>
+        {
+            RuleFor(x => x.Batch!.LotNumber).MaximumLength(StockBatch.MaxLotNumberLength);
+            RuleFor(x => x.Batch!.SupplierName).MaximumLength(StockBatch.MaxSupplierNameLength);
+            RuleFor(x => x.Batch!.InvoiceNumber).MaximumLength(StockBatch.MaxInvoiceNumberLength);
+            RuleFor(x => x.Batch!.TransportMethod).MaximumLength(StockBatch.MaxTransportLength);
+            RuleFor(x => x.Batch!.ColdChainMonitor).MaximumLength(StockBatch.MaxTransportLength);
+        });
+
         RuleFor(x => x.Reason).MaximumLength(ReasonMax).When(x => x.Reason != null);
         RuleFor(x => x.ReferenceType).MaximumLength(ReferenceTypeMax).When(x => x.ReferenceType != null);
         RuleFor(x => x.Notes).MaximumLength(NotesMax).When(x => x.Notes != null);

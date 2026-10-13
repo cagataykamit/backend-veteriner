@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Application.ProductStocks.Specs;
 using Backend.Veteriner.Application.Products.Specs;
+using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Application.StockMovements.Contracts.Dtos;
 using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Domain.Clinics;
@@ -26,6 +27,7 @@ public sealed class CreateStockMovementCommandHandler
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<ProductStock> _productStocksWrite;
     private readonly IRepository<StockMovement> _stockMovementsWrite;
+    private readonly StockBatchResolver _batchResolver;
     private readonly IUnitOfWork _uow;
 
     public CreateStockMovementCommandHandler(
@@ -38,6 +40,7 @@ public sealed class CreateStockMovementCommandHandler
         IReadRepository<Clinic> clinicsRead,
         IRepository<ProductStock> productStocksWrite,
         IRepository<StockMovement> stockMovementsWrite,
+        StockBatchResolver batchResolver,
         IUnitOfWork uow)
     {
         _tenantContext = tenantContext;
@@ -49,6 +52,7 @@ public sealed class CreateStockMovementCommandHandler
         _clinicsRead = clinicsRead;
         _productStocksWrite = productStocksWrite;
         _stockMovementsWrite = stockMovementsWrite;
+        _batchResolver = batchResolver;
         _uow = uow;
     }
 
@@ -136,8 +140,10 @@ public sealed class CreateStockMovementCommandHandler
 
         // Yeni stok satırı, hareketten sonra yazılır: hareketin benzersiz kuralları (requestId, kaynak) önce eler
         // ve satır kalıcılaşmadan işlem sonlanır. Mevcut satırdaki değişiklik hareketle aynı SaveChanges'te gider.
+        // Yeni parti hareketin navigasyonudur: hareketle aynı SaveChanges'te yazılır (hareket elenirse parti de yazılmaz).
         ProductStock? newStock = null;
         StockMovement movement;
+        StockBatch? batch = null; // etkilenen parti; null = partisiz (eski/devir) bakiye
 
         switch (request.MovementType)
         {
@@ -149,6 +155,11 @@ public sealed class CreateStockMovementCommandHandler
                         "Bu ürün için bu klinikte stok satırı zaten var; Initial kullanılamaz.");
                 }
 
+                var initialBatch = CreateEntryBatch(tenantId, request, product, createdBy);
+                if (!initialBatch.IsSuccess)
+                    return Result<StockMovementCreateResult>.Failure(initialBatch.Error);
+
+                batch = initialBatch.Value;
                 newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
                 movement = CreateMovementEntity(
                     tenantId,
@@ -161,6 +172,11 @@ public sealed class CreateStockMovementCommandHandler
                 break;
 
             case StockMovementType.In:
+                var entryBatch = CreateEntryBatch(tenantId, request, product, createdBy);
+                if (!entryBatch.IsSuccess)
+                    return Result<StockMovementCreateResult>.Failure(entryBatch.Error);
+
+                batch = entryBatch.Value;
                 if (stock is null)
                     newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
                 else
@@ -184,6 +200,20 @@ public sealed class CreateStockMovementCommandHandler
                         "Çıkış için yeterli stok yok.");
                 }
 
+                var consumption = await _batchResolver.ResolveForConsumptionAsync(
+                    tenantId,
+                    request.ClinicId,
+                    request.ProductId,
+                    request.BatchId,
+                    request.Quantity,
+                    stock.QuantityOnHand,
+                    request.NotExpiredOn,
+                    ct);
+                if (!consumption.IsSuccess)
+                    return Result<StockMovementCreateResult>.Failure(consumption.Error);
+
+                batch = consumption.Value;
+                batch?.Decrease(request.Quantity);
                 stock.DecreaseQuantity(request.Quantity);
                 movement = CreateMovementEntity(
                     tenantId,
@@ -198,6 +228,22 @@ public sealed class CreateStockMovementCommandHandler
             case StockMovementType.Adjustment:
                 var oldQty = stock?.QuantityOnHand ?? 0;
                 var targetQty = request.Quantity;
+
+                // Parti verilirse hedef o partinin kalanıdır; verilmezse ürünün hedef toplamıdır ve fark partisiz bakiyeye gider.
+                if (request.BatchId is { } adjustedBatchId)
+                {
+                    batch = await _batchResolver.FindAsync(
+                        tenantId, request.ClinicId, request.ProductId, adjustedBatchId, ct);
+                    if (batch is null || stock is null)
+                    {
+                        return Result<StockMovementCreateResult>.Failure(
+                            StockBatchResolver.NotFoundCode,
+                            "Parti bulunamadı veya ürün/klinikle uyuşmuyor.");
+                    }
+
+                    oldQty = batch.RemainingQuantity;
+                }
+
                 var delta = targetQty - oldQty;
                 if (delta == 0)
                 {
@@ -206,10 +252,27 @@ public sealed class CreateStockMovementCommandHandler
                         "Hedef stok miktarı mevcut ile aynı; kayıt oluşturulmadı.");
                 }
 
-                if (stock is null)
-                    newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, targetQty, 0);
+                if (batch is not null)
+                {
+                    batch.SetRemaining(targetQty);
+                    stock!.SetAbsoluteQuantity(stock.QuantityOnHand + delta);
+                }
                 else
-                    stock.SetAbsoluteQuantity(targetQty);
+                {
+                    if (delta < 0
+                        && await _batchResolver.GetUnbatchedQuantityAsync(
+                            tenantId, request.ClinicId, request.ProductId, oldQty, ct) < -delta)
+                    {
+                        return Result<StockMovementCreateResult>.Failure(
+                            "StockMovements.BatchRequired",
+                            "Eksilme partisiz bakiyeyi aşıyor; düzeltilecek partiyi batchId ile seçin.");
+                    }
+
+                    if (stock is null)
+                        newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, targetQty, 0);
+                    else
+                        stock.SetAbsoluteQuantity(targetQty);
+                }
 
                 movement = CreateMovementEntity(
                     tenantId,
@@ -226,6 +289,9 @@ public sealed class CreateStockMovementCommandHandler
                     "StockMovements.InvalidMovementType",
                     "Desteklenmeyen hareket tipi.");
         }
+
+        if (batch is not null)
+            movement.LinkBatch(batch);
 
         // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); işlem sınırı TransactionBehavior'dadır.
         try
@@ -320,6 +386,33 @@ public sealed class CreateStockMovementCommandHandler
 
         return Result<StockMovementCreateResult>.Success(
             new StockMovementCreateResult(existing.ToDto(product, categoryName, clinicName), false));
+    }
+
+    /// <summary>
+    /// Giriş için yeni parti üretir. Parti bilgisi yoksa (veya boşsa) <c>null</c> döner: giriş partisiz bakiyeye eklenir;
+    /// lot ve SKT zorunlu üründe bu durum hatadır.
+    /// </summary>
+    private static Result<StockBatch?> CreateEntryBatch(
+        Guid tenantId,
+        CreateStockMovementCommand request,
+        Product product,
+        Guid? createdByUserId)
+    {
+        var details = request.Batch;
+        if (details is null || details.IsEmpty)
+        {
+            return product.RequiresLotAndExpiry
+                ? Result<StockBatch?>.Failure(
+                    StockBatch.LotAndExpiryRequiredCode,
+                    "Aşı ve kontrollü ürünlerde seri/lot no ve son kullanma tarihi zorunludur.")
+                : Result<StockBatch?>.Success(null);
+        }
+
+        var created = StockBatch.Create(
+            tenantId, request.ClinicId, product, request.Quantity, details, createdByUserId, DateTime.UtcNow);
+        return created.IsSuccess
+            ? Result<StockBatch?>.Success(created.Value)
+            : Result<StockBatch?>.Failure(created.Error);
     }
 
     private static StockMovement CreateMovementEntity(

@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Products.Specs;
+using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Application.StockMovements.Commands.Reverse;
 using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -32,6 +33,7 @@ public sealed class VoidAdministrationCommandHandler
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Product> _products;
     private readonly IReadRepository<StockMovement> _stockMovements;
+    private readonly IReadRepository<StockBatch> _batches;
     private readonly IRepository<Administration> _administrations;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
@@ -44,6 +46,7 @@ public sealed class VoidAdministrationCommandHandler
         IReadRepository<Tenant> tenants,
         IReadRepository<Product> products,
         IReadRepository<StockMovement> stockMovements,
+        IReadRepository<StockBatch> batches,
         IRepository<Administration> administrations,
         ISender sender,
         TimeProvider timeProvider)
@@ -55,6 +58,7 @@ public sealed class VoidAdministrationCommandHandler
         _tenants = tenants;
         _products = products;
         _stockMovements = stockMovements;
+        _batches = batches;
         _administrations = administrations;
         _sender = sender;
         _timeProvider = timeProvider;
@@ -95,6 +99,10 @@ public sealed class VoidAdministrationCommandHandler
         if (product is null)
             return Fail("Products.NotFound", "Ürün bulunamadı veya kiracıya ait değil.");
 
+        var batch = administration.BatchId is { } batchId
+            ? await _batches.FirstOrDefaultAsync(new StockBatchByIdSpec(tenantId, batchId), ct)
+            : null;
+
         var stockOutcome = AdministrationVoidStockOutcome.StockReturned;
         if (!string.IsNullOrWhiteSpace(request.StockOutcome)
             && (!Enum.TryParse(request.StockOutcome, ignoreCase: true, out stockOutcome) || !Enum.IsDefined(stockOutcome)))
@@ -107,7 +115,7 @@ public sealed class VoidAdministrationCommandHandler
             return Result<AdministrationDto>.Failure(voided.Error);
 
         if (stockOutcome == AdministrationVoidStockOutcome.WrittenOff)
-            return await SaveWrittenOffAsync(administration, product, ct);
+            return await SaveWrittenOffAsync(administration, product, batch, ct);
 
         var outMovement = await _stockMovements.FirstOrDefaultAsync(
             new StockMovementByReferenceSpec(
@@ -133,11 +141,11 @@ public sealed class VoidAdministrationCommandHandler
                 : Result<AdministrationDto>.Failure(reversal.Error);
         }
 
-        return Result<AdministrationDto>.Success(administration.ToDto(product));
+        return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
     }
 
     private async Task<Result<AdministrationDto>> SaveWrittenOffAsync(
-        Administration administration, Product product, CancellationToken ct)
+        Administration administration, Product product, StockBatch? batch, CancellationToken ct)
     {
         try
         {
@@ -149,7 +157,7 @@ public sealed class VoidAdministrationCommandHandler
             return Fail("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.");
         }
 
-        return Result<AdministrationDto>.Success(administration.ToDto(product));
+        return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
     }
 
     private static Result<AdministrationDto> Fail(string code, string message)

@@ -24,7 +24,10 @@ public sealed record AdministrationDto(
     string? LateEntryReason,
     Guid CreatedByUserId,
     DateTime CreatedAtUtc,
-    Guid? RequestId);
+    Guid? RequestId,
+    Guid? BatchId = null,
+    string? LotNumber = null,
+    DateOnly? ExpiryDate = null);
 
 /// <summary>Düşümden sonraki stok durumu; düşük stok yalnız bilgidir, kaydı engellemez.</summary>
 public sealed record AdministrationStockDto(decimal QuantityOnHand, decimal MinimumStockLevel, bool IsBelowMinimum);

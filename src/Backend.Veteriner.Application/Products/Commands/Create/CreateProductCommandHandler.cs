@@ -68,25 +68,16 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
             request.ProductCategoryId,
             request.Sku,
             request.Barcode,
-            request.Description);
+            request.Description,
+            request.Kind ?? ProductKind.Other,
+            request.ControlledClass ?? ControlledSubstanceClass.None,
+            request.PharmacologicalForm,
+            request.PresentationForm,
+            request.Packaging);
 
         await _productsWrite.AddAsync(product, ct);
         await _productsWrite.SaveChangesAsync(ct);
 
-        return Result<ProductDto>.Success(ToDto(product, category?.Name));
+        return Result<ProductDto>.Success(product.ToDto(category?.Name));
     }
-
-    private static ProductDto ToDto(Product p, string? categoryName)
-        => new(
-            p.Id,
-            p.ProductCategoryId,
-            categoryName,
-            p.Name,
-            p.Sku,
-            p.Barcode,
-            p.Description,
-            p.Unit,
-            p.UnitPrice,
-            p.Currency,
-            p.IsActive);
 }

@@ -23,4 +23,6 @@ public sealed record StockMovementDto(
     string? Notes,
     DateTime CreatedAtUtc,
     Guid? RequestId,
-    Guid? ReversesMovementId);
+    Guid? ReversesMovementId,
+    Guid? BatchId = null,
+    decimal? BatchBalanceAfter = null);
