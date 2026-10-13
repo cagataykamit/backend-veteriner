@@ -43,7 +43,11 @@ public static class AdminClaimSeeder
     /// <summary>Varsayılan platform admin kullanıcısının e-posta adresi.</summary>
     public const string PlatformAdminUserEmail = "admin@example.com";
 
-    public static async Task SeedAsync(AppDbContext db, CancellationToken ct = default)
+    /// <param name="platformAdminEmail">PlatformAdmin claim'ine bağlanacak kullanıcı; null ise yalnız claim ve permission bağları kurulur (üretim seed hattı).</param>
+    public static async Task SeedAsync(
+        AppDbContext db,
+        CancellationToken ct = default,
+        string? platformAdminEmail = PlatformAdminUserEmail)
     {
         // 1) PlatformAdmin claim'i yoksa oluştur (Admin claim'ine dokunulmaz).
         var platformAdminClaim = await db.Set<OperationClaim>()
@@ -94,9 +98,12 @@ public static class AdminClaimSeeder
             }
         }
 
+        if (platformAdminEmail is null)
+            return;
+
         // 3) Platform admin kullanıcısı — DataSeeder/TestDataSeeder henüz çalışmadıysa bağlantı atlanır.
         var adminUser = await db.Users
-            .FirstOrDefaultAsync(x => x.Email == PlatformAdminUserEmail, ct);
+            .FirstOrDefaultAsync(x => x.Email == platformAdminEmail, ct);
 
         if (adminUser is null)
             return;

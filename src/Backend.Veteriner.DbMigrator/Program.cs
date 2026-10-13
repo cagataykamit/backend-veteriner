@@ -52,7 +52,7 @@ try
                 break;
             }
         case "seed":
-            await RunSeedPipelineAsync(db, hasher, logger, CancellationToken.None);
+            await RunSeedPipelineAsync(db, hasher, logger, sp.GetRequiredService<IHostEnvironment>().IsDevelopment(), CancellationToken.None);
             logger.LogInformation("Seed pipeline completed.");
             break;
         case "seed-dev-veterinarian":
@@ -69,9 +69,24 @@ try
                 logger.LogInformation("Dev sample data seed finished (ready: {Ready}).", summary is not null);
                 break;
             }
+        case "create-platform-admin":
+            {
+                var email = ReadOption(args, "--email") ?? Environment.GetEnvironmentVariable("VETINITY_FIRST_ADMIN_EMAIL");
+                var password = Environment.GetEnvironmentVariable("VETINITY_FIRST_ADMIN_PASSWORD") ?? ReadPasswordInteractively();
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrEmpty(password))
+                {
+                    Console.Error.WriteLine("E-posta (--email veya VETINITY_FIRST_ADMIN_EMAIL) ve parola (VETINITY_FIRST_ADMIN_PASSWORD ya da etkilesimli giris) gerekli.");
+                    return 1;
+                }
+
+                await PlatformAdminBootstrapper.CreateAsync(
+                    db, hasher, new PlatformAdminBootstrapper.Input(email, password), logger, CancellationToken.None);
+                logger.LogInformation("Platform admin creation completed.");
+                break;
+            }
         case "all":
             await db.Database.MigrateAsync();
-            await RunSeedPipelineAsync(db, hasher, logger, CancellationToken.None);
+            await RunSeedPipelineAsync(db, hasher, logger, sp.GetRequiredService<IHostEnvironment>().IsDevelopment(), CancellationToken.None);
             logger.LogInformation("Migrate + seed pipeline completed.");
             break;
         case "loadtest-seed":
@@ -348,18 +363,58 @@ static async Task RunSeedPipelineAsync(
     AppDbContext db,
     IPasswordHasher hasher,
     ILogger logger,
+    bool isDevelopment,
     CancellationToken ct)
 {
     // ConfigureBackendAsync ile aynı sıra (PermissionSeeder ayrıca DataSeeder içinde de çağrılır; davranış korunur).
     await PermissionSeeder.SeedAsync(db, logger, ct);
-    await DataSeeder.SeedAsync(db, hasher, logger, ct);
-    await AdminClaimSeeder.SeedAsync(db, ct);
+    // Sabit parolali varsayilan yonetici yalniz Development icin; uretimde ilk yonetici create-platform-admin ile.
+    await DataSeeder.SeedAsync(db, hasher, logger, ct, seedDefaultAdmin: isDevelopment);
+    await AdminClaimSeeder.SeedAsync(db, ct, isDevelopment ? AdminClaimSeeder.PlatformAdminUserEmail : null);
     await InviteAssignableOperationClaimsSeeder.SeedAsync(db, ct);
     // Invite-assignable rollerin (Admin, ClinicAdmin, Veteriner, Sekreter, …) minimum permission bağlarını uygular.
     // Faz 4B-6: AdminClaimSeeder yalnızca PlatformAdmin claim'ine tüm permission'ları bağlar (admin@example.com platform).
     // RolePermissionBindingSeeder ise Map'teki rolleri seed eder ve "Admin" claim'i için whitelist-dışı (sistem)
     // permission bağlarını idempotent biçimde temizler — tenant Admin ile platform yöneticisi ayrımını korur.
     await RolePermissionBindingSeeder.SeedAsync(db, logger, ct);
+}
+
+static string? ReadOption(string[] args, string name)
+{
+    for (var i = 1; i < args.Length - 1; i++)
+    {
+        if (args[i] == name)
+            return args[i + 1];
+    }
+
+    return null;
+}
+
+static string? ReadPasswordInteractively()
+{
+    if (Console.IsInputRedirected)
+        return null;
+
+    Console.Write("Parola: ");
+    var buffer = new System.Text.StringBuilder();
+    while (true)
+    {
+        var key = Console.ReadKey(intercept: true);
+        if (key.Key == ConsoleKey.Enter)
+            break;
+        if (key.Key == ConsoleKey.Backspace)
+        {
+            if (buffer.Length > 0)
+                buffer.Length--;
+        }
+        else if (!char.IsControl(key.KeyChar))
+        {
+            buffer.Append(key.KeyChar);
+        }
+    }
+
+    Console.WriteLine();
+    return buffer.ToString();
 }
 
 static void PrintHelp()
@@ -374,7 +429,9 @@ static void PrintHelp()
         Komutlar:
           migrate        — EF Core MigrateAsync (command DB; bekleyen migrationları uygular)
           migrate-query  — QueryDbContext MigrateAsync (QueryConnection)
-          seed           — Permission/Data/AdminClaim/InviteAssignable seed zinciri
+          seed           — Permission/Data/AdminClaim/InviteAssignable seed zinciri (varsayilan admin@example.com yalniz Development)
+          create-platform-admin --email <e-posta> — Uretim: ilk PlatformAdmin hesabi (once seed). Parola VETINITY_FIRST_ADMIN_PASSWORD ortam degiskeninden
+                           veya etkilesimli (gizli) girilir; loglanmaz
           all            — önce migrate, sonra seed
           seed-dev-veterinarian — YALNIZCA Development: test hekim kullanıcısı (idempotent; kimlik bilgileri DevTestVeterinarianSeeder.cs)
           seed-dev-sample-data  — YALNIZCA Development: örnek randevu/ücret/ödeme (idempotent; DevSampleDataSeeder.cs; kimlik bilgisi yok)

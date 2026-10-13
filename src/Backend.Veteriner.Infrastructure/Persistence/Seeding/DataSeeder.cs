@@ -15,15 +15,32 @@ public static class DataSeeder
     /// <summary>Varsayılan admin için tek bir seed klinik (tüm aktif kliniklere otomatik atama yapılmaz).</summary>
     public const string DefaultSeedClinicName = "Varsayılan Klinik";
 
+    /// <param name="seedDefaultAdmin">
+    /// Yalnız geliştirme/test: varsayılan kiracı, sabit parolalı varsayılan yönetici, seed klinik ve abonelik. Üretimde false verilir;
+    /// ilk yönetici <c>create-platform-admin</c> komutuyla oluşturulur.
+    /// </param>
     public static async Task SeedAsync(
         AppDbContext db,
         IPasswordHasher hasher,
         ILogger? logger = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool seedDefaultAdmin = true)
     {
         await PermissionSeeder.SeedAsync(db, logger, ct);
         await SpeciesAndBreedCatalogSeeder.SeedAsync(db, logger, ct);
 
+        if (seedDefaultAdmin)
+            await SeedDefaultAdminAsync(db, hasher, logger, ct);
+
+        await VaccineDefinitionSeeder.SeedAsync(db, logger, ct);
+    }
+
+    private static async Task SeedDefaultAdminAsync(
+        AppDbContext db,
+        IPasswordHasher hasher,
+        ILogger? logger,
+        CancellationToken ct)
+    {
         var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Name == DefaultTenantName, ct);
         if (tenant is null)
         {
@@ -100,8 +117,6 @@ public static class DataSeeder
         }
 
         await EnsureDefaultTenantSubscriptionAsync(db, tenant.Id, logger, ct);
-
-        await VaccineDefinitionSeeder.SeedAsync(db, logger, ct);
     }
 
     /// <summary>

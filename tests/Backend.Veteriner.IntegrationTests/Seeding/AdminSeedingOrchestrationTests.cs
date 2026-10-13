@@ -141,4 +141,57 @@ public sealed class AdminSeedingOrchestrationTests
 
         repeatedCount.Should().Be(firstRunCount, "AdminClaimSeeder idempotent olmalı; tekrar çalıştırma yeni satır üretmemeli");
     }
+
+    [Fact]
+    public async Task ProductionSeed_Should_NotCreateDefaultAdminTenantOrLink_When_DefaultAdminDisabled()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+
+        await PermissionSeeder.SeedAsync(db);
+        await DataSeeder.SeedAsync(db, new StubBcryptPasswordHasher(), seedDefaultAdmin: false);
+        await AdminClaimSeeder.SeedAsync(db, platformAdminEmail: null);
+
+        (await db.Users.AnyAsync(u => u.Email == AdminClaimSeeder.PlatformAdminUserEmail)).Should().BeFalse();
+        (await db.Tenants.AnyAsync(t => t.Name == DataSeeder.DefaultTenantName)).Should().BeFalse();
+        (await db.OperationClaims.AnyAsync(c => c.Name == AdminClaimSeeder.PlatformAdminClaimName)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ProductionSeed_Should_NotGrantPlatformAdmin_To_PreexistingDefaultEmailUser()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+        await PermissionSeeder.SeedAsync(db);
+        db.Users.Add(new Backend.Veteriner.Domain.Users.User(AdminClaimSeeder.PlatformAdminUserEmail, new StubBcryptPasswordHasher().Hash("x")));
+        await db.SaveChangesAsync();
+
+        await AdminClaimSeeder.SeedAsync(db, platformAdminEmail: null);
+
+        (await db.UserOperationClaims.AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PlatformAdminBootstrapper_Should_CreateUserLinkedToPlatformAdmin_And_RefuseDuplicateOrWeakPassword()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+        var hasher = new StubBcryptPasswordHasher();
+        await PermissionSeeder.SeedAsync(db);
+        await DataSeeder.SeedAsync(db, hasher, seedDefaultAdmin: false);
+        await AdminClaimSeeder.SeedAsync(db, platformAdminEmail: null);
+
+        var weak = () => PlatformAdminBootstrapper.CreateAsync(db, hasher, new("owner@vetinity.test", "zayif"));
+        await weak.Should().ThrowAsync<InvalidOperationException>();
+
+        await PlatformAdminBootstrapper.CreateAsync(db, hasher, new("Owner@Vetinity.test", "Guclu-Parola-9!"));
+
+        var user = await db.Users.SingleAsync(u => u.Email == "owner@vetinity.test");
+        var claim = await db.OperationClaims.SingleAsync(c => c.Name == AdminClaimSeeder.PlatformAdminClaimName);
+        (await db.UserOperationClaims.AnyAsync(x => x.UserId == user.Id && x.OperationClaimId == claim.Id)).Should().BeTrue();
+        (await db.UserTenants.CountAsync(x => x.UserId == user.Id)).Should().Be(1);
+
+        var duplicate = () => PlatformAdminBootstrapper.CreateAsync(db, hasher, new("owner@vetinity.test", "Guclu-Parola-9!"));
+        await duplicate.Should().ThrowAsync<InvalidOperationException>().WithMessage("*zaten var*");
+    }
 }
