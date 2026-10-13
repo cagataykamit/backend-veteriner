@@ -14,7 +14,7 @@ public sealed class DashboardRecentPaymentsReadRoutingOptionsTests
         "appsettings.json",
         "appsettings.Production.json",
         "appsettings.Staging.json",
-        "appsettings.Development.json",
+        "appsettings.Development.json.example",
         "appsettings.IntegrationTests.json",
         "appsettings.LoadTest.json"
     ];
