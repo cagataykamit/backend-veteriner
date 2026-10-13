@@ -7,6 +7,12 @@ namespace Backend.Veteriner.Domain.Tenants;
 /// </summary>
 public sealed class Tenant : AggregateRoot
 {
+    /// <summary>
+    /// Platform yöneticilerinin bağlandığı, içi boş tutulan kiracı adı (<c>create-platform-admin</c>).
+    /// Müşteri kiracısı bu adı alamaz (<see cref="IsReservedName"/>).
+    /// </summary>
+    public const string PlatformTenantName = "Platform";
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public string Name { get; private set; } = default!;
     public bool IsActive { get; private set; }
@@ -23,6 +29,9 @@ public sealed class Tenant : AggregateRoot
         IsActive = true;
         CreatedAtUtc = DateTime.UtcNow;
     }
+
+    public static bool IsReservedName(string? name)
+        => string.Equals(name?.Trim(), PlatformTenantName, StringComparison.OrdinalIgnoreCase);
 
     public void Rename(string name)
     {

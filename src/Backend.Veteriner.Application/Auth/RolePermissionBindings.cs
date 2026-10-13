@@ -22,7 +22,8 @@ namespace Backend.Veteriner.Application.Auth;
 ///   / <c>Outbox.*</c> / <c>Admin.Diagnostics</c>.</item>
 ///   <item><c>Veteriner</c>: tıbbi operasyon rolü. Klinik kayıtlarının (muayene, aşı, tedavi, reçete, lab,
 ///   yatış) Read/Create/Update; randevu Read/Create/Complete/Reschedule (Cancel verilmez); pet okuma + güncelleme
-///   (kilo/medikal not). <b>Verilmez:</b> müşteri C/U, ödeme C/U, klinik/tenant/abonelik ve sistem yetkileri.</item>
+///   (kilo/medikal not). <b>Verilmez:</b> müşteri C/U, ödeme C/U, klinik/tenant/abonelik ve sistem yetkileri,
+    ///   düzeltme izinleri (<c>*.Correct</c>; yönetici düzeyi: Admin, Owner, ClinicAdmin).</item>
 ///   <item><c>Sekreter</c>: resepsiyon/operasyon rolü. Müşteri/pet R/C/U; randevu R/C/Cancel/Reschedule
 ///   (Complete verilmez); ödeme R/C/U; tıbbi modüller sadece Read. <b>Verilmez:</b> randevu Complete,
 ///   muayene/aşı/tedavi/reçete/lab/yatış C/U, klinik/tenant/abonelik ve sistem yetkileri.</item>
@@ -155,6 +156,7 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.StockMovements.Read,
                 PermissionCatalog.StockMovements.Create,
+                PermissionCatalog.StockMovements.Correct,
             ],
 
             // Tenant sahibi: Admin ile aynı operasyonel paket (ürün kararı: Owner ≈ Admin).
@@ -260,6 +262,7 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.StockMovements.Read,
                 PermissionCatalog.StockMovements.Create,
+                PermissionCatalog.StockMovements.Correct,
             ],
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini
@@ -359,6 +362,7 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.StockMovements.Read,
                 PermissionCatalog.StockMovements.Create,
+                PermissionCatalog.StockMovements.Correct,
 
                 PermissionCatalog.Reminders.Read,
                 PermissionCatalog.Reminders.Manage,
@@ -400,7 +404,6 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Administrations.Read,
                 PermissionCatalog.Administrations.Create,
-                PermissionCatalog.Administrations.Correct,
 
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
@@ -487,5 +490,17 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Reminders.Read,
             ],
+        };
+
+    /// <summary>
+    /// Varsayılan paketten bilinçli çıkarılan (kullanıcı kararı) rol -> permission bağları. Seed bunları
+    /// <see cref="Map"/> dışında kalan eski bağlar olarak bırakmaz, siler; yoksa karar yalnız yeni kurulumlarda geçerli olurdu.
+    /// Yalnız burada listelenen çift etkilenir; diğer manuel atamalara dokunulmaz.
+    /// </summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> Revoked { get; } =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Uygulama iptali yönetici düzeyine ait (ADR-012, karar 2026-10-13).
+            ["Veteriner"] = [PermissionCatalog.Administrations.Correct],
         };
 }
