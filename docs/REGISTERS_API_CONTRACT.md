@@ -86,12 +86,12 @@ Yanıt `{ totalCount, items }`: `totalCount` süzgece uyan muayene sayısı (tü
 | `ePrescriptionId` | string? | Hasta · e-Reçete Kimlik | **Her zaman null** (eksik alan) |
 | `complaint` | string | Hastanın Şikayeti | `VisitReason` |
 | `diagnosis` | string? | Teşhis Edilen Hastalık | `Assessment` |
-| `treatments` | string[] | Tedavi Şekli | Muayeneye bağlı tedavilerin başlığı (tarih sıralı); tedavi yoksa muayenenin `Plan` metni (tek eleman), o da yoksa boş |
-| `prescriptions` | `RegisterPrescriptionDto[]` | Reçete Bilgileri | Muayeneye bağlı reçeteler: `title`, `items[]` (`name`, `quantity?`, `instructions?`); satırsız (eski) reçetede `items` boş |
-| `administrations` | `RegisterAdministrationDto[]` | Satışa Eklenen İlaçlar | Muayeneye bağlı uygulamalar (bölüm 3): `productName`, `quantity`, `unit`, `addedAfterFinalization`, `isVoided` |
+| `treatments` | string[] | Tedavi Şekli, Reçete Bilgileri, Satışa Eklenen İlaçlar (tek sütun) | Muayeneye bağlı tedavilerin başlığı (tarih sıralı); tedavi yoksa muayenenin `Plan` metni (tek eleman), o da yoksa boş |
+| `prescriptions` | `RegisterPrescriptionDto[]` | (tek sütun, yukarıda) | Muayeneye bağlı reçeteler: `title`, `items[]` (`name`, `quantity?`, `instructions?`); satırsız (eski) reçetede `items` boş |
+| `administrations` | `RegisterAdministrationDto[]` | (tek sütun, yukarıda) | Muayeneye bağlı uygulamalar (bölüm 3): `productName`, `quantity`, `unit`, `addedAfterFinalization`, `isVoided` |
 | `veterinarianName` | string? | Veteriner Hekimin Adı Soyadı | Bölüm 4 |
 
-Dosyada `treatments`, `prescriptions`, `administrations` üç ayrı sütundur (rakipte tek sütun); hücre biçimi tek yerde tanımlıdır (bölüm 6): tedaviler `; ` ile; reçete `Başlık: İlaç ×Miktar, İlaç ×Miktar`; uygulama `Ürün Miktar Birim`, sonradan eklenen için ` (sonradan eklendi)`, iptal edilen için ` (iptal)` eki.
+**Karar (2026-10-14):** dosyada (ve ekranda) `treatments`, `prescriptions`, `administrations` **TEK sütun**dur (rakip E-vet biçimi); başlık: `Tedavi Şekli, Reçete Bilgileri, Satışa Eklenen İlaçlar`. API satırı yapısal alanları ayrı döndürmeye devam eder; birleştirme kodda tek yerde yapılır (bölüm 6, `ExaminationRegisterColumns`). Hücre biçimi (frontend `register-definitions.ts` aynısını kullanır): önce tedaviler, sonra `Reçete: ...`, sonra `Satış: ...`; boş bölüm atlanır; bölümler ve kayıtlar `; ` ile ayrılır. Reçete kaydı `Başlık: İlaç ×Miktar, İlaç ×Miktar`; satış kaydı `Ürün Miktar Birim`, sonradan eklenen için ` (sonradan eklendi)`, iptal için ` (iptal)` eki. Örnek: `Serum; Enjeksiyon; Reçete: Reçete 1: Amoksilin ×2,5, Probiyotik; Satış: Aşı X 1 doz (sonradan eklendi)`.
 
 Sıralama: `examinedAtUtc`, `createdAtUtc`, `id` artan.
 
