@@ -215,6 +215,56 @@ public sealed class RolePermissionBindingSeederTests
     }
 
     [Fact]
+    public async Task Seed_Should_Bind_Correction_Permissions_To_AdminLevel_Roles_And_Revoke_Veteriner_Administrations_Correct()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+
+        await PermissionSeeder.SeedAsync(db);
+        await DataSeeder.SeedAsync(db, new StubBcryptPasswordHasher());
+        await AdminClaimSeeder.SeedAsync(db);
+        await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
+        await EnsureOwnerClaimAsync(db);
+
+        // Eski kurulum: Veteriner uygulama iptali iznini önceki varsayılandan almış; ayrıca manuel bir bağ var.
+        var veterinerClaimId = await GetClaimIdAsync(db, "Veteriner");
+        var administrationsCorrectId = await GetPermissionIdAsync(db, PermissionCatalog.Administrations.Correct);
+        var outboxReadId = await GetPermissionIdAsync(db, PermissionCatalog.Outbox.Read);
+        await db.OperationClaimPermissions.AddRangeAsync(
+            new OperationClaimPermission(veterinerClaimId, administrationsCorrectId),
+            new OperationClaimPermission(veterinerClaimId, outboxReadId));
+        await db.SaveChangesAsync();
+
+        await RolePermissionBindingSeeder.SeedAsync(db);
+        var totalAfterFirstRun = await db.OperationClaimPermissions.CountAsync();
+        await RolePermissionBindingSeeder.SeedAsync(db);
+
+        (await db.OperationClaimPermissions.CountAsync()).Should().Be(totalAfterFirstRun, "tekrar çalıştırma idempotent olmalı");
+
+        (await db.OperationClaimPermissions.AnyAsync(x => x.OperationClaimId == veterinerClaimId && x.PermissionId == administrationsCorrectId))
+            .Should().BeFalse("Veteriner'den Administrations.Correct geri alınmalı");
+        (await db.OperationClaimPermissions.AnyAsync(x => x.OperationClaimId == veterinerClaimId && x.PermissionId == outboxReadId))
+            .Should().BeTrue("yalnız Revoked çifti silinir; diğer manuel atamalar korunur");
+
+        var stockCorrectId = await GetPermissionIdAsync(db, PermissionCatalog.StockMovements.Correct);
+        foreach (var role in new[] { "Admin", "Owner", "ClinicAdmin" })
+        {
+            var claimId = await GetClaimIdAsync(db, role);
+            (await db.OperationClaimPermissions.CountAsync(x => x.OperationClaimId == claimId && x.PermissionId == stockCorrectId))
+                .Should().Be(1, $"{role} StockMovements.Correct bağını tam bir kez almalı");
+            (await db.OperationClaimPermissions.CountAsync(x => x.OperationClaimId == claimId && x.PermissionId == administrationsCorrectId))
+                .Should().Be(1, $"{role} Administrations.Correct bağını korumalı");
+        }
+
+        foreach (var role in new[] { "Veteriner", "Sekreter" })
+        {
+            var claimId = await GetClaimIdAsync(db, role);
+            (await db.OperationClaimPermissions.AnyAsync(x => x.OperationClaimId == claimId && x.PermissionId == stockCorrectId))
+                .Should().BeFalse($"{role} StockMovements.Correct almamalı");
+        }
+    }
+
+    [Fact]
     public async Task Seed_Should_NotOverride_ExistingLinks_ForClinicAdmin()
     {
         await using var db = new AppDbContext(CreateOptions());

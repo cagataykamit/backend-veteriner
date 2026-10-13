@@ -367,7 +367,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
     [Fact]
     public async Task Reverse_Out_Should_RestoreStock_Once_And_Replay_With_SameRequestId()
     {
-        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[] { "StockMovements.Create", "Products.Read" });
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[] { "StockMovements.Create", "StockMovements.Correct", "Products.Read" });
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
         await PostMovementAsync(client, ctx, StockMovementType.Initial, 10m);
@@ -396,9 +396,25 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
     }
 
     [Fact]
-    public async Task Reverse_Should_Reject_Adjustment_Missing_Reason_And_Unknown_Movement()
+    public async Task Reverse_Should_Return403_When_OnlyStockMovementsCreate()
     {
         var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[] { "StockMovements.Create", "Products.Read" });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        await PostMovementAsync(client, ctx, StockMovementType.Initial, 10m);
+        var outResponse = await PostMovementAsync(client, ctx, StockMovementType.Out, 4m);
+        var outId = (await outResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var reverse = await client.PostAsJsonAsync($"/api/v1/stock-movements/{outId}/reverse", new { reason = "Yanlış ürün" });
+
+        reverse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await GetQuantityOnHandAsync(client, ctx)).Should().Be(6m);
+    }
+
+    [Fact]
+    public async Task Reverse_Should_Reject_Adjustment_Missing_Reason_And_Unknown_Movement()
+    {
+        var ctx = await SeedTenantClinicProductWithPermissionsAsync(new[] { "StockMovements.Create", "StockMovements.Correct", "Products.Read" });
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
         await PostMovementAsync(client, ctx, StockMovementType.Initial, 10m);
