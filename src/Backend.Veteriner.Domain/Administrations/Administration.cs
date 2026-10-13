@@ -14,6 +14,9 @@ public sealed class Administration : AggregateRoot
     public const int MaxNotesLength = 2000;
     public const string LateEntryReasonRequiredCode = "Administrations.LateEntryReasonRequired";
 
+    /// <summary>Uygulamanın düştüğü stok hareketinin <c>StockMovement.ReferenceType</c> değeri (kaynak izi).</summary>
+    public const string StockReferenceType = "Administration";
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }

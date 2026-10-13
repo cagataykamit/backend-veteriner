@@ -64,6 +64,26 @@ public sealed class RegisterReportRunner
         return Result<IReadOnlyList<TRow>>.Success(read.Items);
     }
 
+    /// <summary>Tüm eşleşen satırları (tavanlı) yükler ve seçilen biçimde dosyaya yazar; ekranla aynı okuyucu çağrısıdır.</summary>
+    public async Task<Result<RegisterExportResult>> ExportAsync<TRow>(
+        IRegisterReader<TRow> reader,
+        RegisterQuery query,
+        RegisterExportFormat format,
+        RegisterExportSpec<TRow> spec,
+        CancellationToken ct)
+    {
+        var loaded = await LoadForExportAsync(reader, query, ct);
+        if (!loaded.IsSuccess)
+            return Result<RegisterExportResult>.Failure(loaded.Error);
+
+        var stamp = FileDateStamp(DateTime.UtcNow);
+        return Result<RegisterExportResult>.Success(format == RegisterExportFormat.Csv
+            ? new RegisterExportResult(
+                RegisterCsvWriter.WriteUtf8Bom(spec.Columns, loaded.Value!), $"{spec.FileBaseName}-{stamp}.csv")
+            : new RegisterExportResult(
+                RegisterXlsxWriter.WriteWorkbook(spec.SheetName, spec.Columns, loaded.Value!), $"{spec.FileBaseName}-{stamp}.xlsx"));
+    }
+
     /// <summary>Dosya adındaki İstanbul takvim günü.</summary>
     public static string FileDateStamp(DateTime utcNow)
         => OperationDayBounds.ToLocalDate(utcNow).ToString("yyyyMMdd");

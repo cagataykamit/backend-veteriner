@@ -6,7 +6,15 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Application.Reports.Registers;
 
 /// <summary>Ham defter sorgusu (İstanbul takvim günleri, ikisi dahil); <see cref="RegisterReportRunner"/> doğrular ve çözer.</summary>
-public sealed record RegisterQuery(DateOnly From, DateOnly To, Guid? ClinicId, bool IncludeVoided);
+/// <param name="ProductId">Yalnız Aşı Bilgi Raporu: ürün süzgeci.</param>
+/// <param name="VeterinarianUserId">Yalnız Aşı Bilgi Raporu: uygulamayı kaydeden veteriner süzgeci.</param>
+public sealed record RegisterQuery(
+    DateOnly From,
+    DateOnly To,
+    Guid? ClinicId,
+    bool IncludeVoided,
+    Guid? ProductId = null,
+    Guid? VeterinarianUserId = null);
 
 /// <summary>Doğrulanmış ve klinik kapsamı çözülmüş süzgeç; JSON ve dışa aktarma tek yerden okur.</summary>
 internal sealed record RegisterReportFilter(
@@ -15,10 +23,12 @@ internal sealed record RegisterReportFilter(
     IReadOnlyCollection<Guid>? AccessibleClinicIds,
     DateTime FromUtc,
     DateTime ToUtcExclusive,
-    bool IncludeVoided)
+    bool IncludeVoided,
+    Guid? ProductId,
+    Guid? VeterinarianUserId)
 {
     public RegisterReadRequest ToReadRequest(int skip, int take)
-        => new(TenantId, ClinicId, AccessibleClinicIds, FromUtc, ToUtcExclusive, IncludeVoided, skip, take);
+        => new(TenantId, ClinicId, AccessibleClinicIds, FromUtc, ToUtcExclusive, IncludeVoided, ProductId, VeterinarianUserId, skip, take);
 
     public static async Task<Result<RegisterReportFilter>> ResolveAsync(
         ITenantContext tenantContext,
@@ -74,6 +84,8 @@ internal sealed record RegisterReportFilter(
             scope.AccessibleClinicIds,
             OperationDayBounds.ForLocalDate(query.From).DayStartUtc,
             OperationDayBounds.ForLocalDate(query.To).DayEndUtc,
-            query.IncludeVoided));
+            query.IncludeVoided,
+            query.ProductId,
+            query.VeterinarianUserId));
     }
 }

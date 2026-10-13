@@ -40,6 +40,7 @@ internal static class RegisterCsvWriter
         {
             null => string.Empty,
             DateTime utc => OperationDayBounds.ToLocalDate(utc).ToString("dd.MM.yyyy", Turkish),
+            DateOnly day => day.ToString("dd.MM.yyyy", Turkish),
             decimal number => number.ToString("0.###", Turkish),
             var other => other.ToString() ?? string.Empty,
         };

@@ -96,6 +96,10 @@ internal static class RegisterXlsxWriter
                 cell.Value = OperationDayBounds.ToLocalDate(utc).ToDateTime(TimeOnly.MinValue);
                 cell.Style.DateFormat.Format = "dd.MM.yyyy";
                 break;
+            case DateOnly day:
+                cell.Value = day.ToDateTime(TimeOnly.MinValue);
+                cell.Style.DateFormat.Format = "dd.MM.yyyy";
+                break;
             case decimal number:
                 cell.Value = number;
                 cell.Style.NumberFormat.Format = "#,##0.###";

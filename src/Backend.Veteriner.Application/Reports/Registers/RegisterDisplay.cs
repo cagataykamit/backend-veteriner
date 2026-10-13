@@ -36,6 +36,10 @@ public static class RegisterDisplay
         return months > 0 ? $"{months} ay" : $"{on.DayNumber - birth.DayNumber} gün";
     }
 
+    /// <summary>İptal edilen/geri alınan kaydın dosya hücresindeki işareti.</summary>
+    public static string WithVoidMark(string text, bool voided)
+        => voided ? $"{text} (iptal)" : text;
+
     /// <summary>Miktar: gereksiz sıfırsız, Türkçe ondalık.</summary>
     public static string Quantity(decimal quantity)
         => quantity.ToString("0.###", Turkish);

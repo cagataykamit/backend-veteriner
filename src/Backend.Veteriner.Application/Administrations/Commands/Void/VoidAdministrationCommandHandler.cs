@@ -24,7 +24,7 @@ namespace Backend.Veteriner.Application.Administrations.Commands.Void;
 public sealed class VoidAdministrationCommandHandler
     : IRequestHandler<VoidAdministrationCommand, Result<AdministrationDto>>
 {
-    private const string StockReferenceType = "Administration";
+    private const string StockReferenceType = Administration.StockReferenceType;
 
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;

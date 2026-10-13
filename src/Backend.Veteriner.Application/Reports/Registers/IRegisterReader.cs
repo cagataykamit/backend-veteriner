@@ -12,7 +12,9 @@ public interface IRegisterReader<TRow>
 /// <param name="ClinicId">Tek klinik kapsamı; null ise <paramref name="AccessibleClinicIds"/> (null = kiracı geneli).</param>
 /// <param name="FromUtc">Dahil.</param>
 /// <param name="ToUtcExclusive">Hariç (İstanbul gün sınırı).</param>
-/// <param name="IncludeVoided">İptal edilmiş uygulamalar da gelsin (yalnız muayene defteri).</param>
+/// <param name="IncludeVoided">İptal edilmiş kayıtlar da gelsin (muayene: uygulama; aşı/ilaç: geri alınan giriş; aşı bilgi: uygulama).</param>
+/// <param name="ProductId">Yalnız Aşı Bilgi Raporu.</param>
+/// <param name="VeterinarianUserId">Yalnız Aşı Bilgi Raporu.</param>
 public sealed record RegisterReadRequest(
     Guid TenantId,
     Guid? ClinicId,
@@ -20,6 +22,8 @@ public sealed record RegisterReadRequest(
     DateTime FromUtc,
     DateTime ToUtcExclusive,
     bool IncludeVoided,
+    Guid? ProductId,
+    Guid? VeterinarianUserId,
     int Skip,
     int Take);
 
