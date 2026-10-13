@@ -63,9 +63,11 @@ Yeni izinler eklenir: seeder ile gelir; **mevcut özel roller elle almalı** ve 
 |---|---|---|
 | `Administrations.Read` | Listeleme/detay | Admin, Owner, ClinicAdmin, Veteriner, Sekreter |
 | `Administrations.Create` | Uygulama kaydı (stok düşer) | Admin, Owner, ClinicAdmin, Veteriner |
-| `Administrations.Correct` | Uygulamayı gerekçeyle iptal (stok geri verilir) | Admin, Owner, ClinicAdmin, Veteriner |
+| `Administrations.Correct` | Uygulamayı gerekçeyle iptal (stok geri verilir) | **Yalnız yönetici düzeyi:** Admin, Owner, ClinicAdmin (kullanıcı kararı 2026-10-13; Veteriner'den çıkarıldı, ADR-012 yönetici düzeyi) |
 
-Manuel stok girişi/çıkışı/düzeltmesi (`StockMovements.Create`) değişmez ve uygulamadan bağımsızdır. Uygulama ucu, `StockMovements.Create` izni olmayan Veteriner için de stok düşer (yetki uygulama iznindedir). Sekreter yazamaz.
+Veteriner uygulama kaydı oluşturur ama iptal edemez; iptal için yönetici düzeyine başvurulur. `Charges.Correct` ve `Payments.Correct` zaten aynı üç rolde olduğundan üç düzeltme izni tutarlıdır.
+
+Manuel stok girişi/çıkışı/düzeltmesi (`StockMovements.Create`) değişmez ve uygulamadan bağımsızdır. Uygulama ucu, `StockMovements.Create` izni olmayan Veteriner için de stok düşer (yetki uygulama iznindedir). Sekreter yazamaz. Uygulama iptalinin ürettiği otomatik ters hareket `StockMovements.Correct` istemez (yetki `Administrations.Correct`'te aranır); `StockMovements.Correct` yalnız `POST /stock-movements/{id}/reverse` ucunu açar.
 
 ---
 
