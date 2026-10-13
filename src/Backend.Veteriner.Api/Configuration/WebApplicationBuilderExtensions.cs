@@ -1,9 +1,12 @@
 using Backend.Veteriner.Api.Auth;
 using Backend.Veteriner.Api.Health;
 using Backend.Veteriner.Api.Middleware;
+using Backend.Veteriner.Api.Observability;
 using Backend.Veteriner.Api.Swagger;
 using Backend.Veteriner.Application;
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Infrastructure;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Security;
@@ -147,6 +150,10 @@ public static class WebApplicationBuilderExtensions
             });
         });
 
+        builder.Services.Configure<OutboxHealthOptions>(builder.Configuration.GetSection(OutboxHealthOptions.SectionName));
+        builder.Services.AddSingleton<OperationsMetrics>();
+        builder.Services.AddSingleton<IErrorReporter, LoggingErrorReporter>();
+
         builder.Services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("sql")
             .AddCheck<QueryDatabaseHealthCheck>("query-sql")
@@ -236,6 +243,7 @@ public static class WebApplicationBuilderExtensions
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddMeter("Backend.Veteriner.Outbox")
+                .AddMeter(OperationsMetrics.MeterName)
                 .AddMeter(AppointmentProjectionMetrics.MeterName);
 
                 if (otlpEndpoint is not null)

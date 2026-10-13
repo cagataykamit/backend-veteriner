@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
@@ -135,6 +136,10 @@ public static class ExceptionHandlingExtensions
                 };
 
                 ctx.Response.StatusCode = status;
+
+                if (status >= StatusCodes.Status500InternalServerError)
+                    ctx.RequestServices.GetRequiredService<IErrorReporter>()
+                        .Report(ex, new ErrorReportContext(traceId, correlationId, status));
 
                 var pd = CreateProblemDetails(
                     status: status,
