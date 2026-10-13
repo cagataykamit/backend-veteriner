@@ -67,6 +67,7 @@ public sealed class ReverseStockMovementCommandHandlerTests
             _clinicsRead.Object,
             _productStocksWrite.Object,
             _stockMovementsWrite.Object,
+            StockBatchMocks.EmptyResolver(),
             _uow.Object);
 
     private StockMovement Movement(

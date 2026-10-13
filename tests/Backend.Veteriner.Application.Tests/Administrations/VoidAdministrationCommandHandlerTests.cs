@@ -77,6 +77,7 @@ public sealed class VoidAdministrationCommandHandlerTests
             tenants.Object,
             products.Object,
             _stockMovements.Object,
+            new Mock<IReadRepository<StockBatch>>().Object,
             _administrations.Object,
             _sender.Object,
             TimeProvider.System);

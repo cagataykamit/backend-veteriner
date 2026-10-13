@@ -45,6 +45,7 @@ public sealed class CreateStockMovementCommandHandlerTests
             _clinicsRead.Object,
             _productStocksWrite.Object,
             _stockMovementsWrite.Object,
+            StockBatchMocks.EmptyResolver(),
             _uow.Object);
 
     private static (Guid TenantId, Guid ClinicId, Guid ProductId, Clinic Clinic, Product Product) SeedIdsAndEntities()
@@ -127,6 +128,7 @@ public sealed class CreateStockMovementCommandHandlerTests
             _clinicsRead.Object,
             _productStocksWrite.Object,
             _stockMovementsWrite.Object,
+            StockBatchMocks.EmptyResolver(),
             _uow.Object);
 
         var (tenantId, clinicId, productId, clinic, product) = SeedIdsAndEntities();
