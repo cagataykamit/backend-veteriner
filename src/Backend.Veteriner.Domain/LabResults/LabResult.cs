@@ -16,7 +16,10 @@ public sealed class LabResult : AggregateRoot
     public Guid? VisitId { get; private set; }
     public LabResultStatus Status { get; private set; }
 
-    /// <summary>Sunucu atar; sonuç tarihinden ayrıdır. Eski kayıtlarda sonuç tarihine eşitlenmiştir.</summary>
+    /// <summary>
+    /// Önce istenip sonra sonuçlanan kayıtta sunucunun istek anıdır; doğrudan sonuçlu kayıtta girilen sonuç tarihidir
+    /// (klinik gerçek tarihe göre sıralansın). Eski kayıtlarda sonuç tarihine eşitlenmiştir.
+    /// </summary>
     public DateTime RequestedAtUtc { get; private set; }
     public Guid? RequestedByUserId { get; private set; }
 
@@ -35,8 +38,12 @@ public sealed class LabResult : AggregateRoot
     /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
     public byte[] RowVersion { get; private set; } = default!;
 
-    /// <summary>Sonuç var ama hekim yorumu yok: durum makinesine girmeyen türetilmiş bayrak.</summary>
-    public bool AwaitingInterpretation => Status == LabResultStatus.Resulted && Interpretation is null;
+    /// <summary>Yeni kayıtlarda true; yorum gerekmiyor sayılan eski (migration ile gelen) kayıtlarda false.</summary>
+    public bool InterpretationRequired { get; private set; }
+
+    /// <summary>Sonuç var, yorum gerekiyor ama hekim yorumu yok: durum makinesine girmeyen türetilmiş bayrak.</summary>
+    public bool AwaitingInterpretation
+        => Status == LabResultStatus.Resulted && InterpretationRequired && Interpretation is null;
 
     private LabResult() { }
 
@@ -76,9 +83,10 @@ public sealed class LabResult : AggregateRoot
         ExaminationId = examinationId;
         VisitId = visitId;
         Status = hasResult ? LabResultStatus.Resulted : LabResultStatus.Requested;
-        RequestedAtUtc = now;
-        RequestedByUserId = requestedByUserId;
+        InterpretationRequired = true;
         ResultDateUtc = hasResult ? NormalizeUtc(resultDateUtc!.Value) : null;
+        RequestedAtUtc = ResultDateUtc ?? now;
+        RequestedByUserId = requestedByUserId;
         TestName = testName.Trim();
         ResultText = hasResult ? resultText!.Trim() : null;
         Interpretation = Trimmed(interpretation);

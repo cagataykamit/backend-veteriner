@@ -33,6 +33,7 @@ public sealed class LabResultTests
         l.RequestedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
         l.AwaitingInterpretation.Should().BeFalse();
     }
+[Fact]    public void Ctor_With_Result_Should_Request_At_Result_Date()    {        var resultDate = DateTime.UtcNow.AddDays(-5);        var l = new LabResult(TenantId, ClinicId, PetId, null, null, UserId, resultDate, "Kan sayımı", "Normal", null, null);        l.RequestedAtUtc.Should().Be(resultDate);        l.InterpretationRequired.Should().BeTrue();    }    [Fact]    public void Requested_Then_Resulted_Should_Keep_Request_Time()    {        var l = Requested();        var requestedAt = l.RequestedAtUtc;        UpdateWith(l, DateTime.UtcNow.AddDays(-2), "Normal").IsSuccess.Should().BeTrue();        l.RequestedAtUtc.Should().Be(requestedAt);    }    [Fact]    public void AwaitingInterpretation_Should_Be_False_When_Interpretation_Not_Required()    {        var l = Resulted();        typeof(LabResult).GetProperty(nameof(LabResult.InterpretationRequired))!.SetValue(l, false);        l.AwaitingInterpretation.Should().BeFalse();    }
 
     [Fact]
     public void Ctor_With_Result_Should_Create_Resulted_And_Await_Interpretation()
