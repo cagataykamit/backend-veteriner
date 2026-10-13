@@ -27,13 +27,15 @@ Diğer alanlar aynıdır. Bir hareketin geri alınıp alınmadığı bu dilimde 
 
 ## 2) Yetkiler
 
-Yeni izin **yoktur** (seed/özel rol değişikliği gerekmez).
+Yeni izin **`StockMovements.Correct`** (kullanıcı kararı 2026-10-13, güvenlik raporu D2): geri alma artık bu izinle yapılır; migration yoktur, izin `DbMigrator seed` ile gelir. Özel roller elle almalıdır.
 
-| İşlem | Policy | Not |
+| İşlem | Policy | Roller |
 |---|---|---|
-| Hareket ekleme | `StockMovements.Create` | Değişmedi |
-| Hareketi geri alma | `StockMovements.Create` | Geri alma, manuel hareketle aynı yetkili kümesinin düzeltmesidir. |
+| Hareket ekleme | `StockMovements.Create` | Admin, Owner, ClinicAdmin, Sekreter |
+| Hareketi geri alma | `StockMovements.Correct` | **Yalnız yönetici düzeyi:** Admin, Owner, ClinicAdmin (ADR-012). Sekreter hareket ekler ama geri alamaz; Veteriner'de ikisi de yok. |
 | Okuma | `StockMovements.Read` | Değişmedi |
+
+**Uygulama iptali bu izne takılmaz.** `POST /administrations/{id}/void` (`Administrations.Correct`) stok iadesini iç komutla (`ReverseStockMovementCommand`) HTTP policy'si olmadan yazar; yetki ucun izninde aranır, ters hareket için ayrıca `StockMovements.Correct` istenmez. HTTP ucu `POST /stock-movements/{id}/reverse` yalnız `StockMovements.Correct` ile açılır.
 
 D8 (dar izin: `Treatments.Administer` / `ProductUsage.Create` ve uygulama iptali için `...Correct`) **Uygulama kaydı (Dilim 2)** içindir; bu dilimde tanımlanmaz.
 
@@ -72,7 +74,7 @@ Yeni kurallar:
 
 ## 4) `POST /api/v1/stock-movements/{id}/reverse`
 
-`StockMovements.Create`. İstek:
+`StockMovements.Correct` (yetkisiz → 403). İstek:
 
 ```json
 {

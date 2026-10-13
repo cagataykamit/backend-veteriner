@@ -17,13 +17,21 @@ public sealed class AdministrationPermissionBindingsTests
     [InlineData("Admin")]
     [InlineData("Owner")]
     [InlineData("ClinicAdmin")]
-    [InlineData("Veteriner")]
-    public void Clinical_And_Admin_Roles_Should_Create_Read_And_Void_Administrations(string role)
+    public void Admin_Level_Roles_Should_Create_Read_And_Void_Administrations(string role)
     {
         var p = Perms(role);
         p.Should().Contain(PermissionCatalog.Administrations.Read);
         p.Should().Contain(PermissionCatalog.Administrations.Create);
         p.Should().Contain(PermissionCatalog.Administrations.Correct);
+    }
+
+    [Fact]
+    public void Veteriner_Should_Create_And_Read_But_Not_Void_Administrations()
+    {
+        var p = Perms("Veteriner");
+        p.Should().Contain(PermissionCatalog.Administrations.Read);
+        p.Should().Contain(PermissionCatalog.Administrations.Create);
+        p.Should().NotContain(PermissionCatalog.Administrations.Correct);
     }
 
     [Fact]

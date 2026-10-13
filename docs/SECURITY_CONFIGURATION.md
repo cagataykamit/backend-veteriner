@@ -40,8 +40,31 @@ Parola kuralları kullanıcı parolasıyla aynıdır; parola loglanmaz, mevcut b
 
 Hosting hedefi yönetilen bulut (Azure). Üretim şablonunda günlük **yalnız konsola (stdout) yapılandırılmış JSON** olarak yazılır (`CompactJsonFormatter`); platform (App Service / Container Apps) stdout'u toplar ve Log Analytics / Application Insights'a aktarır. Dosya sink'i varsayılan olarak kapalıdır (Linux `/var/log` ve Windows yol farkı ortadan kalktı); gerekirse yapılandırmayla eklenir, ör. `Serilog__WriteTo__1__Name=File`, `Serilog__WriteTo__1__Args__path=<yol>` (`Serilog.Sinks.File` pakette mevcut). OpenTelemetry (iz + metrik) OTLP ile yalnız `OTEL_EXPORTER_OTLP_ENDPOINT` tanımlıysa açılır (Development'ta yerel `http://localhost:4317` varsayılanı korunur); Azure Monitor için OTLP toplayıcı/Application Insights OTLP uç noktası verilir. Application Insights'a doğrudan SDK bağlama bu işte yapılmadı.
 
+## İzin değişince oturumlar (`RevokeSessionsOnPermissionChange`)
+
+Production'da **true** (kullanıcı kararı 2026-10-13); Development şablonunda ve kod varsayılanında false kalır (yerel geliştirme ve testler etkilenmez). Davranış koddan doğrulandı:
+
+- **Hangi olay:** yalnız yönetim API'sindeki dört komut: rolün izin listesine izin ekleme/çıkarma (`operation-claim-permissions`: `AddPermissionToClaim`, `RemovePermissionFromClaim`) ve izin tanımını güncelleme/silme (`UpdatePermission`, `DeletePermission`).
+- **Hangi oturumlar:** olaydan etkilenen kullanıcıların (o role ya da izne sahip olanlar) **tüm** etkin refresh token'ları iptal edilir (`RevokeAllByUserAsync`, neden `logout_all`; tüm cihazlar). Başka kullanıcılara dokunulmaz.
+- **Yeniden giriş etkisi:** o ana kadar verilmiş access token, süresi bitene kadar (`Jwt:ExpMinutes` = 60 dk) eski izinlerle geçerlidir, çünkü yetki denetimi yalnız token içindeki izin claim'lerine bakar (güvenlik raporu O6). Süre dolunca yenileme (refresh) başarısız olur ve kullanıcı yeniden giriş yapar; yeni girişte güncel izinleri alır. Yani etki anlık değil, en geç 60 dk içinde olur; geri alınan yetkinin hemen kapanması için ayrıca token ömrü kısaltılmalı (O6, ürün kararı).
+- **Tetiklemeyen yollar:** `DbMigrator seed` (rol-izin bağları doğrudan veritabanına yazılır, oturum iptali yapılmaz) ve kullanıcıya rol atama/çıkarma. Seed sonrası kullanıcıların yeni izinleri alması için çıkış-giriş yapması (ya da token yenilemesi) gerekir.
+- **Yan etki:** yönetici izin düzenlerken ilgili kullanıcılar yeniden giriş yapar; toplu izin düzenlemelerini mesai dışına bırakın.
+
+## Düzeltme izinleri (rol-izin matrisi)
+
+Yönetici düzeyi (ADR-012) = Admin, Owner, ClinicAdmin. Tüm `*.Correct` izinleri yalnız bu rollerdedir; kaynak `RolePermissionBindings.Map` (testler: `CorrectionPermissionMatrixTests`, seed: `RolePermissionBindingSeederTests`).
+
+| İzin | Admin | Owner | ClinicAdmin | Veteriner | Sekreter |
+|---|:-:|:-:|:-:|:-:|:-:|
+| `Charges.Correct` (ücret düzeltme/iptal) | ✔ | ✔ | ✔ | – | – |
+| `Payments.Correct` (ödeme düzeltme/iptal) | ✔ | ✔ | ✔ | – | – |
+| `Administrations.Correct` (uygulama iptali) | ✔ | ✔ | ✔ | – | – |
+| `StockMovements.Correct` (stok hareketini geri alma) | ✔ | ✔ | ✔ | – | – |
+| `StockMovements.Create` (hareket ekleme) | ✔ | ✔ | ✔ | – | ✔ |
+
+Uygulama iptalinin yazdığı otomatik ters hareket `StockMovements.Correct` istemez: yetki ucun izninde (`Administrations.Correct`) aranır, stok iadesi iç komutla yapılır. `StockMovements.Correct` yalnız `POST /stock-movements/{id}/reverse` ucunu açar. `Administrations.Correct` Veteriner'den çıkarıldığı için seed, `RolePermissionBindings.Revoked` ile eski bağı siler (yalnız bu çift; diğer manuel atamalara dokunmaz). Yeni izin eklendiğinden `DbMigrator seed` gerekir (yalnız birleşik `main`'den).
+
 ## Gözden geçirme notları
 
-- `PermissionChange:RevokeSessionsOnPermissionChange` Production'da **false**: izin/rol değişikliği mevcut oturumları düşürmez (JWT ömrü boyunca eski izin geçerli). `true` yapmak ürün kararıdır (yan etki: yönetici izin düzenlerken ilgili kullanıcılar çıkış yapar).
 - Rate limit Production'da açık (`RateLimiting:Enabled` varsayılan true; genel 200/dk/IP; login/refresh için ayrı politikalar). Ters vekil arkasında istemci IP'si için `KnownProxies/KnownNetworks` hâlâ tanımsız (güvenlik raporu D6).
 - SMTP: hata ayıklama günlüğünden kullanıcı adı, gönderen adresi ve parola uzunluğu çıkarıldı; yalnız "var/yok" bilgisi yazılır.

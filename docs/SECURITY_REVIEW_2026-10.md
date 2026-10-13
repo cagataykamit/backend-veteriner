@@ -44,6 +44,7 @@ Kapsam: yalnız statik kod okuma (`C:\Users\DELL\source\repos\Veteriner`, `main`
 - Konum: `Api/Auth/PermissionAuthorizationHandler.cs:11-21` (yalnız token claim'leri), `LoginCommandHandler.cs:153-160`, `appsettings.json` `Jwt:ExpMinutes: 60`. (Klinik tarafı `UserOperationClaim` DB'den okunuyor, yani kısmen güncel.)
 - Etki: yetkisi alınan kullanıcı en fazla 60 dk daha eski yetkisini kullanır; "yalnız yönetici" işlemleri (`*.Correct`) dahil. Refresh yeniden okur (`RefreshCommandHandler.cs:~110`).
 - Öneri: süreyi kısalt (ör. 15 dk) ya da kritik düzeltme komutlarında `ICurrentUserPermissionChecker` ile DB doğrulaması. Çaba: küçük-orta. Ürün kararı.
+- **Kısmi önlem (2026-10-13):** Production'da `RevokeSessionsOnPermissionChange=true`; yetkisi değişenin refresh token'ları düşer, ancak mevcut access token süresi (60 dk) bitene kadar geçerli kalır. Token ömrü/DB doğrulaması açık (`SECURITY_CONFIGURATION.md`).
 
 ### Düşük
 
@@ -51,10 +52,12 @@ Kapsam: yalnız statik kod okuma (`C:\Users\DELL\source\repos\Veteriner`, `main`
 - Konum: `Application/Auth/RolePermissionBindings.cs:304-319` (ClinicAdmin: `Payments.Correct`, `Charges.Correct`, `Administrations.Correct`), `:392-394` (**Veteriner: `Administrations.Correct`**).
 - Kanıt: uçlar `Charges.Correct`/`Payments.Correct`/`Administrations.Correct` ile doğru kısıtlı (`ChargesController.cs:84,106`, `PaymentsController.cs:124`, `AdministrationsController.cs:85`); sorun rol atamasında. Sekreter ve Veteriner'de `Charges.Correct`/`Payments.Correct` yok. Ödeme `PUT`'u (`Payments.Update`, Sekreter'de var) tutar/müşteri/klinik/para birimi değişiminde ayrıca `Payments.Correct` istiyor (`UpdatePaymentCommandHandler.cs:229`) ve doğrulandı.
 - Öneri: ürün sahibi "yönetici" tanımını (Admin/Owner mı, ClinicAdmin dahil mi, Veteriner uygulama iptali mi) netleştirsin. Çaba: karar + seed (uyarı: seed yalnız birleşik main'den).
+- **Karar (2026-10-13) ve durum:** yönetici düzeyi = Admin, Owner, ClinicAdmin (ADR-012). `Administrations.Correct` Veteriner'den çıkarıldı; seed eski bağı siler (`RolePermissionBindings.Revoked`). Matris: `SECURITY_CONFIGURATION.md`.
 
 **D2. Stok geri alma (`/stock-movements/{id}/reverse`) `StockMovements.Create` izniyle**
 - Konum: `StockMovementsController.cs:91-92`. Ayrı bir "düzeltme" izni yok; Sekreter'de `StockMovements.Create` var (`RolePermissionBindings.cs:472-473`), yani manuel stok girişi, düzeltme ve geri alma yapabilir.
 - Öneri: `StockMovements.Correct` gibi ayrı izin düşün (ürün kararı). Çaba: küçük.
+- **Karar (2026-10-13) ve durum:** `StockMovements.Correct` eklendi (Admin, Owner, ClinicAdmin); geri alma ucu bu izni ister, Sekreter hareket ekler ama geri alamaz. Uygulama iptali bu izne takılmaz (`STOCK_MOVEMENT_SAFETY_API_CONTRACT.md`).
 
 **D3. Ödeme tutarı ve stok hareketi miktarında üst sınır yok**
 - Konum: `CreatePaymentCommandValidator.cs:12` (`GreaterThan(0)`), `Domain/Payments/Payment.cs:~72` yalnız `<= 0` kontrolü; `CreateStockMovementCommandValidator.cs:38-45`. Karşılaştırma: `Charge.MaxQuantity/MaxUnitPrice` (`Domain/Charges/Charge.cs:13-14`) ve `Administration.MaxQuantity` var.
