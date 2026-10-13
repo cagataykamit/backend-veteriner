@@ -34,6 +34,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime>("AdministeredAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
@@ -93,6 +96,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
 
                     b.HasIndex("TenantId", "ExaminationId");
 
@@ -1615,6 +1620,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("ControlledClass")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -1630,10 +1640,27 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int>("Kind")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Packaging")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PharmacologicalForm")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PresentationForm")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<Guid?>("ProductCategoryId")
                         .HasColumnType("uniqueidentifier");
@@ -1761,10 +1788,100 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("ProductStocks", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Products.StockBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ColdChainMonitor")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("DispatchedDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("InitialQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<DateOnly?>("InvoiceDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("InvoiceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("ReceivedDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("RemainingQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SupplierName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TransportMethod")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "ClinicId", "LotNumber");
+
+                    b.HasIndex("TenantId", "ClinicId", "ProductId", "ExpiryDate");
+
+                    b.ToTable("StockBatches", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StockBatches_Quantities", "[InitialQuantity] > 0 AND [RemainingQuantity] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Products.StockMovement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("BatchBalanceAfter")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<Guid?>("BatchId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("ClinicId")
@@ -1818,6 +1935,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
 
                     b.HasIndex("ClinicId");
 
@@ -2796,6 +2915,14 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("OutboxMessages", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Administrations.Administration", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Products.StockBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Auth.OperationClaimPermission", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Auth.OperationClaim", null)
@@ -2985,8 +3112,30 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Products.StockBatch", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Products.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Products.StockMovement", b =>
                 {
+                    b.HasOne("Backend.Veteriner.Domain.Products.StockBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
                         .WithMany()
                         .HasForeignKey("ClinicId")
@@ -2998,6 +3147,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Batch");
 
                     b.Navigation("Product");
                 });

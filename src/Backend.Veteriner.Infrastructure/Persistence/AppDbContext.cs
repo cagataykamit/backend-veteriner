@@ -103,6 +103,7 @@ public class AppDbContext : DbContext
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductStock> ProductStocks => Set<ProductStock>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<StockBatch> StockBatches => Set<StockBatch>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

@@ -26,6 +26,12 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         b.Property(x => x.Currency).IsRequired().HasMaxLength(3);
 
+        b.Property(x => x.Kind).HasDefaultValue(ProductKind.Other).IsRequired();
+        b.Property(x => x.ControlledClass).HasDefaultValue(ControlledSubstanceClass.None).IsRequired();
+        b.Property(x => x.PharmacologicalForm).HasMaxLength(100);
+        b.Property(x => x.PresentationForm).HasMaxLength(100);
+        b.Property(x => x.Packaging).HasMaxLength(100);
+
         b.Property(x => x.IsActive).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);

@@ -33,9 +33,12 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
         b.Property(x => x.Notes).HasMaxLength(4000);
         b.Property(x => x.RequestId);
         b.Property(x => x.ReversesMovementId);
+        b.Property(x => x.BatchId);
+        b.Property(x => x.BatchBalanceAfter).HasPrecision(18, 3);
         b.Property(x => x.CreatedAtUtc).IsRequired();
 
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.OccurredAtUtc });
+        b.HasIndex(x => x.BatchId);
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.ProductId, x.OccurredAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ProductId });
 
@@ -60,6 +63,11 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
         b.HasOne(x => x.Product)
             .WithMany(p => p.Movements)
             .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.HasOne(x => x.Batch)
+            .WithMany()
+            .HasForeignKey(x => x.BatchId)
             .OnDelete(DeleteBehavior.Restrict);
 
         b.HasOne<Clinic>()

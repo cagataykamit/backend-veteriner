@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -43,6 +44,7 @@ public sealed class AdministrationConfiguration : IEntityTypeConfiguration<Admin
         b.Property(x => x.CreatedByUserId).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.RequestId);
+        b.Property(x => x.BatchId);
 
         b.Property(x => x.RowVersion)
             .IsRowVersion()
@@ -52,6 +54,11 @@ public sealed class AdministrationConfiguration : IEntityTypeConfiguration<Admin
         b.HasIndex(x => new { x.TenantId, x.ExaminationId });
         b.HasIndex(x => new { x.TenantId, x.TreatmentId });
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.AdministeredAtUtc });
+
+        b.HasOne<StockBatch>()
+            .WithMany()
+            .HasForeignKey(x => x.BatchId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         b.HasIndex(x => new { x.TenantId, x.RequestId })
             .IsUnique()
