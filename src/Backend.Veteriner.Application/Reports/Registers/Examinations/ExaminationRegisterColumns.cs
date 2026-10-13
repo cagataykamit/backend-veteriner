@@ -25,11 +25,20 @@ internal static class ExaminationRegisterColumns
         RegisterColumn<ExaminationRegisterItemDto>.Text(Patient, "e-Reçete Kimlik", r => r.EPrescriptionId),
         RegisterColumn<ExaminationRegisterItemDto>.Text(null, "Hastanın Şikayeti", r => r.Complaint),
         RegisterColumn<ExaminationRegisterItemDto>.Text(null, "Teşhis Edilen Hastalık", r => r.Diagnosis),
-        RegisterColumn<ExaminationRegisterItemDto>.Text(null, "Tedavi Şekli", r => string.Join("; ", r.Treatments)),
-        RegisterColumn<ExaminationRegisterItemDto>.Text(null, "Reçete Bilgileri", r => string.Join("; ", r.Prescriptions.Select(FormatPrescription))),
-        RegisterColumn<ExaminationRegisterItemDto>.Text(null, "Satışa Eklenen İlaçlar", r => string.Join("; ", r.Administrations.Select(FormatAdministration))),
+        RegisterColumn<ExaminationRegisterItemDto>.Text(null, "Tedavi Şekli, Reçete Bilgileri, Satışa Eklenen İlaçlar", FormatTreatmentCell),
         RegisterColumn<ExaminationRegisterItemDto>.Text(null, "Veteriner Hekimin Adı Soyadı", r => r.VeterinarianName),
     ];
+
+    /// <summary>Tek hücre: tedaviler, <c>Reçete: ...</c>, <c>Satış: ...</c>; boş bölümler atlanır, bölümler ve kayıtlar <c>; </c> ile ayrılır.</summary>
+    private static string FormatTreatmentCell(ExaminationRegisterItemDto r)
+    {
+        var parts = r.Treatments.ToList();
+        if (r.Prescriptions.Count > 0)
+            parts.Add("Reçete: " + string.Join("; ", r.Prescriptions.Select(FormatPrescription)));
+        if (r.Administrations.Count > 0)
+            parts.Add("Satış: " + string.Join("; ", r.Administrations.Select(FormatAdministration)));
+        return string.Join("; ", parts);
+    }
 
     /// <summary><c>Başlık: İlaç ×Miktar, İlaç</c>; satırsız (eski) reçetede yalnız başlık.</summary>
     private static string FormatPrescription(RegisterPrescriptionDto p)
