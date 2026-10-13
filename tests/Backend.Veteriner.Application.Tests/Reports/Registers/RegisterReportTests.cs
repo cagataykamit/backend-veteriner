@@ -190,10 +190,22 @@ public sealed class RegisterReportTests
         header[0].Should().Be("Sıra No");
         header[5].Should().Be("Hasta · Ad");
         header[10].Should().Be("Hasta · Kart No");
+        header[^2].Should().Be("Tedavi Şekli, Reçete Bilgileri, Satışa Eklenen İlaçlar");
         header[^1].Should().Be("Veteriner Hekimin Adı Soyadı");
 
         lines[1].Should().StartWith("1;13.10.2026;\"Ayşe; \"\"Yılmaz\"\"\";905551112233;Bornova / İzmir;Pamuk;Kedi;Tekir;Dişi;3 yıl;;123456789;P-7;;Kusma;Gastrit;");
-        lines[1].Should().EndWith("\"Serum; Enjeksiyon\";Reçete 1: Amoksilin ×2,5, Probiyotik;Aşı X 1 doz (sonradan eklendi);Dr. Veli");
+        lines[1].Should().EndWith("\"Serum; Enjeksiyon; Reçete: Reçete 1: Amoksilin ×2,5, Probiyotik; Satış: Aşı X 1 doz (sonradan eklendi)\";Dr. Veli");
+    }
+
+    [Fact]
+    public void Treatment_Prescription_Sale_Cell_Should_Skip_Empty_Sections()
+    {
+        var empty = Examination() with { Treatments = [], Prescriptions = [], Administrations = [] };
+        var onlySale = empty with { Administrations = [new RegisterAdministrationDto("Aşı X", 1m, "doz", false, false)] };
+        var cell = ExaminationRegisterColumns.All.Single(c => c.Header.StartsWith("Tedavi Şekli"));
+
+        cell.Value(empty).Should().Be(string.Empty);
+        cell.Value(onlySale).Should().Be("Satış: Aşı X 1 doz");
     }
 
     [Fact]

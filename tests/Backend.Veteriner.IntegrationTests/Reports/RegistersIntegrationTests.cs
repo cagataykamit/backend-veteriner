@@ -177,8 +177,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         csv.Select(r => r[2]).Should().Equal(screen.Items.Select(i => i.OwnerName));
         csv.Select(r => r[5]).Should().Equal(screen.Items.Select(i => i.PetName));
         csv.Select(r => r[9]).Should().Equal(screen.Items.Select(i => i.Age ?? string.Empty));
-        csv[0][17].Should().Be("Recete: Amoksilin ×2");
-        csv[0][18].Should().EndWith("(sonradan eklendi)");
+        string.Join(";", csv[0]).Should().Contain("Recete: Amoksilin ×2; Satış: Asi X 1 doz (sonradan eklendi)");
 
         xlsxResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         xlsxResponse.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^muayene-defteri-\d{8}\.xlsx$");
