@@ -64,7 +64,7 @@ public sealed class ExportPrescriptionRegisterQueryHandler
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
         return Result<RegisterExportResult>.Success(new RegisterExportResult(
-            RegisterCsvWriter.WriteUtf8Bom(PrescriptionRegisterColumns.All, PrescriptionRegisterLine.Flatten(loaded.Value!)),
+            RegisterCsvWriter.WriteUtf8Bom(PrescriptionRegisterColumns.All, loaded.Value!),
             $"recete-defteri-{RegisterReportRunner.FileDateStamp(DateTime.UtcNow)}.csv"));
     }
 }
@@ -91,7 +91,7 @@ public sealed class ExportPrescriptionRegisterXlsxQueryHandler
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
         return Result<RegisterExportResult>.Success(new RegisterExportResult(
-            RegisterXlsxWriter.WriteWorkbook(SheetName, PrescriptionRegisterColumns.All, PrescriptionRegisterLine.Flatten(loaded.Value!)),
+            RegisterXlsxWriter.WriteWorkbook(SheetName, PrescriptionRegisterColumns.All, loaded.Value!),
             $"recete-defteri-{RegisterReportRunner.FileDateStamp(DateTime.UtcNow)}.xlsx"));
     }
 }

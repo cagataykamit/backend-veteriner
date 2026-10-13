@@ -25,11 +25,3 @@ public sealed record PrescriptionRegisterItemDto(
     string? PharmacologicalForm,
     string? Packaging,
     decimal? Quantity);
-
-/// <summary>Dışa aktarma satırı: reçete bilgisi + bir ilaç satırı (ekran ile aynı veriden türetilir).</summary>
-public sealed record PrescriptionRegisterLine(PrescriptionRegisterEntryDto Entry, PrescriptionRegisterItemDto Item)
-{
-    /// <summary>Her reçeteyi ilaç satırı başına bir satıra açar; reçetenin sırası korunur. Reader satırsız reçeteye tek satır verir.</summary>
-    public static IEnumerable<PrescriptionRegisterLine> Flatten(IEnumerable<PrescriptionRegisterEntryDto> entries)
-        => entries.SelectMany(e => e.Items.Select(i => new PrescriptionRegisterLine(e, i)));
-}

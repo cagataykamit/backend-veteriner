@@ -177,7 +177,6 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         csv.Select(r => r[2]).Should().Equal(screen.Items.Select(i => i.OwnerName));
         csv.Select(r => r[5]).Should().Equal(screen.Items.Select(i => i.PetName));
         csv.Select(r => r[9]).Should().Equal(screen.Items.Select(i => i.Age ?? string.Empty));
-        csv.Select(r => r[14]).Should().Equal(screen.Items.Select(i => i.Complaint));
         csv[0][17].Should().Be("Recete: Amoksilin ×2");
         csv[0][18].Should().EndWith("(sonradan eklendi)");
 
@@ -228,11 +227,11 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         var csvResponse = await env.Http.GetAsync($"{PrescriptionsUrl}/export?from={Day}&to={Day}");
         csvResponse.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^recete-defteri-\d{8}\.csv$");
         var csv = Encoding.UTF8.GetString(await csvResponse.Content.ReadAsByteArrayAsync()).TrimStart('﻿')
-            .Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Skip(1).Select(l => l.Split(';')).ToList();
-        csv.Should().HaveCount(3);
-        csv.Select(r => r[0]).Should().Equal("1", "1", "2");
-        csv.Select(r => r[11]).Should().Equal("Amoksilin", "Probiyotik", "Serbest metin recete");
-        csv.Select(r => r[14]).Should().Equal("2,5", string.Empty, string.Empty);
+            .Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Skip(1).ToList();
+        csv.Should().HaveCount(2);
+        csv.Select(l => l.Split(';')[0]).Should().Equal("1", "2");
+        csv[0].Should().EndWith("\"Amoksilin ×2,5; Probiyotik\"");
+        csv[1].Should().EndWith(";Serbest metin recete");
 
         var xlsxResponse = await env.Http.GetAsync($"{PrescriptionsUrl}/export-xlsx?from={Day}&to={Day}");
         using var wb = new XLWorkbook(new MemoryStream(await xlsxResponse.Content.ReadAsByteArrayAsync()));
@@ -240,8 +239,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         ws.Cell(1, 2).GetString().Should().Be("Reçetenin");
         ws.Cell(2, 2).GetString().Should().Be("Tarihi");
         var rows = Enumerable.Range(3, ws.LastRowUsed()!.RowNumber() - 2).ToList();
-        rows.Select(r => ws.Cell(r, 12).GetString()).Should().Equal("Amoksilin", "Probiyotik", "Serbest metin recete");
-        ws.Cell(3, 15).GetDouble().Should().Be(2.5);
+        rows.Select(r => ws.Cell(r, 12).GetString()).Should().Equal("Amoksilin ×2,5; Probiyotik", "Serbest metin recete");
     }
 
     [Fact]

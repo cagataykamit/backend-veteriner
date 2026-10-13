@@ -107,7 +107,7 @@ Sıralama: `examinedAtUtc`, `createdAtUtc`, `id` artan.
 
 ## 5) Reçete defteri: `GET /api/v1/reports/registers/prescriptions`
 
-Sayfalama ve sayım **reçete** bazlıdır (bir reçete sayfaya bölünmez); `totalCount` süzgece uyan reçete sayısıdır. Her reçete bir `entry`, içindeki ilaç satırları `items` olur. **Dosyada reçete satırı başına bir satır** vardır (reçete bilgileri her satırda tekrarlanır; `Sıra No` aynı reçetenin satırlarında aynıdır). Satırı olmayan (eski, serbest metin) reçete dosyada **tek satır** verir: ilaç adı = reçete `Content` metni, adedi boş.
+Her reçete bir `entry`, içindeki ilaç satırları `items` olur; sayfalama ve sayım reçete bazlıdır, `totalCount` süzgece uyan reçete sayısıdır. **Dosyada reçete başına bir satır** vardır; ilaçlar son sütunda **tek hücrede birleşik metin** olarak gelir (rakip biçimi: "İlacın Adı, Farmakolojik Şekli, Ambalajı, Adedi"). Hücre biçimi: `Ad (farmakolojik şekil, ambalaj) ×Adet`, ilaçlar `; ` ile ayrılır, boş parçalar atlanır (şekil ve ambalaj şu an hep boş). Satırı olmayan (eski, serbest metin) reçetede hücre reçete `Content` metnidir.
 
 `PrescriptionRegisterEntryDto`:
 
@@ -125,11 +125,11 @@ Sayfalama ve sayım **reçete** bazlıdır (bir reçete sayfaya bölünmez); `to
 | `species` | string | Hayvanın · Türü | |
 | `earTagNumber` | string? | Hayvanın · Kulak/İşletme No | **Her zaman null** (eksik alan) |
 | `animalCount` | int | Hayvanın · Sayısı | Her zaman 1 (reçete tek hayvanadır) |
-| `items` | `PrescriptionRegisterItemDto[]` | İlacın … | Aşağıda; satırsız reçetede tek öğe (`name = Content`) |
+| `items` | `PrescriptionRegisterItemDto[]` | İlacın Adı, Farmakolojik Şekli, Ambalajı, Adedi (tek sütun) | Aşağıda; satırsız reçetede tek öğe (`name = Content`) |
 
 `PrescriptionRegisterItemDto`: `name` (İlacın Adı), `pharmacologicalForm` (Farmakolojik Şekli; **her zaman null**), `packaging` (Ambalajı; **her zaman null**), `quantity` (Adedi, ondalık?).
 
-Gruplu sütunlarda (reçete defterinde Sıra No hariç tümü; muayene defterinde "Hasta") XLSX başlığı iki katmanlıdır: ilk satır grup başlığı (aynı gruptaki bitişik sütunlar birleştirilir, grupsuz sütun iki satırı kaplar), ikinci satır sütun başlığı; CSV iki satırlı başlığı güvenle taşımadığından tek başlık satırı `Grup · Sütun` biçimindedir. Reçete grupları: Reçetenin, Veteriner Hekimin, Hayvan Sahibinin, Hayvanın, İlaç.
+Gruplu sütunlarda (reçete defterinde Sıra No ve ilaç sütunu hariç tümü; muayene defterinde "Hasta") XLSX başlığı iki katmanlıdır: ilk satır grup başlığı (aynı gruptaki bitişik sütunlar birleştirilir, grupsuz sütun iki satırı kaplar), ikinci satır sütun başlığı; CSV iki satırlı başlığı güvenle taşımadığından tek başlık satırı `Grup · Sütun` biçimindedir. Reçete grupları: Reçetenin, Veteriner Hekimin, Hayvan Sahibinin, Hayvanın; ilaç sütunu grupsuzdur.
 
 Sıralama: `prescribedAtUtc`, `createdAtUtc`, `id` artan; reçete içinde `SortOrder`.
 
@@ -184,4 +184,4 @@ Defter sayfaları `Examinations.Read` / `Prescriptions.Read` ile görünür. Sü
 ## 11) Test odağı
 
 - Application: tarih aralığı doğrulaması (eksik, ters, 366 gün), klinik bağlam uyuşmazlığı, dışa aktarma tavanı, sütun tanımı ↔ başlık/değer, yaş ve hücre biçimleri, CSV/XLSX içerik.
-- Entegrasyon (LocalDB, kendi kiracısıyla): İstanbul gün sınırı (gece yarısı iki yanı), sıra no ve sıralama, sayfalama (kesişme/atlama yok), sonradan eklenen işareti, iptal edilen uygulamanın varsayılan gizliliği ve `includeVoided`, eksik alanların boşluğu, reçete satır genişletmesi ve satırsız reçete, ekran ≡ CSV ≡ XLSX, klinik kapsamı, başka kiracı (IDOR), `Examinations.Read` / `Prescriptions.Read` olmadan 403, token olmadan 401.
+- Entegrasyon (LocalDB, kendi kiracısıyla): İstanbul gün sınırı (gece yarısı iki yanı), sıra no ve sıralama, sayfalama (kesişme/atlama yok), sonradan eklenen işareti, iptal edilen uygulamanın varsayılan gizliliği ve `includeVoided`, eksik alanların boşluğu, reçete başına tek satır ve ilaçların tek hücrede birleşmesi, satırsız reçete, ekran ≡ CSV ≡ XLSX, klinik kapsamı, başka kiracı (IDOR), `Examinations.Read` / `Prescriptions.Read` olmadan 403, token olmadan 401.

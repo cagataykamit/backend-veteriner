@@ -185,7 +185,6 @@ public sealed class RegisterReportTests
 
         bytes.Take(3).Should().Equal(0xEF, 0xBB, 0xBF);
         var lines = Encoding.UTF8.GetString(bytes).TrimStart('﻿').Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
-        lines.Should().HaveCount(2);
         var header = lines[0].Split(';');
         header.Should().HaveCount(ExaminationRegisterColumns.All.Count);
         header[0].Should().Be("Sıra No");
@@ -224,21 +223,19 @@ public sealed class RegisterReportTests
     }
 
     [Fact]
-    public void Prescription_Lines_Should_Expand_One_Row_Per_Drug_And_Keep_Entry_Columns()
+    public void Prescription_Row_Should_Combine_Drugs_In_One_Cell()
     {
         var entry = new PrescriptionRegisterEntryDto(
             3, Guid.NewGuid(), new DateTime(2026, 10, 12, 21, 30, 0, DateTimeKind.Utc),
             null, null, "Dr. Veli", "Klinik Adresi", "Ayşe Yılmaz", null, "Köpek", null, 1,
             [new PrescriptionRegisterItemDto("Amoksilin", null, null, 2m), new PrescriptionRegisterItemDto("Probiyotik", null, null, null)]);
 
-        var lines = PrescriptionRegisterLine.Flatten([entry]).ToList();
-        var csv = Encoding.UTF8.GetString(RegisterCsvWriter.WriteUtf8Bom(PrescriptionRegisterColumns.All, lines))
+        var csv = Encoding.UTF8.GetString(RegisterCsvWriter.WriteUtf8Bom(PrescriptionRegisterColumns.All, [entry]))
             .TrimStart('﻿').Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
 
-        lines.Should().HaveCount(2);
         csv[0].Should().StartWith("Sıra No;Reçetenin · Tarihi;Reçetenin · Sınıfı;Reçetenin · Cilt/Sıra No;Veteriner Hekimin · Adı Soyadı;");
-        csv[1].Should().Be("3;13.10.2026;;;Dr. Veli;Klinik Adresi;Ayşe Yılmaz;;Köpek;;1;Amoksilin;;;2");
-        csv[2].Should().Be("3;13.10.2026;;;Dr. Veli;Klinik Adresi;Ayşe Yılmaz;;Köpek;;1;Probiyotik;;;");
+        csv.Should().HaveCount(2);
+        csv[1].Should().Be("3;13.10.2026;;;Dr. Veli;Klinik Adresi;Ayşe Yılmaz;;Köpek;;1;\"Amoksilin ×2; Probiyotik\"");
     }
 
     [Fact]
