@@ -45,13 +45,20 @@ public static class PlatformAdminBootstrapper
         if (await db.Users.AnyAsync(u => u.Email == email, ct))
             throw new InvalidOperationException("Bu e-posta ile kullanıcı zaten var; mevcut hesaba dokunulmadı.");
 
-        // Girişte tek kiracı üyeliği zorunlu; platform yöneticisi varsayılan kiracıya bağlanır (abonelik/klinik oluşturulmaz).
-        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Name == DataSeeder.DefaultTenantName, ct);
+        // Girişte tek kiracı üyeliği zorunlu; platform yöneticisi müşteri kiracısından ayrı, boş "Platform" kiracısına bağlanır
+        // (klinik/abonelik oluşturulmaz; aboneliksiz kiracıda yazma komutları zaten reddedilir).
+        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Name == Tenant.PlatformTenantName, ct);
         if (tenant is null)
         {
-            tenant = new Tenant(DataSeeder.DefaultTenantName);
+            tenant = new Tenant(Tenant.PlatformTenantName);
             await db.Tenants.AddAsync(tenant, ct);
             await db.SaveChangesAsync(ct);
+        }
+        else if (await db.Clinics.AnyAsync(c => c.TenantId == tenant.Id, ct)
+                 || await db.TenantSubscriptions.AnyAsync(s => s.TenantId == tenant.Id, ct))
+        {
+            throw new InvalidOperationException(
+                $"'{Tenant.PlatformTenantName}' adlı kiracıda klinik veya abonelik var; müşteri kiracısı olabilir. Platform yöneticisi bağlanmadı.");
         }
 
         var user = new User(email, hasher.Hash(input.Password!));

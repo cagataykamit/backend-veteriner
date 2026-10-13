@@ -14,7 +14,8 @@ public sealed class PublicOwnerSignupCommandValidator : AbstractValidator<Public
         RuleFor(x => x.TenantName)
             .NotEmpty()
             .MinimumLength(2)
-            .MaximumLength(300);
+            .MaximumLength(300)
+            .NotReservedTenantName();
 
         RuleFor(x => x.ClinicName)
             .NotEmpty()
