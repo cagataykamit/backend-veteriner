@@ -194,11 +194,13 @@ Sayfalı. Süzgeçler: `clinicId`, `productId`, `lotNumber` (içerir), `availabl
 
 | Kod | HTTP |
 |---|---|
-| `StockBatches.LotAndExpiryRequired`, `StockBatches.Validation` (alan sınırı, tarih sırası, `batchId` giriş hareketinde), `StockMovements.BatchRequired`, `Administrations.BatchExpired`, `StockBatches.ClinicScopeRequired`, `StockBatches.ClinicContextMismatch` | 400 |
+| `StockBatches.LotAndExpiryRequired`, `StockBatches.Validation` (depo çıkış tarihi geliş tarihinden sonra), `StockMovements.BatchRequired`, `Administrations.BatchExpired`, `StockBatches.ClinicScopeRequired`, `StockBatches.ClinicContextMismatch` | 400 |
 | `StockMovements.InsufficientStock`, `Administrations.InsufficientStock` (yetersiz parti bakiyesi dahil) | 400 |
 | `StockBatches.NotFound` | 404 |
 | `StockMovements.ConcurrencyConflict`, `Administrations.DuplicateRequestId` | 409 |
 | `Clinics.AccessDenied` | 403 |
+
+Alan sınırı aşımı, `batchId` giriş hareketinde, `batch` çıkış/sayımda gibi biçim hataları standart doğrulama yanıtıyla 400 döner (`ValidationBehavior`).
 
 Mevcut kodlar değişmedi.
 
@@ -208,7 +210,7 @@ Mevcut kodlar değişmedi.
 
 - **Veri modeli (migration var):** yeni `StockBatches` tablosu (`TenantId`, `ClinicId`, `ProductId`, `LotNumber`, `ExpiryDate`, `InitialQuantity`, `RemainingQuantity` ≥ 0 CHECK, giriş alanları, `CreatedAtUtc`, `CreatedByUserId`, `RowVersion`; FK ürün ve klinik `Restrict`; indeksler `(TenantId, ClinicId, ProductId, ExpiryDate)` ve `(TenantId, ClinicId, LotNumber)`). `StockMovements`'a `BatchId` (nullable FK, `Restrict`) ve `BatchBalanceAfter`; `Administrations`'a `BatchId` (nullable FK); `Products`'a `Kind` (int, varsayılan 0), `ControlledClass` (int, varsayılan 0), `PharmacologicalForm`, `PresentationForm`, `Packaging`. **Mevcut satırlara veri yazılmaz**: eski hareket ve uygulamalar `BatchId = null` (partisiz) kalır, eski bakiye partisiz bakiyedir. Down yalnız eklenen kolon/tablo/indeksleri siler.
 - **Tek yerde:** parti seçimi (FEFO, açık `batchId` doğrulaması, partisiz bakiye hesabı) uygulama katmanında tek bir çözücüde yaşar; hem `POST /stock-movements` hem `POST /administrations` onu kullanır. Süresi geçmiş partiyi engelleme kuralı yalnız uygulama yolunda açıktır. Ters hareket parti etkisini orijinal hareketin `batchId` değerinden alır.
-- Yazma sırası mevcut deseni korur: yeni parti, hareketle **aynı** `SaveChanges`'te (hareketin navigasyonu olarak) yazılır; `requestId`/kaynak benzersizliği ihlalinde parti de yazılmaz. Mevcut partinin kalanı hareketle aynı `SaveChanges`'te güncellenir.
+- Yazma sırası: önce hareket (mevcut partinin ve stok satırının güncellemesiyle aynı `SaveChanges`; `requestId`/kaynak benzersizliği hiçbir şey yazılmadan eler), sonra yeni stok satırı, **en son yeni parti** ve hareketin `batchId` bağı. Yeni parti hareketten önce yazılırsa, `requestId` yarışını kaybeden istek (tekrar olarak 200 dönse de) sahipsiz bir parti bırakır; bu bir entegrasyon testiyle yakalanıp bu sıraya çevrildi.
 - Uygulama komutu partiyi önce seçer, uygulamayı yazar, sonra seçilen `batchId` ile mevcut `CreateStockMovementCommand`'ı çağırır; stok kuralları (yetersiz bakiye, eşzamanlılık) tek yerde (stok handler'ı) yaşar.
 - Defter türetimi (sonraki dilim) bu veriden yapılır: Aşı/İlaç giriş defteri = `In`/`Initial` hareketleri + parti; narkotik/psikotropik stok ve sarf defteri = parti hareketleri (`In`/`Out`/`Reversal`/`Adjustment`) + `batchBalanceAfter` + belge no (`invoiceNumber`, uygulamada `referenceId`); Aşı Bilgi raporu = uygulama + `lotNumber`/`expiryDate`. Partisiz eski bakiye devir satırı olarak türetilir.
 - Açık / ertelenen: bölünmüş düşüm (iki partiden tek uygulama), açıkça "partisiz bakiyeyi seç" seçeneği, partiyi iade/devir (tedarikçiye iade) hareketi, geçmiş SKT girişini engelleme, aşı uygulamasının (`Vaccination`) partiye bağlanması (D6: aşı kaydı hâlâ stok düşmez), sınıfı değişen ürünün mevcut partileri için uyarı.
