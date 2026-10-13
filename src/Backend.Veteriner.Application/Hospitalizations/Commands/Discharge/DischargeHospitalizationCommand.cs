@@ -1,14 +1,21 @@
+using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Commands.Discharge;
 
 /// <summary>
-/// When <see cref="Notes"/> is non-null, replaces hospitalization notes (empty string clears after trim).
-/// When null, notes are left unchanged.
+/// <see cref="DischargeNote"/>: null = dokunma, boş = temizle, dolu = taburcu notunu yazar; giriş notuna (Notes) dokunulmaz.
+/// <see cref="RowVersion"/> geçiş döneminde opsiyoneldir (verilirse denetlenir).
 /// </summary>
 public sealed record DischargeHospitalizationCommand(
     Guid Id,
     DateTime DischargedAtUtc,
-    string? Notes)
-    : IRequest<Result>;
+    string? DischargeNote,
+    string? RowVersion = null)
+    : IRequest<Result<HospitalizationWriteResultDto>>, ITransactionalRequest, IAuditableRequest
+{
+    public string AuditAction => "Hospitalization.Discharge";
+    public string? AuditTarget => $"HospitalizationId={Id}";
+}

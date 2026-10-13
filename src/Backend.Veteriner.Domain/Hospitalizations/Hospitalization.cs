@@ -3,7 +3,7 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Domain.Hospitalizations;
 
 /// <summary>
-/// In-clinic hospitalization / observation stay for a pet; optionally linked to an examination.
+/// In-clinic hospitalization / observation stay for a pet; optionally linked to an examination and/or a visit.
 /// </summary>
 public sealed class Hospitalization : AggregateRoot
 {
@@ -12,13 +12,23 @@ public sealed class Hospitalization : AggregateRoot
     public Guid ClinicId { get; private set; }
     public Guid PetId { get; private set; }
     public Guid? ExaminationId { get; private set; }
+    public Guid? VisitId { get; private set; }
     public DateTime AdmittedAtUtc { get; private set; }
     public DateTime? PlannedDischargeAtUtc { get; private set; }
     public DateTime? DischargedAtUtc { get; private set; }
     public string Reason { get; private set; } = default!;
     public string? Notes { get; private set; }
+
+    /// <summary>Serbest metin konum (ör. "Kafes 3"); kapasite/oda yönetimi yoktur.</summary>
+    public string? Location { get; private set; }
+
+    /// <summary>Taburcu notu; giriş notunu (<see cref="Notes"/>) ezmemek için ayrı tutulur.</summary>
+    public string? DischargeNote { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
+
+    /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
+    public byte[] RowVersion { get; private set; } = default!;
 
     private Hospitalization() { }
 
@@ -30,7 +40,9 @@ public sealed class Hospitalization : AggregateRoot
         DateTime admittedAtUtc,
         DateTime? plannedDischargeAtUtc,
         string reason,
-        string? notes)
+        string? notes,
+        Guid? visitId = null,
+        string? location = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId is invalid.", nameof(tenantId));
@@ -49,23 +61,31 @@ public sealed class Hospitalization : AggregateRoot
         ClinicId = clinicId;
         PetId = petId;
         ExaminationId = examinationId;
+        VisitId = visitId;
         AdmittedAtUtc = admitted;
         PlannedDischargeAtUtc = plannedDischargeAtUtc.HasValue ? NormalizeUtc(plannedDischargeAtUtc.Value) : null;
         DischargedAtUtc = null;
         Reason = reason.Trim();
-        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        Notes = Trimmed(notes);
+        Location = Trimmed(location);
         CreatedAtUtc = DateTime.UtcNow;
         UpdatedAtUtc = null;
     }
 
+    /// <summary>
+    /// <paramref name="notes"/> tam değiştirilir (null/boş = temizle). <paramref name="location"/>: null = dokunma,
+    /// boş/boşluk = temizle, dolu = değiştir.
+    /// </summary>
     public Result UpdateDetails(
         Guid clinicId,
         Guid petId,
         Guid? examinationId,
+        Guid? visitId,
         DateTime admittedAtUtc,
         DateTime? plannedDischargeAtUtc,
         string reason,
-        string? notes)
+        string? notes,
+        string? location)
     {
         if (DischargedAtUtc.HasValue)
             return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
@@ -88,15 +108,21 @@ public sealed class Hospitalization : AggregateRoot
         ClinicId = clinicId;
         PetId = petId;
         ExaminationId = examinationId;
+        VisitId = visitId;
         AdmittedAtUtc = admitted;
         PlannedDischargeAtUtc = plannedDischargeAtUtc.HasValue ? NormalizeUtc(plannedDischargeAtUtc.Value) : null;
         Reason = reason.Trim();
-        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        Notes = Trimmed(notes);
+        if (location is not null)
+            Location = Trimmed(location);
         UpdatedAtUtc = DateTime.UtcNow;
         return Result.Success();
     }
 
-    public Result Discharge(DateTime dischargedAtUtc, bool applyNotes, string? notes)
+    /// <summary>
+    /// <paramref name="dischargeNote"/>: null = dokunma, boş/boşluk = temizle, dolu = değiştir. Giriş notuna dokunulmaz.
+    /// </summary>
+    public Result Discharge(DateTime dischargedAtUtc, string? dischargeNote)
     {
         if (DischargedAtUtc.HasValue)
             return Result.Failure("Hospitalizations.AlreadyDischarged", "Hospitalization is already discharged.");
@@ -110,12 +136,26 @@ public sealed class Hospitalization : AggregateRoot
         }
 
         DischargedAtUtc = d;
-        if (applyNotes)
-            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        if (dischargeNote is not null)
+            DischargeNote = Trimmed(dischargeNote);
 
         UpdatedAtUtc = DateTime.UtcNow;
         return Result.Success();
     }
+
+    /// <summary>
+    /// İstemcinin gördüğü sürüm: kalıcı yazma yalnızca veritabanındaki sürüm bu değere eşitse gerçekleşir.
+    /// </summary>
+    public void SetExpectedRowVersion(byte[] expectedRowVersion)
+    {
+        if (expectedRowVersion is null || expectedRowVersion.Length == 0)
+            throw new ArgumentException("RowVersion geçersiz.", nameof(expectedRowVersion));
+
+        RowVersion = expectedRowVersion;
+    }
+
+    private static string? Trimmed(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch

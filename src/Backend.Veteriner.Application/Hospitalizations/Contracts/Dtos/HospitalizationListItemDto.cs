@@ -12,4 +12,6 @@ public sealed record HospitalizationListItemDto(
     DateTime? PlannedDischargeAtUtc,
     DateTime? DischargedAtUtc,
     string Reason,
-    bool IsActive);
+    bool IsActive,
+    Guid? VisitId,
+    string? Location);

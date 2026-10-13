@@ -16,14 +16,21 @@ public sealed class HospitalizationConfiguration : IEntityTypeConfiguration<Hosp
         b.Property(x => x.ClinicId).IsRequired();
         b.Property(x => x.PetId).IsRequired();
         b.Property(x => x.ExaminationId);
+        b.Property(x => x.VisitId);
         b.Property(x => x.AdmittedAtUtc).IsRequired();
         b.Property(x => x.PlannedDischargeAtUtc);
         b.Property(x => x.DischargedAtUtc);
 
         b.Property(x => x.Reason).IsRequired().HasMaxLength(2000);
         b.Property(x => x.Notes).HasMaxLength(4000);
+        b.Property(x => x.Location).HasMaxLength(200);
+        b.Property(x => x.DischargeNote).HasMaxLength(4000);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
+
+        b.Property(x => x.RowVersion)
+            .IsRowVersion()
+            .IsConcurrencyToken();
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.AdmittedAtUtc });

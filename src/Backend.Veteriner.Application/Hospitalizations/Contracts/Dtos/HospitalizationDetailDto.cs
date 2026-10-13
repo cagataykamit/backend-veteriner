@@ -16,4 +16,8 @@ public sealed record HospitalizationDetailDto(
     string? Notes,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
-    bool IsActive);
+    bool IsActive,
+    Guid? VisitId,
+    string? Location,
+    string? DischargeNote,
+    string RowVersion);

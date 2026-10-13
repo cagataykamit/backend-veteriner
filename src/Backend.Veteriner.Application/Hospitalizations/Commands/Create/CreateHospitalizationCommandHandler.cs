@@ -1,17 +1,20 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Hospitalizations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Visits.Access;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Visits;
 using MediatR;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Commands.Create;
@@ -25,6 +28,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Examination> _examinations;
+    private readonly IReadRepository<Visit> _visits;
     private readonly IReadRepository<Hospitalization> _hospitalizationsRead;
     private readonly IRepository<Hospitalization> _hospitalizationsWrite;
 
@@ -36,6 +40,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
+        IReadRepository<Visit> visits,
         IReadRepository<Hospitalization> hospitalizationsRead,
         IRepository<Hospitalization> hospitalizationsWrite)
     {
@@ -46,6 +51,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         _clinics = clinics;
         _pets = pets;
         _examinations = examinations;
+        _visits = visits;
         _hospitalizationsRead = hospitalizationsRead;
         _hospitalizationsWrite = hospitalizationsWrite;
     }
@@ -108,9 +114,10 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         if (pet is null)
             return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        Examination? exam = null;
         if (request.ExaminationId is { } examId)
         {
-            var exam = await _examinations.FirstOrDefaultAsync(new ExaminationByIdSpec(tenantId, examId), ct);
+            exam = await _examinations.FirstOrDefaultAsync(new ExaminationByIdSpec(tenantId, examId), ct);
             if (exam is null)
             {
                 return Result<Guid>.Failure(
@@ -133,6 +140,16 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
             }
         }
 
+        var locked = await ExaminationLinkedRecordLock.EnsureHospitalizationLinkEditableAsync(
+            _examinations, tenantId, null, request.ExaminationId, ct);
+        if (!locked.IsSuccess)
+            return Result<Guid>.Failure(locked.Error);
+
+        var visit = await LinkedRecordVisitResolver.ResolveAsync(
+            _visits, tenantId, effectiveClinicId, request.PetId, exam, request.VisitId, "Hospitalizations", "yatış kaydı", ct);
+        if (!visit.IsSuccess)
+            return Result<Guid>.Failure(visit.Error);
+
         var activeExists = await _hospitalizationsRead.AnyAsync(
             new ActiveHospitalizationForPetClinicSpec(tenantId, effectiveClinicId, request.PetId, null),
             ct);
@@ -154,7 +171,9 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
                 admittedUtc,
                 request.PlannedDischargeAtUtc,
                 request.Reason,
-                request.Notes);
+                request.Notes,
+                visit.Value,
+                request.Location);
         }
         catch (ArgumentException ex)
         {

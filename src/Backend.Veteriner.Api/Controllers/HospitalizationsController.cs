@@ -40,6 +40,7 @@ public sealed class HospitalizationsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateHospitalizationCommand cmd, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -59,10 +60,11 @@ public sealed class HospitalizationsController : ControllerBase
     [HttpPut("{id:guid}")]
     [Authorize(Policy = PermissionCatalog.Hospitalizations.Update)]
     [Consumes("application/json")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(HospitalizationWriteResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateHospitalizationBody body, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -79,7 +81,10 @@ public sealed class HospitalizationsController : ControllerBase
             body.AdmittedAtUtc,
             body.PlannedDischargeAtUtc,
             body.Reason,
-            body.Notes);
+            body.Notes,
+            body.VisitId,
+            body.Location,
+            body.RowVersion);
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);
@@ -88,16 +93,17 @@ public sealed class HospitalizationsController : ControllerBase
     [HttpPost("{id:guid}/discharge")]
     [Authorize(Policy = PermissionCatalog.Hospitalizations.Discharge)]
     [Consumes("application/json")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(HospitalizationWriteResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Discharge([FromRoute] Guid id, [FromBody] DischargeHospitalizationBody body, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var cmd = new DischargeHospitalizationCommand(id, body.DischargedAtUtc, body.Notes);
+        var cmd = new DischargeHospitalizationCommand(id, body.DischargedAtUtc, body.DischargeNote ?? body.Notes, body.RowVersion);
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);
     }

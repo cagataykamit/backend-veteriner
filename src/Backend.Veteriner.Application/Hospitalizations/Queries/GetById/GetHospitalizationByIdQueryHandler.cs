@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -105,7 +106,11 @@ public sealed class GetHospitalizationByIdQueryHandler
             row.Notes,
             row.CreatedAtUtc,
             row.UpdatedAtUtc,
-            isActive);
+            isActive,
+            row.VisitId,
+            row.Location,
+            row.DischargeNote,
+            ExaminationRowVersion.Encode(row.RowVersion));
 
         return Result<HospitalizationDetailDto>.Success(dto);
     }

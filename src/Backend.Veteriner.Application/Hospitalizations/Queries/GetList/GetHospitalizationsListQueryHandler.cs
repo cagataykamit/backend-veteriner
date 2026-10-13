@@ -166,7 +166,9 @@ public sealed class GetHospitalizationsListQueryHandler
                     h.PlannedDischargeAtUtc,
                     h.DischargedAtUtc,
                     h.Reason,
-                    isActive);
+                    isActive,
+                    h.VisitId,
+                    h.Location);
             })
             .ToList();
 

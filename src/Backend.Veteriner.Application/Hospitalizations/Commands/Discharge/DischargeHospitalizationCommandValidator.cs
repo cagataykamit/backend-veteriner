@@ -8,8 +8,8 @@ public sealed class DischargeHospitalizationCommandValidator : AbstractValidator
     {
         RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.DischargedAtUtc).NotEqual(default(DateTime));
-        RuleFor(x => x.Notes)
+        RuleFor(x => x.DischargeNote)
             .MaximumLength(4000)
-            .When(x => x.Notes != null);
+            .When(x => x.DischargeNote != null);
     }
 }

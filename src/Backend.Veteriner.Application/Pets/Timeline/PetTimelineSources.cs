@@ -243,7 +243,7 @@ internal sealed class HospitalizationTimelineSource(IReadRepository<Hospitalizat
             Status: h.DischargedAtUtc is null ? "Active" : "Discharged",
             IsVoided: false,
             RelatedExaminationId: h.ExaminationId,
-            RelatedVisitId: null,
+            RelatedVisitId: h.VisitId,
             RelatedAppointmentId: null,
             UpdatedAtUtc: h.UpdatedAtUtc);
 }

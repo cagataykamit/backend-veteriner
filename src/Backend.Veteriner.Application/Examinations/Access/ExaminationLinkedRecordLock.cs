@@ -36,6 +36,21 @@ internal static class ExaminationLinkedRecordLock
     }
 
     /// <summary>
+    /// Yatış için yalnız muayene bağı kilitlidir (ASAMA7 D7): yatış canlı kayıttır, neden/not/konum/taburcu serbesttir;
+    /// yeni yatış kesinleşmiş muayeneye bağlanamaz, mevcut yatışın muayene bağı değişiyorsa mevcut/hedef muayene açık olmalıdır.
+    /// Yeni kayıtta <paramref name="existingExaminationId"/> verilmez.
+    /// </summary>
+    public static async Task<Result> EnsureHospitalizationLinkEditableAsync(
+        IReadRepository<Examination> examinations,
+        Guid tenantId,
+        Guid? existingExaminationId,
+        Guid? examinationId,
+        CancellationToken ct)
+        => existingExaminationId != examinationId
+            ? await EnsureOpenAsync(examinations, tenantId, [examinationId, existingExaminationId], ct)
+            : Result.Success();
+
+    /// <summary>
     /// Lab sonucu için kısmi kilit: geç gelen sonuç yazılabilsin diye kesinleşmiş muayenede yalnız sonuç alanları (tarih, metin, yorum, not)
     /// serbesttir; test adı, hayvan, klinik veya muayene bağı değişiyorsa mevcut/hedef muayene açık olmalıdır.
     /// Yeni lab kaydı eklemek, istenmiş kayda sonuç girmek ve gerekçeli iptal (ADR-013) kilitli değildir; Create ve Cancel handler'ları bu denetimi çağırmaz.

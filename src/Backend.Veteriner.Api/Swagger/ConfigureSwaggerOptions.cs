@@ -610,6 +610,8 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 SetNullable(schema, "examinationId", true);
                 SetNullable(schema, "plannedDischargeAtUtc", true);
                 SetNullable(schema, "notes", true);
+                SetNullable(schema, "visitId", true);
+                SetNullable(schema, "location", true);
                 return;
             }
 
@@ -620,6 +622,9 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 SetNullable(schema, "examinationId", true);
                 SetNullable(schema, "plannedDischargeAtUtc", true);
                 SetNullable(schema, "notes", true);
+                SetNullable(schema, "visitId", true);
+                SetNullable(schema, "location", true);
+                SetNullable(schema, "rowVersion", true);
                 return;
             }
 
@@ -627,6 +632,8 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 MarkRequired(schema, "dischargedAtUtc");
                 SetNullable(schema, "notes", true);
+                SetNullable(schema, "dischargeNote", true);
+                SetNullable(schema, "rowVersion", true);
                 return;
             }
 
@@ -634,12 +641,15 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 MarkRequired(schema,
                     "id", "tenantId", "clinicId", "petId", "petName", "clientId", "clientName",
-                    "admittedAtUtc", "reason", "createdAtUtc", "isActive");
+                    "admittedAtUtc", "reason", "createdAtUtc", "isActive", "rowVersion");
                 SetNullable(schema, "examinationId", true);
                 SetNullable(schema, "plannedDischargeAtUtc", true);
                 SetNullable(schema, "dischargedAtUtc", true);
                 SetNullable(schema, "notes", true);
                 SetNullable(schema, "updatedAtUtc", true);
+                SetNullable(schema, "visitId", true);
+                SetNullable(schema, "location", true);
+                SetNullable(schema, "dischargeNote", true);
                 return;
             }
 
@@ -651,6 +661,8 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 SetNullable(schema, "examinationId", true);
                 SetNullable(schema, "plannedDischargeAtUtc", true);
                 SetNullable(schema, "dischargedAtUtc", true);
+                SetNullable(schema, "visitId", true);
+                SetNullable(schema, "location", true);
             }
         }
 

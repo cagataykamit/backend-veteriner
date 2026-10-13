@@ -10,6 +10,20 @@ public static class ExaminationRowVersion
     public static string Encode(byte[]? rowVersion)
         => rowVersion is { Length: > 0 } ? Convert.ToBase64String(rowVersion) : string.Empty;
 
+    /// <summary>Geçiş dönemi için opsiyonel sürüm: boşsa <c>null</c> ile başarılı, doluysa geçerli olmalıdır.</summary>
+    public static bool TryDecodeOptional(string? value, out byte[]? rowVersion)
+    {
+        rowVersion = null;
+        if (string.IsNullOrWhiteSpace(value))
+            return true;
+
+        if (!TryDecode(value, out var decoded))
+            return false;
+
+        rowVersion = decoded;
+        return true;
+    }
+
     public static bool TryDecode(string? value, out byte[] rowVersion)
     {
         rowVersion = [];
