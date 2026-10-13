@@ -49,7 +49,7 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
     [InlineData("appsettings.json")]
     [InlineData("appsettings.Production.json")]
     [InlineData("appsettings.Staging.json")]
-    [InlineData("appsettings.Development.json")]
+    [InlineData("appsettings.Development.json.example")]
     [InlineData("appsettings.IntegrationTests.json")]
     [InlineData("appsettings.LoadTest.json")]
     public void RolloutDefaults_Should_KeepProjectionAndListReadAndDashboardFinanceDisabled(string fileName)
