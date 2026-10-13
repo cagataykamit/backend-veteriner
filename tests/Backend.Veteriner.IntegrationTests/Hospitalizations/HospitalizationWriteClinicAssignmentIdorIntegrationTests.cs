@@ -210,13 +210,13 @@ public sealed class HospitalizationWriteClinicAssignmentIdorIntegrationTests : I
             AdmittedAtUtc = ValidAdmittedAtUtc,
             Reason = "Admin update",
         });
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var dischargeResponse = await client.PostAsJsonAsync($"/api/v1/hospitalizations/{hospitalizationId}/discharge", new
         {
             DischargedAtUtc = ValidAdmittedAtUtc.AddHours(4),
         });
-        dischargeResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        dischargeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]

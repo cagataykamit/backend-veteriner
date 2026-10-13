@@ -15,6 +15,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Visits;
 using FluentAssertions;
 using Moq;
 
@@ -30,6 +31,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
+    private readonly Mock<IReadRepository<Visit>> _visits = new();
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizationsRead = new();
     private readonly Mock<IRepository<Hospitalization>> _hospitalizationsWrite = new();
 
@@ -42,6 +44,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             _clinics.Object,
             _pets.Object,
             _examinations.Object,
+            _visits.Object,
             _hospitalizationsRead.Object,
             _hospitalizationsWrite.Object);
 
@@ -54,6 +57,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             _clinics.Object,
             _pets.Object,
             _examinations.Object,
+            _visits.Object,
             _hospitalizationsRead.Object,
             _hospitalizationsWrite.Object);
 
@@ -63,7 +67,6 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             _clinicContext.Object,
             resolver ?? _scopeResolver.Object,
             _tenants.Object,
-            _hospitalizationsRead.Object,
             _hospitalizationsWrite.Object);
 
     private void SetupTenant(Guid tid, Guid cid, Guid petId)
@@ -251,7 +254,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
         SetupTenant(tid, cid, petId);
 
         var existing = OpenStay(tid, cid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         _hospitalizationsWrite.Setup(r => r.UpdateAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _hospitalizationsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -278,7 +281,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var existing = OpenStay(tid, entityCid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
@@ -305,7 +308,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var existing = OpenStay(tid, assignedCid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
@@ -331,7 +334,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var existing = OpenStay(tid, entityCid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var result = await CreateUpdateHandler(scope.Object).Handle(
@@ -353,7 +356,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
         SetupTenant(tid, targetCid, petId);
 
         var existing = OpenStay(tid, entityCid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         _hospitalizationsWrite.Setup(r => r.UpdateAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _hospitalizationsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -373,7 +376,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Hospitalization?)null);
 
         var result = await CreateUpdateHandler().Handle(
@@ -397,7 +400,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var row = OpenStay(tid, cid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
         _hospitalizationsWrite.Setup(r => r.UpdateAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _hospitalizationsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -424,7 +427,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var row = OpenStay(tid, entityCid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
 
         var result = await CreateDischargeHandler(scope.Object).Handle(
@@ -452,7 +455,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var row = OpenStay(tid, entityCid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
 
         var result = await CreateDischargeHandler(scope.Object).Handle(
@@ -476,7 +479,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var row = OpenStay(tid, entityCid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
         _hospitalizationsWrite.Setup(r => r.UpdateAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _hospitalizationsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -496,7 +499,7 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Hospitalization?)null);
 
         var result = await CreateDischargeHandler().Handle(

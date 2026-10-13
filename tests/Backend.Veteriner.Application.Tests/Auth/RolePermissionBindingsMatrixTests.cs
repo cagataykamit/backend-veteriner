@@ -101,6 +101,9 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Hospitalizations.Create },
         new object[] { PermissionCatalog.Hospitalizations.Update },
         new object[] { PermissionCatalog.Hospitalizations.Discharge },
+        new object[] { PermissionCatalog.CareInstructions.Read },
+        new object[] { PermissionCatalog.CareInstructions.Create },
+        new object[] { PermissionCatalog.CareInstructions.Update },
         new object[] { PermissionCatalog.Clinics.Read },
         new object[] { PermissionCatalog.Clinics.Create },
         new object[] { PermissionCatalog.Clinics.Update },
@@ -187,6 +190,9 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Hospitalizations.Create },
         new object[] { PermissionCatalog.Hospitalizations.Update },
         new object[] { PermissionCatalog.Hospitalizations.Discharge },
+        new object[] { PermissionCatalog.CareInstructions.Read },
+        new object[] { PermissionCatalog.CareInstructions.Create },
+        new object[] { PermissionCatalog.CareInstructions.Update },
         new object[] { PermissionCatalog.Clinics.Read },
         new object[] { PermissionCatalog.Clinics.Update },
         new object[] { PermissionCatalog.Reminders.Read },
@@ -251,6 +257,9 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Hospitalizations.Create },
         new object[] { PermissionCatalog.Hospitalizations.Update },
         new object[] { PermissionCatalog.Hospitalizations.Discharge },
+        new object[] { PermissionCatalog.CareInstructions.Read },
+        new object[] { PermissionCatalog.CareInstructions.Create },
+        new object[] { PermissionCatalog.CareInstructions.Update },
         new object[] { PermissionCatalog.Payments.Read },
         new object[] { PermissionCatalog.Species.Read },
         new object[] { PermissionCatalog.Breeds.Read },
@@ -288,6 +297,7 @@ public sealed class RolePermissionBindingsMatrixTests
         new object[] { PermissionCatalog.Prescriptions.Read },
         new object[] { PermissionCatalog.LabResults.Read },
         new object[] { PermissionCatalog.Hospitalizations.Read },
+        new object[] { PermissionCatalog.CareInstructions.Read },
         new object[] { PermissionCatalog.Payments.Read },
         new object[] { PermissionCatalog.Payments.Create },
         new object[] { PermissionCatalog.Payments.Update },
@@ -419,6 +429,8 @@ public sealed class RolePermissionBindingsMatrixTests
         sec.Should().NotContain(PermissionCatalog.Hospitalizations.Create);
         sec.Should().NotContain(PermissionCatalog.Hospitalizations.Update);
         sec.Should().NotContain(PermissionCatalog.Hospitalizations.Discharge);
+        sec.Should().NotContain(PermissionCatalog.CareInstructions.Create);
+        sec.Should().NotContain(PermissionCatalog.CareInstructions.Update);
         sec.Should().NotContain(PermissionCatalog.Reminders.Manage, "Reminder yönetimi clinic admin/owner işi");
     }
 

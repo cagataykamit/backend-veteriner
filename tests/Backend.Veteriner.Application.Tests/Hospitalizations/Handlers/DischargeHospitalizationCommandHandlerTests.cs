@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Hospitalizations.Handlers;
@@ -18,7 +19,6 @@ public sealed class DischargeHospitalizationCommandHandlerTests
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
-    private readonly Mock<IReadRepository<Hospitalization>> _hospitalizationsRead = new();
     private readonly Mock<IRepository<Hospitalization>> _hospitalizationsWrite = new();
 
     private DischargeHospitalizationCommandHandler CreateHandler()
@@ -27,7 +27,6 @@ public sealed class DischargeHospitalizationCommandHandlerTests
             _clinicContext.Object,
             _scopeResolver.Object,
             _tenants.Object,
-            _hospitalizationsRead.Object,
             _hospitalizationsWrite.Object);
 
     private static Hospitalization ActiveStay(Guid tid, Guid cid, Guid petId)
@@ -71,8 +70,8 @@ public sealed class DischargeHospitalizationCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Tenants.TenantInactive");
-        _hospitalizationsRead.Verify(
-            r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()),
+        _hospitalizationsWrite.Verify(
+            r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -83,7 +82,7 @@ public sealed class DischargeHospitalizationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Tenant("A"));
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Hospitalization?)null);
 
         var result = await CreateHandler().Handle(
@@ -108,7 +107,7 @@ public sealed class DischargeHospitalizationCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var row = ActiveStay(tid, rowCid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
 
         var result = await CreateHandler().Handle(
@@ -134,7 +133,7 @@ public sealed class DischargeHospitalizationCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var row = new Hospitalization(tid, cid, petId, null, admitted, null, "R", null);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
 
         var result = await CreateHandler().Handle(
@@ -161,7 +160,7 @@ public sealed class DischargeHospitalizationCommandHandlerTests
         typeof(Hospitalization).GetProperty(nameof(Hospitalization.DischargedAtUtc))!
             .SetValue(row, DateTime.UtcNow.AddHours(-1));
 
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
 
         var result = await CreateHandler().Handle(
@@ -185,7 +184,7 @@ public sealed class DischargeHospitalizationCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var row = ActiveStay(tid, cid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
 
         _hospitalizationsWrite.Setup(r => r.UpdateAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()))
@@ -199,12 +198,13 @@ public sealed class DischargeHospitalizationCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         row.DischargedAtUtc.Should().Be(dischargedAt);
-        row.Notes.Should().Be("Taburcu notu");
+        row.DischargeNote.Should().Be("Taburcu notu");
+        row.Notes.Should().Be("Eski not");
         _hospitalizationsWrite.Verify(r => r.UpdateAsync(row, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Handle_Should_LeaveNotesUnchanged_When_NotesNull()
+    public async Task Handle_Should_LeaveDischargeNoteUnchanged_When_NoteNull()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -216,7 +216,7 @@ public sealed class DischargeHospitalizationCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
 
         var row = ActiveStay(tid, cid, petId);
-        _hospitalizationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
 
         _hospitalizationsWrite.Setup(r => r.UpdateAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()))
@@ -224,10 +224,72 @@ public sealed class DischargeHospitalizationCommandHandlerTests
         _hospitalizationsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var result = await CreateHandler().Handle(
-            new DischargeHospitalizationCommand(row.Id, DateTime.UtcNow, Notes: null),
+            new DischargeHospitalizationCommand(row.Id, DateTime.UtcNow, DischargeNote: null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         row.Notes.Should().Be("Eski not");
+        row.DischargeNote.Should().BeNull();
+    }
+
+    private Hospitalization ArrangeActive()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var row = ActiveStay(tid, cid, Guid.NewGuid());
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(row);
+        _hospitalizationsWrite.Setup(r => r.UpdateAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _hospitalizationsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        return row;
+    }
+
+    [Fact]
+    public async Task Handle_Should_Return_RowVersion_And_Apply_Client_Version()
+    {
+        var row = ArrangeActive();
+        var sent = new byte[] { 8, 7, 6, 5, 4, 3, 2, 1 };
+
+        var result = await CreateHandler().Handle(
+            new DischargeHospitalizationCommand(row.Id, DateTime.UtcNow, null, Convert.ToBase64String(sent)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        row.RowVersion.Should().Equal(sent);
+        result.Value!.RowVersion.Should().Be(Convert.ToBase64String(sent));
+    }
+
+    [Fact]
+    public async Task Handle_Should_Reject_Malformed_RowVersion()
+    {
+        var row = ArrangeActive();
+
+        var result = await CreateHandler().Handle(
+            new DischargeHospitalizationCommand(row.Id, DateTime.UtcNow, null, "xx"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Hospitalizations.Validation");
+        _hospitalizationsWrite.Verify(r => r.UpdateAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Return_ConcurrencyConflict_When_Save_Detects_Newer_Version()
+    {
+        var row = ArrangeActive();
+        _hospitalizationsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new DbUpdateConcurrencyException());
+
+        var result = await CreateHandler().Handle(
+            new DischargeHospitalizationCommand(row.Id, DateTime.UtcNow, "Not"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Hospitalizations.ConcurrencyConflict");
     }
 }

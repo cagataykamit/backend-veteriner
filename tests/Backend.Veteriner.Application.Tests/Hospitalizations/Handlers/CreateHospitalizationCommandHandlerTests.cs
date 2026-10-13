@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Hospitalizations.Commands.Create;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
@@ -13,6 +14,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Visits;
 using FluentAssertions;
 using Moq;
 
@@ -27,6 +29,7 @@ public sealed class CreateHospitalizationCommandHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
+    private readonly Mock<IReadRepository<Visit>> _visits = new();
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizationsRead = new();
     private readonly Mock<IRepository<Hospitalization>> _hospitalizationsWrite = new();
 
@@ -39,6 +42,7 @@ public sealed class CreateHospitalizationCommandHandlerTests
             _clinics.Object,
             _pets.Object,
             _examinations.Object,
+            _visits.Object,
             _hospitalizationsRead.Object,
             _hospitalizationsWrite.Object);
 
@@ -198,5 +202,135 @@ public sealed class CreateHospitalizationCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         added.Should().NotBeNull();
         _hospitalizationsWrite.Verify(r => r.AddAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private Examination ArrangeExamination(Guid tid, Guid cid, Guid petId, Guid examId, Guid? visitId = null, bool finalized = false)
+    {
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
+        typeof(Examination).GetProperty(nameof(Examination.VisitId))!.SetValue(exam, visitId);
+        if (finalized)
+            exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+        return exam;
+    }
+
+    private void ArrangeVisit(Guid tid, Guid cid, Guid petId, Guid visitId)
+    {
+        var visit = new Visit(tid, cid, petId, null, null, Guid.NewGuid(), DateTime.UtcNow);
+        typeof(Visit).GetProperty(nameof(Visit.Id))!.SetValue(visit, visitId);
+        _visits.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VisitByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(visit);
+    }
+
+    private void ArrangeAdd(Guid tid, Guid cid, Guid petId)
+    {
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupTenantClinicPetSafe(tid, cid, petId);
+        _hospitalizationsRead.Setup(r => r.AnyAsync(It.IsAny<ActiveHospitalizationForPetClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _hospitalizationsWrite.Setup(r => r.AddAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Hospitalization p, CancellationToken _) => p);
+        _hospitalizationsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Reject_When_Examination_Is_Finalized()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        ArrangeAdd(tid, cid, petId);
+        ArrangeExamination(tid, cid, petId, examId, finalized: true);
+
+        var result = await CreateHandler().Handle(Cmd(cid, petId, examinationId: examId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Examinations.Finalized");
+        _hospitalizationsWrite.Verify(r => r.AddAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Persist_Visit_And_Location()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var visitId = Guid.NewGuid();
+        ArrangeAdd(tid, cid, petId);
+        ArrangeVisit(tid, cid, petId, visitId);
+        Hospitalization? added = null;
+        _hospitalizationsWrite.Setup(r => r.AddAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()))
+            .Callback<Hospitalization, CancellationToken>((p, _) => added = p)
+            .ReturnsAsync((Hospitalization p, CancellationToken _) => p);
+
+        var result = await CreateHandler().Handle(
+            Cmd(cid, petId) with { VisitId = visitId, Location = " Kafes 3 " },
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        added!.VisitId.Should().Be(visitId);
+        added.Location.Should().Be("Kafes 3");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Inherit_Visit_From_Open_Examination()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        var visitId = Guid.NewGuid();
+        ArrangeAdd(tid, cid, petId);
+        ArrangeExamination(tid, cid, petId, examId, visitId);
+        ArrangeVisit(tid, cid, petId, visitId);
+        Hospitalization? added = null;
+        _hospitalizationsWrite.Setup(r => r.AddAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()))
+            .Callback<Hospitalization, CancellationToken>((p, _) => added = p)
+            .ReturnsAsync((Hospitalization p, CancellationToken _) => p);
+
+        var result = await CreateHandler().Handle(Cmd(cid, petId, examinationId: examId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        added!.VisitId.Should().Be(visitId);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Reject_When_Visit_Not_Found()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        ArrangeAdd(tid, cid, petId);
+        _visits.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VisitByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Visit?)null);
+
+        var result = await CreateHandler().Handle(
+            Cmd(cid, petId) with { VisitId = Guid.NewGuid() },
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Visits.NotFound");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Reject_When_Visit_Clinic_Differs()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var visitId = Guid.NewGuid();
+        ArrangeAdd(tid, cid, petId);
+        ArrangeVisit(tid, Guid.NewGuid(), petId, visitId);
+
+        var result = await CreateHandler().Handle(
+            Cmd(cid, petId) with { VisitId = visitId },
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Hospitalizations.VisitClinicMismatch");
     }
 }

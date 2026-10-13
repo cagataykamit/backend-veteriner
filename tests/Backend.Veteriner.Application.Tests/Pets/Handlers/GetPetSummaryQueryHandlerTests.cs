@@ -97,7 +97,7 @@ public sealed class GetPetSummaryQueryHandlerTests
     {
         var h = new Hospitalization(_tenantId, _clinicId, _petId, null, admitted, null, "Gozlem", null);
         if (discharged)
-            h.Discharge(admitted.AddDays(1), false, null);
+            h.Discharge(admitted.AddDays(1), null);
         _hosp.Add(h);
         return h;
     }

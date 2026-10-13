@@ -418,7 +418,7 @@ public sealed class PetTimelineHandlerTests
     public async Task Hospitalization_Is_One_Event_At_Admission_With_Status()
     {
         var h = NewHospitalization(T0);
-        _hosp.Single().Discharge(T0.AddDays(2), false, null);
+        _hosp.Single().Discharge(T0.AddDays(2), null);
 
         var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
 
