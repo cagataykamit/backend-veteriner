@@ -111,7 +111,7 @@ Hasta sahibine verilecek taburcu/evde bakım talimatı ayrı kayıttır; yatış
 Bağ kuralları (oluştururken):
 - Tüm bağlı kayıtlar kiracıya ait, aynı `petId` ve `clinicId`'de olmalıdır (`CareInstructions.HospitalizationPetMismatch` / `…ClinicMismatch`, `ExaminationPetMismatch` / `ExaminationClinicMismatch`; bulunamazsa 404 `Hospitalizations.NotFound` / `Examinations.NotFound` / `Visits.NotFound`).
 - Yatış ve muayene birlikte verilirse yatışın muayenesi (varsa) aynı olmalı: `CareInstructions.HospitalizationExaminationMismatch`.
-- Geliş §2 kuralıyla çözülür: açık `visitId` yoksa önce yatıştan, sonra muayeneden miras alınır; yatış/muayene gelişi ile çelişirse `CareInstructions.VisitMismatch`.
+- Geliş §2 kuralıyla çözülür: açık `visitId` yoksa önce yatıştan, sonra muayeneden miras alınır; yatışın gelişi ile çelişirse `CareInstructions.VisitMismatch`, muayenenin gelişi ile çelişirse `CareInstructions.ExaminationVisitMismatch` (400).
 - Kesinleşmiş muayene **talimat için kilit değildir** (D7: talimat serbest); taburcu talimatı kesinleşmeden sonra yazılabilir. Taburcu edilmiş yatışa talimat yazılabilir.
 
 ## 7) Migration
