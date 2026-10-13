@@ -1,11 +1,9 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
-using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.LabResults.Commands.Cancel;
 using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
-using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
@@ -22,7 +20,6 @@ public sealed class CancelLabResultCommandHandlerTests
     private readonly Mock<IClientContext> _clientContext = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
-    private readonly Mock<IReadRepository<Examination>> _examinations = new();
     private readonly Mock<IRepository<LabResult>> _labResultsWrite = new();
 
     private readonly Guid _tid = Guid.NewGuid();
@@ -47,31 +44,24 @@ public sealed class CancelLabResultCommandHandlerTests
             _clientContext.Object,
             _scopeResolver.Object,
             _tenants.Object,
-            _examinations.Object,
             _labResultsWrite.Object);
 
-    private LabResult Setup(bool withResult, bool examinationFinalized)
+    private LabResult Setup(bool withResult)
     {
+        // Kayıt bir muayeneye bağlı; iptal muayene durumundan bağımsızdır (ADR-013).
         var examId = Guid.NewGuid();
         var row = new LabResult(
             _tid, _cid, _petId, examId, null, null,
             withResult ? DateTime.UtcNow : null, "Test adı", withResult ? "Sonuç" : null, null, null);
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
-
-        var exam = new Examination(_tid, _cid, _petId, null, DateTime.UtcNow, "V", "F", null, null);
-        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
-        if (examinationFinalized)
-            exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
-        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(exam);
         return row;
     }
 
     [Fact]
-    public async Task Handle_Should_Cancel_Requested_Even_When_ExaminationFinalized()
+    public async Task Handle_Should_Cancel_Requested_Record_Bound_To_Examination()
     {
-        var row = Setup(withResult: false, examinationFinalized: true);
+        var row = Setup(withResult: false);
 
         var result = await CreateHandler().Handle(
             new CancelLabResultCommand(row.Id, "Test hiç yapılmadı", RowVersion), CancellationToken.None);
@@ -82,34 +72,22 @@ public sealed class CancelLabResultCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_Reject_Cancelling_Resulted_On_FinalizedExamination()
+    public async Task Handle_Should_Cancel_Resulted_Record_Bound_To_Examination_And_Keep_Result()
     {
-        var row = Setup(withResult: true, examinationFinalized: true);
-
-        var result = await CreateHandler().Handle(
-            new CancelLabResultCommand(row.Id, "Yanlış sonuç girilmiş", RowVersion), CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Examinations.Finalized");
-        row.Status.Should().Be(LabResultStatus.Resulted);
-    }
-
-    [Fact]
-    public async Task Handle_Should_Cancel_Resulted_When_ExaminationOpen()
-    {
-        var row = Setup(withResult: true, examinationFinalized: false);
+        var row = Setup(withResult: true);
 
         var result = await CreateHandler().Handle(
             new CancelLabResultCommand(row.Id, "Yanlış sonuç girilmiş", RowVersion), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         row.Status.Should().Be(LabResultStatus.Cancelled);
+        row.ResultText.Should().Be("Sonuç");
     }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_ReasonTooShort()
     {
-        var row = Setup(withResult: false, examinationFinalized: false);
+        var row = Setup(withResult: false);
 
         var result = await CreateHandler().Handle(new CancelLabResultCommand(row.Id, "yok", RowVersion), CancellationToken.None);
 
@@ -121,7 +99,7 @@ public sealed class CancelLabResultCommandHandlerTests
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_AlreadyCancelled()
     {
-        var row = Setup(withResult: false, examinationFinalized: false);
+        var row = Setup(withResult: false);
         row.Cancel(Guid.NewGuid(), "İlk iptal gerekçesi").IsSuccess.Should().BeTrue();
 
         var result = await CreateHandler().Handle(
@@ -134,7 +112,7 @@ public sealed class CancelLabResultCommandHandlerTests
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_RowVersionInvalid()
     {
-        var row = Setup(withResult: false, examinationFinalized: false);
+        var row = Setup(withResult: false);
 
         var result = await CreateHandler().Handle(
             new CancelLabResultCommand(row.Id, "Test hiç yapılmadı", "bozuk"), CancellationToken.None);
@@ -146,7 +124,7 @@ public sealed class CancelLabResultCommandHandlerTests
     [Fact]
     public async Task Handle_Should_ReturnConflict_When_ConcurrencyViolation()
     {
-        var row = Setup(withResult: false, examinationFinalized: false);
+        var row = Setup(withResult: false);
         _labResultsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException());
 
@@ -160,7 +138,7 @@ public sealed class CancelLabResultCommandHandlerTests
     [Fact]
     public async Task Handle_Should_ReturnNotFound_When_OtherClinic()
     {
-        var row = Setup(withResult: false, examinationFinalized: false);
+        var row = Setup(withResult: false);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
 
         var result = await CreateHandler().Handle(

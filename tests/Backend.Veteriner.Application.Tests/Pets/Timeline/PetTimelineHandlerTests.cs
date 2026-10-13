@@ -8,12 +8,14 @@ using Backend.Veteriner.Application.Pets.Queries.GetTimeline;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Pets.Timeline;
 using Backend.Veteriner.Application.Tests.TestHelpers;
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -44,6 +46,8 @@ public sealed class PetTimelineHandlerTests
     private readonly List<LabResult> _labs = [];
     private readonly List<Vaccination> _vaccinations = [];
     private readonly List<Hospitalization> _hosp = [];
+    private readonly List<Administration> _administrations = [];
+    private readonly List<Product> _products = [];
 
     public PetTimelineHandlerTests()
     {
@@ -72,7 +76,8 @@ public sealed class PetTimelineHandlerTests
                 new PrescriptionTimelineSource(InMemory(_rx).Object),
                 new LabResultTimelineSource(InMemory(_labs).Object),
                 new VaccinationTimelineSource(InMemory(_vaccinations).Object),
-                new HospitalizationTimelineSource(InMemory(_hosp).Object)
+                new HospitalizationTimelineSource(InMemory(_hosp).Object),
+                new AdministrationTimelineSource(InMemory(_administrations).Object, InMemory(_products).Object)
             ]);
 
     /// <summary>Spec'i bellekte değerlendirir (EF'e çeviri entegrasyon testinde doğrulanır).</summary>
@@ -119,6 +124,25 @@ public sealed class PetTimelineHandlerTests
         var h = new Hospitalization(_tenantId, _clinicId, _petId, null, at, null, "Gozlem", null);
         _hosp.Add(h);
         return h;
+    }
+
+    private Administration NewAdministration(DateTime at, bool lateEntry = false, bool voided = false, Product? product = null, Guid? examinationId = null)
+    {
+        product ??= NewProduct();
+        var a = Administration.Create(
+            _tenantId, _clinicId, _petId, examinationId, null, product.Id, 1.5m, at, null,
+            lateEntry, lateEntry ? "Muayene sonrası uygulandı" : null, Guid.NewGuid(), at, null).Value!;
+        if (voided)
+            a.Void(Guid.NewGuid(), "Yanlış ürün seçildi", AdministrationVoidStockOutcome.StockReturned, at.AddMinutes(1));
+        _administrations.Add(a);
+        return a;
+    }
+
+    private Product NewProduct()
+    {
+        var product = new Product(_tenantId, "Amoksisilin", "şişe", 10m, "TRY", sku: "SKU-1");
+        _products.Add(product);
+        return product;
     }
 
     // ---- Doğrulama ----
@@ -402,6 +426,59 @@ public sealed class PetTimelineHandlerTests
         item.EventAtUtc.Should().Be(T0);
         item.Status.Should().Be("Discharged");
         item.SourceId.Should().Be(h.Id);
+    }
+
+    [Fact]
+    public async Task Administration_Row_Shows_Product_Quantity_Late_Marker_And_Hides_Voided_By_Default()
+    {
+        var examId = Guid.NewGuid();
+        var late = NewAdministration(T0, lateEntry: true, examinationId: examId);
+        NewAdministration(T0.AddHours(1), voided: true);
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        var item = result.Value!.Items.Should().ContainSingle().Subject;
+        item.Type.Should().Be(PetRecordKind.Administration);
+        item.SourceId.Should().Be(late.Id);
+        item.EventAtUtc.Should().Be(T0);
+        item.Title.Should().Be("Amoksisilin");
+        item.Summary.Should().Be("1.5 şişe");
+        item.Status.Should().Be("Active");
+        item.IsVoided.Should().BeFalse();
+        item.AddedAfterFinalization.Should().BeTrue();
+        item.RelatedExaminationId.Should().Be(examId);
+        item.LinkRef.Type.Should().Be(PetRecordKind.Administration);
+        item.LinkRef.Id.Should().Be(late.Id);
+    }
+
+    [Fact]
+    public async Task Administration_Voided_Appears_With_IncludeVoided_And_Normal_Rows_Are_Not_Marked()
+    {
+        NewAdministration(T0, voided: true);
+        NewHospitalization(T0.AddHours(1));
+
+        var result = await CreateHandler().Handle(
+            new GetPetTimelineQuery(_petId, IncludeVoided: true), CancellationToken.None);
+
+        var items = result.Value!.Items;
+        items.Should().HaveCount(2);
+        var admin = items.Single(i => i.Type == PetRecordKind.Administration);
+        admin.IsVoided.Should().BeTrue();
+        admin.Status.Should().Be("Voided");
+        admin.AddedAfterFinalization.Should().BeFalse();
+        items.Where(i => i.Type != PetRecordKind.Administration).Should().OnlyContain(i => !i.AddedAfterFinalization);
+    }
+
+    [Fact]
+    public async Task Administration_Is_Omitted_Without_Administrations_Read()
+    {
+        NewAdministration(T0);
+        _permissions.Setup(p => p.HasPermission(PermissionCatalog.Administrations.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        result.Value!.Items.Should().BeEmpty();
+        result.Value.OmittedTypes.Should().Contain("Administration");
     }
 
     [Fact]

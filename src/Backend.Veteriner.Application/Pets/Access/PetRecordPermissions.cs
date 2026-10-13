@@ -17,6 +17,7 @@ public static class PetRecordPermissions
         PetRecordKind.Hospitalization => PermissionCatalog.Hospitalizations.Read,
         PetRecordKind.Appointment => PermissionCatalog.Appointments.Read,
         PetRecordKind.Payment => PermissionCatalog.Payments.Read,
+        PetRecordKind.Administration => PermissionCatalog.Administrations.Read,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Bilinmeyen kayıt türü.")
     };
 

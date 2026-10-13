@@ -989,6 +989,8 @@ FluentValidation → `400` `ValidationProblemDetails`.
 
 **Yanıt:** `PetHistorySummaryDto` — üst düzey `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `recentAppointments`, `recentExaminations`, `recentTreatments`, `recentPrescriptions`, `recentLabResults`, `recentHospitalizations`, `recentPayments`. Her blok öğesi ilgili modülün özet alanlarını taşır (klinik adı `clinicName` ile birlikte `clinicId`).
 
+**`administrations` bloğu (ADR-013, uygulama kaydı):** muayeneye bağlı (`ExaminationId`) **iptal edilmemiş** uygulamalar (iptaller bu blokta gösterilmez; iptal edilenler `GET /api/v1/administrations?examinationId=…&includeVoided=true` ile alınır). Öğe alanları: `id`, `administeredAtUtc`, `clinicId`, `clinicName`, `productName`, `unit`, `quantity`, `addedAfterFinalization` (kesinleştirmeden sonra eklendi rozeti), `lateEntryReason` (yalnız rozetli kayıtta dolu). Yetki bloğu için ek izin aranmaz (diğer bloklarla aynı: `Examinations.Read`). Sıralama `administeredAtUtc` en yeni önce; blok başına en fazla 10 (diğer bloklarla aynı).
+
 **Sıralama ve limit:** Her blok kendi tarih alanına göre **en yeni önce** (`scheduledAtUtc`, `examinedAtUtc`, `treatmentDateUtc`, `prescribedAtUtc`, `resultDateUtc`, `admittedAtUtc`, `paidAtUtc`); blok başına en fazla **10** kayıt (`PetHistorySummaryConstants.RecentItemsTake`).
 
 **Klinik bağlamı:** `IClinicContext.ClinicId` doluysa tüm bloklar yalnız bu klinikteki kayıtlarla sınırlıdır; boşsa tenant içindeki tüm kliniklerdeki ilgili pet kayıtları dahil edilir (client `recent-summary` ile aynı yaklaşım).
@@ -1005,7 +1007,7 @@ FluentValidation → `400` `ValidationProblemDetails`.
 
 **Amaç:** Muayene detay ekranında bu muayeneye bağlı tedavi, reçete, lab, yatış ve ödemeleri ayrı liste endpoint’leri yerine tek yanıtta sunmak.
 
-**Yanıt:** `ExaminationRelatedSummaryDto` — üst düzey `examinationId`, `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `treatments`, `prescriptions`, `labResults`, `hospitalizations`, `payments`. Her blok öğesi ilgili modülün özet alanlarını taşır (`clinicName` ile birlikte `clinicId`). Tedavi öğelerinde `examinationId` tekrarlanmaz (route’taki muayene zaten bağlamdır).
+**Yanıt:** `ExaminationRelatedSummaryDto` — üst düzey `examinationId`, `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `treatments`, `prescriptions`, `labResults`, `hospitalizations`, `administrations`, `payments`. Her blok öğesi ilgili modülün özet alanlarını taşır (`clinicName` ile birlikte `clinicId`). Tedavi öğelerinde `examinationId` tekrarlanmaz (route’taki muayene zaten bağlamdır).
 
 **Sıralama ve limit:** Her blok kendi tarih alanına göre **en yeni önce** (`treatmentDateUtc`, `prescribedAtUtc`, `resultDateUtc`, `admittedAtUtc`, `paidAtUtc`); blok başına en fazla **10** kayıt (`ExaminationRelatedSummaryConstants.RelatedItemsTake`).
 

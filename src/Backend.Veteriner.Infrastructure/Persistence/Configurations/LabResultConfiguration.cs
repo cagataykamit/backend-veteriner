@@ -19,6 +19,7 @@ public sealed class LabResultConfiguration : IEntityTypeConfiguration<LabResult>
         b.Property(x => x.ExaminationId);
         b.Property(x => x.VisitId);
         b.Property(x => x.Status).IsRequired();
+        b.Property(x => x.InterpretationRequired).IsRequired();
         b.Property(x => x.RequestedAtUtc).IsRequired();
         b.Property(x => x.RequestedByUserId);
         b.Property(x => x.ResultDateUtc);

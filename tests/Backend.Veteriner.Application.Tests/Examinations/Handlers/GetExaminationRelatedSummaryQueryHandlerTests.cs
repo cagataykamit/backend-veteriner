@@ -5,6 +5,8 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Queries.GetRelatedSummary;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Products.Specs;
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
@@ -13,6 +15,7 @@ using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Treatments;
 using FluentAssertions;
 using Moq;
@@ -34,6 +37,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
     private readonly Mock<IReadRepository<Prescription>> _prescriptions = new();
     private readonly Mock<IReadRepository<LabResult>> _labResults = new();
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizations = new();
+    private readonly Mock<IReadRepository<Administration>> _administrations = new();
+    private readonly Mock<IReadRepository<Product>> _products = new();
     private readonly Mock<IReadRepository<Payment>> _payments = new();
     private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
 
@@ -63,6 +68,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             _prescriptions.Object,
             _labResults.Object,
             _hospitalizations.Object,
+            _administrations.Object,
+            _products.Object,
             _payments.Object,
             _permissions.Object);
 
@@ -128,6 +135,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             .ReturnsAsync(new List<LabResult>());
         _hospitalizations.Setup(r => r.ListAsync(It.IsAny<HospitalizationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Hospitalization>());
+        _administrations.Setup(r => r.ListAsync(It.IsAny<AdministrationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Administration>());
         _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Payment>());
         _clinics.Setup(r => r.ListAsync(It.IsAny<ClinicsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
@@ -221,6 +230,44 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Include_Administrations_With_Late_Entry_Marker()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        SetupTenant(tid);
+        SetupTenantWideRole("Admin");
+        SetupExaminationFound(BuildExamination(tid, clinicId, petId, examId));
+        SetupSuccessGraph(tid, clinicId, petId, examId);
+
+        var product = new Product(tid, "Amoksisilin", "şişe", 10m, "TRY", sku: "SKU-1");
+        var late = Administration.Create(
+            tid, clinicId, petId, examId, null, product.Id, 1.5m, DateTime.UtcNow, null,
+            true, "Muayene sonrası uygulandı", Guid.NewGuid(), DateTime.UtcNow, null).Value!;
+        var normal = Administration.Create(
+            tid, clinicId, petId, examId, null, product.Id, 1m, DateTime.UtcNow, null,
+            false, null, Guid.NewGuid(), DateTime.UtcNow, null).Value!;
+        _administrations.Setup(r => r.ListAsync(It.IsAny<AdministrationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Administration> { late, normal });
+        _products.Setup(r => r.ListAsync(It.IsAny<ProductsByIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Product> { product });
+
+        var result = await CreateHandler().Handle(new GetExaminationRelatedSummaryQuery(examId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var items = result.Value!.Administrations;
+        items.Should().HaveCount(2);
+        var lateItem = items.Single(i => i.Id == late.Id);
+        lateItem.ProductName.Should().Be("Amoksisilin");
+        lateItem.Unit.Should().Be("şişe");
+        lateItem.Quantity.Should().Be(1.5m);
+        lateItem.AddedAfterFinalization.Should().BeTrue();
+        lateItem.LateEntryReason.Should().Be("Muayene sonrası uygulandı");
+        items.Single(i => i.Id == normal.Id).AddedAfterFinalization.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnSummary_When_AssignedNonTenantWideUserReadsOwnClinicExamination()
     {
         var tid = Guid.NewGuid();
@@ -255,9 +302,11 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.LabResults.Read)).Returns(false);
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Hospitalizations.Read)).Returns(false);
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Payments.Read)).Returns(false);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Administrations.Read)).Returns(false);
 
         var result = await CreateHandler().Handle(new GetExaminationRelatedSummaryQuery(examId), CancellationToken.None);
 
+        _administrations.Verify(r => r.ListAsync(It.IsAny<ISpecification<Administration>>(), It.IsAny<CancellationToken>()), Times.Never);
         result.IsSuccess.Should().BeTrue();
         result.Value!.Treatments.Should().BeEmpty();
         result.Value.Prescriptions.Should().BeEmpty();
