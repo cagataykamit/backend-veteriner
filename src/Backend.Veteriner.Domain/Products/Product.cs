@@ -25,6 +25,25 @@ public sealed class Product : AggregateRoot
     public string Currency { get; private set; } = default!;
 
     public bool IsActive { get; private set; }
+
+    /// <summary>Ürün sınıfı; varsayılan <see cref="ProductKind.Other"/>.</summary>
+    public ProductKind Kind { get; private set; }
+
+    /// <summary>Kontrollü sınıf; varsayılan <see cref="ControlledSubstanceClass.None"/>.</summary>
+    public ControlledSubstanceClass ControlledClass { get; private set; }
+
+    /// <summary>Farmakolojik şekil (ör. enjeksiyonluk çözelti).</summary>
+    public string? PharmacologicalForm { get; private set; }
+
+    /// <summary>Takdim şekli (ör. flakon).</summary>
+    public string? PresentationForm { get; private set; }
+
+    /// <summary>Ambalaj (ör. 10 ml flakon).</summary>
+    public string? Packaging { get; private set; }
+
+    /// <summary>Aşı ve kontrollü ürünlerde stok girişinde seri/lot no ve son kullanma tarihi zorunludur.</summary>
+    public bool RequiresLotAndExpiry => Kind == ProductKind.Vaccine || ControlledClass != ControlledSubstanceClass.None;
+
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
@@ -43,7 +62,12 @@ public sealed class Product : AggregateRoot
         Guid? productCategoryId = null,
         string? sku = null,
         string? barcode = null,
-        string? description = null)
+        string? description = null,
+        ProductKind kind = ProductKind.Other,
+        ControlledSubstanceClass controlledClass = ControlledSubstanceClass.None,
+        string? pharmacologicalForm = null,
+        string? presentationForm = null,
+        string? packaging = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -65,6 +89,11 @@ public sealed class Product : AggregateRoot
         Sku = NormalizeOptional(sku);
         Barcode = NormalizeOptional(barcode);
         Description = NormalizeOptional(description);
+        Kind = kind;
+        ControlledClass = controlledClass;
+        PharmacologicalForm = NormalizeOptional(pharmacologicalForm);
+        PresentationForm = NormalizeOptional(presentationForm);
+        Packaging = NormalizeOptional(packaging);
         IsActive = true;
         CreatedAtUtc = DateTime.UtcNow;
         UpdatedAtUtc = null;
@@ -81,7 +110,12 @@ public sealed class Product : AggregateRoot
         string currency,
         string? sku = null,
         string? barcode = null,
-        string? description = null)
+        string? description = null,
+        ProductKind kind = ProductKind.Other,
+        ControlledSubstanceClass controlledClass = ControlledSubstanceClass.None,
+        string? pharmacologicalForm = null,
+        string? presentationForm = null,
+        string? packaging = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Ürün adı boş olamaz.", nameof(name));
@@ -100,6 +134,11 @@ public sealed class Product : AggregateRoot
         Sku = NormalizeOptional(sku);
         Barcode = NormalizeOptional(barcode);
         Description = NormalizeOptional(description);
+        Kind = kind;
+        ControlledClass = controlledClass;
+        PharmacologicalForm = NormalizeOptional(pharmacologicalForm);
+        PresentationForm = NormalizeOptional(presentationForm);
+        Packaging = NormalizeOptional(packaging);
         UpdatedAtUtc = DateTime.UtcNow;
     }
 

@@ -26,9 +26,14 @@ public sealed class StockMovement
     public Guid? RequestId { get; private set; }
     /// <summary>Yalnız <see cref="StockMovementType.Reversal"/>: geri alınan hareket.</summary>
     public Guid? ReversesMovementId { get; private set; }
+    /// <summary>Etkilenen parti; <c>null</c> = partisiz (eski/devir) bakiye.</summary>
+    public Guid? BatchId { get; private set; }
+    /// <summary>Hareketten sonra partinin kalanı (partisiz bakiyede <c>null</c>); defterin kalan bakiye sütunu ve Adjustment yönü içindir.</summary>
+    public decimal? BatchBalanceAfter { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
 
     public Product? Product { get; private set; }
+    public StockBatch? Batch { get; private set; }
 
     private StockMovement() { }
 
@@ -72,6 +77,17 @@ public sealed class StockMovement
         RequestId = requestId == Guid.Empty ? null : requestId;
         ReversesMovementId = reversesMovementId == Guid.Empty ? null : reversesMovementId;
         CreatedAtUtc = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Hareketi partiye bağlar. Parti kalanı hareketin etkisiyle güncellendikten <b>sonra</b> çağrılır; yeni partide
+    /// parti, hareketle aynı kayıt işleminde yazılır.
+    /// </summary>
+    public void LinkBatch(StockBatch batch)
+    {
+        Batch = batch;
+        BatchId = batch.Id;
+        BatchBalanceAfter = batch.RemainingQuantity;
     }
 
     /// <summary>Geri alınabilir: yalnız yönü bilinen hareketler (Adjustment hedef sayımdır, Reversal tekrar geri alınmaz).</summary>

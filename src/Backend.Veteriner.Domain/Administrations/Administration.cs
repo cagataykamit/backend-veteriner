@@ -49,6 +49,9 @@ public sealed class Administration : AggregateRoot
     /// <summary>İstemci tekrar koruması anahtarı; aynı kiracıda benzersizdir, verilmeyebilir.</summary>
     public Guid? RequestId { get; private set; }
 
+    /// <summary>Düşülen parti; <c>null</c> = partisiz (eski/devir) bakiye.</summary>
+    public Guid? BatchId { get; private set; }
+
     /// <summary>Eşzamanlı iptalleri ayırt eden belirteç (iptal stok iadesi yazmasa da tek kazanan olur).</summary>
     public byte[] RowVersion { get; private set; } = default!;
 
@@ -118,6 +121,15 @@ public sealed class Administration : AggregateRoot
             CreatedAtUtc = NormalizeUtc(createdAtUtc),
             RequestId = requestId,
         });
+    }
+
+    /// <summary>Stok düşümü sırasında seçilen partiyi bağlar (partisiz bakiyeden düşüldüyse çağrılmaz).</summary>
+    public void LinkBatch(Guid batchId)
+    {
+        if (batchId == Guid.Empty)
+            throw new ArgumentException("BatchId geçersiz.", nameof(batchId));
+
+        BatchId = batchId;
     }
 
     /// <summary>
