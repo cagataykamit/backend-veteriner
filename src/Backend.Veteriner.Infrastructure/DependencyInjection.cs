@@ -47,8 +47,12 @@ using Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
 using Backend.Veteriner.Application.Reports.Appointments;
 using Backend.Veteriner.Application.Reports.OutstandingBalances;
 using Backend.Veteriner.Application.Reports.Registers;
+using Backend.Veteriner.Application.Reports.Registers.ControlledSubstances;
 using Backend.Veteriner.Application.Reports.Registers.Examinations;
+using Backend.Veteriner.Application.Reports.Registers.Medications;
 using Backend.Veteriner.Application.Reports.Registers.Prescriptions;
+using Backend.Veteriner.Application.Reports.Registers.VaccineInfo;
+using Backend.Veteriner.Application.Reports.Registers.Vaccines;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaimPermissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaims;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
@@ -171,6 +175,10 @@ public static class DependencyInjection
         services.AddScoped<IOutstandingBalancesReportReader, OutstandingBalancesReportReader>();
         services.AddScoped<IRegisterReader<ExaminationRegisterItemDto>, ExaminationRegisterReader>();
         services.AddScoped<IRegisterReader<PrescriptionRegisterEntryDto>, PrescriptionRegisterReader>();
+        services.AddScoped<IRegisterReader<VaccineRegisterItemDto>, VaccineRegisterReader>();
+        services.AddScoped<IRegisterReader<MedicationRegisterItemDto>, MedicationRegisterReader>();
+        services.AddScoped<IRegisterReader<ControlledSubstanceRegisterItemDto>, ControlledSubstanceRegisterReader>();
+        services.AddScoped<IRegisterReader<VaccineInfoRegisterItemDto>, VaccineInfoRegisterReader>();
         services.AddScoped<IOutbox, EfOutbox>();
 
 
