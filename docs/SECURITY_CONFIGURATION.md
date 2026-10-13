@@ -20,6 +20,8 @@ dotnet user-secrets set "Billing:Iyzico:ApiKey" "<değer>" --project src/Backend
 dotnet user-secrets set "Billing:Iyzico:SecretKey" "<değer>" --project src/Backend.Veteriner.Api
 ```
 
+Testler ve CI bu yerel dosyaya bağımlı değildir: varsayılan/rollout bayrağı testleri `appsettings.Development.json` yerine izlenen `appsettings.Development.json.example` şablonunu okur (şablonda bayraklar production-safe `false` kalmalıdır).
+
 ## Açılış doğrulaması
 
 Development, Production ve Staging ortamlarında şu ayarlar yoksa API başlamaz (hata iletisi yalnız ayar adını söyler, değer yazmaz): `Jwt:Key` (en az 32 karakter), `ConnectionStrings:DefaultConnection`, `ConnectionStrings:QueryConnection`, `Smtp:Pass`, `AllowedOrigins`, `AllowedHosts`. Production/Staging'de ayrıca `Smtp:Host` yer tutucu (`smtp.example.com`) kalamaz. Kural tek yerde: `StartupConfigurationValidator`, `HostSecurityConfiguration`. Test ortamları (`IntegrationTests`, `LoadTest`) kendi yapılandırmasını getirir ve bu denetimin dışındadır.
