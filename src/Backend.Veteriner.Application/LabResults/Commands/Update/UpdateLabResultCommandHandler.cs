@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Visits.Access;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.LabResults;
@@ -165,8 +166,8 @@ public sealed class UpdateLabResultCommandHandler
 
         var visitHint = request.VisitId
             ?? (request.ExaminationId == existing.ExaminationId ? existing.VisitId : null);
-        var visit = await LabResultVisitResolver.ResolveAsync(
-            _visits, tenantId, effectiveClinicId, request.PetId, exam, visitHint, ct);
+        var visit = await LinkedRecordVisitResolver.ResolveAsync(
+            _visits, tenantId, effectiveClinicId, request.PetId, exam, visitHint, "LabResults", "lab kaydı", ct);
         if (!visit.IsSuccess)
             return Result<LabResultWriteResultDto>.Failure(visit.Error);
 

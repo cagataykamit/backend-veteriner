@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.LabResults.Access;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Visits.Access;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.LabResults;
@@ -136,8 +137,8 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
             }
         }
 
-        var visit = await LabResultVisitResolver.ResolveAsync(
-            _visits, tenantId, effectiveClinicId, request.PetId, exam, request.VisitId, ct);
+        var visit = await LinkedRecordVisitResolver.ResolveAsync(
+            _visits, tenantId, effectiveClinicId, request.PetId, exam, request.VisitId, "LabResults", "lab kaydı", ct);
         if (!visit.IsSuccess)
             return Result<Guid>.Failure(visit.Error);
 
