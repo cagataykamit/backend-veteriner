@@ -184,6 +184,13 @@ public static class PermissionCatalog
         public const string Discharge = "Hospitalizations.Discharge";
     }
 
+    public static class CareInstructions
+    {
+        public const string Read = "CareInstructions.Read";
+        public const string Create = "CareInstructions.Create";
+        public const string Update = "CareInstructions.Update";
+    }
+
     public static class ProductCategories
     {
         public const string Read = "ProductCategories.Read";
@@ -318,6 +325,10 @@ public static class PermissionCatalog
         new(Hospitalizations.Create, "Yatış kaydı oluşturma yetkisi", "Hospitalizations"),
         new(Hospitalizations.Update, "Yatış kaydı güncelleme yetkisi", "Hospitalizations"),
         new(Hospitalizations.Discharge, "Yatış kaydını taburcu etme yetkisi", "Hospitalizations"),
+
+        new(CareInstructions.Read, "Bakım talimatlarını listeleme ve görüntüleme yetkisi", "CareInstructions"),
+        new(CareInstructions.Create, "Bakım talimatı oluşturma yetkisi", "CareInstructions"),
+        new(CareInstructions.Update, "Bakım talimatı güncelleme yetkisi", "CareInstructions"),
 
         new(ProductCategories.Read, "Ürün kategorilerini listeleme ve görüntüleme yetkisi", "ProductCategories"),
         new(ProductCategories.Create, "Ürün kategorisi oluşturma yetkisi", "ProductCategories"),

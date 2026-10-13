@@ -12,6 +12,7 @@ using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.CareInstructions;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Prescriptions;
@@ -93,6 +94,7 @@ public class AppDbContext : DbContext
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<LabResult> LabResults => Set<LabResult>();
     public DbSet<Hospitalization> Hospitalizations => Set<Hospitalization>();
+    public DbSet<CareInstruction> CareInstructions => Set<CareInstruction>();
     public DbSet<TenantBillingProfile> TenantBillingProfiles => Set<TenantBillingProfile>();
     public DbSet<TenantReminderSettings> TenantReminderSettings => Set<TenantReminderSettings>();
     public DbSet<ReminderDispatchLog> ReminderDispatchLogs => Set<ReminderDispatchLog>();
