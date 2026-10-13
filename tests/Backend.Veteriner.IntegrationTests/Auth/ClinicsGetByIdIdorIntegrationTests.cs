@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using FluentAssertions;
@@ -112,6 +113,37 @@ public sealed class ClinicsGetByIdIdorIntegrationTests : IClassFixture<CustomWeb
         var response = await client.GetAsync($"/api/v1/clinics/{seedClinicId}");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetById_Should_Return404_When_PlatformAdminReadsClinicOfCustomerTenant()
+    {
+        var client = _factory.CreateClient();
+        var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
+        var email = $"platform-{Guid.NewGuid():N}@vetinity.test";
+        const string password = "Guclu-Parola-9!";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await PlatformAdminBootstrapper.CreateAsync(db, hasher, new(email, password));
+        }
+
+        var customerClinicId = await GetDefaultSeedClinicIdAsync();
+
+        var login = await IntegrationTestAuthHelper.LoginAsync(client, _factory.Services, email, password);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var platformTenant = await db.Tenants.SingleAsync(t => t.Name == Tenant.PlatformTenantName);
+            login.TenantId.Should().Be(platformTenant.Id);
+        }
+
+        var response = await client.GetAsync($"/api/v1/clinics/{customerClinicId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     private async Task<Guid> GetDefaultSeedClinicIdAsync()

@@ -1,6 +1,7 @@
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using FluentAssertions;
@@ -191,7 +192,49 @@ public sealed class AdminSeedingOrchestrationTests
         (await db.UserOperationClaims.AnyAsync(x => x.UserId == user.Id && x.OperationClaimId == claim.Id)).Should().BeTrue();
         (await db.UserTenants.CountAsync(x => x.UserId == user.Id)).Should().Be(1);
 
+        var platformTenant = await db.Tenants.SingleAsync(t => t.Name == Tenant.PlatformTenantName);
+        platformTenant.IsActive.Should().BeTrue();
+        (await db.UserTenants.AnyAsync(x => x.UserId == user.Id && x.TenantId == platformTenant.Id)).Should().BeTrue();
+        (await db.Tenants.AnyAsync(t => t.Name == DataSeeder.DefaultTenantName)).Should().BeFalse();
+        (await db.Clinics.AnyAsync()).Should().BeFalse();
+        (await db.TenantSubscriptions.AnyAsync()).Should().BeFalse();
+
         var duplicate = () => PlatformAdminBootstrapper.CreateAsync(db, hasher, new("owner@vetinity.test", "Guclu-Parola-9!"));
         await duplicate.Should().ThrowAsync<InvalidOperationException>().WithMessage("*zaten var*");
+    }
+
+    [Fact]
+    public async Task PlatformAdminBootstrapper_Should_ReusePlatformTenant_For_SecondAdmin()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+        var hasher = new StubBcryptPasswordHasher();
+        await PermissionSeeder.SeedAsync(db);
+        await AdminClaimSeeder.SeedAsync(db, platformAdminEmail: null);
+
+        await PlatformAdminBootstrapper.CreateAsync(db, hasher, new("ilk@vetinity.test", "Guclu-Parola-9!"));
+        await PlatformAdminBootstrapper.CreateAsync(db, hasher, new("ikinci@vetinity.test", "Guclu-Parola-9!"));
+
+        (await db.Tenants.CountAsync(t => t.Name == Tenant.PlatformTenantName)).Should().Be(1);
+        (await db.UserTenants.Select(x => x.TenantId).Distinct().CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PlatformAdminBootstrapper_Should_Refuse_When_PlatformNamedTenantHasClinic()
+    {
+        await using var db = new AppDbContext(CreateOptions());
+        await ResetDatabaseAsync(db);
+        var hasher = new StubBcryptPasswordHasher();
+        await PermissionSeeder.SeedAsync(db);
+        await AdminClaimSeeder.SeedAsync(db, platformAdminEmail: null);
+        var customerTenant = new Tenant(Tenant.PlatformTenantName);
+        db.Tenants.Add(customerTenant);
+        db.Clinics.Add(new Backend.Veteriner.Domain.Clinics.Clinic(customerTenant.Id, "Müşteri Kliniği", "İstanbul"));
+        await db.SaveChangesAsync();
+
+        var act = () => PlatformAdminBootstrapper.CreateAsync(db, hasher, new("owner@vetinity.test", "Guclu-Parola-9!"));
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*müşteri kiracısı*");
+        (await db.Users.AnyAsync(u => u.Email == "owner@vetinity.test")).Should().BeFalse();
     }
 }
