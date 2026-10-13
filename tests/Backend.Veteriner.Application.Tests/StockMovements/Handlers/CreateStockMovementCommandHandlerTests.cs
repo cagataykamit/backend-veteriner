@@ -45,6 +45,7 @@ public sealed class CreateStockMovementCommandHandlerTests
             _clinicsRead.Object,
             _productStocksWrite.Object,
             _stockMovementsWrite.Object,
+            new Mock<IRepository<StockBatch>>().Object,
             StockBatchMocks.EmptyResolver(),
             _uow.Object);
 
@@ -128,6 +129,7 @@ public sealed class CreateStockMovementCommandHandlerTests
             _clinicsRead.Object,
             _productStocksWrite.Object,
             _stockMovementsWrite.Object,
+            new Mock<IRepository<StockBatch>>().Object,
             StockBatchMocks.EmptyResolver(),
             _uow.Object);
 

@@ -67,6 +67,7 @@ public sealed class CreateStockMovementSafetyTests
             _clinicsRead.Object,
             _productStocksWrite.Object,
             _stockMovementsWrite.Object,
+            new Mock<IRepository<StockBatch>>().Object,
             StockBatchMocks.EmptyResolver(),
             _uow.Object);
 

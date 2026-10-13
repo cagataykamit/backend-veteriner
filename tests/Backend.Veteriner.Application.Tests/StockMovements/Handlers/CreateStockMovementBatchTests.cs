@@ -23,6 +23,7 @@ public sealed class CreateStockMovementBatchTests
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IRepository<ProductStock>> _productStocksWrite = new();
     private readonly Mock<IRepository<StockMovement>> _stockMovementsWrite = new();
+    private readonly Mock<IRepository<StockBatch>> _batchesWrite = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -76,6 +77,7 @@ public sealed class CreateStockMovementBatchTests
             _clinicsRead.Object,
             _productStocksWrite.Object,
             _stockMovementsWrite.Object,
+            _batchesWrite.Object,
             new StockBatchResolver(StockBatchMocks.WithBatches(existingBatches).Object),
             _uow.Object);
 

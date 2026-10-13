@@ -27,6 +27,7 @@ public sealed class CreateStockMovementCommandHandler
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<ProductStock> _productStocksWrite;
     private readonly IRepository<StockMovement> _stockMovementsWrite;
+    private readonly IRepository<StockBatch> _batchesWrite;
     private readonly StockBatchResolver _batchResolver;
     private readonly IUnitOfWork _uow;
 
@@ -40,6 +41,7 @@ public sealed class CreateStockMovementCommandHandler
         IReadRepository<Clinic> clinicsRead,
         IRepository<ProductStock> productStocksWrite,
         IRepository<StockMovement> stockMovementsWrite,
+        IRepository<StockBatch> batchesWrite,
         StockBatchResolver batchResolver,
         IUnitOfWork uow)
     {
@@ -52,6 +54,7 @@ public sealed class CreateStockMovementCommandHandler
         _clinicsRead = clinicsRead;
         _productStocksWrite = productStocksWrite;
         _stockMovementsWrite = stockMovementsWrite;
+        _batchesWrite = batchesWrite;
         _batchResolver = batchResolver;
         _uow = uow;
     }
@@ -290,7 +293,10 @@ public sealed class CreateStockMovementCommandHandler
                     "Desteklenmeyen hareket tipi.");
         }
 
-        if (batch is not null)
+        // Mevcut parti hareketle aynı kayıt işleminde güncellenir (FK satırı var). Yeni parti hareketten sonra yazılır:
+        // aksi hâlde parti INSERT'ü, requestId yarışını kaybeden hareketin INSERT'ünden önce çalışır ve sahipsiz kalır.
+        var batchIsNew = request.MovementType is StockMovementType.In or StockMovementType.Initial;
+        if (batch is not null && !batchIsNew)
             movement.LinkBatch(batch);
 
         // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); işlem sınırı TransactionBehavior'dadır.
@@ -339,6 +345,12 @@ public sealed class CreateStockMovementCommandHandler
 
                 throw;
             }
+        }
+
+        if (batch is not null && batchIsNew)
+        {
+            await _batchesWrite.AddAsync(batch, ct);
+            movement.LinkBatch(batch);
         }
 
         try
