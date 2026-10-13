@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA5_DISCOVERY.md` (R2 çift tüketim, R3 eşzamanlılık, R4 geri alma; D1–D9 kabul edildi). Uçlar `api/v1` altında; hata zarfı standart `ProblemDetails` + `extensions.code` (bkz. `VISITS_API_CONTRACT.md`).
 
-> **Durum:** Sözleşme. Kapsam: mevcut `POST /stock-movements` için tekrar koruması, kaynak benzersizliği, eşzamanlı ilk giriş düzeltmesi ve yeni `POST /stock-movements/{id}/reverse`. **Kapsam dışı:** Uygulama (administration) kaydı, reçete satırı, tedavi/reçete stok bağı, ücret önerisi, yeni dar izin (Dilim 2+).
+> **Durum:** Sözleşme. Kapsam: mevcut `POST /stock-movements` için tekrar koruması, kaynak benzersizliği, eşzamanlı ilk giriş düzeltmesi ve yeni `POST /stock-movements/{id}/reverse`. **Kapsam dışı:** Uygulama (administration) kaydı, reçete satırı, tedavi/reçete stok bağı, ücret önerisi, yeni dar izin (Dilim 2+). **Parti (lot) bazlı stok (ADR-015)** bu sözleşmeyi genişletir: giriş parti açar, çıkış/ters hareket partiye bağlanır; bkz. `BATCH_STOCK_API_CONTRACT.md`.
 
 ---
 

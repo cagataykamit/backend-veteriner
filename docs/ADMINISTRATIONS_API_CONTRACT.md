@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA5_DISCOVERY.md` (D1, D3, D6, D7, D8, D9 kabul edildi; K3, K4, R1, R2, R4), `docs/STOCK_MOVEMENT_SAFETY_API_CONTRACT.md` (requestId, kaynak benzersizliği, ters hareket). Uçlar `api/v1` altında; hata zarfı standart `ProblemDetails` + `extensions.code` (bkz. `VISITS_API_CONTRACT.md`).
 
-> **Durum:** Sözleşme (ADR-013 ile güncellendi: kesinleşmiş muayeneye sonradan ekleme, pasif üründe iptal, iptalde stok sonucu). Kapsam: klinikte hastaya fiilen uygulanan ürünün kaydı, stok düşümü ve iptali. **Kapsam dışı:** reçete satırları (Dilim 3; reçete hiçbir zaman stok değiştirmez), ücret önerisi (Dilim 5), aşıda stok tüketimi (D6), lot/son kullanma ve birim dönüşümü (D4), düşük stok bildirimi/e-posta.
+> **Durum:** Sözleşme (ADR-013 ile güncellendi: kesinleşmiş muayeneye sonradan ekleme, pasif üründe iptal, iptalde stok sonucu). Kapsam: klinikte hastaya fiilen uygulanan ürünün kaydı, stok düşümü ve iptali. **Kapsam dışı:** reçete satırları (Dilim 3; reçete hiçbir zaman stok değiştirmez), ücret önerisi (Dilim 5), aşıda stok tüketimi (D6), birim dönüşümü (D4), düşük stok bildirimi/e-posta. **Parti (lot) ve son kullanma tarihi bu sözleşmenin kapsamı dışındaydı; ADR-015 ile eklendi: uygulama artık bir partiden düşer (`batchId`, yanıtta `lotNumber`/`expiryDate`), süresi geçmiş partide engellenir. Bkz. `BATCH_STOCK_API_CONTRACT.md` bölüm 6.**
 
 ---
 
