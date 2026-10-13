@@ -204,6 +204,7 @@ public static class PermissionCatalog
     {
         public const string Read = "StockMovements.Read";
         public const string Create = "StockMovements.Create";
+        public const string Correct = "StockMovements.Correct";
     }
 
     public static class Admin
@@ -331,6 +332,7 @@ public static class PermissionCatalog
 
         new(StockMovements.Read, "Stok hareketlerini listeleme ve görüntüleme yetkisi", "StockMovements"),
         new(StockMovements.Create, "Stok giriş/çıkış/düzeltme dahil hareket kaydı oluşturma yetkisi", "StockMovements"),
+        new(StockMovements.Correct, "Stok hareketini gerekçeyle geri alma (ters hareket) yetkisi", "StockMovements"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 

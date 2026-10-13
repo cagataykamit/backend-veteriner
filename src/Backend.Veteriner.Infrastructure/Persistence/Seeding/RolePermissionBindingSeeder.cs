@@ -16,7 +16,8 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Seeding;
 ///   <item>OperationClaim veya Permission satırı yoksa skip + warning (upstream seeder'ların
 ///   önce çalışması beklenir: <c>PermissionSeeder</c> → <c>InviteAssignableOperationClaimsSeeder</c>).</item>
 ///   <item>Bu seeder var olan atamaları silmez; sadece eklenecek olanları ekler (ek üst rol).
-///   <b>İstisna (Faz 4B-6):</b> <c>"Admin"</c> claim'i için whitelist temizliği uygulanır — bkz. aşağıda.</item>
+///   <b>İstisnalar:</b> <c>"Admin"</c> claim'i için whitelist temizliği (Faz 4B-6, aşağıda) ve
+///   <see cref="RolePermissionBindings.Revoked"/> içindeki bilinçli geri alınan (rol, permission) çiftleri silinir.</item>
 /// </list>
 /// </para>
 /// <para>
@@ -103,14 +104,59 @@ public static class RolePermissionBindingSeeder
             totalAdded += roleAdded;
         }
 
+        var totalRevoked = await RemoveRevokedBindingsAsync(db, claimByName, permissionByCode, logger, ct);
+
         // Admin whitelist cleanup: tenant Admin rolünden sistem/whitelist-dışı permission'ları kaldır.
         var removedFromAdmin = await CleanupTenantAdminWhitelistAsync(
             db, claimByName, permissions, logger, ct);
 
         logger?.LogInformation(
-            "RolePermissionBindingSeeder tamamlandı. Toplam eklenen bağ: {TotalAdded}, Admin claim'inden temizlenen: {RemovedFromAdmin}.",
+            "RolePermissionBindingSeeder tamamlandı. Toplam eklenen bağ: {TotalAdded}, geri alınan bağ: {TotalRevoked}, Admin claim'inden temizlenen: {RemovedFromAdmin}.",
             totalAdded,
+            totalRevoked,
             removedFromAdmin);
+    }
+
+    /// <summary>
+    /// <see cref="RolePermissionBindings.Revoked"/> içindeki (rol, permission) bağlarını siler; yoksa no-op (idempotent).
+    /// </summary>
+    private static async Task<int> RemoveRevokedBindingsAsync(
+        AppDbContext db,
+        IReadOnlyDictionary<string, OperationClaim> claimByName,
+        IReadOnlyDictionary<string, Permission> permissionByCode,
+        ILogger? logger,
+        CancellationToken ct)
+    {
+        var removed = 0;
+
+        foreach (var (roleName, permissionCodes) in RolePermissionBindings.Revoked)
+        {
+            if (!claimByName.TryGetValue(roleName, out var claim))
+                continue;
+
+            var permissionIds = permissionCodes
+                .Where(permissionByCode.ContainsKey)
+                .Select(code => permissionByCode[code].Id)
+                .ToList();
+
+            var bindings = await db.OperationClaimPermissions
+                .Where(x => x.OperationClaimId == claim.Id && permissionIds.Contains(x.PermissionId))
+                .ToListAsync(ct);
+            if (bindings.Count == 0)
+                continue;
+
+            db.OperationClaimPermissions.RemoveRange(bindings);
+            await db.SaveChangesAsync(ct);
+            removed += bindings.Count;
+
+            logger?.LogInformation(
+                "RolePermissionBindingSeeder: '{RoleName}' rolünden {Count} varsayılan dışı bağ geri alındı: {Codes}",
+                roleName,
+                bindings.Count,
+                string.Join(", ", permissionCodes));
+        }
+
+        return removed;
     }
 
     /// <summary>

@@ -87,9 +87,10 @@ public sealed class StockMovementsController : ControllerBase
 
     /// <summary>
     /// Hareketi geri alır (ters hareket yazar). Yeni kayıt 201; aynı <c>requestId</c> ile tekrar istek 200.
+    /// Yalnız yönetici düzeyi (<c>StockMovements.Correct</c>); uygulama iptali bu uçtan geçmez.
     /// </summary>
     [HttpPost("{id:guid}/reverse")]
-    [Authorize(Policy = PermissionCatalog.StockMovements.Create)]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Correct)]
     [Consumes("application/json")]
     [ProducesResponseType(typeof(StockMovementDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(StockMovementDto), StatusCodes.Status200OK)]
