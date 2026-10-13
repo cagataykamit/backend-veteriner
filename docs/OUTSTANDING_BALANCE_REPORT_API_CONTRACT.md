@@ -15,7 +15,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-012 (bakiye kuralı), ADR
 
 Müşterinin kalan tutarı, `GET /clients/{id}/balance` yanıtındaki `outstandingAmount` ve Bugün satırındaki `clientOutstandingAmount` ile **aynı kuraldır**:
 
-- Kaynak `Charge` sayaçlarıdır: ücretin kalanı `Amount − AllocatedAmount` (`Charge.OutstandingAmountExpression`; hem bellekteki `Charge.OutstandingAmount` hem raporun SQL toplamı bu tek ifadeden gelir).
+- Kaynak `Charge` sayaçlarıdır: ücretin kalanı `Amount − AllocatedAmount` (`Charge.OutstandingAmount`). Bakiye ucu bellekte, rapor SQL toplamı olarak aynı iki sayacı okur; hiçbiri tahsis satırlarını yeniden toplamaz. Eşitlik entegrasyon testiyle korunur (bölüm 9).
 - İptal edilmiş ücret (`VoidedAtUtc`) sayılmaz (`Charge` global sorgu filtresi). İptal edilmiş ödemenin tahsisi geri alındığı için ücret yeniden açık görünür; ayrıca bir düzeltme yapılmaz.
 - Bağlanmamış (eski) ödemeler borçtan **düşülmez** ve rapora girmez (ADR-012 madde 5, FIN-007).
 - Yalnızca TRY.
@@ -103,6 +103,5 @@ Rapor sayfası `Charges.Read` ile görünür (Rapor Merkezi kartı izin kontrol�
 
 ## 9) Test odağı
 
-- Domain: `Charge.OutstandingAmountExpression` ile `OutstandingAmount` özelliği aynı sonucu verir.
 - Application: kiracı/klinik/min tutar/arama doğrulamaları, bağlam uyuşmazlığı, dışa aktarma tavanı, CSV/XLSX içerik ve biçim.
 - Entegrasyon (LocalDB, kendi kiracısıyla): sıralama + toplamlar + sayfalama, iptal edilmiş ücret ve ödeme, kısmi/tam ödeme, `outstandingAmount` ≡ `GET /clients/{id}/balance` ve Bugün `clientOutstandingAmount`, ekran ≡ CSV ≡ XLSX, klinik kapsamı, başka kiracı (IDOR), `Charges.Read` olmadan 403, token olmadan 401.
