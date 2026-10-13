@@ -1,4 +1,5 @@
-using Backend.Veteriner.Application.Common.Constants; // ?? sabit burada
+using System.Diagnostics;
+using Backend.Veteriner.Application.Common.Constants;
 using Serilog.Context;
 
 namespace Backend.Veteriner.Api.Middleware;
@@ -12,23 +13,24 @@ public sealed class CorrelationIdMiddleware
     {
         var headerName = Correlation.HeaderName; // "X-Correlation-ID"
 
-        // Var ise kullan, yoksa �ret
-        var cid = context.Request.Headers.TryGetValue(headerName, out var values) && !string.IsNullOrWhiteSpace(values)
-            ? values.ToString()
-            : Guid.NewGuid().ToString("N");
+        // Güvenli değerse kullan, değilse üret
+        var cid = Correlation.Normalize(context.Request.Headers[headerName].ToString());
 
-        // Request �mr� boyunca eri�ilebilir olsun
+        // Request ömrü boyunca erişilebilir olsun
         context.Items[headerName] = cid;
 
-        // Response header�a yaz
+        // Response header'a yaz
         context.Response.OnStarting(() =>
         {
             context.Response.Headers[headerName] = cid;
             return Task.CompletedTask;
         });
 
-        // Serilog�a property olarak bas
+        Activity.Current?.SetTag("correlation.id", cid);
+
+        // Serilog'a property olarak bas
         using (LogContext.PushProperty("CorrelationId", cid))
+        using (LogContext.PushProperty("TraceId", Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier))
         {
             await _next(context);
         }
