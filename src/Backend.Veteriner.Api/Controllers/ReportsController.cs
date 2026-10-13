@@ -14,6 +14,9 @@ using Backend.Veteriner.Application.Reports.OutstandingBalances;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.ExportOutstandingBalancesReport;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.GetOutstandingBalancesReport;
+using Backend.Veteriner.Application.Reports.Registers;
+using Backend.Veteriner.Application.Reports.Registers.Examinations;
+using Backend.Veteriner.Application.Reports.Registers.Prescriptions;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -471,6 +474,149 @@ public sealed class ReportsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new ExportOutstandingBalancesReportXlsxQuery(clinicId, minAmount, search), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
+    }
+
+    /// <summary>
+    /// Muayene kayıt defteri (sayfalı). <c>from</c>/<c>to</c>: İstanbul takvim günleri, ikisi dahil (en çok 366 gün).
+    /// İptal edilmiş uygulamalar <c>includeVoided=true</c> olmadıkça gelmez. Resmî biçime uygunluk doğrulanmadı.
+    /// </summary>
+    [HttpGet("registers/examinations")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(RegisterReadResult<ExaminationRegisterItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetExaminationRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetExaminationRegisterQuery(from, to, clinicId, includeVoided, page, pageSize), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Muayene defteri CSV (UTF-8 BOM, <c>;</c>, Excel TR). Filtreler JSON ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/examinations/export")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportExaminationRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ExportExaminationRegisterQuery(from, to, clinicId, includeVoided), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.CsvUtf8, v.FileDownloadName);
+    }
+
+    /// <summary>Muayene defteri Excel (gruplu başlık, tarih/sayı hücre biçimi). Filtreler CSV ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/examinations/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportExaminationRegisterXlsx(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ExportExaminationRegisterXlsxQuery(from, to, clinicId, includeVoided), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
+    }
+
+    /// <summary>
+    /// Reçete kayıt defteri (sayfalı; sayfa ve sayım reçete bazlı). <c>from</c>/<c>to</c>: İstanbul takvim günleri, ikisi dahil
+    /// (en çok 366 gün). Resmî biçime uygunluk doğrulanmadı.
+    /// </summary>
+    [HttpGet("registers/prescriptions")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
+    [ProducesResponseType(typeof(RegisterReadResult<PrescriptionRegisterEntryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetPrescriptionRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetPrescriptionRegisterQuery(from, to, clinicId, page, pageSize), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Reçete defteri CSV (reçete satırı başına bir satır). Filtreler JSON ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/prescriptions/export")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportPrescriptionRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ExportPrescriptionRegisterQuery(from, to, clinicId), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.CsvUtf8, v.FileDownloadName);
+    }
+
+    /// <summary>Reçete defteri Excel (gruplu başlık, tarih/sayı hücre biçimi). Filtreler CSV ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/prescriptions/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportPrescriptionRegisterXlsx(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ExportPrescriptionRegisterXlsxQuery(from, to, clinicId), ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
