@@ -1,0 +1,174 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_EF_VERSION: 9.0.9
+
+jobs:
+  build-test:
+    name: Build, unit tests, artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      # Sürüm kuralı: v<MAJOR>.<MINOR>.<PATCH>[-önsürüm] etiketi → sürüm. Etiketsiz koşu: 0.0.0-ci.<koşu no>.
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="${GITHUB_REF_NAME}"
+            if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::Etiket SemVer olmalı (örn. v1.2.3 veya v1.2.3-rc.1): $tag"
+              exit 1
+            fi
+            version="${tag#v}"
+          else
+            version="0.0.0-ci.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "VERSION_PROPS=-p:Version=$version -p:InformationalVersion=$version+$GITHUB_SHA" >> "$GITHUB_ENV"
+          echo "Sürüm: $version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Restore
+        run: dotnet restore Veteriner.sln
+
+      # Uyarılar derlemeyi bozmaz; sayısı ve listesi özette raporlanır.
+      - name: Build
+        run: |
+          dotnet build Veteriner.sln -c Release --no-restore $VERSION_PROPS | tee build.log
+          grep -E "warning [A-Za-z]+[0-9]+" build.log | sed -E 's/ \[[^]]*\]$//' | sort -u > warnings.txt || true
+          {
+            echo "### Derleme uyarıları: $(wc -l < warnings.txt)"
+            if [ -s warnings.txt ]; then
+              echo '```'
+              head -n 50 warnings.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Domain and Application tests
+        run: |
+          for project in Domain Application; do
+            dotnet test "tests/Backend.Veteriner.$project.Tests" -c Release --no-build \
+              --logger "trx;LogFileName=$project.trx" --results-directory test-results
+          done
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-unit
+          path: test-results
+          if-no-files-found: ignore
+
+      # Sürüm özellikleri derlemeyle aynı olmalı (artımlı: yeniden derleme olmaz).
+      # Not: Api.csproj appsettings.Production.json'u yayından hep dışlar, Staging'i dahil eder (docs/CI_CD.md).
+      - name: Publish API
+        run: >
+          dotnet publish src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj
+          -c Release --no-restore $VERSION_PROPS
+          -o artifacts/api
+
+      - name: Publish DbMigrator
+        run: >
+          dotnet publish src/Backend.Veteriner.DbMigrator/Backend.Veteriner.DbMigrator.csproj
+          -c Release --no-restore $VERSION_PROPS
+          -o artifacts/dbmigrator
+
+      # Betik yalnız üretilir; hiçbir veritabanına uygulanmaz. Design-time fabrikalar bağlantı açmaz.
+      - name: Generate idempotent migration scripts
+        run: |
+          dotnet tool install --global dotnet-ef --version "$DOTNET_EF_VERSION"
+          mkdir -p artifacts/migrations
+          for context in AppDbContext QueryDbContext; do
+            dotnet ef migrations script --idempotent \
+              --project src/Backend.Veteriner.Infrastructure \
+              --startup-project src/Backend.Veteriner.Infrastructure \
+              --context "$context" --configuration Release --no-build \
+              --output "artifacts/migrations/$context.sql"
+          done
+
+      - name: Upload API artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-${{ steps.version.outputs.version }}
+          path: artifacts/api
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 30 }}
+
+      - name: Upload DbMigrator artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbmigrator-${{ steps.version.outputs.version }}
+          path: artifacts/dbmigrator
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 30 }}
+
+      - name: Upload migration scripts
+        uses: actions/upload-artifact@v4
+        with:
+          name: migrations-${{ steps.version.outputs.version }}
+          path: artifacts/migrations
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 30 }}
+
+  # Entegrasyon testleri SQL Server LocalDB'ye sabit bağlıdır (Windows); Linux SQL Server kapsayıcısı kullanılamaz.
+  # Veritabanı adları koşuya özgüdür: INTEGRATION_TEST_RUN_ID (bkz. IntegrationTestDatabaseNames).
+  integration-tests:
+    name: Integration tests (LocalDB)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      INTEGRATION_TEST_RUN_ID: ci${{ github.run_id }}a${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Ensure LocalDB instance
+        shell: pwsh
+        run: |
+          if (-not (Get-Command sqllocaldb -ErrorAction SilentlyContinue)) {
+            choco install sqllocaldb -y --no-progress
+          }
+          sqllocaldb create MSSQLLocalDB 2>$null
+          sqllocaldb start MSSQLLocalDB
+          sqllocaldb info MSSQLLocalDB
+
+      - name: Restore
+        run: dotnet restore Veteriner.sln
+
+      - name: Build
+        run: dotnet build tests/Backend.Veteriner.IntegrationTests -c Release --no-restore
+
+      - name: Integration tests
+        run: >
+          dotnet test tests/Backend.Veteriner.IntegrationTests -c Release --no-build
+          --logger "trx;LogFileName=integration.trx" --results-directory test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-integration
+          path: test-results
+          if-no-files-found: ignore
