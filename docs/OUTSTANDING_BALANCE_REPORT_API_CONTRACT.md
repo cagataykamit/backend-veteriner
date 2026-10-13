@@ -28,7 +28,7 @@ Müşteri satırı, kapsamdaki açık ücretlerin (`Amount > AllocatedAmount`) t
 - Üç uç da policy **`Charges.Read`**. Yoksa 403; token yoksa 401.
 - Kiracı bağlamı zorunlu (`Tenants.ContextMissing` 400). Başka kiracının müşteri/ücreti görünmez.
 - Klinik kapsamı `payments` raporu ile aynı çözümleyici (`IClinicReadScopeResolver`):
-  - `clinicId` verilirse (veya JWT/header `clinic_id` bağlamı varsa) yalnız o kliniğin ücretleri sayılır. İkisi birden verilip farklıysa `OutstandingBalances.ClinicContextMismatch` (400). Kullanıcıya atanmamış klinik → `Clinics.AccessDenied` (403); kiracıda olmayan klinik → `Clinics.NotFound` (404).
+  - `clinicId` verilirse (veya JWT/header `clinic_id` bağlamı varsa) yalnız o kliniğin ücretleri sayılır. JWT `clinic_id` ile sorgu `clinicId` farklıysa istek ara katmanda `Context.ClinicConflict` (403) ile reddedilir (tüm uçlarda ortak davranış); işleyicideki `OutstandingBalances.ClinicContextMismatch` (400) aynı durumun savunma amaçlı ikinci denetimidir. Kullanıcıya atanmamış klinik → `Clinics.AccessDenied` (403); kiracıda olmayan klinik → `Clinics.NotFound` (404).
   - Bağlam yoksa kullanıcının erişebildiği tüm kliniklerin ücretleri sayılır (Admin/Owner: kiracı geneli). Atanmış klinik yoksa sonuç boştur.
 - Aynı `clinicId` ile bir müşterinin `outstandingAmount` değeri Bugün satırındaki `clientOutstandingAmount` ile; bağlamsız çağrıdaki değeri `GET /clients/{id}/balance` (bağlamsız) ile **birebir aynıdır** (entegrasyon testiyle kanıtlanır).
 - Okuma Command DB'dedir; Query DB bayrakları bu rapor için geçerli değildir (para verisi eventual-consistent projeksiyondan okunmaz).
@@ -84,7 +84,8 @@ Sıralama: `outstandingAmount` azalan, sonra `clientName`, sonra `clientId` (det
 |---|---|
 | `Tenants.ContextMissing` | 400 |
 | `OutstandingBalances.MinAmountInvalid` | 400 |
-| `OutstandingBalances.ClinicContextMismatch` | 400 |
+| `Context.ClinicConflict` (JWT clinic_id ≠ sorgu clinicId) | 403 |
+| `OutstandingBalances.ClinicContextMismatch` (savunma amaçlı) | 400 |
 | `OutstandingBalances.ReportExportTooManyRows` | 400 |
 | `Clinics.AccessDenied` | 403 |
 | `Clinics.NotFound` | 404 |
