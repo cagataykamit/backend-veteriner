@@ -116,7 +116,8 @@ public sealed class GetPetTimelineQueryHandler
                 r.Kind == PetRecordKind.Visit && visitExaminationIds.TryGetValue(r.SourceId, out var examinationId) ? examinationId : r.RelatedExaminationId,
                 r.RelatedVisitId,
                 r.RelatedAppointmentId,
-                r.UpdatedAtUtc))
+                r.UpdatedAtUtc,
+                r.AddedAfterFinalization))
             .ToList();
 
         var nextCursor = hasMore && page.Count > 0 ? PetTimelineMerger.CursorOf(page[^1]).Encode() : null;

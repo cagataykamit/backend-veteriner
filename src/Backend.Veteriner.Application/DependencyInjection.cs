@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IPetTimelineSource, LabResultTimelineSource>();
         services.AddScoped<IPetTimelineSource, VaccinationTimelineSource>();
         services.AddScoped<IPetTimelineSource, HospitalizationTimelineSource>();
+        services.AddScoped<IPetTimelineSource, AdministrationTimelineSource>();
 
         // =========================================================
         // FluentValidation

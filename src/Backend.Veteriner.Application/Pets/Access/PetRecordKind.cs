@@ -13,5 +13,6 @@ public enum PetRecordKind
     Vaccination = 6,
     Hospitalization = 7,
     Appointment = 8,
-    Payment = 9
+    Payment = 9,
+    Administration = 10
 }

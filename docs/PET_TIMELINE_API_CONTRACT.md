@@ -25,6 +25,7 @@ Ortak kurallar:
 | `LabResult` | `LabResults.Read` |
 | `Vaccination` | `Vaccinations.Read` |
 | `Hospitalization` | `Hospitalizations.Read` |
+| `Administration` | `Administrations.Read` |
 | `Appointment` (yalnız `history-summary`) | `Appointments.Read` |
 | `Payment` (yalnız `history-summary`) | `Payments.Read` |
 
@@ -104,6 +105,7 @@ Yanıt (`200`):
       "relatedExaminationId": null,
       "relatedVisitId": null,
       "relatedAppointmentId": "…",
+      "addedAfterFinalization": false,
       "updatedAtUtc": null
     }
   ],
@@ -125,11 +127,13 @@ Alanlar:
 - `relatedVisitId`: yalnız Examination; muayenenin bağlı olduğu geliş (`Examination.VisitId`, yoksa `null`). Muayeneleri geliş altında gruplamak istemcidedir.
 - `relatedAppointmentId`: yalnız Visit; randevulu gelişte randevu kimliği (randevu **ayrı satır olmaz**, Visit içine katlanır). Randevunun içeriği döndürülmez (`Appointments.Read` gerektirir).
 - `updatedAtUtc`: kayıt güncelleme tarihi (varsa); Visit için `null`.
+- **`Administration` (uygulama kaydı, ADR-013):** `Administrations.Read` ister; izin yoksa `omittedTypes` içine düşer. `eventAtUtc` = `administeredAtUtc`; `title` = ürünün adı; `summary` = `"<miktar> <birim>"` (ör. `"1.5 şişe"`; serbest klinik metin değil); `status` = `Active` | `Voided`; `relatedExaminationId` = uygulamanın bağlı muayenesi (yoksa `null`); `linkRef` = `{ type: "Administration", id }`. İptal edilenler varsayılan gizli, `includeVoided=true` ile `isVoided=true` olarak gelir. Klinik kapsamı diğer türlerle aynıdır.
+- `addedAfterFinalization` (bool): yalnız `Administration` satırlarında anlamlıdır; bağlı muayene kayıt anında kesinleşmişse `true` ("Kesinleştirmeden sonra eklendi" rozeti). Diğer türlerde her zaman `false`. Gerekçe (`lateEntryReason`) timeline'a konmaz; `GET /administrations/{id}` ile alınır.
 - `omittedTypes`: **yetki yok** nedeniyle sorguya girmeyen türler. İstenen `types` içinden izni olmayanlar da buraya düşer. Boş liste = hiçbir tür yetkisizlikten çıkarılmadı. Böylece "kayıt yok" (boş `items`, tür `omittedTypes`'ta değil) ile "yetki yok" ayrılır.
 
 Sıralama ve sayfalama:
 
-- Sıra `(eventAtUtc DESC, typeOrder DESC, sourceId DESC)`; `typeOrder` türün sabit sıra numarasıdır (Visit=1, Examination=2, Treatment=3, Prescription=4, LabResult=5, Vaccination=6, Hospitalization=7; yeni tür sona eklenir, sayılar değişmez). Eşit tarihte bile sıra deterministiktir.
+- Sıra `(eventAtUtc DESC, typeOrder DESC, sourceId DESC)`; `typeOrder` türün sabit sıra numarasıdır (Visit=1, Examination=2, Treatment=3, Prescription=4, LabResult=5, Vaccination=6, Hospitalization=7, Administration=10 (8 ve 9 `Appointment`/`Payment` için ayrılmıştır); yeni tür sona eklenir, sayılar değişmez). Eşit tarihte bile sıra deterministiktir.
 - `cursor` opak (base64) bir değerdir; istemci içeriğini yorumlamamalı, değiştirmemelidir. Bozuk imleç → `400 Pets.Validation`. `nextCursor` null ise sayfa sonudur. Toplam sayı ve sayfa numarası **yoktur**.
 - Aynı süzgeçle aynı imleç zinciri kayıpsız ve çiftsiz ilerler. **Kayma riski (kabul edilmiş):** `ExaminedAtUtc`, `TreatmentDateUtc` gibi olay tarihleri kullanıcı tarafından düzenlenebilir; sayfalar arası düzenlenen kayıt, yeni tarihine göre başka sayfaya geçebilir. İmleç değer tabanlı olduğundan ekleme/silme imleci bozmaz.
 - Sunucu süzgecini her sayfada yeniden uygular; `types`, tarih aralığı, `includeVoided` ve `clinicId` imleç zinciri boyunca aynı gönderilmelidir.

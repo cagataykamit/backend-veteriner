@@ -22,7 +22,8 @@ public sealed record PetTimelineItemDto(
     Guid? RelatedExaminationId,
     Guid? RelatedVisitId,
     Guid? RelatedAppointmentId,
-    DateTime? UpdatedAtUtc);
+    DateTime? UpdatedAtUtc,
+    bool AddedAfterFinalization);
 
 /// <param name="NextCursor">Opak; null ise sayfa sonu.</param>
 /// <param name="OmittedTypes">Yetki yok nedeniyle sorguya girmeyen türler (boş sonuçtan ayırt etmek için).</param>

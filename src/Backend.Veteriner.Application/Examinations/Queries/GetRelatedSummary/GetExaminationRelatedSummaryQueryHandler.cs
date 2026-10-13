@@ -5,14 +5,17 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
 using MediatR;
@@ -35,6 +38,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
     private readonly IReadRepository<Prescription> _prescriptions;
     private readonly IReadRepository<LabResult> _labResults;
     private readonly IReadRepository<Hospitalization> _hospitalizations;
+    private readonly IReadRepository<Administration> _administrations;
+    private readonly IReadRepository<Product> _products;
     private readonly IReadRepository<Payment> _payments;
 
     public GetExaminationRelatedSummaryQueryHandler(
@@ -51,6 +56,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         IReadRepository<Prescription> prescriptions,
         IReadRepository<LabResult> labResults,
         IReadRepository<Hospitalization> hospitalizations,
+        IReadRepository<Administration> administrations,
+        IReadRepository<Product> products,
         IReadRepository<Payment> payments)
     {
         _tenantContext = tenantContext;
@@ -66,6 +73,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         _prescriptions = prescriptions;
         _labResults = labResults;
         _hospitalizations = hospitalizations;
+        _administrations = administrations;
+        _products = products;
         _payments = payments;
     }
 
@@ -126,6 +135,13 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
             new LabResultsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
         var hosp = await _hospitalizations.ListAsync(
             new HospitalizationsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
+        var admins = await _administrations.ListAsync(
+            new AdministrationsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
+        var productRows = admins.Count == 0
+            ? []
+            : await _products.ListAsync(
+                new ProductsByIdsSpec(tenantId, admins.Select(a => a.ProductId).Distinct().ToArray()), ct);
+        var productById = productRows.ToDictionary(p => p.Id);
         var pays = await _payments.ListAsync(
             new PaymentsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
 
@@ -134,6 +150,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         foreach (var p in prescriptions) clinicIds.Add(p.ClinicId);
         foreach (var l in labs) clinicIds.Add(l.ClinicId);
         foreach (var h in hosp) clinicIds.Add(h.ClinicId);
+        foreach (var a in admins) clinicIds.Add(a.ClinicId);
         foreach (var pay in pays) clinicIds.Add(pay.ClinicId);
 
         var clinicIdArr = clinicIds.ToArray();
@@ -186,6 +203,19 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 h.DischargedAtUtc is null))
             .ToList();
 
+        var adminDtos = admins
+            .Select(a => new ExaminationRelatedAdministrationItemDto(
+                a.Id,
+                a.AdministeredAtUtc,
+                a.ClinicId,
+                ClinicName(a.ClinicId),
+                productById.GetValueOrDefault(a.ProductId)?.Name ?? string.Empty,
+                productById.GetValueOrDefault(a.ProductId)?.Unit ?? string.Empty,
+                a.Quantity,
+                a.AddedAfterFinalization,
+                a.LateEntryReason))
+            .ToList();
+
         var payDtos = pays
             .Select(p => new ExaminationRelatedPaymentItemDto(
                 p.Id,
@@ -207,6 +237,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
             prescriptionDtos,
             labDtos,
             hospDtos,
+            adminDtos,
             payDtos);
 
         return Result<ExaminationRelatedSummaryDto>.Success(dto);

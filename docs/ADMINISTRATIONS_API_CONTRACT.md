@@ -177,4 +177,4 @@ Liste/detay `addedAfterFinalization`, `lateEntryReason` ve `voidStockOutcome` al
 
 - **Aşı (D6):** aşı uygulaması stok düşmez; `VaccineDefinition` ile `Product` bağı sonraki karar.
 - Sonradan eklenen kayıt için hekime bildirim/onay akışı (Aşama 8); zarar raporu (Aşama 8 raporları).
-- Muayene özeti ve timeline bugün uygulama kaydı taşımıyor; oraya eklenmesi ayrı iştir (alanlar bu sözleşmedeki `AdministrationDto` ile aynı olacaktır).
+- Muayene özeti (`related-summary`, `administrations` bloğu) ve hasta timeline'ı (`type: "Administration"`) uygulama kaydını rozetle taşır: bkz. `BACKEND-CONTRACT-STANDARD.md` §18 ve `PET_TIMELINE_API_CONTRACT.md`. Her ikisinde iptaller varsayılan gizlidir.

@@ -235,6 +235,49 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
     }
 
     [Fact]
+    public async Task RelatedSummary_And_Timeline_Should_Show_Administrations_With_Late_Marker_And_Hide_Voided()
+    {
+        var ctx = await SeedAsync(stock: 10m, withExamination: true);
+        var client = ClientFor(ctx);
+        var normal = await PostAsync(client, ctx, 1m, examinationId: ctx.ExaminationId);
+        var normalId = (await normal.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("administration").GetProperty("id").GetGuid();
+        var toVoid = await PostAsync(client, ctx, 1m, examinationId: ctx.ExaminationId);
+        var voidId = (await toVoid.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("administration").GetProperty("id").GetGuid();
+        await FinalizeExaminationAsync(ctx.ExaminationId!.Value);
+        var late = await PostAsync(client, ctx, 2m, examinationId: ctx.ExaminationId, lateEntryReason: "Muayene sonrası uygulandı");
+        late.StatusCode.Should().Be(HttpStatusCode.Created);
+        var lateId = (await late.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("administration").GetProperty("id").GetGuid();
+        (await client.PostAsJsonAsync($"/api/v1/administrations/{voidId}/void", new { reason = "Yanlış ürün seçildi" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var reader = await SeedUserClientAsync(ctx, new[] { "Pets.Read", "Examinations.Read", "Administrations.Read" });
+
+        var summary = await reader.GetAsync($"/api/v1/examinations/{ctx.ExaminationId:D}/related-summary");
+        summary.StatusCode.Should().Be(HttpStatusCode.OK);
+        var items = (await summary.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("administrations").EnumerateArray().ToList();
+        items.Select(i => i.GetProperty("id").GetGuid()).Should().BeEquivalentTo(new[] { normalId, lateId });
+        var lateItem = items.Single(i => i.GetProperty("id").GetGuid() == lateId);
+        lateItem.GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+        lateItem.GetProperty("lateEntryReason").GetString().Should().Be("Muayene sonrası uygulandı");
+        lateItem.GetProperty("productName").GetString().Should().NotBeNullOrEmpty();
+        items.Single(i => i.GetProperty("id").GetGuid() == normalId).GetProperty("addedAfterFinalization").GetBoolean().Should().BeFalse();
+
+        var timeline = await reader.GetAsync($"/api/v1/pets/{ctx.PetId:D}/timeline?types=Administration");
+        timeline.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rows = (await timeline.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("items").EnumerateArray().ToList();
+        rows.Select(r => r.GetProperty("sourceId").GetGuid()).Should().BeEquivalentTo(new[] { normalId, lateId });
+        rows.Single(r => r.GetProperty("sourceId").GetGuid() == lateId).GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+        rows.Should().OnlyContain(r => r.GetProperty("type").GetString() == "Administration" && !r.GetProperty("isVoided").GetBoolean());
+
+        var withVoided = await reader.GetAsync($"/api/v1/pets/{ctx.PetId:D}/timeline?types=Administration&includeVoided=true");
+        (await withVoided.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("items").GetArrayLength().Should().Be(3);
+
+        var noPermission = await SeedUserClientAsync(ctx, new[] { "Pets.Read", "Examinations.Read" });
+        var omitted = await (await noPermission.GetAsync($"/api/v1/pets/{ctx.PetId:D}/timeline")).Content.ReadFromJsonAsync<JsonElement>();
+        omitted.GetProperty("omittedTypes").EnumerateArray().Select(e => e.GetString()).Should().Contain("Administration");
+    }
+
+    [Fact]
     public async Task Post_Should_Not_Mark_Or_Store_Reason_On_Draft_Examination()
     {
         var ctx = await SeedAsync(stock: 10m, withExamination: true);
