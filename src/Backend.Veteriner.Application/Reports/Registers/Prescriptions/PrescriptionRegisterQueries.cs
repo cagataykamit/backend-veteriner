@@ -1,0 +1,97 @@
+using Backend.Veteriner.Domain.Shared;
+using MediatR;
+
+namespace Backend.Veteriner.Application.Reports.Registers.Prescriptions;
+
+/// <summary>Reçete defteri (sayfalı; sayfa ve sayım reçete bazlı). <c>From</c>/<c>To</c>: İstanbul takvim günleri, ikisi dahil.</summary>
+public sealed record GetPrescriptionRegisterQuery(
+    DateOnly From,
+    DateOnly To,
+    Guid? ClinicId,
+    int Page,
+    int PageSize) : IRequest<Result<RegisterReadResult<PrescriptionRegisterEntryDto>>>;
+
+public sealed record ExportPrescriptionRegisterQuery(
+    DateOnly From,
+    DateOnly To,
+    Guid? ClinicId) : IRequest<Result<RegisterExportResult>>;
+
+public sealed record ExportPrescriptionRegisterXlsxQuery(
+    DateOnly From,
+    DateOnly To,
+    Guid? ClinicId) : IRequest<Result<RegisterExportResult>>;
+
+public sealed class GetPrescriptionRegisterQueryHandler
+    : IRequestHandler<GetPrescriptionRegisterQuery, Result<RegisterReadResult<PrescriptionRegisterEntryDto>>>
+{
+    private readonly RegisterReportRunner _runner;
+    private readonly IRegisterReader<PrescriptionRegisterEntryDto> _reader;
+
+    public GetPrescriptionRegisterQueryHandler(RegisterReportRunner runner, IRegisterReader<PrescriptionRegisterEntryDto> reader)
+    {
+        _runner = runner;
+        _reader = reader;
+    }
+
+    public Task<Result<RegisterReadResult<PrescriptionRegisterEntryDto>>> Handle(
+        GetPrescriptionRegisterQuery request,
+        CancellationToken ct)
+        => _runner.ReadPageAsync(
+            _reader,
+            new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false),
+            request.Page,
+            request.PageSize,
+            ct);
+}
+
+public sealed class ExportPrescriptionRegisterQueryHandler
+    : IRequestHandler<ExportPrescriptionRegisterQuery, Result<RegisterExportResult>>
+{
+    private readonly RegisterReportRunner _runner;
+    private readonly IRegisterReader<PrescriptionRegisterEntryDto> _reader;
+
+    public ExportPrescriptionRegisterQueryHandler(RegisterReportRunner runner, IRegisterReader<PrescriptionRegisterEntryDto> reader)
+    {
+        _runner = runner;
+        _reader = reader;
+    }
+
+    public async Task<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterQuery request, CancellationToken ct)
+    {
+        var loaded = await _runner.LoadForExportAsync(
+            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), ct);
+        if (!loaded.IsSuccess)
+            return Result<RegisterExportResult>.Failure(loaded.Error);
+
+        return Result<RegisterExportResult>.Success(new RegisterExportResult(
+            RegisterCsvWriter.WriteUtf8Bom(PrescriptionRegisterColumns.All, loaded.Value!),
+            $"recete-defteri-{RegisterReportRunner.FileDateStamp(DateTime.UtcNow)}.csv"));
+    }
+}
+
+public sealed class ExportPrescriptionRegisterXlsxQueryHandler
+    : IRequestHandler<ExportPrescriptionRegisterXlsxQuery, Result<RegisterExportResult>>
+{
+    private const string SheetName = "Recete Defteri";
+
+    private readonly RegisterReportRunner _runner;
+    private readonly IRegisterReader<PrescriptionRegisterEntryDto> _reader;
+
+    public ExportPrescriptionRegisterXlsxQueryHandler(RegisterReportRunner runner, IRegisterReader<PrescriptionRegisterEntryDto> reader)
+    {
+        _runner = runner;
+        _reader = reader;
+    }
+
+    public async Task<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterXlsxQuery request, CancellationToken ct)
+    {
+        var loaded = await _runner.LoadForExportAsync(
+            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), ct);
+        if (!loaded.IsSuccess)
+            return Result<RegisterExportResult>.Failure(loaded.Error);
+
+        return Result<RegisterExportResult>.Success(new RegisterExportResult(
+            RegisterXlsxWriter.WriteWorkbook(SheetName, PrescriptionRegisterColumns.All, loaded.Value!),
+            $"recete-defteri-{RegisterReportRunner.FileDateStamp(DateTime.UtcNow)}.xlsx"));
+    }
+}
