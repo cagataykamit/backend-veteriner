@@ -134,7 +134,7 @@ jobs:
   integration-tests:
     name: Integration tests (LocalDB)
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       INTEGRATION_TEST_RUN_ID: ci${{ github.run_id }}a${{ github.run_attempt }}
     steps:

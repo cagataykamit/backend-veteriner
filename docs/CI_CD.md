@@ -9,7 +9,7 @@ Tetik: `main`'e push, `v*` etiketi, pull request, elle (`workflow_dispatch`).
 | İş | Runner | Ne yapar |
 |---|---|---|
 | `build-test` | ubuntu | restore → Release build (uyarılar hata değil; sayı/liste koşu özetinde) → Domain + Application testleri → API ve DbMigrator publish → idempotent migration betikleri |
-| `integration-tests` | windows | LocalDB hazırla → entegrasyon testleri (`INTEGRATION_TEST_RUN_ID=ci<run_id>a<deneme>` ile koşuya özgü DB adları, bkz. `IntegrationTestDatabaseNames`) |
+| `integration-tests` | windows (yerelde ~21 dk) | LocalDB hazırla → entegrasyon testleri (`INTEGRATION_TEST_RUN_ID=ci<run_id>a<deneme>` ile koşuya özgü DB adları, bkz. `IntegrationTestDatabaseNames`) |
 
 **Neden SQL Server kapsayıcısı değil, Windows + LocalDB:** entegrasyon testleri `(localdb)\mssqllocaldb` + Trusted_Connection'a sabit bağlı (`IntegrationTestDatabaseNames.ConnectionString`, `appsettings.IntegrationTests.json`, birçok test fabrikası). Linux'ta SQL Server hizmet kapsayıcısı kullanmak test kodunda bağlantı dizesini ortam değişkeninden okutmayı gerektirir; bu görevde kaynak değiştirilmedi. İleride yapılırsa `integration-tests` ubuntu + `services: mssql` olabilir (daha hızlı).
 
