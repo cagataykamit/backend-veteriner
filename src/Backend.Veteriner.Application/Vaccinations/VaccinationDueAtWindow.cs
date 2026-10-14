@@ -28,7 +28,16 @@ internal static class VaccinationDueAtWindow
                 "Plan tarihi 10 yıldan daha eski olamaz.");
         }
 
-        if (dueAtUtc > now.AddYears(MaxFutureYears))
+        return ValidateFutureLimit(dueAtUtc, now);
+    }
+
+    /// <summary>
+    /// Yalnız gelecek sınırı. İçe aktarılan geçmiş aşıda geçmiş sınırı yoktur (eski kayıtların sonraki tarihi geçmişte
+    /// kalabilir; IMPORT_API_CONTRACT.md §4.3), gelecek sınırı günlük girişle aynıdır.
+    /// </summary>
+    public static Result ValidateFutureLimit(DateTime dueAtUtc, DateTime nowUtc)
+    {
+        if (dueAtUtc > nowUtc.AddYears(MaxFutureYears))
         {
             return Result.Failure(
                 "Vaccinations.DueTooFarInFuture",
