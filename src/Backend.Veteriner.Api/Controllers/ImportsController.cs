@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Imports.Commands.Commit;
 using Backend.Veteriner.Application.Imports.Commands.Create;
 using Backend.Veteriner.Application.Imports.Commands.Discard;
 using Backend.Veteriner.Application.Imports.Commands.ReleaseReminders;
+using Backend.Veteriner.Application.Imports.Commands.Rollback;
 using Backend.Veteriner.Application.Imports.Commands.UpdateMapping;
 using Backend.Veteriner.Application.Imports.Commands.Validate;
 using Backend.Veteriner.Application.Imports.Contracts.Dtos;
@@ -15,6 +16,7 @@ using Backend.Veteriner.Application.Imports.Queries.GetErrors;
 using Backend.Veteriner.Application.Imports.Queries.GetList;
 using Backend.Veteriner.Application.Imports.Queries.GetPreview;
 using Backend.Veteriner.Application.Imports.Queries.GetProgress;
+using Backend.Veteriner.Application.Imports.Queries.GetRollbackPreview;
 using Backend.Veteriner.Application.Imports.Queries.GetRows;
 using Backend.Veteriner.Application.Imports.Queries.GetTemplate;
 using Backend.Veteriner.Application.Imports.Reading;
@@ -29,7 +31,8 @@ namespace Backend.Veteriner.Api.Controllers;
 
 /// <summary>
 /// Müşteri / hasta / aşı geçmişi içe aktarma (docs/IMPORT_API_CONTRACT.md). B1: parti kaydı; B2: dosya okuma, şablon, eşleme;
-/// B3: doğrulama (kuru çalıştırma), önizleme, satırlar, hata raporu; uygulama ve geri alma sonraki dilimlerde. Kiracı yalnızca <see cref="ITenantContext"/> ile çözülür.
+/// B3: doğrulama (kuru çalıştırma), önizleme, satırlar, hata raporu; B4: uygulama, ilerleme, hatırlatma serbest bırakma;
+/// B5: geri alma önizlemesi ve geri alma. Kiracı yalnızca <see cref="ITenantContext"/> ile çözülür.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -333,6 +336,52 @@ public sealed class ImportsController : ControllerBase
 
         var result = await _mediator.Send(new ReleaseImportRemindersCommand(id, body.ConfirmEmailCount), ct);
         return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Geri alma önizlemesi: partinin oluşturduğu kayıtlardan silinebilecek ve bağı olduğu için kalacak olanlar (neden
+    /// kodlarıyla). Hiçbir şey yazmaz; kayıt kimlikleri döndüğü için <c>Imports.Commit</c> ister.
+    /// </summary>
+    [HttpGet("batches/{id:guid}/rollback-preview")]
+    [Authorize(Policy = PermissionCatalog.Imports.Commit)]
+    [ProducesResponseType(typeof(ImportRollbackPreviewDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> GetRollbackPreview([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetImportRollbackPreviewQuery(id), ct);
+        if (result.IsSuccess)
+            Response.Headers.CacheControl = "no-store";
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Geri almayı arka planda başlatır: yeni iş 202 + parti (<c>RollingBack</c>), aynı <c>requestId</c> ile tekrar 200 +
+    /// parti. <c>Fail</c> politikasında bağı olan kayıt varsa 409 <c>Imports.RollbackBlocked</c> (hiçbir şey silinmez).
+    /// </summary>
+    [HttpPost("batches/{id:guid}/rollback")]
+    [Authorize(Policy = PermissionCatalog.Imports.Commit)]
+    [ProducesResponseType(typeof(ImportBatchDto), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ImportBatchDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RollbackBatch([FromRoute] Guid id, [FromBody] ImportRollbackBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new RollbackImportBatchCommand(id, body.RequestId, body.Reason, body.BlockedPolicy), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var rollback = result.Value!;
+        return rollback.Started ? Accepted(rollback.Batch) : Ok(rollback.Batch);
     }
 
     /// <summary>Taslak partiyi siler (<c>Discarded</c>); ürün verisine dokunmaz. Uygulanmış/çalışan partide 409.</summary>

@@ -12,6 +12,14 @@ public sealed class ImportCommitBody
     public string? OnErrors { get; init; }
 }
 
+/// <summary>POST .../rollback gövdesi (IMPORT_API_CONTRACT.md §7.12); <see cref="BlockedPolicy"/> verilmezse <c>Fail</c>.</summary>
+public sealed class ImportRollbackBody
+{
+    public Guid RequestId { get; init; }
+    public string? Reason { get; init; }
+    public string? BlockedPolicy { get; init; }
+}
+
 /// <summary>POST .../release-reminders gövdesi (IMPORT_API_CONTRACT.md §7.10).</summary>
 public sealed class ImportReleaseRemindersBody
 {
