@@ -186,7 +186,7 @@ Her dilim ayrı dal ve commit; sözleşme dosyası dilim başında güncel tutul
 | B4 | Uygulama | Hosted service + kira, sahip bazlı işlem birimi, mevcut komutlar üzerinden yazma, içe aktarma aşı yolu, geri basınç, `ReminderProcessorService` dışlaması, `release-reminders`, idempotency testleri | — | L |
 | B5 | Geri alma ve temizlik | Bağımlılık denetimi, `rollback-preview/rollback`, silme olayı tipleri + projeksiyon, 30 gün veri temizleme, `Expired` temizliği (**uygulandı**, migration yok) | (olay tipleri için yok) | M–L |
 | F1 | Frontend sihirbaz | Adımlı ekran: şablon indir → yükle → eşle → doğrula/önizleme → onay → ilerleme → rapor; parti geçmişi, hata dosyası indirme, hatırlatma serbest bırakma, geri alma onayı; **ancak B2–B3 sözleşmesi sabitlendikten sonra** | — | L |
-| T | Deneme/perf | Sentetik pilot benzeri veri (5–10 bin hasta), staging'de uçtan uca + geri alma provası, süre ve `health/ready` gözlemi, entegrasyon testleri | — | M |
+| T | Deneme/perf | Sentetik pilot benzeri veri (5–10 bin hasta), staging'de uçtan uca + geri alma provası, süre ve `health/ready` gözlemi, entegrasyon testleri (**yerel ölçüm yapıldı**: `IMPORT_PERFORMANCE_FINDINGS.md`; staging provası yapılmadı) | — | M |
 
 *S/M/L göreli büyüklük; gün tahmini verilmedi (ölçülmüş hız verisi yok). Önerilen sıra: B1 → B2 → B3 (frontend F1 bunlarla paralel başlayabilir) → B4 → B5 → T. Migration yalnız B1'de; uygulama kullanıcı onayıyla.
 
@@ -280,7 +280,7 @@ Bu kararlar ürün davranışını belirler; kullanıcı yanıtlayınca ADR-015 
 
 - Bu iş **yalnız okuma**: derleme, test, API, veritabanı, migration, yük ölçümü yok. Tüm “var/yok” ifadeleri dosya okumasından.
 - Pilot kliniğin gerçek veri biçimi, hacmi ve temizliği **bilinmiyor**; sütun adları ve kural varsayımları tahmindir.
-- `OutboxHealthCheck` ve outbox/pet projeksiyon davranışı bu işte yeniden okunmadı; 500 eşiği ve ready=503 bilgisi `ASAMA9_READINESS.md`'den. Pet projeksiyonu kapalıyken olay tüketimi ve birikimi doğrulanmadı.
+- `OutboxHealthCheck` ve outbox/pet projeksiyon davranışı bu işte yeniden okunmadı; 500 eşiği ve ready=503 bilgisi `ASAMA9_READINESS.md`'den. Pet projeksiyonu kapalıyken olay tüketimi ve birikimi doğrulanmadı. (Dilim T: kapalı hasta projeksiyonunda olayların biriktiği ve sağlığı etkilemediği ölçüldü; içe aktarma sırasındaki 503'lerin nedeni projeksiyon durum okuyucusundaki zaman damgası yarışıydı ve düzeltildi — `IMPORT_PERFORMANCE_FINDINGS.md` §3.5, §5.1.)
 - Client/Pet projeksiyon işleyicilerinin silme olayını nasıl işleyeceği, `backfill-client/pet`'in fazla kayıtları temizleyip temizlemediği, `Client→Pet` ve diğer FK silme davranışları (Restrict/Cascade) **okunmadı**.
 - Kira (lease) deseninin ayrıntısı (`cqrs-11d-claim-lease.md`) okunmadı; hosted service deseni yalnız `AddHostedService` kayıtlarından.
 - (Çözüldü, fix/musteri-mukerrer-turkce) Mükerrer ad anahtarı artık Türkçe duyarlı ve aksan duyarsızdır (`AYŞE YILMAZ` = `Ayşe Yılmaz`, `ISPARTA` = `Isparta`); tek kural `Client.NormalizeFullNameForDuplicateCheck`, veritabanı tarafı `ClientFullNameDuplicateKey` (`Latin1_General_100_CI_AI` + ı/İ katlama). Okuma modeli sıralama anahtarı ayrıdır (`NormalizeFullNameForSort`, değişmedi; migration yok). Pet adı mükerreri hâlâ `ToLowerInvariant` kullanır (kapsam dışı).
