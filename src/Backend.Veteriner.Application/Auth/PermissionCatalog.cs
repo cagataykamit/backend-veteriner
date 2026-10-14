@@ -215,6 +215,19 @@ public static class PermissionCatalog
         public const string Deactivate = "ClinicalTerms.Deactivate";
     }
 
+    /// <summary>
+    /// Muayene şablonu / tedavi paketi (ADR-020 S4). Etkinleştirme de <see cref="Deactivate"/> ile yapılır. <see cref="Apply"/> şablonu
+    /// muayeneye uygular (metin + işlem satırları); uç ayrıca <c>Examinations.Update</c> ve <c>Administrations.Create</c> ister.
+    /// </summary>
+    public static class ExaminationTemplates
+    {
+        public const string Read = "ExaminationTemplates.Read";
+        public const string Create = "ExaminationTemplates.Create";
+        public const string Update = "ExaminationTemplates.Update";
+        public const string Deactivate = "ExaminationTemplates.Deactivate";
+        public const string Apply = "ExaminationTemplates.Apply";
+    }
+
     public static class Products
     {
         public const string Read = "Products.Read";
@@ -368,6 +381,12 @@ public static class PermissionCatalog
         new(ClinicalTerms.Create, "Kliniğe özel tanı/şikâyet sözlük kaydı ekleme yetkisi", "ClinicalTerms"),
         new(ClinicalTerms.Update, "Kliniğe özel tanı/şikâyet sözlük kaydının adını düzeltme yetkisi", "ClinicalTerms"),
         new(ClinicalTerms.Deactivate, "Kliniğe özel tanı/şikâyet sözlük kaydını pasifleştirme ve yeniden etkinleştirme yetkisi", "ClinicalTerms"),
+
+        new(ExaminationTemplates.Read, "Muayene şablonlarını listeleme ve görüntüleme yetkisi", "ExaminationTemplates"),
+        new(ExaminationTemplates.Create, "Kliniğe özel muayene şablonu ekleme yetkisi", "ExaminationTemplates"),
+        new(ExaminationTemplates.Update, "Kliniğe özel muayene şablonunu güncelleme yetkisi", "ExaminationTemplates"),
+        new(ExaminationTemplates.Deactivate, "Kliniğe özel muayene şablonunu pasifleştirme ve yeniden etkinleştirme yetkisi", "ExaminationTemplates"),
+        new(ExaminationTemplates.Apply, "Muayene şablonunu muayeneye uygulama yetkisi", "ExaminationTemplates"),
 
         new(Products.Read, "Ürünleri listeleme ve görüntüleme yetkisi", "Products"),
         new(Products.Create, "Ürün oluşturma yetkisi", "Products"),
