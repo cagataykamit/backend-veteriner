@@ -168,6 +168,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardTodayAppointmentStatusCountsReader, DashboardTodayAppointmentStatusCountsReader>();
         services.AddScoped<IDashboardClinicScopedReader, DashboardClinicScopedReader>();
         services.AddScoped<IVisitTodayReader, VisitTodayReader>();
+        services.AddScoped<IVisitOpenItemsReader, VisitOpenItemsReader>();
         services.AddScoped<IClinicVeterinarianReader, ClinicVeterinarianReader>();
         services.AddScoped<IDashboardFinancePaymentAggregatesReader, DashboardFinancePaymentAggregatesReader>();
         services.AddScoped<IPaymentPetCountReader, PaymentPetCountReader>();

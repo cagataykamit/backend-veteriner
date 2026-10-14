@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), backlog CHECKIN-006/007. Tüm endpoint'ler `api/v1` altında, JSON gövde/query, standart `ProblemDetails` + `extensions.code` hata zarfı (bkz. `EXAMINATIONS_WORKSPACE_API_CONTRACT.md`).
 
-> **Durum:** Sözleşme. Kararlar madde 12'de kayıtlı (D1 komut veritabanı okuması, K-A bağlama yok, S2 açık iş göstergesi yok, S3 `isVoided`, S4 sorumlu hekim seçimi ve görünen ad (madde 3.1)). Uygulama bu sözleşmeye göre yapılır.
+> **Durum:** Sözleşme. Kararlar madde 12'de kayıtlı (D1 komut veritabanı okuması, K-A bağlama yok, S2 açık iş göstergeleri yalnız hesaplanır (`OPEN_ITEMS_API_CONTRACT.md`), S3 `isVoided`, S4 sorumlu hekim seçimi ve görünen ad (madde 3.1)). Uygulama bu sözleşmeye göre yapılır.
 
 ---
 
@@ -238,7 +238,8 @@ Yanıt `TodayDto`:
   "clinicId": "guid",
   "generatedAtUtc": "...",
   "items": [ /* TodayItemDto */ ],
-  "activeHospitalizations": [ /* TodayHospitalizationDto */ ]
+  "activeHospitalizations": [ /* TodayHospitalizationDto */ ],
+  "openItems": { /* açık iş özeti; voided=true görünümünde null */ }
 }
 ```
 
@@ -267,6 +268,9 @@ Randevulu Visit **tek satırdır** (randevu ayrıca satır üretmez). Satır kay
 | `isUrgent` | bool | Visit'in acil işareti; planlı (Visit'siz) satırda `false` |
 | `isVoided` | bool | Yalnızca `voided=true` yanıtında `true` olabilir; normal Bugün'de her zaman `false` |
 | `voidReason` | string? | `isVoided` ise dolu |
+| `chargeIndicator` | enum? | **Açık iş:** `NoChargeableWork` \| `ChargeMissing` \| `PaymentPending` \| `PartiallyPaid` \| `Paid`; `Charges.Read` yoksa ve planlı satırda `null`. Ayrıntı: `OPEN_ITEMS_API_CONTRACT.md` |
+| `chargeableWorkCount` | int? | Açık iş: ziyaretteki ücretlendirilebilir işlem sayısı (yalnız görünür türler) |
+| `awaitingLabCount` | int? | Açık iş: ziyarete bağlı `Requested` lab sayısı; `LabResults.Read` yoksa `null` |
 
 **Ödeme göstergesi dürüstlüğü:** Mevcut ödeme verisi yalnızca *alınan tahsilatı* tutar; borç/bakiye/fatura yoktur. Bu yüzden gösterge "ödendi/borçlu" **demez**: Visit'in randevusuna veya Visit'e bağlı muayenelerine bağlı ödeme kaydı varsa `PaymentRecorded`, yoksa `NoPaymentRecorded`. Bakiye göstergesi Aşama 3 (temel finans) sonrasıdır. Bu alan `careStatus`'u hiçbir koşulda etkilemez.
 
@@ -298,9 +302,13 @@ Hekimin yalnızca kendine atanmış satırları görmesi için sorumlu hekim fil
 
 Kliniğin tarihten bağımsız **aktif** (`dischargedAtUtc = null`) yatışları: `hospitalizationId`, `petId`, `petName`, `clientName`, `admittedAtUtc`, `plannedDischargeAtUtc?`. Ayrı liste olarak döner; `items` içine karıştırılmaz.
 
+### Açık iş göstergeleri (hesaplanan)
+
+Satırdaki `chargeIndicator`, `chargeableWorkCount`, `awaitingLabCount` ve `TodayDto.openItems` özeti (`unchargedVisitCount`, `outstandingVisitCount`, `outstandingAmount`, `awaitingLabCount`, `incompleteVisitCount`) mevcut verilerden hesaplanır; tablo, migration ve izin eklenmedi. Tanımlar, kapsam (hangi işlem ücretlendirilebilir), izin süzmesi ve gün sonu (D6) ile ortak kural: **`OPEN_ITEMS_API_CONTRACT.md`** (tek doğruluk kaynağı). Özet klinik geneli ve güncel durumdur; `localDate` ve hekim süzgecinden etkilenmez. `chargedAmount/allocatedAmount/outstandingAmount` ziyarete muayene üzerinden bağlı ücretleri de kapsar.
+
 ### Kapsam dışı (bu sürüm)
 
-- **Açık iş göstergesi** yok: laboratuvar, tedavi, reçete kayıtlarında açık/kapalı durumu tutulmuyor; uydurulmaz (madde 12, S2).
+- Tedavi ve reçete için "açık/kapalı" durum alanı yoktur, uydurulmaz; lab bekliyor `LabResult.status = Requested` ile türetilir (madde 12, S2).
 - Mevcut dashboard ve randevu raporları değişmez.
 
 ---
@@ -343,7 +351,7 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 
 - **D1 — Bugün'ün okuma kaynağı: komut veritabanı.** Gerekçe madde 11. Query DB read modeli/projeksiyon (ADR-009 uygulama etkisi) bu işin kapsamından çıkarıldı; Query DB okuması açıldığında ayrı iş olarak eklenir. Not: muayene randevuyu `Completed` yaptığında randevu outbox olayının üretilmemesi mevcut bir hatadır (randevu Query DB read modeli `Scheduled` kalır); Bugün bundan etkilenmez, ayrıca ele alınmalıdır.
 - **K-A — Farklı niyetli tekrar geliş:** Hayvanın randevusuz aktif Visit'i varken aynı hayvanın randevusu için geliş denenirse mevcut Visit döner; randevu bağlanmaz.
-- **S2 — Açık iş göstergesi:** Lab/tedavi/reçete kayıtlarında açık-kapalı durumu yok; bu sürümde alan yok, uydurulmaz. Önce ürün tanımı gerekir.
+- **S2 — Açık iş göstergesi:** Tedavi/reçete kayıtlarında açık-kapalı durumu yok, uydurulmaz. Lab istem/durum modeli (`Requested`) geldikten sonra Bugün'e **hesaplanan** açık iş göstergeleri eklendi (D2, `OPEN_ITEMS_API_CONTRACT.md`).
 - **S3 — Yanlış geliş modeli:** Bakım durumuna 4. durum eklenmez; ayrı `isVoided` işareti (ADR "bakım durumu sade 3 durum" ile uyumlu).
 - **S4 — Sorumlu hekim:** Opsiyonel; kiracıdaki aktif kliniğe atanmış `Veteriner` rolündeki kullanıcı. Görünen ad için `User.DisplayName` eklendi (boşsa e-posta türevi). Ayrıntı madde 3.1.
 
@@ -360,7 +368,7 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 
 ## 14) Bilinen eksikler
 
-- **Açık iş göstergesi yok:** Laboratuvar, tedavi ve reçete kayıtlarında açık/kapalı durumu tutulmadığı için Bugün'de gösterge yoktur (S2).
+- **Açık iş göstergeleri sınırlı:** Yalnız hesaplanan göstergeler vardır (ücret yok, ödeme bekliyor, lab bekliyor, tamamlanmamış geliş); tedavi/reçete için açık durum yoktur, kalem düzeyi ücret D4'tür (`OPEN_ITEMS_API_CONTRACT.md` madde 9).
 - **Randevu outbox olayı yok:** Muayene randevuyu `Completed` yaptığında `appointment.completed.v1` olayı üretilmez; Query DB randevu read modeli `Scheduled` kalır. Bugün komut veritabanından okuduğu için etkilenmez; Query DB okuması açılmadan önce düzeltilmelidir.
 - **Query DB read modeli yok:** Visit için projeksiyon ve Query DB okuması bu sürümde yoktur (D1); bayrakla ayrı iş olarak eklenecektir.
 - **Hekim adı ve seçimi:** Randevu hekim alanı taşımaz, bu yüzden randevudan varsayılan hekim türetilmez. Kullanıcıların gerçek adı yalnızca `PUT /me/display-name` ile girilir; girilmeyenlerde e-posta türevi ad görünür. Admin/davet akışında ad girişi yoktur. `GET /tenants/{id}/members` hâlâ e-posta türevi adı döner (bu işte değiştirilmedi).
