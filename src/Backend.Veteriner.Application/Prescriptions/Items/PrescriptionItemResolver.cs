@@ -47,6 +47,13 @@ internal static class PrescriptionItemResolver
                         "Pasif ürün reçete satırına eklenemez.");
                 }
 
+                if (!product.IsStockTracked)
+                {
+                    return Result<IReadOnlyList<PrescriptionItemDraft>>.Failure(
+                        "Products.NotStockTracked",
+                        "Hizmet kalemi reçete satırına eklenemez.");
+                }
+
                 if (string.IsNullOrWhiteSpace(name))
                     name = product.Name;
             }

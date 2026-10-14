@@ -5,5 +5,8 @@ public enum ProductKind
 {
     Other = 0,
     Medicine = 1,
-    Vaccine = 2
+    Vaccine = 2,
+
+    /// <summary>Hizmet kataloğu kalemi: fiyatı vardır, stok takibi yoktur (uygulama, satış, reçete ve stok hareketinde kullanılamaz).</summary>
+    Service = 3
 }
