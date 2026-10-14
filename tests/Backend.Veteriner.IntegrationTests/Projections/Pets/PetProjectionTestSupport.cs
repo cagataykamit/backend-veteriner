@@ -44,7 +44,7 @@ internal static class PetProjectionTestSupport
             tenantId,
             clientId,
             clientFullName,
-            Client.NormalizeFullNameForDuplicateCheck(clientFullName),
+            Client.NormalizeFullNameForSort(clientFullName),
             name,
             name.Trim().ToLowerInvariant(),
             speciesId.Value,

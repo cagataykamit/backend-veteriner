@@ -230,16 +230,23 @@ public sealed class ImportValidationEngineTests
     }
 
     [Fact]
-    public void Customer_Duplicate_Key_Is_The_Existing_Rule_So_Dotless_I_Case_Difference_Is_Not_Folded()
+    public void Customer_Duplicate_Key_Is_Turkish_Aware_So_Upper_Case_And_Dotted_Dotless_I_Merge()
     {
-        // Mevcut müşteri mükerrer kuralı ToLowerInvariant kullanır: "YILMAZ" -> "yilmaz" ≠ "yılmaz" (tasarım §14 bilinen sınır).
+        // ADR-019 K4: "AYŞE YILMAZ" / "Ayşe Yılmaz" ve "ISPARTA" / "Isparta" aynı kişi (eski ToLowerInvariant sınırı kalktı).
         var output = Run(Customers(
             Customer(name: "Ayşe Yılmaz", phone: "05321234567"),
-            Customer(name: "AYŞE YILMAZ", phone: "05321234567")));
+            Customer(name: "AYŞE YILMAZ", phone: "05321234567"),
+            Customer(name: "Isparta Şahin", phone: "05329998877"),
+            Customer(name: "İSPARTA ŞAHİN", phone: "05329998877")));
 
         var second = Single(output, ImportTable.Customers, 3);
-        second.Normalized.Action.Should().Be(ImportRowAction.Create);
-        Codes(second).Should().Equal("Imports.SharedPhone");
+        second.Normalized.Action.Should().Be(ImportRowAction.Skip);
+        second.Normalized.MergedIntoRow.Should().Be(2);
+        Codes(second).Should().Equal("Imports.DuplicateInFile");
+
+        var fourth = Single(output, ImportTable.Customers, 5);
+        fourth.Normalized.Action.Should().Be(ImportRowAction.Skip);
+        fourth.Normalized.MergedIntoRow.Should().Be(4);
     }
 
     [Fact]

@@ -41,7 +41,7 @@ public sealed class PetProjectionSnapshotFactoryTests
         snap.TenantId.Should().Be(tid);
         snap.ClientId.Should().Be(cid);
         snap.ClientFullName.Should().Be("Ayşe Yılmaz");
-        snap.ClientFullNameNormalized.Should().Be(Client.NormalizeFullNameForDuplicateCheck("Ayşe Yılmaz"));
+        snap.ClientFullNameNormalized.Should().Be(Client.NormalizeFullNameForSort("Ayşe Yılmaz"));
         snap.Name.Should().Be("Pamuk");
         snap.NameNormalized.Should().Be("pamuk");
         snap.SpeciesId.Should().Be(species.Id);

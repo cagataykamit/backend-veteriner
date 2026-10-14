@@ -145,6 +145,22 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
     }
 
     [Fact]
+    public async Task QuickRegister_Should_Return_409_For_Turkish_Case_And_Accent_Variant_Of_Same_Name_And_Phone()
+    {
+        var http = await CreateClientAsync(BothPermissions);
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var name = $"Işıl Çağlar Şahin {tag}";
+        (await http.PostAsJsonAsync("/api/v1/clients/quick-register", Body(name, "0555 222 33 44")))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var second = await http.PostAsJsonAsync(
+            "/api/v1/clients/quick-register", Body($"IŞIL  ÇAĞLAR ŞAHİN {tag}".ToUpperInvariant(), "5552223344"));
+
+        second.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(second)).Should().Be("Clients.DuplicateClient");
+    }
+
+    [Fact]
     public async Task QuickRegister_Should_Allow_Same_Phone_With_Different_Name()
     {
         var http = await CreateClientAsync(BothPermissions);

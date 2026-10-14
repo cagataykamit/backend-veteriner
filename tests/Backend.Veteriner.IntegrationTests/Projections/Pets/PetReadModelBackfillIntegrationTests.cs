@@ -225,7 +225,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var row = await queryDb.PetReadModels.AsNoTracking().SingleAsync(x => x.PetId == pet.Id);
         row.ClientFullName.Should().Be("Ayşe Yılmaz");
-        row.ClientFullNameNormalized.Should().Be(Client.NormalizeFullNameForDuplicateCheck("Ayşe Yılmaz"));
+        row.ClientFullNameNormalized.Should().Be(Client.NormalizeFullNameForSort("Ayşe Yılmaz"));
         row.SpeciesName.Should().Be(speciesName);
         row.Breed.Should().Be("Tekir");
         row.BreedRefName.Should().Be(breed.Name);

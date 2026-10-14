@@ -1,14 +1,16 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Vaccinations;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Imports.Specs;
 
 /// <summary>
 /// Dosyadaki telefon / e-posta / ad kümelerinden herhangi biriyle eşleşen mevcut müşteriler (tek sorgu; kümeler
-/// parametre olarak gider, satır başına sorgu yok). Peşin müşteri hariç. Nihai eşleşme motorda katlanmış anahtarla yapılır.
+/// parametre olarak gider, satır başına sorgu yok; ad, ClientFullNameDuplicateKey ile aynı Türkçe/aksan duyarsız kuralla). Peşin müşteri hariç. Nihai eşleşme motorda katlanmış anahtarla yapılır.
 /// </summary>
 public sealed class ImportExistingClientsSpec : Specification<Client, ImportExistingClient>
 {
@@ -20,14 +22,14 @@ public sealed class ImportExistingClientsSpec : Specification<Client, ImportExis
     {
         var phoneSet = phones.ToArray();
         var emailSet = emails.ToArray();
-        var nameSet = names.ToArray();
+        var nameSet = names.Select(Client.NormalizeFullNameForDuplicateCheck).Distinct().ToArray();
 
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId
                          && !c.IsWalkIn
                          && ((c.PhoneNormalized != null && phoneSet.Contains(c.PhoneNormalized))
                              || (c.Email != null && emailSet.Contains(c.Email))
-                             || nameSet.Contains(c.FullName)));
+                             || nameSet.Contains(EF.Functions.Collate(c.FullName.Trim().Replace("ı", "i").Replace("İ", "I").Replace("  ", " ").Replace("  ", " "), DailySearchTerm.ColumnCollation))));
         Query.OrderBy(c => c.Id);
         Query.Select(c => new ImportExistingClient(c.Id, c.FullName, c.PhoneNormalized, c.Email));
     }

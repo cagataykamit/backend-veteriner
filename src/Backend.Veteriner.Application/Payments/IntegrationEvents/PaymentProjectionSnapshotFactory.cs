@@ -10,7 +10,7 @@ namespace Backend.Veteriner.Application.Payments.IntegrationEvents;
 /// CQRS-14C: <paramref name="clientName"/> write path'te zorunludur (boş/null gelmemeli);
 /// <paramref name="petName"/> payment'a pet bağlı değilse <c>null</c> olabilir.
 /// Normalize değerler command-side normalizer'larıyla hizalıdır:
-/// ClientNameNormalized = <see cref="Client.NormalizeFullNameForDuplicateCheck"/> (trim + invariant lower),
+/// ClientNameNormalized = <see cref="Client.NormalizeFullNameForSort"/> (trim + invariant lower, sıralama anahtarı),
 /// PetName/Notes normalize = trim + invariant lower.
 ///
 /// CQRS-15D: <paramref name="clinicName"/> write path'te zorunludur; payment daima geçerli bir kliniğe
@@ -66,7 +66,7 @@ public static class PaymentProjectionSnapshotFactory
             payment.PaidAtUtc,
             PaymentIntegrationEventTypes.SchemaVersion,
             clientName.Trim(),
-            Client.NormalizeFullNameForDuplicateCheck(clientName),
+            Client.NormalizeFullNameForSort(clientName),
             NormalizeRaw(petName),
             NormalizeLower(petName),
             NormalizeRaw(payment.Notes),

@@ -26,7 +26,7 @@ public static class PetProjectionSnapshotFactory
             pet.TenantId,
             pet.ClientId,
             client.FullName,
-            Client.NormalizeFullNameForDuplicateCheck(client.FullName),
+            Client.NormalizeFullNameForSort(client.FullName),
             pet.Name,
             NormalizeName(pet.Name),
             pet.SpeciesId,

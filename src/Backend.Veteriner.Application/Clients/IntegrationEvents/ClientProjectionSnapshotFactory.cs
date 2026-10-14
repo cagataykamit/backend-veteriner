@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Application.Clients.IntegrationEvents;
 /// <see cref="Client"/> aggregate'inden <see cref="ClientProjectionSnapshot"/> üretir.
 /// Tüm alanlar aggregate üzerinde mevcut olduğundan ek DB erişimi gerekmez.
 /// Normalize değerler command-side normalizer'larıyla aynıdır:
-/// FullNameNormalized = <see cref="Client.NormalizeFullNameForDuplicateCheck"/> (trim + invariant lower),
+/// FullNameNormalized = <see cref="Client.NormalizeFullNameForSort"/> (trim + invariant lower, sıralama anahtarı),
 /// PhoneNormalized = aggregate üzerindeki <see cref="Client.PhoneNormalized"/> (TurkishMobilePhone),
 /// Email = aggregate üzerindeki normalize e-posta.
 /// </summary>
@@ -20,7 +20,7 @@ public static class ClientProjectionSnapshotFactory
             client.Id,
             client.TenantId,
             client.FullName,
-            Client.NormalizeFullNameForDuplicateCheck(client.FullName),
+            Client.NormalizeFullNameForSort(client.FullName),
             client.Email,
             client.Phone,
             client.PhoneNormalized,

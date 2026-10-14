@@ -17,7 +17,7 @@ public sealed class ClientProjectionSnapshotFactoryTests
         snap.ClientId.Should().Be(client.Id);
         snap.TenantId.Should().Be(tid);
         snap.FullName.Should().Be("Ayşe Yılmaz");
-        snap.FullNameNormalized.Should().Be(Client.NormalizeFullNameForDuplicateCheck("Ayşe Yılmaz"));
+        snap.FullNameNormalized.Should().Be(Client.NormalizeFullNameForSort("Ayşe Yılmaz"));
         snap.Email.Should().Be("ayse@example.com");
         snap.Phone.Should().Be("905321234567");
         snap.PhoneNormalized.Should().Be("905321234567");

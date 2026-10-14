@@ -4,7 +4,7 @@ namespace Backend.Veteriner.Application.Pets.IntegrationEvents;
 /// Pet read-model projection için denormalize edilmiş anlık görüntü.
 /// Alanlar <c>PetReadModels</c> kolonlarıyla birebir hizalıdır (projection metadata hariç).
 /// Normalize değerler command-side desenlerle üretilir:
-/// ClientFullNameNormalized = <see cref="Domain.Clients.Client.NormalizeFullNameForDuplicateCheck"/>,
+/// ClientFullNameNormalized = <see cref="Domain.Clients.Client.NormalizeFullNameForSort"/>,
 /// Name/Species/Color normalize = trim + invariant lower.
 /// </summary>
 public sealed record PetProjectionSnapshot(
