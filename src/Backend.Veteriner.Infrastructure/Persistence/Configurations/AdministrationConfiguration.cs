@@ -1,6 +1,7 @@
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Vaccinations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -10,6 +11,9 @@ public sealed class AdministrationConfiguration : IEntityTypeConfiguration<Admin
 {
     /// <summary>Aynı istemci isteği (RequestId) kiracıda en fazla bir uygulama üretir.</summary>
     public const string RequestIdIndexName = "UX_Administrations_TenantId_RequestId";
+
+    /// <summary>Bir aşı kaydı en çok bir uygulamaya bağlanır.</summary>
+    public const string VaccinationIndexName = "UX_Administrations_TenantId_VaccinationId";
 
     public void Configure(EntityTypeBuilder<Administration> b)
     {
@@ -45,6 +49,7 @@ public sealed class AdministrationConfiguration : IEntityTypeConfiguration<Admin
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.RequestId);
         b.Property(x => x.BatchId);
+        b.Property(x => x.VaccinationId);
 
         b.Property(x => x.RowVersion)
             .IsRowVersion()
@@ -59,6 +64,16 @@ public sealed class AdministrationConfiguration : IEntityTypeConfiguration<Admin
             .WithMany()
             .HasForeignKey(x => x.BatchId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        b.HasOne<Vaccination>()
+            .WithMany()
+            .HasForeignKey(x => x.VaccinationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.HasIndex(x => new { x.TenantId, x.VaccinationId })
+            .IsUnique()
+            .HasFilter("[VaccinationId] IS NOT NULL")
+            .HasDatabaseName(VaccinationIndexName);
 
         b.HasIndex(x => new { x.TenantId, x.RequestId })
             .IsUnique()

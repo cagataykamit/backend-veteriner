@@ -82,6 +82,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("TreatmentId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("VaccinationId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("VoidReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -99,6 +102,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("BatchId");
 
+                    b.HasIndex("VaccinationId");
+
                     b.HasIndex("TenantId", "ExaminationId");
 
                     b.HasIndex("TenantId", "PetId");
@@ -109,6 +114,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasFilter("[RequestId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "TreatmentId");
+
+                    b.HasIndex("TenantId", "VaccinationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Administrations_TenantId_VaccinationId")
+                        .HasFilter("[VaccinationId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "ClinicId", "AdministeredAtUtc");
 
@@ -3070,6 +3080,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasOne("Backend.Veteriner.Domain.Products.StockBatch", null)
                         .WithMany()
                         .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Backend.Veteriner.Domain.Vaccinations.Vaccination", null)
+                        .WithMany()
+                        .HasForeignKey("VaccinationId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 

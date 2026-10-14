@@ -99,6 +99,17 @@ public sealed class Vaccination : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>
+    /// Bağlı uygulama iptal edildiğinde aşı kaydını iptal eder. İptal kayıtta uygulama tarihi olmaz (durum/tarih kuralı);
+    /// gerçek uygulama zamanı iptal edilen <c>Administration</c> kaydında kalır.
+    /// </summary>
+    public void CancelForVoidedAdministration()
+    {
+        Status = VaccinationStatus.Cancelled;
+        AppliedAtUtc = null;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
     private static DateTime NormalizeUtc(DateTime value)
         => value.Kind switch
         {

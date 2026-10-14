@@ -55,6 +55,9 @@ public sealed class Administration : AggregateRoot
     /// <summary>Düşülen parti; <c>null</c> = partisiz (eski/devir) bakiye.</summary>
     public Guid? BatchId { get; private set; }
 
+    /// <summary>Bu uygulamayı aşı kaydıyla birlikte yazan <c>Vaccination</c>; <c>null</c> = bağımsız uygulama. Bağlı uygulama aşı olayının parçasıdır (çift sayım yok).</summary>
+    public Guid? VaccinationId { get; private set; }
+
     /// <summary>Eşzamanlı iptalleri ayırt eden belirteç (iptal stok iadesi yazmasa da tek kazanan olur).</summary>
     public byte[] RowVersion { get; private set; } = default!;
 
@@ -74,7 +77,8 @@ public sealed class Administration : AggregateRoot
         string? lateEntryReason,
         Guid createdByUserId,
         DateTime createdAtUtc,
-        Guid? requestId)
+        Guid? requestId,
+        Guid? vaccinationId = null)
     {
         if (tenantId == Guid.Empty)
             return Invalid("TenantId geçersiz.");
@@ -84,8 +88,8 @@ public sealed class Administration : AggregateRoot
             return Invalid("PetId zorunludur.");
         if (productId == Guid.Empty)
             return Invalid("ProductId zorunludur.");
-        if (examinationId == Guid.Empty || treatmentId == Guid.Empty || requestId == Guid.Empty)
-            return Invalid("ExaminationId, TreatmentId ve RequestId verilirse geçerli bir kimlik olmalıdır.");
+        if (examinationId == Guid.Empty || treatmentId == Guid.Empty || requestId == Guid.Empty || vaccinationId == Guid.Empty)
+            return Invalid("ExaminationId, TreatmentId, RequestId ve VaccinationId verilirse geçerli bir kimlik olmalıdır.");
         if (createdByUserId == Guid.Empty)
             return Invalid("Oluşturan kullanıcı geçersiz.");
 
@@ -123,6 +127,7 @@ public sealed class Administration : AggregateRoot
             CreatedByUserId = createdByUserId,
             CreatedAtUtc = NormalizeUtc(createdAtUtc),
             RequestId = requestId,
+            VaccinationId = vaccinationId,
         });
     }
 
