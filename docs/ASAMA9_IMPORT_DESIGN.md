@@ -157,6 +157,8 @@ K4 gölge kullanım: klinik içe aktarmanın hemen ardından aynı hastalarla ge
 ### 9.4 Query DB / okuma modeli
 Silme olayı tipi yok; `Client` ve `Appointment` projeksiyon işleyicileri açık. Geri alma silinen müşteri/hasta için okuma modelinde **hayalet kayıt** bırakır (okuma bayrakları kapalı olduğundan pilotta görünmez, ama bayrak açılınca bozuk veri). Seçenekler: (a) `client.deleted.v1`/`pet.deleted.v1` olayı + projeksiyon işleyici desteği (önerilen, B5 kapsamında; projeksiyon işleyicisinin silmeyi nasıl işleyeceği bu işte **okunmadı**); (b) geri alma sonrası backfill (`backfill-client/pet`) ile Query DB yenilemesi — backfill'in fazla kayıtları silip silmediği **doğrulanmadı**. Dilim B5 başında kod okunup seçilir.
 
+**B5 kararı (uygulandı):** (a) seçildi. `client.deleted.v1` / `pet.deleted.v1` olayları silmeyle aynı işlemde outbox'a yazılır; müşteri ve hasta projeksiyon işleyicileri olayda okuma modeli satırını siler (olay son uygulanan olaydan eskiyse yok sayılır). Pilot ayarında hasta projeksiyonu kapalıdır; olaylar kuyrukta bekler ve açıldığında sırayla işlenir. Ayrıntı ve kesin silinebilirlik tablosu: `IMPORT_API_CONTRACT.md` §7.11–7.12, §9. Geri alma isteği (`requestId`, politika) migration gerektirmemek için parti seçenek belgesinde (`OptionsJson`) tutulur; K7 opsiyonel politikanın adı `DeleteUnblockedOnly` oldu (taslakta `KeepBlocked`).
+
 ### 9.5 Sıra ve atomiklik
 Geri alma sahip bazlı birimlerle işlenir (aşı → hasta → müşteri). Birimde bağımlılık denetimi silmeyle aynı transaction'da yapılır (denetim ile silme arasında yeni geliş açılması yarışına karşı). `Fail` politikasında önce planlama (hiçbir şey silmeden) yapılır; engelli varsa durur.
 
@@ -182,7 +184,7 @@ Her dilim ayrı dal ve commit; sözleşme dosyası dilim başında güncel tutul
 | B2 | Okuma ve eşleme | XLSX/CSV okuyucu (kodlama, ayırıcı, imza, tavanlar), kanonik başlık/takma ad eşleme, şablon üretimi (`ClosedXML`), `PUT mapping`, değer eşleme çözücü (katlama) | — | M |
 | B3 | Doğrulama / kuru çalıştırma | Satır kuralları (telefon, e-posta, tarih, çip, cinsiyet…), toplu eşleşme sorguları, mükerrer kuralları, `reminderImpact`, preview/rows/errors uçları, hata raporu dosyası | — | L |
 | B4 | Uygulama | Hosted service + kira, sahip bazlı işlem birimi, mevcut komutlar üzerinden yazma, içe aktarma aşı yolu, geri basınç, `ReminderProcessorService` dışlaması, `release-reminders`, idempotency testleri | — | L |
-| B5 | Geri alma ve temizlik | Bağımlılık denetimi, `rollback-preview/rollback`, silme olayı tipleri + projeksiyon, 30 gün veri temizleme, `Expired` temizliği | (olay tipleri için yok) | M–L |
+| B5 | Geri alma ve temizlik | Bağımlılık denetimi, `rollback-preview/rollback`, silme olayı tipleri + projeksiyon, 30 gün veri temizleme, `Expired` temizliği (**uygulandı**, migration yok) | (olay tipleri için yok) | M–L |
 | F1 | Frontend sihirbaz | Adımlı ekran: şablon indir → yükle → eşle → doğrula/önizleme → onay → ilerleme → rapor; parti geçmişi, hata dosyası indirme, hatırlatma serbest bırakma, geri alma onayı; **ancak B2–B3 sözleşmesi sabitlendikten sonra** | — | L |
 | T | Deneme/perf | Sentetik pilot benzeri veri (5–10 bin hasta), staging'de uçtan uca + geri alma provası, süre ve `health/ready` gözlemi, entegrasyon testleri | — | M |
 
