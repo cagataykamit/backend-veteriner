@@ -57,14 +57,15 @@ public sealed class GetPetsListQueryHandler
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         var searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
 
-        if (_queryReadModelsOptions.PetsEnabled)
+        // Okuma modelinde durum kolonu yok: durum süzgeci verildiğinde komut veritabanından okunur.
+        if (_queryReadModelsOptions.PetsEnabled && request.Status is null)
         {
             return await HandleFromQueryReadModelAsync(
                 tenantId, page, pageSize, request.ClientId, request.SpeciesId, searchPattern, ct);
         }
 
         return await HandleFromCommandDbAsync(
-            tenantId, page, pageSize, request.ClientId, request.SpeciesId,
+            tenantId, page, pageSize, request.ClientId, request.SpeciesId, request.Status,
             DailySearchTerm.Create(request.PageRequest.Search), ct);
     }
 
@@ -88,8 +89,20 @@ public sealed class GetPetsListQueryHandler
             pageSize,
             readResult.TotalCount);
 
+        // Durum okuma modelinde yok; sayfadaki satırların durumu komut veritabanından doldurulur.
+        var items = readResult.Items;
+        if (items.Count > 0)
+        {
+            var statusById = (await _pets.ListAsync(
+                    new PetsByTenantIdsSpec(tenantId, items.Select(i => i.Id).ToArray()), ct))
+                .ToDictionary(p => p.Id, p => p.Status);
+            items = items
+                .Select(i => i with { Status = statusById.GetValueOrDefault(i.Id, PetStatus.Active) })
+                .ToList();
+        }
+
         return Result<PagedResult<PetListItemDto>>.Success(
-            PagedResult<PetListItemDto>.Create(readResult.Items, readResult.TotalCount, page, pageSize));
+            PagedResult<PetListItemDto>.Create(items, readResult.TotalCount, page, pageSize));
     }
 
     private async Task<Result<PagedResult<PetListItemDto>>> HandleFromCommandDbAsync(
@@ -98,6 +111,7 @@ public sealed class GetPetsListQueryHandler
         int pageSize,
         Guid? clientId,
         Guid? speciesId,
+        PetStatus? status,
         DailySearchTerm? searchTerm,
         CancellationToken ct)
     {
@@ -118,6 +132,7 @@ public sealed class GetPetsListQueryHandler
                 tenantId,
                 clientId,
                 speciesId,
+                status,
                 searchTerm,
                 petIdsFromClientText),
             ct);
@@ -128,6 +143,7 @@ public sealed class GetPetsListQueryHandler
                 pageSize,
                 clientId,
                 speciesId,
+                status,
                 searchTerm,
                 petIdsFromClientText),
             ct);
@@ -143,7 +159,8 @@ public sealed class GetPetsListQueryHandler
                 r.ColorId,
                 r.ColorName,
                 r.Breed,
-                r.Weight ?? 0))
+                r.Weight ?? 0,
+                r.Status))
             .ToList();
 
         return Result<PagedResult<PetListItemDto>>.Success(

@@ -62,6 +62,18 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
         b.Property(x => x.Gender)
             .HasConversion<int>();
 
+        // Mevcut satırlar Aktif kabul edilir (ADR-020 S5).
+        b.Property(x => x.Status)
+            .IsRequired()
+            .HasConversion<int>()
+            .HasDefaultValue(PetStatus.Active);
+
+        b.Property(x => x.DeceasedOn);
+
+        b.Property(x => x.RowVersion)
+            .IsRowVersion()
+            .IsConcurrencyToken();
+
         b.Property(x => x.BirthDate);
 
         b.HasOne(x => x.Species)
@@ -81,6 +93,7 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ClientId });
+        b.HasIndex(x => new { x.TenantId, x.Status });
         b.HasIndex(x => x.SpeciesId);
         b.HasIndex(x => x.ColorId);
     }

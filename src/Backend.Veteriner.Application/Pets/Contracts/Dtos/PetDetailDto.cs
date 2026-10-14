@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.Pets;
 
 namespace Backend.Veteriner.Application.Pets.Contracts.Dtos;
@@ -24,4 +25,7 @@ public sealed record PetDetailDto(
     string? PassportOrTagNumber,
     string? SpecialProtocolNumber,
     bool IsNeutered,
-    PetAlertsDto PetAlerts);
+    PetAlertsDto PetAlerts,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] PetStatus Status,
+    DateOnly? DeceasedOn,
+    string RowVersion);

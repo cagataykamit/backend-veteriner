@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
 
@@ -57,6 +58,23 @@ public sealed class Pet : AggregateRoot
 
     /// <summary>Uyarılar için tek kısa not (ör. alerjinin ne olduğu); yalnızca en az bir bayrak varken dolu olabilir.</summary>
     public string? AlertNote { get; private set; }
+
+    /// <summary>Yaşam durumu; varsayılan <see cref="PetStatus.Active"/>. Yalnız <see cref="SetStatus"/> ile değişir.</summary>
+    public PetStatus Status { get; private set; } = PetStatus.Active;
+
+    /// <summary>Vefat tarihi (opsiyonel); yalnız <see cref="PetStatus.Deceased"/> iken dolu olabilir.</summary>
+    public DateOnly? DeceasedOn { get; private set; }
+
+    /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
+    public byte[] RowVersion { get; private set; } = default!;
+
+    /// <summary>
+    /// Bakım iş akışına giren hayvan koşulu (tek kural): hatırlatma adayları ve gecikmiş/yaklaşan aşı listeleri bu ifadeyle
+    /// süzülür; yeni randevu/geliş/muayene kapısı <see cref="EnsureCanStartCare"/> aynı koşulu kullanır.
+    /// </summary>
+    public static readonly Expression<Func<Pet, bool>> ReceivesCare = p => p.Status == PetStatus.Active;
+
+    private static readonly Func<Pet, bool> ReceivesCareCompiled = ReceivesCare.Compile();
 
     /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
     public Species? Species { get; private set; }
@@ -173,6 +191,52 @@ public sealed class Pet : AggregateRoot
         AlertFlags = flags;
         AlertNote = newNote;
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Durumu değiştirir. Vefat: tarih opsiyonel, bugünden ileri ve doğum tarihinden önce olamaz; zaten vefat ise tarih düzeltilir.
+    /// Aktif (yanlış girişin geri alınması): tarih verilemez, vefat tarihi temizlenir. Kural yalnızca burada yaşar.
+    /// </summary>
+    public Result SetStatus(PetStatus status, DateOnly? deceasedOn, DateOnly today)
+    {
+        switch (status)
+        {
+            case PetStatus.Active:
+                if (deceasedOn.HasValue)
+                    return Result.Failure("Pets.Validation", "Aktif hayvan için vefat tarihi verilemez.");
+                Status = PetStatus.Active;
+                DeceasedOn = null;
+                return Result.Success();
+
+            case PetStatus.Deceased:
+                if (deceasedOn > today)
+                    return Result.Failure("Pets.Validation", "Vefat tarihi gelecekte olamaz.");
+                if (deceasedOn.HasValue && BirthDate.HasValue && deceasedOn.Value < BirthDate.Value)
+                    return Result.Failure("Pets.Validation", "Vefat tarihi doğum tarihinden önce olamaz.");
+                Status = PetStatus.Deceased;
+                DeceasedOn = deceasedOn;
+                return Result.Success();
+
+            default:
+                return Result.Failure("Pets.Validation", "Geçersiz hayvan durumu.");
+        }
+    }
+
+    /// <summary>Yeni randevu, geliş ve muayene açılmadan önce çağrılır; vefat eden hayvanda reddeder (geçmiş kayıtlar etkilenmez).</summary>
+    public Result EnsureCanStartCare()
+        => ReceivesCareCompiled(this)
+            ? Result.Success()
+            : Result.Failure("Pets.Deceased", "Vefat etmiş hayvan için yeni randevu, geliş veya muayene açılamaz.");
+
+    /// <summary>
+    /// İstemcinin gördüğü sürüm: kalıcı yazma yalnızca veritabanındaki sürüm bu değere eşitse gerçekleşir.
+    /// </summary>
+    public void SetExpectedRowVersion(byte[] expectedRowVersion)
+    {
+        if (expectedRowVersion is null || expectedRowVersion.Length == 0)
+            throw new ArgumentException("RowVersion geçersiz.", nameof(expectedRowVersion));
+
+        RowVersion = expectedRowVersion;
     }
 
     private static string? NormalizeOptionalIdentityNumber(string? value)

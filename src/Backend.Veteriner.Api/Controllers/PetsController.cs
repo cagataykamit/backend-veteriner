@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Pets.Commands.Create;
+using Backend.Veteriner.Application.Pets.Commands.SetStatus;
 using Backend.Veteriner.Application.Pets.Commands.Update;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Queries.GetById;
@@ -11,7 +12,9 @@ using Backend.Veteriner.Application.Pets.Queries.GetHistorySummary;
 using Backend.Veteriner.Application.Pets.Queries.GetList;
 using Backend.Veteriner.Application.Pets.Queries.GetSummary;
 using Backend.Veteriner.Application.Pets.Queries.GetTimeline;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
+using System.Text.Json.Serialization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -84,6 +87,27 @@ public sealed class PetsController : ControllerBase
         cmd = cmd with { Id = id };
 
         var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Hayvan durumu (ADR-020 S5): <c>Deceased</c> (vefat tarihi opsiyonel) veya yanlış girişin geri alınması için <c>Active</c>.
+    /// <c>rowVersion</c> zorunlu (GET /pets/{id}); eski sürüm 409 <c>Pets.ConcurrencyConflict</c>. Bkz. docs/PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md.
+    /// </summary>
+    [HttpPut("{id:guid}/status")]
+    [Authorize(Policy = PermissionCatalog.Pets.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(PetStatusDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SetStatus([FromRoute] Guid id, [FromBody] SetPetStatusBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new SetPetStatusCommand(id, body.Status, body.DeceasedOn, body.RowVersion), ct);
         return result.ToActionResult(this);
     }
 
@@ -171,7 +195,7 @@ public sealed class PetsController : ControllerBase
 
     /// <summary>
     /// Sayfalı hayvan listesi. <c>search</c> (veya <c>page.search</c>) ad, tür adı, serbest ırk metni / katalog ırk adı, mikroçip ve müşteri bilgisinde arar (Türkçe harf/ad sırası/telefon biçimi toleranslı, bkz. docs/SEARCH_API_CONTRACT.md).
-    /// Opsiyonel <c>clientId</c>, <c>speciesId</c> ile AND. <c>sort</c>/<c>order</c> işlenmez.
+    /// Opsiyonel <c>clientId</c>, <c>speciesId</c>, <c>status</c> (<c>Active</c> | <c>Deceased</c>; verilmezse tümü) ile AND. <c>sort</c>/<c>order</c> işlenmez.
     /// </summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Pets.Read)]
@@ -182,14 +206,28 @@ public sealed class PetsController : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] Guid? clientId = null,
         [FromQuery] Guid? speciesId = null,
+        [FromQuery] PetStatus? status = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(
-            new GetPetsListQuery(PageRequestQuery.WithMergedSearch(paging, search), clientId, speciesId),
+            new GetPetsListQuery(PageRequestQuery.WithMergedSearch(paging, search), clientId, speciesId, status),
             ct);
         return result.ToActionResult(this);
     }
+}
+
+/// <summary>PUT /api/v1/pets/{id}/status gövdesi.</summary>
+public sealed class SetPetStatusBody
+{
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public PetStatus Status { get; init; }
+
+    /// <summary>Yalnız <c>Deceased</c> ile; opsiyonel (yyyy-MM-dd).</summary>
+    public DateOnly? DeceasedOn { get; init; }
+
+    /// <summary>GET /pets/{id} yanıtındaki Base64 sürüm; zorunlu.</summary>
+    public string? RowVersion { get; init; }
 }

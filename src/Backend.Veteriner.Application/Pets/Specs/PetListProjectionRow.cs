@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Pets;
+
 namespace Backend.Veteriner.Application.Pets.Specs;
 
 /// <summary>Pet liste endpoint’i için Include yerine tek SELECT projeksiyonu.</summary>
@@ -11,4 +13,5 @@ public sealed record PetListProjectionRow(
     Guid? ColorId,
     string? ColorName,
     string? Breed,
-    decimal? Weight);
+    decimal? Weight,
+    PetStatus Status = PetStatus.Active);

@@ -14,5 +14,8 @@ public sealed class GetPetsListQueryValidator : AbstractValidator<GetPetsListQue
         RuleFor(x => x.PageRequest.Search)
             .MaximumLength(ListQueryTextSearch.MaxTermLength)
             .When(x => x.PageRequest.Search != null);
+        RuleFor(x => x.Status!.Value)
+            .IsInEnum()
+            .When(x => x.Status.HasValue);
     }
 }

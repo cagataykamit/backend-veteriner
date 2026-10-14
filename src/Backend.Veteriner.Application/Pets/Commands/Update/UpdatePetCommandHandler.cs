@@ -12,6 +12,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Pets.Commands.Update;
 
@@ -130,18 +131,29 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
             request.SpecialProtocolNumber,
             request.IsNeutered);
 
-        await _petsWrite.UpdateAsync(pet, ct);
+        try
+        {
+            await _petsWrite.UpdateAsync(pet, ct);
 
-        // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
-        await _eventOutbox.EnqueueAsync(
-            PetIntegrationEventTypes.Updated,
-            new PetUpdatedIntegrationEvent(
-                Guid.NewGuid(),
-                DateTime.UtcNow,
-                PetProjectionSnapshotFactory.Create(pet, client, species, breedRef, colorRef)),
-            ct);
+            // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
+            await _eventOutbox.EnqueueAsync(
+                PetIntegrationEventTypes.Updated,
+                new PetUpdatedIntegrationEvent(
+                    Guid.NewGuid(),
+                    DateTime.UtcNow,
+                    PetProjectionSnapshotFactory.Create(pet, client, species, breedRef, colorRef)),
+                ct);
 
-        await _petsWrite.SaveChangesAsync(ct);
+            await _petsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Kayıt okunduktan sonra (ör. durum değişikliğiyle) değişti; RowVersion kolonu bu yarışı görünür kılar.
+            return Result.Failure(
+                "Pets.ConcurrencyConflict",
+                "Hayvan kaydı başka biri tarafından değiştirildi; sayfayı yenileyip tekrar deneyin.");
+        }
+
         return Result.Success();
     }
 }

@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
@@ -68,7 +69,10 @@ public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Re
             pet.PassportOrTagNumber,
             pet.SpecialProtocolNumber,
             pet.IsNeutered,
-            PetAlertsDto.From(pet.AlertFlags, pet.AlertNote));
+            PetAlertsDto.From(pet.AlertFlags, pet.AlertNote),
+            pet.Status,
+            pet.DeceasedOn,
+            ExaminationRowVersion.Encode(pet.RowVersion));
         return Result<PetDetailDto>.Success(dto);
     }
 }

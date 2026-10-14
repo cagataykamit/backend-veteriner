@@ -10,6 +10,7 @@ public sealed class PetsByTenantCountSpec : Specification<Pet>
         Guid tenantId,
         Guid? clientId,
         Guid? speciesId,
+        PetStatus? status,
         DailySearchTerm? searchTerm,
         Guid[] petIdsMatchingClientTextOrEmpty)
     {
@@ -17,6 +18,8 @@ public sealed class PetsByTenantCountSpec : Specification<Pet>
         Query.Where(p => p.TenantId == tenantId);
         if (clientId.HasValue)
             Query.Where(p => p.ClientId == clientId.Value);
+        if (status.HasValue)
+            Query.Where(p => p.Status == status.Value);
         if (speciesId.HasValue)
             Query.Where(p => p.SpeciesId == speciesId.Value);
         if (searchTerm is not null)
