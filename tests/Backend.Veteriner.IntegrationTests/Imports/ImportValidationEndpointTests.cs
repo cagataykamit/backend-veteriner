@@ -46,10 +46,8 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
 
-        var response = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        var json = await ValidateAsync(client, id);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         json.GetProperty("status").GetString().Should().Be("Validated");
         json.GetProperty("validationId").ValueKind.Should().Be(JsonValueKind.String);
         json.GetProperty("validatedAtUtc").ValueKind.Should().Be(JsonValueKind.String);
@@ -86,8 +84,8 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
 
-        var first = await (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).Content.ReadFromJsonAsync<JsonElement>();
-        var second = await (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var first = await ValidateAsync(client, id);
+        var second = await ValidateAsync(client, id);
 
         second.GetProperty("validationId").GetGuid().Should().NotBe(first.GetProperty("validationId").GetGuid());
         Counts(second, "pets").Should().Equal(Counts(first, "pets"));
@@ -102,7 +100,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var client = ClientFor(ctx.Token);
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
-        await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(client, id);
 
         var response = await client.GetAsync($"/api/v1/imports/batches/{id}/preview");
 
@@ -155,7 +153,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
             new { kind = "species", source = "Ejderha", targetId = (Guid?)null },
             new { kind = "vaccine", source = "Bilinmeyen Aşı", targetId = (Guid?)null },
         });
-        await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(client, id);
 
         var json = await (await client.GetAsync($"/api/v1/imports/batches/{id}/preview")).Content.ReadFromJsonAsync<JsonElement>();
 
@@ -174,7 +172,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var client = ClientFor(ctx.Token);
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
-        await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(client, id);
 
         var all = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/rows?pageSize=200");
         all.GetProperty("totalItems").GetInt32().Should().Be(15);
@@ -221,7 +219,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var client = ClientFor(ctx.Token);
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
-        await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(client, id);
 
         var response = await client.GetAsync($"/api/v1/imports/batches/{id}/rows?{query}");
 
@@ -238,7 +236,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var client = ClientFor(ctx.Token);
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
-        await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(client, id);
 
         var response = await client.GetAsync($"/api/v1/imports/batches/{id}/errors?format=xlsx");
 
@@ -277,7 +275,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var client = ClientFor(ctx.Token);
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
-        await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(client, id);
 
         var response = await client.GetAsync($"/api/v1/imports/batches/{id}/errors?format=csv");
 
@@ -302,7 +300,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var client = ClientFor(ctx.Token);
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
-        await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(client, id);
 
         (await client.GetAsync($"/api/v1/imports/batches/{id}/errors?format=pdf")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var noFormat = await client.GetAsync($"/api/v1/imports/batches/{id}/errors");
@@ -342,8 +340,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
             ["pets"] = Map("SahipAdSoyad", "SahipAdSoyad", "SahipTelefon", "SahipTelefon", "HayvanAdi", "HayvanAdi", "Tur", "Tur", "Mikrocip", "Mikrocip"),
         });
 
-        var validated = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
-        validated.StatusCode.Should().Be(HttpStatusCode.OK, await validated.Content.ReadAsStringAsync());
+        await ValidateAsync(client, id);
 
         var customers = await RowsAsync(client, id, "customers");
         customers[0].GetProperty("validation").GetProperty("action").GetString().Should().Be("Match");
@@ -390,8 +387,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
             ["customers"] = Map("AdSoyad", "AdSoyad", "Telefon", "Telefon"),
         });
 
-        var validated = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
-        validated.StatusCode.Should().Be(HttpStatusCode.OK, await validated.Content.ReadAsStringAsync());
+        await ValidateAsync(client, id);
 
         var customers = await RowsAsync(client, id, "customers");
         customers[0].GetProperty("validation").GetProperty("action").GetString().Should().Be("Create");
@@ -416,7 +412,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         });
         put.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var json = await (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var json = await ValidateAsync(client, id);
 
         // Tek satır hatalı: hiç aktarılabilir satır yok.
         json.GetProperty("status").GetString().Should().Be("ValidationFailed");
@@ -450,7 +446,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
                 "Tur", "Tur", "AsiAdi", "AsiAdi", "UygulamaTarihi", "UygulamaTarihi"),
         });
 
-        var json = await (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var json = await ValidateAsync(client, id);
 
         json.GetProperty("status").GetString().Should().Be("Validated");
         Counts(json, "vaccinations").Should().Equal(2, 2, 0, 0, 1, 0, 1);
@@ -474,7 +470,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
             ["pets"] = Map("MusteriNo", "MusteriNo", "HayvanAdi", "HayvanAdi", "Tur", "Tur"),
         });
 
-        var json = await (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var json = await ValidateAsync(client, id);
 
         json.GetProperty("status").GetString().Should().Be("ValidationFailed");
         json.GetProperty("validationId").ValueKind.Should().Be(JsonValueKind.Null);
@@ -493,7 +489,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var client = ClientFor(ctx.Token);
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
-        (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        await ValidateAsync(client, id);
 
         // Eşleme değişince sonuçlar güncel değil: parti Mapped, preview/rows/errors 409.
         await MapIdentityAsync(client, id);
@@ -505,7 +501,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
             (await CodeAsync(stale)).Should().Be("Imports.InvalidState");
         }
 
-        (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        await ValidateAsync(client, id);
         (await client.GetAsync($"/api/v1/imports/batches/{id}/preview")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -560,35 +556,134 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         (await StatusAsync(b)).Should().Be(ImportBatchStatus.Validating);
     }
 
+    // ================================================================ Arka plan işi (ADR-019 K13)
+
     [Fact]
-    public async Task Validate_Should_Conflict_While_Own_Lease_Is_Active()
+    public async Task Validate_Should_Queue_And_Return_202_While_Results_Are_Not_Ready_Until_Worker_Finishes()
+    {
+        var ctx = await SeedAsync();
+        var cat = await SeedCatalogAsync(ctx.TenantId);
+        var client = ClientFor(ctx.Token);
+        var id = await UploadMainScenarioAsync(client, ctx, cat);
+        await MapIdentityAsync(client, id);
+
+        var response = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted, await response.Content.ReadAsStringAsync());
+        response.Headers.Location.Should().BeNull();
+        var queued = await response.Content.ReadFromJsonAsync<JsonElement>();
+        queued.GetProperty("status").GetString().Should().Be("Validating");
+        queued.GetProperty("validationId").ValueKind.Should().Be(JsonValueKind.Null);
+
+        // Kuyrukta: ilerleme doğrulama fazını verir, işçi almadığı için kira yok ve işlenen 0.
+        var progress = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/progress");
+        progress.GetProperty("status").GetString().Should().Be("Validating");
+        progress.GetProperty("phase").GetString().Should().Be("Validating");
+        progress.GetProperty("processed").GetInt32().Should().Be(0);
+        progress.GetProperty("total").GetInt32().Should().Be(15);
+        progress.GetProperty("leaseActive").GetBoolean().Should().BeFalse();
+
+        // Sonuç hazır değil: sonuç uçları 409, eşleme/silme/uygulama engelli.
+        foreach (var path in new[] { "preview", "rows", "errors" })
+        {
+            var notReady = await client.GetAsync($"/api/v1/imports/batches/{id}/{path}");
+            notReady.StatusCode.Should().Be(HttpStatusCode.Conflict, path);
+            (await CodeAsync(notReady)).Should().Be("Imports.InvalidState", path);
+        }
+
+        var remap = await client.PutAsJsonAsync($"/api/v1/imports/batches/{id}/mapping", new { columns = IdentityColumns(), valueMappings = Array.Empty<object>() });
+        remap.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeAsync(remap)).Should().Be("Imports.InvalidState");
+        var discard = await client.DeleteAsync($"/api/v1/imports/batches/{id}");
+        discard.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeAsync(discard)).Should().Be("Imports.InvalidState");
+        var committer = ClientFor(await TokenAsync(ctx, new[] { "Imports.Read", "Imports.Manage", "Imports.Commit", "Clients.Create", "Pets.Create", "Vaccinations.Create" }));
+        var commit = await committer.PostAsJsonAsync($"/api/v1/imports/batches/{id}/commit", new { validationId = Guid.NewGuid() });
+        commit.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeAsync(commit)).Should().Be("Imports.InvalidState");
+
+        await ImportValidationTestRunner.RunWorkerAsync(_factory.Services, id);
+
+        var done = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/progress");
+        done.GetProperty("status").GetString().Should().Be("Validated");
+        done.GetProperty("phase").ValueKind.Should().Be(JsonValueKind.Null);
+        done.GetProperty("leaseActive").GetBoolean().Should().BeFalse();
+        var batch = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}");
+        Counts(batch, "customers").Should().Equal(4, 1, 2, 1, 2, 0, 1);
+        (await client.GetAsync($"/api/v1/imports/batches/{id}/preview")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Progress_Should_Count_Rows_Written_By_The_Running_Validation()
+    {
+        var ctx = await SeedAsync();
+        var cat = await SeedCatalogAsync(ctx.TenantId);
+        var client = ClientFor(ctx.Token);
+        var id = await UploadMainScenarioAsync(client, ctx, cat);
+        await MapIdentityAsync(client, id);
+        await ValidateAsync(client, id);
+
+        // Yeniden doğrulama işçide (kira alınmış), önceki sonuçlar sıfırlanmış ve 6 satır yazılmış an.
+        (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).StatusCode.Should().Be(HttpStatusCode.Accepted);
+        await MutateBatchAsync(id, b => b.ClaimValidationLease("w-running", DateTime.UtcNow).IsSuccess.Should().BeTrue());
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var pending = await db.ImportBatchRows.Where(r => r.BatchId == id).OrderBy(r => r.RowNumber).Skip(6)
+                .Select(r => r.Id).ToListAsync();
+            await db.ImportBatchRows.Where(r => pending.Contains(r.Id))
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.ValidationStatus, ImportRowValidationStatus.Pending));
+        }
+
+        var progress = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/progress");
+
+        progress.GetProperty("phase").GetString().Should().Be("Validating");
+        progress.GetProperty("leaseActive").GetBoolean().Should().BeTrue();
+        progress.GetProperty("processed").GetInt32().Should().Be(6);
+        progress.GetProperty("total").GetInt32().Should().Be(15);
+        (await ImportValidationTestRunner.Processor(_factory.Services).ProcessBatchAsync(id, CancellationToken.None))
+            .Should().BeFalse("kira başka işçide");
+    }
+
+    [Fact]
+    public async Task Second_Validate_While_Queued_Or_Running_Should_Return_200_Without_New_Job()
     {
         var ctx = await SeedAsync();
         var client = ClientFor(ctx.Token);
         var id = await UploadCustomersAsync(client);
         await MapCustomersAsync(client, id);
-        await ForceValidatingAsync(id, DateTime.UtcNow);
 
-        var running = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var replay = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
 
-        running.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await CodeAsync(running)).Should().Be("Imports.AnotherJobRunning");
+        replay.StatusCode.Should().Be(HttpStatusCode.OK, await replay.Content.ReadAsStringAsync());
+        (await replay.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().Should().Be("Validating");
+
+        // İşçi kirayı aldıktan sonra da aynı.
+        await MutateBatchAsync(id, b => b.ClaimValidationLease("w-running", DateTime.UtcNow).IsSuccess.Should().BeTrue());
+        (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).StatusCode.Should().Be(HttpStatusCode.OK);
         (await StatusAsync(id)).Should().Be(ImportBatchStatus.Validating);
     }
 
     [Fact]
-    public async Task Validate_Should_Take_Over_A_Crashed_Validation_After_Lease_Expires()
+    public async Task Worker_Should_Take_Over_A_Crashed_Validation_Only_After_Lease_Expires()
     {
         var ctx = await SeedAsync();
         var client = ClientFor(ctx.Token);
         var id = await UploadCustomersAsync(client);
         await MapCustomersAsync(client, id);
-        await ForceValidatingAsync(id, DateTime.UtcNow.AddMinutes(-10)); // kira 5 dk önce bitti
+        await ForceValidatingAsync(id, DateTime.UtcNow); // çalışan (kirası süren) işçi
+        (await ImportValidationTestRunner.Processor(_factory.Services).ProcessBatchAsync(id, CancellationToken.None))
+            .Should().BeFalse("kira dolmadan devralınmaz");
 
-        var takeover = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        // Çöken işçi: kirası 5 dk önce bitti.
+        await MutateBatchAsync(id, b => b.ClaimValidationLease("w-crashed", DateTime.UtcNow.AddMinutes(-10)).IsSuccess.Should().BeTrue());
 
-        takeover.StatusCode.Should().Be(HttpStatusCode.OK, await takeover.Content.ReadAsStringAsync());
-        (await takeover.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().Should().Be("Validated");
+        await ImportValidationTestRunner.RunWorkerAsync(_factory.Services, id);
+
+        var batch = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}");
+        batch.GetProperty("status").GetString().Should().Be("Validated");
+        Counts(batch, "customers").Should().Equal(2, 2, 0, 0, 2, 0, 0);
     }
 
     // ================================================================ Yetki, kiracı yalıtımı
@@ -601,7 +696,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var ownerClient = ClientFor(owner.Token);
         var id = await UploadMainScenarioAsync(ownerClient, owner, cat);
         await MapIdentityAsync(ownerClient, id);
-        await ownerClient.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(ownerClient, id);
         var stranger = ClientFor((await SeedAsync()).Token);
 
         (await stranger.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -637,7 +732,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var manager = ClientFor(ctx.Token);
         var id = await UploadMainScenarioAsync(manager, ctx, cat);
         await MapIdentityAsync(manager, id);
-        await manager.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(manager, id);
 
         var readOnly = ClientFor(await TokenAsync(ctx, new[] { "Imports.Read" }));
         (await readOnly.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -664,7 +759,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var client = ClientFor(ctx.Token);
         var id = await UploadMainScenarioAsync(client, ctx, cat);
         await MapIdentityAsync(client, id);
-        await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        await ValidateAsync(client, id);
         await PurgeAsync(id);
 
         foreach (var path in new[] { "rows", "errors" })
@@ -853,18 +948,28 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
     }
 
     /// <summary>
-    /// Partiyi verilen anda doğrulamaya alınmış gösterir (çöken/süren istek taklidi); kira bu andan 5 dk sonra biter, yani
-    /// geçmiş bir an süresi dolmuş kira üretir.
+    /// Partiyi verilen anda kuyruğa alınmış ve bir işçice (<c>w-crashed</c>) alınmış gösterir (çöken/süren iş taklidi);
+    /// kira bu andan 5 dk sonra biter, yani geçmiş bir an süresi dolmuş kira üretir.
     /// </summary>
-    private async Task ForceValidatingAsync(Guid batchId, DateTime startedAtUtc)
+    private Task ForceValidatingAsync(Guid batchId, DateTime claimedAtUtc)
+        => MutateBatchAsync(batchId, batch =>
+        {
+            var moved = batch.StartValidation(claimedAtUtc);
+            moved.IsSuccess.Should().BeTrue(moved.Error.Message);
+            batch.ClaimValidationLease("w-crashed", claimedAtUtc).IsSuccess.Should().BeTrue();
+        });
+
+    private async Task MutateBatchAsync(Guid batchId, Action<ImportBatch> mutate)
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.SingleAsync(b => b.Id == batchId);
-        var moved = batch.StartValidation(startedAtUtc);
-        moved.IsSuccess.Should().BeTrue(moved.Error.Message);
+        mutate(batch);
         await db.SaveChangesAsync();
     }
+
+    private Task<JsonElement> ValidateAsync(HttpClient client, Guid id)
+        => ImportValidationTestRunner.ValidateAsync(_factory.Services, client, id);
 
     private async Task PurgeAsync(Guid batchId)
     {

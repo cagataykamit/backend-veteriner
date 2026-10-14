@@ -41,8 +41,8 @@ namespace Backend.IntegrationTests.Performance;
 /// <summary>
 /// Dilim T: içe aktarma uçtan uca deneme ve ölçüm (docs/IMPORT_PERFORMANCE_FINDINGS.md). Yalnız <c>VETINITY_PERF=1</c> ile
 /// çalışır; izole, koşu kimlikli LocalDB test veritabanı (paylaşılan/dev DB'ye dokunmaz). Gerçek HTTP yığını
-/// (WebApplicationFactory, JWT, yetki, EF, SQL). Uygulama ve geri alma işleri üretimdeki
-/// <see cref="ImportCommitHostedService"/> / <see cref="ImportRollbackHostedService"/> sınıflarıyla, kısa döngüyle
+/// (WebApplicationFactory, JWT, yetki, EF, SQL). Doğrulama, uygulama ve geri alma işleri üretimdeki
+/// <see cref="ImportValidationHostedService"/> / <see cref="ImportCommitHostedService"/> / <see cref="ImportRollbackHostedService"/> sınıflarıyla, kısa döngüyle
 /// (<c>PollIntervalSeconds = 1</c>) ve varsayılan geri basınçla gerçekten arka planda çalışır; müşteri projeksiyonu ve
 /// genel outbox işleyicisi üretim döngüleriyle açıktır (e-posta no-op). Her aşamada süre, EF komut sayısı (kaynağa göre:
 /// HTTP isteği / işçi / diğer arka plan), ayrılan bellek ve GC sayıları ölçülür; R4 için <c>/health/ready</c> ve outbox
@@ -126,6 +126,10 @@ public sealed class ImportPerformanceTests
         var rollbackWorker = new ImportRollbackHostedService(
             new ImportRollbackProcessor(scopes, Options.Create(workerOptions), TimeProvider.System, rollbackLog, ImportCommitProcessor.NewWorkerId()),
             Options.Create(workerOptions), TimeProvider.System, NullLogger<ImportRollbackHostedService>.Instance);
+        var validationWorker = new ImportValidationHostedService(
+            new ImportValidationProcessor(scopes, TimeProvider.System, NullLogger<ImportValidationProcessor>.Instance, ImportCommitProcessor.NewWorkerId()),
+            Options.Create(workerOptions), TimeProvider.System, NullLogger<ImportValidationHostedService>.Instance);
+        await StartTaggedAsync(validationWorker, SqlBucketCapture.Worker);
         await StartTaggedAsync(commitWorker, SqlBucketCapture.Worker);
         await StartTaggedAsync(rollbackWorker, SqlBucketCapture.Worker);
 
@@ -163,7 +167,7 @@ public sealed class ImportPerformanceTests
             await meter.RunAsync("A eşle (PUT mapping)", async () =>
                 await ExpectJsonAsync(await http.PutAsJsonAsync($"/api/v1/imports/batches/{idA}/mapping", new { columns = columnsA, valueMappings = Array.Empty<object>() })));
 
-            var validated1 = await meter.RunAsync("A doğrula (1. tur)", async () => await ExpectJsonAsync(await http.PostAsync($"/api/v1/imports/batches/{idA}/validate", null)));
+            var validated1 = await ValidateAsync(meter, http, idA, "A doğrula (1. tur)");
             meter.Note($"durum {validated1.GetProperty("status").GetString()}; {SummaryNote(validated1)}");
 
             var preview1 = await meter.RunAsync("A önizleme (1. tur)", async () => await GetJsonAsync(http, $"/api/v1/imports/batches/{idA}/preview"));
@@ -173,7 +177,7 @@ public sealed class ImportPerformanceTests
 
             await meter.RunAsync("A değer eşleme (atla) + yeniden eşle", async () =>
                 await ExpectJsonAsync(await http.PutAsJsonAsync($"/api/v1/imports/batches/{idA}/mapping", new { columns = columnsA, valueMappings = valueMappingsA })));
-            var validated2 = await meter.RunAsync("A doğrula (2. tur)", async () => await ExpectJsonAsync(await http.PostAsync($"/api/v1/imports/batches/{idA}/validate", null)));
+            var validated2 = await ValidateAsync(meter, http, idA, "A doğrula (2. tur)");
             meter.Note($"durum {validated2.GetProperty("status").GetString()}; {SummaryNote(validated2)}");
             var validationIdA = validated2.GetProperty("validationId").GetGuid();
             CheckSummaryInvariants(validated2, "A doğrulama", Check, applied: false);
@@ -199,7 +203,7 @@ public sealed class ImportPerformanceTests
             var idCsv = uploadCsv.GetProperty("id").GetGuid();
             meter.Note($"uyarılar: [{string.Join(",", uploadCsv.GetProperty("warnings").EnumerateArray().Select(w => w.GetProperty("code").GetString()))}]; {SuggestionNote(uploadCsv)}");
             (await http.PutAsJsonAsync($"/api/v1/imports/batches/{idCsv}/mapping", new { columns = SuggestedColumns(uploadCsv), valueMappings = valueMappingsA })).EnsureSuccessStatusCode();
-            var validatedCsv = await meter.RunAsync("A CSV-1254 varyantı doğrula", async () => await ExpectJsonAsync(await http.PostAsync($"/api/v1/imports/batches/{idCsv}/validate", null)));
+            var validatedCsv = await ValidateAsync(meter, http, idCsv, "A CSV-1254 varyantı doğrula");
             meter.Note(SummaryNote(validatedCsv));
             Check("CSV-1254 ve XLSX varyantı aynı doğrulama sayıları", SummaryKey(validatedCsv) == SummaryKey(validated2),
                 $"xlsx: {SummaryKey(validated2)} | csv: {SummaryKey(validatedCsv)}");
@@ -245,10 +249,10 @@ public sealed class ImportPerformanceTests
             meter.Note(SuggestionNote(uploadB));
             var columnsB = SuggestedColumns(uploadB);
             (await http.PutAsJsonAsync($"/api/v1/imports/batches/{idB}/mapping", new { columns = columnsB, valueMappings = Array.Empty<object>() })).EnsureSuccessStatusCode();
-            await meter.RunAsync("B doğrula (1. tur)", async () => await ExpectJsonAsync(await http.PostAsync($"/api/v1/imports/batches/{idB}/validate", null)));
+            await ValidateAsync(meter, http, idB, "B doğrula (1. tur)");
             var previewB1 = await GetJsonAsync(http, $"/api/v1/imports/batches/{idB}/preview");
             (await http.PutAsJsonAsync($"/api/v1/imports/batches/{idB}/mapping", new { columns = columnsB, valueMappings = SkipMappings(previewB1) })).EnsureSuccessStatusCode();
-            var validatedB = await meter.RunAsync("B doğrula (2. tur)", async () => await ExpectJsonAsync(await http.PostAsync($"/api/v1/imports/batches/{idB}/validate", null)));
+            var validatedB = await ValidateAsync(meter, http, idB, "B doğrula (2. tur)");
             meter.Note($"{SummaryNote(validatedB)}");
             var previewB = await GetJsonAsync(http, $"/api/v1/imports/batches/{idB}/preview");
             report.Line();
@@ -353,6 +357,7 @@ public sealed class ImportPerformanceTests
         finally
         {
             sampler.Phase = "Bitti";
+            await validationWorker.StopAsync(CancellationToken.None);
             await commitWorker.StopAsync(CancellationToken.None);
             await rollbackWorker.StopAsync(CancellationToken.None);
             await sampler.StopAsync();
@@ -587,9 +592,32 @@ public sealed class ImportPerformanceTests
         return doc.RootElement.TryGetProperty("code", out var code) ? code.GetString() : null;
     }
 
-    /// <summary>İstemci gibi 2 sn aralıkla <c>progress</c> yoklar; durum <paramref name="whileStatus"/> dışına çıkınca döner.</summary>
+    /// <summary>
+    /// Doğrulama (K13, arka plan): POST hemen 202 döner (istek yanıt süresi ayrıca not edilir), sonuç <c>progress</c>
+    /// 250 ms aralıkla yoklanarak beklenir (aşama süresi önceki senkron ölçümle karşılaştırılabilir kalsın); son parti döner.
+    /// </summary>
+    private static async Task<JsonElement> ValidateAsync(PhaseMeter meter, HttpClient http, Guid id, string phase)
+    {
+        long postMs = 0;
+        var wait = await meter.RunAsync(phase, async () =>
+        {
+            var post = Stopwatch.StartNew();
+            using (var r = await http.PostAsync($"/api/v1/imports/batches/{id}/validate", null))
+            {
+                postMs = post.ElapsedMilliseconds;
+                if (r.StatusCode != HttpStatusCode.Accepted)
+                    throw new InvalidOperationException($"Doğrulama 202 dönmedi: HTTP {(int)r.StatusCode} {await r.Content.ReadAsStringAsync()}");
+            }
+
+            return await WaitWhileAsync(http, id, "Validating", TimeSpan.FromMinutes(30), pollMs: 250);
+        });
+        meter.Note($"POST 202 {postMs} ms; {wait}; en çok işlenen satır {wait.MaxProcessed}");
+        return await GetJsonAsync(http, $"/api/v1/imports/batches/{id}");
+    }
+
+    /// <summary>İstemci gibi <paramref name="pollMs"/> (varsayılan 2 sn) aralıkla <c>progress</c> yoklar; durum <paramref name="whileStatus"/> dışına çıkınca döner.</summary>
     /// <remarks>Hatalı yanıt (ör. 500) işi durdurmaz: arayüz gibi yoklamaya devam edilir, sayı ve ilk hata kaydedilir.</remarks>
-    private static async Task<ProgressWait> WaitWhileAsync(HttpClient http, Guid id, string whileStatus, TimeSpan timeout)
+    private static async Task<ProgressWait> WaitWhileAsync(HttpClient http, Guid id, string whileStatus, TimeSpan timeout, int pollMs = 2000)
     {
         var sw = Stopwatch.StartNew();
         var polls = 0;
@@ -610,7 +638,7 @@ public sealed class ImportPerformanceTests
                 firstError ??= $"HTTP {(int)response.StatusCode} {body[..Math.Min(body.Length, 300)]}";
                 if (sw.Elapsed > timeout)
                     return new ProgressWait("Timeout", polls, maxProcessed, errors, firstError, maxPollMs);
-                await Task.Delay(2000);
+                await Task.Delay(pollMs);
                 continue;
             }
 
@@ -619,7 +647,7 @@ public sealed class ImportPerformanceTests
             var status = progress.RootElement.GetProperty("status").GetString()!;
             if (status != whileStatus || sw.Elapsed > timeout)
                 return new ProgressWait(status, polls, maxProcessed, errors, firstError, maxPollMs);
-            await Task.Delay(2000);
+            await Task.Delay(pollMs);
         }
     }
 
@@ -879,7 +907,7 @@ public sealed class ImportPerformanceTests
 
         public PhaseRecord Last => _records[^1];
 
-        public void Note(string note) => _records[^1].Note = note;
+        public void Note(string note) => _records[^1].Note = _records[^1].Note.Length == 0 ? note : $"{_records[^1].Note}; {note}";
 
         public async Task<T> RunAsync<T>(string name, Func<Task<T>> action)
         {

@@ -26,8 +26,8 @@ namespace Backend.IntegrationTests.Imports;
 
 /// <summary>
 /// İçe aktarma B3: 10.000 satırda doğrulama sorgularının N+1 olmadığı kanıtı. Aynı yapıdaki küçük ve büyük dosyanın
-/// doğrulama isteğinde çalışan SELECT sayısı eşit olmalıdır (satır sayısından bağımsız); satır sonuçları EF toplu
-/// yazmasıyla (komut başına çok satır) kaydedilir. Sayılar test çıktısına yazılır.
+/// doğrulamasında (istek + arka plan işçisi, K13) çalışan SELECT sayısı eşit olmalıdır (satır sayısından bağımsız); satır
+/// sonuçları EF toplu yazmasıyla (komut başına çok satır, parça parça) kaydedilir. Sayılar test çıktısına yazılır.
 /// </summary>
 [Collection("imports-api")]
 public sealed class ImportValidationQueryCountTests
@@ -101,13 +101,17 @@ public sealed class ImportValidationQueryCountTests
         });
         map.StatusCode.Should().Be(HttpStatusCode.OK, await map.Content.ReadAsStringAsync());
 
+        // İstek (kuyruğa alma) + arka plan işçisinin tüm turu birlikte sayılır (ADR-019 K13).
         capture.Clear();
         var watch = Stopwatch.StartNew();
         var response = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        var requestElapsed = watch.Elapsed;
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted, await response.Content.ReadAsStringAsync());
+        await ImportValidationTestRunner.RunWorkerAsync(factory.Services, id);
         watch.Stop();
-        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         var summary = capture.Summarize();
+        var json = await (await client.GetAsync($"/api/v1/imports/batches/{id}")).Content.ReadFromJsonAsync<JsonElement>();
+        _output.WriteLine($"  perTable={perTable}: istek (202) {requestElapsed.TotalMilliseconds:F0} ms, istek + işçi {watch.Elapsed.TotalMilliseconds:F0} ms");
 
         // Önizleme ve satır sayfası da sabit sayıda sorgu çalıştırmalı.
         capture.Clear();

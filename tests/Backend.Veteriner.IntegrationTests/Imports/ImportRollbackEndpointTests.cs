@@ -647,7 +647,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         return (id, await ValidateAsync(client, id));
     }
 
-    private static async Task<(Guid Id, Guid ValidationId)> UploadCustomersAsync(HttpClient client, SeedCtx ctx, int count)
+    private async Task<(Guid Id, Guid ValidationId)> UploadCustomersAsync(HttpClient client, SeedCtx ctx, int count)
     {
         var rows = new List<object?[]> { new object?[] { "AdSoyad", "Telefon" } };
         for (var i = 0; i < count; i++)
@@ -682,12 +682,9 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         return id;
     }
 
-    private static async Task<Guid> ValidateAsync(HttpClient client, Guid id)
-    {
-        var response = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
-        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
-        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("validationId").GetGuid();
-    }
+    /// <summary>Arka plan doğrulamasını başlatıp bitirir (ADR-019 K13); güncel <c>validationId</c>.</summary>
+    private async Task<Guid> ValidateAsync(HttpClient client, Guid id)
+        => (await ImportValidationTestRunner.ValidateAsync(_factory.Services, client, id)).GetProperty("validationId").GetGuid();
 
     private static byte[] Workbook(params (string Sheet, object?[][] Rows)[] sheets)
     {
