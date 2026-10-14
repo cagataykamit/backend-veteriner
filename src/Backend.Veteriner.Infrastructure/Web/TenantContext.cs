@@ -14,7 +14,11 @@ public sealed class TenantContext : ITenantContext
     {
         get
         {
-            var items = _accessor.HttpContext?.Items;
+            // HTTP isteği yoksa (arka plan işi) yalnız açıkça başlatılmış kiracı kapsamı geçerlidir.
+            if (_accessor.HttpContext is null)
+                return BackgroundTenantScope.TenantId;
+
+            var items = _accessor.HttpContext.Items;
             if (items is null ||
                 !items.TryGetValue(TenantHttpContextKeys.ResolvedTenantId, out var raw) ||
                 raw is not Guid g)

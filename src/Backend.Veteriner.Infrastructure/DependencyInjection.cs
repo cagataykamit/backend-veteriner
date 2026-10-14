@@ -59,6 +59,9 @@ using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaims;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.UserOperationClaims;
 using Backend.Veteriner.Infrastructure.Reminders;
+using Backend.Veteriner.Application.Imports.Commit;
+using Backend.Veteriner.Infrastructure.Imports;
+using Microsoft.Extensions.Logging;
 using Backend.Veteriner.Infrastructure.Security;                                  // JwtOptions, JwtTokenService, Sha256TokenHashService, BcryptPasswordHasher, JwtOptionsProvider
 using Backend.Veteriner.Infrastructure.Web;                                       // ClientContext, TenantContext, ClinicContext, AppUrlProvider, HttpAuditContext, CurrentUserPermissionChecker
 using Backend.Veteriner.Infrastructure.Auditing;                                  // AuditLogWriter
@@ -330,6 +333,17 @@ public static class DependencyInjection
         services.AddScoped<IReminderEmailOutboxEnqueuer, ReminderEmailOutboxEnqueuer>();
         services.AddScoped<ReminderProcessorService>();
         services.AddHostedService<ReminderProcessorHostedService>();
+
+        // ===== Veri içe aktarma uygulama işi (ADR-019 K11; iş kuyruğu = ImportBatches, kira + geri basınç) =====
+        services.Configure<ImportCommitOptions>(configuration.GetSection(ImportCommitOptions.SectionName));
+        services.AddScoped<IImportBackpressureProbe, ImportBackpressureProbe>();
+        services.AddSingleton(sp => new ImportCommitProcessor(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<IOptions<ImportCommitOptions>>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<ImportCommitProcessor>>(),
+            ImportCommitProcessor.NewWorkerId()));
+        services.AddHostedService<ImportCommitHostedService>();
 
         // ===== Permission options =====
         services.Configure<PermissionChangeOptions>(configuration.GetSection("PermissionChange"));
