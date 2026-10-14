@@ -2,7 +2,9 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA5_DISCOVERY.md` (D1, D3, D6, D7, D8, D9 kabul edildi; K3, K4, R1, R2, R4), `docs/STOCK_MOVEMENT_SAFETY_API_CONTRACT.md` (requestId, kaynak benzersizliği, ters hareket). Uçlar `api/v1` altında; hata zarfı standart `ProblemDetails` + `extensions.code` (bkz. `VISITS_API_CONTRACT.md`).
 
-> **Durum:** Sözleşme (ADR-013 ile güncellendi: kesinleşmiş muayeneye sonradan ekleme, pasif üründe iptal, iptalde stok sonucu). Kapsam: klinikte hastaya fiilen uygulanan ürünün kaydı, stok düşümü ve iptali. **Kapsam dışı:** reçete satırları (Dilim 3; reçete hiçbir zaman stok değiştirmez), ücret önerisi (Dilim 5), aşıda stok tüketimi (D6), birim dönüşümü (D4), düşük stok bildirimi/e-posta. **Parti (lot) ve son kullanma tarihi bu sözleşmenin kapsamı dışındaydı; ADR-015 ile eklendi: uygulama artık bir partiden düşer (`batchId`, yanıtta `lotNumber`/`expiryDate`), süresi geçmiş partide engellenir. Bkz. `BATCH_STOCK_API_CONTRACT.md` bölüm 6.**
+> **Durum:** Sözleşme (ADR-013 ile güncellendi: kesinleşmiş muayeneye sonradan ekleme, pasif üründe iptal, iptalde stok sonucu). Kapsam: klinikte hastaya fiilen uygulanan ürünün kaydı, stok düşümü ve iptali. **Kapsam dışı:** reçete satırları (Dilim 3; reçete hiçbir zaman stok değiştirmez), ücret önerisi (Dilim 5), birim dönüşümü (D4), düşük stok bildirimi/e-posta. **Parti (lot) ve son kullanma tarihi bu sözleşmenin kapsamı dışındaydı; ADR-015 ile eklendi: uygulama artık bir partiden düşer (`batchId`, yanıtta `lotNumber`/`expiryDate`), süresi geçmiş partide engellenir. Bkz. `BATCH_STOCK_API_CONTRACT.md` bölüm 6.**
+>
+> **Aşı kaydına bağlı uygulama (2026-10-14, D6 değişti):** aşı kaydı oluşturulurken opsiyonel ürün verilirse aynı işlemde bir uygulama (stok düşümü) yazılır ve ikisi bağlanır. Bkz. bölüm 9.
 
 ---
 
@@ -44,6 +46,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA5_DISCOVERY.md` (D1, D3,
 | `createdByUserId` | guid | Uygulamayı kaydeden (klinik uygulayıcı); sonradan eklemede ekleyen kullanıcı |
 | `createdAtUtc` | datetime | Kayıt zamanı; sonradan eklemede eklenme zamanı (`administeredAtUtc` fiilen uygulama zamanıdır) |
 | `requestId` | guid? | Verilmişse kaydedilen değer |
+| `vaccinationId` | guid? | Bu uygulama bir aşı kaydı ile birlikte yazıldıysa o aşı kaydı (bölüm 9); aksi hâlde `null` |
 
 ### `AdministrationStockDto` (yalnız oluşturma yanıtında)
 
@@ -177,6 +180,57 @@ Liste/detay `addedAfterFinalization`, `lateEntryReason` ve `voidStockOutcome` al
 
 **Açık / ertelenen:**
 
-- **Aşı (D6):** aşı uygulaması stok düşmez; `VaccineDefinition` ile `Product` bağı sonraki karar.
+- **Aşı (D6) değişti:** aşı kaydı ürünle birlikte girilirse stok düşer (bölüm 9). Ürünsüz aşı kaydı (takvim/geçmiş aşı) stok düşmez. `VaccineDefinition` ile `Product` arasında kalıcı bağ yoktur; ürün her kayıtta istekle seçilir.
 - Sonradan eklenen kayıt için hekime bildirim/onay akışı (Aşama 8); zarar raporu (Aşama 8 raporları).
 - Muayene özeti (`related-summary`, `administrations` bloğu) ve hasta timeline'ı (`type: "Administration"`) uygulama kaydını rozetle taşır: bkz. `BACKEND-CONTRACT-STANDARD.md` §18 ve `PET_TIMELINE_API_CONTRACT.md`. Her ikisinde iptaller varsayılan gizlidir.
+
+
+---
+
+## 9) Aşı kaydına bağlı uygulama (2026-10-14)
+
+Kaynak: ADR-017 K1, UX denetimi B-01. Rakip pratiği: aşı ürün bazlıdır (ürün, seri no, SKT, miktar, fiyat). `POST /api/v1/vaccinations` opsiyonel `productId` alır; verilirse **aynı transaction'da** bu sözleşmenin `CreateAdministrationCommand` mantığı çalışır (kural kopyalanmaz). Aşı kaydı sözleşmesi: `BACKEND-CONTRACT-STANDARD.md` §11.2.
+
+### 9.1 Bağ ve görünürlük
+
+- Bağ `Administration.vaccinationId` (nullable, **filtreli benzersiz**: bir aşı kaydı en çok bir uygulamaya bağlanır) ile tutulur. `POST /administrations` ucu bu alanı **almaz**; bağ yalnız aşı kaydı oluşturma yoluyla kurulur.
+- **Çift sayım yok:** bağlı uygulama ve aşı kaydı tek olaydır.
+  - **Aşı Bilgi raporu / defterler:** satır = uygulama (bağlı uygulama tek satırdır; aşı kaydı ayrıca satır üretmez). Bağlı olmayan eski/takvim aşı kayıtları bu raporda hâlâ yoktur.
+  - **Hasta timeline'ı:** bağlı uygulama `Administration` satırı olarak **gösterilmez**; olay `Vaccination` satırıdır. Bağlı olmayan uygulamalar eskisi gibi görünür.
+  - **Muayene `related-summary` `administrations` bloğu:** bağlı uygulama bu blokta yoktur (aşı kaydı olarak görünür).
+  - `GET /administrations` liste/detay bağlı uygulamayı döner (`vaccinationId` dolu); stok/zarar incelemesi için erişim sürer.
+
+### 9.2 İptal tutarlılığı (ADR-013 çizgisinde)
+
+- **Uygulama iptali** (`POST /administrations/{id}/void`, `Administrations.Correct`): uygulama bir aşı kaydına bağlıysa aşı kaydı **aynı transaction'da** `Cancelled` olur (`appliedAtUtc` null'lanır; durum kuralı gereği iptal kayıtta uygulama tarihi olmaz; gerçek tarih uygulama kaydındadır). Stok sonucu (`StockReturned`/`WrittenOff`) uygulama iptalindeki gibidir. Kesinleşmiş muayene iptali engellemez (D3); bağlı aşı kaydı da iptal edilir.
+- **Aşı kaydı güncelleme/iptali** (`PUT /vaccinations/{id}`): uygulamaya bağlı aşı kaydında yalnız `notes` ve `dueAtUtc` (sonraki doz) değişebilir. `petId`, `clinicId`, `examinationId`, `vaccineDefinitionId`, `status`, `appliedAtUtc` değişikliği `Vaccinations.LinkedToAdministration` (409) ile reddedilir; iptal için uygulama iptal edilir (gerekçe + stok sonucu gerektiği için). Kesinleşmiş muayene kilidi (`Examinations.Finalized`) aşı kaydı için mevcut kuralla sürer.
+- Zaten iptal edilmiş uygulama `Administrations.AlreadyVoided` (409); eşzamanlılık `RowVersion` ile uygulama satırında çözülür (bölüm 4).
+
+### 9.3 Oluşturma kuralları (aşı ucu)
+
+`Vaccinations.Create` + `productId` verilirse ayrıca `Administrations.Create` izni gerekir (yoksa `Vaccinations.AdministrationPermissionRequired`, 403). `productId` yoksa davranış değişmez.
+
+- `status` `Applied` olmalı (`Vaccinations.ProductRequiresAppliedStatus`, 400); `appliedAtUtc` uygulama zamanı olur ve uygulama penceresine (bölüm 3 kural 6: 7 gün geri) de uymalıdır.
+- `quantity` verilmezse `1` (ürünün stok birimi cinsinden; bölüm 1). `batchId` verilmezse FEFO; süresi geçmiş parti, yetersiz bakiye, pasif ürün, `requestId` ve eşzamanlılık kuralları bölüm 3 ile aynıdır (`Administrations.*` ve `Products.*` kodlarıyla döner).
+- Muayene bağlıysa ve kesinleşmişse aşı kilidi önce çalışır (`Examinations.Finalized`); aşı için "sonradan ekleme" yoktur, `lateEntryReason` alınmaz.
+- Aynı `requestId` ile tekrar: önceki kayıt aynı aşı/uygulama ise **200** ve ilk kayıt (stok değişmez); farklı içerik `Administrations.DuplicateRequestId` veya `Vaccinations.DuplicateRequestId` (409); iptal edilmişse `Administrations.RequestIdVoided` (409).
+- Hata olursa (ör. yetersiz stok) aşı kaydı da yazılmaz.
+
+### 9.4 Frontend için değişenler
+
+Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışır.
+
+| Yer | Değişiklik |
+|---|---|
+| `POST /vaccinations` | İstek: opsiyonel `productId`, `quantity`, `batchId`, `requestId`. Yanıt: `productId` yoksa **eskisi gibi çıplak guid, 201**. `productId` varsa `{ created, id, administration: AdministrationDto, stock: AdministrationStockDto }`, 201 (yeni) / 200 (`requestId` tekrarı) |
+| `GET /vaccinations/{id}` | `administrationId`, `productId`, `productName`, `quantity`, `unit`, `batchId`, `lotNumber`, `expiryDate` (bağlı değilse `null`) |
+| `GET /vaccinations` | Her satırda `administrationId` (bağlı değilse `null`) |
+| `GET /administrations` / detay | `vaccinationId` |
+| `PUT /vaccinations/{id}` | Bağlı kayıtta kilitli alanlar için `Vaccinations.LinkedToAdministration` (409); ekranda bu alanları pasif göster, iptal için "uygulamayı iptal et" akışı |
+| Timeline / related-summary | Bağlı uygulama ayrı satır değil; aşı satırı |
+| Hatalar (yeni) | `Vaccinations.ProductRequiresAppliedStatus` (400), `Vaccinations.LinkedToAdministration` (409), `Vaccinations.DuplicateRequestId` (409), `Vaccinations.AdministrationPermissionRequired` (403) |
+
+### 9.5 Uygulama notları
+
+- Migration `AddVaccinationAdministrationLink`: `Administrations.VaccinationId` (uniqueidentifier null), FK -> `Vaccinations(Id)` (`Restrict`), filtreli benzersiz indeks `UX_Administrations_TenantId_VaccinationId` (`VaccinationId IS NOT NULL`). Veri taşıma yoktur; mevcut satırlar `null`.
+- Komut `CreateVaccinationCommand` `ITransactionalRollbackOnFailureRequest`tir: önce aşı kaydı, sonra `CreateAdministrationCommand` (stok kuralları Dilim 1 handler'larında kalır) gönderilir; herhangi bir başarısızlıkta ikisi de geri alınır. İptal bağlantısı `VoidAdministrationCommandHandler` içindedir (kural tek yerde).

@@ -342,7 +342,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **Endpoint ve yetki:**
 
-- `POST /api/v1/vaccinations` → `Vaccinations.Create`, başarı `201 Created`, gövde **çıplak `Guid`** (oluşan `id`).
+- `POST /api/v1/vaccinations` → `Vaccinations.Create`, başarı `201 Created`, gövde **çıplak `Guid`** (oluşan `id`). **Opsiyonel `productId` (+ `quantity`, `batchId`, `requestId`) verilirse** aynı işlemde stoktan düşen uygulama da yazılır ve ayrıca `Administrations.Create` gerekir; yanıt `{ created, id, administration, stock }` olur, `requestId` tekrarında 200. Kurallar ve iptal tutarlılığı: `ADMINISTRATIONS_API_CONTRACT.md` bölüm 9.
 - `PUT /api/v1/vaccinations/{id}` → `Vaccinations.Update`, başarı `204 NoContent`.
 - `GET /api/v1/vaccinations/{id}` → `Vaccinations.Read`, başarı `200` + `VaccinationDetailDto`.
 - `GET /api/v1/vaccinations` → `Vaccinations.Read`, başarı `200` + `PagedResult<VaccinationListItemDto>`.
@@ -390,14 +390,15 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **Liste/detay DTO farkı:**
 
-- `VaccinationListItemDto`: özet alanlar (`id`, `petId`, `petName`, `clientId`, `clientName`, `clinicId`, `examinationId`, `vaccineName`, `appliedAtUtc`, `dueAtUtc`, `status`).
-- `VaccinationDetailDto`: liste alanlarına ek olarak `tenantId`, `notes`, `createdAtUtc`, `updatedAtUtc`.
+- `VaccinationListItemDto`: özet alanlar (`id`, `petId`, `petName`, `clientId`, `clientName`, `clinicId`, `examinationId`, `vaccineName`, `appliedAtUtc`, `dueAtUtc`, `status`, `administrationId`).
+- `VaccinationDetailDto`: liste alanlarına ek olarak `tenantId`, `notes`, `createdAtUtc`, `updatedAtUtc` ve bağlı uygulama varsa `administrationId`, `productId`, `productName`, `quantity`, `unit`, `batchId`, `lotNumber`, `expiryDate` (bağlı değilse `null`).
+- Uygulamaya bağlı aşı kaydında `PUT` yalnız `notes` ve `dueAtUtc` değiştirebilir (`Vaccinations.LinkedToAdministration`, 409).
 - Pet/client lookup bulunamazsa isimler boş string fallback ile döner (davranış korunur).
 
 **Hata kodları:**
 
 - İş kuralları `Result` → `ProblemDetails` + `extensions.code` ile döner.
-- Sık kodlar: `Vaccinations.NotFound`, `Vaccinations.ClinicContextMismatch`, `Vaccinations.ExaminationPetClinicMismatch`, `Vaccinations.RouteIdMismatch`, status/date kural kodları, `Tenants.TenantInactive`, `Clinics.NotFound`, `Pets.NotFound`, `Examinations.NotFound`.
+- Sık kodlar: `Vaccinations.NotFound`, `Vaccinations.ClinicContextMismatch`, `Vaccinations.ExaminationPetClinicMismatch`, `Vaccinations.RouteIdMismatch`, `Vaccinations.LinkedToAdministration`, `Vaccinations.ProductRequiresAppliedStatus`, status/date kural kodları, `Tenants.TenantInactive`, `Clinics.NotFound`, `Pets.NotFound`, `Examinations.NotFound`.
 - FluentValidation/model state hataları `400 ValidationProblemDetails`.
 
 ---
@@ -989,7 +990,7 @@ FluentValidation → `400` `ValidationProblemDetails`.
 
 **Yanıt:** `PetHistorySummaryDto` — üst düzey `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `recentAppointments`, `recentExaminations`, `recentTreatments`, `recentPrescriptions`, `recentLabResults`, `recentHospitalizations`, `recentPayments`. Her blok öğesi ilgili modülün özet alanlarını taşır (klinik adı `clinicName` ile birlikte `clinicId`).
 
-**`administrations` bloğu (ADR-013, uygulama kaydı):** muayeneye bağlı (`ExaminationId`) **iptal edilmemiş** uygulamalar (iptaller bu blokta gösterilmez; iptal edilenler `GET /api/v1/administrations?examinationId=…&includeVoided=true` ile alınır). Öğe alanları: `id`, `administeredAtUtc`, `clinicId`, `clinicName`, `productName`, `unit`, `quantity`, `addedAfterFinalization` (kesinleştirmeden sonra eklendi rozeti), `lateEntryReason` (yalnız rozetli kayıtta dolu). Yetki bloğu için ek izin aranmaz (diğer bloklarla aynı: `Examinations.Read`). Sıralama `administeredAtUtc` en yeni önce; blok başına en fazla 10 (diğer bloklarla aynı).
+**`administrations` bloğu (ADR-013, uygulama kaydı):** muayeneye bağlı (`ExaminationId`) **iptal edilmemiş** ve **aşı kaydına bağlı olmayan** uygulamalar (iptaller bu blokta gösterilmez; iptal edilenler `GET /api/v1/administrations?examinationId=…&includeVoided=true` ile alınır). Öğe alanları: `id`, `administeredAtUtc`, `clinicId`, `clinicName`, `productName`, `unit`, `quantity`, `addedAfterFinalization` (kesinleştirmeden sonra eklendi rozeti), `lateEntryReason` (yalnız rozetli kayıtta dolu). Yetki bloğu için ek izin aranmaz (diğer bloklarla aynı: `Examinations.Read`). Sıralama `administeredAtUtc` en yeni önce; blok başına en fazla 10 (diğer bloklarla aynı).
 
 **Sıralama ve limit:** Her blok kendi tarih alanına göre **en yeni önce** (`scheduledAtUtc`, `examinedAtUtc`, `treatmentDateUtc`, `prescribedAtUtc`, `resultDateUtc`, `admittedAtUtc`, `paidAtUtc`); blok başına en fazla **10** kayıt (`PetHistorySummaryConstants.RecentItemsTake`).
 

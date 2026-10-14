@@ -341,7 +341,7 @@ Kapsam: `Product.controlledClass ≠ None` olan (narkotik, psikotropik) ürünle
 - **Seri No / S.K.T:** uygulamanın partisinden (`Administration.BatchId`); partisiz bakiyeden düşülen (eski) uygulamada boş.
 - **Fiyat / Toplam:** `Product.UnitPrice` (**ürünün güncel katalog fiyatı**) ve `Toplam = round(Miktar × Fiyat, 2)`; para birimi `currency` (JSON). **Uyarı:** uygulama kaydı bir ücret satırına (`Charge`) bağlı değildir ve uygulama anında fiyat saklanmaz; bu nedenle tutar, fiilen tahsil edilen değil, **rapor anındaki katalog fiyatı**dır. Ücret–uygulama bağı (ücret önerisi) gelince kaynak değişir (S3, bölüm 17).
 - **T.C.:** müşteri kimlik no alanı **yok** (`Client`'ta T.C. kimlik no yok); `clientIdentityNumber` her zaman null, sütun boş (eksik alan).
-- **Kapsam dışı:** `Vaccination` (aşı takvimi/kaydı) varlığı stok düşmez ve partiye bağlı değildir (Administrations sözleşmesi D6); bu rapor yalnız ürün stoğundan düşen aşı uygulamalarını kapsar. Rakipteki "doğrudan satış" satırı bizde yoktur (doğrudan satış modülü yok).
+- **Aşı kaydı ilişkisi (2026-10-14):** ürünle girilen aşı kaydı bağlı bir `Administration` yazar (`ADMINISTRATIONS_API_CONTRACT.md` bölüm 9); rapor satırı **uygulamadır**, aşı kaydı ayrıca satır üretmez (çift sayım yok). Ürünsüz `Vaccination` (takvim/geçmiş aşı) stok düşmez, partiye bağlı değildir ve bu raporda yer almaz. Rakipteki "doğrudan satış" satırı bizde yoktur (doğrudan satış modülü yok).
 
 `VaccineInfoRegisterItemDto`:
 
