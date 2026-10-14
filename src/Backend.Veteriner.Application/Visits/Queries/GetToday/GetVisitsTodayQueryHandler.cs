@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Charges.Specs;
+using Backend.Veteriner.Application.ChargeSuggestions.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -6,6 +7,7 @@ using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Visits;
@@ -24,6 +26,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private readonly IVisitTodayReader _reader;
     private readonly IVisitOpenItemsReader _openItems;
     private readonly IReadRepository<Charge> _charges;
+    private readonly IReadRepository<ChargeSuggestion> _chargeSuggestions;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IClinicVeterinarianReader _veterinarians;
     private readonly TimeProvider _timeProvider;
@@ -35,6 +38,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         IVisitTodayReader reader,
         IVisitOpenItemsReader openItems,
         IReadRepository<Charge> charges,
+        IReadRepository<ChargeSuggestion> chargeSuggestions,
         ICurrentUserPermissionChecker permissions,
         IClinicVeterinarianReader veterinarians,
         TimeProvider timeProvider)
@@ -45,6 +49,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         _reader = reader;
         _openItems = openItems;
         _charges = charges;
+        _chargeSuggestions = chargeSuggestions;
         _permissions = permissions;
         _veterinarians = veterinarians;
         _timeProvider = timeProvider;
@@ -136,8 +141,8 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             OperationDayBounds.ForLocalDate(todayLocal).DayStartUtc);
 
     /// <summary>
-    /// Ücret tutarlarını ve açık iş alanlarını ekler: ziyaret bazında (hesap kuralı <see cref="IVisitOpenItemsReader"/>'da)
-    /// ve müşterinin bu klinikteki toplam açık borcu. İzni olmayan türün alanları null kalır.
+    /// Ücret tutarlarını ve açık iş alanlarını ekler: ziyaret bazında (hesap kuralı <see cref="IVisitOpenItemsReader"/>'da),
+    /// müşterinin bu klinikteki toplam açık borcu ve ziyaretin bekleyen ücret kalemi sayısı. İzni olmayan türün alanları null kalır.
     /// </summary>
     private async Task<IReadOnlyList<TodayItemDto>> WithChargeAndOpenItemsAsync(
         OpenItemsScope scope, IReadOnlyList<TodayItemDto> items, CancellationToken ct)
@@ -151,6 +156,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             visitOpenItems = await _openItems.GetForVisitsAsync(scope, visitIds, ct);
 
         Dictionary<Guid, decimal>? clientOutstanding = null;
+        Dictionary<Guid, int>? pendingByVisit = null;
         if (scope.Sees(OpenItemSources.Charges))
         {
             var clientIds = items.Select(i => i.ClientId).Distinct().ToArray();
@@ -158,6 +164,13 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             clientOutstanding = rows
                 .GroupBy(r => r.ClientId)
                 .ToDictionary(g => g.Key, g => g.Sum(r => r.Amount - r.AllocatedAmount));
+
+            pendingByVisit = visitIds.Length == 0
+                ? new Dictionary<Guid, int>()
+                : (await _chargeSuggestions.ListAsync(
+                        new PendingChargeSuggestionVisitIdsSpec(scope.TenantId, scope.ClinicId, visitIds), ct))
+                    .GroupBy(v => v)
+                    .ToDictionary(g => g.Key, g => g.Count());
         }
 
         return items
@@ -166,7 +179,12 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
                 var row = clientOutstanding is null
                     ? i
                     : i with { ClientOutstandingAmount = clientOutstanding.GetValueOrDefault(i.ClientId) };
-                if (i.VisitId is not { } visitId || !visitOpenItems.TryGetValue(visitId, out var open))
+                if (i.VisitId is not { } visitId)
+                    return row;
+
+                if (pendingByVisit is not null)
+                    row = row with { PendingChargeCount = pendingByVisit.GetValueOrDefault(visitId) };
+                if (!visitOpenItems.TryGetValue(visitId, out var open))
                     return row;
 
                 return row with

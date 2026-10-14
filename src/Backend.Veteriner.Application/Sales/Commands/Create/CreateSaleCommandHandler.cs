@@ -249,6 +249,9 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
             if (!product.IsActive)
                 return DraftFail("Sales.ProductInactive", $"Pasif ürün satılamaz: {product.Name}.");
 
+            if (!product.IsStockTracked)
+                return DraftFail("Products.NotStockTracked", $"Hizmet kalemi doğrudan satılamaz: {product.Name}.");
+
             // ADR-016 karar 3: aşı ve narkotik/psikotropik ilk sürümde yalnız hekim uygulamasıyla kullanılır.
             if (product.Kind == ProductKind.Vaccine)
                 return DraftFail("Sales.VaccineNotSellable", $"Aşı ürünü doğrudan satılamaz: {product.Name}.");

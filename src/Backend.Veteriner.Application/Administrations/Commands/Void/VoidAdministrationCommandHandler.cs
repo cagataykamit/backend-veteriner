@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Administrations.Contracts.Dtos;
 using Backend.Veteriner.Application.Administrations.Specs;
+using Backend.Veteriner.Application.ChargeSuggestions.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Products.Specs;
@@ -9,6 +10,7 @@ using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Vaccinations.Specs;
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -22,7 +24,7 @@ namespace Backend.Veteriner.Application.Administrations.Commands.Void;
 /// Uygulamayı iptal eder. Stoğa iade seçilirse stoğu mevcut <see cref="ReverseStockMovementCommand"/> ile aynı transaction'da geri verir
 /// (ters hareket kuralları tek yerde yaşar; pasif ürün de dahil) ve stok adımı başarısız olursa iptal geri alınır.
 /// Zarar/imha seçilirse stok hareketi yazılmaz; orijinal çıkış hareketi geçerli kalır.
-/// Uygulama bir aşı kaydına bağlıysa aşı kaydı da aynı transaction'da iptal edilir.
+/// Uygulama bir aşı kaydına bağlıysa aşı kaydı da aynı transaction'da iptal edilir; bekleyen ücret kalemi de düşer.
 /// </summary>
 public sealed class VoidAdministrationCommandHandler
     : IRequestHandler<VoidAdministrationCommand, Result<AdministrationDto>>
@@ -39,6 +41,7 @@ public sealed class VoidAdministrationCommandHandler
     private readonly IReadRepository<StockBatch> _batches;
     private readonly IRepository<Administration> _administrations;
     private readonly IRepository<Vaccination> _vaccinations;
+    private readonly IRepository<ChargeSuggestion> _chargeSuggestions;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
 
@@ -53,6 +56,7 @@ public sealed class VoidAdministrationCommandHandler
         IReadRepository<StockBatch> batches,
         IRepository<Administration> administrations,
         IRepository<Vaccination> vaccinations,
+        IRepository<ChargeSuggestion> chargeSuggestions,
         ISender sender,
         TimeProvider timeProvider)
     {
@@ -66,6 +70,7 @@ public sealed class VoidAdministrationCommandHandler
         _batches = batches;
         _administrations = administrations;
         _vaccinations = vaccinations;
+        _chargeSuggestions = chargeSuggestions;
         _sender = sender;
         _timeProvider = timeProvider;
     }
@@ -120,9 +125,22 @@ public sealed class VoidAdministrationCommandHandler
         if (!voided.IsSuccess)
             return Result<AdministrationDto>.Failure(voided.Error);
 
-        if (stockOutcome == AdministrationVoidStockOutcome.WrittenOff)
-            return await SaveWrittenOffAsync(administration, product, batch, ct);
+        var stockStep = stockOutcome == AdministrationVoidStockOutcome.WrittenOff
+            ? await SaveWrittenOffAsync(administration, ct)
+            : await ReturnStockAsync(administration, tenantId, ct);
+        if (!stockStep.IsSuccess)
+            return Result<AdministrationDto>.Failure(stockStep.Error);
 
+        var dropped = await DropChargeSuggestionAsync(administration, userId, ct);
+        if (!dropped.IsSuccess)
+            return Result<AdministrationDto>.Failure(dropped.Error);
+
+        await CancelLinkedVaccinationAsync(administration, ct);
+        return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
+    }
+
+    private async Task<Result> ReturnStockAsync(Administration administration, Guid tenantId, CancellationToken ct)
+    {
         var outMovement = await _stockMovements.FirstOrDefaultAsync(
             new StockMovementByReferenceSpec(
                 tenantId,
@@ -133,7 +151,7 @@ public sealed class VoidAdministrationCommandHandler
                 StockMovementType.Out),
             ct);
         if (outMovement is null)
-            return Fail("Administrations.StockMovementNotFound", "Uygulamanın stok hareketi bulunamadı.");
+            return Result.Failure("Administrations.StockMovementNotFound", "Uygulamanın stok hareketi bulunamadı.");
 
         // Ters hareket yazımı (SaveChanges) izlenen iptal alanlarını da aynı transaction'da kalıcılaştırır.
         var reversal = await _sender.Send(
@@ -143,16 +161,14 @@ public sealed class VoidAdministrationCommandHandler
         {
             // Eşzamanlı iki iptal: kaybeden ters hareket benzersiz kuralına çarpar.
             return reversal.Error.Code == "StockMovements.AlreadyReversed"
-                ? Fail("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.")
-                : Result<AdministrationDto>.Failure(reversal.Error);
+                ? Result.Failure("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.")
+                : Result.Failure(reversal.Error);
         }
 
-        await CancelLinkedVaccinationAsync(administration, ct);
-        return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
+        return Result.Success();
     }
 
-    private async Task<Result<AdministrationDto>> SaveWrittenOffAsync(
-        Administration administration, Product product, StockBatch? batch, CancellationToken ct)
+    private async Task<Result> SaveWrittenOffAsync(Administration administration, CancellationToken ct)
     {
         try
         {
@@ -161,11 +177,34 @@ public sealed class VoidAdministrationCommandHandler
         catch (DbUpdateConcurrencyException)
         {
             // Eşzamanlı iptal kazandı (RowVersion): hiçbir şey yazılmadı.
-            return Fail("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.");
+            return Result.Failure("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.");
         }
 
-        await CancelLinkedVaccinationAsync(administration, ct);
-        return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
+        return Result.Success();
+    }
+
+    // Bekleyen "ücret bekliyor" kalemi düşer (ADR-018). Ücreti kesilmiş/ücretsiz sayılmış kalem değişmez; kesilmiş ücret yönetici düzeltmesidir.
+    // Eşzamanlı ücrete çevirme kazanırsa (RowVersion) iptal geri alınır; kullanıcı yeniden dener ve kalem artık çevrilmiş olur.
+    private async Task<Result> DropChargeSuggestionAsync(Administration administration, Guid userId, CancellationToken ct)
+    {
+        var suggestion = await _chargeSuggestions.FirstOrDefaultAsync(
+            new ChargeSuggestionBySourceForUpdateSpec(administration.TenantId, ChargeSuggestion.AdministrationSource, administration.Id),
+            ct);
+        if (suggestion is null || !suggestion.CancelForVoidedSource(userId, _timeProvider.GetUtcNow().UtcDateTime))
+            return Result.Success();
+
+        try
+        {
+            await _chargeSuggestions.UpdateAsync(suggestion, ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(
+                "Administrations.ConcurrencyConflict",
+                "Uygulamanın ücret kalemi aynı anda değişti; tekrar deneyin.");
+        }
+
+        return Result.Success();
     }
 
     // Bağlı aşı kaydı uygulamanın parçasıdır: uygulama iptal edilince aşı kaydı da iptal olur (kesinleşmiş muayene kilidi uygulamaz, D3).

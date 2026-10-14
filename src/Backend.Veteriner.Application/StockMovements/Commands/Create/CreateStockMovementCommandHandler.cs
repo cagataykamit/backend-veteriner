@@ -126,6 +126,13 @@ public sealed class CreateStockMovementCommandHandler
                 "Pasif ürün için stok hareketi oluşturulamaz.");
         }
 
+        if (!product.IsStockTracked)
+        {
+            return Result<StockMovementCreateResult>.Failure(
+                "Products.NotStockTracked",
+                "Hizmet kalemi için stok hareketi oluşturulamaz.");
+        }
+
         var occurredAtUtc = request.OccurredAtUtc ?? DateTime.UtcNow;
         var createdBy = _clientContext.UserId;
         var referenceId = request.ReferenceId is { } rid && rid != Guid.Empty ? rid : (Guid?)null;

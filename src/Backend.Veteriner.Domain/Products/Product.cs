@@ -41,6 +41,9 @@ public sealed class Product : AggregateRoot
     /// <summary>Ambalaj (ör. 10 ml flakon).</summary>
     public string? Packaging { get; private set; }
 
+    /// <summary>Hizmet dışındaki ürünler stok takiplidir; stok düşen/giren her yüzey bu kuralı kullanır.</summary>
+    public bool IsStockTracked => Kind != ProductKind.Service;
+
     /// <summary>Aşı ve kontrollü ürünlerde stok girişinde seri/lot no ve son kullanma tarihi zorunludur.</summary>
     public bool RequiresLotAndExpiry => Kind == ProductKind.Vaccine || ControlledClass != ControlledSubstanceClass.None;
 
@@ -80,6 +83,9 @@ public sealed class Product : AggregateRoot
             throw new ArgumentOutOfRangeException(nameof(unitPrice), "Birim fiyat negatif olamaz.");
         if (string.IsNullOrWhiteSpace(currency))
             throw new ArgumentException("Para birimi boş olamaz.", nameof(currency));
+
+        if (kind == ProductKind.Service && controlledClass != ControlledSubstanceClass.None)
+            throw new ArgumentException("Hizmet kontrollü sınıfta olamaz.", nameof(controlledClass));
 
         TenantId = tenantId;
         ProductCategoryId = productCategoryId == Guid.Empty ? null : productCategoryId;
@@ -126,6 +132,8 @@ public sealed class Product : AggregateRoot
             throw new ArgumentOutOfRangeException(nameof(unitPrice), "Birim fiyat negatif olamaz.");
         if (string.IsNullOrWhiteSpace(currency))
             throw new ArgumentException("Para birimi boş olamaz.", nameof(currency));
+        if (kind == ProductKind.Service && controlledClass != ControlledSubstanceClass.None)
+            throw new ArgumentException("Hizmet kontrollü sınıfta olamaz.", nameof(controlledClass));
 
         ProductCategoryId = productCategoryId == Guid.Empty ? null : productCategoryId;
         Name = name.Trim();

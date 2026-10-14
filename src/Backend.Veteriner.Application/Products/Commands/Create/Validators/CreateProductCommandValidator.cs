@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Products;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Products.Commands.Create.Validators;
@@ -15,6 +16,10 @@ public sealed class CreateProductCommandValidator : AbstractValidator<CreateProd
         RuleFor(x => x.Description).MaximumLength(4000);
         RuleFor(x => x.Kind).IsInEnum().When(x => x.Kind.HasValue);
         RuleFor(x => x.ControlledClass).IsInEnum().When(x => x.ControlledClass.HasValue);
+        RuleFor(x => x.ControlledClass)
+            .Must(c => c is null or ControlledSubstanceClass.None)
+            .When(x => x.Kind == ProductKind.Service)
+            .WithMessage("Hizmet kontrollü sınıfta olamaz.");
         RuleFor(x => x.PharmacologicalForm).MaximumLength(100);
         RuleFor(x => x.PresentationForm).MaximumLength(100);
         RuleFor(x => x.Packaging).MaximumLength(100);

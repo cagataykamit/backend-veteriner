@@ -42,6 +42,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
     private readonly Mock<IReadRepository<Product>> _products = new();
     private readonly Mock<IReadRepository<Vaccination>> _vaccinations = new();
     private readonly Mock<IReadRepository<Payment>> _payments = new();
+    private readonly Mock<IReadRepository<Backend.Veteriner.Domain.ChargeSuggestions.ChargeSuggestion>> _chargeSuggestions = new();
     private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
 
     private readonly Guid _userId = Guid.NewGuid();
@@ -74,6 +75,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             _products.Object,
             _vaccinations.Object,
             _payments.Object,
+            _chargeSuggestions.Object,
             _permissions.Object);
 
     private void SetupTenant(Guid tenantId) => _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);

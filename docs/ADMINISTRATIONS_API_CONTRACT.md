@@ -234,3 +234,9 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 
 - Migration `AddVaccinationAdministrationLink`: `Administrations.VaccinationId` (uniqueidentifier null), FK -> `Vaccinations(Id)` (`Restrict`), filtreli benzersiz indeks `UX_Administrations_TenantId_VaccinationId` (`VaccinationId IS NOT NULL`). Veri taşıma yoktur; mevcut satırlar `null`.
 - Komut `CreateVaccinationCommand` `ITransactionalRollbackOnFailureRequest`tir: önce aşı kaydı, sonra `CreateAdministrationCommand` (stok kuralları Dilim 1 handler'larında kalır) gönderilir; herhangi bir başarısızlıkta ikisi de geri alınır. İptal bağlantısı `VoidAdministrationCommandHandler` içindedir (kural tek yerde).
+
+## 10) Ücret kalemi (ADR-018, 2026-10-14)
+
+- Fiyatı > 0 olan üründe uygulama (aşı ucundan yazılan dahil) aynı transaction'da bir "ücret bekliyor" kalemi doğurur; ayrıntı `CHARGE_SUGGESTION_API_CONTRACT.md`. Uygulama yanıtı değişmez.
+- İptal: bekleyen kalem aynı transaction'da düşer; ücreti kesilmiş kalem değişmez. Eşzamanlı ücrete çevirme kazanırsa iptal `Administrations.ConcurrencyConflict` (409) döner; tekrar denenir.
+- Hizmet (`kind = Service`) ürünü uygulanamaz: `Products.NotStockTracked` (400).

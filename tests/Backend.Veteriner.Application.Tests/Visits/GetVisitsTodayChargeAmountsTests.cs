@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Charges.Specs;
+using Backend.Veteriner.Application.ChargeSuggestions.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -9,6 +10,7 @@ using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Queries.GetToday;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Visits;
 using FluentAssertions;
 using Moq;
@@ -27,12 +29,16 @@ public sealed class GetVisitsTodayChargeAmountsTests
     private readonly Mock<IVisitOpenItemsReader> _openItems = new();
     private readonly Mock<IClinicVeterinarianReader> _veterinarians = new();
     private readonly Mock<IReadRepository<Charge>> _charges = new();
+    private readonly Mock<IReadRepository<ChargeSuggestion>> _chargeSuggestions = new();
     private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
 
     public GetVisitsTodayChargeAmountsTests()
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _permissions.Setup(p => p.HasPermission(PermissionCatalog.Charges.Read)).Returns(true);
+        _chargeSuggestions
+            .Setup(r => r.ListAsync(It.IsAny<PendingChargeSuggestionVisitIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid>());
         SetupOpenItems(new Dictionary<Guid, VisitOpenItems>());
         _openItems.Setup(r => r.GetSummaryAsync(It.IsAny<OpenItemsSummaryRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new OpenItemsSummaryDto(1, 2, 30m, 4, 5));
@@ -47,7 +53,7 @@ public sealed class GetVisitsTodayChargeAmountsTests
             .ReturnsAsync(new VisitTodayReadResult(items, []));
         var handler = new GetVisitsTodayQueryHandler(
             _tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _reader.Object, _openItems.Object,
-            _charges.Object, _permissions.Object, _veterinarians.Object, VisitHandlerTestSupport.FixedClock);
+            _charges.Object, _chargeSuggestions.Object, _permissions.Object, _veterinarians.Object, VisitHandlerTestSupport.FixedClock);
         return handler.Handle(new GetVisitsTodayQuery(_clinicId, null, Voided: voided), CancellationToken.None);
     }
 
@@ -136,7 +142,9 @@ public sealed class GetVisitsTodayChargeAmountsTests
         (item.ChargedAmount, item.AllocatedAmount, item.OutstandingAmount, item.ClientOutstandingAmount, item.ChargeIndicator, item.ChargeableWorkCount)
             .Should().Be(((decimal?)null, (decimal?)null, (decimal?)null, (decimal?)null, (VisitChargeIndicator?)null, (int?)null));
         item.AwaitingLabCount.Should().Be(2);
+        item.PendingChargeCount.Should().BeNull();
         _charges.Verify(r => r.ListAsync(It.IsAny<ChargeAmountsForClientsSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+        _chargeSuggestions.Verify(r => r.ListAsync(It.IsAny<PendingChargeSuggestionVisitIdsSpec>(), It.IsAny<CancellationToken>()), Times.Never);
         _openItems.Verify(r => r.GetForVisitsAsync(
             It.Is<OpenItemsScope>(s => s.Visible == OpenItemSources.LabResults),
             It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -153,6 +161,22 @@ public sealed class GetVisitsTodayChargeAmountsTests
             .Should().Be(((VisitChargeIndicator?)null, (int?)null, (int?)null, (decimal?)null));
         _openItems.Verify(r => r.GetForVisitsAsync(
             It.IsAny<OpenItemsScope>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Should_Count_Pending_Charge_Suggestions_Per_Visit()
+    {
+        var withPending = Guid.NewGuid();
+        var withoutPending = Guid.NewGuid();
+        SetupCharges();
+        _chargeSuggestions
+            .Setup(r => r.ListAsync(It.IsAny<PendingChargeSuggestionVisitIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid> { withPending, withPending });
+
+        var items = (await RunAsync(VisitRow(Guid.NewGuid(), withPending), VisitRow(Guid.NewGuid(), withoutPending))).Value!.Items;
+
+        items.Single(i => i.VisitId == withPending).PendingChargeCount.Should().Be(2);
+        items.Single(i => i.VisitId == withoutPending).PendingChargeCount.Should().Be(0);
     }
 
     [Fact]

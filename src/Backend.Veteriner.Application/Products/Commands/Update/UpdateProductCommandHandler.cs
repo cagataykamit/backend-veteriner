@@ -61,6 +61,13 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
                 return Result.Failure("Products.SkuAlreadyExists", "Bu kiracıda aynı SKU ile başka ürün var.");
         }
 
+        var kind = request.Kind ?? product.Kind;
+        var controlledClass = request.ControlledClass ?? product.ControlledClass;
+        if ((kind == ProductKind.Service) != (product.Kind == ProductKind.Service))
+            return Result.Failure("Products.KindChangeNotAllowed", "Ürün hizmete veya hizmet ürüne çevrilemez; yenisini oluşturun.");
+        if (kind == ProductKind.Service && controlledClass != ControlledSubstanceClass.None)
+            return Result.Failure("Products.Validation", "Hizmet kontrollü sınıfta olamaz.");
+
         product.Update(
             request.ProductCategoryId,
             request.Name,
@@ -70,8 +77,8 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
             request.Sku,
             request.Barcode,
             request.Description,
-            request.Kind ?? product.Kind,
-            request.ControlledClass ?? product.ControlledClass,
+            kind,
+            controlledClass,
             request.PharmacologicalForm ?? product.PharmacologicalForm,
             request.PresentationForm ?? product.PresentationForm,
             request.Packaging ?? product.Packaging);

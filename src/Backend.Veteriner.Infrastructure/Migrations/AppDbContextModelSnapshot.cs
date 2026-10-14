@@ -663,6 +663,113 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("VaccineDefinitions", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.ChargeSuggestions.ChargeSuggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ChargeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("ExaminationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ResolvedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("SuggestedUnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid?>("VisitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("WaiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChargeId");
+
+                    b.HasIndex("TenantId", "ChargeId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ChargeSuggestions_TenantId_ChargeId")
+                        .HasFilter("[ChargeId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ExaminationId", "Status");
+
+                    b.HasIndex("TenantId", "PetId", "Status");
+
+                    b.HasIndex("TenantId", "SourceType", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ChargeSuggestions_TenantId_SourceType_SourceId");
+
+                    b.HasIndex("TenantId", "VisitId", "Status");
+
+                    b.HasIndex("TenantId", "ClinicId", "Status", "OccurredAtUtc");
+
+                    b.ToTable("ChargeSuggestions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ChargeSuggestions_Quantity_Positive", "[Quantity] > 0");
+
+                            t.HasCheckConstraint("CK_ChargeSuggestions_Status_Consistent", "([Status] = 0 AND [ChargeId] IS NULL AND [WaiveReason] IS NULL AND [ResolvedAtUtc] IS NULL) OR ([Status] = 1 AND [ChargeId] IS NOT NULL AND [WaiveReason] IS NULL AND [ResolvedAtUtc] IS NOT NULL) OR ([Status] = 2 AND [ChargeId] IS NULL AND [WaiveReason] IS NOT NULL AND [ResolvedAtUtc] IS NOT NULL) OR ([Status] = 3 AND [ChargeId] IS NULL AND [WaiveReason] IS NULL AND [ResolvedAtUtc] IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Charges.Charge", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3156,6 +3263,14 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasOne("Backend.Veteriner.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.ChargeSuggestions.ChargeSuggestion", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Charges.Charge", null)
+                        .WithMany()
+                        .HasForeignKey("ChargeId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
