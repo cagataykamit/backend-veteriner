@@ -297,7 +297,7 @@ Normalize değerler: telefon `905XXXXXXXXX`; e-posta küçük harf; tarih `yyyy-
 
 Toplu sorgular (N+1 yok): doğrulama kiracının mevcut verisini sabit sayıda sorguyla okur — katalog (tür, ırk, renk, aşı tanımı: 4 sorgu), partinin hazırlık satırları (1), dosyadaki tüm telefon/e-posta/ad kümeleriyle **tek** müşteri sorgusu, bulunan müşterilerin ve dosyadaki çiplerin hastaları için **tek** hasta sorgusu, bulunan hastaların uygulanmış aşıları için **tek** aşı sorgusu (kümeler tek JSON parametresiyle gider); satır sonuçları EF toplu yazmasıyla kaydedilir (komut başına ~42 satır, satır başına komut yok). SELECT sayısı satır sayısına bağlı değildir. Ölçüm (yerel LocalDB, doğrulama isteği): 9 satırlı dosya ve 10.200 satırlı dosyada **16 SELECT** (kimlik/abonelik/yetki/parti okumaları dahil), 24.000 satırda da 16; 10.200 satır ≈ 1,3 sn, 243 satır-güncelleme komutu (24.000 satır: 572).
 
-**Bilinen sınır (tasarım §14):** ad karşılaştırması mevcut müşteri kuralındaki `ToLowerInvariant` ile yapıldığından `AYŞE YILMAZ` ile `Ayşe Yılmaz` aynı kabul edilmez (`I` → `i`, `ı` değil). Bu fark mükerrer tespitini kaçırır; kural değişirse tek yerde (`Client.NormalizeFullNameForDuplicateCheck`) değiştirilmeli, içe aktarma onu aynen izler.
+**Ad karşılaştırması (ADR-019 K4):** Türkçe duyarlı ve aksan duyarsızdır; `AYŞE YILMAZ`, `Ayşe Yılmaz` ve `AYSE YILMAZ` aynı kişidir, `I/ı/İ/i` birbirine eşittir, baştaki/sondaki/art arda boşluk yok sayılır. Yalnız karşılaştırma anahtarıdır; kayıtlı ad olduğu gibi kalır. Kural tek yerde (`Client.NormalizeFullNameForDuplicateCheck`) yaşar, içe aktarma onu aynen izler. Hayvan adı mükerreri bu kurala dahil değildir.
 
 ## 7) Uçlar
 
