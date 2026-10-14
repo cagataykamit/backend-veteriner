@@ -35,7 +35,8 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandlerTests
             _clinicContext.Object,
             _scopeResolver.Object,
             _clinicsRead.Object,
-            _productStocksWrite.Object);
+            _productStocksWrite.Object,
+            StockBatchMocks.ExpiredReader());
 
     private static (Guid Tid, Guid ClinicId, Guid ProductId, Guid StockId, Product Product, ProductStock Stock, Clinic Clinic)
         SeedTrackedStock(decimal qty, decimal min)
@@ -148,7 +149,8 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandlerTests
             _clinicContext.Object,
             scope.Object,
             _clinicsRead.Object,
-            _productStocksWrite.Object);
+            _productStocksWrite.Object,
+            StockBatchMocks.ExpiredReader());
 
         var (_, _, _, stockId, _, stock, clinic) = SeedTrackedStock(3m, 1m);
         SetupReads(stock.TenantId, stock, clinic);
@@ -179,7 +181,8 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandlerTests
             _clinicContext.Object,
             resolver.Object,
             _clinicsRead.Object,
-            _productStocksWrite.Object);
+            _productStocksWrite.Object,
+            StockBatchMocks.ExpiredReader());
 
         var result = await handler.Handle(
             new UpdateProductStockMinimumStockLevelCommand(stockId, 22m),

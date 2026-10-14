@@ -69,7 +69,8 @@ public sealed class CreateStockMovementSafetyTests
             _stockMovementsWrite.Object,
             new Mock<IRepository<StockBatch>>().Object,
             StockBatchMocks.EmptyResolver(),
-            _uow.Object);
+            _uow.Object,
+            StockBatchMocks.Clock);
 
     private CreateStockMovementCommand Cmd(
         StockMovementType type,
