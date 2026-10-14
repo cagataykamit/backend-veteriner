@@ -120,6 +120,10 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         if (pet is null)
             return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        var careGate = pet.EnsureCanStartCare();
+        if (!careGate.IsSuccess)
+            return Result<Guid>.Failure(careGate.Error);
+
         var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
             new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
 

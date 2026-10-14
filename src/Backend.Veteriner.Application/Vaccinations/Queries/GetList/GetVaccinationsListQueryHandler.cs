@@ -134,6 +134,13 @@ public sealed class GetVaccinationsListQueryHandler
             MarkStep("searchPetIdsLookup");
         }
 
+        IReadOnlyCollection<Guid>? overdueExcludedPetIds = null;
+        if (request.OnlyOverdue)
+        {
+            overdueExcludedPetIds = await _pets.ListAsync(new PetIdsNotReceivingCareSpec(tenantId), ct);
+            MarkStep("petsNotReceivingCareLookup");
+        }
+
         var total = await _vaccinations.CountAsync(
             new VaccinationsFilteredCountSpec(
                 tenantId,
@@ -149,7 +156,8 @@ public sealed class GetVaccinationsListQueryHandler
                 accessibleClinicIds,
                 request.OnlyOverdue,
                 listAsOfUtc,
-                request.ExaminationId),
+                request.ExaminationId,
+                overdueExcludedPetIds),
             ct);
         MarkStep("vaccinationsCount");
 
@@ -170,7 +178,8 @@ public sealed class GetVaccinationsListQueryHandler
                 accessibleClinicIds,
                 request.OnlyOverdue,
                 listAsOfUtc,
-                request.ExaminationId),
+                request.ExaminationId,
+                overdueExcludedPetIds),
             ct);
         MarkStep("vaccinationsPage");
 

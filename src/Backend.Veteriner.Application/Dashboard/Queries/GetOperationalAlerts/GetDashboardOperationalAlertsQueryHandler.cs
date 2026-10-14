@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Dashboard.Contracts;
 using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
 using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Dashboard.Specs;
+using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -27,6 +28,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Vaccination> _vaccinations;
+    private readonly IReadRepository<Pet> _pets;
     private readonly IDashboardTodayAppointmentStatusCountsReader _todayAppointmentCounts;
 
     public GetDashboardOperationalAlertsQueryHandler(
@@ -35,6 +37,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Appointment> appointments,
         IReadRepository<Vaccination> vaccinations,
+        IReadRepository<Pet> pets,
         IDashboardTodayAppointmentStatusCountsReader todayAppointmentCounts)
     {
         _tenantContext = tenantContext;
@@ -42,6 +45,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
         _clinicScopeResolver = clinicScopeResolver;
         _appointments = appointments;
         _vaccinations = vaccinations;
+        _pets = pets;
         _todayAppointmentCounts = todayAppointmentCounts;
     }
 
@@ -79,11 +83,13 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
         var upcomingAppointmentsNext24HoursCount = await _appointments.CountAsync(
             new DashboardUpcomingAppointmentsNext24HoursCountSpec(
                 tenantId, singleClinicId, nowUtc, next24HoursUtcExclusive, accessibleClinicIds), ct);
+        // Vefat eden hayvanın aşısı gecikmiş/yaklaşan sayılmaz (ADR-020 S5).
+        var petIdsNotReceivingCare = await _pets.ListAsync(new PetIdsNotReceivingCareSpec(tenantId), ct);
         var overdueVaccinationsCount = await _vaccinations.CountAsync(
-            new DashboardOverdueVaccinationsCountSpec(tenantId, singleClinicId, nowUtc, accessibleClinicIds), ct);
+            new DashboardOverdueVaccinationsCountSpec(tenantId, singleClinicId, nowUtc, accessibleClinicIds, petIdsNotReceivingCare), ct);
         var upcomingVaccinationsNext7DaysCount = await _vaccinations.CountAsync(
             new DashboardUpcomingVaccinationsNext7DaysCountSpec(
-                tenantId, singleClinicId, nowUtc, next7DaysUtcExclusive, accessibleClinicIds), ct);
+                tenantId, singleClinicId, nowUtc, next7DaysUtcExclusive, accessibleClinicIds, petIdsNotReceivingCare), ct);
 
         var dto = new DashboardOperationalAlertsDto(
             OverdueScheduledAppointmentsCount: overdueScheduledAppointmentsCount,

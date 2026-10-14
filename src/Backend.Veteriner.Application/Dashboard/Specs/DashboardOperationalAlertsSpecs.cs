@@ -47,7 +47,8 @@ public sealed class DashboardOverdueVaccinationsCountSpec : Specification<Vaccin
         Guid tenantId,
         Guid? clinicId,
         DateTime nowUtc,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        IReadOnlyCollection<Guid>? excludedPetIds = null)
     {
         Query.AsNoTracking();
         Query.Where(v =>
@@ -55,6 +56,8 @@ public sealed class DashboardOverdueVaccinationsCountSpec : Specification<Vaccin
             && v.Status == VaccinationStatus.Scheduled
             && v.DueAtUtc.HasValue
             && v.DueAtUtc.Value < nowUtc);
+        if (excludedPetIds is { Count: > 0 })
+            Query.Where(v => !excludedPetIds.Contains(v.PetId));
         DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);
     }
 }
@@ -66,7 +69,8 @@ public sealed class DashboardUpcomingVaccinationsNext7DaysCountSpec : Specificat
         Guid? clinicId,
         DateTime nowUtc,
         DateTime next7DaysUtcExclusive,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        IReadOnlyCollection<Guid>? excludedPetIds = null)
     {
         Query.AsNoTracking();
         Query.Where(v =>
@@ -75,6 +79,8 @@ public sealed class DashboardUpcomingVaccinationsNext7DaysCountSpec : Specificat
             && v.DueAtUtc.HasValue
             && v.DueAtUtc.Value >= nowUtc
             && v.DueAtUtc.Value < next7DaysUtcExclusive);
+        if (excludedPetIds is { Count: > 0 })
+            Query.Where(v => !excludedPetIds.Contains(v.PetId));
         DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);
     }
 }

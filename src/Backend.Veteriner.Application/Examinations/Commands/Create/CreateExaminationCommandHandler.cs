@@ -202,6 +202,10 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         if (pet is null)
             return Result<ExaminationWriteResultDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        var careGate = pet.EnsureCanStartCare();
+        if (!careGate.IsSuccess)
+            return Result<ExaminationWriteResultDto>.Failure(careGate.Error);
+
         var examination = new Examination(
             tenantId,
             clinicId,

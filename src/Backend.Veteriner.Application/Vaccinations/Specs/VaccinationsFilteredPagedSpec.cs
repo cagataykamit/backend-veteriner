@@ -22,7 +22,8 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         bool onlyOverdue = false,
         DateTime? listAsOfUtc = null,
-        Guid? examinationId = null)
+        Guid? examinationId = null,
+        IReadOnlyCollection<Guid>? overdueExcludedPetIds = null)
     {
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId);
@@ -47,6 +48,9 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
             var now = listAsOfUtc ?? DateTime.UtcNow;
             Query.Where(v => v.Status == VaccinationStatus.Scheduled);
             Query.Where(v => v.DueAtUtc != null && v.DueAtUtc.Value < now);
+            // Vefat eden hayvanın planlı aşısı gecikmiş sayılmaz (ADR-020 S5; kimlikler Pet.ReceivesCare ile çözülür).
+            if (overdueExcludedPetIds is { Count: > 0 })
+                Query.Where(v => !overdueExcludedPetIds.Contains(v.PetId));
         }
         else if (status.HasValue)
         {

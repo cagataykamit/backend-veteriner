@@ -179,6 +179,10 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         if (pet is null)
             return Result<VisitCreateResultDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        var careGate = pet.EnsureCanStartCare();
+        if (!careGate.IsSuccess)
+            return Result<VisitCreateResultDto>.Failure(careGate.Error);
+
         var existingActive = await _visitsRead.FirstOrDefaultAsync(
             new ActiveVisitByPetIdSpec(tenantId, petId), ct);
         if (existingActive is not null)

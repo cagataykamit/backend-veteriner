@@ -1,5 +1,7 @@
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -105,6 +107,7 @@ public sealed class ReminderProcessorService
         // as long as the appointment is still in the future and within the lookahead (ScheduledAtUtc <= now + hoursBefore).
         var maxScheduledUtc = nowUtc.AddHours(hoursBefore);
         var dedupeSuffix = AppointmentDedupeSuffix(hoursBefore);
+        var eligiblePetIds = ReminderEligiblePetIds(tenantId);
 
         // Günlüğü yazılmış aday tur sınırına (batchSize) sayılmaz: aksi halde pencerede batchSize'dan fazla aday varken
         // aynı ilk adaylar her turda yeniden seçilir ve kalanlar hiç değerlendirilmez.
@@ -114,6 +117,7 @@ public sealed class ReminderProcessorService
                 && a.Status == AppointmentStatus.Scheduled
                 && a.ScheduledAtUtc > nowUtc
                 && a.ScheduledAtUtc <= maxScheduledUtc
+                && eligiblePetIds.Contains(a.PetId)
                 && !_db.ReminderDispatchLogs.Any(l => l.TenantId == tenantId
                     && l.SourceEntityType == ReminderSourceEntityType.Appointment
                     && l.SourceEntityId == a.Id
@@ -238,6 +242,7 @@ public sealed class ReminderProcessorService
         // as long as DueAtUtc is still in the future and within the lookahead (DueAtUtc <= now + daysBefore).
         var maxDueUtc = nowUtc.AddDays(daysBefore);
         var dedupeSuffix = VaccinationDedupeSuffix(daysBefore);
+        var eligiblePetIds = ReminderEligiblePetIds(tenantId);
 
         // ADR-019 K3 (dışlamanın tek yeri): içe aktarılan aşı, partisinin hatırlatmaları yönetici tarafından serbest
         // bırakılana kadar aday değildir; dışlanan kayıt için dispatch log da yazılmaz. Günlüğü yazılmış aday tur
@@ -249,6 +254,7 @@ public sealed class ReminderProcessorService
                 && v.DueAtUtc.HasValue
                 && v.DueAtUtc.Value > nowUtc
                 && v.DueAtUtc.Value <= maxDueUtc
+                && eligiblePetIds.Contains(v.PetId)
                 && (v.ImportBatchId == null
                     || _db.ImportBatches.Any(b => b.Id == v.ImportBatchId && b.RemindersReleasedAtUtc != null))
                 && !_db.ReminderDispatchLogs.Any(l => l.TenantId == tenantId
@@ -370,6 +376,24 @@ public sealed class ReminderProcessorService
             if (await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId))
                 dedupeSet.Add(dedupeKey);
         }
+    }
+
+    /// <summary>
+    /// ADR-020 S5 (dışlamanın tek yeri): vefat eden hayvan (<see cref="Pet.ReceivesCare"/>) ve hatırlatma istemeyen müşteri
+    /// (<see cref="Client.AcceptsReminders"/>) aday değildir. Süzgeç aday sorgusunun içindedir: dışlanan kayıt tur sınırına
+    /// (batchSize) sayılmaz ve dispatch log yazılmaz; durum geri alınırsa kayıt yeniden aday olur.
+    /// </summary>
+    private IQueryable<Guid> ReminderEligiblePetIds(Guid tenantId)
+    {
+        var acceptingClientIds = _db.Clients
+            .Where(c => c.TenantId == tenantId)
+            .Where(Client.AcceptsReminders)
+            .Select(c => c.Id);
+
+        return _db.Pets
+            .Where(p => p.TenantId == tenantId && acceptingClientIds.Contains(p.ClientId))
+            .Where(Pet.ReceivesCare)
+            .Select(p => p.Id);
     }
 
     private async Task SyncEnqueuedDispatchLogsWithOutboxStatusAsync(int batchSize, CancellationToken ct)

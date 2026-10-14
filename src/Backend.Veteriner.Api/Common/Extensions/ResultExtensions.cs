@@ -122,6 +122,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Vefat etmiş hayvan için yeni randevu/geliş/muayene (ADR-020 S5): kaydın durumu ile çakışma.
+        if (normalized is "pets.deceased")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         if (normalized.Contains("sameplan") || normalized.Contains("notopen") || normalized.Contains("finalized"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
