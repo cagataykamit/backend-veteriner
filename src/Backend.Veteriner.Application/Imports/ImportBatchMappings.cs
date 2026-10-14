@@ -5,7 +5,10 @@ namespace Backend.Veteriner.Application.Imports;
 
 internal static class ImportBatchMappings
 {
-    public static ImportBatchDto ToDto(this ImportBatch b)
+    public static ImportBatchDto ToDto(
+        this ImportBatch b,
+        IReadOnlyList<ImportTableInfoDto>? tables = null,
+        IReadOnlyList<ImportWarningDto>? warnings = null)
         => new(
             b.Id,
             b.Status,
@@ -20,7 +23,9 @@ internal static class ImportBatchMappings
             b.RolledBackAtUtc,
             b.RemindersReleasedAtUtc,
             b.PayloadPurgedAtUtc,
-            new ImportBatchSummaryDto(b.CustomerCounts.ToDto(), b.PetCounts.ToDto(), b.VaccinationCounts.ToDto()));
+            new ImportBatchSummaryDto(b.CustomerCounts.ToDto(), b.PetCounts.ToDto(), b.VaccinationCounts.ToDto()),
+            tables,
+            warnings);
 
     private static ImportTableCountsDto ToDto(this ImportTableCounts c)
         => new(

@@ -3,7 +3,10 @@ using Backend.Veteriner.Domain.Imports;
 
 namespace Backend.Veteriner.Application.Imports.Contracts.Dtos;
 
-/// <summary>İçe aktarma partisi (ayrıntı ve liste öğesi). Satır verisi içermez.</summary>
+/// <summary>
+/// İçe aktarma partisi (ayrıntı ve liste öğesi). Satır verisi içermez. <see cref="Tables"/> ayrıntı, yükleme ve eşleme
+/// yanıtında, <see cref="Warnings"/> yalnız yükleme yanıtında dolar (listede ikisi de null).
+/// </summary>
 public sealed record ImportBatchDto(
     Guid Id,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ImportBatchStatus Status,
@@ -18,7 +21,9 @@ public sealed record ImportBatchDto(
     DateTime? RolledBackAtUtc,
     DateTime? RemindersReleasedAtUtc,
     DateTime? PayloadPurgedAtUtc,
-    ImportBatchSummaryDto Summary);
+    ImportBatchSummaryDto Summary,
+    IReadOnlyList<ImportTableInfoDto>? Tables = null,
+    IReadOnlyList<ImportWarningDto>? Warnings = null);
 
 /// <summary>Tablo başına sayaçlar.</summary>
 public sealed record ImportBatchSummaryDto(
