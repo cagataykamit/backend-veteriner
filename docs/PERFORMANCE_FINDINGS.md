@@ -1,89 +1,101 @@
-# Performans bulguları (Aşama 9 Dilim 9) — WIP
+# Performans bulguları — Aşama 9 Dilim 9 (pilot hacmi ölçümü)
 
-Durum: YARIM. Yalnız 1k aşaması ölçüldü (aşağıdaki ham çıktı); 10k aşaması (5000 müşteri/10k hasta/365 gün x 100 geliş) bilgisayar yeniden başlatılacağı için kesildi (~3500/38000 geliş yazılmıştı), ölçülmedi. Yorum/öneriler henüz yazılmadı.
+Tarih: 2026-10-14. Kapsam: yalnız ölçüm ve rapor. İndeks/migration **uygulanmadı ve üretilmedi**; öneriler bölüm 5'te, onay bekler.
 
-## 1k ham ölçüm çıktısı
+## 1. Özet
 
-Ölçek: PerfScale { Clients = 1000, PetsPerClient = 2, Days = 60, VisitsPerDay = 20, Products = 300 }
-Üretilen kayıtlar: Clients=1000, Pets=2000, Products=300, StockBatches=1200, Visits=1200, Examinations=1186, Prescriptions=371, Payments=1095, Charges=2355, Vaccinations=299, Appointments=600, StockMovements=2034
-Veri üretim süresi: 11,3 sn
+- Pilot hacminde (5.000 müşteri, 10.000 hasta, 36.500 geliş/yıl, 72.940 ücret) ölçülen **tüm uçlar tek kullanıcıda 100 ms altında** (ortanca); istisnalar dışa aktarımlar (CSV 6 MB: ~550 ms, XLSX 90 gün: ~490 ms, ilk çağrı ~3 sn).
+- **Bugün 500 satır sınırı** çalışıyor: 500 satır = 200 (ortanca 36 ms, 365 KB gövde); 501 satır = 400 `Visits.TodayLimitExceeded` (25 ms). Günlük gerçekçi hacim (100 geliş) 37 ms.
+- **N+1 tespit edilmedi:** her uçta SQL komut sayısı sabit (2–10) ve aynı SQL metni istek içinde tekrar etmiyor (tek istisna: Hasta özeti, 2 tekrar — iki farklı parametreli sorgu şekli, döngü değil).
+- **Ölçekle büyüyen** uçlar (1k → 10k): Borç raporu (5 → 55 ms), müşteri/hasta arama (10–24 → 34–67 ms), Defter: muayene (15 → 75 ms), CSV dışa aktarımlar. Nedenleri bölüm 4'te; eksik indeks önerileri bölüm 5'te.
+- Pilot ölçeğinde acil darboğaz yok. Öneri, büyüme/çok şube (10× ve üzeri) için Charges ve Examinations indeksleri ile arama biçiminin ileride gözden geçirilmesi.
 
-| Uç | HTTP | 1. çağrı ms | Ortanca ms | Maks ms | SQL komut | SQL ms (ort.) | Tekrar eden SQL (maks) | Gövde bayt |
-|---|---|---|---|---|---|---|---|---|
-| Bugün (günlük hacim) | 200 | 350 | 30 | 79 | 8 | 6 | 1 | 22531 |
-| Bugün (tam 500 satır) | 200 | 36 | 15 | 22 | 8 | 6 | 1 | 364294 |
-| Bugün (501 satır → sınır hatası) | 400 | 21 | 14 | 15 | 7 | 6 | 1 | 380 |
-| Müşteri listesi (arama yok, sayfa 1) | 200 | 85 | 3 | 5 | 2 | 1 | 1 | 4421 |
-| Müşteri arama (ad parçası) | 200 | 36 | 10 | 13 | 2 | 7 | 1 | 4370 |
-| Müşteri arama (telefon) | 200 | 13 | 11 | 15 | 2 | 8 | 1 | 65 |
-| Hasta listesi (arama yok) | 200 | 32 | 4 | 7 | 2 | 2 | 1 | 5983 |
-| Hasta arama (ad) | 200 | 57 | 24 | 28 | 3 | 19 | 1 | 5956 |
-| Hasta arama (mikroçip) | 200 | 25 | 24 | 27 | 3 | 21 | 1 | 358 |
-| Hasta timeline (yoğun hasta) | 200 | 147 | 10 | 16 | 10 | 4 | 1 | 25302 |
-| Hasta timeline (tipik hasta) | 200 | 6 | 8 | 13 | 10 | 3 | 1 | 532 |
-| Hasta özeti (tipik) | 200 | 97 | 7 | 10 | 9 | 3 | 1 | 518 |
-| Müşteri bakiyesi | 200 | 44 | 4 | 5 | 5 | 1 | 1 | 299 |
-| Stok durumu (liste) | 200 | 44 | 5 | 6 | 5 | 2 | 1 | 19811 |
-| Stok durumu (minimum altı) | 200 | 19 | 4 | 4 | 4 | 1 | 1 | 65 |
-| Stok hareketleri (son sayfa 1) | 200 | 68 | 9 | 11 | 5 | 5 | 1 | 34904 |
-| Stok hareketleri (ürüne göre) | 200 | 24 | 4 | 4 | 5 | 1 | 1 | 3970 |
-| Stok hareketleri (tarih aralığı) | 200 | 26 | 6 | 7 | 5 | 3 | 1 | 34903 |
-| Stok partileri | 200 | 48 | 5 | 10 | 5 | 3 | 1 | 32742 |
-| Borç raporu | 200 | 96 | 5 | 7 | 5 | 4 | 1 | 10657 |
-| Borç raporu (arama) | 200 | 82 | 19 | 91 | 5 | 16 | 1 | 1351 |
-| Tahsilat raporu | 200 | 87 | 15 | 35 | 8 | 9 | 1 | 19145 |
-| Randevu raporu | 200 | 78 | 8 | 8 | 7 | 4 | 1 | 17998 |
-| Muayene raporu | 200 | 67 | 10 | 11 | 7 | 6 | 1 | 22586 |
-| Aşı raporu | 200 | 46 | 6 | 7 | 7 | 3 | 1 | 24187 |
-| Defter: muayene | 200 | 120 | 15 | 18 | 8 | 8 | 1 | 30594 |
-| Defter: reçete | 200 | 86 | 7 | 7 | 5 | 3 | 1 | 23466 |
-| Defter: aşı | 200 | 38 | 3 | 4 | 3 | 2 | 1 | 27 |
-| Defter: ilaç | 200 | 9 | 3 | 3 | 3 | 1 | 1 | 27 |
-| Defter: kontrollü madde | 200 | 54 | 6 | 8 | 4 | 3 | 1 | 23218 |
-| Dışa aktarım CSV: borç | 200 | 62 | 5 | 7 | 5 | 3 | 1 | 5175 |
-| Dışa aktarım XLSX: tahsilat | 200 | 968 | 260 | 389 | 7 | 12 | 1 | 61511 |
-| Dışa aktarım CSV: muayene defteri | 200 | 105 | 36 | 44 | 8 | 20 | 1 | 195269 |
+## 2. Yöntem
 
-## Eksik indeks önerileri (sys.dm_db_missing_index_*)
+- **Ortam:** yerel, tek kullanıcı, Windows, LocalDB (SQL Server 2025), Debug derleme, bellek ~2 GB boşta. Uygulama süreç içi `WebApplicationFactory` ile çalıştı; gerçek HTTP yığını, JWT, yetki, EF ve SQL dahil. Ağ gecikmesi yok.
+- **Veritabanı yalıtımı:** entegrasyon testi altyapısındaki koşu kimlikli izole test DB (`VetinityCommandDb_IntegrationTests_<koşu>`); `IntegrationTestDatabaseGuard` ile doğrulanır, dev/paylaşılan/üretim DB'ye ve çalışan dev API'ye dokunulmadı. Test sonunda DB silinir. Query DB kapalı (pilot kararı K5).
+- **Veri üretici:** `tests/Backend.Veteriner.IntegrationTests/Performance/PerfDataGenerator.cs` (sabit tohum, domain fabrikaları, gün başına tek `SaveChanges`). Ölçek ortam değişkenleriyle: `PERF_CLIENTS`, `PERF_PETS_PER_CLIENT`, `PERF_DAYS`, `PERF_VISITS_PER_DAY`, `PERF_PRODUCTS`.
+- **Ölçüm:** `PerformanceMeasurementTests` (yalnız `VETINITY_PERF=1` ile çalışır). Her uç 1 soğuk + 5 sıcak çağrı; ortanca ve en büyük süre. EF `DbCommandInterceptor` ile istek başına SQL komut sayısı, SQL süresi, tekrar eden SQL sayısı. Ölçümden önce `sp_updatestats`. Sonda DMV'ler: `sys.dm_db_missing_index_*`, `sys.dm_exec_query_stats` + plan XML (tarama/arama operatörleri).
+- **Çalıştırma** (PowerShell):
+
 ```
-249 | 36 | Charges | [TenantId], [VoidedAtUtc] |  | [ClinicId], [ClientId], [Amount], [AllocatedAmount]
-121 | 18 | Charges | [TenantId], [VoidedAtUtc] |  | [ClinicId], [ClientId], [Amount], [CreatedAtUtc], [AllocatedAmount]
-101 | 18 | Visits | [TenantId], [PetId], [VoidedAtUtc] |  | 
-76 | 18 | Examinations | [TenantId] | [ExaminedAtUtc] | [ClinicId]
-70 | 18 | Examinations | [TenantId] | [ExaminedAtUtc] | [ClinicId], [CreatedAtUtc]
-58 | 12 | StockMovements | [TenantId] | [MovementType], [OccurredAtUtc] | [ClinicId], [ProductId]
-48 | 18 | Payments | [TenantId], [VoidedAtUtc] |  | [AppointmentId], [ExaminationId]
-34 | 12 | Payments | [TenantId], [VoidedAtUtc] | [PaidAtUtc] | [ClinicId]
-18 | 6 | StockBatches | [TenantId], [ClinicId] | [RemainingQuantity] | 
-16 | 6 | Payments | [TenantId], [VoidedAtUtc] | [PaidAtUtc] | [ClinicId], [Amount]
+$env:VETINITY_PERF='1'; $env:INTEGRATION_TEST_RUN_ID='Perf10'; $env:PERF_OUT="$env:TEMP\perf-10k.md"
+$env:PERF_CLIENTS='5000'; $env:PERF_DAYS='365'; $env:PERF_VISITS_PER_DAY='100'
+dotnet test tests\Backend.Veteriner.IntegrationTests --filter "FullyQualifiedName~PerformanceMeasurementTests"
 ```
 
-## Plan operatörleri: tablo/indeks taraması içeren sorgular (plan önbelleği)
-```
-5 | 1628 | 2 |  | (@__tenantId_0 uniqueidentifier,@__petIds_1 nvarchar(max) )SELECT [p].[Id], [p].[AlertFlags], [p].[AlertNote], [p].[BirthDate], [p].[Breed], [p].[BreedId], [p].[ClientId], [p].[ColorId], [p].[Gender], [p].[IsNeutered], [p].[MicrochipNumber], [p].[Name], [p].[N
-5 | 1292 | 2 |  | (@__tenantId_0 uniqueidentifier,@__clientIds_1 nvarchar(max) )SELECT [c].[Id], [c].[Address], [c].[CreatedAtUtc], [c].[Email], [c].[FullName], [c].[Phone], [c].[PhoneNormalized], [c].[TenantId], [c].[UpdatedAtUtc]  FROM [Clients] AS [c]  WHERE [c].[TenantId] =
-6 | 245 | 15 | ClusteredScan  | (@__request_TenantId_0 uniqueidentifier,@__request_FromUtc_1 datetime2(7),@__request_ToUtcExclusive_2 datetime2(7),@__accessible_3 nvarchar(4000),@__p_4 int,@__p_5 int)SELECT [e0].[Id], [e0].[ExaminedAtUtc], [e0].[CreatedAtUtc], [e0].[Status], [c].[FullName] A
-6 | 90 | 4 | ClusteredScan  | (@__request_TenantId_0 uniqueidentifier,@__request_FromUtc_1 datetime2(7),@__request_ToUtcExclusive_2 datetime2(7),@__accessible_3 nvarchar(4000))SELECT [p].[ExaminationId], [p].[Title], [p].[Id], [p0].[Name], [p0].[Quantity], [p0].[Instructions], [p0].[Id]  F
-6 | 65 | 2 | ClusteredScan  | (@__request_TenantId_0 uniqueidentifier,@__request_FromUtc_1 datetime2(7),@__request_ToUtcExclusive_2 datetime2(7),@__accessible_3 nvarchar(4000))SELECT COUNT(*)  FROM [Examinations] AS [e]  WHERE [e].[TenantId] = @__request_TenantId_0 AND [e].[ExaminedAtUtc] 
-5 | 46 | 6 | ClusteredScan  | (@__tenantId_0 uniqueidentifier,@__accessibleClinicIds_1 nvarchar(4000),@__paidFromUtc_2 datetime2(7),@__paidToUtc_3 datetime2(7))SELECT [p].[Id], [p].[AllocatedAmount], [p].[Amount], [p].[AppointmentId], [p].[ClientId], [p].[ClinicId], [p].[Currency], [p].[Ex
-5 | 46 | 2 | ClusteredScan  | (@__tenantId_0 uniqueidentifier,@__accessibleClinicIds_1 nvarchar(4000),@__paidFromUtc_Value_2 datetime2(7),@__paidToUtc_Value_3 datetime2(7))SELECT COUNT(*)  FROM [Payments] AS [p]  WHERE [p].[VoidedAtUtc] IS NULL AND [p].[TenantId] = @__tenantId_0 AND [p].[C
-11 | 14 | 0 | IndexScan  | (@__userId_0 uniqueidentifier)SELECT [o].[Name]  FROM [UserOperationClaims] AS [u]  INNER JOIN [OperationClaims] AS [o] ON [u].[OperationClaimId] = [o].[Id]  WHERE [u].[UserId] = @__userId_0  ORDER BY [o].[Name]
-11 | 14 | 0 |  | (@__userId_0 uniqueidentifier,@__tenantId_1 uniqueidentifier)SELECT [c].[Id], [c].[Address], [c].[City], [c].[Description], [c].[Email], [c].[IsActive], [c].[Name], [c].[Phone], [c].[TenantId]  FROM [UserClinics] AS [u]  INNER JOIN [Clinics] AS [c] ON [u].[Cli
-5 | 3 | 0 | ClusteredScan  | (@__tenantId_0 uniqueidentifier,@__clinicIds_1 nvarchar(4000))SELECT [c].[Id], [c].[Address], [c].[City], [c].[Description], [c].[Email], [c].[IsActive], [c].[Name], [c].[Phone], [c].[TenantId]  FROM [Clinics] AS [c]  WHERE [c].[TenantId] = @__tenantId_0 AND [
-6 | 2 | 0 | ClusteredScan  | (@__veterinarianIds_0 nvarchar(4000))SELECT [u].[Id], [u].[CreatedAtUtc], [u].[DisplayName], [u].[Email], [u].[EmailConfirmed], [u].[PasswordHash], [u].[UpdatedAtUtc], [u0].[Id], [u0].[Name], [u0].[UserId]  FROM [Users] AS [u]  LEFT JOIN [UserRoles] AS [u0] ON
-6 | 0 | 0 | ClusteredScan  | (@__request_TenantId_0 uniqueidentifier,@__request_FromUtc_1 datetime2(7),@__request_ToUtcExclusive_2 datetime2(7),@__accessible_3 nvarchar(4000))SELECT [t].[ExaminationId], [t].[Title]  FROM [Treatments] AS [t]  WHERE [t].[TenantId] = @__request_TenantId_0 AN
-6 | 0 | 0 | ClusteredScan  | (@__request_TenantId_0 uniqueidentifier,@__request_FromUtc_1 datetime2(7),@__request_ToUtcExclusive_2 datetime2(7),@__accessible_3 nvarchar(4000))SELECT [a].[ExaminationId], [p].[Name], [a].[Quantity], [p].[Unit], [a].[AddedAfterFinalization], CASE      WHEN [
-```
+## 3. Ölçülen değerler
 
-## Tablo satır sayıları
-```
-Charges | 2355
-Visits | 2201
-PaymentAllocations | 2186
-StockMovements | 2034
-Pets | 2000
-StockBatches | 1200
-Examinations | 1186
-Payments | 1095
-```
+Üretilen veri — **1k aşaması:** 1.000 müşteri, 2.000 hasta, 60 gün × 20 geliş (1.200 geliş, 2.355 ücret). **10k aşaması:** 5.000 müşteri, 10.000 hasta, 365 gün × 100 geliş (36.500 geliş, 36.433 muayene, 72.940 ücret, 33.568 ödeme, 67.253 tahsis, 10.724 reçete, 9.072 aşı, 18.250 randevu, 26.777 stok hareketi, 1.200 parti, 300 ürün). Veri üretimi 249 sn. Yaklaşık %8 geliş borçlu bırakıldı.
 
+Ortanca süre (ms, sıcak), SQL komut sayısı 10k aşamasından. Not: 1k'da rapor pencereleri 60 gün, 10k'da 90 gündür; sütunlar tamamen karşılaştırılabilir değildir.
+
+| Uç | 1k ms | 10k ms | SQL komut (10k) |
+|---|---|---|---|
+| Bugün (günlük, 100 geliş) | 30 | 37 | 8 |
+| Bugün (tam 500 satır) | 15 | 36 | 8 |
+| Bugün (501 satır → 400 hata) | 14 | 25 | 7 |
+| Müşteri listesi (sayfa 1) | 3 | 2 | 2 |
+| Müşteri arama (ad / telefon) | 10 / 11 | 34 / 37 | 2 |
+| Hasta listesi (sayfa 1) | 4 | 13 | 2 |
+| Hasta arama (ad / mikroçip) | 24 / 24 | 66 / 67 | 3 |
+| Hasta timeline (yoğun / tipik) | 10 / 8 | 11 / 10 | 10 |
+| Hasta özeti | 7 | 11 | 10 |
+| Müşteri bakiyesi | 4 | 4 | 7 |
+| Stok durumu (liste / minimum altı) | 5 / 4 | 4 / 3 | 5 / 4 |
+| Stok hareketleri (sayfa / ürün / tarih) | 9 / 4 / 6 | 7 / 4 / 7 | 5 |
+| Stok partileri | 5 | 4 | 5 |
+| Borç raporu (sayfa / arama) | 5 / 19 | 55 / 96 | 5 |
+| Tahsilat raporu (90 gün) | 15 | 23 | 8 |
+| Randevu / Muayene / Aşı raporu (90 gün) | 8 / 10 / 6 | 7 / 16 / 17 | 7 |
+| Defter: muayene | 15 | 75 | 8 |
+| Defter: reçete / kontrollü madde | 7 / 6 | 16 / 22 | 5 / 4 |
+| Defter: aşı / ilaç (**boş sonuç**, bkz. bölüm 6) | 3 / 3 | 8 / 9 | 3 |
+| CSV: borç (tüm satırlar, 130 KB) | 5 | 61 | 5 |
+| CSV: muayene defteri (1 yıl, 6 MB) | 36 | 546 | 8 |
+| XLSX: tahsilat (90 gün, 412 KB) | 260 | 492 (maks 1.145) | 7 |
+
+Soğuk (ilk) çağrı: Bugün 655 ms, XLSX 3.020 ms (JIT/plan derleme; uygulama ısındıktan sonra görülmez). Her istekte 2 sabit yetki sorgusu (UserOperationClaims, UserClinics) vardır ve süreye dahildir.
+
+Ham çıktılar ve istek başına SQL metinleri `PERF_OUT` yolunda (`.md` ve `.sql.txt`) üretilir; depoda tutulmaz.
+
+## 4. Sorgu incelemesi (plan önbelleği, 10k)
+
+| Uç / sorgu | Gözlem (10k) | Not |
+|---|---|---|
+| Bugün — ücret tutarları (`Charges`, müşteri kümesi için) | ortalama ~8.850 mantıksal okuma/yürütme; en çok okuma yapan uygulama sorgularından | Müşterilerin **tüm geçmiş** ücretlerini okuyup bellekte toplar (`ChargeAmountsForClientsSpec`); büyüyen geçmişle artar. Eksik indeks DMV'sinde Charges ilk sırada. |
+| Borç raporu (sayım, toplam, sayfa: 3 sorgu) | her biri `Charges` kümelenmiş tarama, ~3.600 okuma | Aynı filtre 3 kez yürür; ücret sayısıyla doğrusal büyür (1k'da 5 ms → 10k'da 55 ms). |
+| Defter: muayene (+ CSV) | `Examinations` kümelenmiş tarama; ~14.500 okuma/yürütme | `(TenantId, ExaminedAtUtc)` indeksi var ama kapsayıcı değil; plan taramayı seçiyor. |
+| Müşteri / hasta arama | `Clients` / `Pets` kümelenmiş tarama | Aramada `REPLACE(...) COLLATE ...` ve `LIKE` kullanılıyor (Türkçe harf toleransı); indeksle desteklenemez. Süre kayıt sayısıyla doğrusal: müşteride 1k→5k kayıtta 10→34 ms. |
+| Hasta timeline / özeti / son geliş | `Visits` taraması (~1.300 okuma) | `Visits` üzerindeki `(TenantId, PetId)` indeksi yalnız aktif gelişleri kapsıyor (filtreli); hastanın geçmiş gelişleri için kapsayan indeks yok. |
+| Bugün / randevu — ödemeler (`Payments`, randevu/muayene kimlikleriyle) | kümelenmiş tarama, ~1.400 okuma | `Payments`'ta `(TenantId, VoidedAtUtc)` kapsayan indeks yok. |
+| Stok uçları | 549 okuma, indeks araması | Sorun yok (ürün/klinik/tarih indeksleri kullanılıyor). |
+
+**N+1:** hiçbir uçta komut sayısı sonuç satırı sayısına bağlı değil (Bugün 100 ve 500 satırda aynı 8 komut). Hasta özeti'ndeki 2 tekrar, aynı şekle sahip iki ayrı filtreli sorgudur.
+
+## 5. Eksik indeks önerileri (UYGULANMADI — onay gerekir)
+
+Kaynak: `sys.dm_db_missing_index_*` (10k koşusu, "improvement" sırasıyla). Bunlar yalnız bu ölçüm iş yükünden çıkan **adaylardır**; her biri yazma maliyeti ve mevcut indekslerle çakışma açısından gözden geçirilmeli, uygulandıktan sonra yeniden ölçülmelidir (etkisi **ölçülmedi**).
+
+| # | Tablo | Anahtar / INCLUDE (DMV önerisi) | Yarar |
+|---|---|---|---|
+| 1 | Charges | `(TenantId, VoidedAtUtc)` INCLUDE `(ClinicId, ClientId, Amount, AllocatedAmount, CreatedAtUtc)` | Bugün ücret tutarları, Borç raporu (3 sorgu), bakiye. DMV'nin iki ayrı önerisini birleştirir. En yüksek etki (skor 7.756 + 3.764). |
+| 2 | Examinations | `(TenantId, ExaminedAtUtc)` INCLUDE `(ClinicId, CreatedAtUtc)` | Muayene raporu/defteri ve CSV (skor 2.187 + 1.572). Mevcut `(TenantId, ExaminedAtUtc)` indeksinin kapsayıcı hale getirilmesi anlamına gelir (yeni indeks yerine genişletme tercih edilebilir). |
+| 3 | Visits | DMV: `(TenantId, PetId, VoidedAtUtc)`; muhtemelen `ArrivedAtUtc` ile birlikte daha uygun | Hasta timeline/özet/son geliş (skor 1.890). Anahtar seçimi **doğrulanmadı**; sorgunun sıralama sütunu belirlenip ayrıca denenmeli. |
+| 4 | Payments | `(TenantId, VoidedAtUtc)` INCLUDE `(AppointmentId, ExaminationId)` | Randevu/Bugün ödeme eşleştirmesi (skor 1.603). |
+| 5 | StockMovements | `(TenantId, MovementType, OccurredAtUtc)` INCLUDE `(ClinicId, ProductId)` | Defter: ilaç/aşı stok girişleri (skor 804). Düşük öncelik. |
+| 6 | Prescriptions, Pets, StockBatches | DMV düşük skorlu (143, 112, 16) | Şimdilik gerekmez. |
+
+Kod tarafı (migration gerektirmez, ürün/tasarım kararı gerekebilir): Bugün ücret tutarlarının yalnız açık ücretleri okuması; Borç raporunun 3 sorguyu tek geçişe indirmesi. Bunlar öneridir, uygulanmadı.
+
+## 6. Doğrulanmayanlar / sınırlar
+
+- **Eşzamanlılık ölçülmedi:** tek kullanıcı, tek istek. Çok kullanıcılı yük (mevcut `tests/load/*` k6 betikleri) çalıştırılmadı.
+- **Gerçek ortam farkı:** LocalDB + Debug derleme + süreç içi host; yönetilen bulut SQL, ağ gecikmesi ve Release derlemesi süreleri değiştirir. Mutlak ms değerleri pilot ortamına taşınamaz; yalnız oranlar/eğilimler anlamlıdır.
+- **Sentetik veri:** düzgün rastgele dağılım; gerçek klinikte yoğunlaşma (az sayıda yoğun hasta/müşteri, tatil günleri, uzun açık borç geçmişi) farklıdır. Yalnız "yoğun hasta" için tek örnek ölçüldü (yıl boyunca ~120+ geliş).
+- **Kapsam dışı kalan veri/uç:** Yatış, laboratuvar sonucu, tedavi, uygulama (Administration) kayıtları, hatırlatıcılar, Dashboard uçları ölçülmedi/üretilmedi. **Defter: aşı ve defter: ilaç boş yanıt (27 bayt) döndü** — bu defterler stok *giriş* hareketlerini okur ve üretici girişleri ölçüm penceresinin dışına (veri başlangıcından önce) yazdı; bu iki satırın süreleri boş sonuç içindir, anlamlı ölçüm sayılmaz. Kontrollü madde defteri (çıkış hareketleri) dolu döndü.
+- **Outbox:** `SaveChanges` kesişim noktası outbox satırlarını yazdı; işleyici (arka plan) çalıştırılmadı, dolayısıyla projeksiyon/outbox yükü ölçüme dahil değil.
+- **İndeks etkisi** uygulanmadı, dolayısıyla "iyileşir" iddiası ölçülmüş değildir.
+- Soğuk başlangıç (ilk çağrı) etkisi tek kez gözlendi; derinlemesine incelenmedi.
+- Rapor uçlarının tarih penceresi en çok 93 gündür (`ReportsSharedLimits.MaxRangeDays`), defterler 366 gün; daha uzun aralık 400 döner (ölçüm sırasında ilk denemede görüldü).
+- Test sınırı: `PerformanceMeasurementTests` normal koşularda atlanır; tam test paketi çalıştırılmadı.
