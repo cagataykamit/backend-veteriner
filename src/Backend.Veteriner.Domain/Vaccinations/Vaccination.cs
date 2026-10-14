@@ -27,6 +27,12 @@ public sealed class Vaccination : AggregateRoot
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
+    /// <summary>
+    /// Kaydı oluşturan içe aktarma partisi; günlük girişte boştur. Partinin hatırlatmaları serbest bırakılana kadar
+    /// kayıt hatırlatma adaylarından dışlanır (ADR-019 K3).
+    /// </summary>
+    public Guid? ImportBatchId { get; private set; }
+
     private Vaccination() { }
 
     public Vaccination(
