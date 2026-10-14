@@ -51,6 +51,7 @@ public sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBa
             .IsConcurrencyToken();
 
         b.Ignore(x => x.IsDraft);
+        b.Ignore(x => x.CanMap);
 
         b.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
         b.HasIndex(x => new { x.TenantId, x.Status });

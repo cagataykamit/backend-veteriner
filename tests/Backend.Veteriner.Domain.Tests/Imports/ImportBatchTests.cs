@@ -11,6 +11,7 @@ public sealed class ImportBatchTests
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid ValidationId = Guid.NewGuid();
     private static readonly DateTime Now = new(2026, 10, 14, 9, 0, 0, DateTimeKind.Utc);
+    private static readonly string Hash = new('a', ImportBatch.ContentHashLength);
     private static readonly ImportTableCounts Counts = new() { Total = 3, Valid = 2, Error = 1, WillCreate = 2 };
 
     private static ImportBatch NewBatch(string? name = "Eski sistem", Guid? clinicId = null)
@@ -185,9 +186,75 @@ public sealed class ImportBatchTests
         var clinicId = Guid.NewGuid();
         var b = NewBatch(" Parti ", clinicId);
 
-        b.MatchesRequest(clinicId, "Parti").Should().BeTrue();
-        b.MatchesRequest(clinicId, "Başka").Should().BeFalse();
-        b.MatchesRequest(null, "Parti").Should().BeFalse();
+        b.MatchesRequest(clinicId, "Parti", null).Should().BeTrue();
+        b.MatchesRequest(clinicId, "Başka", null).Should().BeFalse();
+        b.MatchesRequest(null, "Parti", null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void MatchesRequest_Should_Compare_Content_Hash_Case_Insensitively()
+    {
+        var b = NewBatch();
+        b.AttachFile(Hash, 1, 0, 0).IsSuccess.Should().BeTrue();
+
+        b.MatchesRequest(null, "Eski sistem", Hash.ToUpperInvariant()).Should().BeTrue();
+        b.MatchesRequest(null, "Eski sistem", new string('b', ImportBatch.ContentHashLength)).Should().BeFalse();
+        b.MatchesRequest(null, "Eski sistem", null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AttachFile_Should_Store_Normalized_Hash_And_Row_Totals_Once()
+    {
+        var b = NewBatch();
+
+        b.AttachFile(Hash.ToUpperInvariant(), 5, 4, 3).IsSuccess.Should().BeTrue();
+
+        b.ContentHash.Should().Be(Hash);
+        b.CustomerCounts.Should().Be(ImportTableCounts.Empty with { Total = 5 });
+        b.PetCounts.Total.Should().Be(4);
+        b.VaccinationCounts.Total.Should().Be(3);
+        b.AttachFile(Hash, 1, 1, 1).Error.Code.Should().Be("Imports.InvalidState");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("abc")]
+    [InlineData("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")]
+    public void AttachFile_Should_Reject_Invalid_Hash(string hash)
+        => NewBatch().AttachFile(hash, 1, 0, 0).Error.Code.Should().Be("Imports.Validation");
+
+    [Fact]
+    public void AttachFile_Should_Reject_Negative_Counts_And_Non_Uploaded_Batch()
+    {
+        NewBatch().AttachFile(Hash, -1, 0, 0).Error.Code.Should().Be("Imports.Validation");
+        BatchIn(ImportBatchStatus.Mapped).AttachFile(Hash, 1, 0, 0).Error.Code.Should().Be("Imports.InvalidState");
+    }
+
+    [Theory]
+    [InlineData(ImportBatchStatus.Uploaded, true)]
+    [InlineData(ImportBatchStatus.Mapped, true)]
+    [InlineData(ImportBatchStatus.Validated, true)]
+    [InlineData(ImportBatchStatus.ValidationFailed, true)]
+    [InlineData(ImportBatchStatus.Validating, false)]
+    [InlineData(ImportBatchStatus.Committed, false)]
+    [InlineData(ImportBatchStatus.Discarded, false)]
+    public void CanMap_Should_Match_ApplyMapping_Transitions(ImportBatchStatus status, bool expected)
+    {
+        var b = BatchIn(status);
+
+        b.CanMap.Should().Be(expected);
+        b.ApplyMapping("{}", null, Now).IsSuccess.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Discard_Should_Record_Payload_Purge_Time()
+    {
+        var b = NewBatch();
+        b.PayloadPurgedAtUtc.Should().BeNull();
+
+        b.Discard(Now.AddHours(1)).IsSuccess.Should().BeTrue();
+
+        b.PayloadPurgedAtUtc.Should().Be(Now.AddHours(1));
     }
 
     [Fact]

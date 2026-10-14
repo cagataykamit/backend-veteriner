@@ -70,6 +70,14 @@ public sealed class ImportBatch : AggregateRoot
 
     public bool IsDraft => ImportBatchStatusSets.Draft.Contains(Status);
 
+    /// <summary>Eşlemenin kaydedilebildiği durumlar; <see cref="ApplyMapping"/> geçiş tablosuyla aynı küme.</summary>
+    private static readonly ImportBatchStatus[] MappableFrom =
+    [
+        ImportBatchStatus.Uploaded, ImportBatchStatus.Mapped, ImportBatchStatus.Validated, ImportBatchStatus.ValidationFailed,
+    ];
+
+    public bool CanMap => MappableFrom.Contains(Status);
+
     private ImportBatch() { }
 
     public static Result<ImportBatch> Create(
@@ -106,8 +114,32 @@ public sealed class ImportBatch : AggregateRoot
     }
 
     /// <summary>Aynı <see cref="RequestId"/> ile gelen istek bu partiyi mi tarif ediyor (tekrar) yoksa başka içerik mi.</summary>
-    public bool MatchesRequest(Guid? clinicId, string? name)
-        => ClinicId == clinicId && Name == NormalizeName(name);
+    public bool MatchesRequest(Guid? clinicId, string? name, string? contentHash)
+        => ClinicId == clinicId
+           && Name == NormalizeName(name)
+           && string.Equals(ContentHash, contentHash, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Yüklenen içeriğin özetini ve tablo başına satır sayısını kaydeder (B2). Yalnız dosyası henüz bağlanmamış
+    /// <c>Uploaded</c> parti için; sayaçların yalnız <c>Total</c> alanı dolar, doğrulama sonrası diğerleri gelir.
+    /// </summary>
+    public Result AttachFile(string contentHash, int customerRows, int petRows, int vaccinationRows)
+    {
+        if (Status != ImportBatchStatus.Uploaded || ContentHash is not null)
+            return InvalidState("Dosya yalnız yeni oluşturulan partiye bağlanabilir.");
+
+        if (contentHash is not { Length: ContentHashLength } || !contentHash.All(Uri.IsHexDigit))
+            return Result.Failure("Imports.Validation", $"İçerik özeti {ContentHashLength} karakterlik onaltılık dizge olmalıdır.");
+
+        if (customerRows < 0 || petRows < 0 || vaccinationRows < 0)
+            return Result.Failure("Imports.Validation", "Satır sayısı negatif olamaz.");
+
+        ContentHash = contentHash.ToLowerInvariant();
+        CustomerCounts = ImportTableCounts.Empty with { Total = customerRows };
+        PetCounts = ImportTableCounts.Empty with { Total = petRows };
+        VaccinationCounts = ImportTableCounts.Empty with { Total = vaccinationRows };
+        return Result.Success();
+    }
 
     /// <summary>Eşlemeyi tam değiştirir; doğrulanmış parti yeniden eşlenince önizleme geçersizleşir.</summary>
     public Result ApplyMapping(string mappingJson, string? optionsJson, DateTime nowUtc)
@@ -115,10 +147,7 @@ public sealed class ImportBatch : AggregateRoot
         if (string.IsNullOrWhiteSpace(mappingJson))
             return Result.Failure("Imports.Validation", "Eşleme boş olamaz.");
 
-        var moved = MoveTo(
-            ImportBatchStatus.Mapped,
-            nowUtc,
-            ImportBatchStatus.Uploaded, ImportBatchStatus.Mapped, ImportBatchStatus.Validated, ImportBatchStatus.ValidationFailed);
+        var moved = MoveTo(ImportBatchStatus.Mapped, nowUtc, MappableFrom);
         if (!moved.IsSuccess)
             return moved;
 
@@ -233,9 +262,17 @@ public sealed class ImportBatch : AggregateRoot
         return Result.Success();
     }
 
-    /// <summary>Kullanıcı taslağı siler; ürün verisine dokunulmaz, kayıt geçmişte kalır.</summary>
+    /// <summary>
+    /// Kullanıcı taslağı siler; ürün verisine dokunulmaz, kayıt geçmişte kalır. Hazırlık satırları (kişisel veri) aynı
+    /// işlemde silindiğinden temizlik anı da işlenir.
+    /// </summary>
     public Result Discard(DateTime nowUtc)
-        => MoveTo(ImportBatchStatus.Discarded, nowUtc, [.. ImportBatchStatusSets.IdleDraft]);
+    {
+        var moved = MoveTo(ImportBatchStatus.Discarded, nowUtc, [.. ImportBatchStatusSets.IdleDraft]);
+        if (moved.IsSuccess)
+            PayloadPurgedAtUtc = UpdatedAtUtc;
+        return moved;
+    }
 
     /// <summary>Son hareketten <see cref="DraftLifetime"/> geçmiş taslağın süresi dolar.</summary>
     public Result Expire(DateTime nowUtc)
