@@ -74,7 +74,7 @@ Gövdeye eklenen opsiyonel alanlar (diğerleri `STOCK_MOVEMENT_SAFETY_API_CONTRA
 }
 ```
 
-`acknowledgeExpired` (bool, varsayılan `false`): yalnız giriş (`In`/`Initial`) için anlamlıdır; `batch.expiryDate` geçmişteyse `true` olmalıdır. Diğer durumlarda yok sayılır.
+`acknowledgeExpired` (bool, varsayılan `false`; `null` = `false`): yalnız giriş (`In`/`Initial`) için anlamlıdır; `batch.expiryDate` geçmişteyse `true` olmalıdır. Diğer durumlarda yok sayılır.
 
 | Alan | Sınır |
 |---|---|
