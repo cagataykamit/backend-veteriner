@@ -148,7 +148,8 @@ public sealed class GetVaccinationsListQueryHandler
                 searchPetIds,
                 accessibleClinicIds,
                 request.OnlyOverdue,
-                listAsOfUtc),
+                listAsOfUtc,
+                request.ExaminationId),
             ct);
         MarkStep("vaccinationsCount");
 
@@ -168,7 +169,8 @@ public sealed class GetVaccinationsListQueryHandler
                 searchPetIds,
                 accessibleClinicIds,
                 request.OnlyOverdue,
-                listAsOfUtc),
+                listAsOfUtc,
+                request.ExaminationId),
             ct);
         MarkStep("vaccinationsPage");
 

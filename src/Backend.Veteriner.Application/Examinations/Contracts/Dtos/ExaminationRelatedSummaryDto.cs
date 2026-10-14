@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Payments;
+using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 
@@ -15,6 +16,7 @@ public sealed record ExaminationRelatedSummaryDto(
     IReadOnlyList<ExaminationRelatedLabResultItemDto> LabResults,
     IReadOnlyList<ExaminationRelatedHospitalizationItemDto> Hospitalizations,
     IReadOnlyList<ExaminationRelatedAdministrationItemDto> Administrations,
+    IReadOnlyList<ExaminationRelatedVaccinationItemDto> Vaccinations,
     IReadOnlyList<ExaminationRelatedPaymentItemDto> Payments);
 
 public sealed record ExaminationRelatedTreatmentItemDto(
@@ -62,6 +64,16 @@ public sealed record ExaminationRelatedAdministrationItemDto(
     decimal Quantity,
     bool AddedAfterFinalization,
     string? LateEntryReason);
+
+/// <summary>Muayeneye bağlı aşı kaydı (her durum); tarihlerden dolu olan(lar) durumla tutarlıdır.</summary>
+public sealed record ExaminationRelatedVaccinationItemDto(
+    Guid Id,
+    Guid ClinicId,
+    string ClinicName,
+    string VaccineName,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] VaccinationStatus Status,
+    DateTime? AppliedAtUtc,
+    DateTime? DueAtUtc);
 
 public sealed record ExaminationRelatedPaymentItemDto(
     Guid Id,

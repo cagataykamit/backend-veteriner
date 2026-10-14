@@ -17,6 +17,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Treatments;
+using Backend.Veteriner.Domain.Vaccinations;
 using FluentAssertions;
 using Moq;
 
@@ -39,6 +40,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizations = new();
     private readonly Mock<IReadRepository<Administration>> _administrations = new();
     private readonly Mock<IReadRepository<Product>> _products = new();
+    private readonly Mock<IReadRepository<Vaccination>> _vaccinations = new();
     private readonly Mock<IReadRepository<Payment>> _payments = new();
     private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
 
@@ -70,6 +72,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             _hospitalizations.Object,
             _administrations.Object,
             _products.Object,
+            _vaccinations.Object,
             _payments.Object,
             _permissions.Object);
 
@@ -137,6 +140,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             .ReturnsAsync(new List<Hospitalization>());
         _administrations.Setup(r => r.ListAsync(It.IsAny<AdministrationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Administration>());
+        _vaccinations.Setup(r => r.ListAsync(It.IsAny<VaccinationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Vaccination>());
         _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Payment>());
         _clinics.Setup(r => r.ListAsync(It.IsAny<ClinicsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
@@ -318,6 +323,56 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
         _labResults.Verify(r => r.ListAsync(It.IsAny<LabResultsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()), Times.Never);
         _hospitalizations.Verify(r => r.ListAsync(It.IsAny<HospitalizationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()), Times.Never);
         _payments.Verify(r => r.ListAsync(It.IsAny<PaymentsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Include_Vaccinations_Linked_To_Examination()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        SetupTenant(tid);
+        SetupTenantWideRole("Admin");
+        SetupExaminationFound(BuildExamination(tid, clinicId, petId, examId));
+        SetupSuccessGraph(tid, clinicId, petId, examId);
+        var applied = new Vaccination(
+            tid, petId, clinicId, examId, Guid.NewGuid(), "Kuduz",
+            VaccinationStatus.Applied, DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddYears(1), null);
+        _vaccinations.Setup(r => r.ListAsync(It.IsAny<VaccinationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Vaccination> { applied });
+
+        var result = await CreateHandler().Handle(new GetExaminationRelatedSummaryQuery(examId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var item = result.Value!.Vaccinations.Should().ContainSingle().Subject;
+        item.Id.Should().Be(applied.Id);
+        item.VaccineName.Should().Be("Kuduz");
+        item.Status.Should().Be(VaccinationStatus.Applied);
+        item.ClinicName.Should().Be("Klinik");
+        item.AppliedAtUtc.Should().Be(applied.AppliedAtUtc);
+        item.DueAtUtc.Should().Be(applied.DueAtUtc);
+    }
+
+    [Fact]
+    public async Task Handle_Should_OmitVaccinations_When_UserLacksVaccinationsReadPermission()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        SetupTenant(tid);
+        SetupTenantWideRole("Admin");
+        SetupExaminationFound(BuildExamination(tid, clinicId, petId, examId));
+        SetupSuccessGraph(tid, clinicId, petId, examId);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Vaccinations.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetExaminationRelatedSummaryQuery(examId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Vaccinations.Should().BeEmpty();
+        result.Value.Treatments.Should().ContainSingle();
+        _vaccinations.Verify(r => r.ListAsync(It.IsAny<ISpecification<Vaccination>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

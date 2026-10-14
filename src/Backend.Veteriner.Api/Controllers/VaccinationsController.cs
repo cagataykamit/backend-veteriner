@@ -131,7 +131,7 @@ public sealed class VaccinationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>): aşı adı, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>sort</c>/<c>order</c> işlenmez. <c>onlyOverdue</c>: planlı ve vadesi geçmiş aşılar (Scheduled, DueAtUtc dolu ve &lt; UTC şimdi); açıkken istek <c>status</c> değerini yok sayar.</summary>
+    /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>): aşı adı, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>sort</c>/<c>order</c> işlenmez. <c>onlyOverdue</c>: planlı ve vadesi geçmiş aşılar (Scheduled, DueAtUtc dolu ve &lt; UTC şimdi); açıkken istek <c>status</c> değerini yok sayar. <c>examinationId</c>: yalnız bu muayeneye bağlı aşılar (kiracı/klinik kapsamı yine uygulanır).</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
     [ProducesResponseType(typeof(PagedResult<VaccinationListItemDto>), StatusCodes.Status200OK)]
@@ -147,6 +147,7 @@ public sealed class VaccinationsController : ControllerBase
         [FromQuery] DateTime? appliedFromUtc = null,
         [FromQuery] DateTime? appliedToUtc = null,
         [FromQuery] bool onlyOverdue = false,
+        [FromQuery] Guid? examinationId = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -163,7 +164,8 @@ public sealed class VaccinationsController : ControllerBase
                 dueToUtc,
                 appliedFromUtc,
                 appliedToUtc,
-                onlyOverdue),
+                onlyOverdue,
+                examinationId),
             ct);
         return result.ToActionResult(this);
     }
