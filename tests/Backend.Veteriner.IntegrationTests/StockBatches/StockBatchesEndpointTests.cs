@@ -455,6 +455,94 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
     }
 
     [Fact]
+    public async Task Administration_Insufficient_Should_Tell_Available_And_Expired_Excluded()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx);
+        await EnterBatchAsync(client, ctx, 3m, "OLD", Date(-10));
+        await EnterBatchAsync(client, ctx, 5m, "OK", Date(100));
+
+        var response = await PostAdministrationAsync(client, ctx, 6m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().Should().Be("Administrations.InsufficientStock");
+        problem.GetProperty("detail").GetString().Should().Contain("Yetersiz bakiye: kullanılabilir 5, süresi geçmiş 3 (hariç)");
+    }
+
+    [Fact]
+    public async Task Entry_With_Past_Expiry_Should_Require_Acknowledgement_And_Create_Nothing_Without_It()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx);
+        var batch = new { lotNumber = "ESKI", expiryDate = Date(-30) };
+
+        var withoutAck = await PostMovementAsync(client, ctx, 1, 3m, batch: batch);
+        var falseAck = await PostMovementAsync(client, ctx, 1, 3m, batch: batch, acknowledgeExpired: false);
+
+        withoutAck.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(withoutAck)).Should().Be("StockBatches.ExpiredAcknowledgementRequired");
+        falseAck.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await BatchCountAsync(ctx)).Should().Be(0);
+        (await GetStockAsync(ctx)).Should().Be(0m);
+
+        var acknowledged = await PostMovementAsync(client, ctx, 1, 3m, batch: batch, acknowledgeExpired: true);
+        acknowledged.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await BatchCountAsync(ctx)).Should().Be(1);
+        (await GetStockAsync(ctx)).Should().Be(3m);
+    }
+
+    [Fact]
+    public async Task Balance_StockStatus_And_LowStock_Should_Split_Available_From_Expired()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx);
+        await EnterBatchAsync(client, ctx, 5m, "OK", Date(100));
+        await EnterBatchAsync(client, ctx, 3m, "OLD", Date(-10));
+
+        var balance = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/products/{ctx.ProductId}/stock-batches?clinicId={ctx.ClinicId}");
+        balance.GetProperty("quantityOnHand").GetDecimal().Should().Be(8m);
+        balance.GetProperty("availableQuantity").GetDecimal().Should().Be(5m);
+        balance.GetProperty("expiredQuantity").GetDecimal().Should().Be(3m);
+
+        var stocks = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/product-stocks?page=1&pageSize=20&clinicId={ctx.ClinicId}&productId={ctx.ProductId}");
+        var stockRow = stocks.GetProperty("items").EnumerateArray().Single();
+        var stockId = stockRow.GetProperty("id").GetGuid();
+        stockRow.GetProperty("quantityOnHand").GetDecimal().Should().Be(8m);
+        stockRow.GetProperty("availableQuantity").GetDecimal().Should().Be(5m);
+        stockRow.GetProperty("expiredQuantity").GetDecimal().Should().Be(3m);
+
+        // Eşik 6: toplam 8 >= 6 ama kullanılabilir 5 < 6 → düşük stok.
+        var put = await client.PutAsJsonAsync(
+            $"/api/v1/product-stocks/{stockId}/minimum-stock-level", new { minimumStockLevel = 6m });
+        put.StatusCode.Should().Be(HttpStatusCode.OK);
+        var putJson = await put.Content.ReadFromJsonAsync<JsonElement>();
+        putJson.GetProperty("isBelowMinimum").GetBoolean().Should().BeTrue();
+        putJson.GetProperty("availableQuantity").GetDecimal().Should().Be(5m);
+
+        var below = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/product-stocks?page=1&pageSize=20&clinicId={ctx.ClinicId}&isBelowMinimum=true");
+        var notBelow = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/product-stocks?page=1&pageSize=20&clinicId={ctx.ClinicId}&isBelowMinimum=false");
+        below.GetProperty("items").GetArrayLength().Should().Be(1);
+        notBelow.GetProperty("items").GetArrayLength().Should().Be(0);
+
+        var byProduct = await client.GetFromJsonAsync<JsonElement>($"/api/v1/products/{ctx.ProductId}/stocks");
+        byProduct.EnumerateArray().Single().GetProperty("expiredQuantity").GetDecimal().Should().Be(3m);
+
+        // Uygulama sonrası kalan bildirimi kullanılabiliri söyler: 5 - 1 = 4 (süresi geçmiş 3 ayrı).
+        var administration = await PostAdministrationAsync(client, ctx, 1m);
+        administration.StatusCode.Should().Be(HttpStatusCode.Created);
+        var remaining = (await administration.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("stock");
+        remaining.GetProperty("quantityOnHand").GetDecimal().Should().Be(7m);
+        remaining.GetProperty("availableQuantity").GetDecimal().Should().Be(4m);
+        remaining.GetProperty("expiredQuantity").GetDecimal().Should().Be(3m);
+        remaining.GetProperty("isBelowMinimum").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Administration_On_Legacy_Unbatched_Stock_Should_Work_With_Null_Batch()
     {
         var ctx = await SeedAsync(legacyStock: 10m);
@@ -707,7 +795,8 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
         decimal quantity,
         Guid? requestId = null,
         object? batch = null,
-        Guid? batchId = null)
+        Guid? batchId = null,
+        bool? acknowledgeExpired = null)
         => client.PostAsJsonAsync("/api/v1/stock-movements", new
         {
             clinicId = ctx.ClinicId,
@@ -717,6 +806,7 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
             requestId,
             batch,
             batchId,
+            acknowledgeExpired,
         });
 
     private static Task<HttpResponseMessage> ReverseAsync(HttpClient client, Guid movementId)
@@ -737,7 +827,9 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
     /// <summary>Yeni parti girer ve kimliğini döndürür.</summary>
     private static async Task<Guid> EnterBatchAsync(HttpClient client, SeedCtx ctx, decimal quantity, string lot, string? expiry)
     {
-        var response = await PostMovementAsync(client, ctx, 1, quantity, batch: new { lotNumber = lot, expiryDate = expiry });
+        // Geçmiş SKT'li girişler açık onayla yapılır (ADR-015 karar 6).
+        var response = await PostMovementAsync(
+            client, ctx, 1, quantity, batch: new { lotNumber = lot, expiryDate = expiry }, acknowledgeExpired: true);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("batchId").GetGuid();
     }
