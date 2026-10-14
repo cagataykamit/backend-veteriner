@@ -45,6 +45,18 @@ public sealed class ClientIntegrationEventSerializationTests
     }
 
     [Fact]
+    public void Deleted_Should_RoundTrip_Without_Personal_Data()
+    {
+        var evt = new ClientDeletedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), Guid.NewGuid());
+
+        var json = JsonSerializer.Serialize(evt, JsonOptions);
+        var restored = JsonSerializer.Deserialize<ClientDeletedIntegrationEvent>(json, JsonOptions);
+
+        restored.Should().BeEquivalentTo(evt);
+        ClientIntegrationEventTypes.Deleted.Should().Be("client.deleted.v1");
+    }
+
+    [Fact]
     public void Updated_Should_RoundTrip()
     {
         var evt = new ClientUpdatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, Snapshot());
