@@ -26,7 +26,7 @@ public sealed class Charge : AggregateRoot
     public decimal Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
 
-    /// <summary><c>round(Quantity × UnitPrice, 2)</c>; tek hesap yeri <c>ValidateDetails</c>.</summary>
+    /// <summary><c>round(Quantity × UnitPrice, 2)</c>; tek hesap yeri <see cref="CalculateAmount"/>.</summary>
     public decimal Amount { get; private set; }
 
     public string Currency { get; private set; } = DefaultCurrency;
@@ -198,6 +198,10 @@ public sealed class Charge : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>Ücret tutarı: <c>round(miktar × birim fiyat, 2)</c>. Ücret önerisi tutar toplamı da bu kuralı kullanır.</summary>
+    public static decimal CalculateAmount(decimal quantity, decimal unitPrice)
+        => decimal.Round(quantity * unitPrice, 2, MidpointRounding.AwayFromZero);
+
     /// <summary>Açıklama, miktar ve birim fiyat kuralları ile tutar hesabı için tek yer (oluşturma ve düzeltme paylaşır).</summary>
     private static Result<(string Description, decimal Amount)> ValidateDetails(
         string? description,
@@ -215,7 +219,7 @@ public sealed class Charge : AggregateRoot
         if (unitPrice <= 0 || unitPrice > MaxUnitPrice || decimal.Round(unitPrice, UnitPriceDecimals) != unitPrice)
             return InvalidDetails($"Birim fiyat 0'dan büyük, en fazla {MaxUnitPrice:0} ve en fazla {UnitPriceDecimals} ondalıklı olmalıdır.");
 
-        var amount = decimal.Round(quantity * unitPrice, 2, MidpointRounding.AwayFromZero);
+        var amount = CalculateAmount(quantity, unitPrice);
         if (amount <= 0)
             return InvalidDetails("Tutar sıfıra yuvarlanamaz; miktar ve birim fiyatı kontrol edin.");
 

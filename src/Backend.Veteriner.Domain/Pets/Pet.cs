@@ -76,6 +76,9 @@ public sealed class Pet : AggregateRoot
 
     private static readonly Func<Pet, bool> ReceivesCareCompiled = ReceivesCare.Compile();
 
+    /// <summary>Bellekteki kayıt için <see cref="ReceivesCare"/> (hasta özeti ve açık işler gibi tek hayvanlı okumalar).</summary>
+    public bool IsReceivingCare => ReceivesCareCompiled(this);
+
     /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
     public Species? Species { get; private set; }
 
@@ -224,7 +227,7 @@ public sealed class Pet : AggregateRoot
 
     /// <summary>Yeni randevu, geliş ve muayene açılmadan önce çağrılır; vefat eden hayvanda reddeder (geçmiş kayıtlar etkilenmez).</summary>
     public Result EnsureCanStartCare()
-        => ReceivesCareCompiled(this)
+        => IsReceivingCare
             ? Result.Success()
             : Result.Failure("Pets.Deceased", "Vefat etmiş hayvan için yeni randevu, geliş veya muayene açılamaz.");
 

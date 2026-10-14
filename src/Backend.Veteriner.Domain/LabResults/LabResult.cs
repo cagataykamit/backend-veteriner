@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.LabResults;
@@ -41,9 +42,17 @@ public sealed class LabResult : AggregateRoot
     /// <summary>Yeni kayıtlarda true; yorum gerekmiyor sayılan eski (migration ile gelen) kayıtlarda false.</summary>
     public bool InterpretationRequired { get; private set; }
 
-    /// <summary>Sonuç var, yorum gerekiyor ama hekim yorumu yok: durum makinesine girmeyen türetilmiş bayrak.</summary>
-    public bool AwaitingInterpretation
-        => Status == LabResultStatus.Resulted && InterpretationRequired && Interpretation is null;
+    /// <summary>
+    /// Sonuç var, yorum gerekiyor ama hekim yorumu yok (tek kural): sorgularda bu ifade, bellekte
+    /// <see cref="AwaitingInterpretation"/> kullanılır.
+    /// </summary>
+    public static readonly Expression<Func<LabResult, bool>> IsAwaitingInterpretation =
+        l => l.Status == LabResultStatus.Resulted && l.InterpretationRequired && l.Interpretation == null;
+
+    private static readonly Func<LabResult, bool> IsAwaitingInterpretationCompiled = IsAwaitingInterpretation.Compile();
+
+    /// <summary>Durum makinesine girmeyen türetilmiş bayrak; kural <see cref="IsAwaitingInterpretation"/>.</summary>
+    public bool AwaitingInterpretation => IsAwaitingInterpretationCompiled(this);
 
     private LabResult() { }
 
