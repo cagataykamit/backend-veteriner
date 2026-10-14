@@ -12,7 +12,7 @@ public sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBa
 {
     public const string RequestIdIndexName = "UX_ImportBatches_TenantId_RequestId";
     public const string ContentHashIndexName = "UX_ImportBatches_TenantId_ContentHash";
-    public const string ActiveJobIndexName = "UX_ImportBatches_TenantId_ActiveJob";
+    public const string ActiveJobIndexName = ImportBatch.ActiveJobIndexName;
 
     public void Configure(EntityTypeBuilder<ImportBatch> b)
     {
@@ -51,6 +51,8 @@ public sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBa
             .IsConcurrencyToken();
 
         b.Ignore(x => x.IsDraft);
+        b.Ignore(x => x.PayloadPurgeDueAtUtc);
+        b.Ignore(x => x.HasValidationResult);
         b.Ignore(x => x.CanMap);
 
         b.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });

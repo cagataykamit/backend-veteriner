@@ -119,6 +119,10 @@ public sealed class ImportBatchTests
     {
         foreach (var from in Enum.GetValues<ImportBatchStatus>())
         {
+            // Kirası dolmuş Validating devralma kuralı ImportBatchValidationLeaseTests içindedir.
+            if (operation == "StartValidation" && from == ImportBatchStatus.Validating)
+                continue;
+
             var batch = BatchIn(from);
 
             var result = Apply(batch, operation);

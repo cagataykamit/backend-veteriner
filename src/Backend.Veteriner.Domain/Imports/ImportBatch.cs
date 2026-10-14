@@ -13,11 +13,23 @@ public sealed class ImportBatch : AggregateRoot
     public const int ContentHashLength = 64;
     public const int MaxLeaseOwnerLength = 100;
 
+    /// <summary>Kiracı başına tek aktif iş güvencesi olan filtreli benzersiz indeksin adı (çarpışma tespiti için).</summary>
+    public const string ActiveJobIndexName = "UX_ImportBatches_TenantId_ActiveJob";
+
     /// <summary>Kiracı başına açık taslak sınırı (uygulama düzeyi).</summary>
     public const int MaxOpenDraftsPerTenant = 5;
 
     /// <summary>Hareketsiz taslağın süresinin dolması için geçmesi gereken süre.</summary>
     public static readonly TimeSpan DraftLifetime = TimeSpan.FromDays(7);
+
+    /// <summary>Doğrulama kirası; çöken istek sonrası takılı kalan <c>Validating</c> parti bu süre sonunda devralınır.</summary>
+    public static readonly TimeSpan ValidationLeaseDuration = TimeSpan.FromMinutes(5);
+
+    /// <summary>Senkron doğrulamanın kira sahibi (arka plan işçisi B4'te kendi adını kullanır).</summary>
+    public const string ValidationLeaseOwner = "api";
+
+    /// <summary>Satır verisinin (kişisel veri) saklama süresi; son durum değişikliğinden sayılır (ADR-019 K9).</summary>
+    public static readonly TimeSpan PayloadRetention = TimeSpan.FromDays(30);
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
@@ -69,6 +81,15 @@ public sealed class ImportBatch : AggregateRoot
     public byte[] RowVersion { get; private set; } = default!;
 
     public bool IsDraft => ImportBatchStatusSets.Draft.Contains(Status);
+
+    /// <summary>
+    /// Satır verisinin temizlenmesi gereken an (<see cref="PayloadRetention"/>); temizlenmişse veya satırları saklanan
+    /// bir son duruma ulaşmamışsa null. Taslak silinirken veri zaten temizlenir (<see cref="Discard"/>).
+    /// </summary>
+    public DateTime? PayloadPurgeDueAtUtc
+        => PayloadPurgedAtUtc is null && ImportBatchStatusSets.PayloadRetained.Contains(Status)
+            ? (UpdatedAtUtc ?? CreatedAtUtc) + PayloadRetention
+            : null;
 
     /// <summary>Eşlemenin kaydedilebildiği durumlar; <see cref="ApplyMapping"/> geçiş tablosuyla aynı küme.</summary>
     private static readonly ImportBatchStatus[] MappableFrom =
@@ -157,11 +178,35 @@ public sealed class ImportBatch : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>Takılı kalmış <c>Validating</c> partinin kirası dolduysa yeniden doğrulama başlatılabilir.</summary>
+    public bool IsValidationLeaseExpired(DateTime nowUtc)
+        => Status == ImportBatchStatus.Validating
+           && (LeaseUntilUtc is null || LeaseUntilUtc <= NormalizeUtc(nowUtc));
+
+    /// <summary>Doğrulama başlatılabilir mi (geçiş tablosu; kirası dolmuş <c>Validating</c> dahil).</summary>
+    public bool CanStartValidation(DateTime nowUtc)
+        => IsValidationLeaseExpired(nowUtc)
+           || Status is ImportBatchStatus.Mapped or ImportBatchStatus.Validated or ImportBatchStatus.ValidationFailed;
+
+    /// <summary>Doğrulaması en az bir kez bitmiş partide satır sonuçları, önizleme ve hata raporu okunabilir.</summary>
+    public bool HasValidationResult => ImportBatchStatusSets.ValidationResultAvailable.Contains(Status);
+
     public Result StartValidation(DateTime nowUtc)
-        => MoveTo(
-            ImportBatchStatus.Validating,
-            nowUtc,
-            ImportBatchStatus.Mapped, ImportBatchStatus.Validated, ImportBatchStatus.ValidationFailed);
+    {
+        var now = NormalizeUtc(nowUtc);
+        var moved = IsValidationLeaseExpired(now)
+            ? MoveTo(ImportBatchStatus.Validating, now, ImportBatchStatus.Validating)
+            : MoveTo(
+                ImportBatchStatus.Validating,
+                now,
+                ImportBatchStatus.Mapped, ImportBatchStatus.Validated, ImportBatchStatus.ValidationFailed);
+        if (!moved.IsSuccess)
+            return moved;
+
+        LeaseOwner = ValidationLeaseOwner;
+        LeaseUntilUtc = now + ValidationLeaseDuration;
+        return Result.Success();
+    }
 
     public Result CompleteValidation(
         Guid validationId,
@@ -179,19 +224,33 @@ public sealed class ImportBatch : AggregateRoot
 
         ValidationId = validationId;
         ValidatedAtUtc = UpdatedAtUtc;
+        ReleaseLease();
         CustomerCounts = customers;
         PetCounts = pets;
         VaccinationCounts = vaccinations;
         return Result.Success();
     }
 
-    /// <summary>Dosya düzeyi sorun (zorunlu sütun yok, yapısal bozukluk, hiç geçerli satır yok).</summary>
-    public Result FailValidation(DateTime nowUtc)
+    /// <summary>
+    /// Dosya düzeyi sorun (bağlantı sütunu yok, hiç geçerli satır yok) veya beklenmeyen hata. Önceki doğrulamanın
+    /// sayaçları geçersizleşir: verilmeyen tablo yalnız <c>Total</c> taşır; verilenler (örn. "hepsi hatalı") korunur.
+    /// </summary>
+    public Result FailValidation(
+        DateTime nowUtc,
+        ImportTableCounts? customers = null,
+        ImportTableCounts? pets = null,
+        ImportTableCounts? vaccinations = null)
     {
         var moved = MoveTo(ImportBatchStatus.ValidationFailed, nowUtc, ImportBatchStatus.Validating);
-        if (moved.IsSuccess)
-            ValidationId = null;
-        return moved;
+        if (!moved.IsSuccess)
+            return moved;
+
+        ValidationId = null;
+        ReleaseLease();
+        CustomerCounts = customers ?? ImportTableCounts.Empty with { Total = CustomerCounts.Total };
+        PetCounts = pets ?? ImportTableCounts.Empty with { Total = PetCounts.Total };
+        VaccinationCounts = vaccinations ?? ImportTableCounts.Empty with { Total = VaccinationCounts.Total };
+        return Result.Success();
     }
 
     /// <summary>Kullanıcı tam olarak önizlediğini onaylar: yalnız en son doğrulamanın kimliği kabul edilir.</summary>
@@ -274,6 +333,20 @@ public sealed class ImportBatch : AggregateRoot
         return moved;
     }
 
+    /// <summary>
+    /// Saklama süresi dolan partinin satır verisi temizlendi (satırlar ayrıca <see cref="ImportBatchRow.PurgePayload"/>
+    /// ile boşaltılır); sayaçlar ve özet kalır. Süre henüz dolmadıysa veya zaten temizlenmişse reddedilir.
+    /// </summary>
+    public Result PurgePayload(DateTime nowUtc)
+    {
+        var now = NormalizeUtc(nowUtc);
+        if (PayloadPurgeDueAtUtc is not { } due || now < due)
+            return InvalidState("Satır verisinin saklama süresi henüz dolmadı veya veri zaten temizlendi.");
+
+        PayloadPurgedAtUtc = now;
+        return Result.Success();
+    }
+
     /// <summary>Son hareketten <see cref="DraftLifetime"/> geçmiş taslağın süresi dolar.</summary>
     public Result Expire(DateTime nowUtc)
     {
@@ -292,6 +365,12 @@ public sealed class ImportBatch : AggregateRoot
         Status = target;
         UpdatedAtUtc = NormalizeUtc(nowUtc);
         return Result.Success();
+    }
+
+    private void ReleaseLease()
+    {
+        LeaseOwner = null;
+        LeaseUntilUtc = null;
     }
 
     private static string? NormalizeName(string? name)

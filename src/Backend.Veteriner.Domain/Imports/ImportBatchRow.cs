@@ -31,6 +31,28 @@ public sealed class ImportBatchRow
 
     private ImportBatchRow() { }
 
+    /// <summary>
+    /// Doğrulama (kuru çalıştırma) sonucunu yazar; önceki sonucun yerini alır. Uygulama durumu ve hedef kayıt
+    /// değişmez (B4 yazar).
+    /// </summary>
+    public void ApplyValidation(ImportRowValidationStatus status, string? issuesJson, string normalizedJson)
+    {
+        if (status == ImportRowValidationStatus.Pending)
+            throw new ArgumentOutOfRangeException(nameof(status), "Doğrulama sonucu Pending olamaz.");
+
+        ValidationStatus = status;
+        IssuesJson = issuesJson;
+        NormalizedJson = normalizedJson;
+    }
+
+    /// <summary>Saklama süresi sonunda kişisel veriyi boşaltır; satır kimliği, durumları ve hedef kayıt kimliği kalır.</summary>
+    public void PurgePayload()
+    {
+        SourceJson = null;
+        NormalizedJson = null;
+        IssuesJson = null;
+    }
+
     public static ImportBatchRow Create(Guid batchId, ImportTable table, int rowNumber, string sourceJson, string? normalizedJson)
     {
         if (batchId == Guid.Empty)

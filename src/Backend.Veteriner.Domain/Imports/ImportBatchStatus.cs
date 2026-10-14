@@ -52,6 +52,29 @@ public static class ImportBatchStatusSets
         ImportBatchStatus.RollingBack,
     ];
 
+    /// <summary>Doğrulaması bitmiş (satır sonuçları okunabilir) durumlar; eşleme değişince parti <c>Mapped</c>'a düşüp çıkar.</summary>
+    public static readonly IReadOnlyList<ImportBatchStatus> ValidationResultAvailable =
+    [
+        ImportBatchStatus.Validated,
+        ImportBatchStatus.ValidationFailed,
+        ImportBatchStatus.Committing,
+        ImportBatchStatus.Committed,
+        ImportBatchStatus.CommitFailed,
+        ImportBatchStatus.RollingBack,
+        ImportBatchStatus.RolledBack,
+        ImportBatchStatus.PartiallyRolledBack,
+        ImportBatchStatus.RollbackFailed,
+    ];
+
+    /// <summary>Satır verisi saklama süresi (K9) sonunda temizlenen son durumlar; <c>Discarded</c> silinirken zaten temizlenir.</summary>
+    public static readonly IReadOnlyList<ImportBatchStatus> PayloadRetained =
+    [
+        ImportBatchStatus.Committed,
+        ImportBatchStatus.RolledBack,
+        ImportBatchStatus.PartiallyRolledBack,
+        ImportBatchStatus.Expired,
+    ];
+
     /// <summary>İçerik özetini serbest bırakan durumlar: aynı dosya yeniden yüklenebilir.</summary>
     public static readonly IReadOnlyList<ImportBatchStatus> ContentHashReleased =
     [
