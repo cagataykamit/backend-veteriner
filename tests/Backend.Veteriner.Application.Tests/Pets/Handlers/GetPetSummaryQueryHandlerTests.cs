@@ -211,6 +211,29 @@ public sealed class GetPetSummaryQueryHandlerTests
     }
 
     [Fact]
+    public async Task Deceased_Pet_Next_Due_Vaccination_Is_Not_Overdue_And_Status_Is_Returned()
+    {
+        var pet = NewPet();
+        pet.SetStatus(PetStatus.Deceased, null, DateOnly.FromDateTime(Now));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(pet);
+        var due = AddVaccination(VaccinationStatus.Scheduled, null, Now.AddDays(-3));
+
+        var result = await Run(CreateHandler());
+
+        result.Value!.Status.Should().Be(PetStatus.Deceased);
+        result.Value.Vaccinations.Data!.NextDue!.Id.Should().Be(due.Id);
+        result.Value.Vaccinations.Data.NextDue.IsOverdue.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Active_Pet_Status_Is_Returned()
+    {
+        var result = await Run(CreateHandler());
+
+        result.Value!.Status.Should().Be(PetStatus.Active);
+    }
+
+    [Fact]
     public async Task Only_Scheduled_Vaccination_Must_Not_Count_As_Applied()
     {
         AddVaccination(VaccinationStatus.Scheduled, null, Now.AddDays(10));

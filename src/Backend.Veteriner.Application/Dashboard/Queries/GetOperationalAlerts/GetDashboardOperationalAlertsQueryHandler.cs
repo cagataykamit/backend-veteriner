@@ -78,13 +78,14 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
 
         var todayCounts = await _todayAppointmentCounts.GetAsync(
             tenantId, singleClinicId, dayStartUtc, dayEndUtc, accessibleClinicIds, ct);
+        // Vefat eden hayvanın aşısı gecikmiş/yaklaşan, açık kalan planlı randevusu gecikmiş sayılmaz (ADR-020 S5).
+        var petIdsNotReceivingCare = await _pets.ListAsync(new PetIdsNotReceivingCareSpec(tenantId), ct);
         var overdueScheduledAppointmentsCount = await _appointments.CountAsync(
-            new DashboardOverdueScheduledAppointmentsCountSpec(tenantId, singleClinicId, nowUtc, accessibleClinicIds), ct);
+            new DashboardOverdueScheduledAppointmentsCountSpec(
+                tenantId, singleClinicId, nowUtc, accessibleClinicIds, petIdsNotReceivingCare), ct);
         var upcomingAppointmentsNext24HoursCount = await _appointments.CountAsync(
             new DashboardUpcomingAppointmentsNext24HoursCountSpec(
                 tenantId, singleClinicId, nowUtc, next24HoursUtcExclusive, accessibleClinicIds), ct);
-        // Vefat eden hayvanın aşısı gecikmiş/yaklaşan sayılmaz (ADR-020 S5).
-        var petIdsNotReceivingCare = await _pets.ListAsync(new PetIdsNotReceivingCareSpec(tenantId), ct);
         var overdueVaccinationsCount = await _vaccinations.CountAsync(
             new DashboardOverdueVaccinationsCountSpec(tenantId, singleClinicId, nowUtc, accessibleClinicIds, petIdsNotReceivingCare), ct);
         var upcomingVaccinationsNext7DaysCount = await _vaccinations.CountAsync(
