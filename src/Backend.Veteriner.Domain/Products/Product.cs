@@ -50,6 +50,7 @@ public sealed class Product : AggregateRoot
     public ProductCategory? Category { get; private set; }
     public ICollection<ProductStock> Stocks { get; private set; } = new List<ProductStock>();
     public ICollection<StockMovement> Movements { get; private set; } = new List<StockMovement>();
+    public ICollection<StockBatch> StockBatches { get; private set; } = new List<StockBatch>();
 
     private Product() { }
 

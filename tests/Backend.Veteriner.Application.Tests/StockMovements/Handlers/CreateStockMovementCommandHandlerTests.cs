@@ -47,7 +47,8 @@ public sealed class CreateStockMovementCommandHandlerTests
             _stockMovementsWrite.Object,
             new Mock<IRepository<StockBatch>>().Object,
             StockBatchMocks.EmptyResolver(),
-            _uow.Object);
+            _uow.Object,
+            StockBatchMocks.Clock);
 
     private static (Guid TenantId, Guid ClinicId, Guid ProductId, Clinic Clinic, Product Product) SeedIdsAndEntities()
     {
@@ -131,7 +132,8 @@ public sealed class CreateStockMovementCommandHandlerTests
             _stockMovementsWrite.Object,
             new Mock<IRepository<StockBatch>>().Object,
             StockBatchMocks.EmptyResolver(),
-            _uow.Object);
+            _uow.Object,
+            StockBatchMocks.Clock);
 
         var (tenantId, clinicId, productId, clinic, product) = SeedIdsAndEntities();
         SetupDefaultReads(tenantId, clinicId, product, clinic);

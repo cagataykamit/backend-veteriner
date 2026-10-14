@@ -30,7 +30,8 @@ public sealed class GetProductStocksByProductIdQueryHandlerTests
             _products.Object,
             _categories.Object,
             _productStocks.Object,
-            _clinics.Object);
+            _clinics.Object,
+            StockBatchMocks.ExpiredReader());
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

@@ -14,7 +14,8 @@ public sealed class ProductStocksFilteredCountSpec : Specification<ProductStock>
         Guid? productId,
         bool? isBelowMinimum,
         bool? isActiveProduct,
-        string? searchContainsLikePattern)
+        string? searchContainsLikePattern,
+        DateOnly today)
     {
         Query.AsNoTracking();
         Query.Where(s => s.TenantId == tenantId);
@@ -31,12 +32,7 @@ public sealed class ProductStocksFilteredCountSpec : Specification<ProductStock>
             Query.Where(s => s.Product!.IsActive == isActiveProduct.Value);
 
         if (isBelowMinimum.HasValue)
-        {
-            if (isBelowMinimum.Value)
-                Query.Where(s => s.QuantityOnHand < s.MinimumStockLevel);
-            else
-                Query.Where(s => s.QuantityOnHand >= s.MinimumStockLevel);
-        }
+            Query.Where(ProductStockMinimumFilter.Create(isBelowMinimum.Value, today));
 
         if (searchContainsLikePattern is not null)
         {

@@ -45,7 +45,7 @@ public sealed class StockBatchConfiguration : IEntityTypeConfiguration<StockBatc
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.LotNumber });
 
         b.HasOne(x => x.Product)
-            .WithMany()
+            .WithMany(p => p.StockBatches)
             .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 

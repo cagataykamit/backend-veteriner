@@ -15,6 +15,7 @@ public sealed class StockBatch
     public const int MaxTransportLength = 200;
     public const string LotAndExpiryRequiredCode = "StockBatches.LotAndExpiryRequired";
     public const string ValidationCode = "StockBatches.Validation";
+    public const string ExpiredAcknowledgementRequiredCode = "StockBatches.ExpiredAcknowledgementRequired";
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

@@ -99,6 +99,25 @@ public sealed class StockBatchesFilteredPagedSpec : StockBatchesFilteredSpec
     }
 }
 
+/// <summary>Verilen klinik ve ürünlerde SKT'si <paramref name="today"/>'den önce olan, kalanı olan partiler (okuma); süresi geçmiş miktar için.</summary>
+public sealed class StockBatchesExpiredReadSpec : Specification<StockBatch>
+{
+    public StockBatchesExpiredReadSpec(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> clinicIds,
+        IReadOnlyCollection<Guid> productIds,
+        DateOnly today)
+    {
+        Query.AsNoTracking();
+        Query.Where(b => b.TenantId == tenantId
+            && clinicIds.Contains(b.ClinicId)
+            && productIds.Contains(b.ProductId)
+            && b.RemainingQuantity > 0
+            && b.ExpiryDate != null
+            && b.ExpiryDate < today);
+    }
+}
+
 /// <summary>Bir klinik+ürünün kalanı olan partileri FEFO sıralı (okuma); ürün bazlı parti bakiyesi için.</summary>
 public sealed class StockBatchesWithBalanceReadSpec : Specification<StockBatch>
 {

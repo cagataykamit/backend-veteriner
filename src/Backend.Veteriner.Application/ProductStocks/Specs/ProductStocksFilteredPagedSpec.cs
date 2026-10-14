@@ -15,6 +15,7 @@ public sealed class ProductStocksFilteredPagedSpec : Specification<ProductStock>
         bool? isBelowMinimum,
         bool? isActiveProduct,
         string? searchContainsLikePattern,
+        DateOnly today,
         int page,
         int pageSize)
     {
@@ -33,12 +34,7 @@ public sealed class ProductStocksFilteredPagedSpec : Specification<ProductStock>
             Query.Where(s => s.Product!.IsActive == isActiveProduct.Value);
 
         if (isBelowMinimum.HasValue)
-        {
-            if (isBelowMinimum.Value)
-                Query.Where(s => s.QuantityOnHand < s.MinimumStockLevel);
-            else
-                Query.Where(s => s.QuantityOnHand >= s.MinimumStockLevel);
-        }
+            Query.Where(ProductStockMinimumFilter.Create(isBelowMinimum.Value, today));
 
         if (searchContainsLikePattern is not null)
         {

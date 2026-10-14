@@ -79,7 +79,8 @@ public sealed class CreateStockMovementBatchTests
             _stockMovementsWrite.Object,
             _batchesWrite.Object,
             new StockBatchResolver(StockBatchMocks.WithBatches(existingBatches).Object),
-            _uow.Object);
+            _uow.Object,
+            StockBatchMocks.Clock);
 
     private ProductStock SetupStock(decimal qty)
     {
@@ -348,6 +349,98 @@ public sealed class CreateStockMovementBatchTests
 
         result.Error.Code.Should().Be(StockBatchResolver.ExpiredCode);
         expired.RemainingQuantity.Should().Be(10m);
+    }
+
+    [Fact]
+    public async Task Out_Application_Path_Should_Report_Available_And_Expired_When_Balance_Is_Short()
+    {
+        var product = SetupProduct();
+        var stock = SetupStock(8m); // 5 uygun + 3 süresi geçmiş
+        var valid = Batch(product, 5m, new DateOnly(2027, 12, 31));
+        var expired = Batch(product, 3m, new DateOnly(2026, 1, 1));
+
+        var shortBySingleBatch = await CreateHandler(valid, expired).Handle(
+            Cmd(StockMovementType.Out, 6m, notExpiredOn: Today), CancellationToken.None);
+        var shortByTotal = await CreateHandler(valid, expired).Handle(
+            Cmd(StockMovementType.Out, 9m, notExpiredOn: Today), CancellationToken.None);
+
+        shortBySingleBatch.Error.Code.Should().Be("StockMovements.InsufficientStock");
+        shortBySingleBatch.Error.Message.Should().Be("Yetersiz bakiye: kullanılabilir 5, süresi geçmiş 3 (hariç)");
+        shortByTotal.Error.Message.Should().Be("Yetersiz bakiye: kullanılabilir 5, süresi geçmiş 3 (hariç)");
+        stock.QuantityOnHand.Should().Be(8m);
+        valid.RemainingQuantity.Should().Be(5m);
+    }
+
+    [Fact]
+    public async Task Out_Application_Path_Should_Say_Split_When_Available_Total_Covers_But_No_Single_Batch()
+    {
+        var product = SetupProduct();
+        SetupStock(6m);
+        var a = Batch(product, 3m, new DateOnly(2027, 1, 1));
+        var b = Batch(product, 3m, new DateOnly(2027, 2, 1));
+
+        var result = await CreateHandler(a, b).Handle(
+            Cmd(StockMovementType.Out, 4m, notExpiredOn: Today), CancellationToken.None);
+
+        result.Error.Code.Should().Be("StockMovements.InsufficientStock");
+        result.Error.Message.Should().Contain("tek başına");
+    }
+
+    // ---- Süresi geçmiş giriş onayı ----
+
+    [Fact]
+    public async Task In_With_Past_Expiry_Should_Require_Acknowledgement_And_Write_Nothing()
+    {
+        SetupProduct();
+        var stock = SetupStock(5m);
+        var details = new StockBatchDetails(LotNumber: "ESKI", ExpiryDate: new DateOnly(2026, 1, 1));
+
+        var result = await CreateHandler().Handle(Cmd(StockMovementType.In, 3m, details), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be(StockBatch.ExpiredAcknowledgementRequiredCode);
+        result.Error.Message.Should().Be("Bu partinin son kullanma tarihi geçmiş. Devam etmek için onaylayın.");
+        stock.QuantityOnHand.Should().Be(5m);
+        _stockMovementsWrite.Verify(r => r.AddAsync(It.IsAny<StockMovement>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(StockMovementType.In)]
+    [InlineData(StockMovementType.Initial)]
+    public async Task Entry_With_Past_Expiry_And_Acknowledgement_Should_Be_Accepted(StockMovementType type)
+    {
+        SetupProduct();
+        if (type == StockMovementType.Initial)
+        {
+            _productStocksWrite
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ProductStock?)null);
+        }
+        else
+        {
+            SetupStock(5m);
+        }
+
+        var details = new StockBatchDetails(LotNumber: "ESKI", ExpiryDate: new DateOnly(2026, 1, 1));
+
+        var result = await CreateHandler().Handle(
+            Cmd(type, 3m, details) with { AcknowledgeExpired = true }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _written!.Batch!.ExpiryDate.Should().Be(new DateOnly(2026, 1, 1));
+    }
+
+    [Fact]
+    public async Task In_With_Expiry_Today_Should_Not_Require_Acknowledgement()
+    {
+        SetupProduct();
+        SetupStock(5m);
+
+        var result = await CreateHandler().Handle(
+            Cmd(StockMovementType.In, 1m, new StockBatchDetails(LotNumber: "BUGUN", ExpiryDate: Today)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
     }
 
     // ---- Sayım ----

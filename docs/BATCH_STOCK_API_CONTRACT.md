@@ -13,7 +13,8 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-015-ba
 - **Değişmez kural:** `ProductStock.quantityOnHand` her zaman `Σ parti.remainingQuantity + unbatchedQuantity`'dir ve `unbatchedQuantity ≥ 0`'dır. Bütün stok değişimleri mevcut stok handler'larından (`POST /stock-movements`, ters hareket) geçtiği için kural tek yerde korunur.
 - **FEFO (SKT'si en yakın önce):** partiden düşümde varsayılan seçim. Sıra: SKT artan; SKT'si olmayan partiler en sonda; eşitlikte giriş zamanı (eski önce). Partisiz bakiye en son sırada ve yalnız partilerin hiçbiri yetmediğinde kullanılır. **Düşüm tek partiden yapılır** (bir uygulama/çıkış iki partiye bölünmez): FEFO sırasındaki **ilk yeterli** parti seçilir. Hiçbiri tek başına yetmiyorsa yetersiz stok kuralı çalışır (`InsufficientStock`); kullanıcı miktarı iki kayıt olarak girer.
 - **Zorunluluk ürün sınıfına bağlı:** `Product.kind = Vaccine` veya `Product.controlledClass ≠ None` ise ürün "lot ve SKT zorunlu"dur; bu ürünlerde stok girişinde `batch.lotNumber` ve `batch.expiryDate` zorunludur. Diğer ürünlerde parti bilgisi opsiyoneldir.
-- **Süresi geçmiş parti:** `expiryDate` uygulama gününden (İstanbul takvim günü) **önceyse** süresi geçmiştir; SKT günü dahil kullanılabilir. **Uygulama kaydı süresi geçmiş partiden yapılamaz** (kullanıcı kararı 2026-10-13: engelle). Süresi geçmiş stok, manuel `Out`/`Adjustment` (imha/sayım) ile stoktan düşülebilir; bu engellenmez. Girişte geçmiş SKT reddedilmez (eski stok girişi için), yalnız listede `isExpired` ile işaretlenir.
+- **Süresi geçmiş parti:** `expiryDate` uygulama gününden (İstanbul takvim günü) **önceyse** süresi geçmiştir; SKT günü dahil kullanılabilir. **Uygulama kaydı süresi geçmiş partiden yapılamaz** (kullanıcı kararı 2026-10-13: engelle). Süresi geçmiş stok, manuel `Out`/`Adjustment` (imha/sayım) ile stoktan düşülebilir; bu engellenmez. Girişte geçmiş SKT **engellenmez** (eski stok girişi için) ama **açık onay ister**: istek `acknowledgeExpired: true` taşımalıdır, aksi hâlde `StockBatches.ExpiredAcknowledgementRequired` (400, bölüm 4). Parti listede `isExpired` ile işaretlenir.
+- **Kullanılabilir / süresi geçmiş miktar (ADR-015 karar 6):** `expiredQuantity` = SKT'si geçmiş partilerin kalanları toplamı; `availableQuantity` = `quantityOnHand − expiredQuantity` (partisiz bakiye kullanılabilirdir). `quantityOnHand` **toplam olarak aynen kalır** (geçmiş parti dahil, geriye uyumlu). Düşük stok uyarısı (`isBelowMinimum`, `isBelowMinimum` süzgeci) ve uygulanabilir bakiye **yalnız `availableQuantity`'ye** bakar. "Süresi geçmiş" tanımı tek: SKT, İstanbul takvim gününden önce.
 - **Geriye uyum:** Yeni alanların hepsi opsiyoneldir; parti alanı göndermeyen mevcut istemci aynı şekilde çalışır (giriş partisiz bakiyeye eklenir, çıkış FEFO ile uygun partiye ya da partisiz bakiyeye düşer). Mevcut hata kodları ve anlamları değişmez; yetersiz parti bakiyesi mevcut `InsufficientStock` koduyla döner.
 
 ### `StockMovementDto` değişikliği (geriye uyumlu, iki alan eklenir)
@@ -68,9 +69,12 @@ Gövdeye eklenen opsiyonel alanlar (diğerleri `STOCK_MOVEMENT_SAFETY_API_CONTRA
     "transportMethod": "string?",
     "coldChainMonitor": "string?"
   },
-  "batchId": "guid?"
+  "batchId": "guid?",
+  "acknowledgeExpired": false
 }
 ```
+
+`acknowledgeExpired` (bool, varsayılan `false`; `null` = `false`): yalnız giriş (`In`/`Initial`) için anlamlıdır; `batch.expiryDate` geçmişteyse `true` olmalıdır. Diğer durumlarda yok sayılır.
 
 | Alan | Sınır |
 |---|---|
@@ -93,6 +97,7 @@ Tarihler saat içermez (`yyyy-MM-dd`). Bütün `batch` alanları boşsa `batch` 
 3. "Lot ve SKT zorunlu" üründe `batch.lotNumber` veya `batch.expiryDate` eksikse `StockBatches.LotAndExpiryRequired` (400); hiçbir şey yazılmaz.
 4. `batchId` bu hareket tiplerinde gönderilemez (400): giriş her zaman yeni parti açar. Mevcut partiye ek miktar girişi desteklenmez (her giriş ayrı parti: defter satırı).
 5. Aynı `lotNumber` aynı üründe tekrar girilebilir (ayrı teslimatlar); benzersizlik zorlanmaz.
+6. **Geçmiş SKT onayı:** `batch.expiryDate` bugünden (İstanbul günü) önceyse ve `acknowledgeExpired` `true` değilse `StockBatches.ExpiredAcknowledgementRequired` (400, "Bu partinin son kullanma tarihi geçmiş. Devam etmek için onaylayın."); hiçbir şey yazılmaz. `acknowledgeExpired: true` ile giriş normal kabul edilir; parti `isExpired: true` ve bakiyesi `expiredQuantity`'ye yazılır. Onay kuralı tekrar isteklerde (`requestId`) ilk kayda dokunmaz.
 
 **`Out`:**
 
@@ -129,6 +134,7 @@ Giriş geri alınınca parti kalanı 0 olur ama parti kaydı kalır (silinmez). 
 1. `batchId` verilirse o parti kullanılır; yoksa FEFO ile **süresi geçmemiş** ilk yeterli parti seçilir; yoksa yeterli partisiz bakiye; hiçbiri yetmezse `Administrations.InsufficientStock` (400).
 2. Seçilen parti süresi geçmişse `Administrations.BatchExpired` (400); kayıt ve stok değişmez. (Varsayılan FEFO süresi geçmiş partiyi hiç seçmez; yalnız açıkça seçilen parti bu hatayı verir. Yalnız süresi geçmiş partilerde yeterli stok varsa varsayılan seçim `Administrations.BatchExpired` döner.)
 3. Parti kiracıya/klinik/ürüne ait değilse `StockBatches.NotFound` (404).
+   **Yetersiz bakiye mesajı (M3-6):** bakiye süresi geçmiş miktar hariç yetmiyorsa `Administrations.InsufficientStock` mesajı `Yetersiz bakiye: kullanılabilir X, süresi geçmiş Y (hariç)` biçimindedir (X = `availableQuantity`, Y = `expiredQuantity`; sayılar ondalık ayraçlı, ör. `2.5`). Kullanılabilir toplam yeterli ama hiçbir parti tek başına karşılamıyorsa mesaj bunu söyler ve miktarın bölünüp ayrı kayıt girilmesini önerir. Kod değişmez.
 4. Düşüm mevcut `Out` hareketi üzerinden yapılır; seçilen parti hareketin ve uygulamanın `batchId` alanında kalır. İptalde (`StockReturned`) ters hareket aynı partiye iade eder; `WrittenOff` partiye dokunmaz (parti kalanı düşmüş kalır).
 5. Aynı `requestId` ile tekrarda ilk kayıt döner; farklı `batchId` istenmişse `Administrations.DuplicateRequestId` (409).
 
@@ -141,6 +147,8 @@ Giriş geri alınınca parti kalanı 0 olur ama parti kaydı kalır (silinmez). 
 | `expiryDate` | date? | Partinin SKT'si |
 
 Liste/detay/oluşturma yanıtında bulunur. İptal edilmiş uygulamada da düşülen parti görünür.
+
+Oluşturma yanıtındaki `stock` (düşümden sonraki kalan bildirimi) alanları: `quantityOnHand` (toplam, geriye uyumlu), **yeni** `availableQuantity` ve `expiredQuantity`, `minimumStockLevel`, `isBelowMinimum` (artık `availableQuantity < minimumStockLevel`). "Kalan stok" bildirimi için `availableQuantity` kullanılmalıdır.
 
 ---
 
@@ -180,13 +188,19 @@ Sayfalı. Süzgeçler: `clinicId`, `productId`, `lotNumber` (içerir), `availabl
   "clinicId": "guid",
   "unit": "şişe",
   "quantityOnHand": 14,
+  "availableQuantity": 11,
+  "expiredQuantity": 3,
   "batchedQuantity": 12,
   "unbatchedQuantity": 2,
   "batches": [ "StockBatchDto", "... FEFO sıralı, remainingQuantity > 0" ]
 }
 ```
 
-`unbatchedQuantity` partisiz bakiyedir. Ürün yoksa `Products.NotFound` (404). `quantityOnHand` stok satırı yoksa 0'dır.
+`quantityOnHand` toplamdır (geçmiş dahil); `availableQuantity = quantityOnHand − expiredQuantity`; `expiredQuantity` SKT'si geçmiş partilerin kalanıdır. `unbatchedQuantity` partisiz bakiyedir.
+
+### Stok durumu (`GET /product-stocks`, `GET /products/{id}/stocks`, `PUT /product-stocks/{id}/minimum`) — `ProductStockDto`
+
+Mevcut alanlar aynen kalır (`quantityOnHand` toplam). **Yeni:** `availableQuantity`, `expiredQuantity`. `isBelowMinimum` ve `isBelowMinimum=` süzgeci artık `availableQuantity < minimumStockLevel` demektir (düşük stok yalnız kullanılabilir miktara bakar). Ürün yoksa `Products.NotFound` (404). `quantityOnHand` stok satırı yoksa 0'dır.
 
 ---
 
@@ -194,7 +208,7 @@ Sayfalı. Süzgeçler: `clinicId`, `productId`, `lotNumber` (içerir), `availabl
 
 | Kod | HTTP |
 |---|---|
-| `StockBatches.LotAndExpiryRequired`, `StockBatches.Validation` (depo çıkış tarihi geliş tarihinden sonra), `StockMovements.BatchRequired`, `Administrations.BatchExpired`, `StockBatches.ClinicScopeRequired`, `StockBatches.ClinicContextMismatch` | 400 |
+| `StockBatches.ExpiredAcknowledgementRequired` (geçmiş SKT'li giriş, `acknowledgeExpired` yok), `StockBatches.LotAndExpiryRequired`, `StockBatches.Validation` (depo çıkış tarihi geliş tarihinden sonra), `StockMovements.BatchRequired`, `Administrations.BatchExpired`, `StockBatches.ClinicScopeRequired`, `StockBatches.ClinicContextMismatch` | 400 |
 | `StockMovements.InsufficientStock`, `Administrations.InsufficientStock` (yetersiz parti bakiyesi dahil) | 400 |
 | `StockBatches.NotFound` | 404 |
 | `StockMovements.ConcurrencyConflict`, `Administrations.DuplicateRequestId` | 409 |
@@ -202,7 +216,7 @@ Sayfalı. Süzgeçler: `clinicId`, `productId`, `lotNumber` (içerir), `availabl
 
 Alan sınırı aşımı, `batchId` giriş hareketinde, `batch` çıkış/sayımda gibi biçim hataları standart doğrulama yanıtıyla 400 döner (`ValidationBehavior`).
 
-Mevcut kodlar değişmedi.
+Mevcut kodlar değişmedi; yalnız yukarıdaki `StockBatches.ExpiredAcknowledgementRequired` eklendi ve `InsufficientStock` mesajı yönlendirici oldu.
 
 ---
 
@@ -213,7 +227,7 @@ Mevcut kodlar değişmedi.
 - Yazma sırası: önce hareket (mevcut partinin ve stok satırının güncellemesiyle aynı `SaveChanges`; `requestId`/kaynak benzersizliği hiçbir şey yazılmadan eler), sonra yeni stok satırı, **en son yeni parti** ve hareketin `batchId` bağı. Yeni parti hareketten önce yazılırsa, `requestId` yarışını kaybeden istek (tekrar olarak 200 dönse de) sahipsiz bir parti bırakır; bu bir entegrasyon testiyle yakalanıp bu sıraya çevrildi.
 - Uygulama komutu partiyi önce seçer, uygulamayı yazar, sonra seçilen `batchId` ile mevcut `CreateStockMovementCommand`'ı çağırır; stok kuralları (yetersiz bakiye, eşzamanlılık) tek yerde (stok handler'ı) yaşar.
 - Defter türetimi (sonraki dilim) bu veriden yapılır: Aşı/İlaç giriş defteri = `In`/`Initial` hareketleri + parti; narkotik/psikotropik stok ve sarf defteri = parti hareketleri (`In`/`Out`/`Reversal`/`Adjustment`) + `batchBalanceAfter` + belge no (`invoiceNumber`, uygulamada `referenceId`); Aşı Bilgi raporu = uygulama + `lotNumber`/`expiryDate`. Partisiz eski bakiye devir satırı olarak türetilir.
-- Açık / ertelenen: bölünmüş düşüm (iki partiden tek uygulama), açıkça "partisiz bakiyeyi seç" seçeneği, partiyi iade/devir (tedarikçiye iade) hareketi, geçmiş SKT girişini engelleme, aşı uygulamasının (`Vaccination`) partiye bağlanması (D6: aşı kaydı hâlâ stok düşmez), sınıfı değişen ürünün mevcut partileri için uyarı.
+- Açık / ertelenen: bölünmüş düşüm (iki partiden tek uygulama), açıkça "partisiz bakiyeyi seç" seçeneği, partiyi iade/devir (tedarikçiye iade) hareketi, aşı uygulamasının (`Vaccination`) partiye bağlanması (D6: aşı kaydı hâlâ stok düşmez), sınıfı değişen ürünün mevcut partileri için uyarı.
 
 ---
 
@@ -232,3 +246,16 @@ Hepsi geriye uyumludur: mevcut istemci hiçbir değişiklik yapmadan çalışır
 | Yeni liste ekranı | `GET /stock-batches` (SKT yaklaşan / süresi geçmiş: `expiresBeforeDate`, `expired`) |
 
 Yeni izin yoktur; `DbMigrator seed` gerekmez.
+
+### Süresi geçmiş parti kararı (ADR-015 karar 6) — frontend için değişenler
+
+Geriye uyumludur; yalnız aşağıdaki tek davranış eski istemciyi etkiler: geçmiş SKT'li giriş artık onaysız 400 döner.
+
+| Ekran | Değişiklik |
+|---|---|
+| Stok girişi formu | SKT geçmişteyse uyarı göster ve onay kutusu/ikinci adım iste; onaylanırsa isteğe `acknowledgeExpired: true` ekle. Onaysız istek `StockBatches.ExpiredAcknowledgementRequired` (400, "Bu partinin son kullanma tarihi geçmiş. Devam etmek için onaylayın.") döner; bu kodu yakalayıp onay iletişim kutusunu aç |
+| Stok durumu listesi / ürün detayı stok kartı | "Eldeki stok" toplamı yerine **"Kullanılabilir"** (`availableQuantity`) ve **"Süresi geçmiş"** (`expiredQuantity`) ayrı göster. `quantityOnHand` hâlâ toplamdır |
+| Ürün detayı "Partiler" (`/products/{id}/stock-batches`) | Üstte `availableQuantity` / `expiredQuantity`; satırlar için `isExpired` zaten var |
+| Uygulama sonrası "kalan stok" bildirimi | `stock.quantityOnHand` yerine `stock.availableQuantity` kullan; `stock.isBelowMinimum` artık kullanılabilire göre |
+| Düşük stok rozeti / süzgeci | `isBelowMinimum` alanını olduğu gibi kullan (backend kullanılabilire göre hesaplar); istemcide `quantityOnHand < minimumStockLevel` yeniden hesaplanmamalı |
+| Yetersiz bakiye hatası | `Administrations.InsufficientStock` mesajını (`Yetersiz bakiye: kullanılabilir X, süresi geçmiş Y (hariç)`) olduğu gibi göster; eski sabit "miktarı azaltıp ayrı kayıt girin" metnini kaldır |

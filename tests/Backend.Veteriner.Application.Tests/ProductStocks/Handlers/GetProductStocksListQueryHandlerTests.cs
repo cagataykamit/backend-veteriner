@@ -27,7 +27,8 @@ public sealed class GetProductStocksListQueryHandlerTests
             _clinicContext.Object,
             _scopeResolver.Object,
             _productStocks.Object,
-            _clinics.Object);
+            _clinics.Object,
+            StockBatchMocks.ExpiredReader());
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -141,7 +142,8 @@ public sealed class GetProductStocksListQueryHandlerTests
             _clinicContext.Object,
             resolver.Object,
             _productStocks.Object,
-            _clinics.Object);
+            _clinics.Object,
+            StockBatchMocks.ExpiredReader());
 
         var page = new PageRequest { Page = 1, PageSize = 20 };
         var result = await handler.Handle(new GetProductStocksListQuery(page), CancellationToken.None);
@@ -189,6 +191,46 @@ public sealed class GetProductStocksListQueryHandlerTests
         dto.IsBelowMinimum.Should().BeTrue();
         dto.QuantityOnHand.Should().Be(2);
         dto.MinimumStockLevel.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Separate_Available_And_Expired_And_Use_Available_For_IsBelowMinimum()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var product = new Product(tid, "VAC", "Adet", 10m, "TRY");
+        AttachProductReflection(product);
+        // Toplam 8 >= eşik 6, ama 3'ü süresi geçmiş: kullanılabilir 5 < 6.
+        var stock = new ProductStock(tid, clinicId, product.Id, quantityOnHand: 8m, minimumStockLevel: 6m);
+        AttachStockProductReflection(stock, product);
+        var expired = StockBatchMocks.Batch(tid, clinicId, product, 3m, "ESKI", new DateOnly(2026, 1, 1));
+        var valid = StockBatchMocks.Batch(tid, clinicId, product, 5m, "YENI", new DateOnly(2027, 1, 1));
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
+        _productStocks.Setup(r => r.CountAsync(It.IsAny<ProductStocksFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _productStocks.Setup(r => r.ListAsync(It.IsAny<ProductStocksFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ProductStock> { stock });
+        _clinics.Setup(r => r.ListAsync(It.IsAny<ISpecification<Clinic>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic> { CreateClinicReflection(clinicId, tid, "Merkez Subesi") });
+
+        var handler = new GetProductStocksListQueryHandler(
+            _tenantContext.Object,
+            _clinicContext.Object,
+            _scopeResolver.Object,
+            _productStocks.Object,
+            _clinics.Object,
+            StockBatchMocks.ExpiredReader(expired, valid));
+
+        var result = await handler.Handle(
+            new GetProductStocksListQuery(new PageRequest { Page = 1, PageSize = 20 }), CancellationToken.None);
+
+        var dto = result.Value!.Items.Should().ContainSingle().Subject;
+        dto.QuantityOnHand.Should().Be(8m);
+        dto.ExpiredQuantity.Should().Be(3m);
+        dto.AvailableQuantity.Should().Be(5m);
+        dto.IsBelowMinimum.Should().BeTrue();
     }
 
     private static void AttachProductReflection(Product product)

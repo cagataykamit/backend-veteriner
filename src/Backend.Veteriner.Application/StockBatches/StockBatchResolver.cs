@@ -1,3 +1,4 @@
+using System.Globalization;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Domain.Products;
@@ -61,8 +62,26 @@ public sealed class StockBatchResolver
         if (notExpiredOn is not null && StockBatch.PickFirstSufficient(candidates, quantity, notExpiredOn: null) is not null)
             return Result<StockBatch?>.Failure(ExpiredCode, "Yeterli stok yalnız son kullanma tarihi geçmiş partilerde.");
 
+        // Süresi geçmiş partiler dışlanıyorsa (uygulama) kullanıcıya kullanılabilir ve hariç tutulan miktarı söyle.
+        if (notExpiredOn is { } excludeDay)
+        {
+            var expired = candidates.Where(b => b.IsExpiredOn(excludeDay)).Sum(b => b.RemainingQuantity);
+            var available = ExpiredStockReader.Available(quantityOnHand, expired);
+            return Result<StockBatch?>.Failure(
+                InsufficientStockCode,
+                available < quantity
+                    ? ShortfallMessage(available, expired)
+                    : "Kullanılabilir bakiye yeterli ancak hiçbir parti bu miktarı tek başına karşılamıyor; miktarı bölüp ayrı kayıt girin.");
+        }
+
         return Result<StockBatch?>.Failure(InsufficientStockCode, "Yeterli parti bakiyesi yok.");
     }
+
+    /// <summary>Yetersiz bakiye mesajı: kullanılabilir ve süresi geçmiş (hariç) miktar (M3-6).</summary>
+    private static string ShortfallMessage(decimal available, decimal expired)
+        => $"Yetersiz bakiye: kullanılabilir {Format(available)}, süresi geçmiş {Format(expired)} (hariç)";
+
+    private static string Format(decimal value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 
     /// <summary>Partisiz (eski/devir) bakiye: stok satırındaki toplamdan parti kalanlarının çıkarılmış hâli.</summary>
     public async Task<decimal> GetUnbatchedQuantityAsync(

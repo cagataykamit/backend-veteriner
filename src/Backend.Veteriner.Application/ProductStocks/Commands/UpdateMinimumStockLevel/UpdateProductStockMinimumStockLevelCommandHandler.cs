@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.ProductStocks.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductStocks.Specs;
+using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
@@ -19,19 +20,22 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<ProductStock> _productStocksWrite;
+    private readonly ExpiredStockReader _expiredStock;
 
     public UpdateProductStockMinimumStockLevelCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Clinic> clinicsRead,
-        IRepository<ProductStock> productStocksWrite)
+        IRepository<ProductStock> productStocksWrite,
+        ExpiredStockReader expiredStock)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _clinicsRead = clinicsRead;
         _productStocksWrite = productStocksWrite;
+        _expiredStock = expiredStock;
     }
 
     public async Task<Result<ProductStockDto>> Handle(
@@ -89,13 +93,15 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandler
                 "Stok satırı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
         }
 
-        return Result<ProductStockDto>.Success(MapDto(stock, clinic.Name));
+        var expired = await _expiredStock.GetAsync(tenantId, stock.ClinicId, stock.ProductId, ct);
+        return Result<ProductStockDto>.Success(MapDto(stock, clinic.Name, expired));
     }
 
-    private static ProductStockDto MapDto(ProductStock stock, string clinicName)
+    private static ProductStockDto MapDto(ProductStock stock, string clinicName, decimal expired)
     {
         var product = stock.Product!;
         var categoryName = product.Category?.Name;
+        var available = ExpiredStockReader.Available(stock.QuantityOnHand, expired);
 
         return new ProductStockDto(
             stock.Id,
@@ -108,7 +114,9 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandler
             clinicName,
             stock.QuantityOnHand,
             stock.MinimumStockLevel,
-            stock.QuantityOnHand < stock.MinimumStockLevel,
-            stock.UpdatedAtUtc);
+            available < stock.MinimumStockLevel,
+            stock.UpdatedAtUtc,
+            available,
+            expired);
     }
 }

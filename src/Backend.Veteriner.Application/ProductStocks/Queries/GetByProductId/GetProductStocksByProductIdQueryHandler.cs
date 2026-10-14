@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Application.ProductStocks.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductStocks.Specs;
 using Backend.Veteriner.Application.Products.Specs;
+using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
@@ -22,6 +23,7 @@ public sealed class GetProductStocksByProductIdQueryHandler
     private readonly IReadRepository<ProductCategory> _categories;
     private readonly IReadRepository<ProductStock> _productStocks;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly ExpiredStockReader _expiredStock;
 
     public GetProductStocksByProductIdQueryHandler(
         ITenantContext tenantContext,
@@ -30,7 +32,8 @@ public sealed class GetProductStocksByProductIdQueryHandler
         IReadRepository<Product> products,
         IReadRepository<ProductCategory> categories,
         IReadRepository<ProductStock> productStocks,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        ExpiredStockReader expiredStock)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -39,6 +42,7 @@ public sealed class GetProductStocksByProductIdQueryHandler
         _categories = categories;
         _productStocks = productStocks;
         _clinics = clinics;
+        _expiredStock = expiredStock;
     }
 
     public async Task<Result<IReadOnlyList<ProductStockDto>>> Handle(
@@ -98,11 +102,14 @@ public sealed class GetProductStocksByProductIdQueryHandler
             ? []
             : await _clinics.ListAsync(new ClinicsByTenantAndIdsSpec(tenantId, clinicIds), ct);
         var clinicNameById = clinics.ToDictionary(c => c.Id, c => c.Name);
+        var expiredByStock = await _expiredStock.GetAsync(tenantId, clinicIds, [request.ProductId], ct);
 
         var items = rows.Select(s =>
         {
             clinicNameById.TryGetValue(s.ClinicId, out var clinicName);
             clinicName ??= string.Empty;
+            var expired = expiredByStock.GetValueOrDefault((s.ClinicId, s.ProductId));
+            var available = ExpiredStockReader.Available(s.QuantityOnHand, expired);
 
             return new ProductStockDto(
                 s.Id,
@@ -115,8 +122,10 @@ public sealed class GetProductStocksByProductIdQueryHandler
                 clinicName,
                 s.QuantityOnHand,
                 s.MinimumStockLevel,
-                s.QuantityOnHand < s.MinimumStockLevel,
-                s.UpdatedAtUtc);
+                available < s.MinimumStockLevel,
+                s.UpdatedAtUtc,
+                available,
+                expired);
         }).ToList();
 
         return Result<IReadOnlyList<ProductStockDto>>.Success(items);
