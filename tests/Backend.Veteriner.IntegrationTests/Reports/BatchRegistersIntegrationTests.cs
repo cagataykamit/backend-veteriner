@@ -15,10 +15,12 @@ using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
+using Backend.Veteriner.Domain.Visits;
 using Backend.Veteriner.Infrastructure.Persistence;
 using ClosedXML.Excel;
 using FluentAssertions;
@@ -245,7 +247,8 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         var a1 = await env.SeedAdministrationAsync(pet, vaccine, entry.BatchId, 1m, DayStartUtc.AddHours(9), AdministrationFlags.None);
         var a2 = await env.SeedAdministrationAsync(pet, vaccine, null, 2m, DayStartUtc.AddHours(10), AdministrationFlags.Late);
         var a3 = await env.SeedAdministrationAsync(pet, vaccine, entry.BatchId, 1m, DayStartUtc.AddHours(11), AdministrationFlags.Voided);
-        var a4 = await env.SeedAdministrationAsync(pet, priced, null, 3m, DayStartUtc.AddHours(12), AdministrationFlags.None, createdBy: otherVet);
+        var a4 = await env.SeedAdministrationAsync(pet, priced, null, 3m, DayStartUtc.AddHours(12), AdministrationFlags.None, responsibleVeterinarian: otherVet);
+        var a5 = await env.SeedAdministrationAsync(pet, priced, null, 1m, DayStartUtc.AddHours(13), AdministrationFlags.None, createdBy: otherVet);
         await env.SeedAdministrationAsync(pet, medicine, null, 1m, DayStartUtc.AddHours(9), AdministrationFlags.None);
 
         var shown = await env.GetAsync<VaccineInfoRegisterItemDto>(VaccineInfo);
@@ -253,8 +256,8 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         var byProduct = await env.GetAsync<VaccineInfoRegisterItemDto>(VaccineInfo, $"&productId={vaccine}");
         var byVet = await env.GetAsync<VaccineInfoRegisterItemDto>(VaccineInfo, $"&veterinarianId={otherVet}");
 
-        shown.Items.Select(i => i.AdministrationId).Should().Equal(a1, a2, a4);
-        withVoided.Items.Select(i => i.AdministrationId).Should().Equal(a1, a2, a3, a4);
+        shown.Items.Select(i => i.AdministrationId).Should().Equal(a1, a2, a4, a5);
+        withVoided.Items.Select(i => i.AdministrationId).Should().Equal(a1, a2, a3, a4, a5);
         withVoided.Items[2].IsVoided.Should().BeTrue();
         byProduct.Items.Select(i => i.AdministrationId).Should().Equal(a1, a2);
         byVet.Items.Select(i => i.AdministrationId).Should().Equal(a4);
@@ -784,13 +787,25 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             DateTime administeredAtUtc,
             AdministrationFlags flags,
             Guid? createdBy = null,
-            Guid? clinicId = null)
+            Guid? clinicId = null,
+            Guid? responsibleVeterinarian = null)
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Guid? examinationId = null;
+            if (responsibleVeterinarian is { } vetId)
+            {
+                var visit = new Visit(TenantId, clinicId ?? ClinicId, petId, null, vetId, UserId, administeredAtUtc);
+                var examination = new Examination(
+                    TenantId, clinicId ?? ClinicId, petId, null, administeredAtUtc, "Muayene", null, null, null, visitId: visit.Id);
+                db.Visits.Add(visit);
+                db.Examinations.Add(examination);
+                examinationId = examination.Id;
+            }
+
             var late = flags.HasFlag(AdministrationFlags.Late);
             var administration = Administration.Create(
-                    TenantId, clinicId ?? ClinicId, petId, null, null, productId, quantity, administeredAtUtc, null,
+                    TenantId, clinicId ?? ClinicId, petId, examinationId, null, productId, quantity, administeredAtUtc, null,
                     late, late ? "Sonradan eklenen kayit" : null, createdBy ?? UserId, DateTime.UtcNow, null)
                 .Value!;
             if (batchId is { } id)
