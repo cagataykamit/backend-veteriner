@@ -959,6 +959,16 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int>("PreferredContactChannel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<bool>("RemindersOptedOut")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1901,6 +1911,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ColorId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateOnly?>("DeceasedOn")
+                        .HasColumnType("date");
+
                     b.Property<int?>("Gender")
                         .HasColumnType("int");
 
@@ -1926,12 +1939,23 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("SpecialProtocolNumber")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<Guid>("SpeciesId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
@@ -1950,6 +1974,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "ClientId");
+
+                    b.HasIndex("TenantId", "Status");
 
                     b.ToTable("Pets", (string)null);
                 });
