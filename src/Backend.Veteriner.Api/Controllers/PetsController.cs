@@ -10,6 +10,7 @@ using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Queries.GetById;
 using Backend.Veteriner.Application.Pets.Queries.GetHistorySummary;
 using Backend.Veteriner.Application.Pets.Queries.GetList;
+using Backend.Veteriner.Application.Pets.Queries.GetOpenItems;
 using Backend.Veteriner.Application.Pets.Queries.GetSummary;
 using Backend.Veteriner.Application.Pets.Queries.GetTimeline;
 using Backend.Veteriner.Domain.Pets;
@@ -140,6 +141,25 @@ public sealed class PetsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var result = await _mediator.Send(new GetPetSummaryQuery(id, clinicId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Hasta kartı "Yapılacaklar": gecikmiş/yaklaşan (30 gün) aşı, sonucu/yorumu bekleyen lab, ücret bekleyen kalem
+    /// (sayı + toplam), sonraki planlı randevu ve açık borç payı. Bölüm durumları özetle aynıdır (Ok / Empty / Forbidden / Unavailable).
+    /// Vefat eden hayvanda aşı bölümü boş döner. Bkz. docs/PET_OPEN_ITEMS_API_CONTRACT.md.
+    /// </summary>
+    [HttpGet("{id:guid}/open-items")]
+    [Authorize(Policy = PermissionCatalog.Pets.Read)]
+    [ProducesResponseType(typeof(PetOpenItemsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetOpenItems([FromRoute] Guid id, [FromQuery] Guid? clinicId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var result = await _mediator.Send(new GetPetOpenItemsQuery(id, clinicId), ct);
         return result.ToActionResult(this);
     }
 
