@@ -151,3 +151,21 @@ Aday sorgusu `Take(BatchSize)` ile alınıyor, günlüğü zaten yazılmış ada
 - 4.1–4.6 önerilerinin etkisi **ölçülmedi**; tam test paketi çalıştırılmadı (yalnız içe aktarma + hatırlatma 156, projeksiyon/outbox/sağlık 290 test; birim testleri çalıştırılmadı).
 - 500 ölçekli ilk koşudaki `progress` 500 hatasının nedeni bulunamadı (bölüm 4.7).
 - Sentetik veri: düzgün rastgele dağılım; gerçek klinik dosyasının biçimi (R3) bilinmiyor.
+
+## 7. Sonradan uygulanan düzeltmeler (dal `perf/ice-aktarma-dogrulama`, 2026-10-15)
+
+Aynı makine, aynı test (`ImportPerformanceTests`, 5.000 müşteri ölçeği), değişiklikten önce ve sonra birer koşu; mutlak değerler bölüm 6'daki sapmaya tabidir.
+
+- **4.1 uygulandı (seçenek a):** `ImportExistingClientsSpec` / `ImportExistingPetsSpec` anahtar türü başına ayrı sorgu (müşteri: telefon / e-posta / ad; hasta: müşteri / çip); `ImportExistingDataLoader` sonuçları kimliğe göre bellekte birleştirir (en çok 6 sorgu, sonuç kümesi birleşik `OR` koşuluyla aynı). Kural, anahtar ve Türkçe/aksan duyarsız ad karşılaştırması değişmedi; iki koşuda doğrulama sayıları, sorun dağılımları ve uygulama sonuçları birebir aynı.
+
+| Aşama | Önce (ms) | Sonra (ms) | Not |
+|---|---|---|---|
+| B doğrula (2. tur) | 21.941 | 1.449 | HTTP okuyucu ömrü 20.785 → 338 ms |
+| B doğrula (1. tur) | 36.641 | 15.037 | kalan süre sonuç yazımı (4.5) |
+| A doğrula (2. tur) | 1.734 | 2.219 | küçük, gürültü aralığında |
+| A commit + arka plan | 168.993 | 115.568 | çip denetimi dahil; koşu sapması da var |
+| B commit + arka plan | 71.974 | 50.928 | |
+
+- **4.3 (indeks) uygulanmadı:** commit'teki K10 çip denetimi artık yalnız çip sorgusunu çalıştırıyor (boş `ClientId IN OPENJSON` kolu kalktı). Önce 2.965 çağrı toplam 17.911 ms (işçinin süre sıralamasında 2.); sonra işçinin en yüksek 8 komutu arasına girmiyor (< 5.645 ms; tam değer raporda yok). Kalan maliyet commit süresinin < %5'i olduğundan `(TenantId, MicrochipNumber)` indeksi ve migration ölçülmüş bir fayda göstermiyor; kiracı hasta sayısı çok büyürse yeniden ölçülmeli.
+- **3.7 geri alma sırası:** kod değişmedi; sözleşmeye (`IMPORT_API_CONTRACT.md` §9) "bağlı partiler ters sırayla geri alınır" notu eklendi.
+- **4.4 tablo sınırı:** değiştirilmedi (öneri raporda).
