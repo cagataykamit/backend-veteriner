@@ -52,7 +52,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-018-ch
 
 ## 2) `GET /api/v1/charge-suggestions`
 
-`Charges.Read` (hekim dahil). Yalnız `Pending` kalemler. Sayfalı (`page` ≥ 1, `pageSize` 1–200; varsayılan 1/20) `PagedResult<ChargeSuggestionDto>`. Klinik kapsamı zorunlu: `clinicId` veya aktif klinik bağlamı (`ChargeSuggestions.ClinicScopeRequired` 400; uyuşmazlık `ChargeSuggestions.ClinicContextMismatch` 400; atanmamış klinik `Clinics.AccessDenied` 403). Süzgeçler: `petId`, `examinationId`, `visitId`. Sıralama: `occurredAtUtc` azalan.
+`Charges.Read` (hekim dahil). Yalnız `Pending` kalemler. Sayfalı (`page` ≥ 1, `pageSize` 1–200; varsayılan 1/20) `PagedResult<ChargeSuggestionDto>`. Klinik kapsamı zorunlu: `clinicId` veya aktif klinik bağlamı (`ChargeSuggestions.ClinicScopeRequired` 400; uyuşmazlık `ChargeSuggestions.ClinicContextMismatch` 400; atanmamış klinik `Clinics.AccessDenied` 403). Süzgeçler: `petId`, `examinationId`, `visitId`, `clientId` (müşterinin güncel hayvanlarının kalemleri; ADR-020 S5, bkz. `PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md` §3). Sıralama: `occurredAtUtc` azalan.
 
 ## 3) `POST /api/v1/charge-suggestions/{id}/convert`
 
