@@ -105,7 +105,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         if (request.BirthDate.HasValue && request.BirthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))
             return Result.Failure("Pets.BirthDateInFuture", "Dogum tarihi gelecekte olamaz.");
 
-        var nameKey = request.Name.Trim().ToLowerInvariant();
+        var nameKey = Pet.NormalizeNameForDuplicateCheck(request.Name);
         var duplicate = await _petsRead.FirstOrDefaultAsync(
             new PetByClientNameAndSpeciesIdExcludingIdSpec(request.ClientId, nameKey, request.SpeciesId, request.Id), ct);
         if (duplicate is not null)

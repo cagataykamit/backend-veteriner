@@ -12,6 +12,13 @@ public sealed class Pet : AggregateRoot
 {
     public const int MaxAlertNoteLength = 200;
 
+    /// <summary>
+    /// Aynı müşteri + ad + tür mükerreri için karşılaştırma anahtarı (yalnız karşılaştırma; saklanan <see cref="Name"/> değişmez).
+    /// Müşteri adıyla aynı tek kural: <see cref="Clients.Client.NormalizeFullNameForDuplicateCheck"/>.
+    /// </summary>
+    public static string NormalizeNameForDuplicateCheck(string name)
+        => Clients.Client.NormalizeFullNameForDuplicateCheck(name);
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClientId { get; private set; }

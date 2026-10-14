@@ -859,7 +859,7 @@ Controller `TryGetResolvedTenant` ile tenant çözülmezse işlem başlamaz (di�
 | `Pets.BreedNotFound` / `Pets.BreedSpeciesMismatch` | `400` | Irk yok/pasif veya tür ile uyumsuz |
 | `Pets.ColorNotFound` | `400` | Renk yok veya pasif |
 | `Pets.BirthDateInFuture` | `400` | Doğum tarihi gelecekte |
-| **`Pets.DuplicatePet`** | **`409`** | Aynı müşteri + aynı isim (normalize) + aynı `SpeciesId` (create/update; update’te kendi `id` hariç) |
+| **`Pets.DuplicatePet`** | **`409`** | Aynı müşteri + aynı isim (Türkçe duyarlı, aksan duyarsız anahtar; `Pet.NormalizeNameForDuplicateCheck`) + aynı `SpeciesId` (create/update; update’te kendi `id` hariç) |
 | `Pets.NotFound` | `404` | Pet yok veya tenant dışı |
 | **`Pets.Inconsistent`** | **`400`** | Detayda tür navigasyonu yüklenemedi (`Species` null) |
 | `Pets.RouteIdMismatch` | `400` | PUT route ≠ body id |

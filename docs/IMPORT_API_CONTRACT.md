@@ -206,7 +206,7 @@ Eşleme anahtarı katlanmış metindir: küçük harf, Türkçe harf farkı yok 
 
 ### 6.1 Yinelenen kayıt kuralları
 
-Karşılaştırma **mevcut oluşturma kurallarıyla aynı** anahtarlarla yapılır (kural tek yerde): müşteride `Client.NormalizeFullNameForDuplicateCheck` + normalize telefon/e-posta, hayvanda müşteri + küçük harf ad + tür.
+Karşılaştırma **mevcut oluşturma kurallarıyla aynı** anahtarlarla yapılır (kural tek yerde): müşteride `Client.NormalizeFullNameForDuplicateCheck` + normalize telefon/e-posta, hayvanda müşteri + aynı Türkçe duyarlı ad anahtarı (`Pet.NormalizeNameForDuplicateCheck`) + tür.
 
 | Durum | Sonuç |
 |-------|-------|
@@ -289,7 +289,7 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | `Imports.PetRowInvalid` | Error | Hasta satırı hatalı olduğundan aşı aktarılamaz. |
 | `Imports.DuplicateVaccination` | Info | Aynı hasta + aynı aşı tanımı + aynı uygulama günü dosyada önceden var veya kiracıda kayıtlı; eylem `Skip`. |
 
-Bağlantı çözümü: **Hasta→müşteri:** `MusteriNo` doluysa yalnız dosyadaki müşteri satırı aranır (bulunamazsa `OwnerNotFound`, `MusteriNo` kiracıdaki kayıtlara bağlanmaz). `MusteriNo` yoksa/eşlenmemişse `SahipAdSoyad + SahipTelefon`: telefon geçerliyse önce dosyadaki müşteri (ad+telefon), sonra kiracıdaki müşteri (ad+telefon); telefon boş/geçersizse (`PhoneInvalid` uyarısı) dosyadaki müşteri tablosunda **aynı katlanmış adlı tek** müşteri aranır (birden çok ya da yoksa `OwnerNotFound`; kiracı tarafında telefonsuz ad eşleşmesi yapılmaz). Müşteri satırı mevcut müşteriyle eşleştiyse (`Match`/`Skip` modu) hasta o kiracı müşterisine bağlanır. **Aşı→hasta:** `HayvanNo` doluysa dosyadaki hasta satırı; yoksa sahip (yukarıdaki kural) + `HayvanAdi` + `Tur` ile dosyadaki hasta, sonra sahibin kiracıdaki hastaları. Hasta mevcut hastayla eşleştiyse (aynı müşteri + küçük harf ad + tür) aşı o hastaya bağlanır.
+Bağlantı çözümü: **Hasta→müşteri:** `MusteriNo` doluysa yalnız dosyadaki müşteri satırı aranır (bulunamazsa `OwnerNotFound`, `MusteriNo` kiracıdaki kayıtlara bağlanmaz). `MusteriNo` yoksa/eşlenmemişse `SahipAdSoyad + SahipTelefon`: telefon geçerliyse önce dosyadaki müşteri (ad+telefon), sonra kiracıdaki müşteri (ad+telefon); telefon boş/geçersizse (`PhoneInvalid` uyarısı) dosyadaki müşteri tablosunda **aynı katlanmış adlı tek** müşteri aranır (birden çok ya da yoksa `OwnerNotFound`; kiracı tarafında telefonsuz ad eşleşmesi yapılmaz). Müşteri satırı mevcut müşteriyle eşleştiyse (`Match`/`Skip` modu) hasta o kiracı müşterisine bağlanır. **Aşı→hasta:** `HayvanNo` doluysa dosyadaki hasta satırı; yoksa sahip (yukarıdaki kural) + `HayvanAdi` + `Tur` ile dosyadaki hasta, sonra sahibin kiracıdaki hastaları. Hasta mevcut hastayla eşleştiyse (aynı müşteri + Türkçe duyarlı ad anahtarı + tür) aşı o hastaya bağlanır.
 
 Katalog değerleri satır bağlamında `ImportValueResolver` ile çözülür (bölüm 5): tür → ırk (türün ırkları) → renk; aşı → hastanın türü. Sonuç `Empty` zorunlu alanda `RequiredMissing`; `Unmapped` tür/aşı `Error`, ırk/renk `Info` (serbest metin).
 
@@ -297,7 +297,7 @@ Normalize değerler: telefon `905XXXXXXXXX`; e-posta küçük harf; tarih `yyyy-
 
 Toplu sorgular (N+1 yok): doğrulama kiracının mevcut verisini sabit sayıda sorguyla okur — katalog (tür, ırk, renk, aşı tanımı: 4 sorgu), partinin hazırlık satırları (1), dosyadaki tüm telefon/e-posta/ad kümeleriyle **tek** müşteri sorgusu, bulunan müşterilerin ve dosyadaki çiplerin hastaları için **tek** hasta sorgusu, bulunan hastaların uygulanmış aşıları için **tek** aşı sorgusu (kümeler tek JSON parametresiyle gider); satır sonuçları EF toplu yazmasıyla kaydedilir (komut başına ~42 satır, satır başına komut yok). SELECT sayısı satır sayısına bağlı değildir. Ölçüm (yerel LocalDB, doğrulama isteği): 9 satırlı dosya ve 10.200 satırlı dosyada **16 SELECT** (kimlik/abonelik/yetki/parti okumaları dahil), 24.000 satırda da 16; 10.200 satır ≈ 1,3 sn, 243 satır-güncelleme komutu (24.000 satır: 572).
 
-**Ad karşılaştırması (ADR-019 K4):** Türkçe duyarlı ve aksan duyarsızdır; `AYŞE YILMAZ`, `Ayşe Yılmaz` ve `AYSE YILMAZ` aynı kişidir, `I/ı/İ/i` birbirine eşittir, baştaki/sondaki/art arda boşluk yok sayılır. Yalnız karşılaştırma anahtarıdır; kayıtlı ad olduğu gibi kalır. Kural tek yerde (`Client.NormalizeFullNameForDuplicateCheck`) yaşar, içe aktarma onu aynen izler. Hayvan adı mükerreri bu kurala dahil değildir.
+**Ad karşılaştırması (ADR-019 K4):** Türkçe duyarlı ve aksan duyarsızdır; `AYŞE YILMAZ`, `Ayşe Yılmaz` ve `AYSE YILMAZ` aynı kişidir, `I/ı/İ/i` birbirine eşittir, baştaki/sondaki/art arda boşluk yok sayılır. Yalnız karşılaştırma anahtarıdır; kayıtlı ad olduğu gibi kalır. Kural tek yerde (`Client.NormalizeFullNameForDuplicateCheck`) yaşar, içe aktarma onu aynen izler. Hayvan adı mükerreri de aynı kuralı izler (`KARAMEL` = `Karamel`; `Pet.NormalizeNameForDuplicateCheck`, müşteri kuralına yönlenir).
 
 ## 7) Uçlar
 

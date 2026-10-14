@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
+using Backend.Veteriner.Domain.Pets;
 
 namespace Backend.Veteriner.Application.Imports.Validation;
 
@@ -170,9 +171,9 @@ public sealed partial class ImportValidationEngine
         }
     }
 
-    /// <summary>Hayvan mükerrer anahtarı: kırpılmış küçük harf ad (mevcut hayvan kuralı).</summary>
+    /// <summary>Hayvan mükerrer anahtarı: Türkçe duyarlı, aksan duyarsız ad anahtarı (CreatePetCommand ile aynı kural).</summary>
     private static string PetNameKey(string name)
-        => (ImportValueParsers.NormalizeText(name) ?? string.Empty).ToLowerInvariant();
+        => Pet.NormalizeNameForDuplicateCheck(ImportValueParsers.NormalizeText(name) ?? string.Empty);
 
     /// <summary>
     /// Tarih alanını okur; ayrıştırma hatasını sorun listesine ekler. Boş alan <c>(null, false)</c>, hatalı alan

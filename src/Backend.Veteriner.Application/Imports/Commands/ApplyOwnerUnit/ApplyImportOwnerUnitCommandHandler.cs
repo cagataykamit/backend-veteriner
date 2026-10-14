@@ -233,8 +233,8 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     private async Task<Result<Guid>> CreateOrMatchPetAsync(
         UnitState unit, ImportBatchRow row, ImportNormalizedPet data, Guid clientId, CancellationToken ct)
     {
-        // Mevcut hayvan mükerrer kuralı (CreatePetCommand ile aynı anahtar): aynı müşteri + küçük harf ad + tür.
-        var nameKey = data.Name!.Trim().ToLowerInvariant();
+        // Mevcut hayvan mükerrer kuralı (CreatePetCommand ile aynı anahtar): aynı müşteri + Türkçe duyarlı ad anahtarı + tür.
+        var nameKey = Pet.NormalizeNameForDuplicateCheck(data.Name!);
         var existing = await _pets.FirstOrDefaultAsync(new PetByClientNameAndSpeciesIdSpec(clientId, nameKey, data.SpeciesId!.Value), ct);
         if (existing is not null)
         {

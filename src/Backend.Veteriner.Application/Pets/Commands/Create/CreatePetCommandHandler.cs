@@ -116,7 +116,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             && request.BirthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))
             return Result<Guid>.Failure("Pets.BirthDateInFuture", "Doğum tarihi gelecekte olamaz.");
 
-        var nameKey = request.Name.Trim().ToLowerInvariant();
+        var nameKey = Pet.NormalizeNameForDuplicateCheck(request.Name);
         var duplicate = await _petsRead.FirstOrDefaultAsync(
             new PetByClientNameAndSpeciesIdSpec(request.ClientId, nameKey, request.SpeciesId), ct);
         if (duplicate is not null)
