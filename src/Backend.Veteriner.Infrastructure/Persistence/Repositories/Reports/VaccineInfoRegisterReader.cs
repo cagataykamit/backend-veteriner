@@ -30,7 +30,8 @@ public sealed class VaccineInfoRegisterReader : IRegisterReader<VaccineInfoRegis
         if (request.ProductId is { } productId)
             administrations = administrations.Where(a => a.ProductId == productId);
         if (request.VeterinarianUserId is { } veterinarianId)
-            administrations = administrations.Where(a => a.CreatedByUserId == veterinarianId);
+            administrations = administrations.Where(a => _db.Examinations.Any(e => e.Id == a.ExaminationId
+                                                       && _db.Visits.Any(v => v.Id == e.VisitId && v.ResponsibleVeterinarianUserId == veterinarianId)));
 
         if (request.ClinicId.HasValue)
         {
