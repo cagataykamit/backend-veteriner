@@ -66,13 +66,27 @@ public static class ImportBatchStatusSets
         ImportBatchStatus.RollbackFailed,
     ];
 
-    /// <summary>Satır verisi saklama süresi (K9) sonunda temizlenen son durumlar; <c>Discarded</c> silinirken zaten temizlenir.</summary>
+    /// <summary>
+    /// Satır verisi saklama süresi (K9) sonunda temizlenen, işi bitmiş durumlar. <c>Discarded</c> ve <c>Expired</c>
+    /// partinin satırları durum değişirken silinir; geri alınabilir başarısız durumlar da işlem bittiği için sayılır
+    /// (geri alma yalnız satır durumu ve hedef kimliği kullanır, temizlenmiş partide de çalışır).
+    /// </summary>
     public static readonly IReadOnlyList<ImportBatchStatus> PayloadRetained =
     [
         ImportBatchStatus.Committed,
+        ImportBatchStatus.CommitFailed,
         ImportBatchStatus.RolledBack,
         ImportBatchStatus.PartiallyRolledBack,
-        ImportBatchStatus.Expired,
+        ImportBatchStatus.RollbackFailed,
+    ];
+
+    /// <summary>Geri almanın başlatılabildiği durumlar (geçiş tablosu); başarısız geri alma yeniden denenebilir.</summary>
+    public static readonly IReadOnlyList<ImportBatchStatus> RollbackableFrom =
+    [
+        ImportBatchStatus.Committed,
+        ImportBatchStatus.CommitFailed,
+        ImportBatchStatus.PartiallyRolledBack,
+        ImportBatchStatus.RollbackFailed,
     ];
 
     /// <summary>İçerik özetini serbest bırakan durumlar: aynı dosya yeniden yüklenebilir.</summary>

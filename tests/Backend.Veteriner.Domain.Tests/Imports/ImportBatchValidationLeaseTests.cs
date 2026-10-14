@@ -187,13 +187,39 @@ public sealed class ImportBatchValidationLeaseTests
     }
 
     [Fact]
-    public void Expired_Draft_Should_Become_Purgeable_30_Days_After_Expiry()
+    public void Expired_Draft_Should_Be_Purged_At_Expiry_B5()
     {
         var b = Mapped();
         var expiredAt = Now + ImportBatch.DraftLifetime;
         b.Expire(expiredAt).IsSuccess.Should().BeTrue();
 
-        b.PayloadPurgeDueAtUtc.Should().Be(expiredAt + ImportBatch.PayloadRetention);
+        b.PayloadPurgedAtUtc.Should().Be(expiredAt, "satırlar hiçbir uçtan okunamaz; Discard gibi hemen silinir");
+        b.PayloadPurgeDueAtUtc.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(ImportBatchStatus.CommitFailed)]
+    [InlineData(ImportBatchStatus.RollbackFailed)]
+    public void Failed_Terminal_Statuses_Should_Also_Be_Purgeable_After_30_Days_B5(ImportBatchStatus status)
+    {
+        var b = Mapped();
+        b.StartValidation(Now);
+        b.CompleteValidation(Guid.NewGuid(), Counts, Counts, Counts, Now);
+        var validationId = b.ValidationId!.Value;
+        b.StartCommit(validationId, Now);
+        if (status == ImportBatchStatus.CommitFailed)
+        {
+            b.FailCommit(Now);
+        }
+        else
+        {
+            b.CompleteCommit(Counts, Counts, Counts, Now);
+            b.StartRollback("{}", Now);
+            b.FailRollback(Now);
+        }
+
+        b.Status.Should().Be(status);
+        b.PayloadPurgeDueAtUtc.Should().Be(Now + ImportBatch.PayloadRetention);
     }
 
     [Fact]

@@ -74,6 +74,23 @@ public sealed class ImportBatchRow
             IssuesJson = issuesJson;
     }
 
+    /// <summary>
+    /// Geri alma sonucunu yazar (silmeyle aynı transaction'da): <c>RolledBack</c> (hedef kayıt silindi veya zaten yok) ya da
+    /// <c>Kept</c> (bağımlılık nedeniyle bırakıldı). Yalnız partinin oluşturduğu kaydı taşıyan satır (<c>Created</c>) veya önceki
+    /// kısmi geri almada bırakılan satır (<c>Kept</c>, yeniden deneme) için; hedef kimliği değişmez. Eşleşen mevcut kayıt
+    /// satırları (<c>Matched</c>) geri almada hiç değişmez.
+    /// </summary>
+    public void RecordRollbackResult(ImportRowApplyStatus status, string? issuesJson)
+    {
+        if (status is not (ImportRowApplyStatus.RolledBack or ImportRowApplyStatus.Kept))
+            throw new ArgumentOutOfRangeException(nameof(status), "Geri alma sonucu RolledBack/Kept olmalıdır.");
+        if (ApplyStatus is not (ImportRowApplyStatus.Created or ImportRowApplyStatus.Kept))
+            throw new InvalidOperationException($"Satır geri alınamaz ({ApplyStatus}); yalnız oluşturulan kayıt satırı geri alınır.");
+
+        ApplyStatus = status;
+        IssuesJson = issuesJson;
+    }
+
     /// <summary>Saklama süresi sonunda kişisel veriyi boşaltır; satır kimliği, durumları ve hedef kayıt kimliği kalır.</summary>
     public void PurgePayload()
     {

@@ -34,6 +34,9 @@ public sealed class ImportBatch : AggregateRoot
     /// </summary>
     public static readonly TimeSpan CommitLeaseDuration = TimeSpan.FromMinutes(2);
 
+    /// <summary>Geri alma işçisinin kirası; uygulama kirasıyla aynı devralma kuralı.</summary>
+    public static readonly TimeSpan RollbackLeaseDuration = TimeSpan.FromMinutes(2);
+
     /// <summary>Satır verisinin (kişisel veri) saklama süresi; son durum değişikliğinden sayılır (ADR-019 K9).</summary>
     public static readonly TimeSpan PayloadRetention = TimeSpan.FromDays(30);
 
@@ -276,37 +279,28 @@ public sealed class ImportBatch : AggregateRoot
     public bool IsCommitLeaseActive(DateTime nowUtc)
         => Status == ImportBatchStatus.Committing && LeaseUntilUtc > NormalizeUtc(nowUtc);
 
+    /// <summary>Arka plan işi (uygulama veya geri alma) sürerken kira bir işçide mi (süresi dolmamış).</summary>
+    public bool IsJobLeaseActive(DateTime nowUtc)
+        => Status is ImportBatchStatus.Committing or ImportBatchStatus.RollingBack && LeaseUntilUtc > NormalizeUtc(nowUtc);
+
     /// <summary>
     /// Arka plan işçisi <c>Committing</c> partiyi alır: kira boşsa, süresi dolduysa (çökme sonrası devralma) veya zaten
     /// bu işçideyse. Eşzamanlı iki işçiden yalnız biri kaydedebilir (rowversion).
     /// </summary>
     public Result ClaimCommitLease(string owner, DateTime nowUtc)
-    {
-        var ownerCheck = ValidateLeaseOwner(owner);
-        if (!ownerCheck.IsSuccess)
-            return ownerCheck;
-
-        if (Status != ImportBatchStatus.Committing)
-            return InvalidState($"Parti '{Status}' durumunda; uygulama kirası alınamaz.");
-
-        var now = NormalizeUtc(nowUtc);
-        if (IsCommitLeaseActive(now) && LeaseOwner != owner)
-            return Result.Failure("Imports.AnotherJobRunning", "Partinin uygulama kirası başka bir işçide.");
-
-        LeaseOwner = owner;
-        LeaseUntilUtc = now + CommitLeaseDuration;
-        return Result.Success();
-    }
+        => ClaimJobLease(ImportBatchStatus.Committing, CommitLeaseDuration, owner, nowUtc);
 
     /// <summary>Kirayı uzatır; kira başka işçiye geçtiyse (devralındıysa) reddedilir ve eski işçi durmalıdır.</summary>
     public Result RenewCommitLease(string owner, DateTime nowUtc)
-    {
-        if (Status != ImportBatchStatus.Committing || LeaseOwner != owner)
-            return Result.Failure("Imports.LeaseLost", "Partinin uygulama kirası bu işçide değil.");
+        => RenewJobLease(ImportBatchStatus.Committing, CommitLeaseDuration, owner, nowUtc);
 
-        LeaseUntilUtc = NormalizeUtc(nowUtc) + CommitLeaseDuration;
-        return Result.Success();
-    }
+    /// <summary>Geri alma işçisi <c>RollingBack</c> partiyi alır (uygulama kirasıyla aynı kural).</summary>
+    public Result ClaimRollbackLease(string owner, DateTime nowUtc)
+        => ClaimJobLease(ImportBatchStatus.RollingBack, RollbackLeaseDuration, owner, nowUtc);
+
+    /// <summary>Geri alma kirasını uzatır; devralındıysa reddedilir ve eski işçi durmalıdır.</summary>
+    public Result RenewRollbackLease(string owner, DateTime nowUtc)
+        => RenewJobLease(ImportBatchStatus.RollingBack, RollbackLeaseDuration, owner, nowUtc);
 
     public Result CompleteCommit(
         ImportTableCounts customers,
@@ -335,25 +329,48 @@ public sealed class ImportBatch : AggregateRoot
         return moved;
     }
 
-    public Result StartRollback(DateTime nowUtc)
-        => MoveTo(
-            ImportBatchStatus.RollingBack,
-            nowUtc,
-            ImportBatchStatus.Committed, ImportBatchStatus.PartiallyRolledBack,
-            ImportBatchStatus.CommitFailed, ImportBatchStatus.RollbackFailed);
+    /// <summary>Geri alma başlatılabilen durumlar (geçiş tablosu); <see cref="StartRollback"/> ile aynı küme.</summary>
+    public bool CanStartRollback => ImportBatchStatusSets.RollbackableFrom.Contains(Status);
 
-    /// <summary><paramref name="partial"/>: engelli kayıtlar bırakıldı (<c>KeepBlocked</c>).</summary>
+    /// <summary>
+    /// Geri almayı kuyruğa alır (ADR-019 K7). <paramref name="optionsJson"/> partinin seçenek belgesidir; geri alma isteği
+    /// (istek anahtarı, politika) uygulama katmanınca bu belgeye eklenir ve iş boyunca buradan okunur.
+    /// </summary>
+    public Result StartRollback(string optionsJson, DateTime nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(optionsJson))
+            return Result.Failure("Imports.Validation", "Geri alma seçenekleri boş olamaz.");
+
+        var moved = MoveTo(ImportBatchStatus.RollingBack, nowUtc, [.. ImportBatchStatusSets.RollbackableFrom]);
+        if (!moved.IsSuccess)
+            return moved;
+
+        OptionsJson = optionsJson;
+        ReleaseLease();
+        return Result.Success();
+    }
+
+    /// <summary><paramref name="partial"/>: engelli kayıtlar bırakıldı (<c>Kept</c> satır var).</summary>
     public Result CompleteRollback(bool partial, DateTime nowUtc)
     {
         var target = partial ? ImportBatchStatus.PartiallyRolledBack : ImportBatchStatus.RolledBack;
         var moved = MoveTo(target, nowUtc, ImportBatchStatus.RollingBack);
-        if (moved.IsSuccess)
-            RolledBackAtUtc = UpdatedAtUtc;
-        return moved;
+        if (!moved.IsSuccess)
+            return moved;
+
+        RolledBackAtUtc = UpdatedAtUtc;
+        ReleaseLease();
+        return Result.Success();
     }
 
+    /// <summary>Geri alma durdu (engel veya beklenmeyen hata); silinmiş birimler silinmiş kalır, yeniden denenebilir.</summary>
     public Result FailRollback(DateTime nowUtc)
-        => MoveTo(ImportBatchStatus.RollbackFailed, nowUtc, ImportBatchStatus.RollingBack);
+    {
+        var moved = MoveTo(ImportBatchStatus.RollbackFailed, nowUtc, ImportBatchStatus.RollingBack);
+        if (moved.IsSuccess)
+            ReleaseLease();
+        return moved;
+    }
 
     /// <summary>Tek yönlü: içe aktarılan aşılar hatırlatma adayı olur. Durum değişmez.</summary>
     public Result ReleaseReminders(DateTime nowUtc)
@@ -395,14 +412,20 @@ public sealed class ImportBatch : AggregateRoot
         return Result.Success();
     }
 
-    /// <summary>Son hareketten <see cref="DraftLifetime"/> geçmiş taslağın süresi dolar.</summary>
+    /// <summary>
+    /// Son hareketten <see cref="DraftLifetime"/> geçmiş taslağın süresi dolar. Hazırlık satırları (kişisel veri) çağıranca
+    /// aynı işlemde silinir (<see cref="Discard"/> gibi): satırlar hiçbir uçtan okunamayacağından saklanmaz.
+    /// </summary>
     public Result Expire(DateTime nowUtc)
     {
         var now = NormalizeUtc(nowUtc);
         if (ImportBatchStatusSets.IdleDraft.Contains(Status) && now - (UpdatedAtUtc ?? CreatedAtUtc) < DraftLifetime)
             return InvalidState($"Taslak son hareketten {DraftLifetime.TotalDays:0} gün geçmeden süresi dolmuş sayılamaz.");
 
-        return MoveTo(ImportBatchStatus.Expired, now, [.. ImportBatchStatusSets.IdleDraft]);
+        var moved = MoveTo(ImportBatchStatus.Expired, now, [.. ImportBatchStatusSets.IdleDraft]);
+        if (moved.IsSuccess)
+            PayloadPurgedAtUtc = UpdatedAtUtc;
+        return moved;
     }
 
     private Result MoveTo(ImportBatchStatus target, DateTime nowUtc, params ImportBatchStatus[] allowedFrom)
@@ -412,6 +435,33 @@ public sealed class ImportBatch : AggregateRoot
 
         Status = target;
         UpdatedAtUtc = NormalizeUtc(nowUtc);
+        return Result.Success();
+    }
+
+    private Result ClaimJobLease(ImportBatchStatus jobStatus, TimeSpan duration, string owner, DateTime nowUtc)
+    {
+        var ownerCheck = ValidateLeaseOwner(owner);
+        if (!ownerCheck.IsSuccess)
+            return ownerCheck;
+
+        if (Status != jobStatus)
+            return InvalidState($"Parti '{Status}' durumunda; '{jobStatus}' işinin kirası alınamaz.");
+
+        var now = NormalizeUtc(nowUtc);
+        if (LeaseUntilUtc > now && LeaseOwner != owner)
+            return Result.Failure("Imports.AnotherJobRunning", "Partinin iş kirası başka bir işçide.");
+
+        LeaseOwner = owner;
+        LeaseUntilUtc = now + duration;
+        return Result.Success();
+    }
+
+    private Result RenewJobLease(ImportBatchStatus jobStatus, TimeSpan duration, string owner, DateTime nowUtc)
+    {
+        if (Status != jobStatus || LeaseOwner != owner)
+            return Result.Failure("Imports.LeaseLost", "Partinin iş kirası bu işçide değil.");
+
+        LeaseUntilUtc = NormalizeUtc(nowUtc) + duration;
         return Result.Success();
     }
 

@@ -13,6 +13,7 @@ public sealed class ImportBatchTests
     private static readonly DateTime Now = new(2026, 10, 14, 9, 0, 0, DateTimeKind.Utc);
     private static readonly string Hash = new('a', ImportBatch.ContentHashLength);
     private static readonly ImportTableCounts Counts = new() { Total = 3, Valid = 2, Error = 1, WillCreate = 2 };
+    private const string RollbackOptions = "{\"onDuplicateClient\":\"Match\",\"rollback\":{\"requestId\":\"7d0b7c3e-0000-4000-8000-000000000001\",\"policy\":\"Fail\"}}";
 
     private static ImportBatch NewBatch(string? name = "Eski sistem", Guid? clinicId = null)
         => ImportBatch.Create(TenantId, clinicId, Guid.NewGuid(), name, UserId, Now).Value!;
@@ -59,7 +60,7 @@ public sealed class ImportBatchTests
                 Ok(b.CompleteCommit(Counts, Counts, Counts, Now));
                 if (status == ImportBatchStatus.Committed)
                     break;
-                Ok(b.StartRollback(Now));
+                Ok(b.StartRollback(RollbackOptions, Now));
                 if (status == ImportBatchStatus.RollingBack)
                     break;
                 if (status == ImportBatchStatus.RollbackFailed)
@@ -102,7 +103,7 @@ public sealed class ImportBatchTests
             "StartCommit" => b.StartCommit(ValidationId, later),
             "CompleteCommit" => b.CompleteCommit(Counts, Counts, Counts, later),
             "FailCommit" => b.FailCommit(later),
-            "StartRollback" => b.StartRollback(later),
+            "StartRollback" => b.StartRollback(RollbackOptions, later),
             "CompleteRollback" => b.CompleteRollback(partial: false, later),
             "CompletePartialRollback" => b.CompleteRollback(partial: true, later),
             "FailRollback" => b.FailRollback(later),
@@ -325,6 +326,94 @@ public sealed class ImportBatchTests
         b.RolledBackAtUtc.Should().Be(Now.AddHours(1));
     }
 
+    [Fact]
+    public void StartRollback_Should_Store_Options_And_Reject_Empty_Options()
+    {
+        var b = BatchIn(ImportBatchStatus.Committed);
+        b.CanStartRollback.Should().BeTrue();
+
+        b.StartRollback(" ", Now).Error.Code.Should().Be("Imports.Validation");
+        b.Status.Should().Be(ImportBatchStatus.Committed);
+
+        b.StartRollback(RollbackOptions, Now.AddHours(1)).IsSuccess.Should().BeTrue();
+        b.OptionsJson.Should().Be(RollbackOptions);
+        b.CanStartRollback.Should().BeFalse();
+        b.LeaseOwner.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(ImportBatchStatus.Committed, true)]
+    [InlineData(ImportBatchStatus.CommitFailed, true)]
+    [InlineData(ImportBatchStatus.PartiallyRolledBack, true)]
+    [InlineData(ImportBatchStatus.RollbackFailed, true)]
+    [InlineData(ImportBatchStatus.RollingBack, false)]
+    [InlineData(ImportBatchStatus.RolledBack, false)]
+    [InlineData(ImportBatchStatus.Validated, false)]
+    public void CanStartRollback_Should_Match_Transition_Table(ImportBatchStatus status, bool expected)
+        => BatchIn(status).CanStartRollback.Should().Be(expected);
+
+    [Fact]
+    public void Rollback_Lease_Should_Be_Claimed_Renewed_Taken_Over_And_Released()
+    {
+        var b = BatchIn(ImportBatchStatus.RollingBack);
+
+        b.ClaimCommitLease("w1", Now).Error.Code.Should().Be("Imports.InvalidState", "uygulama kirası geri almada alınmaz");
+        b.ClaimRollbackLease("w1", Now).IsSuccess.Should().BeTrue();
+        b.IsJobLeaseActive(Now.AddSeconds(30)).Should().BeTrue();
+        b.ClaimRollbackLease("w2", Now.AddSeconds(30)).Error.Code.Should().Be("Imports.AnotherJobRunning");
+        b.RenewRollbackLease("w2", Now.AddSeconds(30)).Error.Code.Should().Be("Imports.LeaseLost");
+        b.RenewRollbackLease("w1", Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
+        b.LeaseUntilUtc.Should().Be(Now.AddMinutes(1) + ImportBatch.RollbackLeaseDuration);
+
+        // Çökme: kira dolunca başka işçi devralır, eski işçi yenileyemez.
+        var expired = Now.AddMinutes(1) + ImportBatch.RollbackLeaseDuration;
+        b.IsJobLeaseActive(expired).Should().BeFalse();
+        b.ClaimRollbackLease("w2", expired).IsSuccess.Should().BeTrue();
+        b.RenewRollbackLease("w1", expired).Error.Code.Should().Be("Imports.LeaseLost");
+
+        b.CompleteRollback(partial: true, expired).IsSuccess.Should().BeTrue();
+        b.LeaseOwner.Should().BeNull();
+        b.LeaseUntilUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public void FailRollback_Should_Release_Lease_And_Allow_Retry()
+    {
+        var b = BatchIn(ImportBatchStatus.RollingBack);
+        b.ClaimRollbackLease("w1", Now).IsSuccess.Should().BeTrue();
+
+        b.FailRollback(Now).IsSuccess.Should().BeTrue();
+
+        b.LeaseOwner.Should().BeNull();
+        b.CanStartRollback.Should().BeTrue();
+        b.StartRollback(RollbackOptions, Now).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Row_RecordRollbackResult_Should_Only_Move_Created_Or_Kept_Rows()
+    {
+        var created = AppliedRow(ImportRowApplyStatus.Created);
+        created.RecordRollbackResult(ImportRowApplyStatus.Kept, "[]");
+        created.ApplyStatus.Should().Be(ImportRowApplyStatus.Kept);
+        created.RecordRollbackResult(ImportRowApplyStatus.RolledBack, null);
+        created.ApplyStatus.Should().Be(ImportRowApplyStatus.RolledBack);
+        created.TargetEntityId.Should().NotBeNull("hedef kimliği tarihçe için kalır");
+
+        FluentActions.Invoking(() => created.RecordRollbackResult(ImportRowApplyStatus.Kept, null))
+            .Should().Throw<InvalidOperationException>("geri alınmış satır yeniden geri alınmaz");
+        FluentActions.Invoking(() => AppliedRow(ImportRowApplyStatus.Matched).RecordRollbackResult(ImportRowApplyStatus.RolledBack, null))
+            .Should().Throw<InvalidOperationException>("eşleşen mevcut kayıt geri alınmaz");
+        FluentActions.Invoking(() => AppliedRow(ImportRowApplyStatus.Created).RecordRollbackResult(ImportRowApplyStatus.Created, null))
+            .Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    private static ImportBatchRow AppliedRow(ImportRowApplyStatus status)
+    {
+        var row = ImportBatchRow.Create(Guid.NewGuid(), ImportTable.Customers, 2, "{\"AdSoyad\":\"x\"}", null);
+        row.RecordApplyResult(status, "Client", Guid.NewGuid(), matched: status == ImportRowApplyStatus.Matched, Now);
+        return row;
+    }
+
     [Theory]
     [InlineData(ImportBatchStatus.Committed)]
     [InlineData(ImportBatchStatus.PartiallyRolledBack)]
@@ -360,6 +449,7 @@ public sealed class ImportBatchTests
 
         b.Expire(Now.AddDays(10)).IsSuccess.Should().BeTrue();
         b.Status.Should().Be(ImportBatchStatus.Expired);
+        b.PayloadPurgedAtUtc.Should().Be(Now.AddDays(10), "hazırlık satırları süre dolarken silinir (B5)");
     }
 
     [Fact]
@@ -380,6 +470,11 @@ public sealed class ImportBatchTests
         ImportBatchStatusSets.ContentHashReleased.Should().BeEquivalentTo(
             [ImportBatchStatus.CommitFailed, ImportBatchStatus.RolledBack, ImportBatchStatus.Discarded, ImportBatchStatus.Expired]);
         ImportBatchStatusSets.Draft.Should().Contain(ImportBatchStatusSets.IdleDraft).And.Contain(ImportBatchStatus.Validating);
+        ImportBatchStatusSets.PayloadRetained.Should().BeEquivalentTo(
+        [
+            ImportBatchStatus.Committed, ImportBatchStatus.CommitFailed, ImportBatchStatus.RolledBack,
+            ImportBatchStatus.PartiallyRolledBack, ImportBatchStatus.RollbackFailed,
+        ]);
     }
 
     [Fact]
