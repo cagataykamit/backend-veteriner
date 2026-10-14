@@ -5,19 +5,26 @@ using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Dashboard.Specs;
 
+/// <summary>
+/// Saati geçmiş, hâlâ planlı randevular. <paramref name="excludedPetIds"/>: vefat eden hayvanların randevuları
+/// (otomatik iptal edilmezler, ADR-020 S5 K4; ama gecikmiş iş sayılmazlar).
+/// </summary>
 public sealed class DashboardOverdueScheduledAppointmentsCountSpec : Specification<Appointment>
 {
     public DashboardOverdueScheduledAppointmentsCountSpec(
         Guid tenantId,
         Guid? clinicId,
         DateTime nowUtc,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        IReadOnlyCollection<Guid>? excludedPetIds = null)
     {
         Query.AsNoTracking();
         Query.Where(a =>
             a.TenantId == tenantId
             && a.Status == AppointmentStatus.Scheduled
             && a.ScheduledAtUtc < nowUtc);
+        if (excludedPetIds is { Count: > 0 })
+            Query.Where(a => !excludedPetIds.Contains(a.PetId));
         DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
     }
 }

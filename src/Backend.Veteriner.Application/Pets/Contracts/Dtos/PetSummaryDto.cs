@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Visits;
 
 namespace Backend.Veteriner.Application.Pets.Contracts.Dtos;
@@ -74,10 +75,12 @@ public sealed record PetSummaryLastExaminationDto(
     string ClinicName);
 
 /// <param name="ProfileWeightKg">Hayvan profilindeki tarihsiz kilo (<c>Pet.Weight</c>).</param>
+/// <param name="Status">Hayvan durumu (<c>Active</c> | <c>Deceased</c>); vefat edende <c>nextDue.isOverdue</c> hep false.</param>
 public sealed record PetSummaryDto(
     Guid PetId,
     PetAlertsDto PetAlerts,
     decimal? ProfileWeightKg,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] PetStatus Status,
     PetSummarySectionDto<PetSummaryActiveHospitalizationDto> ActiveHospitalization,
     PetSummarySectionDto<PetSummaryVaccinationsDto> Vaccinations,
     PetSummarySectionDto<PetSummaryWeightDto> LatestWeight,

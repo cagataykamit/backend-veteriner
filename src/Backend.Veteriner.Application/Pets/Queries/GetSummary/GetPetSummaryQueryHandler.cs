@@ -120,7 +120,8 @@ public sealed class GetPetSummaryQueryHandler : IRequestHandler<GetPetSummaryQue
                         due.Id,
                         due.VaccineName,
                         due.DueAtUtc!.Value,
-                        due.DueAtUtc.Value < nowUtc,
+                        // Vefat eden hayvanın planlı aşısı gecikmiş sayılmaz (ADR-020 S5; Pet.ReceivesCare).
+                        pet.IsReceivingCare && due.DueAtUtc.Value < nowUtc,
                         due.ClinicId));
         }, ct);
 
@@ -166,6 +167,7 @@ public sealed class GetPetSummaryQueryHandler : IRequestHandler<GetPetSummaryQue
             pet.Id,
             PetAlertsDto.From(pet.AlertFlags, pet.AlertNote),
             pet.Weight,
+            pet.Status,
             hospitalization,
             vaccinations,
             weight,
@@ -173,29 +175,12 @@ public sealed class GetPetSummaryQueryHandler : IRequestHandler<GetPetSummaryQue
             lastExamination));
     }
 
-    private async Task<PetSummarySectionDto<T>> LoadAsync<T>(
+    private Task<PetSummarySectionDto<T>> LoadAsync<T>(
         PetRecordKind kind,
         bool noClinicAccess,
         Func<Task<T?>> load,
         CancellationToken ct) where T : class
-    {
-        if (!_permissionChecker.CanRead(kind))
-            return PetSummarySectionDto<T>.Forbidden();
-
-        if (noClinicAccess)
-            return PetSummarySectionDto<T>.Empty();
-
-        try
-        {
-            var data = await load();
-            return data is null ? PetSummarySectionDto<T>.Empty() : PetSummarySectionDto<T>.Ok(data);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-        {
-            _logger.LogWarning(ex, "Hasta özeti bölümü okunamadı: {Kind}", kind);
-            return PetSummarySectionDto<T>.Unavailable();
-        }
-    }
+        => PetSectionLoader.LoadAsync(_permissionChecker.CanRead(kind), noClinicAccess, load, _logger, kind.ToString(), ct);
 
     private async Task<string> ClinicNameAsync(Guid tenantId, Guid clinicId, CancellationToken ct)
     {

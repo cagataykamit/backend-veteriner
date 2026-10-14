@@ -56,6 +56,9 @@ Yanıt **200**:
 | Otomatik aşı ve randevu e-posta hatırlatması | Aday değil; gönderilmez, günlük (dispatch log) yazılmaz |
 | `GET /vaccinations?onlyOverdue=true` (gecikmiş aşı listesi) | Vefat eden hayvanın aşısı çıkmaz |
 | Pano operasyon uyarıları: `overdueVaccinationsCount`, `upcomingVaccinationsNext7DaysCount` | Sayılmaz |
+| Pano `overdueScheduledAppointmentsCount` (saati geçmiş planlı randevu) | **Sayılmaz** (K12). Randevu açık kalır (K4); yalnız gecikmiş iş sayısına girmez |
+| Hasta özeti `GET /pets/{id}/summary` | Yanıta `status` eklendi; `vaccinations.nextDue` görünür ama `isOverdue` hep `false` |
+| Hasta açık işleri `GET /pets/{id}/open-items` | `vaccinations` bölümü `Empty` (gecikmiş/yaklaşan aşı kalemi yok); sonraki randevu görünür (K4). Bkz. `PET_OPEN_ITEMS_API_CONTRACT.md` |
 | Var olan planlı randevu | **Otomatik iptal edilmez** (karar K4); hatırlatması gitmez, gerekirse elle iptal edilir |
 | Geçmiş kayıtlar, zaman çizelgesi, hasta özeti, arama | Değişmez, görünür |
 
@@ -108,6 +111,7 @@ GET /api/v1/charge-suggestions?clinicId={clinicId}&clientId={clientId}&pageSize=
 | K9 | Hatırlatma istemiyor | Tek bayrak, tüm otomatik hatırlatmaları (aşı + randevu) kapsar; tür bazında ayrım yok. | En sade model; tür bazlı tercih ve kanal bazlı rıza ihtiyacı pilotta görülürse eklenir. |
 | K10 | Ücret önerisi | Yeni uç değil, mevcut listeye `clientId` süzgeci; toplam alanı yok. | Sözleşme bozulmaz; sayı `totalItems`'ta, tutar istemcide sayfadan hesaplanır (fiyatsız kalem tutara girmez, ayrı gösterilmeli). |
 | K11 | Query DB okuma modeli | Durum okuma modeline eklenmedi; `status` süzgeci verilirse liste komut DB'den okunur, okuma modeli yolunda sayfadaki satırların durumu komut DB'den doldurulur. | Okuma modeli bayrağı her ortamda kapalı; Query DB migration'ı bu dilimin kapsamı dışında. |
+| K12 | Gecikmiş randevu sayısı | Pano `overdueScheduledAppointmentsCount` vefat edenin açık randevusunu **saymaz**; randevu iptal edilmez, listede/takvimde ve hasta açık işlerinde görünür kalır. `upcomingAppointmentsNext24HoursCount` ve günlük randevu sayıları **değişmedi** (randevu hâlâ takvimdedir). | K4 ile çelişmez: durum makinesine dokunulmaz, yalnız "gecikmiş iş" göstergesi vefat edeni dışlar (aşı sayımlarıyla aynı kural, `Pet.ReceivesCare`). Geri alınınca yeniden sayılır. |
 
 ---
 
@@ -125,7 +129,7 @@ GET /api/v1/charge-suggestions?clinicId={clinicId}&clientId={clientId}&pageSize=
 ## 6) Bilinen eksikler ve açık sorular
 
 - **İçe aktarma hatırlatma etkisi** (`reminderImpact`, `IMPORT_API_CONTRACT.md` §6.3) vefat/hatırlatma istemeyen ayrımını yapmaz; tahmin olarak biraz fazla sayabilir (gönderim doğru dışlanır).
-- **Hasta özeti** (`GET /pets/{id}/summary`) `nextDueVaccination.isOverdue` vefat eden hayvanda da hesaplanır; durum alanı özet DTO'suna eklenmedi (kart detaydan okur).
-- **Pano gecikmiş randevu** sayısı (`overdueScheduledAppointmentsCount`) vefat eden hayvanın planlı randevusunu sayar (K4 gereği randevu açık kalır).
+- ~~Hasta özeti `isOverdue` vefat edende de hesaplanıyordu~~ ve ~~pano gecikmiş randevu sayısı vefat edeni sayıyordu~~: kapandı (dal `feat/hasta-acik-isler`; özet `status` alanı eklendi, K12).
+- Pano `upcomingAppointmentsNext24HoursCount` vefat edenin ileri tarihli açık randevusunu hâlâ sayar (randevu takvimde olduğu için bilinçli; K12).
 - **KVKK:** pazarlama/hatırlatma için açık rıza kaydı (metin sürümü, tarih, kanal, kanıt) gerekirse ayrı model; KVKK uzmanı görüşü doğrulanmadı.
 - Gerçek veri hacminde sorgu ölçümü yapılmadı (vefat eden hayvan kimlik listesi gecikmiş aşı sayımlarında `NOT IN` olarak kullanılır; kiracı başına küçük olması beklenir).

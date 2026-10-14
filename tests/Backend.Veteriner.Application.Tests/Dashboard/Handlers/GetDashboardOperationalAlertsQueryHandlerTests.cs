@@ -113,6 +113,60 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerTests
     }
 
     [Fact]
+    public void OverdueScheduledAppointmentsSpec_Should_Exclude_Deceased_Pets_Appointments()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var nowUtc = new DateTime(2026, 10, 11, 9, 0, 0, DateTimeKind.Utc);
+        var deceasedPetId = Guid.NewGuid();
+        var activePetId = Guid.NewGuid();
+        var rows = new List<Appointment>
+        {
+            new(tenantId, clinicId, activePetId, nowUtc.AddHours(-2)),
+            new(tenantId, clinicId, deceasedPetId, nowUtc.AddHours(-2)),
+            new(tenantId, clinicId, activePetId, nowUtc.AddHours(2)),
+        };
+
+        var withExclusion = new DashboardOverdueScheduledAppointmentsCountSpec(
+            tenantId, clinicId, nowUtc, null, [deceasedPetId]).Evaluate(rows);
+        var withoutExclusion = new DashboardOverdueScheduledAppointmentsCountSpec(tenantId, clinicId, nowUtc).Evaluate(rows);
+
+        withExclusion.Select(a => a.PetId).Should().Equal(activePetId);
+        withoutExclusion.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Pass_Deceased_Pet_Ids_To_Overdue_Appointments_Count()
+    {
+        var tenantId = Guid.NewGuid();
+        var deceasedPetId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tenantId);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _todayCounts
+            .Setup(r => r.GetAsync(tenantId, null, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DashboardTodayAppointmentStatusCounts(0, 0, 0));
+        _pets.Setup(r => r.ListAsync(It.IsAny<Ardalis.Specification.ISpecification<Pet, Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([deceasedPetId]);
+        DashboardOverdueScheduledAppointmentsCountSpec? captured = null;
+        _appointments
+            .Setup(r => r.CountAsync(It.IsAny<DashboardOverdueScheduledAppointmentsCountSpec>(), It.IsAny<CancellationToken>()))
+            .Callback((Ardalis.Specification.ISpecification<Appointment> s, CancellationToken _) =>
+                captured = (DashboardOverdueScheduledAppointmentsCountSpec)s)
+            .ReturnsAsync(0);
+
+        var result = await CreateHandler().Handle(new GetDashboardOperationalAlertsQuery(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var past = DateTime.UtcNow.AddHours(-1);
+        captured!.Evaluate(
+            [
+                new Appointment(tenantId, Guid.NewGuid(), deceasedPetId, past),
+                new Appointment(tenantId, Guid.NewGuid(), Guid.NewGuid(), past),
+            ])
+            .Should().ContainSingle(a => a.PetId != deceasedPetId);
+    }
+
+    [Fact]
     public async Task Handle_Should_UseClinicScope_When_ClinicSelected()
     {
         var tenantId = Guid.NewGuid();

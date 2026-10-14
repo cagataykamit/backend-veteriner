@@ -44,6 +44,7 @@ Yanıt (`200`):
   "petId": "…",
   "petAlerts": { "flags": ["Allergy"], "note": "Penisiline alerji" },
   "profileWeightKg": 4.2,
+  "status": "Active",
   "activeHospitalization": { "state": "Ok", "data": { "id": "…", "clinicId": "…", "clinicName": "…", "admittedAtUtc": "…", "plannedDischargeAtUtc": null, "reason": "…", "examinationId": null } },
   "vaccinations": { "state": "Ok", "data": {
       "lastApplied": { "id": "…", "vaccineName": "…", "appliedAtUtc": "…", "clinicId": "…" },
@@ -65,11 +66,12 @@ Bölüm zarfı: `{ "state": "Ok" | "Empty" | "Forbidden" | "Unavailable", "data"
 
 - `petAlerts` ve `profileWeightKg` `Pets.Read` altındadır ve bölüm zarfı taşımaz (ayrı sorgu değil, hayvan kaydıyla gelir). Uyarı yoksa `flags: []` ("uyarı yok"); `petAlerts` null olmaz. `profileWeightKg` tarihsizdir (`Pet.Weight`), tarih uydurulmaz.
 - `activeHospitalization`: `DischargedAtUtc == null` olan kayıt (`history-summary`'deki son 10 sınırından bağımsız, ayrı sorgu). Birden fazla klinikte aktif yatış nadir de olsa mümkünse en yeni `AdmittedAtUtc` döner. İzin: `Hospitalizations.Read`.
-- `vaccinations` (`Vaccinations.Read`): `lastApplied` = `Status=Applied` olanlar içinde en yeni `AppliedAtUtc`; `nextDue` = `Status=Scheduled` olanlar içinde **en erken** `DueAtUtc` (gecikmiş olabilir: `isOverdue = dueAtUtc < şimdi`). İkisi ayrı alandır; ikisi de yoksa `state: "Empty"`, biri varsa `Ok` ve diğeri `null`.
+- `vaccinations` (`Vaccinations.Read`): `lastApplied` = `Status=Applied` olanlar içinde en yeni `AppliedAtUtc`; `nextDue` = `Status=Scheduled` olanlar içinde **en erken** `DueAtUtc` (gecikmiş olabilir: `isOverdue = dueAtUtc < şimdi`; **vefat eden hayvanda hep `false`**, ADR-020 S5 — kayıt yine görünür). İkisi ayrı alandır; ikisi de yoksa `state: "Empty"`, biri varsa `Ok` ve diğeri `null`.
 - `latestWeight` (`Examinations.Read`): `WeightKg` dolu muayeneler içinde `VitalsMeasuredAtUtc` (yoksa `ExaminedAtUtc`) en yeni olan. `source` bugün hep `"Examination"`.
 - `lastVisit` (`Visits.Read`): yanlış işaretli (`VoidedAtUtc != null`) olmayan en yeni `ArrivedAtUtc`.
 - `lastExamination` (`Examinations.Read`): en yeni `ExaminedAtUtc`.
-- Açık iş göstergesi yoktur (ürün kararı: ilk sürümde göstergesiz).
+- `status` (`Pets.Read`, bölüm zarfı yok): `Active` | `Deceased`; eklenen alan, geriye uyumlu (ADR-020 S5). Ayrıntı: `PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md`.
+- Açık iş göstergesi bu yanıtta yoktur; hasta kartı "Yapılacaklar" için ayrı uç: `GET /pets/{id}/open-items` (`PET_OPEN_ITEMS_API_CONTRACT.md`).
 
 ## 2. `GET /api/v1/pets/{id}/timeline` — birleşik zaman çizelgesi (dilim B)
 
