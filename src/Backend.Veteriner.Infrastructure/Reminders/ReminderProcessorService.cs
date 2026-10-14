@@ -231,13 +231,17 @@ public sealed class ReminderProcessorService
         // as long as DueAtUtc is still in the future and within the lookahead (DueAtUtc <= now + daysBefore).
         var maxDueUtc = nowUtc.AddDays(daysBefore);
 
+        // ADR-019 K3 (dışlamanın tek yeri): içe aktarılan aşı, partisinin hatırlatmaları yönetici tarafından serbest
+        // bırakılana kadar aday değildir; dışlanan kayıt için dispatch log da yazılmaz.
         var candidates = await _db.Vaccinations
             .AsNoTracking()
             .Where(v => v.TenantId == tenantId
                 && (v.Status == VaccinationStatus.Scheduled || v.Status == VaccinationStatus.Applied)
                 && v.DueAtUtc.HasValue
                 && v.DueAtUtc.Value > nowUtc
-                && v.DueAtUtc.Value <= maxDueUtc)
+                && v.DueAtUtc.Value <= maxDueUtc
+                && (v.ImportBatchId == null
+                    || _db.ImportBatches.Any(b => b.Id == v.ImportBatchId && b.RemindersReleasedAtUtc != null)))
             .OrderBy(v => v.DueAtUtc)
             .Select(v => new VaccinationReminderCandidateRow(
                 v.Id,
