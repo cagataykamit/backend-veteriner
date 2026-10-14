@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Charges.Specs;
+using Backend.Veteriner.Application.ChargeSuggestions.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -9,6 +10,7 @@ using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Queries.GetToday;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Visits;
 using FluentAssertions;
 using Moq;
@@ -26,12 +28,16 @@ public sealed class GetVisitsTodayChargeAmountsTests
     private readonly Mock<IVisitTodayReader> _reader = new();
     private readonly Mock<IClinicVeterinarianReader> _veterinarians = new();
     private readonly Mock<IReadRepository<Charge>> _charges = new();
+    private readonly Mock<IReadRepository<ChargeSuggestion>> _chargeSuggestions = new();
     private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
 
     public GetVisitsTodayChargeAmountsTests()
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _permissions.Setup(p => p.HasPermission(PermissionCatalog.Charges.Read)).Returns(true);
+        _chargeSuggestions
+            .Setup(r => r.ListAsync(It.IsAny<PendingChargeSuggestionVisitIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid>());
     }
 
     private Task<Backend.Veteriner.Domain.Shared.Result<TodayDto>> RunAsync(params TodayItemDto[] items)
@@ -40,7 +46,7 @@ public sealed class GetVisitsTodayChargeAmountsTests
             .ReturnsAsync(new VisitTodayReadResult(items, []));
         var handler = new GetVisitsTodayQueryHandler(
             _tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _reader.Object,
-            _charges.Object, _permissions.Object, _veterinarians.Object, VisitHandlerTestSupport.FixedClock);
+            _charges.Object, _chargeSuggestions.Object, _permissions.Object, _veterinarians.Object, VisitHandlerTestSupport.FixedClock);
         return handler.Handle(new GetVisitsTodayQuery(_clinicId, null), CancellationToken.None);
     }
 
@@ -119,6 +125,22 @@ public sealed class GetVisitsTodayChargeAmountsTests
         (item.ChargedAmount, item.AllocatedAmount, item.OutstandingAmount, item.ClientOutstandingAmount)
             .Should().Be(((decimal?)null, (decimal?)null, (decimal?)null, (decimal?)null));
         _charges.Verify(r => r.ListAsync(It.IsAny<ChargeAmountsForClientsSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Should_Count_Pending_Charge_Suggestions_Per_Visit()
+    {
+        var withPending = Guid.NewGuid();
+        var withoutPending = Guid.NewGuid();
+        SetupCharges();
+        _chargeSuggestions
+            .Setup(r => r.ListAsync(It.IsAny<PendingChargeSuggestionVisitIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid> { withPending, withPending });
+
+        var items = (await RunAsync(VisitRow(Guid.NewGuid(), withPending), VisitRow(Guid.NewGuid(), withoutPending))).Value!.Items;
+
+        items.Single(i => i.VisitId == withPending).PendingChargeCount.Should().Be(2);
+        items.Single(i => i.VisitId == withoutPending).PendingChargeCount.Should().Be(0);
     }
 
     [Fact]

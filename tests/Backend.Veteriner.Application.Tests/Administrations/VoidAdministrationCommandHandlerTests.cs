@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.StockMovements.Commands.Reverse;
 using Backend.Veteriner.Application.StockMovements.Contracts.Dtos;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -21,6 +22,7 @@ public sealed class VoidAdministrationCommandHandlerTests
     private readonly Mock<IRepository<Administration>> _administrations = new();
     private readonly Mock<ISender> _sender = new();
     private readonly Mock<IReadRepository<StockMovement>> _stockMovements = new();
+    private readonly Mock<IRepository<ChargeSuggestion>> _chargeSuggestions = new();
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly Guid _clinicId = Guid.NewGuid();
     private readonly Guid _productId = Guid.NewGuid();
@@ -81,6 +83,7 @@ public sealed class VoidAdministrationCommandHandlerTests
             new Mock<IReadRepository<StockBatch>>().Object,
             _administrations.Object,
             new Mock<IRepository<Vaccination>>().Object,
+            _chargeSuggestions.Object,
             _sender.Object,
             TimeProvider.System);
     }
@@ -126,6 +129,58 @@ public sealed class VoidAdministrationCommandHandlerTests
             new VoidAdministrationCommand(_administration.Id, "Şişe kırıldı, imha edildi", "WrittenOff"), CancellationToken.None);
 
         result.Error!.Code.Should().Be("Administrations.AlreadyVoided");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Drop_Pending_Charge_Suggestion()
+    {
+        var suggestion = SetupSuggestion();
+
+        var result = await CreateHandler().Handle(
+            new VoidAdministrationCommand(_administration.Id, "Yanlış ürün seçildi", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        suggestion.Status.Should().Be(ChargeSuggestionStatus.Cancelled);
+        _chargeSuggestions.Verify(r => r.UpdateAsync(suggestion, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Leave_Converted_Charge_Suggestion_Untouched()
+    {
+        var suggestion = SetupSuggestion();
+        suggestion.MarkConverted(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow);
+
+        var result = await CreateHandler().Handle(
+            new VoidAdministrationCommand(_administration.Id, "Yanlış ürün seçildi", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        suggestion.Status.Should().Be(ChargeSuggestionStatus.Converted);
+        _chargeSuggestions.Verify(r => r.UpdateAsync(It.IsAny<ChargeSuggestion>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_Suggestion_Changed_Concurrently()
+    {
+        SetupSuggestion();
+        _chargeSuggestions
+            .Setup(r => r.UpdateAsync(It.IsAny<ChargeSuggestion>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new DbUpdateConcurrencyException("Concurrency conflict.", innerException: null));
+
+        var result = await CreateHandler().Handle(
+            new VoidAdministrationCommand(_administration.Id, "Yanlış ürün seçildi", null), CancellationToken.None);
+
+        result.Error!.Code.Should().Be("Administrations.ConcurrencyConflict");
+    }
+
+    private ChargeSuggestion SetupSuggestion()
+    {
+        var product = new Product(_tenantId, "Ürün", "Adet", 10m, "TRY", sku: "SKU-1");
+        typeof(Product).GetProperty(nameof(Product.Id))!.SetValue(product, _productId);
+        var suggestion = ChargeSuggestion.ForAdministration(_administration, product, null).Value!;
+        _chargeSuggestions
+            .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ChargeSuggestion>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(suggestion);
+        return suggestion;
     }
 
     [Theory]
