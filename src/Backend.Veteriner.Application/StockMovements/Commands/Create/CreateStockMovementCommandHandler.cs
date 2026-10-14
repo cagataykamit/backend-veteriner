@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Application.ProductStocks.Specs;
 using Backend.Veteriner.Application.Products.Specs;
@@ -30,6 +31,7 @@ public sealed class CreateStockMovementCommandHandler
     private readonly IRepository<StockBatch> _batchesWrite;
     private readonly StockBatchResolver _batchResolver;
     private readonly IUnitOfWork _uow;
+    private readonly TimeProvider _timeProvider;
 
     public CreateStockMovementCommandHandler(
         ITenantContext tenantContext,
@@ -43,7 +45,8 @@ public sealed class CreateStockMovementCommandHandler
         IRepository<StockMovement> stockMovementsWrite,
         IRepository<StockBatch> batchesWrite,
         StockBatchResolver batchResolver,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -57,6 +60,7 @@ public sealed class CreateStockMovementCommandHandler
         _batchesWrite = batchesWrite;
         _batchResolver = batchResolver;
         _uow = uow;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Result<StockMovementCreateResult>> Handle(CreateStockMovementCommand request, CancellationToken ct)
@@ -158,7 +162,7 @@ public sealed class CreateStockMovementCommandHandler
                         "Bu ürün için bu klinikte stok satırı zaten var; Initial kullanılamaz.");
                 }
 
-                var initialBatch = CreateEntryBatch(tenantId, request, product, createdBy);
+                var initialBatch = CreateEntryBatch(tenantId, request, product, createdBy, Today());
                 if (!initialBatch.IsSuccess)
                     return Result<StockMovementCreateResult>.Failure(initialBatch.Error);
 
@@ -175,7 +179,7 @@ public sealed class CreateStockMovementCommandHandler
                 break;
 
             case StockMovementType.In:
-                var entryBatch = CreateEntryBatch(tenantId, request, product, createdBy);
+                var entryBatch = CreateEntryBatch(tenantId, request, product, createdBy, Today());
                 if (!entryBatch.IsSuccess)
                     return Result<StockMovementCreateResult>.Failure(entryBatch.Error);
 
@@ -196,12 +200,14 @@ public sealed class CreateStockMovementCommandHandler
                 break;
 
             case StockMovementType.Out:
-                if (stock is null || stock.QuantityOnHand < request.Quantity)
-                {
-                    return Result<StockMovementCreateResult>.Failure(
-                        "StockMovements.InsufficientStock",
-                        "Çıkış için yeterli stok yok.");
-                }
+                var onHand = stock?.QuantityOnHand ?? 0;
+                var insufficient = Result<StockMovementCreateResult>.Failure(
+                    "StockMovements.InsufficientStock",
+                    "Çıkış için yeterli stok yok.");
+
+                // Süresi geçmiş partiyi dışlayan çıkışta (uygulama) mesajı çözücü üretir: kullanılabilir/süresi geçmiş miktarı söyler.
+                if (onHand < request.Quantity && request.NotExpiredOn is null)
+                    return insufficient;
 
                 var consumption = await _batchResolver.ResolveForConsumptionAsync(
                     tenantId,
@@ -209,11 +215,14 @@ public sealed class CreateStockMovementCommandHandler
                     request.ProductId,
                     request.BatchId,
                     request.Quantity,
-                    stock.QuantityOnHand,
+                    onHand,
                     request.NotExpiredOn,
                     ct);
                 if (!consumption.IsSuccess)
                     return Result<StockMovementCreateResult>.Failure(consumption.Error);
+
+                if (stock is null || onHand < request.Quantity)
+                    return insufficient;
 
                 batch = consumption.Value;
                 batch?.Decrease(request.Quantity);
@@ -366,6 +375,8 @@ public sealed class CreateStockMovementCommandHandler
             new StockMovementCreateResult(movement.ToDto(product, categoryName, clinic.Name), true));
     }
 
+    private DateOnly Today() => OperationDayBounds.ToLocalDate(_timeProvider.GetUtcNow().UtcDateTime);
+
     private async Task<bool> StockRowExistsAsync(Guid tenantId, Guid clinicId, Guid productId, CancellationToken ct)
         => await _productStocksWrite.FirstOrDefaultAsync(
             new ProductStockForUpdateSpec(tenantId, clinicId, productId), ct) is not null;
@@ -408,7 +419,8 @@ public sealed class CreateStockMovementCommandHandler
         Guid tenantId,
         CreateStockMovementCommand request,
         Product product,
-        Guid? createdByUserId)
+        Guid? createdByUserId,
+        DateOnly today)
     {
         var details = request.Batch;
         if (details is null || details.IsEmpty)
@@ -418,6 +430,14 @@ public sealed class CreateStockMovementCommandHandler
                     StockBatch.LotAndExpiryRequiredCode,
                     "Aşı ve kontrollü ürünlerde seri/lot no ve son kullanma tarihi zorunludur.")
                 : Result<StockBatch?>.Success(null);
+        }
+
+        // Geçmiş SKT engellenmez ama açık onay ister (ADR-015 karar 6).
+        if (details.ExpiryDate is { } expiry && expiry < today && !request.AcknowledgeExpired)
+        {
+            return Result<StockBatch?>.Failure(
+                StockBatch.ExpiredAcknowledgementRequiredCode,
+                "Bu partinin son kullanma tarihi geçmiş. Devam etmek için onaylayın.");
         }
 
         var created = StockBatch.Create(

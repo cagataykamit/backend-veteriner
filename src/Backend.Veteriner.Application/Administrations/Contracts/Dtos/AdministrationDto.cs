@@ -29,8 +29,13 @@ public sealed record AdministrationDto(
     string? LotNumber = null,
     DateOnly? ExpiryDate = null);
 
-/// <summary>Düşümden sonraki stok durumu; düşük stok yalnız bilgidir, kaydı engellemez.</summary>
-public sealed record AdministrationStockDto(decimal QuantityOnHand, decimal MinimumStockLevel, bool IsBelowMinimum);
+/// <summary>Düşümden sonraki stok durumu; düşük stok yalnız bilgidir, kaydı engellemez. <see cref="IsBelowMinimum"/> kullanılabilir miktara bakar.</summary>
+public sealed record AdministrationStockDto(
+    decimal QuantityOnHand,
+    decimal MinimumStockLevel,
+    bool IsBelowMinimum,
+    decimal AvailableQuantity,
+    decimal ExpiredQuantity);
 
 /// <summary>Oluşturma sonucu; <see cref="Created"/> false ise aynı <c>requestId</c> ile tekrar istek ilk kaydı döndürmüştür.</summary>
 public sealed record AdministrationCreateResultDto(bool Created, AdministrationDto Administration, AdministrationStockDto Stock);

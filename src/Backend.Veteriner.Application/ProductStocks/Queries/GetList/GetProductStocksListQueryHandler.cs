@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.ProductStocks.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductStocks.Specs;
+using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
@@ -20,19 +21,22 @@ public sealed class GetProductStocksListQueryHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<ProductStock> _productStocks;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly ExpiredStockReader _expiredStock;
 
     public GetProductStocksListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<ProductStock> productStocks,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        ExpiredStockReader expiredStock)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _productStocks = productStocks;
         _clinics = clinics;
+        _expiredStock = expiredStock;
     }
 
     public async Task<Result<PagedResult<ProductStockDto>>> Handle(
@@ -76,6 +80,7 @@ public sealed class GetProductStocksListQueryHandler
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         var searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
 
+        var today = _expiredStock.Today;
         var total = await _productStocks.CountAsync(
             new ProductStocksFilteredCountSpec(
                 tenantId,
@@ -85,7 +90,8 @@ public sealed class GetProductStocksListQueryHandler
                 request.ProductId,
                 request.IsBelowMinimum,
                 request.IsActiveProduct,
-                searchPattern),
+                searchPattern,
+                today),
             ct);
 
         var rows = await _productStocks.ListAsync(
@@ -98,11 +104,14 @@ public sealed class GetProductStocksListQueryHandler
                 request.IsBelowMinimum,
                 request.IsActiveProduct,
                 searchPattern,
+                today,
                 page,
                 pageSize),
             ct);
 
         var clinicIds = rows.Select(r => r.ClinicId).Distinct().ToArray();
+        var expiredByStock = await _expiredStock.GetAsync(
+            tenantId, clinicIds, rows.Select(r => r.ProductId).Distinct().ToArray(), ct);
         var clinics = clinicIds.Length == 0
             ? []
             : await _clinics.ListAsync(new ClinicsByTenantAndIdsSpec(tenantId, clinicIds), ct);
@@ -114,6 +123,8 @@ public sealed class GetProductStocksListQueryHandler
             var categoryName = product.Category?.Name;
             clinicNameById.TryGetValue(s.ClinicId, out var clinicName);
             clinicName ??= string.Empty;
+            var expired = expiredByStock.GetValueOrDefault((s.ClinicId, s.ProductId));
+            var available = ExpiredStockReader.Available(s.QuantityOnHand, expired);
 
             return new ProductStockDto(
                 s.Id,
@@ -126,8 +137,10 @@ public sealed class GetProductStocksListQueryHandler
                 clinicName,
                 s.QuantityOnHand,
                 s.MinimumStockLevel,
-                s.QuantityOnHand < s.MinimumStockLevel,
-                s.UpdatedAtUtc);
+                available < s.MinimumStockLevel,
+                s.UpdatedAtUtc,
+                available,
+                expired);
         }).ToList();
 
         return Result<PagedResult<ProductStockDto>>.Success(

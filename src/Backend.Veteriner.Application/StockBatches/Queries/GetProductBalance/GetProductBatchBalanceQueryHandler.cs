@@ -67,6 +67,7 @@ public sealed class GetProductBatchBalanceQueryHandler
         var today = OperationDayBounds.ToLocalDate(_timeProvider.GetUtcNow().UtcDateTime);
         var quantityOnHand = stock?.QuantityOnHand ?? 0;
         var batchedQuantity = batches.Sum(b => b.RemainingQuantity);
+        var expiredQuantity = batches.Where(b => b.IsExpiredOn(today)).Sum(b => b.RemainingQuantity);
 
         return Result<ProductBatchBalanceDto>.Success(new ProductBatchBalanceDto(
             product.Id,
@@ -75,6 +76,8 @@ public sealed class GetProductBatchBalanceQueryHandler
             quantityOnHand,
             batchedQuantity,
             quantityOnHand - batchedQuantity,
-            batches.Select(b => b.ToDto(product, today)).ToList()));
+            batches.Select(b => b.ToDto(product, today)).ToList(),
+            ExpiredStockReader.Available(quantityOnHand, expiredQuantity),
+            expiredQuantity));
     }
 }

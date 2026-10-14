@@ -3121,7 +3121,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired();
 
                     b.HasOne("Backend.Veteriner.Domain.Products.Product", "Product")
-                        .WithMany()
+                        .WithMany("StockBatches")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -3277,6 +3277,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
             modelBuilder.Entity("Backend.Veteriner.Domain.Products.Product", b =>
                 {
                     b.Navigation("Movements");
+
+                    b.Navigation("StockBatches");
 
                     b.Navigation("Stocks");
                 });

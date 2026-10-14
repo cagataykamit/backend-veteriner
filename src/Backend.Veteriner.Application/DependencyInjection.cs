@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IClinicAssignmentAccessGuard, ClinicAssignmentAccessGuard>();
         services.AddScoped<IClinicReadScopeResolver, ClinicReadScopeResolver>();
         services.AddScoped<StockBatchResolver>();
+        services.AddScoped<ExpiredStockReader>();
         services.AddScoped<RegisterReportRunner>();
 
         // Pet timeline: her kayıt türü kendi okuyucusuyla bağlanır (ödeme okuyucusu Aşama 3 sonrası eklenecek).

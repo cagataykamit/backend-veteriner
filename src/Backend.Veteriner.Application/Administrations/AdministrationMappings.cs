@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Administrations.Contracts.Dtos;
+using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Products;
 
@@ -34,6 +35,9 @@ internal static class AdministrationMappings
             batch?.LotNumber,
             batch?.ExpiryDate);
 
-    public static AdministrationStockDto ToDto(this ProductStock stock)
-        => new(stock.QuantityOnHand, stock.MinimumStockLevel, stock.QuantityOnHand < stock.MinimumStockLevel);
+    public static AdministrationStockDto ToDto(this ProductStock stock, decimal expiredQuantity)
+    {
+        var available = ExpiredStockReader.Available(stock.QuantityOnHand, expiredQuantity);
+        return new(stock.QuantityOnHand, stock.MinimumStockLevel, available < stock.MinimumStockLevel, available, expiredQuantity);
+    }
 }

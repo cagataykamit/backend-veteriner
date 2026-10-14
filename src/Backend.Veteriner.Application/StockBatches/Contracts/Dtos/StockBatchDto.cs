@@ -31,6 +31,7 @@ public sealed record StockBatchDto(
 /// <summary>
 /// Ürün bazlı parti bakiyesi: <see cref="UnbatchedQuantity"/> parti bilgisi olmayan (eski/devir) bakiyedir
 /// (<c>QuantityOnHand − BatchedQuantity</c>); <see cref="Batches"/> kalanı olan partiler FEFO sıralıdır.
+/// <see cref="ExpiredQuantity"/> süresi geçmiş partilerin kalanıdır; <see cref="AvailableQuantity"/> = <c>QuantityOnHand − ExpiredQuantity</c>.
 /// </summary>
 public sealed record ProductBatchBalanceDto(
     Guid ProductId,
@@ -39,4 +40,6 @@ public sealed record ProductBatchBalanceDto(
     decimal QuantityOnHand,
     decimal BatchedQuantity,
     decimal UnbatchedQuantity,
-    IReadOnlyList<StockBatchDto> Batches);
+    IReadOnlyList<StockBatchDto> Batches,
+    decimal AvailableQuantity,
+    decimal ExpiredQuantity);

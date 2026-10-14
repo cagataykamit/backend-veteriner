@@ -50,6 +50,7 @@ public sealed class CreateAdministrationCommandHandler
     private readonly IRepository<Administration> _administrationsWrite;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
+    private readonly ExpiredStockReader _expiredStock;
 
     public CreateAdministrationCommandHandler(
         ITenantContext tenantContext,
@@ -66,7 +67,8 @@ public sealed class CreateAdministrationCommandHandler
         IReadRepository<Administration> administrationsRead,
         IRepository<Administration> administrationsWrite,
         ISender sender,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ExpiredStockReader expiredStock)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -83,6 +85,7 @@ public sealed class CreateAdministrationCommandHandler
         _administrationsWrite = administrationsWrite;
         _sender = sender;
         _timeProvider = timeProvider;
+        _expiredStock = expiredStock;
     }
 
     public async Task<Result<AdministrationCreateResultDto>> Handle(
@@ -252,8 +255,10 @@ public sealed class CreateAdministrationCommandHandler
         var stock = await _stocks.FirstOrDefaultAsync(
             new ProductStockForUpdateSpec(tenantId, clinicId, request.ProductId), ct);
 
+        var expired = await _expiredStock.GetAsync(tenantId, clinicId, request.ProductId, ct);
+
         return Result<AdministrationCreateResultDto>.Success(
-            new AdministrationCreateResultDto(true, administration.ToDto(product, batch), stock!.ToDto()));
+            new AdministrationCreateResultDto(true, administration.ToDto(product, batch), stock!.ToDto(expired)));
     }
 
     private async Task<Result<AdministrationCreateResultDto>> ExistingAsync(
@@ -287,14 +292,16 @@ public sealed class CreateAdministrationCommandHandler
         var stock = await _stocks.FirstOrDefaultAsync(
             new ProductStockForUpdateSpec(existing.TenantId, existing.ClinicId, existing.ProductId), ct);
 
+        var expired = await _expiredStock.GetAsync(existing.TenantId, existing.ClinicId, existing.ProductId, ct);
+
         return Result<AdministrationCreateResultDto>.Success(
-            new AdministrationCreateResultDto(false, existing.ToDto(product, batch), stock!.ToDto()));
+            new AdministrationCreateResultDto(false, existing.ToDto(product, batch), stock!.ToDto(expired)));
     }
 
     private static Error MapStockError(Error error)
         => error.Code switch
         {
-            StockBatchResolver.InsufficientStockCode => new Error("Administrations.InsufficientStock", "Uygulama için yeterli stok yok."),
+            StockBatchResolver.InsufficientStockCode => new Error("Administrations.InsufficientStock", error.Message),
             StockBatchResolver.ExpiredCode => new Error("Administrations.BatchExpired", error.Message),
             _ => error,
         };
