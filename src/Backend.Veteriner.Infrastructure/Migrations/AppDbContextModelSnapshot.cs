@@ -406,6 +406,55 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Breeds", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.ClinicalTerm", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Kind", "IsActive");
+
+                    b.HasIndex("TenantId", "Kind", "NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ClinicalTerms_TenantId_Kind_NormalizedName")
+                        .HasFilter("[TenantId] IS NOT NULL");
+
+                    b.ToTable("ClinicalTerms", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.PetColor", b =>
                 {
                     b.Property<Guid>("Id")

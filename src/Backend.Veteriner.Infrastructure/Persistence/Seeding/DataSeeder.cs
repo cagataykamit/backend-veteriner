@@ -33,6 +33,7 @@ public static class DataSeeder
             await SeedDefaultAdminAsync(db, hasher, logger, ct);
 
         await VaccineDefinitionSeeder.SeedAsync(db, logger, ct);
+        await ClinicalTermSeeder.SeedAsync(db, logger, ct);
     }
 
     private static async Task SeedDefaultAdminAsync(
