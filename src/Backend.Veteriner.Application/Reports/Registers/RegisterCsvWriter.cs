@@ -41,6 +41,8 @@ internal static class RegisterCsvWriter
             null => string.Empty,
             DateTime utc => OperationDayBounds.ToLocalDate(utc).ToString("dd.MM.yyyy", Turkish),
             DateOnly day => day.ToString("dd.MM.yyyy", Turkish),
+            LocalDateTime time => OperationDayBounds.ToLocal(time.Utc).ToString("dd.MM.yyyy HH:mm", Turkish),
+            MoneyAmount money => money.Value.ToString("0.00", Turkish),
             decimal number => number.ToString("0.###", Turkish),
             var other => other.ToString() ?? string.Empty,
         };

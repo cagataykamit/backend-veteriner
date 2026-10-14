@@ -29,6 +29,12 @@ public static class OperationDayBounds
     }
 
     /// <summary>
+    /// UTC anını İstanbul duvar saatine çevirir (Kind Unspecified).
+    /// </summary>
+    public static DateTime ToLocal(DateTime utc)
+        => DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utc), IstanbulTimeZone), DateTimeKind.Unspecified);
+
+    /// <summary>
     /// UTC anını İstanbul takvim gününe çevirir.
     /// </summary>
     public static DateOnly ToLocalDate(DateTime scheduledAtUtc)

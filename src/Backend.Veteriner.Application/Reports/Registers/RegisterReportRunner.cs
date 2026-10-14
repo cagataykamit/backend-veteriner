@@ -76,12 +76,16 @@ public sealed class RegisterReportRunner
         if (!loaded.IsSuccess)
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
+        return Result<RegisterExportResult>.Success(BuildFile(spec, loaded.Value!, format));
+    }
+
+    /// <summary>Hazır satırlardan seçilen biçimde dosya üretir (dosya adı: önek + İstanbul tarihi).</summary>
+    public static RegisterExportResult BuildFile<TRow>(RegisterExportSpec<TRow> spec, IReadOnlyList<TRow> rows, RegisterExportFormat format)
+    {
         var stamp = FileDateStamp(DateTime.UtcNow);
-        return Result<RegisterExportResult>.Success(format == RegisterExportFormat.Csv
-            ? new RegisterExportResult(
-                RegisterCsvWriter.WriteUtf8Bom(spec.Columns, loaded.Value!), $"{spec.FileBaseName}-{stamp}.csv")
-            : new RegisterExportResult(
-                RegisterXlsxWriter.WriteWorkbook(spec.SheetName, spec.Columns, loaded.Value!), $"{spec.FileBaseName}-{stamp}.xlsx"));
+        return format == RegisterExportFormat.Csv
+            ? new RegisterExportResult(RegisterCsvWriter.WriteUtf8Bom(spec.Columns, rows), $"{spec.FileBaseName}-{stamp}.csv")
+            : new RegisterExportResult(RegisterXlsxWriter.WriteWorkbook(spec.SheetName, spec.Columns, rows), $"{spec.FileBaseName}-{stamp}.xlsx");
     }
 
     /// <summary>Dosya adındaki İstanbul takvim günü.</summary>

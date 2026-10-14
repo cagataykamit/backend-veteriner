@@ -100,6 +100,14 @@ internal static class RegisterXlsxWriter
                 cell.Value = day.ToDateTime(TimeOnly.MinValue);
                 cell.Style.DateFormat.Format = "dd.MM.yyyy";
                 break;
+            case LocalDateTime time:
+                cell.Value = OperationDayBounds.ToLocal(time.Utc);
+                cell.Style.DateFormat.Format = "dd.MM.yyyy HH:mm";
+                break;
+            case MoneyAmount money:
+                cell.Value = money.Value;
+                cell.Style.NumberFormat.Format = "#,##0.00";
+                break;
             case decimal number:
                 cell.Value = number;
                 cell.Style.NumberFormat.Format = "#,##0.###";
