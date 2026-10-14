@@ -16,6 +16,7 @@ using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.CareInstructions;
 using Backend.Veteriner.Domain.Hospitalizations;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Products;
@@ -103,6 +104,8 @@ public class AppDbContext : DbContext
     public DbSet<TenantBillingProfile> TenantBillingProfiles => Set<TenantBillingProfile>();
     public DbSet<TenantReminderSettings> TenantReminderSettings => Set<TenantReminderSettings>();
     public DbSet<ReminderDispatchLog> ReminderDispatchLogs => Set<ReminderDispatchLog>();
+    public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
+    public DbSet<ImportBatchRow> ImportBatchRows => Set<ImportBatchRow>();
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();

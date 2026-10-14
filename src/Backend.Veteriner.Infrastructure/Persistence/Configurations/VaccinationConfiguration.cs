@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Catalog;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Vaccinations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -34,6 +35,15 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
         b.HasIndex(x => new { x.TenantId, x.AppliedAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ExaminationId });
         b.HasIndex(x => x.VaccineDefinitionId);
+
+        // İçe aktarılan kayıtlar: hatırlatma dışlaması ve parti geri alması bu indeksten okur.
+        b.Property(x => x.ImportBatchId);
+        b.HasIndex(x => x.ImportBatchId).HasFilter("[ImportBatchId] IS NOT NULL");
+        b.HasOne<ImportBatch>()
+            .WithMany()
+            .HasForeignKey(x => x.ImportBatchId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
 
         b.HasOne<VaccineDefinition>()
             .WithMany()
