@@ -1414,6 +1414,9 @@ internal static class IntegrationTestAuthHelper
             _ when permissionCode == PermissionCatalog.Charges.Correct => EnsureIntegrationPermissionClaimAsync(db, "IntegrationChargeCorrector", permissionCode, "Charges"),
             _ when permissionCode == PermissionCatalog.Imports.Read => EnsureIntegrationPermissionClaimAsync(db, "IntegrationImportReader", permissionCode, "Imports"),
             _ when permissionCode == PermissionCatalog.Imports.Manage => EnsureIntegrationPermissionClaimAsync(db, "IntegrationImportManager", permissionCode, "Imports"),
+            _ when permissionCode == PermissionCatalog.Imports.Commit => EnsureIntegrationPermissionClaimAsync(db, "IntegrationImportCommitter", permissionCode, "Imports"),
+            _ when permissionCode == PermissionCatalog.Clients.Create => EnsureIntegrationPermissionClaimAsync(db, "IntegrationClientCreator", permissionCode, "Clients"),
+            _ when permissionCode == PermissionCatalog.Pets.Create => EnsureIntegrationPermissionClaimAsync(db, "IntegrationPetCreator", permissionCode, "Pets"),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(permissionCode),
                 permissionCode,

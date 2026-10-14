@@ -2,6 +2,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Tenants;
@@ -954,6 +955,70 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         var updatedB = await db.ReminderDispatchLogs.SingleAsync(x => x.TenantId == tenantB.Id);
         updatedA.Status.Should().Be(ReminderDispatchStatus.Sent);
         updatedB.Status.Should().Be(ReminderDispatchStatus.Enqueued);
+    }
+
+    /// <summary>
+    /// ADR-019 K3: içe aktarılan aşı, partisinin hatırlatmaları serbest bırakılana kadar aday değildir (dispatch log da
+    /// yazılmaz); günlük girişli aşı ve serbest bırakılmış partinin aşısı mevcut kuralla aday olur.
+    /// </summary>
+    [Fact]
+    public async Task ProcessOnce_Should_Exclude_Imported_Vaccinations_Until_Batch_Reminders_Released()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, 3, true);
+
+        var unreleased = CommittedBatch(tenant.Id, clinic.Id, now, release: false);
+        var released = CommittedBatch(tenant.Id, clinic.Id, now, release: true);
+        var applied = now.AddYears(-1);
+        var manual = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, applied, now.AddDays(2), null);
+        var importedHeld = Vaccination.CreateImported(tenant.Id, pet.Id, clinic.Id, rabies.Id, rabies.Name, applied, now.AddDays(2), null, unreleased.Id);
+        var importedReleased = Vaccination.CreateImported(tenant.Id, pet.Id, clinic.Id, rabies.Id, rabies.Name, applied, now.AddDays(1), null, released.Id);
+
+        db.AddRange(tenant, clinic, client, pet, settings, unreleased, released, manual, importedHeld, importedReleased);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+
+        var sources = await db.ReminderDispatchLogs.Select(x => x.SourceEntityId).ToListAsync();
+        sources.Should().BeEquivalentTo([manual.Id, importedReleased.Id]);
+        sources.Should().NotContain(importedHeld.Id, "serbest bırakılmamış içe aktarma aşısı için log da yazılmaz");
+        email.Enqueued.Should().HaveCount(2);
+
+        // Yönetici serbest bırakınca sonraki turda aday olur.
+        var held = await db.ImportBatches.SingleAsync(b => b.Id == unreleased.Id);
+        held.ReleaseReminders(DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        await db.SaveChangesAsync();
+
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+
+        (await db.ReminderDispatchLogs.Select(x => x.SourceEntityId).ToListAsync()).Should().Contain(importedHeld.Id);
+        email.Enqueued.Should().HaveCount(3);
+    }
+
+    private static ImportBatch CommittedBatch(Guid tenantId, Guid clinicId, DateTime now, bool release)
+    {
+        var counts = new ImportTableCounts { Total = 1, Valid = 1, WillCreate = 1 };
+        var batch = ImportBatch.Create(tenantId, clinicId, Guid.NewGuid(), null, Guid.NewGuid(), now).Value!;
+        batch.AttachFile(Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"), 0, 0, 1);
+        batch.ApplyMapping("{}", null, now);
+        batch.StartValidation(now);
+        var validationId = Guid.NewGuid();
+        batch.CompleteValidation(validationId, counts, counts, counts, now);
+        batch.StartCommit(validationId, now);
+        batch.CompleteCommit(counts, counts, counts, now).IsSuccess.Should().BeTrue();
+        if (release)
+            batch.ReleaseReminders(now).IsSuccess.Should().BeTrue();
+        return batch;
     }
 
     private static ReminderProcessorService CreateService(AppDbContext db, FakeReminderEmailOutboxEnqueuer enqueuer, bool enabled = true)
