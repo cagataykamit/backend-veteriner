@@ -36,7 +36,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-017 K8 ("Günlük işlem 
 
 ## 3) `GET /api/v1/reports/daily-transactions`
 
-Sorgu parametreleri:
+Sorgu parametreleri (enum değerleri sorguda ve JSON yanıtta metin olarak gelir/gider):
 
 | Parametre | Tip | Not |
 |---|---|---|

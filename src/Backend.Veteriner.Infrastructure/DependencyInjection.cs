@@ -46,6 +46,7 @@ using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
 using Backend.Veteriner.Application.Reports.Appointments;
 using Backend.Veteriner.Application.Reports.OutstandingBalances;
+using Backend.Veteriner.Application.Reports.DailyTransactions;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Reports.Registers.ControlledSubstances;
 using Backend.Veteriner.Application.Reports.Registers.Examinations;
@@ -174,6 +175,9 @@ public static class DependencyInjection
         services.AddScoped<IPaymentPetCountReader, PaymentPetCountReader>();
         services.AddScoped<IAppointmentsReportStatusBreakdownReader, AppointmentsReportStatusBreakdownReader>();
         services.AddScoped<IOutstandingBalancesReportReader, OutstandingBalancesReportReader>();
+        services.AddScoped<DailyTransactionsReader>();
+        services.AddScoped<IDailyTransactionsReader>(sp => sp.GetRequiredService<DailyTransactionsReader>());
+        services.AddScoped<ICashEventsReader>(sp => sp.GetRequiredService<DailyTransactionsReader>());
         services.AddScoped<IRegisterReader<ExaminationRegisterItemDto>, ExaminationRegisterReader>();
         services.AddScoped<IRegisterReader<PrescriptionRegisterEntryDto>, PrescriptionRegisterReader>();
         services.AddScoped<IRegisterReader<VaccineRegisterItemDto>, VaccineRegisterReader>();
