@@ -67,8 +67,7 @@ public sealed class PrescriptionRegisterReader : IRegisterReader<PrescriptionReg
                 Items = p.Items.OrderBy(i => i.SortOrder)
                     .Select(i => new { i.Name, i.Quantity })
                     .ToList(),
-                VeterinarianUserId = (v == null ? null : v.ResponsibleVeterinarianUserId)
-                                     ?? (e == null ? null : e.FinalizedByUserId),
+                VeterinarianUserId = v == null ? null : v.ResponsibleVeterinarianUserId,
             }).ToListAsync(ct);
 
         var veterinarianIds = rows.Where(r => r.VeterinarianUserId.HasValue).Select(r => r.VeterinarianUserId!.Value).Distinct().ToList();

@@ -76,7 +76,7 @@ public sealed class ExaminationRegisterReader : IRegisterReader<ExaminationRegis
                 Complaint = e.VisitReason,
                 Diagnosis = e.Assessment,
                 e.Plan,
-                VeterinarianUserId = (v == null ? null : v.ResponsibleVeterinarianUserId) ?? e.FinalizedByUserId,
+                VeterinarianUserId = v == null ? null : v.ResponsibleVeterinarianUserId,
             }).ToListAsync(ct);
 
         var treatments = (await _db.Treatments.AsNoTracking()
