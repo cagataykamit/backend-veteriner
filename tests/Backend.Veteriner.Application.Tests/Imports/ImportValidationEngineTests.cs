@@ -778,6 +778,43 @@ public sealed class ImportValidationEngineTests
     }
 
     [Fact]
+    public void Pet_Duplicate_Name_Is_Turkish_Aware_In_File()
+    {
+        // Müşteri kuralıyla tutarlı: KARAMEL / Karamel ve ISPARTA / Isparta aynı hayvan (eski ToLowerInvariant sınırı kalktı).
+        var output = Run(
+            customers: Customers(Customer(no: "M-1")),
+            pets: Pets(
+                Pet(customerNo: "M-1", name: "Karamel"),
+                Pet(customerNo: "M-1", name: "KARAMEL"),
+                Pet(customerNo: "M-1", name: "Isparta"),
+                Pet(customerNo: "M-1", name: "İSPARTA")));
+
+        Codes(Single(output, ImportTable.Pets, 3)).Should().Equal("Imports.DuplicateInFile");
+        Codes(Single(output, ImportTable.Pets, 5)).Should().Equal("Imports.DuplicateInFile");
+        Single(output, ImportTable.Pets, 5).Normalized.MergedIntoRow.Should().Be(4);
+    }
+
+    [Fact]
+    public void Pet_Existing_Name_Match_Is_Turkish_Aware()
+    {
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var existing = new ImportExistingData(
+            [new(clientId, "Ayşe Yılmaz", "905321234567", null)],
+            [new(petId, clientId, "Isparta", Cat, null, null)],
+            []);
+
+        var output = Run(
+            customers: Customers(Customer(no: "M-1")),
+            pets: Pets(Pet(customerNo: "M-1", name: "İSPARTA")),
+            existing: existing);
+
+        var r = Single(output, ImportTable.Pets);
+        r.Normalized.Action.Should().Be(ImportRowAction.Match);
+        r.Normalized.TargetId.Should().Be(petId);
+    }
+
+    [Fact]
     public void Pet_Existing_For_Matched_Client_Should_Match_Without_Overwrite()
     {
         var clientId = Guid.NewGuid();

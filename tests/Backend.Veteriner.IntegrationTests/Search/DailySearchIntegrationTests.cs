@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.Queries.GetList;
+using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -88,6 +89,34 @@ public sealed class DailySearchIntegrationTests
         var names = await ListPetNamesAsync(scope.ServiceProvider, seed.TenantId, search);
 
         names.Should().Contain(expectedPet);
+    }
+
+    [Theory]
+    [InlineData("PAMUK", true)]
+    [InlineData("pamuk", true)]
+    [InlineData("IŞIK", true)]
+    [InlineData("ISIK", true)]
+    [InlineData("Işik", true)]
+    [InlineData("İşık", true)]
+    [InlineData("Pamuk2", false)]
+    public async Task PetDuplicateSpecs_Should_Match_Turkish_And_Accent_Insensitive(string name, bool expected)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var seed = await SeedAsync(scope.ServiceProvider);
+        var pets = scope.ServiceProvider.GetRequiredService<IReadRepository<Pet>>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+        var key = Pet.NormalizeNameForDuplicateCheck(name);
+
+        var found = await pets.FirstOrDefaultAsync(new PetByClientNameAndSpeciesIdSpec(seed.ShuleId, key, speciesId));
+        (found is not null).Should().Be(expected);
+
+        if (found is not null)
+        {
+            var excludingSelf = await pets.FirstOrDefaultAsync(
+                new PetByClientNameAndSpeciesIdExcludingIdSpec(seed.ShuleId, key, speciesId, found.Id));
+            excludingSelf.Should().BeNull();
+        }
     }
 
     [Fact]
