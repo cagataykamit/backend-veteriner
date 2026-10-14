@@ -60,6 +60,7 @@ using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.UserOperationClaims;
 using Backend.Veteriner.Infrastructure.Reminders;
 using Backend.Veteriner.Application.Imports.Commit;
+using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Infrastructure.Imports;
 using Microsoft.Extensions.Logging;
 using Backend.Veteriner.Infrastructure.Security;                                  // JwtOptions, JwtTokenService, Sha256TokenHashService, BcryptPasswordHasher, JwtOptionsProvider
@@ -344,6 +345,19 @@ public static class DependencyInjection
             sp.GetRequiredService<ILogger<ImportCommitProcessor>>(),
             ImportCommitProcessor.NewWorkerId()));
         services.AddHostedService<ImportCommitHostedService>();
+
+        // Geri alma işi (ADR-019 K7; uygulama işiyle aynı ayarlar ve desen) ve bakım işi (K9: Expired + 30 gün temizlik).
+        services.AddScoped<IImportRollbackDependencyReader, ImportRollbackDependencyReader>();
+        services.AddSingleton(sp => new ImportRollbackProcessor(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<IOptions<ImportCommitOptions>>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<ImportRollbackProcessor>>(),
+            ImportCommitProcessor.NewWorkerId()));
+        services.AddHostedService<ImportRollbackHostedService>();
+        services.Configure<ImportMaintenanceOptions>(configuration.GetSection(ImportMaintenanceOptions.SectionName));
+        services.AddSingleton<ImportMaintenanceProcessor>();
+        services.AddHostedService<ImportMaintenanceHostedService>();
 
         // ===== Permission options =====
         services.Configure<PermissionChangeOptions>(configuration.GetSection("PermissionChange"));
