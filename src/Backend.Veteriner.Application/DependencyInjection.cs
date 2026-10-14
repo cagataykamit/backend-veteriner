@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Pets.Timeline;
 using Backend.Veteriner.Application.Reports.Registers;
+using Backend.Veteriner.Application.Sales;
 using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Billing;
@@ -35,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IClinicReadScopeResolver, ClinicReadScopeResolver>();
         services.AddScoped<StockBatchResolver>();
         services.AddScoped<ExpiredStockReader>();
+        services.AddScoped<SaleDtoAssembler>();
         services.AddScoped<RegisterReportRunner>();
 
         // Pet timeline: her kayıt türü kendi okuyucusuyla bağlanır (ödeme okuyucusu Aşama 3 sonrası eklenecek).

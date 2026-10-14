@@ -53,6 +53,9 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
         if (client is null)
             return Result.Failure("Clients.NotFound", "Müşteri bulunamadı.");
 
+        if (client.IsWalkIn)
+            return Result.Failure("Clients.WalkInReadOnly", "Peşin müşteri sistem kaydıdır; düzenlenemez.");
+
         var emailNorm = Client.NormalizeEmailForStorage(request.Email);
         string? phoneNorm = null;
         if (!string.IsNullOrWhiteSpace(request.Phone))

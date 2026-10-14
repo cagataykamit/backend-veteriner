@@ -155,6 +155,13 @@ public static class PermissionCatalog
         public const string Correct = "Administrations.Correct";
     }
 
+    public static class Sales
+    {
+        public const string Read = "Sales.Read";
+        public const string Create = "Sales.Create";
+        public const string Correct = "Sales.Correct";
+    }
+
     public static class Treatments
     {
         public const string Read = "Treatments.Read";
@@ -309,6 +316,10 @@ public static class PermissionCatalog
         new(Administrations.Read, "Uygulama kayıtlarını listeleme ve görüntüleme yetkisi", "Administrations"),
         new(Administrations.Create, "Hastaya uygulanan ürünü kaydetme yetkisi (stok düşer)", "Administrations"),
         new(Administrations.Correct, "Uygulama kaydını gerekçeyle iptal etme yetkisi (stok geri verilir)", "Administrations"),
+
+        new(Sales.Read, "Doğrudan satış kayıtlarını listeleme ve görüntüleme yetkisi", "Sales"),
+        new(Sales.Create, "Muayenesiz ürün satışı oluşturma yetkisi (stok düşer, ücret ve ödeme yazılır)", "Sales"),
+        new(Sales.Correct, "Satışı gerekçeyle iptal etme yetkisi (ödeme/ücret iptal edilir, stok iade veya zarar)", "Sales"),
 
         new(Treatments.Read, "Tedavi kayıtlarını listeleme ve görüntüleme yetkisi", "Treatments"),
         new(Treatments.Create, "Tedavi kaydı oluşturma yetkisi", "Treatments"),

@@ -104,6 +104,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Administrations.Create,
                 PermissionCatalog.Administrations.Correct,
 
+                PermissionCatalog.Sales.Read,
+                PermissionCatalog.Sales.Create,
+                PermissionCatalog.Sales.Correct,
+
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
                 PermissionCatalog.Treatments.Update,
@@ -209,6 +213,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Administrations.Read,
                 PermissionCatalog.Administrations.Create,
                 PermissionCatalog.Administrations.Correct,
+
+                PermissionCatalog.Sales.Read,
+                PermissionCatalog.Sales.Create,
+                PermissionCatalog.Sales.Correct,
 
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
@@ -326,6 +334,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Administrations.Read,
                 PermissionCatalog.Administrations.Create,
                 PermissionCatalog.Administrations.Correct,
+
+                PermissionCatalog.Sales.Read,
+                PermissionCatalog.Sales.Create,
+                PermissionCatalog.Sales.Correct,
 
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Treatments.Create,
@@ -479,6 +491,9 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Charges.Read,
                 PermissionCatalog.Charges.Create,
+
+                PermissionCatalog.Sales.Read,
+                PermissionCatalog.Sales.Create,
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
