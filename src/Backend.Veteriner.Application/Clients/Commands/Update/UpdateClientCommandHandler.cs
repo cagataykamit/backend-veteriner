@@ -6,6 +6,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Clients.Commands.Update;
 
@@ -95,18 +96,30 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
             return preferences;
 
         client.UpdateDetails(request.FullName, request.Email, request.Phone, request.Address);
-        await _clientsWrite.UpdateAsync(client, ct);
 
-        // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
-        await _eventOutbox.EnqueueAsync(
-            ClientIntegrationEventTypes.Updated,
-            new ClientUpdatedIntegrationEvent(
-                Guid.NewGuid(),
-                DateTime.UtcNow,
-                ClientProjectionSnapshotFactory.Create(client)),
-            ct);
+        try
+        {
+            await _clientsWrite.UpdateAsync(client, ct);
 
-        await _clientsWrite.SaveChangesAsync(ct);
+            // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
+            await _eventOutbox.EnqueueAsync(
+                ClientIntegrationEventTypes.Updated,
+                new ClientUpdatedIntegrationEvent(
+                    Guid.NewGuid(),
+                    DateTime.UtcNow,
+                    ClientProjectionSnapshotFactory.Create(client)),
+                ct);
+
+            await _clientsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Okuma ile yazma arasında kayıt değişti (ör. eşzamanlı KVKK rıza işareti; Clients.RowVersion).
+            return Result.Failure(
+                "Clients.ConcurrencyConflict",
+                "Müşteri kaydı başka biri tarafından değiştirildi; sayfayı yenileyip tekrar deneyin.");
+        }
+
         return Result.Success();
     }
 }

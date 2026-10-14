@@ -3,6 +3,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clients.Commands.Create;
 using Backend.Veteriner.Application.Clients.Commands.QuickRegister;
+using Backend.Veteriner.Application.Clients.Commands.SetKvkkConsent;
 using Backend.Veteriner.Application.Clients.Commands.Update;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetById;
@@ -12,7 +13,9 @@ using Backend.Veteriner.Application.Clients.Queries.GetPaymentSummary;
 using Backend.Veteriner.Application.Clients.Queries.GetRecentSummary;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
+using System.Text.Json.Serialization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -120,6 +123,28 @@ public sealed class ClientsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>
+    /// KVKK açık rıza formu sonucu (ADR-021): <c>Accepted</c> / <c>Declined</c> (tarih opsiyonel, verilmezse bugün; gelecek olamaz)
+    /// veya yanlış girişin geri alınması için <c>None</c>. <c>rowVersion</c> zorunlu (GET /clients/{id}); eski sürüm 409
+    /// <c>Clients.ConcurrencyConflict</c>. Hatırlatma tercihine dokunmaz. Bkz. docs/KVKK_CONSENT_API_CONTRACT.md.
+    /// </summary>
+    [HttpPut("{id:guid}/kvkk-consent")]
+    [Authorize(Policy = PermissionCatalog.Clients.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ClientKvkkConsentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SetKvkkConsent([FromRoute] Guid id, [FromBody] SetClientKvkkConsentBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new SetClientKvkkConsentCommand(id, body.Status, body.RecordedOn, body.RowVersion), ct);
+        return result.ToActionResult(this);
+    }
+
     [HttpGet("{id:guid}")]
     [Authorize(Policy = PermissionCatalog.Clients.Read)]
     [ProducesResponseType(typeof(ClientDetailDto), StatusCodes.Status200OK)]
@@ -202,4 +227,17 @@ public sealed class ClientsController : ControllerBase
         var result = await _mediator.Send(new GetClientsListQuery(PageRequestQuery.WithMergedSearch(paging, search)), ct);
         return result.ToActionResult(this);
     }
+}
+
+/// <summary>PUT /api/v1/clients/{id}/kvkk-consent gövdesi.</summary>
+public sealed class SetClientKvkkConsentBody
+{
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public KvkkConsentStatus Status { get; init; }
+
+    /// <summary>Yalnız <c>Accepted</c>/<c>Declined</c> ile; opsiyonel (yyyy-MM-dd), verilmezse bugün.</summary>
+    public DateOnly? RecordedOn { get; init; }
+
+    /// <summary>GET /clients/{id} yanıtındaki Base64 sürüm; zorunlu.</summary>
+    public string? RowVersion { get; init; }
 }

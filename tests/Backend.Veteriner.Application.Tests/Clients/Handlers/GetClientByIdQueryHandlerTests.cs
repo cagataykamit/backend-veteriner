@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clients.Queries.GetById;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
@@ -12,9 +13,10 @@ public sealed class GetClientByIdQueryHandlerTests
 {
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IClinicVeterinarianReader> _userNames = new();
 
     private GetClientByIdQueryHandler CreateHandler()
-        => new(_tenantContext.Object, _clients.Object);
+        => new(_tenantContext.Object, _clients.Object, _userNames.Object);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
@@ -74,5 +76,35 @@ public sealed class GetClientByIdQueryHandlerTests
         dto.Email.Should().Be("ali@example.com");
         dto.Phone.Should().Be("905321234567");
         dto.Address.Should().Be("Ankara");
+        dto.KvkkConsentStatus.Should().Be(KvkkConsentStatus.None);
+        dto.KvkkConsentRecordedOn.Should().BeNull();
+        dto.KvkkConsentRecordedByName.Should().BeNull();
+        _userNames.Verify(
+            r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Return_KvkkConsent_With_Recorder_Name()
+    {
+        var tid = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var entity = new Client(tid, "Ali Veli", "05321234567");
+        entity.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 15), userId);
+        typeof(Client).GetProperty(nameof(Client.RowVersion))!.SetValue(entity, new byte[] { 0, 0, 0, 0, 0, 0, 0, 7 });
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(entity);
+        _userNames.Setup(r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, string?> { [userId] = "Dr. Can" });
+
+        var dto = (await CreateHandler().Handle(new GetClientByIdQuery(entity.Id), CancellationToken.None)).Value!;
+
+        dto.KvkkConsentStatus.Should().Be(KvkkConsentStatus.Accepted);
+        dto.KvkkConsentRecordedOn.Should().Be(new DateOnly(2026, 10, 1));
+        dto.KvkkConsentRecordedByUserId.Should().Be(userId);
+        dto.KvkkConsentRecordedByName.Should().Be("Dr. Can");
+        dto.RowVersion.Should().Be(Convert.ToBase64String(new byte[] { 0, 0, 0, 0, 0, 0, 0, 7 }));
     }
 }
