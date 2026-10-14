@@ -3,6 +3,9 @@ using Backend.Veteriner.Application.Imports.Mapping;
 
 namespace Backend.Veteriner.Application.Imports.Validation;
 
+/// <summary>Hatırlatma etkisi adayı: sonraki aşı tarihi, sahip anahtarı ve sahibin e-postası var mı.</summary>
+public sealed record ImportReminderCandidate(DateTime? DueAtUtc, string? OwnerKey, bool OwnerHasEmail);
+
 /// <summary>
 /// Önizleme toplulaştırması (IMPORT_API_CONTRACT.md §7.6): saklanan satır sonuçlarından (<c>IssuesJson</c>,
 /// <c>NormalizedJson</c>) türetilir; saat bağımlı değerler (hatırlatma penceresi) çağrı anındaki saate göredir.
@@ -74,6 +77,24 @@ public static class ImportPreviewAggregator
         DateTime nowUtc,
         int windowDays,
         bool tenantRemindersEnabled)
+        => ReminderImpactOf(
+            vaccinationNormalizedJson
+                .Select(ImportNormalizedJson.ParseVaccination)
+                .Where(row => row is { Action: ImportRowAction.Create })
+                .Select(row => new ImportReminderCandidate(row!.DueAtUtc, row.OwnerKey, row.OwnerHasEmail)),
+            nowUtc,
+            windowDays,
+            tenantRemindersEnabled);
+
+    /// <summary>
+    /// Sayım kuralının tek yeri: önizlemede normalize satırlardan, uygulama sonrası gerçek içe aktarılmış aşılardan
+    /// (<see cref="ImportReminderImpactReader"/>) gelen adaylar aynı tanımla sayılır.
+    /// </summary>
+    public static ImportReminderImpactDto ReminderImpactOf(
+        IEnumerable<ImportReminderCandidate> candidates,
+        DateTime nowUtc,
+        int windowDays,
+        bool tenantRemindersEnabled)
     {
         var windowEnd = nowUtc.AddDays(windowDays);
         var withDue = 0;
@@ -82,10 +103,9 @@ public static class ImportPreviewAggregator
         var inWindow = 0;
         var owners = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var json in vaccinationNormalizedJson)
+        foreach (var row in candidates)
         {
-            var row = ImportNormalizedJson.ParseVaccination(json);
-            if (row is not { Action: ImportRowAction.Create, DueAtUtc: { } due })
+            if (row.DueAtUtc is not { } due)
                 continue;
 
             withDue++;

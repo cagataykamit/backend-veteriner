@@ -1,5 +1,9 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Imports.Validation;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
+using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Imports.Specs;
 
@@ -25,6 +29,41 @@ public sealed class ImportVaccinationNormalizedJsonSpec : Specification<ImportBa
                          && r.ValidationStatus != ImportRowValidationStatus.Error
                          && r.NormalizedJson != null);
         Query.Select(r => r.NormalizedJson);
+    }
+}
+
+/// <summary>Partinin içe aktardığı uygulanmış aşılar: hasta ve sonraki aşı tarihi (gerçek hatırlatma etkisi).</summary>
+public sealed class ImportedVaccinationDueSpec : Specification<Vaccination, ImportedVaccinationDue>
+{
+    public ImportedVaccinationDueSpec(Guid tenantId, Guid batchId)
+    {
+        Query.AsNoTracking();
+        Query.Where(v => v.TenantId == tenantId && v.ImportBatchId == batchId && v.Status == VaccinationStatus.Applied);
+        Query.Select(v => new ImportedVaccinationDue(v.PetId, v.DueAtUtc));
+    }
+}
+
+/// <summary>Hastaların bugünkü sahibi (tek sorgu; kimlikler tek JSON parametresiyle).</summary>
+public sealed class ImportPetOwnersSpec : Specification<Pet, ImportPetOwner>
+{
+    public ImportPetOwnersSpec(Guid tenantId, IReadOnlyCollection<Guid> petIds)
+    {
+        var ids = petIds.ToArray();
+        Query.AsNoTracking();
+        Query.Where(p => p.TenantId == tenantId && ids.Contains(p.Id));
+        Query.Select(p => new ImportPetOwner(p.Id, p.ClientId));
+    }
+}
+
+/// <summary>Müşterilerin e-postası (yalnız e-posta var mı bilgisi için).</summary>
+public sealed class ImportClientEmailsSpec : Specification<Client, ImportClientEmail>
+{
+    public ImportClientEmailsSpec(Guid tenantId, IReadOnlyCollection<Guid> clientIds)
+    {
+        var ids = clientIds.ToArray();
+        Query.AsNoTracking();
+        Query.Where(c => c.TenantId == tenantId && ids.Contains(c.Id));
+        Query.Select(c => new ImportClientEmail(c.Id, c.Email));
     }
 }
 

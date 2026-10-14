@@ -86,13 +86,26 @@ public static class ImportNormalizedJson
         => JsonSerializer.Serialize(row, row.GetType(), Options);
 
     public static ImportNormalizedVaccination? ParseVaccination(string? json)
+        => Parse<ImportNormalizedVaccination>(json);
+
+    /// <summary>Tablonun normalize satırı; boş veya bozuksa null.</summary>
+    public static ImportNormalizedRow? Parse(ImportTable table, string? json) => table switch
+    {
+        ImportTable.Customers => Parse<ImportNormalizedCustomer>(json),
+        ImportTable.Pets => Parse<ImportNormalizedPet>(json),
+        ImportTable.Vaccinations => Parse<ImportNormalizedVaccination>(json),
+        _ => null,
+    };
+
+    private static T? Parse<T>(string? json)
+        where T : ImportNormalizedRow
     {
         if (string.IsNullOrWhiteSpace(json))
             return null;
 
         try
         {
-            return JsonSerializer.Deserialize<ImportNormalizedVaccination>(json, Options);
+            return JsonSerializer.Deserialize<T>(json, Options);
         }
         catch (JsonException)
         {

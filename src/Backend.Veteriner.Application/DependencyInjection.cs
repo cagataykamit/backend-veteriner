@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<ImportCatalogLoader>();
         services.AddScoped<ImportTableInfoLoader>();
         services.AddScoped<ImportExistingDataLoader>();
+        services.AddScoped<ImportReminderImpactReader>();
 
         // Pet timeline: her kayıt türü kendi okuyucusuyla bağlanır (ödeme okuyucusu Aşama 3 sonrası eklenecek).
         services.AddScoped<IPetTimelineSource, VisitTimelineSource>();

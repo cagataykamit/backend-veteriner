@@ -125,6 +125,14 @@ public static class ImportRules
     public static readonly ImportRule PetRowInvalid = new("Imports.PetRowInvalid", ImportIssueSeverity.Error,
         "Hayvan satırı hatalı olduğu için bu aşı satırı aktarılamaz.");
 
+    // Uygulama (B4; satır sonucu yazılırken sorun listesine eklenir, doğrulama durumu değişmez)
+    public static readonly ImportRule OwnerUnitFailed = new("Imports.OwnerUnitFailed", ImportIssueSeverity.Error,
+        "Aynı sahibe bağlı başka bir satır uygulanamadığı için bu satır da uygulanmadı (sahip birimi bütün olarak yazılır).");
+    public static readonly ImportRule MatchedAtCommit = new("Imports.MatchedAtCommit", ImportIssueSeverity.Info,
+        "Önizlemeden sonra eklenmiş mevcut kayıtla eşleşti; yeni kayıt oluşmadı.");
+    public static readonly ImportRule ApplyFailed = new("Imports.ApplyFailed", ImportIssueSeverity.Error,
+        "Kayıt yazılırken veritabanı çakışması oluştu ve yeniden deneme de başarısız oldu.");
+
     // Dosya düzeyi (satır sorunu değil; preview.blockers)
     public static readonly ImportRule OwnerLinkUnavailable = new("Imports.OwnerLinkUnavailable", ImportIssueSeverity.Error,
         "Hasta tablosu yalnız MusteriNo ile bağlanıyor ancak müşteri tablosu yok veya MusteriNo sütunu eşlenmemiş.");
@@ -172,6 +180,10 @@ public static class ImportIssueJson
             return [];
         }
     }
+
+    /// <summary>Uygulama anı sorununu mevcut listeye ekler (doğrulama sorunları korunur).</summary>
+    public static string? Append(string? json, ImportIssue? issue)
+        => issue is null ? json : Serialize([.. Parse(json), issue]);
 
     /// <summary>Satır sorunlarından birinin kodunu <c>LIKE</c> ile aramak için JSON parçası.</summary>
     public static string CodeFragment(string code) => $"\"code\":\"{code}\"";
