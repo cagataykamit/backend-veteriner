@@ -19,16 +19,16 @@ public sealed class ExaminationConfiguration : IEntityTypeConfiguration<Examinat
         b.Property(x => x.VisitId);
         b.Property(x => x.ExaminedAtUtc).IsRequired();
 
-        b.Property(x => x.VisitReason).IsRequired().HasMaxLength(2000);
+        b.Property(x => x.VisitReason).IsRequired().HasMaxLength(Examination.MaxVisitReasonLength);
         b.Property(x => x.Anamnesis).HasMaxLength(4000);
-        b.Property(x => x.Findings).IsRequired().HasMaxLength(8000);
+        b.Property(x => x.Findings).IsRequired().HasMaxLength(Examination.MaxFindingsLength);
         b.Property(x => x.WeightKg).HasPrecision(9, 3);
         b.Property(x => x.TemperatureC).HasPrecision(5, 2);
         b.Property(x => x.HeartRateBpm);
         b.Property(x => x.RespiratoryRatePerMin);
         b.Property(x => x.VitalsMeasuredAtUtc);
         b.Property(x => x.Assessment).HasMaxLength(4000);
-        b.Property(x => x.Plan).HasMaxLength(4000);
+        b.Property(x => x.Plan).HasMaxLength(Examination.MaxPlanLength);
         b.Property(x => x.Notes).HasMaxLength(4000);
         b.Property(x => x.Status)
             .IsRequired()

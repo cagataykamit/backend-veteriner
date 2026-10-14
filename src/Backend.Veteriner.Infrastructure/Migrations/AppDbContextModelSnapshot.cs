@@ -455,6 +455,94 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("ClinicalTerms", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.ExaminationTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Findings")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Plan")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VisitReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "IsActive");
+
+                    b.HasIndex("TenantId", "NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ExaminationTemplates_TenantId_NormalizedName")
+                        .HasFilter("[TenantId] IS NOT NULL");
+
+                    b.ToTable("ExaminationTemplates", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.ExaminationTemplateLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExaminationTemplateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExaminationTemplateId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ExaminationTemplateLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ExaminationTemplateLines_Quantity_Positive", "[Quantity] > 0");
+                        });
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.PetColor", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3576,6 +3664,21 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Species");
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.ExaminationTemplateLine", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Catalog.ExaminationTemplate", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("ExaminationTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.VaccineDefinition", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Catalog.Species", null)
@@ -3917,6 +4020,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("VaccineDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.ExaminationTemplate", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Prescriptions.Prescription", b =>

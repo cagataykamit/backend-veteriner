@@ -10,6 +10,10 @@ namespace Backend.Veteriner.Domain.Examinations;
 /// </summary>
 public sealed class Examination : AggregateRoot
 {
+    public const int MaxVisitReasonLength = 2000;
+    public const int MaxFindingsLength = 8000;
+    public const int MaxPlanLength = 4000;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
@@ -160,6 +164,50 @@ public sealed class Examination : AggregateRoot
         ApplyVitals(weightKg, temperatureC, heartRateBpm, respiratoryRatePerMin, update.VitalsMeasuredAtUtc);
         UpdatedAtUtc = DateTime.UtcNow;
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Şablon ön dolumu (ADR-020 S4): şikâyet, bulgu ve plan metnini mevcut içeriği silmeden birleştirir
+    /// (<see cref="ExaminationTextMerge"/>). Kesinleşmiş muayeneye uygulanamaz (ADR-013). Metin değişmese de
+    /// <see cref="UpdatedAtUtc"/> yazılır; böylece satır sürümü (rowversion) her uygulamada ilerler ve aynı sürümle
+    /// ikinci uygulama eşzamanlılık hatası alır (çift tıklama koruması).
+    /// </summary>
+    /// <returns>Değişen alanların API adları (<c>visitReason</c>, <c>findings</c>, <c>plan</c>).</returns>
+    public Result<IReadOnlyList<string>> PrefillFromTemplate(string? visitReason, string? findings, string? plan, DateTime nowUtc)
+    {
+        if (IsFinalized)
+        {
+            return Result<IReadOnlyList<string>>.Failure(
+                "Examinations.Finalized",
+                "Kesinleşmiş muayeneye şablon uygulanamaz.");
+        }
+
+        var mergedReason = ExaminationTextMerge.Merge(VisitReason, visitReason, ExaminationTextMerge.InlineSeparator)!;
+        var mergedFindings = ExaminationTextMerge.Merge(Findings, findings, ExaminationTextMerge.BlockSeparator) ?? string.Empty;
+        var mergedPlan = ExaminationTextMerge.Merge(Plan, plan, ExaminationTextMerge.BlockSeparator);
+
+        if (mergedReason.Length > MaxVisitReasonLength
+            || mergedFindings.Length > MaxFindingsLength
+            || (mergedPlan?.Length ?? 0) > MaxPlanLength)
+        {
+            return Result<IReadOnlyList<string>>.Failure(
+                "Examinations.TemplateTextTooLong",
+                "Şablon metni eklenince muayene alanı izin verilen uzunluğu aşıyor; alanı kısaltıp tekrar deneyin.");
+        }
+
+        var changed = new List<string>(3);
+        if (!string.Equals(mergedReason, VisitReason, StringComparison.Ordinal))
+            changed.Add("visitReason");
+        if (!string.Equals(mergedFindings, Findings, StringComparison.Ordinal))
+            changed.Add("findings");
+        if (!string.Equals(mergedPlan, Plan, StringComparison.Ordinal))
+            changed.Add("plan");
+
+        VisitReason = mergedReason;
+        Findings = mergedFindings;
+        Plan = mergedPlan;
+        UpdatedAtUtc = NormalizeUtc(nowUtc);
+        return Result<IReadOnlyList<string>>.Success(changed);
     }
 
     /// <summary>Kesinleşmiş muayeneye bağlı tedavi/reçete/aşı eklenemez veya değiştirilemez; kilit kuralının tek yeri.</summary>
