@@ -72,6 +72,15 @@ public static class ResultExtensions
 
         var normalized = code.ToLowerInvariant();
 
+        // İçe aktarma partisi durum/tekrar çakışmaları (IMPORT_API_CONTRACT.md §8); "validationstale" aşağıdaki
+        // "validation" dalına düşmesin diye önce değerlendirilir.
+        if (normalized is "imports.invalidstate" or "imports.requestidconflict" or "imports.toomanyopendrafts"
+            or "imports.anotherjobrunning" or "imports.validationstale" or "imports.haserrorrows"
+            or "imports.reminderimpactchanged" or "imports.rollbackblocked")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         if (normalized.Contains("duplicate"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
