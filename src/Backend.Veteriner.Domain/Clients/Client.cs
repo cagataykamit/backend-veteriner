@@ -81,45 +81,11 @@ public sealed class Client : AggregateRoot
         => string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
 
     /// <summary>
-    /// Aynı ad + e-posta/telefon mükerreri için tek karşılaştırma anahtarı (yalnız karşılaştırma; saklanan <see cref="FullName"/> olduğu gibi kalır):
-    /// kırp, art arda boşluğu teke indir, Türkçe duyarlı küçült (I/ı/İ/i hepsi "i") ve ç/ğ/ö/ş/ü ile â/î/û aksanlarını at.
+    /// Aynı ad + e-posta/telefon mükerreri için tek karşılaştırma anahtarı (yalnız karşılaştırma; saklanan <see cref="FullName"/> olduğu gibi kalır).
+    /// Kural <see cref="TurkishTextKey.Normalize"/> içindedir.
     /// </summary>
     public static string NormalizeFullNameForDuplicateCheck(string fullName)
-    {
-        if (string.IsNullOrWhiteSpace(fullName))
-            return string.Empty;
-
-        var sb = new System.Text.StringBuilder(fullName.Length);
-        var pendingSpace = false;
-        foreach (var raw in fullName.Trim())
-        {
-            if (char.IsWhiteSpace(raw))
-            {
-                pendingSpace = true;
-                continue;
-            }
-
-            if (pendingSpace)
-            {
-                sb.Append(' ');
-                pendingSpace = false;
-            }
-
-            sb.Append(raw switch
-            {
-                'ı' or 'İ' or 'I' or 'î' or 'Î' => 'i',
-                'ç' or 'Ç' => 'c',
-                'ğ' or 'Ğ' => 'g',
-                'ö' or 'Ö' => 'o',
-                'ş' or 'Ş' => 's',
-                'ü' or 'Ü' or 'û' or 'Û' => 'u',
-                'â' or 'Â' => 'a',
-                _ => char.ToLowerInvariant(raw),
-            });
-        }
-
-        return sb.ToString();
-    }
+        => TurkishTextKey.Normalize(fullName);
 
     /// <summary>Okuma modeli sıralama anahtarı (trim + invariant küçük harf). Mükerrer kuralından bağımsızdır; saklı satırlar değişmesin diye eski biçim korunur.</summary>
     public static string NormalizeFullNameForSort(string fullName)
