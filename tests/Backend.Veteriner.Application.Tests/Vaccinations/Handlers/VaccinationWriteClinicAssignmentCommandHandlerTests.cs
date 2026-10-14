@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Administrations;
+using MediatR;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -54,7 +56,10 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
             _pets.Object,
             _examinations.Object,
             _definitions.Object,
-            _vaccinationsWrite.Object);
+            _vaccinationsRead.Object,
+            _vaccinationsWrite.Object,
+            new Mock<IReadRepository<Administration>>().Object,
+            new Mock<ISender>().Object);
 
     private UpdateVaccinationCommandHandler CreateUpdateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -67,7 +72,8 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
             _examinations.Object,
             _definitions.Object,
             _vaccinationsRead.Object,
-            _vaccinationsWrite.Object);
+            _vaccinationsWrite.Object,
+            new Mock<IReadRepository<Administration>>().Object);
 
     private void SetupTenant(Guid tid, Guid cid, Guid petId)
     {

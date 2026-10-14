@@ -1,4 +1,6 @@
+using Backend.Veteriner.Domain.Administrations;
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -23,6 +25,7 @@ public sealed class GetVaccinationsListQueryHandlerTests
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IReadRepository<Vaccination>> _vaccinations = new();
+    private readonly Mock<IReadRepository<Administration>> _administrations = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
@@ -34,6 +37,7 @@ public sealed class GetVaccinationsListQueryHandlerTests
             _clinicContext.Object,
             _scopeResolver.Object,
             _vaccinations.Object,
+            _administrations.Object,
             _pets.Object,
             _clients.Object,
             _petLookupReader.Object,
@@ -212,11 +216,17 @@ public sealed class GetVaccinationsListQueryHandlerTests
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ClientNameRow> { new(clientId, "Ali Veli") });
 
+        var linked = Administration.Create(
+            tid, clinicId, petId, null, null, Guid.NewGuid(), 1m, DateTime.UtcNow, null, false, null, Guid.NewGuid(), DateTime.UtcNow, null, entity.Id).Value!;
+        _administrations.Setup(r => r.ListAsync(It.IsAny<AdministrationsByVaccinationIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Administration> { linked });
+
         var result = await CreateHandler().Handle(new GetVaccinationsListQuery(new PageRequest { Page = 1, PageSize = 20 }), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         var dto = result.Value!.Items.Should().ContainSingle().Subject;
         dto.Id.Should().Be(entity.Id);
+        dto.AdministrationId.Should().Be(linked.Id);
         dto.ClinicId.Should().Be(clinicId);
         dto.PetId.Should().Be(petId);
         dto.PetName.Should().Be("Pamuk");

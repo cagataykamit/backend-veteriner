@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Vaccinations;
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Administrations.Commands.Void;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -79,6 +80,7 @@ public sealed class VoidAdministrationCommandHandlerTests
             _stockMovements.Object,
             new Mock<IReadRepository<StockBatch>>().Object,
             _administrations.Object,
+            new Mock<IRepository<Vaccination>>().Object,
             _sender.Object,
             TimeProvider.System);
     }

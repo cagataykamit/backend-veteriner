@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -79,6 +80,7 @@ public sealed class ClinicalListSharedSearchLookupFeatureFlagTests
             _clinicContext.Object,
             _scopeResolver.Object,
             vaccinations.Object,
+            new Mock<IReadRepository<Administration>>().Object,
             _pets.Object,
             _clients.Object,
             _petLookupReader.Object,

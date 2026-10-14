@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.Products;
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -42,6 +44,9 @@ public sealed class GetVaccinationByIdQueryHandlerTests
             _userOperationClaims.Object,
             _userClinics.Object,
             _vaccinations.Object,
+            new Mock<IReadRepository<Administration>>().Object,
+            new Mock<IReadRepository<Product>>().Object,
+            new Mock<IReadRepository<StockBatch>>().Object,
             _pets.Object,
             _clients.Object);
 

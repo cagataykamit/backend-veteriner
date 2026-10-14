@@ -17,6 +17,22 @@ public sealed class AdministrationTests
             TenantId, ClinicId, PetId, null, null, ProductId, quantity, Now, notes, false, null, UserId, Now, requestId).Value!;
 
     [Fact]
+    public void Create_Should_Link_Vaccination_When_Given_And_Reject_Empty_Id()
+    {
+        var vaccinationId = Guid.NewGuid();
+
+        var linked = Administration.Create(
+            TenantId, ClinicId, PetId, null, null, ProductId, 1m, Now, null, false, null, UserId, Now, null, vaccinationId);
+        var empty = Administration.Create(
+            TenantId, ClinicId, PetId, null, null, ProductId, 1m, Now, null, false, null, UserId, Now, null, Guid.Empty);
+
+        linked.Value!.VaccinationId.Should().Be(vaccinationId);
+        New().VaccinationId.Should().BeNull();
+        empty.IsSuccess.Should().BeFalse();
+        empty.Error.Code.Should().Be("Administrations.Validation");
+    }
+
+    [Fact]
     public void Create_Should_Set_Fields_And_Start_Active()
     {
         var requestId = Guid.NewGuid();

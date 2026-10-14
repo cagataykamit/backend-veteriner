@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Administrations;
+using MediatR;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Clinics.Access;
@@ -49,7 +51,10 @@ public sealed class CreateVaccinationCommandHandlerTests
             _pets.Object,
             _examinations.Object,
             _definitions.Object,
-            _vaccinationsWrite.Object);
+            new Mock<IReadRepository<Vaccination>>().Object,
+            _vaccinationsWrite.Object,
+            new Mock<IReadRepository<Administration>>().Object,
+            new Mock<ISender>().Object);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
@@ -69,6 +74,29 @@ public sealed class CreateVaccinationCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Tenants.ContextMissing");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ProductGiven_And_Status_NotApplied()
+    {
+        _tenantContext.SetupGet(t => t.TenantId).Returns(Guid.NewGuid());
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        var cmd = new CreateVaccinationCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            TestDefinition.Id,
+            VaccinationStatus.Scheduled,
+            null,
+            DateTime.UtcNow.AddDays(7),
+            null,
+            ProductId: Guid.NewGuid());
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Vaccinations.ProductRequiresAppliedStatus");
     }
 
     [Fact]

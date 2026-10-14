@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Administrations;
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Tests.TestHelpers;
@@ -53,7 +54,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             _examinations.Object,
             _definitions.Object,
             _vaccinationsRead.Object,
-            _vaccinationsWrite.Object);
+            _vaccinationsWrite.Object,
+            new Mock<IReadRepository<Administration>>().Object);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
