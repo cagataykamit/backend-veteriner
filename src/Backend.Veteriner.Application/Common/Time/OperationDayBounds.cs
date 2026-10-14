@@ -35,6 +35,16 @@ public static class OperationDayBounds
         => DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utc), IstanbulTimeZone), DateTimeKind.Unspecified);
 
     /// <summary>
+    /// İstanbul takvim gününün 12:00 anı (UTC). Yalnız-tarih verisi (örn. içe aktarılan aşı tarihi) UTC kaymasıyla
+    /// günü değiştirmesin diye öğle saati seçilir.
+    /// </summary>
+    public static DateTime NoonUtcForLocalDate(DateOnly localDate)
+    {
+        var noon = new DateTime(localDate.Year, localDate.Month, localDate.Day, 12, 0, 0, DateTimeKind.Unspecified);
+        return TimeZoneInfo.ConvertTimeToUtc(noon, IstanbulTimeZone);
+    }
+
+    /// <summary>
     /// UTC anını İstanbul takvim gününe çevirir.
     /// </summary>
     public static DateOnly ToLocalDate(DateTime scheduledAtUtc)

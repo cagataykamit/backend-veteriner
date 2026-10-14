@@ -7,6 +7,9 @@ namespace Backend.Veteriner.Application.Vaccinations;
 /// </summary>
 internal static class VaccinationDueAtWindow
 {
+    /// <summary>Planlanabilecek en uzak gelecek (yıl); içe aktarma doğrulaması da bu sınırı kullanır.</summary>
+    public const int MaxFutureYears = 5;
+
     public static DateTime ToUtc(DateTime value)
         => value.Kind switch
         {
@@ -25,7 +28,7 @@ internal static class VaccinationDueAtWindow
                 "Plan tarihi 10 yıldan daha eski olamaz.");
         }
 
-        if (dueAtUtc > now.AddYears(5))
+        if (dueAtUtc > now.AddYears(MaxFutureYears))
         {
             return Result.Failure(
                 "Vaccinations.DueTooFarInFuture",

@@ -57,4 +57,21 @@ public sealed record ImportOptionsDocument(string OnDuplicateClient)
     public static ImportOptionsDocument Default => new(Match);
 
     public string ToJson() => JsonSerializer.Serialize(this, Json);
+
+    /// <summary>Kayıtlı seçenekler; yoksa veya bozuksa/izinli kümede değilse varsayılan (<see cref="Match"/>).</summary>
+    public static ImportOptionsDocument Parse(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return Default;
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<ImportOptionsDocument>(json, Json);
+            return parsed is not null && AllowedDuplicateClientModes.Contains(parsed.OnDuplicateClient) ? parsed : Default;
+        }
+        catch (JsonException)
+        {
+            return Default;
+        }
+    }
 }
