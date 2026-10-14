@@ -4,6 +4,7 @@ using Backend.Veteriner.Domain.Payments;
 
 namespace Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 
+/// <summary><see cref="PendingChargeCount"/>: muayeneye bağlı "ücret bekliyor" kalemi sayısı (ADR-018); <c>Charges.Read</c> yoksa <c>null</c>.</summary>
 public sealed record ExaminationRelatedSummaryDto(
     Guid ExaminationId,
     Guid PetId,
@@ -15,7 +16,8 @@ public sealed record ExaminationRelatedSummaryDto(
     IReadOnlyList<ExaminationRelatedLabResultItemDto> LabResults,
     IReadOnlyList<ExaminationRelatedHospitalizationItemDto> Hospitalizations,
     IReadOnlyList<ExaminationRelatedAdministrationItemDto> Administrations,
-    IReadOnlyList<ExaminationRelatedPaymentItemDto> Payments);
+    IReadOnlyList<ExaminationRelatedPaymentItemDto> Payments,
+    int? PendingChargeCount = null);
 
 public sealed record ExaminationRelatedTreatmentItemDto(
     Guid Id,

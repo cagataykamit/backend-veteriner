@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.ChargeSuggestions.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -11,6 +12,7 @@ using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.LabResults;
@@ -43,6 +45,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
     private readonly IReadRepository<Administration> _administrations;
     private readonly IReadRepository<Product> _products;
     private readonly IReadRepository<Payment> _payments;
+    private readonly IReadRepository<ChargeSuggestion> _chargeSuggestions;
     private readonly ICurrentUserPermissionChecker _permissionChecker;
 
     public GetExaminationRelatedSummaryQueryHandler(
@@ -62,6 +65,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         IReadRepository<Administration> administrations,
         IReadRepository<Product> products,
         IReadRepository<Payment> payments,
+        IReadRepository<ChargeSuggestion> chargeSuggestions,
         ICurrentUserPermissionChecker permissionChecker)
     {
         _tenantContext = tenantContext;
@@ -80,6 +84,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         _administrations = administrations;
         _products = products;
         _payments = payments;
+        _chargeSuggestions = chargeSuggestions;
         _permissionChecker = permissionChecker;
     }
 
@@ -149,6 +154,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         var productById = productRows.ToDictionary(p => p.Id);
         var pays = !CanRead(PetRecordKind.Payment) ? [] : await _payments.ListAsync(
             new PaymentsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
+        int? pendingChargeCount = !_permissionChecker.HasPermission(PermissionCatalog.Charges.Read) ? null : await _chargeSuggestions.CountAsync(
+            new PendingChargeSuggestionsForExaminationSpec(tenantId, clinicId, examinationId), ct);
 
         var clinicIds = new HashSet<Guid>();
         foreach (var t in treatments) clinicIds.Add(t.ClinicId);
@@ -243,7 +250,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
             labDtos,
             hospDtos,
             adminDtos,
-            payDtos);
+            payDtos,
+            pendingChargeCount);
 
         return Result<ExaminationRelatedSummaryDto>.Success(dto);
     }

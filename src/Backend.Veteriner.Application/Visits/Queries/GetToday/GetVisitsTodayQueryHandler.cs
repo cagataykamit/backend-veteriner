@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Charges.Specs;
+using Backend.Veteriner.Application.ChargeSuggestions.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -7,6 +8,7 @@ using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Visits;
@@ -24,6 +26,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IVisitTodayReader _reader;
     private readonly IReadRepository<Charge> _charges;
+    private readonly IReadRepository<ChargeSuggestion> _chargeSuggestions;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IClinicVeterinarianReader _veterinarians;
     private readonly TimeProvider _timeProvider;
@@ -34,6 +37,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         IClinicReadScopeResolver clinicScopeResolver,
         IVisitTodayReader reader,
         IReadRepository<Charge> charges,
+        IReadRepository<ChargeSuggestion> chargeSuggestions,
         ICurrentUserPermissionChecker permissions,
         IClinicVeterinarianReader veterinarians,
         TimeProvider timeProvider)
@@ -43,6 +47,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         _clinicScopeResolver = clinicScopeResolver;
         _reader = reader;
         _charges = charges;
+        _chargeSuggestions = chargeSuggestions;
         _permissions = permissions;
         _veterinarians = veterinarians;
         _timeProvider = timeProvider;
@@ -120,7 +125,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     }
 
     /// <summary>
-    /// Ücret tutarlarını ekler: ziyaret bazında ve müşterinin bu klinikteki toplam açık borcu.
+    /// Ücret tutarlarını ekler: ziyaret bazında, müşterinin bu klinikteki toplam açık borcu ve ziyaretin bekleyen ücret kalemi sayısı.
     /// <c>Charges.Read</c> yoksa satırlara dokunmaz (alanlar null).
     /// </summary>
     private async Task<IReadOnlyList<TodayItemDto>> WithChargeAmountsAsync(
@@ -140,6 +145,13 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             .GroupBy(r => r.VisitId!.Value)
             .ToDictionary(g => g.Key, g => (Charged: g.Sum(r => r.Amount), Allocated: g.Sum(r => r.AllocatedAmount)));
 
+        var visitIds = items.Where(i => i.VisitId.HasValue).Select(i => i.VisitId!.Value).Distinct().ToArray();
+        var pendingByVisit = visitIds.Length == 0
+            ? new Dictionary<Guid, int>()
+            : (await _chargeSuggestions.ListAsync(new PendingChargeSuggestionVisitIdsSpec(tenantId, clinicId, visitIds), ct))
+                .GroupBy(v => v)
+                .ToDictionary(g => g.Key, g => g.Count());
+
         return items
             .Select(i =>
             {
@@ -153,6 +165,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
                     ChargedAmount = charged,
                     AllocatedAmount = allocated,
                     OutstandingAmount = charged - allocated,
+                    PendingChargeCount = pendingByVisit.GetValueOrDefault(visitId),
                 };
             })
             .ToList();

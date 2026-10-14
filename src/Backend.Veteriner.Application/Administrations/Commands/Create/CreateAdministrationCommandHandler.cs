@@ -14,6 +14,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Treatments;
 using Backend.Veteriner.Application.Treatments.Specs;
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Products;
@@ -29,6 +30,7 @@ namespace Backend.Veteriner.Application.Administrations.Commands.Create;
 /// Uygulama kaydını yazar, ardından stok düşümünü mevcut <see cref="CreateStockMovementCommand"/> ile aynı transaction'da yapar
 /// (stok kuralları tek yerde yaşar). Atomiklik, komutun <see cref="ITransactionalRollbackOnFailureRequest"/> işaretiyle
 /// <c>TransactionBehavior</c> tarafından sağlanır: stok adımı başarısız olursa uygulama kaydı geri alınır.
+/// Fiyatlı üründe aynı transaction'da "ücret bekliyor" kalemi (<see cref="ChargeSuggestion"/>) yazılır.
 /// </summary>
 public sealed class CreateAdministrationCommandHandler
     : IRequestHandler<CreateAdministrationCommand, Result<AdministrationCreateResultDto>>
@@ -48,6 +50,7 @@ public sealed class CreateAdministrationCommandHandler
     private readonly IReadRepository<StockBatch> _batches;
     private readonly IReadRepository<Administration> _administrationsRead;
     private readonly IRepository<Administration> _administrationsWrite;
+    private readonly IRepository<ChargeSuggestion> _chargeSuggestions;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
     private readonly ExpiredStockReader _expiredStock;
@@ -66,6 +69,7 @@ public sealed class CreateAdministrationCommandHandler
         IReadRepository<StockBatch> batches,
         IReadRepository<Administration> administrationsRead,
         IRepository<Administration> administrationsWrite,
+        IRepository<ChargeSuggestion> chargeSuggestions,
         ISender sender,
         TimeProvider timeProvider,
         ExpiredStockReader expiredStock)
@@ -83,6 +87,7 @@ public sealed class CreateAdministrationCommandHandler
         _batches = batches;
         _administrationsRead = administrationsRead;
         _administrationsWrite = administrationsWrite;
+        _chargeSuggestions = chargeSuggestions;
         _sender = sender;
         _timeProvider = timeProvider;
         _expiredStock = expiredStock;
@@ -139,12 +144,16 @@ public sealed class CreateAdministrationCommandHandler
         if (!product.IsActive)
             return Fail("Products.Inactive", "Pasif ürün için uygulama kaydı oluşturulamaz.");
 
+        if (!product.IsStockTracked)
+            return Fail("Products.NotStockTracked", "Hizmet kalemi için uygulama kaydı oluşturulamaz.");
+
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, request.PetId), ct);
         if (pet is null)
             return Fail("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
         var examinationId = request.ExaminationId;
         var addedAfterFinalization = false;
+        Guid? visitId = null;
         if (request.TreatmentId is { } treatmentId)
         {
             var treatment = await _treatments.FirstOrDefaultAsync(new TreatmentByIdSpec(tenantId, treatmentId), ct);
@@ -181,6 +190,7 @@ public sealed class CreateAdministrationCommandHandler
 
             // Kesinleşmiş muayene uygulamayı reddetmez (ADR-013): sonradan ekleme olarak gerekçeyle kaydedilir.
             addedAfterFinalization = exam.IsFinalized;
+            visitId = exam.VisitId;
         }
 
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
@@ -251,6 +261,16 @@ public sealed class CreateAdministrationCommandHandler
             batch = await _batches.FirstOrDefaultAsync(new StockBatchByIdSpec(tenantId, batchId), ct);
             administration.LinkBatch(batchId);
             await _administrationsWrite.UpdateAsync(administration, ct);
+        }
+
+        // Ücretlendirilebilir uygulama "ücret bekliyor" kalemi doğurur (ADR-018); hekim ücret yazmaz, resepsiyon çevirir.
+        if (ChargeSuggestion.IsChargeable(product))
+        {
+            var suggestion = ChargeSuggestion.ForAdministration(administration, product, visitId);
+            if (!suggestion.IsSuccess)
+                return Result<AdministrationCreateResultDto>.Failure(suggestion.Error);
+
+            await _chargeSuggestions.AddAsync(suggestion.Value!, ct);
         }
 
         var stock = await _stocks.FirstOrDefaultAsync(
