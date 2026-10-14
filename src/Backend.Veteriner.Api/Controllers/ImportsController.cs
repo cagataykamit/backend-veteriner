@@ -3,8 +3,10 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Imports.Commands.Commit;
 using Backend.Veteriner.Application.Imports.Commands.Create;
 using Backend.Veteriner.Application.Imports.Commands.Discard;
+using Backend.Veteriner.Application.Imports.Commands.ReleaseReminders;
 using Backend.Veteriner.Application.Imports.Commands.UpdateMapping;
 using Backend.Veteriner.Application.Imports.Commands.Validate;
 using Backend.Veteriner.Application.Imports.Contracts.Dtos;
@@ -12,6 +14,7 @@ using Backend.Veteriner.Application.Imports.Queries.GetById;
 using Backend.Veteriner.Application.Imports.Queries.GetErrors;
 using Backend.Veteriner.Application.Imports.Queries.GetList;
 using Backend.Veteriner.Application.Imports.Queries.GetPreview;
+using Backend.Veteriner.Application.Imports.Queries.GetProgress;
 using Backend.Veteriner.Application.Imports.Queries.GetRows;
 using Backend.Veteriner.Application.Imports.Queries.GetTemplate;
 using Backend.Veteriner.Application.Imports.Reading;
@@ -267,6 +270,69 @@ public sealed class ImportsController : ControllerBase
         Response.Headers.CacheControl = "no-store";
         var file = result.Value!;
         return File(file.Content, file.ContentType, file.FileName);
+    }
+
+    /// <summary>
+    /// Önizlenen doğrulamayı onaylar ve arka plan uygulamasını başlatır: yeni iş 202 + parti (<c>Committing</c>), aynı
+    /// <c>validationId</c> ile tekrar 200 + aynı parti. İlerleme <c>GET .../progress</c> ile yoklanır.
+    /// </summary>
+    [HttpPost("batches/{id:guid}/commit")]
+    [Authorize(Policy = PermissionCatalog.Imports.Commit)]
+    [ProducesResponseType(typeof(ImportBatchDto), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ImportBatchDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CommitBatch([FromRoute] Guid id, [FromBody] ImportCommitBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CommitImportBatchCommand(id, body.ValidationId, body.OnErrors), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var commit = result.Value!;
+        return commit.Started ? Accepted(commit.Batch) : Ok(commit.Batch);
+    }
+
+    /// <summary>Uygulama ilerlemesi (hafif yoklama ucu; önerilen aralık 2 sn).</summary>
+    [HttpGet("batches/{id:guid}/progress")]
+    [Authorize(Policy = PermissionCatalog.Imports.Read)]
+    [ProducesResponseType(typeof(ImportProgressDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetProgress([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetImportBatchProgressQuery(id), ct);
+        if (result.IsSuccess)
+            Response.Headers.CacheControl = "no-store";
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// İçe aktarılan aşıların hatırlatmalarını bilinçli açar (geri alınamaz). <c>confirmEmailCount</c> güncel
+    /// hatırlatma penceresi e-posta sayısıyla eşleşmezse 409 + güncel sayı.
+    /// </summary>
+    [HttpPost("batches/{id:guid}/release-reminders")]
+    [Authorize(Policy = PermissionCatalog.Imports.Commit)]
+    [ProducesResponseType(typeof(ImportReleaseRemindersResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReleaseReminders(
+        [FromRoute] Guid id,
+        [FromBody] ImportReleaseRemindersBody body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ReleaseImportRemindersCommand(id, body.ConfirmEmailCount), ct);
+        return result.ToActionResult(this);
     }
 
     /// <summary>Taslak partiyi siler (<c>Discarded</c>); ürün verisine dokunmaz. Uygulanmış/çalışan partide 409.</summary>
