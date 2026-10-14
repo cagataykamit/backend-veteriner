@@ -43,6 +43,16 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
             .IsRequired()
             .HasDefaultValue(false);
 
+        // Mevcut satırlar tercihsiz ve hatırlatmaya açık kalır (ADR-020 S5).
+        b.Property(x => x.PreferredContactChannel)
+            .IsRequired()
+            .HasConversion<int>()
+            .HasDefaultValue(ContactChannel.None);
+
+        b.Property(x => x.RemindersOptedOut)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.FullName });
 

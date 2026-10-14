@@ -90,6 +90,10 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
             }
         }
 
+        var preferences = client.ApplyContactPreferences(request.PreferredContactChannel, request.RemindersOptedOut);
+        if (!preferences.IsSuccess)
+            return preferences;
+
         client.UpdateDetails(request.FullName, request.Email, request.Phone, request.Address);
         await _clientsWrite.UpdateAsync(client, ct);
 

@@ -85,6 +85,10 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
         }
 
         var client = new Client(tenantId, request.FullName, request.Phone, request.Email, request.Address);
+        var preferences = client.ApplyContactPreferences(request.PreferredContactChannel, request.RemindersOptedOut);
+        if (!preferences.IsSuccess)
+            return Result<ClientCreatedDto>.Failure(preferences.Error);
+
         await _clientsWrite.AddAsync(client, ct);
 
         // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).

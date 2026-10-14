@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Clients;
@@ -27,6 +28,15 @@ public sealed class Client : AggregateRoot
 
     /// <summary>Müşterisiz perakende satışın yazıldığı sistem müşterisi; düzenlenemez, kiracıda en fazla bir.</summary>
     public bool IsWalkIn { get; private set; }
+
+    /// <summary>Tercih edilen iletişim kanalı (yalnız bilgi); varsayılan <see cref="ContactChannel.None"/>.</summary>
+    public ContactChannel PreferredContactChannel { get; private set; } = ContactChannel.None;
+
+    /// <summary>Müşteri otomatik hatırlatma istemiyor; true iken aşı/randevu hatırlatma adaylarından dışlanır.</summary>
+    public bool RemindersOptedOut { get; private set; }
+
+    /// <summary>Otomatik hatırlatma alabilen müşteri koşulu (tek kural; hatırlatma aday sorguları bunu kullanır).</summary>
+    public static readonly Expression<Func<Client, bool>> AcceptsReminders = c => !c.RemindersOptedOut;
 
     private Client() { }
 
@@ -58,6 +68,22 @@ public sealed class Client : AggregateRoot
         ApplyPhone(phone);
         Address = NormalizeAddress(address);
         UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// İletişim tercihlerini günceller; <c>null</c> parametre mevcut değere dokunmaz (PUT tam değiştirme olduğu için
+    /// alanı bilmeyen eski istemci tercihi silmesin). Kanal tercihi <see cref="ContactChannel.None"/> ile temizlenir.
+    /// </summary>
+    public Result ApplyContactPreferences(ContactChannel? preferredChannel, bool? remindersOptedOut)
+    {
+        if (preferredChannel is { } channel && !Enum.IsDefined(channel))
+            return Result.Failure("Clients.Validation", "Geçersiz iletişim kanalı.");
+
+        if (preferredChannel is { } newChannel)
+            PreferredContactChannel = newChannel;
+        if (remindersOptedOut is { } optedOut)
+            RemindersOptedOut = optedOut;
+        return Result.Success();
     }
 
     private void ApplyPhone(string? phone)

@@ -39,7 +39,9 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
             client.FullName,
             client.Email,
             client.Phone,
-            client.Address);
+            client.Address,
+            client.PreferredContactChannel,
+            client.RemindersOptedOut);
         return Result<ClientDetailDto>.Success(dto);
     }
 }

@@ -33,5 +33,9 @@ public sealed class UpdateClientCommandValidator : AbstractValidator<UpdateClien
         RuleFor(x => x.Address)
             .MaximumLength(500).WithMessage("Adres en fazla 500 karakter olabilir.")
             .When(x => !string.IsNullOrWhiteSpace(x.Address));
+
+        RuleFor(x => x.PreferredContactChannel!.Value)
+            .IsInEnum().WithMessage("Geçersiz iletişim kanalı.")
+            .When(x => x.PreferredContactChannel.HasValue);
     }
 }
