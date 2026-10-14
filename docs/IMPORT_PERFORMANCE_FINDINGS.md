@@ -169,3 +169,20 @@ Aynı makine, aynı test (`ImportPerformanceTests`, 5.000 müşteri ölçeği), 
 - **4.3 (indeks) uygulanmadı:** commit'teki K10 çip denetimi artık yalnız çip sorgusunu çalıştırıyor (boş `ClientId IN OPENJSON` kolu kalktı). Önce 2.965 çağrı toplam 17.911 ms (işçinin süre sıralamasında 2.); sonra işçinin en yüksek 8 komutu arasına girmiyor (< 5.645 ms; tam değer raporda yok). Kalan maliyet commit süresinin < %5'i olduğundan `(TenantId, MicrochipNumber)` indeksi ve migration ölçülmüş bir fayda göstermiyor; kiracı hasta sayısı çok büyürse yeniden ölçülmeli.
 - **3.7 geri alma sırası:** kod değişmedi; sözleşmeye (`IMPORT_API_CONTRACT.md` §9) "bağlı partiler ters sırayla geri alınır" notu eklendi.
 - **4.4 tablo sınırı:** değiştirilmedi (öneri raporda).
+
+## 8. Doğrulama arka plan işine alındı (ADR-019 K13, dal `feat/ice-aktarma-dogrulama-arka-plan`, 2026-10-15)
+
+`POST .../validate` artık işi kuyruğa alıp `202` döner; satırları `ImportValidationProcessor` işler (sözleşme `IMPORT_API_CONTRACT.md` §7.4). Bu §4.5'teki "staging'de 60 sn aşılırsa arka plana al" önerisinin ölçümden bağımsız olarak uygulanmasıdır (kullanıcı kararı). Ölçüm: aynı makine, aynı oturum, `ImportPerformanceTests` (`VETINITY_PERF=1`, `IMPORT_PERF_CUSTOMERS=5000`, izole koşu kimlikli LocalDB), önce = `main` (`d055927`, senkron istek süresi), sonra = bu dal (POST + işin bitişine kadar 250 ms aralıklı `progress` yoklaması; perf işçisi `PollIntervalSeconds = 1`). Diğer ajanların süreçleri aynı anda çalışıyordu; mutlak değerler bölüm 6'daki sapmaya tabidir.
+
+| Aşama | Önce: senkron istek (ms) | Sonra: POST yanıtı (ms) | Sonra: bitişe kadar (ms) |
+|---|---|---|---|
+| A doğrula (1. tur) | 25.509 | 20 | 25.891 |
+| A doğrula (2. tur) | 2.342 | 11 | 4.080 |
+| A CSV-1254 varyantı doğrula | 23.285 | 10 | 26.963 |
+| B doğrula (1. tur) | 10.482 | 12 | 11.521 |
+| B doğrula (2. tur) | 836 | 8 | 2.455 |
+
+- İstek artık anlık (8–20 ms); toplam iş süresi pratikte aynı. Fark: işçinin işi alma gecikmesi (boşta yoklama aralığı, üretimde en çok 2 sn), yoklama tanesi (≤ 250 ms) ve önceki sonuçların sıfırlanıp parça parça yazılması. Sonuç sayıları, sorun dağılımları ve tüm denetimler (`[x]`) önceki koşuyla aynı.
+- İlk ölçümde yeniden doğrulama (2. tur) belirgin yavaştı (A 11.933 ms, B 7.129 ms): sıfırlanan durum yüzünden her satır ayrı `UPDATE` ile yazılıyordu. Sonucu değişmeyen satırların yalnız durumu parça başına küme güncellemesiyle yazılınca yukarıdaki değerlere indi (commit `perf(imports): yeniden dogrulamada ...`).
+- Sorgu sayısı (`ImportValidationQueryCountTests`, istek + işçi): 9 / 10.200 / 24.000 satırda 21 SELECT (önceki yalnız istek: 16); 10.200 satır ≈ 2,4 sn, 24.000 satır ≈ 2,3 sn; POST yanıtı 8–33 ms.
+- **Doğrulanmadı:** staging SQL'de süre; çok örnekli kurulumda iki işçinin gerçekten yarıştığı senaryo (kira/rowversion birim ve entegrasyon testleriyle sınandı, gerçek iki süreçle değil).
