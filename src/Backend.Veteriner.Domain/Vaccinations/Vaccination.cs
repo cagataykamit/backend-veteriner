@@ -72,6 +72,32 @@ public sealed class Vaccination : AggregateRoot
         UpdatedAtUtc = null;
     }
 
+    /// <summary>
+    /// İçe aktarılan geçmiş aşı (ADR-019): her zaman <see cref="VaccinationStatus.Applied"/>, muayenesiz, partiye bağlı.
+    /// Stok/uygulama kaydı oluşmaz. Tarih kuralları çağıran içe aktarma yolunda mevcut kural sınıflarıyla denetlenir.
+    /// </summary>
+    public static Vaccination CreateImported(
+        Guid tenantId,
+        Guid petId,
+        Guid clinicId,
+        Guid vaccineDefinitionId,
+        string vaccineNameSnapshot,
+        DateTime appliedAtUtc,
+        DateTime? dueAtUtc,
+        string? notes,
+        Guid importBatchId)
+    {
+        if (importBatchId == Guid.Empty)
+            throw new ArgumentException("ImportBatchId geçersiz.", nameof(importBatchId));
+
+        return new Vaccination(
+            tenantId, petId, clinicId, examinationId: null, vaccineDefinitionId, vaccineNameSnapshot,
+            VaccinationStatus.Applied, appliedAtUtc, dueAtUtc, notes)
+        {
+            ImportBatchId = importBatchId,
+        };
+    }
+
     public Result UpdateDetails(
         Guid petId,
         Guid clinicId,

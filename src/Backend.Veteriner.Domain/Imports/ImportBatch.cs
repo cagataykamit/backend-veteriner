@@ -28,6 +28,12 @@ public sealed class ImportBatch : AggregateRoot
     /// <summary>Senkron doğrulamanın kira sahibi (arka plan işçisi B4'te kendi adını kullanır).</summary>
     public const string ValidationLeaseOwner = "api";
 
+    /// <summary>
+    /// Uygulama (commit) işçisinin kirası. İşçi her parçada ve her sahip biriminde yeniler; süreç çökerse bu süre sonunda
+    /// başka örnek (veya yeniden başlayan uygulama) partiyi devralır.
+    /// </summary>
+    public static readonly TimeSpan CommitLeaseDuration = TimeSpan.FromMinutes(2);
+
     /// <summary>Satır verisinin (kişisel veri) saklama süresi; son durum değişikliğinden sayılır (ADR-019 K9).</summary>
     public static readonly TimeSpan PayloadRetention = TimeSpan.FromDays(30);
 
@@ -266,6 +272,42 @@ public sealed class ImportBatch : AggregateRoot
         return MoveTo(ImportBatchStatus.Committing, nowUtc, ImportBatchStatus.Validated);
     }
 
+    /// <summary>Uygulama işi sürerken kirayı bu işçi tutuyor mu (süresi dolmamış).</summary>
+    public bool IsCommitLeaseActive(DateTime nowUtc)
+        => Status == ImportBatchStatus.Committing && LeaseUntilUtc > NormalizeUtc(nowUtc);
+
+    /// <summary>
+    /// Arka plan işçisi <c>Committing</c> partiyi alır: kira boşsa, süresi dolduysa (çökme sonrası devralma) veya zaten
+    /// bu işçideyse. Eşzamanlı iki işçiden yalnız biri kaydedebilir (rowversion).
+    /// </summary>
+    public Result ClaimCommitLease(string owner, DateTime nowUtc)
+    {
+        var ownerCheck = ValidateLeaseOwner(owner);
+        if (!ownerCheck.IsSuccess)
+            return ownerCheck;
+
+        if (Status != ImportBatchStatus.Committing)
+            return InvalidState($"Parti '{Status}' durumunda; uygulama kirası alınamaz.");
+
+        var now = NormalizeUtc(nowUtc);
+        if (IsCommitLeaseActive(now) && LeaseOwner != owner)
+            return Result.Failure("Imports.AnotherJobRunning", "Partinin uygulama kirası başka bir işçide.");
+
+        LeaseOwner = owner;
+        LeaseUntilUtc = now + CommitLeaseDuration;
+        return Result.Success();
+    }
+
+    /// <summary>Kirayı uzatır; kira başka işçiye geçtiyse (devralındıysa) reddedilir ve eski işçi durmalıdır.</summary>
+    public Result RenewCommitLease(string owner, DateTime nowUtc)
+    {
+        if (Status != ImportBatchStatus.Committing || LeaseOwner != owner)
+            return Result.Failure("Imports.LeaseLost", "Partinin uygulama kirası bu işçide değil.");
+
+        LeaseUntilUtc = NormalizeUtc(nowUtc) + CommitLeaseDuration;
+        return Result.Success();
+    }
+
     public Result CompleteCommit(
         ImportTableCounts customers,
         ImportTableCounts pets,
@@ -277,6 +319,7 @@ public sealed class ImportBatch : AggregateRoot
             return moved;
 
         CommittedAtUtc = UpdatedAtUtc;
+        ReleaseLease();
         CustomerCounts = customers;
         PetCounts = pets;
         VaccinationCounts = vaccinations;
@@ -285,7 +328,12 @@ public sealed class ImportBatch : AggregateRoot
 
     /// <summary>Beklenmeyen hata: uygulanmış satırlar korunur ve geri alınabilir.</summary>
     public Result FailCommit(DateTime nowUtc)
-        => MoveTo(ImportBatchStatus.CommitFailed, nowUtc, ImportBatchStatus.Committing);
+    {
+        var moved = MoveTo(ImportBatchStatus.CommitFailed, nowUtc, ImportBatchStatus.Committing);
+        if (moved.IsSuccess)
+            ReleaseLease();
+        return moved;
+    }
 
     public Result StartRollback(DateTime nowUtc)
         => MoveTo(
@@ -372,6 +420,11 @@ public sealed class ImportBatch : AggregateRoot
         LeaseOwner = null;
         LeaseUntilUtc = null;
     }
+
+    private static Result ValidateLeaseOwner(string owner)
+        => string.IsNullOrWhiteSpace(owner) || owner.Length > MaxLeaseOwnerLength
+            ? Result.Failure("Imports.Validation", $"Kira sahibi boş olamaz ve en fazla {MaxLeaseOwnerLength} karakter olabilir.")
+            : Result.Success();
 
     private static string? NormalizeName(string? name)
         => string.IsNullOrWhiteSpace(name) ? null : name.Trim();

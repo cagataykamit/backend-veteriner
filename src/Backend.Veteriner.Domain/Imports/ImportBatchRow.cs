@@ -45,6 +45,35 @@ public sealed class ImportBatchRow
         NormalizedJson = normalizedJson;
     }
 
+    /// <summary>
+    /// Uygulama sonucunu yazar (kayıtla aynı transaction'da). Satır yalnız bir kez uygulanır: sonucu yazılmış satır için
+    /// ikinci çağrı reddedilir (yeniden çalıştırmada aynı satır iki kez yazılmaz). <paramref name="issuesJson"/> verilirse
+    /// sorun listesinin yerini alır (uygulama anı sorunları doğrulama sorunlarına eklenmiş hâliyle gelir).
+    /// </summary>
+    public void RecordApplyResult(
+        ImportRowApplyStatus status,
+        string? targetEntityType,
+        Guid? targetEntityId,
+        bool matched,
+        DateTime appliedAtUtc,
+        string? issuesJson = null)
+    {
+        if (status is ImportRowApplyStatus.Pending or ImportRowApplyStatus.RolledBack or ImportRowApplyStatus.Kept)
+            throw new ArgumentOutOfRangeException(nameof(status), "Uygulama sonucu Created/Matched/Skipped/Failed olmalıdır.");
+        if (ApplyStatus != ImportRowApplyStatus.Pending)
+            throw new InvalidOperationException($"Satır zaten uygulanmış ({ApplyStatus}); ikinci kez yazılamaz.");
+        if (targetEntityType is { Length: > MaxTargetEntityTypeLength })
+            throw new ArgumentOutOfRangeException(nameof(targetEntityType));
+
+        ApplyStatus = status;
+        TargetEntityType = targetEntityId is null ? null : targetEntityType;
+        TargetEntityId = targetEntityId;
+        Matched = matched;
+        AppliedAtUtc = appliedAtUtc.Kind == DateTimeKind.Utc ? appliedAtUtc : DateTime.SpecifyKind(appliedAtUtc, DateTimeKind.Utc);
+        if (issuesJson is not null)
+            IssuesJson = issuesJson;
+    }
+
     /// <summary>Saklama süresi sonunda kişisel veriyi boşaltır; satır kimliği, durumları ve hedef kayıt kimliği kalır.</summary>
     public void PurgePayload()
     {
