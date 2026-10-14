@@ -208,13 +208,13 @@ Kaynak: ADR-017 K1, UX denetimi B-01. Rakip pratiği: aşı ürün bazlıdır (�
 
 ### 9.3 Oluşturma kuralları (aşı ucu)
 
-`Vaccinations.Create` + `productId` verilirse ayrıca `Administrations.Create` izni gerekir (yoksa `Vaccinations.AdministrationPermissionRequired`, 403). `productId` yoksa davranış değişmez.
+`Vaccinations.Create` + `productId` verilirse ayrıca `Administrations.Create` izni gerekir (yoksa `Vaccinations.AdministrationForbidden`, 403). `productId` yoksa davranış değişmez.
 
 - `status` `Applied` olmalı (`Vaccinations.ProductRequiresAppliedStatus`, 400); `appliedAtUtc` uygulama zamanı olur ve uygulama penceresine (bölüm 3 kural 6: 7 gün geri) de uymalıdır.
 - `quantity` verilmezse `1` (ürünün stok birimi cinsinden; bölüm 1). `batchId` verilmezse FEFO; süresi geçmiş parti, yetersiz bakiye, pasif ürün, `requestId` ve eşzamanlılık kuralları bölüm 3 ile aynıdır (`Administrations.*` ve `Products.*` kodlarıyla döner).
 - Muayene bağlıysa ve kesinleşmişse aşı kilidi önce çalışır (`Examinations.Finalized`); aşı için "sonradan ekleme" yoktur, `lateEntryReason` alınmaz.
 - Aynı `requestId` ile tekrar: önceki kayıt aynı aşı/uygulama ise **200** ve ilk kayıt (stok değişmez); farklı içerik `Administrations.DuplicateRequestId` veya `Vaccinations.DuplicateRequestId` (409); iptal edilmişse `Administrations.RequestIdVoided` (409).
-- Hata olursa (ör. yetersiz stok) aşı kaydı da yazılmaz.
+- Hata olursa (ör. yetersiz stok) aşı kaydı da yazılmaz. Aynı `requestId` ile **eşzamanlı** iki istekte kaybeden `Vaccinations.ConcurrencyConflict` (409) alır ve aşı kaydı geri alınır; aynı gövde ve `requestId` ile yeniden deneme 200 ve ilk kaydı döndürür.
 
 ### 9.4 Frontend için değişenler
 
@@ -228,7 +228,7 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 | `GET /administrations` / detay | `vaccinationId` |
 | `PUT /vaccinations/{id}` | Bağlı kayıtta kilitli alanlar için `Vaccinations.LinkedToAdministration` (409); ekranda bu alanları pasif göster, iptal için "uygulamayı iptal et" akışı |
 | Timeline / related-summary | Bağlı uygulama ayrı satır değil; aşı satırı |
-| Hatalar (yeni) | `Vaccinations.ProductRequiresAppliedStatus` (400), `Vaccinations.LinkedToAdministration` (409), `Vaccinations.DuplicateRequestId` (409), `Vaccinations.AdministrationPermissionRequired` (403) |
+| Hatalar (yeni) | `Vaccinations.ProductRequiresAppliedStatus` (400), `Vaccinations.LinkedToAdministration` (409), `Vaccinations.DuplicateRequestId` (409), `Vaccinations.ConcurrencyConflict` (409), `Vaccinations.AdministrationForbidden` (403) |
 
 ### 9.5 Uygulama notları
 
