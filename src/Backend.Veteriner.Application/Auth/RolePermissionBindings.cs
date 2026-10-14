@@ -161,6 +161,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.StockMovements.Read,
                 PermissionCatalog.StockMovements.Create,
                 PermissionCatalog.StockMovements.Correct,
+
+                // İçe aktarma yalnız yönetici düzeyi (ADR-019 K8).
+                PermissionCatalog.Imports.Read,
+                PermissionCatalog.Imports.Manage,
+                PermissionCatalog.Imports.Commit,
             ],
 
             // Tenant sahibi: Admin ile aynı operasyonel paket (ürün kararı: Owner ≈ Admin).
@@ -271,6 +276,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.StockMovements.Read,
                 PermissionCatalog.StockMovements.Create,
                 PermissionCatalog.StockMovements.Correct,
+
+                PermissionCatalog.Imports.Read,
+                PermissionCatalog.Imports.Manage,
+                PermissionCatalog.Imports.Commit,
             ],
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini
@@ -380,6 +389,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Reminders.Manage,
 
                 PermissionCatalog.Subscriptions.Read,
+
+                PermissionCatalog.Imports.Read,
+                PermissionCatalog.Imports.Manage,
+                PermissionCatalog.Imports.Commit,
             ],
 
             // Tıbbi operasyon: klinik kayıtlarını (muayene/aşı/tedavi/reçete/lab/yatış) yönetir.

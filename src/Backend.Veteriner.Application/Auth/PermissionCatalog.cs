@@ -221,6 +221,14 @@ public static class PermissionCatalog
         public const string Correct = "StockMovements.Correct";
     }
 
+    /// <summary>Müşteri/hasta/aşı geçmişi içe aktarma (ADR-019 K8: yalnız yönetici düzeyi).</summary>
+    public static class Imports
+    {
+        public const string Read = "Imports.Read";
+        public const string Manage = "Imports.Manage";
+        public const string Commit = "Imports.Commit";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -355,6 +363,10 @@ public static class PermissionCatalog
         new(StockMovements.Read, "Stok hareketlerini listeleme ve görüntüleme yetkisi", "StockMovements"),
         new(StockMovements.Create, "Stok giriş/çıkış/düzeltme dahil hareket kaydı oluşturma yetkisi", "StockMovements"),
         new(StockMovements.Correct, "Stok hareketini gerekçeyle geri alma (ters hareket) yetkisi", "StockMovements"),
+
+        new(Imports.Read, "İçe aktarma partilerini, önizlemeyi ve hata raporunu görüntüleme yetkisi", "Imports"),
+        new(Imports.Manage, "İçe aktarma partisi yükleme, eşleme, doğrulama ve taslak silme yetkisi", "Imports"),
+        new(Imports.Commit, "İçe aktarmayı onaylayıp uygulama, hatırlatmaları serbest bırakma ve geri alma yetkisi", "Imports"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 
