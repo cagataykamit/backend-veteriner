@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<ImportCatalogLoader>();
         services.AddScoped<ImportTableInfoLoader>();
         services.AddScoped<ImportExistingDataLoader>();
+        services.AddScoped<ImportValidationRunner>();
         services.AddScoped<ImportReminderImpactReader>();
         services.AddScoped<ImportRollbackPlanLoader>();
 

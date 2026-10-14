@@ -31,13 +31,20 @@ public sealed class ImportBatchValidationLeaseTests
     // ---------------------------------------------------------------- Kira
 
     [Fact]
-    public void StartValidation_Should_Take_Lease_And_Complete_Should_Release_It()
+    public void StartValidation_Should_Queue_Without_Lease_And_Worker_Claim_Then_Complete_Should_Release_It()
     {
         var b = Mapped();
 
         b.StartValidation(Now).IsSuccess.Should().BeTrue();
-        b.LeaseOwner.Should().Be(ImportBatch.ValidationLeaseOwner);
-        b.LeaseUntilUtc.Should().Be(Now + ImportBatch.ValidationLeaseDuration);
+        b.Status.Should().Be(ImportBatchStatus.Validating);
+        b.LeaseOwner.Should().BeNull("iş kuyrukta; işçi alınca kira dolar");
+        b.LeaseUntilUtc.Should().BeNull();
+        b.IsJobLeaseActive(Now).Should().BeFalse();
+
+        b.ClaimValidationLease("w1", Now.AddSeconds(1)).IsSuccess.Should().BeTrue();
+        b.LeaseOwner.Should().Be("w1");
+        b.LeaseUntilUtc.Should().Be(Now.AddSeconds(1) + ImportBatch.ValidationLeaseDuration);
+        b.IsJobLeaseActive(Now.AddSeconds(2)).Should().BeTrue();
 
         b.CompleteValidation(Guid.NewGuid(), Counts, Counts, Counts, Now.AddSeconds(5)).IsSuccess.Should().BeTrue();
         b.LeaseOwner.Should().BeNull();
@@ -45,33 +52,46 @@ public sealed class ImportBatchValidationLeaseTests
     }
 
     [Fact]
-    public void Active_Lease_Should_Block_Second_Validation_Until_It_Expires()
+    public void Validation_Lease_Should_Be_Claimed_Renewed_Taken_Over_After_Expiry()
     {
         var b = Mapped();
         b.StartValidation(Now);
+        b.ClaimCommitLease("w1", Now).Error.Code.Should().Be("Imports.InvalidState", "uygulama kirası doğrulamada alınmaz");
+        b.ClaimValidationLease("w1", Now).IsSuccess.Should().BeTrue();
 
-        b.CanStartValidation(Now.AddMinutes(4)).Should().BeFalse();
-        b.StartValidation(Now.AddMinutes(4)).Error.Code.Should().Be("Imports.InvalidState");
+        // İkinci istek yeni iş başlatamaz; başka işçi süren kirayı alamaz.
+        b.CanStartValidation.Should().BeFalse();
+        b.StartValidation(Now.AddMinutes(1)).Error.Code.Should().Be("Imports.InvalidState");
+        b.ClaimValidationLease("w2", Now.AddMinutes(4)).Error.Code.Should().Be("Imports.AnotherJobRunning");
+        b.RenewValidationLease("w2", Now.AddMinutes(4)).Error.Code.Should().Be("Imports.LeaseLost");
+        b.RenewValidationLease("w1", Now.AddMinutes(4)).IsSuccess.Should().BeTrue();
+        b.LeaseUntilUtc.Should().Be(Now.AddMinutes(4) + ImportBatch.ValidationLeaseDuration);
 
-        var afterExpiry = Now + ImportBatch.ValidationLeaseDuration;
-        b.IsValidationLeaseExpired(afterExpiry).Should().BeTrue();
-        b.CanStartValidation(afterExpiry).Should().BeTrue();
-        b.StartValidation(afterExpiry).IsSuccess.Should().BeTrue("çöken doğrulama kira dolunca devralınır");
+        // Çökme: kira dolunca başka işçi devralır, eski işçi yenileyemez.
+        var afterExpiry = Now.AddMinutes(4) + ImportBatch.ValidationLeaseDuration;
+        b.IsJobLeaseActive(afterExpiry).Should().BeFalse();
+        b.ClaimValidationLease("w2", afterExpiry).IsSuccess.Should().BeTrue("çöken doğrulama kira dolunca devralınır");
+        b.RenewValidationLease("w1", afterExpiry).Error.Code.Should().Be("Imports.LeaseLost");
         b.Status.Should().Be(ImportBatchStatus.Validating);
-        b.LeaseUntilUtc.Should().Be(afterExpiry + ImportBatch.ValidationLeaseDuration);
     }
 
     [Theory]
     [InlineData(ImportBatchStatus.Uploaded)]
     [InlineData(ImportBatchStatus.Discarded)]
+    [InlineData(ImportBatchStatus.Validating)]
     public void CanStartValidation_Should_Be_False_Outside_Mapped_Validated_Failed(ImportBatchStatus status)
     {
-        var b = ImportBatch.Create(Guid.NewGuid(), null, Guid.NewGuid(), null, Guid.NewGuid(), Now).Value!;
+        var b = status == ImportBatchStatus.Validating
+            ? Mapped()
+            : ImportBatch.Create(Guid.NewGuid(), null, Guid.NewGuid(), null, Guid.NewGuid(), Now).Value!;
         if (status == ImportBatchStatus.Discarded)
             b.Discard(Now);
+        if (status == ImportBatchStatus.Validating)
+            b.StartValidation(Now);
 
         b.Status.Should().Be(status);
-        b.CanStartValidation(Now.AddDays(1)).Should().BeFalse();
+        b.CanStartValidation.Should().BeFalse();
+        b.ClaimValidationLease("w1", Now).IsSuccess.Should().Be(status == ImportBatchStatus.Validating);
     }
 
     [Fact]

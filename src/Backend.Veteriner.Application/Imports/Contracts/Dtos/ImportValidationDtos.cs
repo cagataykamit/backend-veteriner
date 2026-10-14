@@ -51,3 +51,6 @@ public sealed record ImportRowDto(
 public sealed record ImportRowValidationDto(string Status, string? Action);
 
 public sealed record ImportRowApplyDto(string Status, Guid? TargetId);
+
+/// <summary>POST .../validate sonucu; <see cref="Started"/> false ise doğrulama zaten kuyrukta/sürüyordur (200).</summary>
+public sealed record ImportValidationStartResultDto(bool Started, ImportBatchDto Batch);

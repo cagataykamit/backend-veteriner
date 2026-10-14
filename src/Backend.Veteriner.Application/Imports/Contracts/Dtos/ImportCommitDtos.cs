@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Application.Imports.Contracts.Dtos;
 /// <summary>POST .../commit sonucu; <see cref="Started"/> false ise aynı <c>validationId</c> ile tekrar istektir (200).</summary>
 public sealed record ImportCommitResultDto(bool Started, ImportBatchDto Batch);
 
-/// <summary>GET .../progress (IMPORT_API_CONTRACT.md §7.14): hafif yoklama yanıtı (uygulama veya geri alma fazı).</summary>
+/// <summary>GET .../progress (IMPORT_API_CONTRACT.md §7.14): hafif yoklama yanıtı (doğrulama, uygulama veya geri alma fazı).</summary>
 public sealed record ImportProgressDto(
     Guid Id,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ImportBatchStatus Status,

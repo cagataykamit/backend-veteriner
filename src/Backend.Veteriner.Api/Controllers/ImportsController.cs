@@ -186,11 +186,13 @@ public sealed class ImportsController : ControllerBase
     }
 
     /// <summary>
-    /// Kuru çalıştırma: satırları doğrular, mükerrer/çip/bağlantı kurallarını işletir ve sonuçları yazar; müşteri/hasta/aşı
-    /// kaydı oluşturmaz. Senkrondur: 200 + güncel parti (<c>Validated</c> | <c>ValidationFailed</c>).
+    /// Kuru çalıştırmayı arka planda başlatır (satır kuralları, mükerrer/çip/bağlantı; müşteri/hasta/aşı kaydı oluşmaz):
+    /// yeni iş 202 + parti (<c>Validating</c>), iş zaten kuyrukta/sürüyorsa 200 + aynı parti. Sonuç
+    /// <c>GET .../progress</c> yoklanarak beklenir (<c>Validated</c> | <c>ValidationFailed</c>).
     /// </summary>
     [HttpPost("batches/{id:guid}/validate")]
     [Authorize(Policy = PermissionCatalog.Imports.Manage)]
+    [ProducesResponseType(typeof(ImportBatchDto), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ImportBatchDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -201,7 +203,11 @@ public sealed class ImportsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new ValidateImportBatchCommand(id), ct);
-        return result.ToActionResult(this);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var validation = result.Value!;
+        return validation.Started ? Accepted(validation.Batch) : Ok(validation.Batch);
     }
 
     /// <summary>Kuru çalıştırma önizlemesi: sayaçlar, eşlenemeyen değerler, hatırlatma etkisi, engeller.</summary>
@@ -300,7 +306,7 @@ public sealed class ImportsController : ControllerBase
         return commit.Started ? Accepted(commit.Batch) : Ok(commit.Batch);
     }
 
-    /// <summary>Uygulama ilerlemesi (hafif yoklama ucu; önerilen aralık 2 sn).</summary>
+    /// <summary>Doğrulama, uygulama ve geri alma ilerlemesi (hafif yoklama ucu; önerilen aralık 2 sn).</summary>
     [HttpGet("batches/{id:guid}/progress")]
     [Authorize(Policy = PermissionCatalog.Imports.Read)]
     [ProducesResponseType(typeof(ImportProgressDto), StatusCodes.Status200OK)]

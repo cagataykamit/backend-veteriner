@@ -54,6 +54,7 @@ public sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBa
         b.Ignore(x => x.PayloadPurgeDueAtUtc);
         b.Ignore(x => x.HasValidationResult);
         b.Ignore(x => x.CanMap);
+        b.Ignore(x => x.CanStartValidation);
         b.Ignore(x => x.CanStartRollback);
 
         b.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });

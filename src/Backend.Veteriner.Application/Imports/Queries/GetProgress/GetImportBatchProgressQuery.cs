@@ -13,8 +13,8 @@ namespace Backend.Veteriner.Application.Imports.Queries.GetProgress;
 public sealed record GetImportBatchProgressQuery(Guid Id) : IRequest<Result<ImportProgressDto>>;
 
 /// <summary>
-/// En çok üç sorgu: parti + uygulama sonucu yazılmış satır sayısı (uygulama başladıysa) ya da geri alma fazında hedef ve
-/// sonucu yazılmış satır sayıları.
+/// En çok üç sorgu: parti + doğrulama fazında sonucu yazılmış satır sayısı, uygulama sonucu yazılmış satır sayısı
+/// (uygulama başladıysa) ya da geri alma fazında hedef ve sonucu yazılmış satır sayıları.
 /// </summary>
 public sealed class GetImportBatchProgressQueryHandler : IRequestHandler<GetImportBatchProgressQuery, Result<ImportProgressDto>>
 {
@@ -60,8 +60,16 @@ public sealed class GetImportBatchProgressQueryHandler : IRequestHandler<GetImpo
         if (batch is null || !await ImportBatchVisibility.IsVisibleAsync(batch, _clinicContext, _clinicScopeResolver, ct))
             return Result<ImportProgressDto>.Failure(ImportBatchVisibility.NotFound());
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var leaseActive = batch.IsJobLeaseActive(now);
         int total, processed;
-        if (RollbackPhase.Contains(batch.Status))
+        if (batch.Status == ImportBatchStatus.Validating)
+        {
+            // Doğrulama: işçi kirayı alıp önceki sonuçları sıfırladıktan sonra sonucu yazılmış satırlar; kuyruktayken 0.
+            total = batch.CustomerCounts.Total + batch.PetCounts.Total + batch.VaccinationCounts.Total;
+            processed = leaseActive ? await _rows.CountAsync(new ImportValidatedRowsSpec(batch.Id), ct) : 0;
+        }
+        else if (RollbackPhase.Contains(batch.Status))
         {
             // Geri alma: hedef satırlar (oluşturulan kaydı taşıyan) ve sonucu yazılmış olanlar.
             processed = await _rows.CountAsync(
@@ -77,6 +85,7 @@ public sealed class GetImportBatchProgressQueryHandler : IRequestHandler<GetImpo
 
         var phase = batch.Status switch
         {
+            ImportBatchStatus.Validating => nameof(ImportBatchStatus.Validating),
             ImportBatchStatus.Committing => nameof(ImportBatchStatus.Committing),
             ImportBatchStatus.RollingBack => nameof(ImportBatchStatus.RollingBack),
             _ => null,
@@ -91,6 +100,6 @@ public sealed class GetImportBatchProgressQueryHandler : IRequestHandler<GetImpo
             batch.UpdatedAtUtc,
             batch.CommittedAtUtc,
             batch.RolledBackAtUtc,
-            batch.IsJobLeaseActive(_timeProvider.GetUtcNow().UtcDateTime)));
+            leaseActive));
     }
 }

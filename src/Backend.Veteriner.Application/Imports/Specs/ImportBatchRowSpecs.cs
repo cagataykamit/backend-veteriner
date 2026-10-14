@@ -37,6 +37,16 @@ public sealed class ImportAppliedRowsSpec : Specification<ImportBatchRow>
     }
 }
 
+/// <summary>Doğrulama sonucu yazılmış satır sayısı (doğrulama ilerlemesi; işçi tur başında sonuçları sıfırlar).</summary>
+public sealed class ImportValidatedRowsSpec : Specification<ImportBatchRow>
+{
+    public ImportValidatedRowsSpec(Guid batchId)
+    {
+        Query.AsNoTracking();
+        Query.Where(r => r.BatchId == batchId && r.ValidationStatus != ImportRowValidationStatus.Pending);
+    }
+}
+
 /// <summary>Partinin tüm hazırlık satırları (izlenir; silme için).</summary>
 public sealed class ImportBatchRowsByBatchSpec : Specification<ImportBatchRow>
 {

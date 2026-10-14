@@ -346,6 +346,14 @@ public static class DependencyInjection
             ImportCommitProcessor.NewWorkerId()));
         services.AddHostedService<ImportCommitHostedService>();
 
+        // Doğrulama (kuru çalıştırma) işi (ADR-019 K13; aynı iş kuyruğu ve kira deseni, outbox yazmadığından geri basınç yok).
+        services.AddSingleton(sp => new ImportValidationProcessor(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<ImportValidationProcessor>>(),
+            ImportCommitProcessor.NewWorkerId()));
+        services.AddHostedService<ImportValidationHostedService>();
+
         // Geri alma işi (ADR-019 K7; uygulama işiyle aynı ayarlar ve desen) ve bakım işi (K9: Expired + 30 gün temizlik).
         services.AddScoped<IImportRollbackDependencyReader, ImportRollbackDependencyReader>();
         services.AddSingleton(sp => new ImportRollbackProcessor(

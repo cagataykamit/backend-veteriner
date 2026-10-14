@@ -22,11 +22,11 @@ public sealed class ImportBatch : AggregateRoot
     /// <summary>Hareketsiz taslağın süresinin dolması için geçmesi gereken süre.</summary>
     public static readonly TimeSpan DraftLifetime = TimeSpan.FromDays(7);
 
-    /// <summary>Doğrulama kirası; çöken istek sonrası takılı kalan <c>Validating</c> parti bu süre sonunda devralınır.</summary>
+    /// <summary>
+    /// Doğrulama işçisinin kirası (ADR-019 K13). İşçi aşama başlarında ve her satır parçasında yeniler; satırların bellekte
+    /// işlendiği aşama yenilemesiz geçtiğinden uygulama kirasından uzundur. Süreç çökerse bu süre sonunda devralınır.
+    /// </summary>
     public static readonly TimeSpan ValidationLeaseDuration = TimeSpan.FromMinutes(5);
-
-    /// <summary>Senkron doğrulamanın kira sahibi (arka plan işçisi B4'te kendi adını kullanır).</summary>
-    public const string ValidationLeaseOwner = "api";
 
     /// <summary>
     /// Uygulama (commit) işçisinin kirası. İşçi her parçada ve her sahip biriminde yeniler; süreç çökerse bu süre sonunda
@@ -187,35 +187,39 @@ public sealed class ImportBatch : AggregateRoot
         return Result.Success();
     }
 
-    /// <summary>Takılı kalmış <c>Validating</c> partinin kirası dolduysa yeniden doğrulama başlatılabilir.</summary>
-    public bool IsValidationLeaseExpired(DateTime nowUtc)
-        => Status == ImportBatchStatus.Validating
-           && (LeaseUntilUtc is null || LeaseUntilUtc <= NormalizeUtc(nowUtc));
+    /// <summary>Doğrulamanın başlatılabildiği durumlar; <see cref="StartValidation"/> geçiş tablosuyla aynı küme.</summary>
+    private static readonly ImportBatchStatus[] ValidatableFrom =
+    [
+        ImportBatchStatus.Mapped, ImportBatchStatus.Validated, ImportBatchStatus.ValidationFailed,
+    ];
 
-    /// <summary>Doğrulama başlatılabilir mi (geçiş tablosu; kirası dolmuş <c>Validating</c> dahil).</summary>
-    public bool CanStartValidation(DateTime nowUtc)
-        => IsValidationLeaseExpired(nowUtc)
-           || Status is ImportBatchStatus.Mapped or ImportBatchStatus.Validated or ImportBatchStatus.ValidationFailed;
+    public bool CanStartValidation => ValidatableFrom.Contains(Status);
 
     /// <summary>Doğrulaması en az bir kez bitmiş partide satır sonuçları, önizleme ve hata raporu okunabilir.</summary>
     public bool HasValidationResult => ImportBatchStatusSets.ValidationResultAvailable.Contains(Status);
 
+    /// <summary>
+    /// Doğrulamayı kuyruğa alır (ADR-019 K13): parti <c>Validating</c> olur, kira boştur; arka plan işçisi
+    /// <see cref="ClaimValidationLease"/> ile alır. Çöken işin devralınması kira üzerindendir, yeni istekle değil.
+    /// </summary>
     public Result StartValidation(DateTime nowUtc)
     {
-        var now = NormalizeUtc(nowUtc);
-        var moved = IsValidationLeaseExpired(now)
-            ? MoveTo(ImportBatchStatus.Validating, now, ImportBatchStatus.Validating)
-            : MoveTo(
-                ImportBatchStatus.Validating,
-                now,
-                ImportBatchStatus.Mapped, ImportBatchStatus.Validated, ImportBatchStatus.ValidationFailed);
-        if (!moved.IsSuccess)
-            return moved;
-
-        LeaseOwner = ValidationLeaseOwner;
-        LeaseUntilUtc = now + ValidationLeaseDuration;
-        return Result.Success();
+        var moved = MoveTo(ImportBatchStatus.Validating, nowUtc, ValidatableFrom);
+        if (moved.IsSuccess)
+            ReleaseLease();
+        return moved;
     }
+
+    /// <summary>
+    /// Doğrulama işçisi <c>Validating</c> partiyi alır: kira boşsa, süresi dolduysa (çökme sonrası devralma) veya zaten bu
+    /// işçideyse. Eşzamanlı iki işçiden yalnız biri kaydedebilir (rowversion).
+    /// </summary>
+    public Result ClaimValidationLease(string owner, DateTime nowUtc)
+        => ClaimJobLease(ImportBatchStatus.Validating, ValidationLeaseDuration, owner, nowUtc);
+
+    /// <summary>Doğrulama kirasını uzatır; kira başka işçiye geçtiyse reddedilir ve eski işçi durmalıdır.</summary>
+    public Result RenewValidationLease(string owner, DateTime nowUtc)
+        => RenewJobLease(ImportBatchStatus.Validating, ValidationLeaseDuration, owner, nowUtc);
 
     public Result CompleteValidation(
         Guid validationId,
@@ -279,9 +283,9 @@ public sealed class ImportBatch : AggregateRoot
     public bool IsCommitLeaseActive(DateTime nowUtc)
         => Status == ImportBatchStatus.Committing && LeaseUntilUtc > NormalizeUtc(nowUtc);
 
-    /// <summary>Arka plan işi (uygulama veya geri alma) sürerken kira bir işçide mi (süresi dolmamış).</summary>
+    /// <summary>Arka plan işi (doğrulama, uygulama veya geri alma) sürerken kira bir işçide mi (süresi dolmamış).</summary>
     public bool IsJobLeaseActive(DateTime nowUtc)
-        => Status is ImportBatchStatus.Committing or ImportBatchStatus.RollingBack && LeaseUntilUtc > NormalizeUtc(nowUtc);
+        => ImportBatchStatusSets.ActiveJob.Contains(Status) && LeaseUntilUtc > NormalizeUtc(nowUtc);
 
     /// <summary>
     /// Arka plan işçisi <c>Committing</c> partiyi alır: kira boşsa, süresi dolduysa (çökme sonrası devralma) veya zaten
