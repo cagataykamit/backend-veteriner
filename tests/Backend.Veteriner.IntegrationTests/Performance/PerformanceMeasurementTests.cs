@@ -104,6 +104,7 @@ public sealed class PerformanceMeasurementTests
         var toDate = seed.ToUtc.ToString("yyyy-MM-dd");
         var from = Uri.EscapeDataString(seed.FromUtc.ToString("O"));
         var to = Uri.EscapeDataString(seed.ToUtc.ToString("O"));
+        var rFrom = Uri.EscapeDataString(seed.ToUtc.AddDays(-90).ToString("O")); // rapor uçları en çok 93 gün kabul eder
         var c = seed.ClinicId;
         var cases = new (string Name, string Url)[]
         {
@@ -128,17 +129,17 @@ public sealed class PerformanceMeasurementTests
             ("Stok partileri", $"/api/v1/stock-batches?clinicId={c}&page=1&pageSize=50"),
             ("Borç raporu", "/api/v1/reports/outstanding-balances?page=1&pageSize=50"),
             ("Borç raporu (arama)", "/api/v1/reports/outstanding-balances?search=Yılmaz&page=1&pageSize=50"),
-            ("Tahsilat raporu", $"/api/v1/reports/payments?from={from}&to={to}&page=1&pageSize=50"),
-            ("Randevu raporu", $"/api/v1/reports/appointments?from={from}&to={to}&page=1&pageSize=50"),
-            ("Muayene raporu", $"/api/v1/reports/examinations?from={from}&to={to}&page=1&pageSize=50"),
-            ("Aşı raporu", $"/api/v1/reports/vaccinations?from={from}&to={to}&page=1&pageSize=50"),
+            ("Tahsilat raporu", $"/api/v1/reports/payments?from={rFrom}&to={to}&page=1&pageSize=50"),
+            ("Randevu raporu", $"/api/v1/reports/appointments?from={rFrom}&to={to}&page=1&pageSize=50"),
+            ("Muayene raporu", $"/api/v1/reports/examinations?from={rFrom}&to={to}&page=1&pageSize=50"),
+            ("Aşı raporu", $"/api/v1/reports/vaccinations?from={rFrom}&to={to}&page=1&pageSize=50"),
             ("Defter: muayene", $"/api/v1/reports/registers/examinations?from={fromDate}&to={toDate}&page=1&pageSize=50"),
             ("Defter: reçete", $"/api/v1/reports/registers/prescriptions?from={fromDate}&to={toDate}&page=1&pageSize=50"),
             ("Defter: aşı", $"/api/v1/reports/registers/vaccines?from={fromDate}&to={toDate}&page=1&pageSize=50"),
             ("Defter: ilaç", $"/api/v1/reports/registers/medications?from={fromDate}&to={toDate}&page=1&pageSize=50"),
             ("Defter: kontrollü madde", $"/api/v1/reports/registers/controlled-substances?from={fromDate}&to={toDate}&page=1&pageSize=50"),
             ("Dışa aktarım CSV: borç", "/api/v1/reports/outstanding-balances/export"),
-            ("Dışa aktarım XLSX: tahsilat", $"/api/v1/reports/payments/export-xlsx?from={from}&to={to}"),
+            ("Dışa aktarım XLSX: tahsilat", $"/api/v1/reports/payments/export-xlsx?from={rFrom}&to={to}"),
             ("Dışa aktarım CSV: muayene defteri", $"/api/v1/reports/registers/examinations/export?from={fromDate}&to={toDate}"),
         };
 
