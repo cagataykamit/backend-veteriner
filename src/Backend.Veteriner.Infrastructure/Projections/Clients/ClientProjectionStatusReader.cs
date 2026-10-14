@@ -58,24 +58,29 @@ public sealed class ClientProjectionStatusReader : IClientProjectionStatusReader
             .ClientIntegrationEventsOnly(_commandDb.OutboxMessages)
             .Where(m => m.ProcessedAtUtc == null)
             .GroupBy(_ => 1)
+            // Yeniden deneme bekleyen = en az bir kez başarısız (RetryCount > 0) ve sonraki denemesi gelecekte. Okuma
+            // anından (utcNow) hemen sonra yazılan olayın NextAttemptAtUtc'si (yazım anı) utcNow'dan büyüktür; onu yeniden
+            // deneme saymak yoğun yazımda sahte Degraded (/health/ready 503) üretir.
             .Select(g => new OutboxStats
             {
                 DeadLetterCount = g.Count(m => m.DeadLetterAtUtc != null),
                 RetryWaitingCount = g.Count(m =>
                     m.DeadLetterAtUtc == null
+                    && m.RetryCount > 0
                     && m.NextAttemptAtUtc != null
                     && m.NextAttemptAtUtc > utcNow),
                 PendingCount = g.Count(m =>
                     m.DeadLetterAtUtc == null
-                    && (m.NextAttemptAtUtc == null || m.NextAttemptAtUtc <= utcNow)),
+                    && (m.RetryCount == 0 || m.NextAttemptAtUtc == null || m.NextAttemptAtUtc <= utcNow)),
                 OldestPendingCreatedAtUtc = g
                     .Where(m =>
                         m.DeadLetterAtUtc == null
-                        && (m.NextAttemptAtUtc == null || m.NextAttemptAtUtc <= utcNow))
+                        && (m.RetryCount == 0 || m.NextAttemptAtUtc == null || m.NextAttemptAtUtc <= utcNow))
                     .Min(m => (DateTime?)m.CreatedAtUtc),
                 NextRetryAtUtc = g
                     .Where(m =>
                         m.DeadLetterAtUtc == null
+                        && m.RetryCount > 0
                         && m.NextAttemptAtUtc != null
                         && m.NextAttemptAtUtc > utcNow)
                     .Min(m => (DateTime?)m.NextAttemptAtUtc)

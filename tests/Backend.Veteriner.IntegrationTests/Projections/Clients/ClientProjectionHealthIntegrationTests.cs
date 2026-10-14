@@ -100,6 +100,43 @@ public sealed class ClientProjectionHealthIntegrationTests
         evaluation.Level.Should().Be(ClientProjectionHealthLevel.Degraded);
     }
 
+    /// <summary>
+    /// İçe aktarma Dilim T bulgusu: yoğun yazımda okuma anından (utcNow) hemen sonra yazılan olayın NextAttemptAtUtc
+    /// değeri (yazım anı) utcNow'dan büyük olur. Hiç başarısız olmamış (RetryCount = 0) olay yeniden deneme bekleyen
+    /// sayılmamalı; aksi halde sağlık sahte Degraded olur ve /health/ready 503 döner.
+    /// </summary>
+    [Fact]
+    public async Task Evaluate_Should_StayHealthy_When_Fresh_Event_Is_Written_After_Status_Snapshot()
+    {
+        await ResetBaselineAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var writtenAt = DateTime.UtcNow.AddSeconds(5);
+        commandDb.OutboxMessages.Add(new OutboxMessage
+        {
+            Type = ClientIntegrationEventTypes.Created,
+            Payload = "{}",
+            CreatedAtUtc = writtenAt,
+            NextAttemptAtUtc = writtenAt,
+            RetryCount = 0
+        });
+        await commandDb.SaveChangesAsync();
+
+        var status = await scope.ServiceProvider
+            .GetRequiredService<IClientProjectionStatusReader>()
+            .GetStatusAsync(CancellationToken.None);
+
+        status.RetryWaitingCount.Should().Be(0);
+        status.PendingCount.Should().Be(1);
+        ClientProjectionHealthEvaluator.Evaluate(
+                status,
+                new ClientProjectionHealthOptions { DegradedAfterSeconds = 10, UnhealthyAfterSeconds = 30 },
+                new QueryReadModelsOptions { ClientsEnabled = false })
+            .Level.Should().Be(ClientProjectionHealthLevel.Healthy);
+    }
+
     [Fact]
     public async Task Evaluate_Should_BeUnhealthy_WhenClientDeadLetterExists()
     {

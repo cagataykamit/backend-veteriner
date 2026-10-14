@@ -100,6 +100,34 @@ public sealed class PetProjectionHealthIntegrationTests
         status.PendingCount.Should().Be(0);
     }
 
+    /// <summary>Okuma anından sonra yazılan, hiç başarısız olmamış olay yeniden deneme bekleyen sayılmaz (sahte Degraded).</summary>
+    [Fact]
+    public async Task StatusReader_Should_Not_Count_Fresh_Event_Written_After_Snapshot_As_RetryWaiting()
+    {
+        await ResetBaselineAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var writtenAt = DateTime.UtcNow.AddSeconds(5);
+        commandDb.OutboxMessages.Add(new OutboxMessage
+        {
+            Type = PetIntegrationEventTypes.Created,
+            Payload = "{}",
+            CreatedAtUtc = writtenAt,
+            NextAttemptAtUtc = writtenAt,
+            RetryCount = 0
+        });
+        await commandDb.SaveChangesAsync();
+
+        var status = await scope.ServiceProvider
+            .GetRequiredService<IPetProjectionStatusReader>()
+            .GetStatusAsync(CancellationToken.None);
+
+        status.RetryWaitingCount.Should().Be(0);
+        status.PendingCount.Should().Be(1);
+    }
+
     [Fact]
     public async Task Evaluate_Should_BeHealthy_WhenProjectionDisabledEvenIfPendingAgeExceedsThresholds()
     {

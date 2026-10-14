@@ -106,4 +106,34 @@ public sealed class AppointmentProjectionStatusIntegrationTests
         status.OldestPendingCreatedAtUtc.Should().BeNull();
         status.OldestPendingAge.Should().BeNull();
     }
+
+    /// <summary>Okuma anından sonra yazılan, hiç başarısız olmamış olay yeniden deneme bekleyen sayılmaz (sahte Degraded).</summary>
+    [Fact]
+    public async Task GetStatus_Should_Not_Count_Fresh_Event_Written_After_Snapshot_As_RetryWaiting()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var reader = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionStatusReader>();
+
+        await AppointmentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var writtenAt = DateTime.UtcNow.AddSeconds(5);
+        commandDb.OutboxMessages.Add(new OutboxMessage
+        {
+            Type = AppointmentIntegrationEventTypes.Created,
+            Payload = "{}",
+            CreatedAtUtc = writtenAt,
+            NextAttemptAtUtc = writtenAt,
+            RetryCount = 0
+        });
+        await commandDb.SaveChangesAsync();
+
+        var status = await reader.GetStatusAsync(CancellationToken.None);
+
+        status.RetryWaitingCount.Should().Be(0);
+        status.NextRetryAtUtc.Should().BeNull();
+        status.PendingCount.Should().Be(1);
+    }
 }
