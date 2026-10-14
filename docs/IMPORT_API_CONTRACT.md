@@ -2,14 +2,14 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9_READINESS.md` Dilim 7. Tasarım gerekçesi, akış, riskler ve kullanıcı kararları: `ASAMA9_IMPORT_DESIGN.md`. Tüm uçlar `api/v1` altında, JSON (dosya yükleme ve indirme hariç), standart `ProblemDetails` + `extensions.code` hata zarfı, sayfalama mevcut liste uçlarındaki biçimde.
 
-> **Durum:** Kararlar kesinleşti: ADR-019 (ürün deposu, K1–K12 önerilen seçeneklerle kabul). `[K#]` işaretleri o karara bağlıdır. **Uygulanan dilim: B1 (temel)** — parti kaydı, durum makinesi, izinler, parti oluştur/listele/oku/sil iskeleti, migration `AddDataImportBatches`. B2–B5 uçları aşağıda **taslak**tır; dilim başında kesinleşir (bölüm 0).
+> **Durum:** Kararlar kesinleşti: ADR-019 (ürün deposu, K1–K12 önerilen seçeneklerle kabul). `[K#]` işaretleri o karara bağlıdır. **Uygulanan dilimler: B1 (temel)** — parti kaydı, durum makinesi, izinler, migration `AddDataImportBatches`; **B2 (okuma ve eşleme)** — XLSX/CSV okuyucu, dosya yükleme, sütun/değer eşleme, şablon (yeni migration yok). B3–B5 uçları aşağıda **taslak**tır; dilim başında kesinleşir (bölüm 0).
 
 ## 0) Dilim durumu ve frontend için değişenler
 
 | Dilim | Uç / yüzey | Durum |
 |-------|------------|-------|
 | B1 | `POST /imports/batches` (dosyasız iskelet), `GET /imports/batches`, `GET /imports/batches/{id}`, `DELETE /imports/batches/{id}`; izinler; durum makinesi; `Vaccination.ImportBatchId` | **Uygulandı** |
-| B2 | `POST /imports/batches` dosya alanları (`file`, `customersFile`…), `GET /imports/template`, `PUT .../mapping`, yanıtta `tables[]` | Taslak |
+| B2 | `POST /imports/batches` dosya alanları (`file`, `customersFile`…), `GET /imports/template`, `PUT .../mapping`, yanıtta `tables[]` | **Uygulandı** |
 | B3 | `POST .../validate`, `GET .../preview`, `GET .../rows`, `GET .../errors` | Taslak |
 | B4 | `POST .../commit`, `POST .../release-reminders`, `progress`, hatırlatma dışlaması | Taslak |
 | B5 | `GET .../rollback-preview`, `POST .../rollback`, 30 gün temizlik, `Expired` işi | Taslak |
@@ -19,6 +19,16 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - `POST /imports/batches` B1'de **dosyasız** çalışır (yalnız `requestId`, `name`, `clinicId`); parti `Uploaded` durumunda, satırsız oluşur. Gövde zaten `multipart/form-data`'dır; B2 aynı uca dosya alanlarını ekler (alan adları değişmez). Sihirbaz (F1) B2–B3 sözleşmesi sabitlenene kadar bağlanmamalıdır.
 - Parti yanıtındaki tarih alanları UTC, `status` metin (`"Uploaded"` …), sayaçlar `summary.<tablo>` altında (B1'de hepsi 0).
 - Mevcut müşteri/hasta/aşı uçlarının sözleşmesi **değişmez** (`Vaccination.ImportBatchId` yalnız veritabanında; okuma DTO'larına eklenmedi).
+
+**Frontend için değişenler (B2):**
+- `POST /imports/batches` artık **dosya ister** (`file` XLSX veya `customersFile`/`petsFile`/`vaccinationsFile` CSV); dosyasız iskelet çağrısı `400 Imports.EmptyFile` döner. `requestId`, `name`, `clinicId` alanları değişmedi. Yeni isteğe bağlı alanlar `encoding`, `delimiter`. Yanıt (201/200) parti nesnesine `tables[]` (algılanan sütunlar + önerilen eşleme) ve yalnız yükleme yanıtında `warnings[]` ekler (bölüm 7.2).
+- `GET /imports/batches/{id}` ve `PUT .../mapping` yanıtı da `tables[]` taşır (`columns[].mapped` = kayıtlı eşleme, yoksa `null`); parti listesinde `tables` ve `warnings` `null`'dır.
+- `PUT /imports/batches/{id}/mapping` kullanılabilir (bölüm 7.3). `GET /imports/template` kullanılabilir (bölüm 7.1; `Imports.Read`).
+- Aşı tablosu içeren partide `clinicId` zorunludur (`400 Imports.ClinicRequired`).
+- Aynı dosya ikinci kez yüklenirse `409 Imports.DuplicateFile` + `extensions.batchId` (parti çağıranın görebildiği bir partiyse).
+- Tür/ırk/renk/aşı **değer eşleme çözücüsü** B2'de iç servis olarak vardır; kullanıcıya dönük "eşlenemeyen değerler" listesi B3 `preview` ile gelir. `PUT mapping` yalnız hedefin varlığını/aktifliğini doğrular.
+- Taslak silinince (`DELETE`) hazırlık satırları da silinir; parti `payloadPurgedAtUtc` ile görünür ve `tables[].columns` boş döner.
+- Aktarma kapsamı yalnız veri okumadır: bu dilimde müşteri/hasta/aşı kaydı **oluşmaz**; doğrulama (B3) ve uygulama (B4) sonraki dilimlerdir.
 
 ## 1) Kapsam ve sınırlar
 
@@ -80,9 +90,28 @@ Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (a�
 | Boş satırlar | Tamamen boş satırlar sayılmaz ve yok sayılır. |
 | Formül/Biçim | XLSX'te hücrenin **görüntülenen/önbellek değeri** okunur; formül çalıştırılmaz. Dış bağlantılar yok sayılır. |
 
+**B2 okuyucu ayrıntıları (uygulandı):**
+
+| Konu | Kural |
+|------|-------|
+| Alan–biçim eşleşmesi | `file` yalnız `.xlsx`; `customersFile`/`petsFile`/`vaccinationsFile` yalnız `.csv`. `file` ile CSV alanları birlikte verilemez. Hiç dosya yoksa `Imports.EmptyFile`, boş (0 bayt) dosya `Imports.EmptyFile`. Başka uzantı (`.xls`, `.xlsm`, `.txt`…) `Imports.UnsupportedFile`. |
+| İmza / MIME | İçerik uzantıya değil imzaya bakılır: xlsx = zip (`PK\x03\x04`); OLE2 imzası (`D0 CF 11 E0`: eski `.xls` veya parolalı xlsx) reddedilir; CSV'de zip/OLE/PDF/EXE imzası veya NUL bayt (ilk 8 KB) reddedilir. `Content-Type` güvenilmez ama verilmişse izinli kümede olmalıdır (xlsx: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `application/octet-stream`, `application/zip`, `application/x-zip-compressed`; csv: `text/csv`, `application/csv`, `text/plain`, `text/comma-separated-values`, `application/vnd.ms-excel`, `application/octet-stream`); aksi `Imports.UnsupportedFile`. |
+| XLSX güvenliği | Dosya belleğe alınmadan önce zip denetlenir: giriş sayısı ≤ 1.000, **gerçek** açılmış boyut ≤ 100 MB (başlıktaki boyuta güvenilmez; zip bombası), `vbaProject.bin` (makro) varsa veya XML parçalarında `<!DOCTYPE`/`<!ENTITY` varsa (XXE) `Imports.UnsupportedFile`. Dış bağlantı parçaları okunmaz. Çalışma kitabında en çok 20 sayfa. |
+| XLSX sayfaları | Sayfa adları katlanarak (bölüm 5 katlaması) tanınır: `Musteriler`/`Musteri`/`Customers` = müşteri; `Hayvanlar`/`Hayvan`/`Hastalar`/`Hasta`/`Pets` = hasta; `Asilar`/`Asi`/`Vaccinations` = aşı. Tanınmayan sayfalar (örn. `Aciklama`) yok sayılır; hiçbiri tanınmazsa `Imports.UnsupportedFile` (tek sayfalı düz liste ilk sürümde yok, K1). Yalnız başlığı olan, veri satırı olmayan sayfa atlanır ve `Imports.TableEmpty` uyarısı verilir; hiçbir tabloda veri yoksa `Imports.EmptyFile`. |
+| Tavanlar | Başlık sütunu ≤ 60; tek hücre ≤ 10.000 karakter; tablo başına ≤ 10.000, toplam ≤ 25.000 veri satırı (boş satırlar sayılmaz). Aşımda dosya reddedilir: boyut/hücre `Imports.FileTooLarge`, satır `Imports.TooManyRows`, sütun `Imports.UnsupportedFile`. Satır sayısı okunurken sayılır, aşıldığı anda okuma durur. Tavanlar `Imports:Limits` yapılandırmasıyla değişir; istek gövdesi üst sınırı (3 dosya için 33 MB) aşılırsa taşıma katmanı `413` döner. |
+| Formül / enjeksiyon | Formül hücresinde yalnız dosyadaki önbellek değeri okunur (yoksa boş); formül **hiçbir zaman** değerlendirilmez. `=`, `+`, `-`, `@` ile başlayan metin hücresi (örn. `+90 532…`, `-5`) düz **metin** olarak, olduğu gibi saklanır; yorumlanmaz. Dışarı yazılan dosyalarda (şablon, hata raporu) bu karakterlerle başlayan metin hücrelerinin başına `'` eklenir. |
+| Hücre değerleri | Satır kaynağı `başlık → metin` sözlüğü olarak saklanır (`SourceJson`). XLSX: metin olduğu gibi; sayı değişmez kültürle (bilimsel gösterim yok, `5321234567`); tarih hücresi `yyyy-MM-dd` (saat varsa `yyyy-MM-ddTHH:mm:ss`); mantıksal `true`/`false`; hata hücresi (`#N/A`) boş. Yalnız boşluk içeren hücre boştur (`null`). |
+| Başlık sütunları | İlk dolu satır başlıktır. Başlığı boş sütun: verisi yoksa yok sayılır, varsa `Sütun N` adı verilir. Yinelenen başlık `Ad (2)`, `Ad (3)` olur. Başlık 200 karaktere kırpılır. |
+| Satır numarası | Kullanıcıya gösterilen `rowNumber`: XLSX'te Excel satır numarası; CSV'de kayıt sırası (başlık dahil, boş kayıtlar sayılır). |
+| CSV kodlama | BOM varsa (UTF-8, UTF-16) o kullanılır. BOM yoksa katı UTF-8 denenir, geçersizse Windows-1254. `encoding` alanıyla zorlanırsa (`utf-8`, `windows-1254`) çözümleme bozulmuşsa (`�`) `Imports.EncodingSuspect` uyarısı verilir (hata değil). |
+| CSV ayırıcı | `delimiter` alanı yoksa ilk 20 kayıtta `;` `,` sekme adayları denenir; başlıkla aynı alan sayısına sahip kayıt sayısı en yüksek olan seçilir (eşitlikte `;`, `,`, sekme sırası). `delimiter` değerleri: `;` `,` `\t` (`semicolon`, `comma`, `tab` de kabul). Tırnaklı alanlar RFC 4180 (tırnak içinde ayırıcı, satır sonu ve `""`). |
+| İçerik özeti | Tek `file`: dosyanın SHA-256'sı (küçük harf hex). CSV alanları: `customers=<h>;pets=<h>;vaccinations=<h>` (verilmeyen alan atlanır) metninin SHA-256'sı. `encoding`/`delimiter` özete girmez. |
+
 ### 4.2 Şablon (yönetici indirir)
 
 `GET /imports/template?format=xlsx` (üç sayfa + `Aciklama` sayfası: kolon açıklamaları, örnek satır, kabul edilen değerler) ve `?format=csv&table=customers|pets|vaccinations`. Şablon başlıkları aşağıdaki **kanonik başlıklardır**; ayrıca kanonik başlıklar için kabul edilen takma adlar (`aliases`) sütun eşleme önerisinde kullanılır.
+
+**B2 şablon içeriği (uygulandı):** XLSX'te `Musteriler`, `Hayvanlar`, `Asilar` sayfaları yalnız **kanonik başlık satırını** taşır (sabit satır, filtre yok); örnek veri **veri sayfalarında yoktur** (şablon doldurulmadan yüklenirse sahte kayıt oluşmasın). `Aciklama` sayfası her kanonik başlık için tablo, zorunluluk, kural açıklaması ve örnek değer verir. Telefon, mikroçip, numara ve tarih sütunları metin biçimlidir (baştaki 0 ve 15 haneli çip kaybolmasın; tarih yerel biçime çevrilmesin). `format=csv` `table` ister; dosya UTF-8 BOM'lu, `;` ayırıcılı, yalnız başlık satırı. Dosya adları `vetinity-iceaktar-sablon.xlsx` ve `vetinity-iceaktar-<musteriler|hayvanlar|asilar>.csv`. Eksik/geçersiz `format` veya `table` `400 Validation.FluentValidation`.
 
 **Sütun eşleme (mapping) `[K1]`:** Pilot kliniğin gerçek dosya biçimi bilinmiyor. Bu yüzden iki yol birlikte desteklenir: (a) şablona uyan dosya yüklenir, eşleme otomatik; (b) kliniğin kendi dosyası yüklenir, başlıklar otomatik önerilir (kanonik ad + takma ad, katlanmış karşılaştırma) ve kullanıcı eşlemeyi düzeltir. Kaynak sütun birden fazla kanonik alana eşlenemez; zorunlu kanonik alan eşlenmemişse `validate` reddedilir (`Imports.MappingIncomplete`). Eşleme parti kaydında saklanır (`PUT .../mapping`).
 
@@ -143,6 +172,8 @@ Eşleme anahtarı katlanmış metindir: küçük harf, Türkçe harf farkı yok 
 3. **Değer eşleme:** `PUT .../mapping` ile `valueMappings` içinde `{ kind: "species|breed|vaccine|color", source, targetId | null }` verilir; `targetId = null` bu değerli satırların **atlanması** demektir (ırk/renk için: serbest metin/nota düş). Değer eşlemeleri parti kaydında saklanır ve doğrulama tekrarında yeniden uygulanır.
 4. **Yeni katalog kaydı oluşturma ilk sürümde yok** `[K6]`: eşlenemeyen tür/aşı satırları `Imports.SpeciesUnmapped` / `Imports.VaccineUnmapped` hatası alır; klinik gerekli aşı tanımını Ayarlar'dan ekleyip doğrulamayı yeniden çalıştırır.
 
+**B2 çözücü (uygulandı, iç servis `ImportValueResolver`):** Katlama tek yerdedir (`ImportTextFolding.Fold`): `DailySearchTerm.Fold` (ı→i, İ→I) + küçük harf + `ç→c ğ→g ö→o ş→s ü→u â→a î→i û→u` + harf/rakam dışı her karakterin atılması (`Kuduz-2023`, `kuduz 2023`, `KUDUZ_2023` aynı anahtar). Sıra: (1) kullanıcının `valueMappings` kaydı (aynı `kind` + katlanmış `source`; `targetId = null` → `Skipped`), (2) katalog `Name`/`Code` birebir (katlanmış), (3) yerleşik takma ad tablosu (aşağıda; hedef, katalogda katlanmış adıyla aranır, yoksa eşleşmez), (4) `Unmapped`. Boş/boşluk değer `Empty` döner (zorunlu alan denetimi B3'tür). Katalog kapsamı: tür = aktif `Species`; ırk = seçilen türün aktif `Breed` kayıtları; renk = aktif `PetColor`; aşı = kiracıya görünür (global + kiracı) aktif `VaccineDefinition`, tanımın türü doluysa hastanın türüyle aynı olmalı (farklıysa eşleşmez). Yerleşik takma adlar: tür `dog→kopek`, `cat→kedi`, `bird→kus`, `rabbit→tavsan`; aşı `rabies→kuduz`, `kuduz asisi→kuduz`, `mixed→karma`, `karma asisi→karma`, `bronchine→bronsin`, `leukemia→losemi`. Birden fazla katalog kaydı aynı anahtara düşerse (belirsiz) eşleşme **yapılmaz** (`Unmapped`).
+
 ## 6) Kurallar
 
 ### 6.1 Yinelenen kayıt kuralları
@@ -179,7 +210,7 @@ Doğrulama sonrası her satır: `Valid`, `Warning` (aktarılır, not düşülür
 Hata zarfı için bölüm 8. `{id}` = parti kimliği.
 
 ### 7.1 `GET /imports/template`
-`?format=xlsx` (tek dosya) veya `?format=csv&table=customers|pets|vaccinations`. `Imports.Read`. `200` dosya (`Content-Disposition`).
+`?format=xlsx` (tek dosya) veya `?format=csv&table=customers|pets|vaccinations`. `Imports.Read`. `200` dosya (`Content-Disposition`), `Cache-Control: no-store`. İçerik bölüm 4.2 ("B2 şablon içeriği").
 
 ### 7.2 `POST /imports/batches` (parti oluştur)
 `multipart/form-data`, `Imports.Manage`. Alanlar:
@@ -187,13 +218,17 @@ Hata zarfı için bölüm 8. `{id}` = parti kimliği.
 | Alan | Zorunlu | Not |
 |------|---------|-----|
 | `requestId` | **Evet** (Guid) | Aynı kiracı + aynı `requestId` ikinci çağrıda **aynı partiyi** döndürür (`200`); farklı içerikle gelirse `409 Imports.RequestIdConflict`. |
-| `file` | Evet (XLSX) | XLSX: üç sayfa içerebilir. |
+| `file` | Evet (XLSX için) | XLSX: üç sayfa içerebilir. Ya `file` ya da CSV alanlarından en az biri zorunludur. |
 | `customersFile`, `petsFile`, `vaccinationsFile` | CSV için | Her biri ayrı CSV. `file` ile birlikte verilemez. |
 | `clinicId` | Aşı varsa evet | Bölüm 4.3. |
 | `name` | Hayır | Listede görünen etiket (≤ 100); kişisel veri içermemeli. |
 | `encoding`, `delimiter` | Hayır | CSV zorlaması. |
 
 İşlem: dosya boyut/biçim denetimi, **içerik özeti (SHA-256)** hesabı, başlıkların okunması, kanonik başlıklarla otomatik eşleme önerisi. Satırlar bu aşamada saklanır (`Uploaded`) ama doğrulanmamıştır.
+
+**B2 davranışı (uygulandı):** Dosya alanları işlenir (bölüm 4.1 "B2 okuyucu ayrıntıları"). Sıra: kiracı/klinik denetimi → dosya imza/boyut denetimi → içerik özeti → aynı `requestId` tekrarı (`200` aynı parti; `name`, `clinicId` **ve içerik özeti** aynı olmalı, aksi `409 Imports.RequestIdConflict`) → aynı özetli aktif parti (`409 Imports.DuplicateFile`; `extensions.batchId` yalnız çağıranın görebildiği partiyse) → açık taslak sınırı → okuma (bölüm 4.1 hataları) → aşı tablosu var ve `clinicId` yok (`400 Imports.ClinicRequired`) → kayıt. Parti ve hazırlık satırları **tek veritabanı işleminde** yazılır; okuma hatasında hiçbir şey kalmaz. Satırlar `ImportBatchRow` olarak saklanır (`SourceJson` = başlık → metin sözlüğü, `NormalizedJson` boş, doğrulama durumu `Pending`); `summary.<tablo>.total` satır sayısı olur. Dosya yoksa `400 Imports.EmptyFile`. Aşı için `clinicId` erişimi B1'deki gibi okuma kapsamıyla denetlenir; aşı yazma erişimi ve `Vaccinations.Create` denetimi uygulama (B4) adımındadır. `encoding` ve `delimiter` değerleri izinli kümede değilse `400 Validation.FluentValidation`. Audit payload'ı dosya içeriği ve satır verisi taşımaz (yalnız `requestId`, `name`, `clinicId`, `encoding`, `delimiter`).
+
+Yanıt gövdesi (B1 alanlarına ek): `tables[]` ve yalnız yükleme yanıtında `warnings[]` (`{ code, table?, message }`: `Imports.EncodingSuspect`, `Imports.TableEmpty`). `tables[].table` = `customers|pets|vaccinations`; `rowCount` = veri satırı sayısı; `columns[]` = dosyadaki başlıklar sırasıyla `{ source, suggested, confidence, mapped }`: `suggested` kanonik başlık veya `null`, `confidence` `Exact` (kanonik adla katlanmış eşit) | `Alias` (takma adla eşit) | `None`, `mapped` kayıtlı eşlemedeki kanonik ad (eşleme kaydedilmemişse `null`). Öneri kuralı: önce `Exact`, sonra `Alias`; bir kanonik alan en çok bir sütuna, bir sütun en çok bir kanonik alana önerilir (ilk gelen kazanır). Sütun başlığı karşılaştırması bölüm 4.1/5 katlamasıyladır. Takma ad tablosu koddadır (`ImportCanonicalSchema`); yönetilen veri değildir.
 
 **B1 davranışı (uygulandı):** Dosya alanları henüz yoktur; yalnız `requestId` (zorunlu), `name` (≤ 100, boşluk kırpılır, boşsa null) ve `clinicId` (opsiyonel) okunur. `clinicId` verilirse kiracıya ait ve çağıranın erişebildiği klinik olmalı (`404 Clinics.NotFound` / `403 Clinics.AccessDenied`) ve aktif klinik bağlamıyla çelişmemeli (`400 Imports.ClinicContextMismatch`). Pasif kiracı `403 Tenants.TenantInactive`; abonelik yazma koruması mevcut kodlarla. Aynı `requestId` + aynı `name`/`clinicId` → `200` aynı parti; farklı `name` veya `clinicId` → `409 Imports.RequestIdConflict` (B2'de içerik özeti de karşılaştırmaya girer). Kiracıda 5 açık taslak varsa `409 Imports.TooManyOpenDrafts`. Yanıt gövdesi bölüm 7.5'teki parti nesnesidir (`tables[]` B2'de eklenir).
 
@@ -206,8 +241,9 @@ Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBac
   "id": "guid", "status": "Uploaded", "name": "string?", "clinicId": "guid?",
   "tables": [
     { "table": "customers", "rowCount": 1200,
-      "columns": [ { "source": "Ad Soyad", "suggested": "AdSoyad", "confidence": "Exact|Alias|None" } ] }
+      "columns": [ { "source": "Ad Soyad", "suggested": "AdSoyad", "confidence": "Exact|Alias|None", "mapped": null } ] }
   ],
+  "warnings": [ { "code": "Imports.EncodingSuspect", "table": "customers", "message": "..." } ],
   "createdAtUtc": "...", "createdBy": "guid"
 }
 ```
@@ -223,6 +259,14 @@ Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBac
 }
 ```
 `options.onDuplicateClient` `[K4]`: `Match` (öneri) | `Skip` | `Error`. Doğrulanmış parti eşleme değişince `Mapped`'a düşer (önizleme geçersiz). Yanıt: güncel parti özeti. Hatalar: `Imports.MappingIncomplete`, `Imports.MappingUnknownColumn`, `Imports.ValueMappingTargetInvalid` (hedef yok/pasif/tür uyumsuz).
+
+**B2 davranışı (uygulandı):** `columns` anahtarı `kanonik başlık → kaynak sütun adı`dır (örnekteki gibi). `columns` / `valueMappings` / `options` tamamı tam değiştirme; `options` verilmezse `onDuplicateClient = Match`. Denetimler (tümü `400`, hiçbir şey kaydedilmez):
+- Partide olmayan tablo anahtarı, tablonun kanonik listesinde olmayan alan adı (büyük/küçük harf duyarlı kanonik ad), tabloda bulunmayan kaynak sütun adı (başlıkla birebir) → `Imports.MappingUnknownColumn`.
+- Aynı kaynak sütunun aynı tabloda iki kanonik alana eşlenmesi → `Imports.MappingSourceReused`.
+- Partide bulunan her tablo için zorunlu alanlar: müşteri `AdSoyad`; hasta `HayvanAdi`, `Tur` ve sahip bağlantısı (`MusteriNo` **veya** `SahipAdSoyad`+`SahipTelefon`); aşı `AsiAdi`, `UygulamaTarihi` ve hasta bağlantısı (`HayvanNo` **veya** `SahipAdSoyad`+`SahipTelefon`+`HayvanAdi`+`Tur`). Eksik → `Imports.MappingIncomplete` (mesaj eksik alanları sayar). Tablolar arası bağlantı tutarlılığı (hasta `MusteriNo` ile bağlanıyorsa müşteri tablosunda `MusteriNo` eşlenmiş olması) `validate` (B3) adımındadır.
+- `valueMappings[].kind` ∈ `species|breed|vaccine|color`; `source` boş olamaz (≤ 200); aynı `kind` + katlanmış `source` iki kez verilemez; `targetId` dolu ise hedef var, aktif ve (aşı için) kiracıya görünür olmalı → `Imports.ValueMappingTargetInvalid`. Tür uyumu (ırk–tür, aşı–hasta türü) satır bağlamı gerektirdiğinden `validate` (B3) adımındadır. `targetId = null` bilinçli atlamadır.
+- `options.onDuplicateClient` izinli kümede değilse `400 Validation.FluentValidation`.
+Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `Mapped`, önceki `validationId` silinir); diğer durumda `409 Imports.InvalidState`. Yanıt `200` + parti nesnesi (`tables[].columns[].mapped` kayıtlı eşlemeyi gösterir). Audit eylemi `ImportBatch.Mapping` (hedef `ImportBatchId`; payload'da sütun/değer eşleme gövdesi **yazılmaz**: kaynak değerler kişisel veri taşıyabilir).
 
 ### 7.4 `POST /imports/batches/{id}/validate`
 `Imports.Manage`; durum `Mapped|Validated|ValidationFailed`. **Veritabanına müşteri/hasta/aşı yazmaz** (yalnız parti ve satır sonuçları). `202 Accepted` + parti özeti (`status = Validating`). Bittiğinde `Validated` (satır hataları olsa da) veya `ValidationFailed` (dosya düzeyi sorun: zorunlu sütun yok, yapısal bozukluk, hiç geçerli satır yok). Aynı kiracıda başka aktif iş varsa `409 Imports.AnotherJobRunning`. Tekrar çağrılabilir; idempotent (aynı eşleme → aynı sonuç, yeni `validationId`).
@@ -313,7 +357,7 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 ### 7.13 `DELETE /imports/batches/{id}`
 `Imports.Manage`; yalnız taslak durumları (`Uploaded|Mapped|Validated|ValidationFailed`). Hazırlık verisini siler (ürün verisine dokunmaz) → `Discarded`; `204`. `Committing/Committed` partide `409 Imports.InvalidState`.
 
-**B1 davranışı (uygulandı):** Parti kaydı silinmez, durumu `Discarded` olur (liste/geçmişte görünür, içerik özeti serbest kalır). B1'de satır olmadığından yalnız durum değişir; hazırlık satırlarının silinmesi satırların yazıldığı B2 ile gelir. Zaten `Discarded` parti için tekrar çağrı `409 Imports.InvalidState`. Başka kiracı/erişilemeyen klinik → `404 Imports.BatchNotFound`.
+**Davranış (B1 + B2, uygulandı):** Parti kaydı silinmez, durumu `Discarded` olur (liste/geçmişte görünür, içerik özeti serbest kalır). B2'den itibaren partinin hazırlık satırları (`ImportBatchRows`) **aynı işlemde silinir** ve `payloadPurgedAtUtc` silme anıyla dolar. Zaten `Discarded` parti için tekrar çağrı `409 Imports.InvalidState`. Başka kiracı/erişilemeyen klinik → `404 Imports.BatchNotFound`.
 
 ## 8) Hata kodları
 
@@ -321,7 +365,7 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 |------|-----|-------|
 | 400 | `Validation.FluentValidation` | İstek biçimi (eksik `requestId`, geçersiz sayfa vb.) |
 | 400 | `Imports.UnsupportedFile` / `Imports.FileTooLarge` / `Imports.TooManyRows` / `Imports.EmptyFile` | Dosya düzeyi |
-| 400 | `Imports.MappingIncomplete` / `Imports.MappingUnknownColumn` / `Imports.ValueMappingTargetInvalid` | Eşleme |
+| 400 | `Imports.MappingIncomplete` / `Imports.MappingUnknownColumn` / `Imports.MappingSourceReused` / `Imports.ValueMappingTargetInvalid` | Eşleme |
 | 400 | `Imports.ClinicRequired` | Aşı tablosu var, `clinicId` yok |
 | 404 | `Imports.BatchNotFound` | Parti yok veya başka kiracıya ait |
 | 404 | `Clinics.NotFound` | Klinik yok/kiracıya ait değil (mevcut kod) |
@@ -369,4 +413,6 @@ Silinmeyen kayıt `Kept` ve nedeni (`HasVisits`, `HasCharges`, `HasExaminations`
 - Yeni: `ImportBatch`, `ImportBatchRow`, izinler, arka plan işçisi, silme olayı tipleri (Client/Pet).
 - **B1 migration `AddDataImportBatches`** (tek migration): `ImportBatches`, `ImportBatchRows` tabloları, `Vaccinations.ImportBatchId` (nullable, filtreli indeks, `ImportBatches`'e `NO ACTION` FK). Veritabanı güvenceleri: `UX_ImportBatches_TenantId_RequestId`; `UX_ImportBatches_TenantId_ContentHash` (özet dolu ve durum `CommitFailed/RolledBack/Discarded/Expired` dışı); `UX_ImportBatches_TenantId_ActiveJob` (durum `Validating/Committing/RollingBack` iken kiracı başına tek satır); `UX_ImportBatchRows_BatchId_Table_RowNumber`; `ImportBatchRows.TargetEntityId` indeksi; `ImportBatches.RowVersion`.
 - B1 audit eylemleri: `ImportBatch.Create` (hedef `RequestId`), `ImportBatch.Discard` (hedef `ImportBatchId`). Payload yalnız `requestId`, `name`, `clinicId` / parti kimliği taşır.
+- B2 audit eylemleri: `ImportBatch.Create` (payload'a ek olarak `encoding`, `delimiter`; dosya içeriği ve satır verisi yok), `ImportBatch.Mapping` (hedef `ImportBatchId`; eşleme gövdesi yok). B2 migration gerektirmez: yeni alan yok, yalnız mevcut `ContentHash`, sayaç `Total` alanları ve `ImportBatchRows` kullanılır.
+- Ortak hata zarfı: `Error` değeri isteğe bağlı `Extensions` taşır; `ProblemDetails.extensions` alanına (örn. `batchId`) kopyalanır.
 - Mevcut müşteri/hasta/aşı uçlarının sözleşmesi **değişmez**.
