@@ -2,108 +2,117 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-018-charge-suggestion-and-service-catalog.md` (taslak), `ux/HEDEF-IS-AKISLARI-2026-10.md` bölüm 1.4 / dilim D4; `ADMINISTRATIONS_API_CONTRACT.md`, `CHARGES_API_CONTRACT.md`, `FIN_DISCOVERY.md`. Uçlar `api/v1` altında; hata zarfı standart `ProblemDetails` + `extensions.code`.
 
-> **Durum:** Sözleşme (kod bu sözleşmeye göre yazıldı). Migration dosyası üretildi, **hiçbir veritabanına uygulanmadı**. Yeni izin için seed gerekir (bölüm 6).
+> **Durum:** Uygulandı (kod + test). Migration `20261014043646_AddChargeSuggestions` dosyası üretildi, **paylaşılan/yerel dev veritabanına uygulanmadı**. Yeni izin **yok** (seed gerekmez; bölüm 6).
 
 ---
 
 ## 1) Kavramlar ve kurallar
 
-- **Ücret önerisi ("ücret bekliyor" kalemi) kalıcı kayıt değildir, hesaplanır.** Kalem = klinikte kaydedilmiş, **iptal edilmemiş** bir işlem kaydı (`sourceType = "Administration"`: stoktan düşen uygulama; aşı kaydıyla birlikte yazılanlar dahil) ki (a) kaynağı olarak gösteren **hiçbir ücret** yoktur (iptal edilmiş ücret dahil) ve (b) **ücretsiz sayılmamıştır**. İşlem kaydı tek doğruluk kaynağıdır; ayrı öneri satırı yoktur.
-- **Kaynak izi:** `Charge` iki yeni alan taşır: `sourceType` (string?, şimdilik yalnız `"Administration"`), `sourceId` (guid?). Kiracıda `(sourceType, sourceId)` **benzersizdir** (iptal edilmiş ücretler dahil; DB düzeyinde). Elle yazılan ücrette ikisi `null`.
-- **Çift ücret olmaz:** bir işlemden en çok bir ücret doğar. Dönüştürme `requestId` ile idempotenttir; eşzamanlı iki dönüştürmede biri kazanır, diğeri `ChargeSuggestions.AlreadyConverted` (409) alır (aynı `requestId` ile tekrar = ilk ücret, 200).
+- **"Ücret bekliyor" kalemi kalıcı bir kayıttır (`ChargeSuggestion`), ücret değildir.** Hekimin ücretlendirilebilir işlemi kaydedildiği **aynı transaction'da** doğar. Bugün tek kaynak: **uygulama** (`sourceType = "Administration"`: stoktan düşen uygulama; aşı kaydıyla birlikte yazılan uygulama dahil).
+- **Kalem doğar:** ürünün katalog fiyatı `> 0` ise. Katalogda bedelsiz (fiyat 0) tanımlı ürün kalem doğurmaz (bilinçli ücretsiz). Hizmet (`Service`) uygulanamadığı için bugün kaynağı yoktur (bölüm 7).
+- **Ön değerler (kalem doğduğu andaki):** açıklama = ürün adı, miktar = uygulama miktarı, birim = ürün birimi, `suggestedUnitPrice` = katalog fiyatı. Fiyat TRY değilse veya ücret kuralına uymuyorsa (> 2 ondalık, üst sınır) `null`: resepsiyon girer. Sonraki katalog fiyat değişikliği bekleyen kalemi **değiştirmez**.
+- **Durum makinesi:** `Pending` → `Converted` | `Waived` | `Cancelled`. Yalnız `Pending` listede görünür ve karar alır; diğerleri **son durumdur, geri dönmez**.
+- **Kaynak izi:** kiracıda `(sourceType, sourceId)` benzersizdir (bir işlemden en çok bir kalem); `chargeId` benzersizdir (bir ücret en çok bir kalemi kapatır). `Charge` değişmedi; bağ kalemdedir.
 - **Net kurallar:**
-  1. Dönüştürülen kalem listeden düşer.
-  2. **Uygulama iptal edilirse** kalem düşer. Ücreti **zaten kesilmişse** ücret kendiliğinden değişmez (ADMINISTRATIONS D5); yönetici ücreti `Charges.Correct` ile iptal/düzeltir.
-  3. **Ücret iptal edilirse kalem geri "bekliyor" OLMAZ** (kaynak izi iptal edilmiş ücrette de durur). Yanlış ücret düzeltmesi elle serbest ücretle yapılır.
-  4. **Ücretsiz say** gerekçelidir (5–500), audit'lenir, **geri alınmaz**; kalem düşer; sonradan dönüştürülemez.
-  5. Hekim kalemleri **okur**, ücret ekleyemez/dönüştüremez/ücretsiz sayamaz (ADR-012 K2).
-- **Kapsam:** yalnız `Administration` kaynağı. Tedavi, yatış günü, lab ve hizmet seçimi **bu sözleşmede yok**: bu kayıtlarda ürün/hizmet bağı yok, dolayısıyla fiyat kaynağı yok (ADR-018 karar 8). Aşı kaydı ürünsüzse uygulama yoktur, kalem de yoktur.
-- **Eşzamanlılık:** koruma, kaynak benzersiz indeksi (DB) ve `requestId` replay'idir. Uygulamanın `RowVersion`'ı yalnız iptal eşzamanlılığı içindir ve dönüştürmede **kullanılmaz**; dönüştürmeyle eşzamanlı iptal yarışı çok dar bir pencerede kesilmiş ücret + iptal edilmiş uygulama bırakabilir (kural 2 yönetici düzeltmesi).
+  1. **Çevrilen kalem** listeden düşer (`Converted`, `chargeId` dolu).
+  2. **Çift ücret olmaz:** (a) yalnız `Pending` çevrilir; (b) kalemin `RowVersion`'ı eşzamanlı iki karardan yalnız birini kabul eder, kaybedenin yazdığı ücret aynı transaction'da geri alınır; (c) `requestId` tekrarı ilk ücreti döndürür.
+  3. **Uygulama iptal edilirse** bekleyen kalem aynı transaction'da düşer (`Cancelled`). Ücreti **zaten kesilmişse** kalem ve ücret değişmez (ADMINISTRATIONS D5); yönetici ücreti `Charges.Correct` ile düzeltir/iptal eder. İptal ile eşzamanlı çevirme yarışında tek kazanan olur: çevirme kazanırsa iptal `Administrations.ConcurrencyConflict` (409) alır ve tekrar denenince kalem artık `Converted` olduğu için iptal başarılı olur (ücret kalır, kural 3).
+  4. **Ücret iptal edilirse kalem geri "bekliyor" OLMAZ** (`Converted` kalır). Yeniden ücretlendirme gerekirse elle serbest ücret yazılır.
+  5. **Ücretsiz say** gerekçelidir (5–500), audit'lenir (`ChargeSuggestion.Waive`), **geri alınmaz**.
+  6. **Hekim** kalemleri okur (`Charges.Read`), çeviremez/ücretsiz sayamaz (`Charges.Create` yok; ADR-012 K2).
+- **Geçmiş veri:** migration öncesi uygulamalar için kalem **üretilmez** (backfill yok); liste yalnız bu sürümden sonraki işlemleri gösterir.
 
 ### `ChargeSuggestionDto`
 
 | Alan | Tip | Not |
 |---|---|---|
+| `id` | guid | Kalem kimliği (çevirme/ücretsiz sayma uçları bununla) |
 | `sourceType` | string | `"Administration"` |
 | `sourceId` | guid | Uygulama kimliği |
 | `clinicId` | guid | |
-| `clientId` | guid | Hayvanın sahibi; dönüştürmede ücretin müşterisi |
+| `clientId` | guid | Hayvanın **güncel** sahibi (ücretin müşterisi) |
 | `clientName` | string | |
 | `petId` | guid | |
 | `petName` | string | |
 | `examinationId` | guid? | |
-| `visitId` | guid? | Muayenenin geliş kaydı |
-| `vaccinationId` | guid? | Aşı kaydıyla birlikte yazıldıysa |
+| `visitId` | guid? | Muayenenin kalem doğduğu andaki geliş kaydı |
 | `productId` | guid | |
-| `description` | string | Ürün/hizmet **adı** (ücret açıklaması önerisi) |
-| `quantity` | decimal | Uygulama miktarı |
-| `unit` | string | Ürün stok birimi (miktarın yanında gösterilir) |
-| `suggestedUnitPrice` | decimal? | Ürünün güncel birim fiyatı; fiyat ≤ 0 veya para birimi TRY değilse `null` (resepsiyon girer) |
+| `description` | string | Ürün/hizmet adı |
+| `quantity` | decimal | |
+| `unit` | string | Ürün birimi |
+| `suggestedUnitPrice` | decimal? | Katalog fiyatı; `null` = resepsiyon girer |
 | `currency` | string | `"TRY"` |
 | `occurredAtUtc` | datetime | Uygulama zamanı |
-| `addedAfterFinalization` | bool | Kesinleşmiş muayeneye sonradan eklenmiş |
+| `status` | string | `Pending` \| `Converted` \| `Waived` \| `Cancelled` |
+| `chargeId` | guid? | `Converted` iken |
+| `resolvedAtUtc` | datetime? | Karar zamanı |
+| `waiveReason` | string? | `Waived` iken |
 
 ---
 
 ## 2) `GET /api/v1/charge-suggestions`
 
-`ChargeSuggestions.Read`. Sayfalı (`page`, `pageSize` 1–200, varsayılan 1/20) `PagedResult<ChargeSuggestionDto>`. Klinik kapsamı zorunlu: `clinicId` veya aktif klinik bağlamı (`ChargeSuggestions.ClinicScopeRequired`, 400; uyuşmazlık `ChargeSuggestions.ClinicContextMismatch` 400; atanmamış klinik `Clinics.AccessDenied` 403). Süzgeçler: `petId`, `examinationId`, `clientId`. Sıralama: `occurredAtUtc` azalan. Liste kalemin **şu anki** durumunu verir; fiyat güncel ürün fiyatıdır.
+`Charges.Read` (hekim dahil). Yalnız `Pending` kalemler. Sayfalı (`page` ≥ 1, `pageSize` 1–200; varsayılan 1/20) `PagedResult<ChargeSuggestionDto>`. Klinik kapsamı zorunlu: `clinicId` veya aktif klinik bağlamı (`ChargeSuggestions.ClinicScopeRequired` 400; uyuşmazlık `ChargeSuggestions.ClinicContextMismatch` 400; atanmamış klinik `Clinics.AccessDenied` 403). Süzgeçler: `petId`, `examinationId`, `visitId`. Sıralama: `occurredAtUtc` azalan.
 
-## 3) `POST /api/v1/charge-suggestions/convert`
+## 3) `POST /api/v1/charge-suggestions/{id}/convert`
 
-`Charges.Create` (resepsiyon, yönetici düzeyi; hekimde yok). İstek:
+`Charges.Create` (resepsiyon, yönetici; hekimde yok). Gövde opsiyoneldir (boş gövde = kalemdeki değerlerle tek tık):
 
 ```json
-{
-  "clinicId": "guid?",
-  "sourceType": "Administration",
-  "sourceId": "guid",
-  "description": "string?",
-  "quantity": 1,
-  "unitPrice": 250.00,
-  "requestId": "guid?"
-}
+{ "description": "string?", "quantity": 1, "unitPrice": 250.00, "requestId": "guid?" }
 ```
 
-`description`, `quantity`, `unitPrice` **opsiyonel**: verilmezse kalemdeki değer (ad, miktar, `suggestedUnitPrice`) kullanılır; verilirse düzenlenmiş değerdir (ücret kuralları `CHARGES_API_CONTRACT.md` ile aynı). Fiyat ne kalemde ne istekte yoksa `ChargeSuggestions.Validation` (400, "birim fiyat gerekli").
+Verilmeyen alan kalemden gelir; verilen alan düzenlenmiş değerdir (kurallar `CHARGES_API_CONTRACT.md` ile aynı). Etki: ücret mevcut ücret kurallarıyla yazılır — müşteri = hayvanın güncel sahibi, `petId`, `examinationId`, muayenenin **güncel** `visitId`'si; kalem `Converted` olur. İkisi tek transaction.
 
-Yanıt: yeni ücret **201** + `ChargeCreateResultDto` (`{ created: true, charge }`); aynı `requestId` tekrarında **200**, `created: false`. Etki: `Charge` normal ücret kurallarıyla yazılır (müşteri = hayvanın sahibi, `petId`, `examinationId`, muayenenin `visitId`'si, kaynak izi). Mevcut ücret ucu (`POST /charges`) aynen kalır ve kaynak almaz.
+Yanıt: yeni ücret **201** + `ChargeCreateResultDto` (`{ created: true, charge }`, `Location` = `/charges/{id}`); aynı `requestId` tekrarında **200**, `created: false`, aynı ücret.
 
-Hatalar: `ChargeSuggestions.Validation` (400; desteklenmeyen `sourceType`, fiyat yok), `ChargeSuggestions.NotFound` (404; kaynak yok/kiracı-klinik dışı), `ChargeSuggestions.SourceAlreadyVoided` (409; uygulama iptal edilmiş), `ChargeSuggestions.AlreadyConverted` (409; başka `requestId`/isteksiz ikinci dönüştürme), `ChargeSuggestions.AlreadyWaived` (409), ücret uçlarının kodları (`Charges.Validation`, `Pets.NotFound`, `Clients.NotFound`, `Tenants.TenantInactive`, `Clinics.AccessDenied`).
+| Kod | HTTP | Durum |
+|---|---|---|
+| `ChargeSuggestions.NotFound` | 404 | Kalem yok / başka kiracı / aktif klinik dışı |
+| `ChargeSuggestions.Validation` | 400 | Kalemde fiyat yok ve `unitPrice` verilmedi |
+| `ChargeSuggestions.AlreadyConverted` | 409 | Kalem zaten ücrete çevrilmiş (başka `requestId` ile ya da istek kimliksiz) |
+| `ChargeSuggestions.AlreadyWaived` | 409 | Ücretsiz sayılmış |
+| `ChargeSuggestions.SourceAlreadyVoided` | 409 | Uygulama iptal edilmiş |
+| `ChargeSuggestions.DuplicateRequestId` | 409 | `requestId` başka bir ücrete ait |
+| `ChargeSuggestions.ConcurrencyConflict` | 409 | Kalem aynı anda değişti (nadir); listeyi yenile |
+| `Charges.RequestIdVoided` | 409 | Bu `requestId`'nin ücreti sonradan iptal edilmiş (tekrar istek) |
+| `Charges.Validation`, `Charges.VisitVoided`, `Pets.NotFound`, `Tenants.TenantInactive`, `Clinics.AccessDenied` | 400/404/403 | Ücret kuralları |
 
-## 4) `POST /api/v1/charge-suggestions/waive`
+Mevcut `POST /charges` (serbest ücret) aynen kalır.
 
-`Charges.Create`. İstek: `{ "clinicId": "guid?", "sourceType": "Administration", "sourceId": "guid", "reason": "string" }` (`reason` 5–500). Yanıt **200** `{ sourceType, sourceId, waivedAtUtc, reason }`. Aynı kalem ikinci kez: `ChargeSuggestions.AlreadyWaived` (409); ücreti varsa `AlreadyConverted` (409); iptal edilmiş uygulama `SourceAlreadyVoided` (409). Audit: `ChargeSuggestion.Waive`.
+## 4) `POST /api/v1/charge-suggestions/{id}/waive`
 
-## 5) Muayene özetinde bekleyen sayı
+`Charges.Create`. Gövde `{ "reason": "string" }` (5–500). Yanıt **200** `ChargeSuggestionDto` (`status: "Waived"`). Hatalar: `ChargeSuggestions.Validation` (400, gerekçe), `NotFound` (404), `AlreadyWaived` / `AlreadyConverted` / `SourceAlreadyVoided` / `ConcurrencyConflict` (409). Audit: `ChargeSuggestion.Waive`.
 
-`GET /api/v1/examinations/{id}/related-summary` yanıtına **`pendingChargeCount`** (`int?`) eklenir: o muayeneye bağlı kalem sayısı (bölüm 1 kuralı; blok başına 10 sınırı yalnız listelere uygulanır, sayıya değil). Çağıranda `ChargeSuggestions.Read` yoksa `null`. Hekim, resepsiyon ve yönetici aynı sayıyı görür.
+## 5) Sayılar (muayene ve Bugün)
+
+- `GET /api/v1/examinations/{id}/related-summary` → **`pendingChargeCount`** (`int?`): muayeneye bağlı `Pending` kalem sayısı (klinik bağlamı varsa onunla sınırlı; blok başına 10 sınırı sayıya uygulanmaz). `Charges.Read` yoksa `null`.
+- `GET /api/v1/visits/today` satırları → **`pendingChargeCount`** (`int?`): ziyarete bağlı `Pending` kalem sayısı (kalemin `visitId`'si). Diğer tutar alanlarıyla aynı kural: `Charges.Read` yoksa `null`, ziyaretsiz (planlı) satırda `null`, ziyaret varsa `0` veya fazlası.
 
 ## 6) Yetkiler
 
-| İzin | Açıklama | Roller |
-|---|---|---|
-| `ChargeSuggestions.Read` (**yeni**) | Bekleyen kalemleri okuma | Admin, Owner, ClinicAdmin, **Veteriner**, Sekreter |
-| `Charges.Create` (mevcut) | Dönüştürme ve ücretsiz sayma | Admin, Owner, ClinicAdmin, Sekreter (Veteriner'de yok) |
+Yeni izin **yok**; seed gerekmez.
 
-**Seed gerekir:** yeni izin `PermissionCatalog`'a ve `RolePermissionBindings`'e eklendi; yerel/paylaşılan veritabanına **kullanıcı çalıştırır** (izin seed komutu). Mevcut özel roller elle almalı.
+| İşlem | İzin | Varsayılan roller |
+|---|---|---|
+| Liste, sayılar | `Charges.Read` | Admin, Owner, ClinicAdmin, Veteriner, Sekreter |
+| Çevirme, ücretsiz sayma | `Charges.Create` | Admin, Owner, ClinicAdmin, Sekreter (Veteriner'de yok) |
 
 ## 7) Hizmet kataloğu (`Product` genişlemesi)
 
-- `ProductKind` değerine **`Service`** eklendi (`kind: "Service"`); mevcut `POST/PUT /products` aynı: `name`, `unit` (örn. `"Adet"`), `unitPrice`, `currency`. Hizmette `controlledClass` `None` olmalıdır (`Products.Validation`, 400).
-- Hizmet **stok takipli değildir**: uygulama, stok hareketi, doğrudan satış ve reçete satırında kullanılamaz → `Products.NotStockTracked` (400). `ProductDto` değişmez (`kind` yeni değer alır).
-- Tür değişimi: bir ürün `Service`'e veya `Service`'ten çevrilemez (`Products.KindChangeNotAllowed`, 400); yanlış kayıt pasif yapılır, yenisi açılır.
-- Pilot: ücret önerisi kaynağı yalnız uygulama olduğundan hizmet bugün **fiyat kataloğudur**; resepsiyon elle ücret yazarken katalogdan (`GET /products`, `kind = Service` istemcide ayıklanır) ad ve fiyatı doldurur. Hekimin işlemde hizmet seçmesi sonraki dilim. KDV, birim dönüşümü, paket yok.
-- `GET /products` listesine `kind` süzgeci **eklenmedi** (pilot kataloğu küçük).
+- `ProductKind` değerine **`Service`** (= 3) eklendi; mevcut `POST/PUT /products` aynı: `name`, `unit` (örn. `"Adet"`), `unitPrice`, `currency`, istekte `kind: 3` (sayı; diğer türlerle aynı biçim), yanıtta `kind: "Service"`. Hizmette `controlledClass` `None` olmalıdır (`Products.Validation`, 400).
+- Hizmet **stok takipli değildir**: uygulama, stok hareketi (giriş/çıkış/sayım), doğrudan satış ve reçete satırında kullanılamaz → `Products.NotStockTracked` (400). `ProductDto` değişmez (`kind` yeni değeri alır).
+- Tür değişimi: ürün `Service`'e veya `Service`'ten çevrilemez (`Products.KindChangeNotAllowed`, 400); yanlış kayıt pasif yapılır, yenisi açılır.
+- Pilot: kalem kaynağı yalnız uygulama olduğundan hizmet bugün **fiyat kataloğudur**; resepsiyon serbest ücret yazarken katalogdan (`GET /products`, `kind = Service` istemcide ayıklanır) ad ve fiyatı doldurur. Hekimin işlemde hizmet seçmesi (hizmet kaynaklı kalem) sonraki dilim. KDV, birim dönüşümü, paket yok. `GET /products` listesine `kind` süzgeci eklenmedi.
 
 ---
 
 ## 8) Frontend için değişenler
 
-1. **Yeni uçlar:** `GET /charge-suggestions` (Ücretlendir paneli, Bugün rozeti), `POST /charge-suggestions/convert` (tek tık; alanlar önceden dolu, düzenlenirse üç alan gönderilir), `POST /charge-suggestions/waive` (gerekçe zorunlu). Dönüştürme/ücretsiz sayma için `requestId` üretip yeniden denemede aynısını gönder.
-2. **Hekim:** bekleyen kalemi görür (`ChargeSuggestions.Read`); dönüştür/ücretsiz say düğmeleri yalnız `Charges.Create` olanda görünür.
-3. **related-summary:** `pendingChargeCount` (`int?`; `null` = yetki yok). Muayene/kesinleştirme kontrolünde "n ücret bekliyor" göstergesi için.
-4. **Ürün formu:** `kind` seçeneklerine `Service` ("Hizmet"); seçilince stok, kontrollü sınıf, parti alanlarını gizle; stok/uygulama/satış ürün seçicilerinden hizmetleri çıkar (sunucu da reddeder: `Products.NotStockTracked`).
-5. **Ücret DTO'su değişmedi** (kaynak izi iç kayıt, `ChargeDto`'ya eklenmedi).
-6. **Yeni hata kodları:** `ChargeSuggestions.*` (bölüm 3, 4), `Products.NotStockTracked`, `Products.KindChangeNotAllowed`. 409'larda listeyi yenile.
-7. **Davranış:** ücret iptal edilirse kalem geri gelmez; uygulama iptalinde kalem kaybolur; liste her zaman sunucudan okunur (istemci hesaplamaz).
+1. **Yeni uçlar:** `GET /charge-suggestions` (Ücretlendir paneli; `visitId`/`examinationId`/`petId` süzgeci), `POST /charge-suggestions/{id}/convert` (tek tık: boş gövde; düzenlendiyse yalnız değişen alanlar), `POST /charge-suggestions/{id}/waive` (gerekçe zorunlu). Çevirmede `requestId` üret, yeniden denemede aynısını gönder.
+2. **Hekim:** kalemleri görür; Çevir/Ücretsiz say düğmeleri yalnız `Charges.Create` olanda.
+3. **Sayılar:** `related-summary.pendingChargeCount` (kesinleştirme kontrolü: "n ücret bekliyor"), `visits/today` satırında `pendingChargeCount` (Bugün rozeti). `null` = yetki yok/ziyaretsiz satır.
+4. **Ürün formu:** `kind` seçeneklerine `Service` ("Hizmet"); seçilince stok, kontrollü sınıf, parti alanlarını gizle; stok/uygulama/satış/reçete ürün seçicilerinden hizmetleri çıkar (sunucu da reddeder).
+5. **`ChargeDto` değişmedi.** Fiyatı `null` kalemde birim fiyat alanı boş ve zorunlu gelir.
+6. **Yeni hata kodları:** `ChargeSuggestions.*` (bölüm 3, 4), `Products.NotStockTracked`, `Products.KindChangeNotAllowed`, uygulama iptalinde `Administrations.ConcurrencyConflict`. 409'larda listeyi yenile.
+7. **Davranış:** ücret iptal edilirse kalem geri gelmez; uygulama iptalinde bekleyen kalem kaybolur; liste her zaman sunucudan okunur.
