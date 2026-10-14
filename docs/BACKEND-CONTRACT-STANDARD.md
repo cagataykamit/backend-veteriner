@@ -345,7 +345,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 - `POST /api/v1/vaccinations` → `Vaccinations.Create`, başarı `201 Created`, gövde **çıplak `Guid`** (oluşan `id`). **Opsiyonel `productId` (+ `quantity`, `batchId`, `requestId`) verilirse** aynı işlemde stoktan düşen uygulama da yazılır ve ayrıca `Administrations.Create` gerekir; yanıt `{ created, id, administration, stock }` olur, `requestId` tekrarında 200. Kurallar ve iptal tutarlılığı: `ADMINISTRATIONS_API_CONTRACT.md` bölüm 9.
 - `PUT /api/v1/vaccinations/{id}` → `Vaccinations.Update`, başarı `204 NoContent`.
 - `GET /api/v1/vaccinations/{id}` → `Vaccinations.Read`, başarı `200` + `VaccinationDetailDto`.
-- `GET /api/v1/vaccinations` → `Vaccinations.Read`, başarı `200` + `PagedResult<VaccinationListItemDto>`.
+- `GET /api/v1/vaccinations` → `Vaccinations.Read`, başarı `200` + `PagedResult<VaccinationListItemDto>`. Opsiyonel süzgeç `examinationId` (Guid): yalnız `Vaccination.ExaminationId` bu değere eşit kayıtlar; kiracı ve klinik kapsamı süzgeçten bağımsız uygulanır (başka kiracı/klinik muayene kimliği boş sayfa döner, hata değil). Diğer süzgeçlerle AND.
 
 **Canonical alan notu:**
 
@@ -1008,11 +1008,15 @@ FluentValidation → `400` `ValidationProblemDetails`.
 
 **Amaç:** Muayene detay ekranında bu muayeneye bağlı tedavi, reçete, lab, yatış ve ödemeleri ayrı liste endpoint’leri yerine tek yanıtta sunmak.
 
-**Yanıt:** `ExaminationRelatedSummaryDto` — üst düzey `examinationId`, `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `treatments`, `prescriptions`, `labResults`, `hospitalizations`, `administrations`, `payments`. Her blok öğesi ilgili modülün özet alanlarını taşır (`clinicName` ile birlikte `clinicId`). Tedavi öğelerinde `examinationId` tekrarlanmaz (route’taki muayene zaten bağlamdır).
+**Yanıt:** `ExaminationRelatedSummaryDto` — üst düzey `examinationId`, `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `treatments`, `prescriptions`, `labResults`, `hospitalizations`, `administrations`, `vaccinations`, `payments`. Her blok öğesi ilgili modülün özet alanlarını taşır (`clinicName` ile birlikte `clinicId`). Tedavi öğelerinde `examinationId` tekrarlanmaz (route’taki muayene zaten bağlamdır).
 
-**Sıralama ve limit:** Her blok kendi tarih alanına göre **en yeni önce** (`treatmentDateUtc`, `prescribedAtUtc`, `resultDateUtc`, `admittedAtUtc`, `paidAtUtc`); blok başına en fazla **10** kayıt (`ExaminationRelatedSummaryConstants.RelatedItemsTake`).
+**Sıralama ve limit:** Her blok kendi tarih alanına göre **en yeni önce** (`treatmentDateUtc`, `prescribedAtUtc`, `resultDateUtc`, `admittedAtUtc`, `paidAtUtc`; `vaccinations` için `appliedAtUtc`, yoksa `dueAtUtc`); blok başına en fazla **10** kayıt (`ExaminationRelatedSummaryConstants.RelatedItemsTake`).
+
+**`vaccinations` bloğu:** `Vaccination.ExaminationId` bu muayeneye eşit aşı kayıtları (tüm durumlar: `Scheduled`, `Applied`, `Cancelled`; `status` alanı ile ayrılır). Öğe: `id`, `vaccineName`, `status` (string enum), `appliedAtUtc` (null olabilir), `dueAtUtc` (null olabilir), `clinicId`, `clinicName`. Blok yalnız çağıranın `Vaccinations.Read` izni varsa dolar; izin yoksa `[]` döner (diğer bloklarla aynı izin süzmesi). Uygulamaya bağlı aşı (`ADMINISTRATIONS_API_CONTRACT.md` bölüm 9) yalnız burada aşı satırı olarak görünür, `administrations` bloğunda yoktur.
 
 **Klinik bağlamı:** `IClinicContext.ClinicId` doluysa önce muayenenin kendisi bu klinikte olmalıdır (aksi halde `Examinations.NotFound`, `GET /api/v1/examinations/{id}` ile aynı gizleme); ardından her blok yalnız bu klinikteki ve `ExaminationId` bu muayeneye eşit kayıtları içerir. Bağlam yoksa tenant içindeki tüm kliniklerde bu muayeneye bağlı kayıtlar dahildir (pet `history-summary` ile uyumlu yaklaşım).
+
+**Frontend için değişenler (additive, kırıcı değil):** yanıta `vaccinations` dizisi eklendi (her zaman mevcut, izin yoksa `[]`); `GET /vaccinations?examinationId=` süzgeci eklendi. Muayene çalışma alanı aşı satırlarını artık oturum dışı da buradan okuyabilir.
 
 **Hatalar:** Tenant bağlamı yoksa `Tenants.ContextMissing`; muayene yok / tenant dışı / aktif klinik ile uyumsuzsa `Examinations.NotFound`. FluentValidation (boş route id) → 400.
 

@@ -21,6 +21,7 @@ public sealed class GetVisitsTodayQueryHandlerTests
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IVisitTodayReader> _reader = new();
+    private readonly Mock<IVisitOpenItemsReader> _openItems = new();
     private readonly Mock<IClinicVeterinarianReader> _veterinarians = new();
 
     // FixedNowUtc = 2026-10-10 09:00 UTC → İstanbul 12:00, takvim günü 2026-10-10.
@@ -39,6 +40,7 @@ public sealed class GetVisitsTodayQueryHandlerTests
             _clinicContext.Object,
             _scopeResolver.Object,
             _reader.Object,
+            _openItems.Object,
             new Mock<IReadRepository<Backend.Veteriner.Domain.Charges.Charge>>().Object,
             new Mock<IReadRepository<Backend.Veteriner.Domain.ChargeSuggestions.ChargeSuggestion>>().Object,
             new Mock<ICurrentUserPermissionChecker>().Object,

@@ -19,7 +19,8 @@ public sealed class VaccinationsFilteredCountSpec : Specification<Vaccination>
         Guid[] searchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         bool onlyOverdue = false,
-        DateTime? listAsOfUtc = null)
+        DateTime? listAsOfUtc = null,
+        Guid? examinationId = null)
     {
         Query.Where(v => v.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -35,6 +36,8 @@ public sealed class VaccinationsFilteredCountSpec : Specification<Vaccination>
         }
         if (petId.HasValue)
             Query.Where(v => v.PetId == petId.Value);
+        if (examinationId.HasValue)
+            Query.Where(v => v.ExaminationId == examinationId.Value);
 
         if (onlyOverdue)
         {

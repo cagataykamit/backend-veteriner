@@ -15,5 +15,6 @@ public sealed record GetVaccinationsListQuery(
     DateTime? DueToUtc = null,
     DateTime? AppliedFromUtc = null,
     DateTime? AppliedToUtc = null,
-    bool OnlyOverdue = false)
+    bool OnlyOverdue = false,
+    Guid? ExaminationId = null)
     : IRequest<Result<PagedResult<VaccinationListItemDto>>>;
