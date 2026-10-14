@@ -18,7 +18,7 @@ public enum TodayPaymentIndicator
 /// <summary>
 /// Bugün satırı: tek hasta gelişi veya (Visit'i olmayan) planlı randevu. Randevulu Visit tek satırdır.
 /// Planlı satırda <see cref="VisitId"/> ve <see cref="CareStatus"/> null'dır.
-/// Tutar alanları (ziyaret ve müşteri bazında) handler tarafından doldurulur; <c>Charges.Read</c> yoksa hepsi null, ziyaretsiz satırda yalnızca müşteri tutarı dolu.
+/// Tutar ve açık iş alanları (ziyaret ve müşteri bazında) handler tarafından doldurulur; <c>Charges.Read</c> yoksa hepsi null, ziyaretsiz satırda yalnızca müşteri tutarı dolu.
 /// <see cref="IsVoided"/> yalnızca yanlış işaretlenenler görünümünde (<c>voided=true</c>) doludur.
 /// </summary>
 public sealed record TodayItemDto(
@@ -46,7 +46,10 @@ public sealed record TodayItemDto(
     decimal? ChargedAmount = null,
     decimal? AllocatedAmount = null,
     decimal? OutstandingAmount = null,
-    decimal? ClientOutstandingAmount = null);
+    decimal? ClientOutstandingAmount = null,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] VisitChargeIndicator? ChargeIndicator = null,
+    int? ChargeableWorkCount = null,
+    int? AwaitingLabCount = null);
 
 public sealed record TodayHospitalizationDto(
     Guid HospitalizationId,
@@ -61,4 +64,5 @@ public sealed record TodayDto(
     Guid ClinicId,
     DateTime GeneratedAtUtc,
     IReadOnlyList<TodayItemDto> Items,
-    IReadOnlyList<TodayHospitalizationDto> ActiveHospitalizations);
+    IReadOnlyList<TodayHospitalizationDto> ActiveHospitalizations,
+    OpenItemsSummaryDto? OpenItems = null);

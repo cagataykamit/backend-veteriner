@@ -1,4 +1,3 @@
-using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
@@ -23,6 +22,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IVisitTodayReader _reader;
+    private readonly IVisitOpenItemsReader _openItems;
     private readonly IReadRepository<Charge> _charges;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IClinicVeterinarianReader _veterinarians;
@@ -33,6 +33,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IVisitTodayReader reader,
+        IVisitOpenItemsReader openItems,
         IReadRepository<Charge> charges,
         ICurrentUserPermissionChecker permissions,
         IClinicVeterinarianReader veterinarians,
@@ -42,6 +43,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _reader = reader;
+        _openItems = openItems;
         _charges = charges;
         _permissions = permissions;
         _veterinarians = veterinarians;
@@ -109,50 +111,72 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
                 $"Bugün görünümü en çok {MaxItems} satır gösterebilir.");
         }
 
-        var items = await WithChargeAmountsAsync(tenantId, clinicId, data.Items, ct);
+        var openScope = OpenItemsScope.For(tenantId, clinicId, _permissions);
+        var items = await WithChargeAndOpenItemsAsync(openScope, data.Items, ct);
+
+        var openItems = request.Voided
+            ? null
+            : await _openItems.GetSummaryAsync(BuildOpenItemsRequest(openScope, nowUtc, todayLocal), ct);
 
         return Result<TodayDto>.Success(new TodayDto(
             date,
             clinicId,
             nowUtc,
             request.Voided ? items.OrderByDescending(i => i.ArrivedAtUtc).ToList() : Order(items),
-            data.ActiveHospitalizations));
+            data.ActiveHospitalizations,
+            openItems));
     }
 
+    /// <summary>Açık iş özeti isteği: ücretsiz ziyaret penceresi son 30 İstanbul günü, tamamlanmamış geliş = bugünden önceki açık geliş.</summary>
+    private static OpenItemsSummaryRequest BuildOpenItemsRequest(OpenItemsScope scope, DateTime nowUtc, DateOnly todayLocal)
+        => new(
+            scope,
+            OperationDayBounds.ForLocalDate(todayLocal.AddDays(-OpenItemsDefaults.UnchargedLookbackDays)).DayStartUtc,
+            nowUtc,
+            OperationDayBounds.ForLocalDate(todayLocal).DayStartUtc);
+
     /// <summary>
-    /// Ücret tutarlarını ekler: ziyaret bazında ve müşterinin bu klinikteki toplam açık borcu.
-    /// <c>Charges.Read</c> yoksa satırlara dokunmaz (alanlar null).
+    /// Ücret tutarlarını ve açık iş alanlarını ekler: ziyaret bazında (hesap kuralı <see cref="IVisitOpenItemsReader"/>'da)
+    /// ve müşterinin bu klinikteki toplam açık borcu. İzni olmayan türün alanları null kalır.
     /// </summary>
-    private async Task<IReadOnlyList<TodayItemDto>> WithChargeAmountsAsync(
-        Guid tenantId, Guid clinicId, IReadOnlyList<TodayItemDto> items, CancellationToken ct)
+    private async Task<IReadOnlyList<TodayItemDto>> WithChargeAndOpenItemsAsync(
+        OpenItemsScope scope, IReadOnlyList<TodayItemDto> items, CancellationToken ct)
     {
-        if (items.Count == 0 || !_permissions.HasPermission(PermissionCatalog.Charges.Read))
+        if (items.Count == 0)
             return items;
 
-        var clientIds = items.Select(i => i.ClientId).Distinct().ToArray();
-        var rows = await _charges.ListAsync(new ChargeAmountsForClientsSpec(tenantId, clinicId, clientIds), ct);
+        IReadOnlyDictionary<Guid, VisitOpenItems> visitOpenItems = new Dictionary<Guid, VisitOpenItems>();
+        var visitIds = items.Where(i => i.VisitId.HasValue).Select(i => i.VisitId!.Value).ToArray();
+        if (visitIds.Length > 0 && scope.Visible != OpenItemSources.None)
+            visitOpenItems = await _openItems.GetForVisitsAsync(scope, visitIds, ct);
 
-        var clientOutstanding = rows
-            .GroupBy(r => r.ClientId)
-            .ToDictionary(g => g.Key, g => g.Sum(r => r.Amount - r.AllocatedAmount));
-        var visitTotals = rows
-            .Where(r => r.VisitId.HasValue)
-            .GroupBy(r => r.VisitId!.Value)
-            .ToDictionary(g => g.Key, g => (Charged: g.Sum(r => r.Amount), Allocated: g.Sum(r => r.AllocatedAmount)));
+        Dictionary<Guid, decimal>? clientOutstanding = null;
+        if (scope.Sees(OpenItemSources.Charges))
+        {
+            var clientIds = items.Select(i => i.ClientId).Distinct().ToArray();
+            var rows = await _charges.ListAsync(new ChargeAmountsForClientsSpec(scope.TenantId, scope.ClinicId, clientIds), ct);
+            clientOutstanding = rows
+                .GroupBy(r => r.ClientId)
+                .ToDictionary(g => g.Key, g => g.Sum(r => r.Amount - r.AllocatedAmount));
+        }
 
         return items
             .Select(i =>
             {
-                var withClient = i with { ClientOutstandingAmount = clientOutstanding.GetValueOrDefault(i.ClientId) };
-                if (i.VisitId is not { } visitId)
-                    return withClient;
+                var row = clientOutstanding is null
+                    ? i
+                    : i with { ClientOutstandingAmount = clientOutstanding.GetValueOrDefault(i.ClientId) };
+                if (i.VisitId is not { } visitId || !visitOpenItems.TryGetValue(visitId, out var open))
+                    return row;
 
-                var (charged, allocated) = visitTotals.GetValueOrDefault(visitId);
-                return withClient with
+                return row with
                 {
-                    ChargedAmount = charged,
-                    AllocatedAmount = allocated,
-                    OutstandingAmount = charged - allocated,
+                    ChargedAmount = open.ChargedAmount,
+                    AllocatedAmount = open.AllocatedAmount,
+                    OutstandingAmount = open.ChargedAmount - open.AllocatedAmount,
+                    ChargeIndicator = open.ChargeIndicator,
+                    ChargeableWorkCount = open.ChargeableWorkCount,
+                    AwaitingLabCount = open.AwaitingLabCount,
                 };
             })
             .ToList();
