@@ -6,6 +6,8 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Configurations;
 
 public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
 {
+    public const string WalkInIndexName = "UX_Clients_TenantId_WalkIn";
+
     public void Configure(EntityTypeBuilder<Client> b)
     {
         b.ToTable("Clients");
@@ -37,8 +39,18 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
         b.Property(x => x.PhoneNormalized)
             .HasMaxLength(50);
 
+        b.Property(x => x.IsWalkIn)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.FullName });
+
+        // Peşin müşteri (doğrudan satış): kiracıda en fazla bir kayıt.
+        b.HasIndex(x => new { x.TenantId, x.IsWalkIn })
+            .IsUnique()
+            .HasFilter("[IsWalkIn] = 1")
+            .HasDatabaseName(WalkInIndexName);
 
         b.HasIndex(x => new { x.TenantId, x.Email, x.PhoneNormalized })
             .IsUnique()

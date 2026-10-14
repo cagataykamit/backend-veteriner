@@ -22,7 +22,16 @@ public sealed class Client : AggregateRoot
     /// <summary>Mükerrer (ad+telefon) için; Phone ile aynı standart.</summary>
     public string? PhoneNormalized { get; private set; }
 
+    /// <summary>Peşin müşterinin sabit adı (doğrudan satış, ADR-016); kiracıda tek kayıt.</summary>
+    public const string WalkInFullName = "Peşin müşteri";
+
+    /// <summary>Müşterisiz perakende satışın yazıldığı sistem müşterisi; düzenlenemez, kiracıda en fazla bir.</summary>
+    public bool IsWalkIn { get; private set; }
+
     private Client() { }
+
+    public static Client CreateWalkIn(Guid tenantId)
+        => new(tenantId, WalkInFullName) { IsWalkIn = true };
 
     public Client(Guid tenantId, string fullName, string? phone = null, string? email = null, string? address = null)
     {

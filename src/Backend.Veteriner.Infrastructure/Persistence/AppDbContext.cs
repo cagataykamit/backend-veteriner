@@ -8,6 +8,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.Sales;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Reminders;
@@ -90,6 +91,8 @@ public class AppDbContext : DbContext
     public DbSet<Charge> Charges => Set<Charge>();
     public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
     public DbSet<Administration> Administrations => Set<Administration>();
+    public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<SaleLine> SaleLines => Set<SaleLine>();
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<LabResult> LabResults => Set<LabResult>();

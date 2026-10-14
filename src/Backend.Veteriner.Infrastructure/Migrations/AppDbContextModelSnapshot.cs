@@ -779,6 +779,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<bool>("IsWalkIn")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Phone")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -798,6 +803,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "FullName");
+
+                    b.HasIndex("TenantId", "IsWalkIn")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Clients_TenantId_WalkIn")
+                        .HasFilter("[IsWalkIn] = 1");
 
                     b.HasIndex("TenantId", "Email", "PhoneNormalized")
                         .IsUnique()
@@ -2088,6 +2098,146 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("TenantReminderSettings", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Sales.Sale", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ChargeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("PaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("SoldAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("VoidStockOutcome")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("VoidedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("VoidedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChargeId");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("TenantId", "ClientId");
+
+                    b.HasIndex("TenantId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Sales_TenantId_RequestId");
+
+                    b.HasIndex("TenantId", "ClinicId", "SoldAtUtc");
+
+                    b.ToTable("Sales", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Sales_TotalAmount_Positive", "[TotalAmount] > 0");
+
+                            t.HasCheckConstraint("CK_Sales_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL AND [VoidStockOutcome] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL AND [VoidStockOutcome] IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Sales.SaleLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("LineAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("SaleId");
+
+                    b.ToTable("SaleLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SaleLines_LineAmount_Positive", "[LineAmount] > 0");
+
+                            t.HasCheckConstraint("CK_SaleLines_Quantity_Positive", "[Quantity] > 0");
+                        });
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.BillingCheckoutSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3153,6 +3303,39 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Sales.Sale", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Charges.Charge", null)
+                        .WithMany()
+                        .HasForeignKey("ChargeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Backend.Veteriner.Domain.Payments.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Sales.SaleLine", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Products.StockBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Backend.Veteriner.Domain.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Sales.Sale", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.BillingCheckoutSession", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Tenants.Tenant", null)
@@ -3286,6 +3469,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
             modelBuilder.Entity("Backend.Veteriner.Domain.Products.ProductCategory", b =>
                 {
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Sales.Sale", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Users.User", b =>
