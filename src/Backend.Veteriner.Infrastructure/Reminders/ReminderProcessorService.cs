@@ -104,13 +104,20 @@ public sealed class ReminderProcessorService
         // Reminder due = ScheduledAtUtc - hoursBefore. Include "missed window": reminder time may be in the past
         // as long as the appointment is still in the future and within the lookahead (ScheduledAtUtc <= now + hoursBefore).
         var maxScheduledUtc = nowUtc.AddHours(hoursBefore);
+        var dedupeSuffix = AppointmentDedupeSuffix(hoursBefore);
 
+        // Günlüğü yazılmış aday tur sınırına (batchSize) sayılmaz: aksi halde pencerede batchSize'dan fazla aday varken
+        // aynı ilk adaylar her turda yeniden seçilir ve kalanlar hiç değerlendirilmez.
         var candidates = await _db.Appointments
             .AsNoTracking()
             .Where(a => a.TenantId == tenantId
                 && a.Status == AppointmentStatus.Scheduled
                 && a.ScheduledAtUtc > nowUtc
-                && a.ScheduledAtUtc <= maxScheduledUtc)
+                && a.ScheduledAtUtc <= maxScheduledUtc
+                && !_db.ReminderDispatchLogs.Any(l => l.TenantId == tenantId
+                    && l.SourceEntityType == ReminderSourceEntityType.Appointment
+                    && l.SourceEntityId == a.Id
+                    && l.DedupeKey.EndsWith(dedupeSuffix)))
             .OrderBy(a => a.ScheduledAtUtc)
             .Select(a => new AppointmentReminderCandidateRow(a.Id, a.ClinicId, a.PetId, a.ScheduledAtUtc, a.AppointmentType))
             .Take(batchSize)
@@ -230,9 +237,11 @@ public sealed class ReminderProcessorService
         // Reminder due = DueAtUtc - daysBefore. Include "missed window": reminder time may be in the past
         // as long as DueAtUtc is still in the future and within the lookahead (DueAtUtc <= now + daysBefore).
         var maxDueUtc = nowUtc.AddDays(daysBefore);
+        var dedupeSuffix = VaccinationDedupeSuffix(daysBefore);
 
         // ADR-019 K3 (dışlamanın tek yeri): içe aktarılan aşı, partisinin hatırlatmaları yönetici tarafından serbest
-        // bırakılana kadar aday değildir; dışlanan kayıt için dispatch log da yazılmaz.
+        // bırakılana kadar aday değildir; dışlanan kayıt için dispatch log da yazılmaz. Günlüğü yazılmış aday tur
+        // sınırına sayılmaz (randevu ile aynı gerekçe; içe aktarılan aşıların vadesi aynı ana düşer).
         var candidates = await _db.Vaccinations
             .AsNoTracking()
             .Where(v => v.TenantId == tenantId
@@ -241,7 +250,11 @@ public sealed class ReminderProcessorService
                 && v.DueAtUtc.Value > nowUtc
                 && v.DueAtUtc.Value <= maxDueUtc
                 && (v.ImportBatchId == null
-                    || _db.ImportBatches.Any(b => b.Id == v.ImportBatchId && b.RemindersReleasedAtUtc != null)))
+                    || _db.ImportBatches.Any(b => b.Id == v.ImportBatchId && b.RemindersReleasedAtUtc != null))
+                && !_db.ReminderDispatchLogs.Any(l => l.TenantId == tenantId
+                    && l.SourceEntityType == ReminderSourceEntityType.Vaccination
+                    && l.SourceEntityId == v.Id
+                    && l.DedupeKey.EndsWith(dedupeSuffix)))
             .OrderBy(v => v.DueAtUtc)
             .Select(v => new VaccinationReminderCandidateRow(
                 v.Id,
@@ -472,10 +485,14 @@ public sealed class ReminderProcessorService
            || ex.Message.Contains("IX_ReminderDispatchLogs_TenantId_DedupeKey", StringComparison.OrdinalIgnoreCase);
 
     private static string BuildAppointmentDedupeKey(Guid appointmentId, int hoursBefore)
-        => $"appointment:{appointmentId:D}:hours-before:{hoursBefore}";
+        => $"appointment:{appointmentId:D}{AppointmentDedupeSuffix(hoursBefore)}";
+
+    private static string AppointmentDedupeSuffix(int hoursBefore) => $":hours-before:{hoursBefore}";
 
     private static string BuildVaccinationDedupeKey(Guid vaccinationId, int daysBefore)
-        => $"vaccination:{vaccinationId:D}:days-before:{daysBefore}";
+        => $"vaccination:{vaccinationId:D}{VaccinationDedupeSuffix(daysBefore)}";
+
+    private static string VaccinationDedupeSuffix(int daysBefore) => $":days-before:{daysBefore}";
 
     private static string FormatForDisplay(DateTime utcDateTime)
     {

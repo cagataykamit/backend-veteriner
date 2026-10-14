@@ -1005,6 +1005,78 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         email.Enqueued.Should().HaveCount(3);
     }
 
+    /// <summary>
+    /// İçe aktarma Dilim T bulgusu: pencerede tur sınırından (<c>BatchSize</c>) fazla aday varsa, günlüğü yazılmış
+    /// adaylar sonraki turlarda kalanların önünü tıkamamalı. İçe aktarılan aşıların vadesi aynı ana (İstanbul 12:00)
+    /// düştüğünden, eski davranışta ilk turdan sonra kalanlar vade geçene kadar hiç seçilmiyordu.
+    /// </summary>
+    [Fact]
+    public async Task ProcessOnce_Should_Reach_All_Vaccination_Candidates_When_Window_Exceeds_BatchSize()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(false, 24, true, 3, true);
+        db.AddRange(tenant, clinic, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+
+        var dueAt = now.AddDays(2);
+        for (var i = 0; i < 5; i++)
+        {
+            // İkisi e-postasız (Skipped günlüğü de tur sınırına sayılır).
+            var client = new Client(tenant.Id, $"Sahip {i}", $"90555555550{i}", i < 2 ? null : $"sahip{i}@example.com");
+            var pet = new Pet(tenant.Id, client.Id, $"Pamuk {i}", speciesId);
+            db.AddRange(client, pet,
+                new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddYears(-1), dueAt, null));
+        }
+
+        await db.SaveChangesAsync();
+
+        for (var turn = 0; turn < 3; turn++)
+            await CreateService(db, email, batchSize: 2).ProcessOnceAsync(CancellationToken.None);
+
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(5, "her tur günlüğü olmayan sıradaki adayları almalı");
+        email.Enqueued.Should().HaveCount(3);
+        (await db.ReminderDispatchLogs.CountAsync(l => l.Status == ReminderDispatchStatus.Skipped)).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_Reach_All_Appointment_Candidates_When_Window_Exceeds_BatchSize()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(true, 24, false, 3, true);
+        db.AddRange(tenant, clinic, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+
+        var scheduledAt = now.AddHours(12);
+        for (var i = 0; i < 5; i++)
+        {
+            var client = new Client(tenant.Id, $"Sahip {i}", $"90555555550{i}", $"sahip{i}@example.com");
+            var pet = new Pet(tenant.Id, client.Id, $"Pamuk {i}", speciesId);
+            db.AddRange(client, pet,
+                new Appointment(tenant.Id, clinic.Id, pet.Id, scheduledAt, 30, AppointmentType.Checkup, AppointmentStatus.Scheduled));
+        }
+
+        await db.SaveChangesAsync();
+
+        for (var turn = 0; turn < 3; turn++)
+            await CreateService(db, email, batchSize: 2).ProcessOnceAsync(CancellationToken.None);
+
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(5);
+        email.Enqueued.Should().HaveCount(5);
+    }
+
     private static ImportBatch CommittedBatch(Guid tenantId, Guid clinicId, DateTime now, bool release)
     {
         var counts = new ImportTableCounts { Total = 1, Valid = 1, WillCreate = 1 };
@@ -1021,7 +1093,8 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         return batch;
     }
 
-    private static ReminderProcessorService CreateService(AppDbContext db, FakeReminderEmailOutboxEnqueuer enqueuer, bool enabled = true)
+    private static ReminderProcessorService CreateService(
+        AppDbContext db, FakeReminderEmailOutboxEnqueuer enqueuer, bool enabled = true, int batchSize = 100)
     {
         enqueuer.Db = db;
         return new ReminderProcessorService(
@@ -1031,7 +1104,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             {
                 Enabled = enabled,
                 IntervalMinutes = 5,
-                BatchSize = 100,
+                BatchSize = batchSize,
                 WindowToleranceMinutes = 10
             }),
             NullLogger<ReminderProcessorService>.Instance);
