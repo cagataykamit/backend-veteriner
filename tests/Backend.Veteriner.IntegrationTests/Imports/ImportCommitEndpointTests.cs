@@ -92,7 +92,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         var clients = await db.Clients.AsNoTracking().Where(c => c.TenantId == ctx.TenantId).ToListAsync();
         clients.Should().HaveCount(2, "M1 + M2; M4 M1'in mükerreri, M3 hatalı");
         var pets = await db.Pets.AsNoTracking().Where(p => p.TenantId == ctx.TenantId).ToListAsync();
-        pets.Select(p => p.Name).Should().BeEquivalentTo("Pamuk", "Karamel");
+        pets.Select(p => p.Name).Should().BeEquivalentTo("Pamuk", "Kehribar");
         pets.Single(p => p.Name == "Pamuk").MicrochipNumber.Should().Be(Chip);
 
         var vaccinations = await db.Vaccinations.AsNoTracking().Where(v => v.TenantId == ctx.TenantId).ToListAsync();
@@ -310,7 +310,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
 
         // M1 birimi bütünüyle geri alındı (müşteri dahil); M2 birimi etkilenmedi.
         (await data.Clients.AsNoTracking().CountAsync(c => c.TenantId == ctx.TenantId && c.FullName == ctx.CustomerName)).Should().Be(0);
-        (await data.Pets.AsNoTracking().CountAsync(p => p.TenantId == ctx.TenantId && p.Name == "Karamel")).Should().Be(1);
+        (await data.Pets.AsNoTracking().CountAsync(p => p.TenantId == ctx.TenantId && p.Name == "Kehribar")).Should().Be(1);
         (await data.Vaccinations.AsNoTracking().CountAsync(v => v.ImportBatchId == id)).Should().Be(1, "yalnız H2 aşısı");
 
         var batch = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}");
@@ -640,7 +640,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
             [
                 ["MusteriNo", "HayvanNo", "HayvanAdi", "Tur", "Mikrocip"],
                 ["M1", "H1", "Pamuk", ctx.SpeciesName, Chip],
-                ["M2", "H2", "Karamel", ctx.SpeciesName, null],
+                ["M2", "H2", "Kehribar", ctx.SpeciesName, null],
                 ["M3", "H4", "Hatalı", ctx.SpeciesName, null],
                 ["M4", "H5", "Pamuk", ctx.SpeciesName, null],
             ]),
