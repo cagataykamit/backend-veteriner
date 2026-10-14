@@ -153,6 +153,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.ProductCategories.Update,
                 PermissionCatalog.ProductCategories.Deactivate,
 
+                PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.ClinicalTerms.Create,
+                PermissionCatalog.ClinicalTerms.Update,
+                PermissionCatalog.ClinicalTerms.Deactivate,
+
                 PermissionCatalog.Products.Read,
                 PermissionCatalog.Products.Create,
                 PermissionCatalog.Products.Update,
@@ -268,6 +273,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.ProductCategories.Update,
                 PermissionCatalog.ProductCategories.Deactivate,
 
+                PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.ClinicalTerms.Create,
+                PermissionCatalog.ClinicalTerms.Update,
+                PermissionCatalog.ClinicalTerms.Deactivate,
+
                 PermissionCatalog.Products.Read,
                 PermissionCatalog.Products.Create,
                 PermissionCatalog.Products.Update,
@@ -376,6 +386,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.ProductCategories.Update,
                 PermissionCatalog.ProductCategories.Deactivate,
 
+                PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.ClinicalTerms.Create,
+                PermissionCatalog.ClinicalTerms.Update,
+                PermissionCatalog.ClinicalTerms.Deactivate,
+
                 PermissionCatalog.Products.Read,
                 PermissionCatalog.Products.Create,
                 PermissionCatalog.Products.Update,
@@ -457,6 +472,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
 
+                PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.ClinicalTerms.Create,
+                PermissionCatalog.ClinicalTerms.Update,
+
                 PermissionCatalog.ProductCategories.Read,
                 PermissionCatalog.Products.Read,
                 PermissionCatalog.StockMovements.Read,
@@ -515,6 +534,8 @@ public static class RolePermissionBindings
                 PermissionCatalog.Products.Read,
                 PermissionCatalog.StockMovements.Read,
                 PermissionCatalog.StockMovements.Create,
+
+                PermissionCatalog.ClinicalTerms.Read,
 
                 PermissionCatalog.Reminders.Read,
             ],

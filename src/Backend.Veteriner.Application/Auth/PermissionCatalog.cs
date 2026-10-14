@@ -206,6 +206,15 @@ public static class PermissionCatalog
         public const string Deactivate = "ProductCategories.Deactivate";
     }
 
+    /// <summary>Tanı/şikâyet sözlüğü (ADR-020 S3). Etkinleştirme de <see cref="Deactivate"/> ile yapılır (liste düzeni).</summary>
+    public static class ClinicalTerms
+    {
+        public const string Read = "ClinicalTerms.Read";
+        public const string Create = "ClinicalTerms.Create";
+        public const string Update = "ClinicalTerms.Update";
+        public const string Deactivate = "ClinicalTerms.Deactivate";
+    }
+
     public static class Products
     {
         public const string Read = "Products.Read";
@@ -354,6 +363,11 @@ public static class PermissionCatalog
         new(ProductCategories.Create, "Ürün kategorisi oluşturma yetkisi", "ProductCategories"),
         new(ProductCategories.Update, "Ürün kategorisi güncelleme yetkisi", "ProductCategories"),
         new(ProductCategories.Deactivate, "Ürün kategorisini pasifleştirme yetkisi", "ProductCategories"),
+
+        new(ClinicalTerms.Read, "Tanı/şikâyet sözlüğünü listeleme ve arama yetkisi", "ClinicalTerms"),
+        new(ClinicalTerms.Create, "Kliniğe özel tanı/şikâyet sözlük kaydı ekleme yetkisi", "ClinicalTerms"),
+        new(ClinicalTerms.Update, "Kliniğe özel tanı/şikâyet sözlük kaydının adını düzeltme yetkisi", "ClinicalTerms"),
+        new(ClinicalTerms.Deactivate, "Kliniğe özel tanı/şikâyet sözlük kaydını pasifleştirme ve yeniden etkinleştirme yetkisi", "ClinicalTerms"),
 
         new(Products.Read, "Ürünleri listeleme ve görüntüleme yetkisi", "Products"),
         new(Products.Create, "Ürün oluşturma yetkisi", "Products"),
