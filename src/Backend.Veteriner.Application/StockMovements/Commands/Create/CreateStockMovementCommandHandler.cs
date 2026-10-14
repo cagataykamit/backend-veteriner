@@ -433,7 +433,7 @@ public sealed class CreateStockMovementCommandHandler
         }
 
         // Geçmiş SKT engellenmez ama açık onay ister (ADR-015 karar 6).
-        if (details.ExpiryDate is { } expiry && expiry < today && !request.AcknowledgeExpired)
+        if (details.ExpiryDate is { } expiry && expiry < today && request.AcknowledgeExpired != true)
         {
             return Result<StockBatch?>.Failure(
                 StockBatch.ExpiredAcknowledgementRequiredCode,

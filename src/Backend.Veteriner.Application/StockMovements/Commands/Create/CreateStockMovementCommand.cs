@@ -28,5 +28,5 @@ public sealed record CreateStockMovementCommand(
     StockBatchDetails? Batch = null,
     Guid? BatchId = null,
     [property: JsonIgnore] DateOnly? NotExpiredOn = null,
-    bool AcknowledgeExpired = false)
+    bool? AcknowledgeExpired = null)
     : IRequest<Result<StockMovementCreateResult>>, ITransactionalRollbackOnFailureRequest;
