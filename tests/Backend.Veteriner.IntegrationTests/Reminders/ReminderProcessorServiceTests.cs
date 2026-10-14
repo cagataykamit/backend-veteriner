@@ -1077,6 +1077,84 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         email.Enqueued.Should().HaveCount(5);
     }
 
+    /// <summary>
+    /// ADR-020 S5: vefat eden hayvan ve hatırlatma istemeyen müşteri aday değildir; günlük yazılmaz ve dışlanan kayıtlar
+    /// tur sınırını tüketmez (en erken vadeli adaylar dışlananlar olsa da uygun aday ilk turda seçilir).
+    /// </summary>
+    [Fact]
+    public async Task ProcessOnce_Should_Exclude_DeceasedPets_And_OptedOutClients_Without_Starving_Others()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(true, 24, true, 3, true);
+        db.AddRange(tenant, clinic, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+
+        var deceasedOwner = new Client(tenant.Id, "Vefat Sahibi", "905555555501", "vefat@example.com");
+        var deceasedPet = new Pet(tenant.Id, deceasedOwner.Id, "Boncuk", speciesId);
+        deceasedPet.SetStatus(PetStatus.Deceased, today, today).IsSuccess.Should().BeTrue();
+
+        var optedOutOwner = new Client(tenant.Id, "İstemez Sahibi", "905555555502", "istemez@example.com");
+        optedOutOwner.ApplyContactPreferences(ContactChannel.Phone, remindersOptedOut: true).IsSuccess.Should().BeTrue();
+        var optedOutPet = new Pet(tenant.Id, optedOutOwner.Id, "Tarçın", speciesId);
+
+        var activeOwner = new Client(tenant.Id, "Aktif Sahibi", "905555555503", "aktif@example.com");
+        var activePet = new Pet(tenant.Id, activeOwner.Id, "Pamuk", speciesId);
+
+        db.AddRange(deceasedOwner, deceasedPet, optedOutOwner, optedOutPet, activeOwner, activePet);
+        db.AddRange(
+            new Vaccination(tenant.Id, deceasedPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(1), null),
+            new Vaccination(tenant.Id, optedOutPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(1).AddMinutes(1), null),
+            new Vaccination(tenant.Id, activePet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(2), null),
+            new Appointment(tenant.Id, clinic.Id, deceasedPet.Id, now.AddHours(2), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled),
+            new Appointment(tenant.Id, clinic.Id, optedOutPet.Id, now.AddHours(3), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled),
+            new Appointment(tenant.Id, clinic.Id, activePet.Id, now.AddHours(12), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled));
+        await db.SaveChangesAsync();
+
+        await CreateService(db, email, batchSize: 1).ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Should().HaveCount(2, "tek turda yalnız uygun hayvanın aşı ve randevu hatırlatması gider");
+        email.Enqueued.Should().OnlyContain(e => e.To == "aktif@example.com");
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(2, "dışlanan kayıt için günlük yazılmaz");
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_Include_Pet_Again_When_Status_Reverted_To_Active()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+        var tenant = new Tenant("Tenant A");
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        pet.SetStatus(PetStatus.Deceased, null, today).IsSuccess.Should().BeTrue();
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
+        settings.Update(true, 24, false, 3, true);
+        db.AddRange(tenant, clinic, client, pet, settings,
+            new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(12), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled));
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+        email.Enqueued.Should().BeEmpty();
+
+        pet.SetStatus(PetStatus.Active, null, today).IsSuccess.Should().BeTrue();
+        await db.SaveChangesAsync();
+
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+        email.Enqueued.Should().HaveCount(1);
+    }
+
     private static ImportBatch CommittedBatch(Guid tenantId, Guid clinicId, DateTime now, bool release)
     {
         var counts = new ImportTableCounts { Total = 1, Valid = 1, WillCreate = 1 };

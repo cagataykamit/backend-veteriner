@@ -262,7 +262,31 @@ public sealed class CreateClientCommandHandlerTests
         captured!.TenantId.Should().Be(tid);
         captured.FullName.Should().Be("Mehmet Demir");
         captured.Phone.Should().BeNull();
+        captured.PreferredContactChannel.Should().Be(ContactChannel.None);
+        captured.RemindersOptedOut.Should().BeFalse();
 
         _clientsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Store_ContactPreferences_When_Given()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("Klinik A.Ş.");
+        AlignTenantId(tenant, tid);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        Client? captured = null;
+        _clientsWrite.Setup(r => r.AddAsync(It.IsAny<Client>(), It.IsAny<CancellationToken>()))
+            .Callback<Client, CancellationToken>((c, _) => captured = c);
+
+        var result = await CreateHandler().Handle(
+            new CreateClientCommand("Mehmet Demir", PreferredContactChannel: ContactChannel.WhatsApp, RemindersOptedOut: true),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.PreferredContactChannel.Should().Be(ContactChannel.WhatsApp);
+        captured.RemindersOptedOut.Should().BeTrue();
     }
 }

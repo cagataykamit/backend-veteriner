@@ -266,7 +266,54 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
         (await ChargeCountAsync(ctx)).Should().Be(0);
     }
 
+    [Fact]
+    public async Task List_By_ClientId_Should_Return_Items_Of_All_Client_Pets_In_One_Request()
+    {
+        var ctx = await SeedAsync();
+        var secondPet = await AddPetWithExaminationAsync(ctx);
+        var reception = await ClientAsync(ctx, ReceptionPermissions);
+        await AdministerAsync(reception, ctx, 1m);
+        await AdministerAsync(reception, secondPet, 2m);
+
+        var response = await reception.GetAsync($"/api/v1/charge-suggestions?clinicId={ctx.ClinicId:D}&clientId={ctx.ClientId:D}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("totalItems").GetInt32().Should().Be(2);
+        body.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("petId").GetGuid())
+            .Should().BeEquivalentTo(new[] { ctx.PetId, secondPet.PetId });
+
+        // Süzgeç yoksa davranış değişmez; başka müşteri boş döner.
+        var otherClientId = await AddClientAsync(ctx.TenantId);
+        var other = await reception.GetAsync($"/api/v1/charge-suggestions?clinicId={ctx.ClinicId:D}&clientId={otherClientId:D}");
+        (await other.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("totalItems").GetInt32().Should().Be(0);
+        var all = await reception.GetAsync($"/api/v1/charge-suggestions?clinicId={ctx.ClinicId:D}");
+        (await all.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("totalItems").GetInt32().Should().Be(2);
+    }
+
     // ---- yardımcılar ----
+
+    private async Task<SeedCtx> AddPetWithExaminationAsync(SeedCtx ctx)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+        var pet = new Pet(ctx.TenantId, ctx.ClientId, $"CsPet2-{Guid.NewGuid():N}"[..12], speciesId);
+        db.Pets.Add(pet);
+        var exam = new Examination(ctx.TenantId, ctx.ClinicId, pet.Id, appointmentId: null, DateTime.UtcNow.AddHours(-1), "Aşı", "Bulgu yok", null, null);
+        db.Examinations.Add(exam);
+        await db.SaveChangesAsync();
+        return ctx with { PetId = pet.Id, ExaminationId = exam.Id };
+    }
+
+    private async Task<Guid> AddClientAsync(Guid tenantId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var client = new Client(tenantId, $"CsOther-{Guid.NewGuid():N}"[..14], "905551110078");
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+        return client.Id;
+    }
 
     private static Guid Id(JsonElement item) => item.GetProperty("id").GetGuid();
 

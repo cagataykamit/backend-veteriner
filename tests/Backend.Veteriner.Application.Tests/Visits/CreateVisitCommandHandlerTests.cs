@@ -129,6 +129,23 @@ public sealed class CreateVisitCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_Pet_Deceased()
+    {
+        var pet = new Pet(_tenantId, Guid.NewGuid(), "Pamuk", Guid.NewGuid());
+        pet.SetStatus(PetStatus.Deceased, null, new DateOnly(2026, 10, 14));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pet);
+        ReturnActiveVisitForPet(null);
+
+        var result = await CreateHandler().Handle(
+            new CreateVisitCommand(_clinicId, _petId, null, null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Pets.Deceased");
+        _visitsWrite.Verify(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Walkin_Should_Return_Existing_Active_Visit_Without_Creating()
     {
         var existing = VisitHandlerTestSupport.NewVisit(_tenantId, _clinicId, _petId);

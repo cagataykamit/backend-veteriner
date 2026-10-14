@@ -280,6 +280,32 @@ public sealed class CreateAppointmentCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_PetDeceased()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var cmd = new CreateAppointmentCommand(cid, pid, SlotAlignedUtcPlusDays(1), AppointmentType.Examination);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+
+        var pet = new Pet(tid, Guid.NewGuid(), "Pamuk", Guid.NewGuid());
+        pet.SetStatus(PetStatus.Deceased, null, new DateOnly(2026, 10, 14));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pet);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Pets.Deceased");
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_ClinicSlotDuplicate()
     {
         var handler = CreateHandler();

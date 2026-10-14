@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Dashboard.Queries.GetOperationalAlerts;
 using Backend.Veteriner.Application.Dashboard.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Vaccinations;
 using FluentAssertions;
 using Moq;
@@ -17,6 +18,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerTests
     private readonly Mock<IClinicContext> _clinic = new();
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
     private readonly Mock<IReadRepository<Vaccination>> _vaccinations = new();
+    private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IDashboardTodayAppointmentStatusCountsReader> _todayCounts = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
@@ -27,6 +29,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerTests
             _scopeResolver.Object,
             _appointments.Object,
             _vaccinations.Object,
+            _pets.Object,
             _todayCounts.Object);
 
     [Fact]

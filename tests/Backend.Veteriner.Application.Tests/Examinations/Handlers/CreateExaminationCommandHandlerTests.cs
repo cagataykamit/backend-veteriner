@@ -124,6 +124,32 @@ public sealed class CreateExaminationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_PetDeceased()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var cmd = Cmd(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1));
+
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tenant("A"));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+
+        var pet = new Pet(tid, Guid.NewGuid(), "Pamuk", Guid.NewGuid());
+        pet.SetStatus(PetStatus.Deceased, null, new DateOnly(2026, 10, 14));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pet);
+
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Pets.Deceased");
+        _examinationsWrite.Verify(r => r.AddAsync(It.IsAny<Examination>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_AppointmentNotInTenant()
     {
         var tid = Guid.NewGuid();

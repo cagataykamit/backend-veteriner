@@ -129,6 +129,46 @@ public sealed class PetQueryHandlerFeatureFlagTests
         _pets.Verify(r => r.CountAsync(It.IsAny<PetsByTenantCountSpec>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task List_WhenFlagTrue_Should_FillStatus_From_CommandRepository()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        var deceased = new Pet(tid, Guid.NewGuid(), "Boncuk", TestSpeciesIds.Dog);
+        deceased.SetStatus(PetStatus.Deceased, null, new DateOnly(2026, 10, 14));
+        var active = new Pet(tid, Guid.NewGuid(), "Pamuk", TestSpeciesIds.Dog);
+        _readModelReader.Setup(r => r.GetListAsync(It.IsAny<PetListReadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PetListReadResult(
+                [
+                    new PetListItemDto(deceased.Id, tid, deceased.ClientId, "Boncuk", TestSpeciesIds.Dog, "Köpek", null, null, null, 0),
+                    new PetListItemDto(active.Id, tid, active.ClientId, "Pamuk", TestSpeciesIds.Dog, "Köpek", null, null, null, 0),
+                ],
+                2));
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Pet> { deceased, active });
+
+        var result = await CreateListHandler(true).Handle(new GetPetsListQuery(new PageRequest()), CancellationToken.None);
+
+        result.Value!.Items.Select(i => i.Status).Should().Equal(PetStatus.Deceased, PetStatus.Active);
+    }
+
+    [Fact]
+    public async Task List_WhenFlagTrue_And_StatusFilter_Should_UseCommandRepository()
+    {
+        var tid = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _pets.Setup(r => r.CountAsync(It.IsAny<PetsByTenantCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PetListProjectionRow>());
+
+        await CreateListHandler(true).Handle(
+            new GetPetsListQuery(new PageRequest(), Status: PetStatus.Deceased), CancellationToken.None);
+
+        _readModelReader.Verify(r => r.GetListAsync(It.IsAny<PetListReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+        _pets.Verify(r => r.ListAsync(It.IsAny<PetsByTenantPagedSpec>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private GetPetsListQueryHandler CreateListHandler(bool enabled)
         => new(
             _tenantContext.Object,

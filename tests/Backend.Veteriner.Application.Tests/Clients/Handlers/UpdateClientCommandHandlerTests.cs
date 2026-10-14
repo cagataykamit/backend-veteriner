@@ -95,6 +95,36 @@ public sealed class UpdateClientCommandHandlerTests
         existing.UpdatedAtUtc!.Value.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
     }
 
+    [Theory]
+    [InlineData(null, null, ContactChannel.Sms, true)]
+    [InlineData(ContactChannel.None, false, ContactChannel.None, false)]
+    [InlineData(ContactChannel.WhatsApp, null, ContactChannel.WhatsApp, true)]
+    public async Task Handle_Should_Apply_ContactPreferences_And_Keep_When_Omitted(
+        ContactChannel? channel, bool? optedOut, ContactChannel expectedChannel, bool expectedOptedOut)
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var tenant = new Tenant("Klinik A.Ş.");
+        AlignTenantId(tenant, tid);
+        var existing = new Client(tid, "Ayşe Yılmaz", "05321112233", "ayse@example.com");
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(existing, cid);
+        existing.ApplyContactPreferences(ContactChannel.Sms, true);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var result = await CreateHandler().Handle(
+            new UpdateClientCommand(cid, "Ayşe Yılmaz", "ayse@example.com", "05321112233", null, channel, optedOut),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        existing.PreferredContactChannel.Should().Be(expectedChannel);
+        existing.RemindersOptedOut.Should().Be(expectedOptedOut);
+    }
+
     [Fact]
     public async Task Handle_Should_Succeed_When_DuplicateNameEmailOrNamePhoneQueryReturnsSameClient()
     {

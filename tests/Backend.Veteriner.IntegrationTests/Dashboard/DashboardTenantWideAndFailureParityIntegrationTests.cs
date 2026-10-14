@@ -309,6 +309,7 @@ file static class DashboardOperationalAlertsTestInvoker
             new DashboardParityClinicReadScopeResolver(),
             sp.GetRequiredService<IReadRepository<Appointment>>(),
             sp.GetRequiredService<IReadRepository<Backend.Veteriner.Domain.Vaccinations.Vaccination>>(),
+            sp.GetRequiredService<IReadRepository<Backend.Veteriner.Domain.Pets.Pet>>(),
             sp.GetRequiredService<IDashboardTodayAppointmentStatusCountsReader>());
 
         return await handler.Handle(new GetDashboardOperationalAlertsQuery(), CancellationToken.None);
