@@ -72,6 +72,13 @@ public sealed class OutboxPersistenceIntegrationTests : IClassFixture<CustomWebA
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await buffer.EnqueueAsync(typeMarker, "{}");
             await db.SaveChangesAsync();
+
+            // GET /outbox/pending en eski 100 bekleyen mesajı döner (CreatedAtUtc artan). Paylaşılan test DB'sinde
+            // diğer sınıfların ürettiği outbox satırları işlenmeden birikir (IntegrationTests'te işleyici döngüsü 1 saat);
+            // 100'ü aşınca yeni mesaj listeye girmez. Mesajı en eskiye çekerek testi koşu sırasından bağımsız kılıyoruz.
+            await db.OutboxMessages
+                .Where(x => x.Type == typeMarker)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatedAtUtc, new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
         }
 
         using var client = _factory.CreateClient();
