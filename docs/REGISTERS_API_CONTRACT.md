@@ -103,7 +103,7 @@ Sıralama: `examinedAtUtc`, `createdAtUtc`, `id` artan.
 
 ## 4) Hekim adı kuralı (tek yerde)
 
-`veterinarianName`: muayenenin geliş (Visit) kaydındaki **sorumlu hekim** (`ResponsibleVeterinarianUserId`); geliş yoksa veya sorumlu hekim atanmamışsa muayeneyi **kesinleştiren** kullanıcı; ikisi de yoksa null. Ad: kullanıcının `DisplayName` değeri, yoksa e-postası. Reçete defterinde aynı kural, reçetenin bağlı olduğu muayene üzerinden uygulanır; muayenesiz reçetede hekim **boş**tur (reçetede hekim alanı yok; bölüm 7).
+`veterinarianName`: muayenenin geliş (Visit) kaydındaki **sorumlu hekim** (`ResponsibleVeterinarianUserId`); geliş yoksa veya sorumlu hekim atanmamışsa **null** (boş). Muayeneyi kesinleştiren kullanıcı **yedek değildir** (karar 2026-10-14: admin/resepsiyon kesinleştirince resmî defterde hekim yerine o kişi görünüyordu). Ad: kullanıcının `DisplayName` değeri, yoksa e-postası. Reçete defterinde aynı kural, reçetenin bağlı olduğu muayene üzerinden uygulanır; muayenesiz reçetede hekim **boş**tur (reçetede hekim alanı yok; bölüm 7).
 
 ## 5) Reçete defteri: `GET /api/v1/reports/registers/prescriptions`
 
@@ -152,7 +152,7 @@ Aşağıdakiler bu sürümde **boş** (veya kısmen doludur). Her biri ayrı bir
 | Kulak/İşletme No | Reçete | Boş | `Pet.EarTagNumber` (veya işletme no), özellikle büyük/küçükbaş hayvan |
 | Farmakolojik şekil, Ambalaj | Reçete | Boş | `Product` alanları (ADR-015 madde 3, parti bazlı stok işi). `PrescriptionItem` yalnız serbest ad ve opsiyonel `ProductId` taşır; ürün alanları eklenince `ProductId` dolu satırlarda üründen okunur |
 | Hekim (muayenesiz reçete) | Reçete | Boş | `Prescription.PrescribedByUserId`. Bugün hekim yalnız bağlı muayeneden çıkar |
-| Hekim (gelişsiz/atanmamış muayene) | Muayene | Kısmen | `Examination.ResponsibleVeterinarianUserId`; bugün Visit sorumlu hekimi, yoksa kesinleştiren kullanıcı (bölüm 4) |
+| Hekim (gelişsiz/atanmamış muayene) | Muayene | Kısmen | `Examination.ResponsibleVeterinarianUserId`; yalnız Visit sorumlu hekimi, yoksa boş (bölüm 4) |
 | Hekimin adresi | Reçete | Kısmen | Klinik adresi kullanılıyor; hekime özel adres/işyeri adresi alanı yok |
 | Sahip adresi | İkisi | Var (opsiyonel) | `Client.Address` serbest metin; boş olabilir |
 
