@@ -53,6 +53,20 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
             .IsRequired()
             .HasDefaultValue(false);
 
+        // Mevcut satırlar "Yok" (form alınmadı) olarak kalır (ADR-021).
+        b.Property(x => x.KvkkConsentStatus)
+            .IsRequired()
+            .HasConversion<int>()
+            .HasDefaultValue(KvkkConsentStatus.None);
+
+        b.Property(x => x.KvkkConsentRecordedOn);
+
+        b.Property(x => x.KvkkConsentRecordedByUserId);
+
+        b.Property(x => x.RowVersion)
+            .IsRowVersion()
+            .IsConcurrencyToken();
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.FullName });
 

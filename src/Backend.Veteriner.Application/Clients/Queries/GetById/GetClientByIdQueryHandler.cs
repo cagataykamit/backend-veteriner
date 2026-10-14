@@ -1,6 +1,8 @@
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
@@ -11,11 +13,16 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
 {
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Client> _clients;
+    private readonly IClinicVeterinarianReader _userNames;
 
-    public GetClientByIdQueryHandler(ITenantContext tenantContext, IReadRepository<Client> clients)
+    public GetClientByIdQueryHandler(
+        ITenantContext tenantContext,
+        IReadRepository<Client> clients,
+        IClinicVeterinarianReader userNames)
     {
         _tenantContext = tenantContext;
         _clients = clients;
+        _userNames = userNames;
     }
 
     public async Task<Result<ClientDetailDto>> Handle(GetClientByIdQuery request, CancellationToken ct)
@@ -31,6 +38,10 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
         if (client is null)
             return Result<ClientDetailDto>.Failure("Clients.NotFound", "Müşteri bulunamadı.");
 
+        string? kvkkRecordedByName = null;
+        if (client.KvkkConsentRecordedByUserId is { } recordedBy)
+            (await _userNames.GetNamesAsync([recordedBy], ct)).TryGetValue(recordedBy, out kvkkRecordedByName);
+
         var dto = new ClientDetailDto(
             client.Id,
             client.TenantId,
@@ -41,7 +52,12 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
             client.Phone,
             client.Address,
             client.PreferredContactChannel,
-            client.RemindersOptedOut);
+            client.RemindersOptedOut,
+            client.KvkkConsentStatus,
+            client.KvkkConsentRecordedOn,
+            client.KvkkConsentRecordedByUserId,
+            kvkkRecordedByName,
+            ExaminationRowVersion.Encode(client.RowVersion));
         return Result<ClientDetailDto>.Success(dto);
     }
 }

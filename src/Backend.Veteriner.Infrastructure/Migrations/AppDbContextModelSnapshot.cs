@@ -1039,6 +1039,17 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
+                    b.Property<Guid?>("KvkkConsentRecordedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("KvkkConsentRecordedOn")
+                        .HasColumnType("date");
+
+                    b.Property<int>("KvkkConsentStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("Phone")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1056,6 +1067,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
@@ -1163,6 +1180,48 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ClinicAppointmentSettings", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicKvkkFormTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicKvkkFormTemplates", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicWorkingHour", b =>
@@ -3727,6 +3786,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicAppointmentSettings", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicKvkkFormTemplate", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
                         .WithMany()

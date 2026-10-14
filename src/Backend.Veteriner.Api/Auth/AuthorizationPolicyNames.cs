@@ -19,4 +19,11 @@ public static class AuthorizationPolicyNames
     /// PUT/UPDATE endpoint'leri buna dahil değildir; onlar <c>Clinics.Update</c> ile korunmaya devam eder.
     /// </summary>
     public const string ClinicsSchedulingRead = "Clinics_SchedulingRead";
+
+    /// <summary>
+    /// Klinik KVKK açık rıza formu şablonunu okuma (ADR-021): müşteri kartından form yazdıran
+    /// (<c>Clients.Read</c>) ve Ayarlar'da metni düzenleyen (<c>Clinics.Read</c> / <c>Clinics.Update</c>)
+    /// kullanıcıya açıktır. PUT <c>Clinics.Update</c> ile korunur.
+    /// </summary>
+    public const string ClinicsKvkkFormRead = "Clinics_KvkkFormRead";
 }

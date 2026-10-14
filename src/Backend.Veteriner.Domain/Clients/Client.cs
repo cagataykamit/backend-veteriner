@@ -38,6 +38,18 @@ public sealed class Client : AggregateRoot
     /// <summary>Otomatik hatırlatma alabilen müşteri koşulu (tek kural; hatırlatma aday sorguları bunu kullanır).</summary>
     public static readonly Expression<Func<Client, bool>> AcceptsReminders = c => !c.RemindersOptedOut;
 
+    /// <summary>KVKK açık rıza formu sonucu (ADR-021); varsayılan <see cref="KvkkConsentStatus.None"/>. Yalnız <see cref="RecordKvkkConsent"/> ile değişir.</summary>
+    public KvkkConsentStatus KvkkConsentStatus { get; private set; } = KvkkConsentStatus.None;
+
+    /// <summary>İmzalı formun alındığı gün (İstanbul takvim günü); yalnız Kabul/Ret iken dolu.</summary>
+    public DateOnly? KvkkConsentRecordedOn { get; private set; }
+
+    /// <summary>Rıza durumunu işaretleyen kullanıcı; yalnız Kabul/Ret iken dolu.</summary>
+    public Guid? KvkkConsentRecordedByUserId { get; private set; }
+
+    /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
+    public byte[] RowVersion { get; private set; } = default!;
+
     private Client() { }
 
     public static Client CreateWalkIn(Guid tenantId)
@@ -84,6 +96,53 @@ public sealed class Client : AggregateRoot
         if (remindersOptedOut is { } optedOut)
             RemindersOptedOut = optedOut;
         return Result.Success();
+    }
+
+    /// <summary>
+    /// KVKK açık rıza formu sonucunu kaydeder (ADR-021). Kabul/Ret: tarih verilmezse bugün, bugünden ileri olamaz;
+    /// işaretleyen kullanıcı yazılır. Yok (yanlış girişin geri alınması): tarih verilemez, tarih ve kullanıcı temizlenir.
+    /// Hatırlatma tercihine (<see cref="RemindersOptedOut"/>) dokunmaz. Kural yalnızca burada yaşar.
+    /// </summary>
+    public Result RecordKvkkConsent(KvkkConsentStatus status, DateOnly? recordedOn, DateOnly today, Guid recordedByUserId)
+    {
+        switch (status)
+        {
+            case KvkkConsentStatus.None:
+                if (recordedOn.HasValue)
+                    return Result.Failure("Clients.Validation", "Rıza durumu 'Yok' iken tarih verilemez.");
+                KvkkConsentStatus = KvkkConsentStatus.None;
+                KvkkConsentRecordedOn = null;
+                KvkkConsentRecordedByUserId = null;
+                break;
+
+            case KvkkConsentStatus.Accepted:
+            case KvkkConsentStatus.Declined:
+                if (recordedOn > today)
+                    return Result.Failure("Clients.Validation", "Rıza tarihi gelecekte olamaz.");
+                if (recordedByUserId == Guid.Empty)
+                    return Result.Failure("Clients.Validation", "İşaretleyen kullanıcı geçersiz.");
+                KvkkConsentStatus = status;
+                KvkkConsentRecordedOn = recordedOn ?? today;
+                KvkkConsentRecordedByUserId = recordedByUserId;
+                break;
+
+            default:
+                return Result.Failure("Clients.Validation", "Geçersiz rıza durumu.");
+        }
+
+        UpdatedAtUtc = DateTime.UtcNow;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// İstemcinin gördüğü sürüm: kalıcı yazma yalnızca veritabanındaki sürüm bu değere eşitse gerçekleşir.
+    /// </summary>
+    public void SetExpectedRowVersion(byte[] expectedRowVersion)
+    {
+        if (expectedRowVersion is null || expectedRowVersion.Length == 0)
+            throw new ArgumentException("RowVersion geçersiz.", nameof(expectedRowVersion));
+
+        RowVersion = expectedRowVersion;
     }
 
     private void ApplyPhone(string? phone)
