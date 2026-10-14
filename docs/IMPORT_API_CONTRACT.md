@@ -2,7 +2,23 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9_READINESS.md` Dilim 7. Tasarım gerekçesi, akış, riskler ve kullanıcı kararları: `ASAMA9_IMPORT_DESIGN.md`. Tüm uçlar `api/v1` altında, JSON (dosya yükleme ve indirme hariç), standart `ProblemDetails` + `extensions.code` hata zarfı, sayfalama mevcut liste uçlarındaki biçimde.
 
-> **Durum:** TASARIM TASLAĞI. Kod yok, migration yok. Bu sözleşme, `ASAMA9_IMPORT_DESIGN.md` bölüm 12'deki kullanıcı kararları alınmadan **kesinleşmez**; kararlara bağlı yerler `[K#]` ile işaretli ve önerilen seçenekle yazılmıştır.
+> **Durum:** Kararlar kesinleşti: ADR-019 (ürün deposu, K1–K12 önerilen seçeneklerle kabul). `[K#]` işaretleri o karara bağlıdır. **Uygulanan dilim: B1 (temel)** — parti kaydı, durum makinesi, izinler, parti oluştur/listele/oku/sil iskeleti, migration `AddDataImportBatches`. B2–B5 uçları aşağıda **taslak**tır; dilim başında kesinleşir (bölüm 0).
+
+## 0) Dilim durumu ve frontend için değişenler
+
+| Dilim | Uç / yüzey | Durum |
+|-------|------------|-------|
+| B1 | `POST /imports/batches` (dosyasız iskelet), `GET /imports/batches`, `GET /imports/batches/{id}`, `DELETE /imports/batches/{id}`; izinler; durum makinesi; `Vaccination.ImportBatchId` | **Uygulandı** |
+| B2 | `POST /imports/batches` dosya alanları (`file`, `customersFile`…), `GET /imports/template`, `PUT .../mapping`, yanıtta `tables[]` | Taslak |
+| B3 | `POST .../validate`, `GET .../preview`, `GET .../rows`, `GET .../errors` | Taslak |
+| B4 | `POST .../commit`, `POST .../release-reminders`, `progress`, hatırlatma dışlaması | Taslak |
+| B5 | `GET .../rollback-preview`, `POST .../rollback`, 30 gün temizlik, `Expired` işi | Taslak |
+
+**Frontend için değişenler (B1):**
+- Yeni izinler `Imports.Read`, `Imports.Manage`, `Imports.Commit` yalnız yönetici düzeyine (Admin, Owner, ClinicAdmin) bağlanır. Seed çalışıp kullanıcı çıkış-giriş yapana kadar bu uçlar `403` döner; menü öğesi izinle gizlenmelidir.
+- `POST /imports/batches` B1'de **dosyasız** çalışır (yalnız `requestId`, `name`, `clinicId`); parti `Uploaded` durumunda, satırsız oluşur. Gövde zaten `multipart/form-data`'dır; B2 aynı uca dosya alanlarını ekler (alan adları değişmez). Sihirbaz (F1) B2–B3 sözleşmesi sabitlenene kadar bağlanmamalıdır.
+- Parti yanıtındaki tarih alanları UTC, `status` metin (`"Uploaded"` …), sayaçlar `summary.<tablo>` altında (B1'de hepsi 0).
+- Mevcut müşteri/hasta/aşı uçlarının sözleşmesi **değişmez** (`Vaccination.ImportBatchId` yalnız veritabanında; okuma DTO'larına eklenmedi).
 
 ## 1) Kapsam ve sınırlar
 
@@ -13,7 +29,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 
 ## 2) Yetki (yeni izinler) `[K8]`
 
-Seed ile gelir (`PermissionCatalog` + `RolePermissionBindingSeeder`); varsayılan olarak yalnız **Yönetici** rolüne bağlanır. Mevcut özel roller elle almalıdır.
+Seed ile gelir (`PermissionCatalog` + `RolePermissionBindingSeeder`); varsayılan olarak yalnız **yönetici düzeyi** rollere (`Admin`, `Owner`, `ClinicAdmin`; `*.Correct` izinleriyle aynı hiza) bağlanır. `Veteriner` ve `Sekreter` almaz. Mevcut özel roller elle almalıdır. Seed yalnız birleşik `main`'den çalıştırılır; sonrasında çıkış-giriş gerekir.
 
 | İzin | Uçlar |
 |------|-------|
@@ -26,6 +42,24 @@ Ek zorunlu izinler (yetki yükseltmeyi önlemek için): `commit` çağıranın `
 ## 3) Yaşam döngüsü
 
 Parti durumları (`status`): `Uploaded` → `Mapped` → `Validating` → `Validated` | `ValidationFailed` → `Committing` → `Committed` | `CommitFailed`; `Committed` → `RollingBack` → `RolledBack` | `PartiallyRolledBack` | `RollbackFailed`; taslak aşamalarından `Discarded`; 7 gün hareketsiz taslak `Expired`.
+
+**Geçiş tablosu (B1, domain'de tek yer: `ImportBatch`).** Tabloda olmayan her geçiş `409 Imports.InvalidState` döner; iki istek aynı partiyi aynı anda değiştirirse ikincisi `409 Imports.ConcurrencyConflict` (rowversion).
+
+| İşlem | Kaynak durum(lar) | Hedef |
+|-------|-------------------|-------|
+| Oluştur | — | `Uploaded` |
+| Eşleme kaydet | `Uploaded`, `Mapped`, `Validated`, `ValidationFailed` | `Mapped` (önceki `validationId` geçersizleşir) |
+| Doğrulama başlat | `Mapped`, `Validated`, `ValidationFailed` | `Validating` |
+| Doğrulama bitti | `Validating` | `Validated` (yeni `validationId`) \| `ValidationFailed` |
+| Uygula | `Validated` + güncel `validationId` (aksi `Imports.ValidationStale`) | `Committing` |
+| Uygulama bitti | `Committing` | `Committed` \| `CommitFailed` |
+| Geri al | `Committed`, `PartiallyRolledBack`, `CommitFailed`, `RollbackFailed` (yeniden deneme) | `RollingBack` |
+| Geri alma bitti | `RollingBack` | `RolledBack` \| `PartiallyRolledBack` \| `RollbackFailed` |
+| Hatırlatmaları serbest bırak | `Committed`, `PartiallyRolledBack`; yalnız bir kez | durum değişmez, `remindersReleasedAtUtc` dolar |
+| Taslağı sil | `Uploaded`, `Mapped`, `Validated`, `ValidationFailed` | `Discarded` |
+| Süre doldu | taslak durumları + son hareketten ≥ 7 gün | `Expired` |
+
+Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (açık taslak sınırı için sayılır). Aktif iş = `Validating`, `Committing`, `RollingBack`. Son durumlar: `Committed` (geri alınabilir), `RolledBack`, `Discarded`, `Expired`. Kiracı başına en fazla **5 açık taslak** (`409 Imports.TooManyOpenDrafts`; uygulama düzeyi sınır, eşzamanlı iki istekte 6. oluşabilir).
 
 - Doğrulama ve uygulama **arka plan işidir** (`202 Accepted`); istemci `GET /imports/batches/{id}` ile durumu ve ilerlemeyi yoklar (önerilen aralık 2 sn).
 - Aynı kiracıda aynı anda **tek** aktif iş (`Validating`, `Committing`, `RollingBack`) olabilir; ikincisi `409 Imports.AnotherJobRunning`.
@@ -161,6 +195,8 @@ Hata zarfı için bölüm 8. `{id}` = parti kimliği.
 
 İşlem: dosya boyut/biçim denetimi, **içerik özeti (SHA-256)** hesabı, başlıkların okunması, kanonik başlıklarla otomatik eşleme önerisi. Satırlar bu aşamada saklanır (`Uploaded`) ama doğrulanmamıştır.
 
+**B1 davranışı (uygulandı):** Dosya alanları henüz yoktur; yalnız `requestId` (zorunlu), `name` (≤ 100, boşluk kırpılır, boşsa null) ve `clinicId` (opsiyonel) okunur. `clinicId` verilirse kiracıya ait ve çağıranın erişebildiği klinik olmalı (`404 Clinics.NotFound` / `403 Clinics.AccessDenied`) ve aktif klinik bağlamıyla çelişmemeli (`400 Imports.ClinicContextMismatch`). Pasif kiracı `403 Tenants.TenantInactive`; abonelik yazma koruması mevcut kodlarla. Aynı `requestId` + aynı `name`/`clinicId` → `200` aynı parti; farklı `name` veya `clinicId` → `409 Imports.RequestIdConflict` (B2'de içerik özeti de karşılaştırmaya girer). Kiracıda 5 açık taslak varsa `409 Imports.TooManyOpenDrafts`. Yanıt gövdesi bölüm 7.5'teki parti nesnesidir (`tables[]` B2'de eklenir).
+
 Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBack/CommitFailed` **olmayan** parti varsa `409 Imports.DuplicateFile` + `extensions.batchId` (aynı dosya iki kez yüklenip çift kayıt oluşmasın; geri alınmış partinin dosyası yeniden yüklenebilir).
 
 `201 Created` (`Location` → `GET /imports/batches/{id}`):
@@ -205,6 +241,26 @@ Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBac
 }
 ```
 `summary.<tablo>`: `{ "total", "valid", "warning", "error", "willCreate", "willMatch", "willSkip" }`; uygulama sonrası `created`, `matched`, `skipped`, `failed`. Liste: `?page=1&pageSize=20&status=` (`pageSize` ≤ 100), yeniden eskiye sıralı, mevcut liste zarfıyla (`items`, toplam sayı).
+
+**B1 yanıt şekli (uygulandı; ayrıntı ve liste öğesi aynı nesne):**
+
+```json
+{
+  "id": "guid", "status": "Uploaded", "name": "Eski sistem 1. parti", "clinicId": "guid|null",
+  "validationId": null, "createdByUserId": "guid", "createdAtUtc": "...", "updatedAtUtc": null,
+  "validatedAtUtc": null, "committedAtUtc": null, "rolledBackAtUtc": null,
+  "remindersReleasedAtUtc": null, "payloadPurgedAtUtc": null,
+  "summary": {
+    "customers":    { "total": 0, "valid": 0, "warning": 0, "error": 0, "willCreate": 0, "willMatch": 0, "willSkip": 0, "created": 0, "matched": 0, "skipped": 0, "failed": 0 },
+    "pets":         { "...": 0 },
+    "vaccinations": { "...": 0 }
+  }
+}
+```
+
+- `progress` B4'te eklenir. `updatedAtUtc` son durum değişikliğidir (7 günlük süre bunun üzerinden, yoksa `createdAtUtc`).
+- Liste: `GET /imports/batches?page=1&pageSize=20&status=Uploaded` → `{ items, page, pageSize, totalItems, totalPages }`; `pageSize` 1–100, `status` geçersizse `400`. Sıralama `createdAtUtc` azalan.
+- Görünürlük: yalnız çağıranın kiracısı. Klinik bağlı parti (`clinicId` dolu) yalnız o kliniğe erişebilen kullanıcıya görünür; erişemeyen için ayrıntı `404 Imports.BatchNotFound`, listede görünmez. Klinik bağsız parti kiracıdaki `Imports.Read` sahiplerine görünür (müşteri/hasta kiracı genelidir).
 
 ### 7.6 `GET /imports/batches/{id}/preview` (kuru çalıştırma sonucu)
 `Imports.Read`; durum `Validated`, `Committing`, `Committed`, … Yanıt:
@@ -257,6 +313,8 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 ### 7.13 `DELETE /imports/batches/{id}`
 `Imports.Manage`; yalnız taslak durumları (`Uploaded|Mapped|Validated|ValidationFailed`). Hazırlık verisini siler (ürün verisine dokunmaz) → `Discarded`; `204`. `Committing/Committed` partide `409 Imports.InvalidState`.
 
+**B1 davranışı (uygulandı):** Parti kaydı silinmez, durumu `Discarded` olur (liste/geçmişte görünür, içerik özeti serbest kalır). B1'de satır olmadığından yalnız durum değişir; hazırlık satırlarının silinmesi satırların yazıldığı B2 ile gelir. Zaten `Discarded` parti için tekrar çağrı `409 Imports.InvalidState`. Başka kiracı/erişilemeyen klinik → `404 Imports.BatchNotFound`.
+
 ## 8) Hata kodları
 
 | HTTP | Kod | Durum |
@@ -272,6 +330,9 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 | 409 | `Imports.RequestIdConflict` | Aynı `requestId`, farklı içerik |
 | 409 | `Imports.AnotherJobRunning` | Kiracıda aktif iş |
 | 409 | `Imports.InvalidState` | Durum bu işleme uygun değil |
+| 409 | `Imports.ConcurrencyConflict` | Parti aynı anda başka istekle değişti (rowversion); yeniden okuyup deneyin |
+| 409 | `Imports.TooManyOpenDrafts` | Kiracıda 5 açık taslak parti var |
+| 400 | `Imports.ClinicContextMismatch` | `clinicId` aktif klinik bağlamıyla çelişiyor |
 | 409 | `Imports.ValidationStale` | `validationId` güncel değil (eşleme değişti/yeniden doğrulandı) |
 | 409 | `Imports.HasErrorRows` | `FailIfAny` ve hatalı satır var |
 | 409 | `Imports.ReminderImpactChanged` | Onaylanan e-posta sayısı güncel değil |
@@ -306,4 +367,6 @@ Silinmeyen kayıt `Kept` ve nedeni (`HasVisits`, `HasCharges`, `HasExaminations`
 - `Vaccination`: nullable `ImportBatchId` alanı eklenir (migration); mevcut sorgu/DTO değişmez (isteğe bağlı olarak okuma DTO'larına alan eklenebilir, ayrı karar).
 - `ReminderProcessorService.ProcessVaccinationRemindersAsync`: aday sorgusuna "içe aktarılmış ve serbest bırakılmamış değil" koşulu eklenir (bölüm 6.3).
 - Yeni: `ImportBatch`, `ImportBatchRow`, izinler, arka plan işçisi, silme olayı tipleri (Client/Pet).
+- **B1 migration `AddDataImportBatches`** (tek migration): `ImportBatches`, `ImportBatchRows` tabloları, `Vaccinations.ImportBatchId` (nullable, filtreli indeks, `ImportBatches`'e `NO ACTION` FK). Veritabanı güvenceleri: `UX_ImportBatches_TenantId_RequestId`; `UX_ImportBatches_TenantId_ContentHash` (özet dolu ve durum `CommitFailed/RolledBack/Discarded/Expired` dışı); `UX_ImportBatches_TenantId_ActiveJob` (durum `Validating/Committing/RollingBack` iken kiracı başına tek satır); `UX_ImportBatchRows_BatchId_Table_RowNumber`; `ImportBatchRows.TargetEntityId` indeksi; `ImportBatches.RowVersion`.
+- B1 audit eylemleri: `ImportBatch.Create` (hedef `RequestId`), `ImportBatch.Discard` (hedef `ImportBatchId`). Payload yalnız `requestId`, `name`, `clinicId` / parti kimliği taşır.
 - Mevcut müşteri/hasta/aşı uçlarının sözleşmesi **değişmez**.
