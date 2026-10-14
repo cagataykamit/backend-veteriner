@@ -421,7 +421,7 @@ Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `M
 - `issueCounts`: sorun kodu + önem başına etkilenen satır sayısı (aynı satırda aynı kod bir kez), `rowCount` azalan.
 - `canCommit`: durum `Validated`, `validationId` dolu, `blockers` boş ve `willCreate` toplamı > 0.
 - `blockers`: dosya düzeyi nedenler (`Imports.OwnerLinkUnavailable`, `Imports.PetLinkUnavailable`, `Imports.NoImportableRows`) ve satırı olan **bloklayan** eşlenmemiş değer kodları (`Imports.SpeciesUnmapped`, `Imports.VaccineUnmapped`). Hatalı satırların varlığı tek başına engel değildir `[K2]` (`onErrors`, bölüm 7.9).
-- Satır verisi temizlenmişse (`payloadPurgedAtUtc` dolu) `summary` korunur; `unmappedValues`, `reminderImpact`, `issueCounts` boş/sıfır, `payloadPurged = true`, `canCommit = false`.
+- Satır verisi temizlenmişse (`payloadPurgedAtUtc` dolu) `summary` korunur; `unmappedValues`, `issueCounts` boş, `payloadPurged = true`, `canCommit = false`, `blockers` yalnız dosya düzeyi. `reminderImpact` uygulanmış partide (B4) satır verisi gerektirmediği için gerçek kayıtlardan hesaplanmaya devam eder; uygulanmamış (`Expired`) partide sıfırdır.
 
 ### 7.7 `GET /imports/batches/{id}/rows`
 `Imports.Read`; durum kuralı bölüm 7.6 ile aynı. Sorgu: `table=customers|pets|vaccinations` (verilmezse üç tablo: müşteri, hasta, aşı sırasıyla), `status=Valid|Warning|Error` (doğrulama durumu; uygulama sonrası `Created|Matched|Skipped|Failed|RolledBack|Kept` uygulama durumunu süzer), `code=<kural kodu>` (satırın sorunlarından birinin kodu), `page` (varsayılan 1), `pageSize` (varsayılan 50, 1–200). Sıralama: tablo, `rowNumber`. Yanıt `{ items, page, pageSize, totalItems, totalPages }`; öğe:
