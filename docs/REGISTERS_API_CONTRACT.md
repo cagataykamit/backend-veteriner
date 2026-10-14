@@ -221,7 +221,7 @@ Bölüm 1 ile aynıdır (`from`, `to`, `clinicId`, `page`, `pageSize`; İstanbul
 | `includeVoided` | vaccine-info | İptal edilen uygulamalar da gelsin (varsayılan `false`) |
 | `includeVoided` | controlled-substances | **Yoktur** (hareket defteri: geri alma kendi satırıdır, hiçbir şey gizlenmez) |
 | `productId` (guid?) | vaccine-info | Ürün süzgeci |
-| `veterinarianId` (guid?) | vaccine-info | Veteriner (uygulamayı kaydeden kullanıcı) süzgeci |
+| `veterinarianId` (guid?) | vaccine-info | Veteriner (geliş kaydındaki sorumlu hekim) süzgeci |
 
 Kiracıda olmayan `productId`/`veterinarianId` hata vermez, satır da eşleşmez (IDOR yok).
 
@@ -335,7 +335,7 @@ Kapsam: `Product.controlledClass ≠ None` olan (narkotik, psikotropik) ürünle
 
 **Satır = bir aşı uygulaması** (`Administration`, hayvan bazlı). Yalnız `Product.kind = Vaccine` ürünlerin uygulamaları. Süzgeç: tarih aralığı, `productId`, `veterinarianId`, `clinicId`, `includeVoided`.
 
-- **Veteriner** = uygulamayı kaydeden kullanıcı (`Administration.CreatedByUserId`; "klinik uygulayıcı"). Uygulamanın ayrı bir hekim alanı yoktur. Sonradan eklemede kaydı ekleyen kullanıcıdır.
+- **Veteriner** = uygulamanın bağlı olduğu muayenenin geliş (Visit) kaydındaki **sorumlu hekim** (`Visit.ResponsibleVeterinarianUserId`), muayene ve reçete defterleriyle aynı kural (bölüm 4). `veterinarianId` süzgeci yalnız buna bakar; muayenesiz uygulama, gelişsiz muayene veya sorumlu hekimi atanmamış geliş süzgeçle **eşleşmez**. `Administration.CreatedByUserId` (kaydı giren kullanıcı) artık hekim sayılmaz. Raporda hekim sütunu yoktur; kural yalnız süzgeçtedir.
 - **İptal edilen uygulamalar** varsayılan gizli (`includeVoided=false`); `true` iken `isVoided = true` ve dosyada ürün hücresinde ` (iptal)`.
 - **Sonradan eklenen** (ADR-013, `AddedAfterFinalization`): `addedAfterFinalization = true`; dosyada ürün hücresinde ` (sonradan eklendi)`. Gerekçe deftere yazılmaz.
 - **Seri No / S.K.T:** uygulamanın partisinden (`Administration.BatchId`); partisiz bakiyeden düşülen (eski) uygulamada boş.
