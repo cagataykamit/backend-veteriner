@@ -13,6 +13,7 @@ public sealed class ClientIntegrationEventTypeRegistry
         {
             [ClientIntegrationEventTypes.Created] = typeof(ClientCreatedIntegrationEvent),
             [ClientIntegrationEventTypes.Updated] = typeof(ClientUpdatedIntegrationEvent),
+            [ClientIntegrationEventTypes.Deleted] = typeof(ClientDeletedIntegrationEvent),
         };
 
     public static bool TryResolvePayloadType(string eventType, out Type payloadType)

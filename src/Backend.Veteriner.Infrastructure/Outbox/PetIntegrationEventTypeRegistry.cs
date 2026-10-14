@@ -13,6 +13,7 @@ public sealed class PetIntegrationEventTypeRegistry
         {
             [PetIntegrationEventTypes.Created] = typeof(PetCreatedIntegrationEvent),
             [PetIntegrationEventTypes.Updated] = typeof(PetUpdatedIntegrationEvent),
+            [PetIntegrationEventTypes.Deleted] = typeof(PetDeletedIntegrationEvent),
         };
 
     public static bool TryResolvePayloadType(string eventType, out Type payloadType)

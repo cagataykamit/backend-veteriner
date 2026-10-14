@@ -9,13 +9,15 @@ public static class ClientIntegrationEventTypes
 {
     public const string Created = "client.created.v1";
     public const string Updated = "client.updated.v1";
+    public const string Deleted = "client.deleted.v1";
 
     public const int MaxTypeLength = 64;
 
     public static IReadOnlyList<string> All { get; } =
     [
         Created,
-        Updated
+        Updated,
+        Deleted
     ];
 
     public static bool IsKnown(string eventType)

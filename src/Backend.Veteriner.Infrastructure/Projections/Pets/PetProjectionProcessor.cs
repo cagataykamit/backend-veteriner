@@ -12,8 +12,8 @@ using Microsoft.Extensions.Options;
 namespace Backend.Veteriner.Infrastructure.Projections.Pets;
 
 /// <summary>
-/// Pet integration event'lerini (<c>pet.created.v1</c> / <c>pet.updated.v1</c>) Query DB
-/// <c>PetReadModels</c> tablosuna project eder.
+/// Pet integration event'lerini (<c>pet.created.v1</c> / <c>pet.updated.v1</c> / <c>pet.deleted.v1</c>) Query DB
+/// <c>PetReadModels</c> tablosuna project eder (silme olayı satırı kaldırır; içe aktarma geri alması).
 ///
 /// Tasarım kararları:
 /// - Yalnızca pet projection event tiplerini claim eder (<see cref="OutboxMessageQueryFilters.PetIntegrationEventsOnly"/>);
@@ -339,7 +339,9 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
                 return PetProjectionApplyResult.DuplicateSkipped();
             }
 
-            var stale = UpsertPetReadModel(integrationEvent.Snapshot, occurredAtUtc, eventId, projectedAtUtc);
+            var stale = integrationEvent.Snapshot is { } snapshot
+                ? UpsertPetReadModel(snapshot, occurredAtUtc, eventId, projectedAtUtc)
+                : DeletePetReadModel(integrationEvent.DeletedPetId!.Value, occurredAtUtc);
             await _queryDb.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -400,6 +402,24 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
             return true;
 
         ApplySnapshotToExisting(existing, snap, eventId, occurredAtUtc, projectedAtUtc);
+        return false;
+    }
+
+    /// <summary>
+    /// Silme (içe aktarma geri alması): satır varsa ve olay son uygulanan olaydan eski değilse silinir; satır yoksa iş
+    /// yapılmaz (dedup kaydı yine yazılır).
+    /// </summary>
+    /// <returns><c>true</c> ise event stale'dir; read-model satırı korunmuştur.</returns>
+    private bool DeletePetReadModel(Guid petId, DateTime occurredAtUtc)
+    {
+        var existing = _queryDb.PetReadModels.Find(petId);
+        if (existing is null)
+            return false;
+
+        if (occurredAtUtc < existing.LastEventOccurredAtUtc)
+            return true;
+
+        _queryDb.PetReadModels.Remove(existing);
         return false;
     }
 
@@ -477,9 +497,12 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
                 (new PetProjectionEvent(created.Current), created.EventId, created.OccurredAtUtc),
             PetUpdatedIntegrationEvent updated =>
                 (new PetProjectionEvent(updated.Current), updated.EventId, updated.OccurredAtUtc),
+            PetDeletedIntegrationEvent deleted =>
+                (new PetProjectionEvent(null, deleted.PetId), deleted.EventId, deleted.OccurredAtUtc),
             _ => throw new UnknownPetIntegrationEventTypeException(type)
         };
     }
 
-    private readonly record struct PetProjectionEvent(PetProjectionSnapshot Snapshot);
+    /// <summary>Create/Update event'lerini upsert için, Delete event'ini silme için normalize eden iç taşıyıcı.</summary>
+    private readonly record struct PetProjectionEvent(PetProjectionSnapshot? Snapshot, Guid? DeletedPetId = null);
 }

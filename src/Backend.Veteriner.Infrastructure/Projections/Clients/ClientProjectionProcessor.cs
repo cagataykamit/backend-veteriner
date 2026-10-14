@@ -13,8 +13,8 @@ using Microsoft.Extensions.Options;
 namespace Backend.Veteriner.Infrastructure.Projections.Clients;
 
 /// <summary>
-/// Client integration event'lerini (<c>client.created.v1</c> / <c>client.updated.v1</c>) Query DB
-/// <c>ClientReadModels</c> tablosuna project eder.
+/// Client integration event'lerini (<c>client.created.v1</c> / <c>client.updated.v1</c> / <c>client.deleted.v1</c>)
+/// Query DB <c>ClientReadModels</c> tablosuna project eder (silme olayı satırı kaldırır; içe aktarma geri alması).
 ///
 /// Tasarım kararları:
 /// - Yalnızca client projection event tiplerini claim eder (<see cref="OutboxMessageQueryFilters.ClientIntegrationEventsOnly"/>);
@@ -342,7 +342,9 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
                 return ClientProjectionApplyResult.DuplicateSkipped();
             }
 
-            var stale = UpsertClientReadModel(integrationEvent.Snapshot, occurredAtUtc, eventId, projectedAtUtc);
+            var stale = integrationEvent.Snapshot is { } snapshot
+                ? UpsertClientReadModel(snapshot, occurredAtUtc, eventId, projectedAtUtc)
+                : DeleteClientReadModel(integrationEvent.DeletedClientId!.Value, occurredAtUtc);
             await _queryDb.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -430,6 +432,24 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
         return false;
     }
 
+    /// <summary>
+    /// Silme (içe aktarma geri alması): satır varsa ve olay son uygulanan olaydan eski değilse silinir; satır yoksa iş
+    /// yapılmaz (dedup kaydı yine yazılır).
+    /// </summary>
+    /// <returns><c>true</c> ise event stale'dir; read-model satırı korunmuştur.</returns>
+    private bool DeleteClientReadModel(Guid clientId, DateTime occurredAtUtc)
+    {
+        var existing = _queryDb.ClientReadModels.Find(clientId);
+        if (existing is null)
+            return false;
+
+        if (occurredAtUtc < existing.LastEventOccurredAtUtc)
+            return true;
+
+        _queryDb.ClientReadModels.Remove(existing);
+        return false;
+    }
+
     private static (ClientProjectionEvent Event, Guid EventId, DateTime OccurredAtUtc) DeserializeIntegrationEvent(
         string type, string payload)
     {
@@ -443,10 +463,12 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
                 (new ClientProjectionEvent(created.Current), created.EventId, created.OccurredAtUtc),
             ClientUpdatedIntegrationEvent updated =>
                 (new ClientProjectionEvent(updated.Current), updated.EventId, updated.OccurredAtUtc),
+            ClientDeletedIntegrationEvent deleted =>
+                (new ClientProjectionEvent(null, deleted.ClientId), deleted.EventId, deleted.OccurredAtUtc),
             _ => throw new UnknownClientIntegrationEventTypeException(type)
         };
     }
 
-    /// <summary>Create/Update event'lerini ortak upsert için normalize eden iç taşıyıcı.</summary>
-    private readonly record struct ClientProjectionEvent(ClientProjectionSnapshot Snapshot);
+    /// <summary>Create/Update event'lerini ortak upsert için, Delete event'ini silme için normalize eden iç taşıyıcı.</summary>
+    private readonly record struct ClientProjectionEvent(ClientProjectionSnapshot? Snapshot, Guid? DeletedClientId = null);
 }

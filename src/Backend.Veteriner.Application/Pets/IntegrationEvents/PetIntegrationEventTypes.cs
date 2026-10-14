@@ -9,13 +9,15 @@ public static class PetIntegrationEventTypes
 {
     public const string Created = "pet.created.v1";
     public const string Updated = "pet.updated.v1";
+    public const string Deleted = "pet.deleted.v1";
 
     public const int MaxTypeLength = 64;
 
     public static IReadOnlyList<string> All { get; } =
     [
         Created,
-        Updated
+        Updated,
+        Deleted
     ];
 
     public static bool IsKnown(string eventType)
