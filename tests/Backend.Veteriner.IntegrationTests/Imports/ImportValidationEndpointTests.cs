@@ -368,6 +368,39 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
     }
 
     [Fact]
+    public async Task Existing_Clients_Found_By_Only_Phone_Or_Only_Name_Should_Both_Be_Considered()
+    {
+        // Mevcut kayıtlar anahtar türü başına ayrı sorguyla okunur; yalnız telefonla ve yalnız adla bulunanlar birlikte değerlendirilmeli.
+        var ctx = await SeedAsync();
+        var cat = await SeedCatalogAsync(ctx.TenantId);
+        var sfx = cat.Suffix;
+        await SeedExistingAsync(ctx.TenantId, cat, $"Başka Kişi {sfx}", "905321230000", "Boncuk", null);
+        await SeedExistingAsync(ctx.TenantId, cat, $"ADLI KİŞİ {sfx}", "905321239999", "Pamuk", null);
+        var client = ClientFor(ctx.Token);
+
+        var bytes = Workbook(("Musteriler",
+        [
+            ["AdSoyad", "Telefon"],
+            [$"Yeni Kişi {sfx}", "0532 123 00 00"], // telefon başka mevcut müşteride (yalnız telefon sorgusuyla bulunur)
+            [$"adlı kişi {sfx}", null], // telefonsuz, adı mevcut müşteriyle aynı (yalnız ad sorgusuyla bulunur)
+        ]));
+        var id = await IdAsync(await PostAsync(client, Guid.NewGuid(), null, null, ("file", "anahtar.xlsx", bytes, XlsxType)));
+        await PutMappingAsync(client, id, new Dictionary<string, Dictionary<string, string>>
+        {
+            ["customers"] = Map("AdSoyad", "AdSoyad", "Telefon", "Telefon"),
+        });
+
+        var validated = await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null);
+        validated.StatusCode.Should().Be(HttpStatusCode.OK, await validated.Content.ReadAsStringAsync());
+
+        var customers = await RowsAsync(client, id, "customers");
+        customers[0].GetProperty("validation").GetProperty("action").GetString().Should().Be("Create");
+        customers[0].GetProperty("issues").EnumerateArray().Select(i => i.GetProperty("code").GetString()).Should().Contain("Imports.SharedPhone");
+        customers[1].GetProperty("validation").GetProperty("action").GetString().Should().Be("Create");
+        customers[1].GetProperty("issues").EnumerateArray().Select(i => i.GetProperty("code").GetString()).Should().Contain("Imports.PossibleDuplicate");
+    }
+
+    [Fact]
     public async Task OnDuplicateClient_Error_Option_Should_Make_Existing_Client_Row_An_Error()
     {
         var ctx = await SeedAsync();

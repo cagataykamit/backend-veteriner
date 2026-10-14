@@ -246,7 +246,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         // K10: önizlemeden sonra aynı çip başka hayvana kaydedilmiş olabilir.
         if (data.Microchip is { } chip)
         {
-            var sameChip = await _pets.ListAsync(new ImportExistingPetsSpec(unit.TenantId, [], [chip]), ct);
+            var sameChip = await _pets.ListAsync(ImportExistingPetsSpec.ByMicrochips(unit.TenantId, [chip]), ct);
             if (sameChip.Count > 0)
                 return FailOf<Guid>(row, ImportRules.MicrochipConflict.Code, ImportRules.MicrochipConflict.Message);
         }

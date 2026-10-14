@@ -7,8 +7,9 @@ using Backend.Veteriner.Domain.Vaccinations;
 namespace Backend.Veteriner.Application.Imports.Validation;
 
 /// <summary>
-/// Doğrulama için kiracının mevcut müşteri / hayvan / aşı kayıtlarını <b>sabit sayıda</b> sorguyla (en çok 3) okur:
-/// müşteriler (telefon/e-posta/ad kümeleri), onların ve çiplerin hayvanları, bulunan hayvanların uygulanmış aşıları.
+/// Doğrulama için kiracının mevcut müşteri / hayvan / aşı kayıtlarını <b>sabit sayıda</b> sorguyla (en çok 6) okur:
+/// müşteriler (telefon, e-posta, ad kümeleri ayrı ayrı), onların ve çiplerin hayvanları (ayrı ayrı), bulunan hayvanların
+/// uygulanmış aşıları. Ayrı sorguların sonuçları kimliğe göre tekilleştirilir; sonuç kümesi birleşik koşulla aynıdır.
 /// </summary>
 public sealed class ImportExistingDataLoader
 {
@@ -28,18 +29,33 @@ public sealed class ImportExistingDataLoader
 
     public async Task<ImportExistingData> LoadAsync(Guid tenantId, ImportLookupKeys keys, CancellationToken ct)
     {
-        IReadOnlyList<ImportExistingClient> clients = [];
-        if (keys.Phones.Count + keys.Emails.Count + keys.Names.Count > 0)
-            clients = await _clients.ListAsync(new ImportExistingClientsSpec(tenantId, keys.Phones, keys.Emails, keys.Names), ct);
+        var clients = new Dictionary<Guid, ImportExistingClient>();
+        if (keys.Phones.Count > 0)
+            AddById(clients, await _clients.ListAsync(ImportExistingClientsSpec.ByPhones(tenantId, keys.Phones), ct), c => c.Id);
+        if (keys.Emails.Count > 0)
+            AddById(clients, await _clients.ListAsync(ImportExistingClientsSpec.ByEmails(tenantId, keys.Emails), ct), c => c.Id);
+        if (keys.Names.Count > 0)
+            AddById(clients, await _clients.ListAsync(ImportExistingClientsSpec.ByNames(tenantId, keys.Names), ct), c => c.Id);
 
-        IReadOnlyList<ImportExistingPet> pets = [];
-        if (clients.Count + keys.Microchips.Count > 0)
-            pets = await _pets.ListAsync(new ImportExistingPetsSpec(tenantId, clients.Select(c => c.Id).ToArray(), keys.Microchips), ct);
+        var pets = new Dictionary<Guid, ImportExistingPet>();
+        if (clients.Count > 0)
+            AddById(pets, await _pets.ListAsync(ImportExistingPetsSpec.ByClients(tenantId, clients.Keys), ct), p => p.Id);
+        if (keys.Microchips.Count > 0)
+            AddById(pets, await _pets.ListAsync(ImportExistingPetsSpec.ByMicrochips(tenantId, keys.Microchips), ct), p => p.Id);
 
         IReadOnlyList<ImportExistingVaccination> vaccinations = [];
         if (pets.Count > 0)
-            vaccinations = await _vaccinations.ListAsync(new ImportExistingVaccinationsSpec(tenantId, pets.Select(p => p.Id).ToArray()), ct);
+            vaccinations = await _vaccinations.ListAsync(new ImportExistingVaccinationsSpec(tenantId, pets.Keys), ct);
 
-        return new ImportExistingData(clients, pets, vaccinations);
+        return new ImportExistingData(
+            clients.Values.OrderBy(c => c.Id).ToList(),
+            pets.Values.OrderBy(p => p.Id).ToList(),
+            vaccinations);
+    }
+
+    private static void AddById<T>(Dictionary<Guid, T> target, IEnumerable<T> items, Func<T, Guid> id)
+    {
+        foreach (var item in items)
+            target.TryAdd(id(item), item);
     }
 }
