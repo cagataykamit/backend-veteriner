@@ -90,6 +90,11 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         second.GetProperty("validationId").GetGuid().Should().NotBe(first.GetProperty("validationId").GetGuid());
         Counts(second, "pets").Should().Equal(Counts(first, "pets"));
         (await RowCountAsync(id)).Should().Be(15);
+
+        // Sonucu değişmeyen satırların sıfırlanan durumu geri yazıldı (küme güncellemesi).
+        var rows = (await RowsAsync(client, id, "customers")).Concat(await RowsAsync(client, id, "pets")).Concat(await RowsAsync(client, id, "vaccinations"));
+        rows.Select(r => r.GetProperty("validation").GetProperty("status").GetString()).Should().NotContain("Pending");
+        Counts(second, "vaccinations").Should().Equal(Counts(first, "vaccinations"));
     }
 
     [Fact]

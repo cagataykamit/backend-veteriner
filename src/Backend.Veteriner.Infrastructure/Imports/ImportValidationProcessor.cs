@@ -14,7 +14,8 @@ namespace Backend.Veteriner.Infrastructure.Imports;
 /// İçe aktarma doğrulama (kuru çalıştırma) işi (ADR-019 K13, IMPORT_API_CONTRACT.md §7.4). Uygulama işiyle aynı desen: iş
 /// kuyruğu parti tablosudur, <c>Validating</c> ve kirası boş/dolmuş parti alınır (rowversion: iki örnekten biri). Kurallar
 /// <see cref="ImportValidationRunner"/> içindedir; işçi yalnız çalıştırır ve yazar: önceki satır sonuçları kira yenilemesiyle
-/// aynı işlemde sıfırlanır (ilerleme sayımı), yeni sonuçlar parça parça (<see cref="RowWriteChunk"/>) ve her parçada kira
+/// aynı işlemde sıfırlanır (ilerleme sayımı), yeni sonuçlar parça parça (<see cref="RowWriteChunk"/>; değişmeyen sonuçlar
+/// yalnız durum sütunuyla, küme güncellemesiyle) ve her parçada kira
 /// yenilenerek yazılır, sonunda parti <c>Validated</c> / <c>ValidationFailed</c> olur. Kira başka işçiye geçtiyse parça
 /// yazılmaz (rowversion) ve eski işçi durur; çökme sonrası devralan işçi doğrulamayı baştan çalıştırır (ürün tablolarına
 /// yazılmadığı için tekrar zararsızdır). Doğrulama outbox olayı üretmediğinden geri basınç uygulanmaz. Günlüklere yalnız
@@ -168,15 +169,41 @@ public sealed class ImportValidationProcessor
 
         foreach (var chunk in rows.OrderBy(r => r.Table).ThenBy(r => r.RowNumber).Chunk(RowWriteChunk))
         {
+            // İzlenen anlık görüntü sıfırlamadan önceki sonucu taşır. Sonucu değişen satır EF ile yazılır (durum sütunu
+            // zorlanarak); sonucu aynı kalan satırın (yeniden doğrulamada çoğunluk) yalnız durumu küme güncellemesiyle
+            // geri yazılır: satır başına komut olmaz.
+            var unchanged = new Dictionary<ImportRowValidationStatus, List<Guid>>();
             foreach (var row in chunk)
             {
                 outcome.ApplyTo(row);
-                // İzlenen anlık görüntü sıfırlamadan önceki durumu taşır; aynı sonuç da yeniden yazılmalı.
-                db.Entry(row).Property(r => r.ValidationStatus).IsModified = true;
+                var entry = db.Entry(row);
+                entry.DetectChanges();
+                if (entry.State == EntityState.Unchanged)
+                {
+                    if (!unchanged.TryGetValue(row.ValidationStatus, out var ids))
+                        unchanged[row.ValidationStatus] = ids = [];
+                    ids.Add(row.Id);
+                }
+                else
+                {
+                    entry.Property(r => r.ValidationStatus).IsModified = true;
+                }
             }
 
-            if (!batch.RenewValidationLease(WorkerId, Now).IsSuccess || !await TrySaveAsync(db, ct))
-                return false;
+            await using (var tx = await db.Database.BeginTransactionAsync(ct))
+            {
+                if (!batch.RenewValidationLease(WorkerId, Now).IsSuccess || !await TrySaveAsync(db, ct))
+                    return false;
+
+                foreach (var (status, ids) in unchanged)
+                {
+                    await db.ImportBatchRows
+                        .Where(r => r.BatchId == batch.Id && ids.Contains(r.Id))
+                        .ExecuteUpdateAsync(s => s.SetProperty(r => r.ValidationStatus, status), ct);
+                }
+
+                await tx.CommitAsync(ct);
+            }
 
             foreach (var row in chunk)
                 db.Entry(row).State = EntityState.Detached;
