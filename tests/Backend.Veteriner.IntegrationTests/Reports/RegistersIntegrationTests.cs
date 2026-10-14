@@ -149,6 +149,24 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
     }
 
     [Fact]
+    public async Task Veterinarian_Should_Be_Empty_When_Visit_Has_No_Responsible_Veterinarian_Even_If_Finalized()
+    {
+        var env = await SeedTenantAsync();
+        var client = await env.SeedClientAsync("Ayse Yilmaz", "Bornova / Izmir");
+        var pet = await env.SeedPetAsync(client, "Pamuk");
+        var noVet = await env.SeedExaminationAsync(pet, DayStartUtc.AddHours(9), "Birinci", withVisit: true, finalize: true, visitHasVeterinarian: false);
+        var noVisit = await env.SeedExaminationAsync(pet, DayStartUtc.AddHours(11), "Ikinci", finalize: true);
+        await env.SeedPrescriptionAsync(pet, noVet, DayStartUtc.AddHours(9), ("Amoksilin", 2m));
+
+        var examinations = await env.GetExaminationsAsync();
+        var prescriptions = await env.GetPrescriptionsAsync();
+
+        examinations.Items.Select(i => i.ExaminationId).Should().Equal(noVet, noVisit);
+        examinations.Items.Should().OnlyContain(i => i.VeterinarianName == null);
+        prescriptions.Items.Should().ContainSingle().Which.VeterinarianName.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Examination_Screen_Csv_And_Xlsx_Should_Match()
     {
         var env = await SeedTenantAsync();
@@ -491,14 +509,14 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
 
         public async Task<Guid> SeedExaminationAsync(
             Guid petId, DateTime examinedAtUtc, string visitReason, string? assessment = null, string? plan = null,
-            bool withVisit = false, bool finalize = false, Guid? clinicId = null)
+            bool withVisit = false, bool finalize = false, Guid? clinicId = null, bool visitHasVeterinarian = true)
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             Guid? visitId = null;
             if (withVisit)
             {
-                var visit = new Visit(TenantId, clinicId ?? ClinicId, petId, null, UserId, UserId, examinedAtUtc);
+                var visit = new Visit(TenantId, clinicId ?? ClinicId, petId, null, visitHasVeterinarian ? UserId : null, UserId, examinedAtUtc);
                 db.Visits.Add(visit);
                 visitId = visit.Id;
             }
