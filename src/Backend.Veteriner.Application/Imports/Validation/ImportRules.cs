@@ -133,6 +133,10 @@ public static class ImportRules
     public static readonly ImportRule ApplyFailed = new("Imports.ApplyFailed", ImportIssueSeverity.Error,
         "Kayıt yazılırken veritabanı çakışması oluştu ve yeniden deneme de başarısız oldu.");
 
+    // Geri alma (B5; Kept satırına eklenir, value = virgülle ayrılmış neden kodları, IMPORT_API_CONTRACT.md §9)
+    public static readonly ImportRule RollbackKept = new("Imports.RollbackKept", ImportIssueSeverity.Info,
+        "Geri almada silinmedi: kayda bağlı başka kayıt var veya kayıt sonradan değiştirilmiş.");
+
     // Dosya düzeyi (satır sorunu değil; preview.blockers)
     public static readonly ImportRule OwnerLinkUnavailable = new("Imports.OwnerLinkUnavailable", ImportIssueSeverity.Error,
         "Hasta tablosu yalnız MusteriNo ile bağlanıyor ancak müşteri tablosu yok veya MusteriNo sütunu eşlenmemiş.");

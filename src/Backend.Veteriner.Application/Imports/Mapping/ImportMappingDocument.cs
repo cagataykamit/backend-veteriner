@@ -43,8 +43,14 @@ public sealed class ImportMappingDocument
             : new Dictionary<string, string>();
 }
 
-/// <summary>Parti seçenekleri (<c>OptionsJson</c>). <see cref="OnDuplicateClient"/> ADR-019 K4.</summary>
-public sealed record ImportOptionsDocument(string OnDuplicateClient)
+/// <summary>Geri alma isteği: istek anahtarı (tekrar = aynı iş) ve engelli kayıt politikası (ADR-019 K7).</summary>
+public sealed record ImportRollbackRequest(Guid RequestId, string Policy);
+
+/// <summary>
+/// Parti seçenekleri (<c>OptionsJson</c>). <see cref="OnDuplicateClient"/> ADR-019 K4; <see cref="Rollback"/> son geri alma
+/// isteği (B5; geri alma işi politikayı buradan okur).
+/// </summary>
+public sealed record ImportOptionsDocument(string OnDuplicateClient, ImportRollbackRequest? Rollback = null)
 {
     public const string Match = "Match";
     public const string Skip = "Skip";

@@ -1,4 +1,3 @@
-using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Imports.Access;
@@ -77,7 +76,7 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
         if (batch.Status != ImportBatchStatus.Validated)
             return Fail("Imports.InvalidState", $"Parti '{batch.Status}' durumundayken uygulanamaz.");
 
-        var permission = CheckWritePermissions(batch);
+        var permission = ImportWritePermissions.Check(batch, _permissions);
         if (!permission.IsSuccess)
             return Result<ImportCommitResultDto>.Failure(permission.Error);
 
@@ -143,23 +142,6 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
     private async Task<Result<ImportCommitResultDto>> ReplayAsync(ImportBatch batch, CancellationToken ct)
         => Result<ImportCommitResultDto>.Success(
             new ImportCommitResultDto(Started: false, batch.ToDto(await _tableInfo.LoadAsync(batch, ct))));
-
-    /// <summary>Yetki yükseltmesini önler: partide bulunan her tablo için ilgili oluşturma izni de gerekir.</summary>
-    private Result CheckWritePermissions(ImportBatch batch)
-    {
-        var required = new List<string>();
-        if (batch.CustomerCounts.Total > 0)
-            required.Add(PermissionCatalog.Clients.Create);
-        if (batch.PetCounts.Total > 0)
-            required.Add(PermissionCatalog.Pets.Create);
-        if (batch.VaccinationCounts.Total > 0)
-            required.Add(PermissionCatalog.Vaccinations.Create);
-
-        var missing = required.Where(p => !_permissions.HasPermission(p)).ToList();
-        return missing.Count == 0
-            ? Result.Success()
-            : Result.Failure("Imports.AccessDenied", $"İçe aktarmayı uygulamak için şu izinler de gerekir: {string.Join(", ", missing)}.");
-    }
 
     /// <summary>Aşı tablosu varsa partinin kliniğine yazma erişimi (günlük aşı girişiyle aynı kural).</summary>
     private async Task<Result> CheckClinicAsync(ImportBatch batch, Guid tenantId, CancellationToken ct)

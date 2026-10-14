@@ -12,9 +12,18 @@ namespace Backend.Veteriner.Application.Imports.Queries.GetProgress;
 /// <summary>GET /api/v1/imports/batches/{id}/progress (IMPORT_API_CONTRACT.md §7.14): yoklama için hafif durum.</summary>
 public sealed record GetImportBatchProgressQuery(Guid Id) : IRequest<Result<ImportProgressDto>>;
 
-/// <summary>En çok iki sorgu: parti + uygulama sonucu yazılmış satır sayısı (yalnız uygulama başladıysa).</summary>
+/// <summary>
+/// En çok üç sorgu: parti + uygulama sonucu yazılmış satır sayısı (uygulama başladıysa) ya da geri alma fazında hedef ve
+/// sonucu yazılmış satır sayıları.
+/// </summary>
 public sealed class GetImportBatchProgressQueryHandler : IRequestHandler<GetImportBatchProgressQuery, Result<ImportProgressDto>>
 {
+    private static readonly ImportBatchStatus[] RollbackPhase =
+    [
+        ImportBatchStatus.RollingBack, ImportBatchStatus.RolledBack,
+        ImportBatchStatus.PartiallyRolledBack, ImportBatchStatus.RollbackFailed,
+    ];
+
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
@@ -51,20 +60,37 @@ public sealed class GetImportBatchProgressQueryHandler : IRequestHandler<GetImpo
         if (batch is null || !await ImportBatchVisibility.IsVisibleAsync(batch, _clinicContext, _clinicScopeResolver, ct))
             return Result<ImportProgressDto>.Failure(ImportBatchVisibility.NotFound());
 
-        var total = batch.CustomerCounts.Total + batch.PetCounts.Total + batch.VaccinationCounts.Total;
-        var started = batch.Status is not (ImportBatchStatus.Uploaded or ImportBatchStatus.Mapped or ImportBatchStatus.Validating
-            or ImportBatchStatus.Validated or ImportBatchStatus.ValidationFailed or ImportBatchStatus.Discarded or ImportBatchStatus.Expired);
-        var processed = started ? await _rows.CountAsync(new ImportAppliedRowsSpec(batch.Id), ct) : 0;
-        var committing = batch.Status == ImportBatchStatus.Committing;
+        int total, processed;
+        if (RollbackPhase.Contains(batch.Status))
+        {
+            // Geri alma: hedef satırlar (oluşturulan kaydı taşıyan) ve sonucu yazılmış olanlar.
+            processed = await _rows.CountAsync(
+                new ImportRowsByApplyStatusSpec(batch.Id, ImportRowApplyStatus.RolledBack, ImportRowApplyStatus.Kept), ct);
+            total = processed + await _rows.CountAsync(new ImportRowsByApplyStatusSpec(batch.Id, ImportRowApplyStatus.Created), ct);
+        }
+        else
+        {
+            total = batch.CustomerCounts.Total + batch.PetCounts.Total + batch.VaccinationCounts.Total;
+            var started = batch.Status is ImportBatchStatus.Committing or ImportBatchStatus.Committed or ImportBatchStatus.CommitFailed;
+            processed = started ? await _rows.CountAsync(new ImportAppliedRowsSpec(batch.Id), ct) : 0;
+        }
+
+        var phase = batch.Status switch
+        {
+            ImportBatchStatus.Committing => nameof(ImportBatchStatus.Committing),
+            ImportBatchStatus.RollingBack => nameof(ImportBatchStatus.RollingBack),
+            _ => null,
+        };
 
         return Result<ImportProgressDto>.Success(new ImportProgressDto(
             batch.Id,
             batch.Status,
-            committing ? nameof(ImportBatchStatus.Committing) : null,
+            phase,
             processed,
             total,
             batch.UpdatedAtUtc,
             batch.CommittedAtUtc,
-            batch.IsCommitLeaseActive(_timeProvider.GetUtcNow().UtcDateTime)));
+            batch.RolledBackAtUtc,
+            batch.IsJobLeaseActive(_timeProvider.GetUtcNow().UtcDateTime)));
     }
 }
