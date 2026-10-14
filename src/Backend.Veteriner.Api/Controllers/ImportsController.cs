@@ -6,9 +6,13 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Imports.Commands.Create;
 using Backend.Veteriner.Application.Imports.Commands.Discard;
 using Backend.Veteriner.Application.Imports.Commands.UpdateMapping;
+using Backend.Veteriner.Application.Imports.Commands.Validate;
 using Backend.Veteriner.Application.Imports.Contracts.Dtos;
 using Backend.Veteriner.Application.Imports.Queries.GetById;
+using Backend.Veteriner.Application.Imports.Queries.GetErrors;
 using Backend.Veteriner.Application.Imports.Queries.GetList;
+using Backend.Veteriner.Application.Imports.Queries.GetPreview;
+using Backend.Veteriner.Application.Imports.Queries.GetRows;
 using Backend.Veteriner.Application.Imports.Queries.GetTemplate;
 using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Domain.Imports;
@@ -22,7 +26,7 @@ namespace Backend.Veteriner.Api.Controllers;
 
 /// <summary>
 /// Müşteri / hasta / aşı geçmişi içe aktarma (docs/IMPORT_API_CONTRACT.md). B1: parti kaydı; B2: dosya okuma, şablon, eşleme;
-/// doğrulama, uygulama ve geri alma sonraki dilimlerde. Kiracı yalnızca <see cref="ITenantContext"/> ile çözülür.
+/// B3: doğrulama (kuru çalıştırma), önizleme, satırlar, hata raporu; uygulama ve geri alma sonraki dilimlerde. Kiracı yalnızca <see cref="ITenantContext"/> ile çözülür.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -173,6 +177,96 @@ public sealed class ImportsController : ControllerBase
 
         var result = await _mediator.Send(new GetImportBatchByIdQuery(id), ct);
         return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Kuru çalıştırma: satırları doğrular, mükerrer/çip/bağlantı kurallarını işletir ve sonuçları yazar; müşteri/hasta/aşı
+    /// kaydı oluşturmaz. Senkrondur: 200 + güncel parti (<c>Validated</c> | <c>ValidationFailed</c>).
+    /// </summary>
+    [HttpPost("batches/{id:guid}/validate")]
+    [Authorize(Policy = PermissionCatalog.Imports.Manage)]
+    [ProducesResponseType(typeof(ImportBatchDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ValidateBatch([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ValidateImportBatchCommand(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Kuru çalıştırma önizlemesi: sayaçlar, eşlenemeyen değerler, hatırlatma etkisi, engeller.</summary>
+    [HttpGet("batches/{id:guid}/preview")]
+    [Authorize(Policy = PermissionCatalog.Imports.Read)]
+    [ProducesResponseType(typeof(ImportPreviewDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> GetPreview([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetImportBatchPreviewQuery(id), ct);
+        if (result.IsSuccess)
+            Response.Headers.CacheControl = "no-store";
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Satır sonuçları (süzgeç: <c>table</c>, <c>status</c>, <c>code</c>; sayfalı). Kişisel veri içerir, önbelleğe alınmaz.
+    /// </summary>
+    [HttpGet("batches/{id:guid}/rows")]
+    [Authorize(Policy = PermissionCatalog.Imports.Read)]
+    [ProducesResponseType(typeof(PagedResult<ImportRowDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
+    public async Task<IActionResult> GetRows(
+        [FromRoute] Guid id,
+        [FromQuery] string? table = null,
+        [FromQuery] string? status = null,
+        [FromQuery] string? code = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = GetImportBatchRowsQuery.DefaultPageSize,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetImportBatchRowsQuery(id, table, status, code, page, pageSize), ct);
+        if (result.IsSuccess)
+            Response.Headers.CacheControl = "no-store";
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Hata raporu dosyası (<c>format=xlsx|csv</c>, varsayılan xlsx): hatalı satırların orijinal değerleri + hata kodu ve
+    /// açıklama. Formül enjeksiyonuna karşı hücre değerleri güvenli yazılır; indirme audit'e yazılır.
+    /// </summary>
+    [HttpGet("batches/{id:guid}/errors")]
+    [Authorize(Policy = PermissionCatalog.Imports.Read)]
+    [Produces("application/octet-stream")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
+    public async Task<IActionResult> GetErrors([FromRoute] Guid id, [FromQuery] string? format, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetImportBatchErrorsQuery(id, format), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        Response.Headers.CacheControl = "no-store";
+        var file = result.Value!;
+        return File(file.Content, file.ContentType, file.FileName);
     }
 
     /// <summary>Taslak partiyi siler (<c>Discarded</c>); ürün verisine dokunmaz. Uygulanmış/çalışan partide 409.</summary>

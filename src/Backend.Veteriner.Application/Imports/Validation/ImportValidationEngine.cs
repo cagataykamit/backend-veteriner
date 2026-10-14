@@ -2,7 +2,6 @@ using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
-using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Imports.Validation;
 

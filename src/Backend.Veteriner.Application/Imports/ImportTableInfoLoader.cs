@@ -22,7 +22,7 @@ public sealed class ImportTableInfoLoader
         var headers = new Dictionary<ImportTable, IReadOnlyList<string>>();
         if (batch.PayloadPurgedAtUtc is null)
         {
-            foreach (var table in ImportCanonicalNames.Tables.Where(t => RowCountOf(batch, t) > 0))
+            foreach (var table in PresentTables(batch))
             {
                 var first = await _rows.FirstOrDefaultAsync(new ImportFirstRowSpec(batch.Id, table), ct);
                 headers[table] = HeadersOf(first?.SourceJson);
@@ -80,7 +80,11 @@ public sealed class ImportTableInfoLoader
             : [];
     }
 
-    private static int RowCountOf(ImportBatch batch, ImportTable table) => table switch
+    /// <summary>Partide satırı olan tablolar (kanonik sırayla).</summary>
+    public static IReadOnlyList<ImportTable> PresentTables(ImportBatch batch)
+        => ImportCanonicalNames.Tables.Where(t => RowCountOf(batch, t) > 0).ToList();
+
+    public static int RowCountOf(ImportBatch batch, ImportTable table) => table switch
     {
         ImportTable.Customers => batch.CustomerCounts.Total,
         ImportTable.Pets => batch.PetCounts.Total,

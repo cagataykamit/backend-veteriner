@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Imports.Contracts.Dtos;
+using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 
 namespace Backend.Veteriner.Application.Imports;
@@ -26,6 +27,9 @@ internal static class ImportBatchMappings
             new ImportBatchSummaryDto(b.CustomerCounts.ToDto(), b.PetCounts.ToDto(), b.VaccinationCounts.ToDto()),
             tables,
             warnings);
+
+    public static ImportIssueDto ToDto(this ImportIssue i)
+        => new(i.Severity.ToString(), i.Code, i.Field, i.Message, i.Value);
 
     private static ImportTableCountsDto ToDto(this ImportTableCounts c)
         => new(

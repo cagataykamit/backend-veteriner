@@ -86,6 +86,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Saklama süresi sonunda temizlenen satır verisi (ADR-019 K9).
+        if (normalized is "imports.payloadpurged")
+        {
+            return (StatusCodes.Status410Gone, "https://httpstatuses.io/410");
+        }
+
         if (normalized.Contains("duplicate"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");

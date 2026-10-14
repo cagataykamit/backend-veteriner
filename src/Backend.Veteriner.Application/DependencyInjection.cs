@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Imports;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Reading;
+using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Application.Pets.Timeline;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Sales;
@@ -47,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<ImportUploadReader>();
         services.AddScoped<ImportCatalogLoader>();
         services.AddScoped<ImportTableInfoLoader>();
+        services.AddScoped<ImportExistingDataLoader>();
 
         // Pet timeline: her kayıt türü kendi okuyucusuyla bağlanır (ödeme okuyucusu Aşama 3 sonrası eklenecek).
         services.AddScoped<IPetTimelineSource, VisitTimelineSource>();
