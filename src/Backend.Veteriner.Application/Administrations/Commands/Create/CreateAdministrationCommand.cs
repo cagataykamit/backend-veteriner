@@ -11,6 +11,8 @@ namespace Backend.Veteriner.Application.Administrations.Commands.Create;
 /// <see cref="AdministeredAtUtc"/>, <see cref="RequestId"/> (tekrar koruması). Stok düşümü aynı transaction'da yazılır.
 /// <see cref="BatchId"/> düşülecek partidir; verilmezse FEFO ile süresi geçmemiş ilk yeterli parti seçilir.
 ///
+/// <see cref="VaccinationId"/> yalnız aşı kaydı oluşturma akışı tarafından verilir (HTTP gövdesinde yoktur); uygulamayı o aşı kaydına bağlar.
+///
 /// <see cref="LateEntryReason"/> bağlı muayene kesinleşmişse zorunludur (sonradan ekleme), aksi hâlde yok sayılır.
 /// </summary>
 public sealed record CreateAdministrationCommand(
@@ -24,7 +26,8 @@ public sealed record CreateAdministrationCommand(
     string? Notes,
     string? LateEntryReason,
     Guid? RequestId,
-    Guid? BatchId = null)
+    Guid? BatchId = null,
+    Guid? VaccinationId = null)
     : IRequest<Result<AdministrationCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Administration.Create";

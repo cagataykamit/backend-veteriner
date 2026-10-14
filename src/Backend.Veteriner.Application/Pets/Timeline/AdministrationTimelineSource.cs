@@ -11,7 +11,7 @@ namespace Backend.Veteriner.Application.Pets.Timeline;
 /// <summary>
 /// Uygulama kaydı (ADR-013). Başlık ürün adı, özet "miktar birim"dir; ürün adı için satır eşlemesi asenkron olduğundan
 /// ortak kaynak tabanını kullanmaz, aynı sorgu/imleç kuralını (<see cref="PetTimelineSpec{T}"/>) doğrudan uygular.
-/// İptal edilenler varsayılan gizlidir.
+/// İptal edilenler varsayılan gizlidir. Aşı kaydına bağlı uygulama burada yoktur; olay <c>Vaccination</c> satırıdır (çift satır yok).
 /// </summary>
 internal sealed class AdministrationTimelineSource(
     IReadRepository<Administration> administrations,
@@ -23,8 +23,8 @@ internal sealed class AdministrationTimelineSource(
     {
         var spec = new PetTimelineSpec<Administration>(
             q.IncludeVoided
-                ? a => a.TenantId == q.TenantId && a.PetId == q.PetId
-                : a => a.TenantId == q.TenantId && a.PetId == q.PetId && a.VoidedAtUtc == null,
+                ? a => a.TenantId == q.TenantId && a.PetId == q.PetId && a.VaccinationId == null
+                : a => a.TenantId == q.TenantId && a.PetId == q.PetId && a.VaccinationId == null && a.VoidedAtUtc == null,
             builder => DashboardSpecificationClinicScope.ApplyToAdministration(builder, q.SingleClinicId, q.AccessibleClinicIds),
             a => a.AdministeredAtUtc,
             a => a.Id,

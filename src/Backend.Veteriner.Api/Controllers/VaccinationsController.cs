@@ -28,34 +28,63 @@ public sealed class VaccinationsController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ITenantContext _tenantContext;
+    private readonly IAuthorizationService _authorization;
 
-    public VaccinationsController(IMediator mediator, ITenantContext tenantContext)
+    public VaccinationsController(IMediator mediator, ITenantContext tenantContext, IAuthorizationService authorization)
     {
         _mediator = mediator;
         _tenantContext = tenantContext;
+        _authorization = authorization;
     }
 
+    /// <summary>
+    /// Aşı kaydı oluşturur. <c>productId</c> yoksa 201 + çıplak <c>id</c>. <c>productId</c> (ve opsiyonel <c>quantity</c>, <c>batchId</c>, <c>requestId</c>) verilirse
+    /// aynı işlemde stoktan düşen uygulama da yazılır (ayrıca <c>Administrations.Create</c> gerekir); yanıt <see cref="VaccinationCreateResultDto"/>, aynı <c>requestId</c> tekrarında 200.
+    /// </summary>
     [HttpPost]
     [Authorize(Policy = PermissionCatalog.Vaccinations.Create)]
     [Consumes("application/json")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(VaccinationCreateResultDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(VaccinationCreateResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateVaccinationCommand cmd, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
+        // Stok düşümü uygulama iznindedir: aşı iznine ek olarak aranır.
+        if (cmd.ProductId.HasValue
+            && !(await _authorization.AuthorizeAsync(User, PermissionCatalog.Administrations.Create)).Succeeded)
+        {
+            return Result.Failure(
+                "Vaccinations.AdministrationForbidden",
+                "Ürünle (stok düşümlü) aşı kaydı için uygulama kaydı yetkisi gerekir.").ToActionResult(this);
+        }
+
         var result = await _mediator.Send(cmd, ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
-        var id = result.Value;
+        var created = result.Value!;
+        if (cmd.ProductId is null)
+        {
+            return CreatedAtAction(
+                nameof(GetById),
+                new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id = created.Id },
+                created.Id);
+        }
+
+        if (!created.Created)
+            return Ok(created);
+
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
-            id);
+            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id = created.Id },
+            created);
     }
 
     [HttpPut("{id:guid}")]

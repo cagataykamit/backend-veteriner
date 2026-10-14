@@ -7,10 +7,12 @@ using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Application.StockMovements.Commands.Reverse;
 using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Vaccinations.Specs;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Vaccinations;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +22,7 @@ namespace Backend.Veteriner.Application.Administrations.Commands.Void;
 /// Uygulamayı iptal eder. Stoğa iade seçilirse stoğu mevcut <see cref="ReverseStockMovementCommand"/> ile aynı transaction'da geri verir
 /// (ters hareket kuralları tek yerde yaşar; pasif ürün de dahil) ve stok adımı başarısız olursa iptal geri alınır.
 /// Zarar/imha seçilirse stok hareketi yazılmaz; orijinal çıkış hareketi geçerli kalır.
+/// Uygulama bir aşı kaydına bağlıysa aşı kaydı da aynı transaction'da iptal edilir.
 /// </summary>
 public sealed class VoidAdministrationCommandHandler
     : IRequestHandler<VoidAdministrationCommand, Result<AdministrationDto>>
@@ -35,6 +38,7 @@ public sealed class VoidAdministrationCommandHandler
     private readonly IReadRepository<StockMovement> _stockMovements;
     private readonly IReadRepository<StockBatch> _batches;
     private readonly IRepository<Administration> _administrations;
+    private readonly IRepository<Vaccination> _vaccinations;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
 
@@ -48,6 +52,7 @@ public sealed class VoidAdministrationCommandHandler
         IReadRepository<StockMovement> stockMovements,
         IReadRepository<StockBatch> batches,
         IRepository<Administration> administrations,
+        IRepository<Vaccination> vaccinations,
         ISender sender,
         TimeProvider timeProvider)
     {
@@ -60,6 +65,7 @@ public sealed class VoidAdministrationCommandHandler
         _stockMovements = stockMovements;
         _batches = batches;
         _administrations = administrations;
+        _vaccinations = vaccinations;
         _sender = sender;
         _timeProvider = timeProvider;
     }
@@ -141,6 +147,7 @@ public sealed class VoidAdministrationCommandHandler
                 : Result<AdministrationDto>.Failure(reversal.Error);
         }
 
+        await CancelLinkedVaccinationAsync(administration, ct);
         return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
     }
 
@@ -157,7 +164,23 @@ public sealed class VoidAdministrationCommandHandler
             return Fail("Administrations.AlreadyVoided", "Uygulama zaten iptal edilmiş.");
         }
 
+        await CancelLinkedVaccinationAsync(administration, ct);
         return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
+    }
+
+    // Bağlı aşı kaydı uygulamanın parçasıdır: uygulama iptal edilince aşı kaydı da iptal olur (kesinleşmiş muayene kilidi uygulamaz, D3).
+    private async Task CancelLinkedVaccinationAsync(Administration administration, CancellationToken ct)
+    {
+        if (administration.VaccinationId is not { } vaccinationId)
+            return;
+
+        var vaccination = await _vaccinations.FirstOrDefaultAsync(
+            new VaccinationByIdSpec(administration.TenantId, vaccinationId), ct);
+        if (vaccination is null)
+            return;
+
+        vaccination.CancelForVoidedAdministration();
+        await _vaccinations.UpdateAsync(vaccination, ct);
     }
 
     private static Result<AdministrationDto> Fail(string code, string message)

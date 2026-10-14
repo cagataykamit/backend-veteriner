@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -8,6 +9,7 @@ using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Vaccinations.Specs;
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
@@ -27,6 +29,7 @@ public sealed class GetVaccinationsListQueryHandler
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Vaccination> _vaccinations;
+    private readonly IReadRepository<Administration> _administrations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
     private readonly IPetReadModelLookupReader _petLookupReader;
@@ -38,6 +41,7 @@ public sealed class GetVaccinationsListQueryHandler
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Vaccination> vaccinations,
+        IReadRepository<Administration> administrations,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
         IPetReadModelLookupReader petLookupReader,
@@ -48,6 +52,7 @@ public sealed class GetVaccinationsListQueryHandler
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _vaccinations = vaccinations;
+        _administrations = administrations;
         _pets = pets;
         _clients = clients;
         _petLookupReader = petLookupReader;
@@ -183,6 +188,14 @@ public sealed class GetVaccinationsListQueryHandler
             MarkStep("clientsLookup");
         var clientNameById = clients.ToDictionary(x => x.Id, x => x.FullName);
 
+        var administrationByVaccinationId = rows.Count == 0
+            ? []
+            : (await _administrations.ListAsync(
+                    new AdministrationsByVaccinationIdsSpec(tenantId, rows.Select(x => x.Id).ToArray()), ct))
+                .ToDictionary(a => a.VaccinationId!.Value, a => a.Id);
+        if (rows.Count > 0)
+            MarkStep("administrationsLookup");
+
         var items = rows
             .Select(v =>
             {
@@ -205,7 +218,8 @@ public sealed class GetVaccinationsListQueryHandler
                     v.VaccineName,
                     v.AppliedAtUtc,
                     v.DueAtUtc,
-                    v.Status);
+                    v.Status,
+                    administrationByVaccinationId.TryGetValue(v.Id, out var administrationId) ? administrationId : null);
             })
             .ToList();
 

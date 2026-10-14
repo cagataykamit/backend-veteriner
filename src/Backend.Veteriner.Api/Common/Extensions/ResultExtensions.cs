@@ -95,7 +95,8 @@ public static class ResultExtensions
         if (normalized.Contains("exceedsoutstanding") || normalized.Contains("updateblockedbyallocation")
             || normalized.Contains("voidblockedbyallocation") || normalized.Contains("correctionbelowallocated")
             || normalized.Contains("alreadyvoided") || normalized.Contains("requestidvoided")
-            || normalized.Contains("alreadyreversed") || normalized.Contains("alreadycancelled"))
+            || normalized.Contains("alreadyreversed") || normalized.Contains("alreadycancelled")
+            || normalized.Contains("linkedtoadministration"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }

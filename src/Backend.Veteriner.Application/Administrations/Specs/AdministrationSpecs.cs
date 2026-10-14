@@ -77,3 +77,23 @@ public sealed class AdministrationsFilteredPagedSpec : AdministrationsFilteredSp
             .Take(pageSize);
     }
 }
+
+/// <summary>Aşı kaydına bağlı uygulama (aşı başına en çok bir tane).</summary>
+public sealed class AdministrationByVaccinationIdSpec : Specification<Administration>
+{
+    public AdministrationByVaccinationIdSpec(Guid tenantId, Guid vaccinationId)
+    {
+        Query.AsNoTracking();
+        Query.Where(a => a.TenantId == tenantId && a.VaccinationId == vaccinationId);
+    }
+}
+
+/// <summary>Verilen aşı kayıtlarına bağlı uygulamalar (liste/detay zenginleştirmesi).</summary>
+public sealed class AdministrationsByVaccinationIdsSpec : Specification<Administration>
+{
+    public AdministrationsByVaccinationIdsSpec(Guid tenantId, IReadOnlyCollection<Guid> vaccinationIds)
+    {
+        Query.AsNoTracking();
+        Query.Where(a => a.TenantId == tenantId && a.VaccinationId != null && vaccinationIds.Contains(a.VaccinationId.Value));
+    }
+}

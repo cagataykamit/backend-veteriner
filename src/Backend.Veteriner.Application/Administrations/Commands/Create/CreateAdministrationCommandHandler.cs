@@ -203,7 +203,8 @@ public sealed class CreateAdministrationCommandHandler
             request.LateEntryReason,
             userId,
             nowUtc,
-            request.RequestId);
+            request.RequestId,
+            request.VaccinationId);
         if (!created.IsSuccess)
             return Result<AdministrationCreateResultDto>.Failure(created.Error);
 

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -7,6 +8,7 @@ using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Vaccinations.Specs;
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
@@ -30,6 +32,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
     private readonly IReadRepository<VaccineDefinition> _vaccineDefinitions;
     private readonly IReadRepository<Vaccination> _vaccinationsRead;
     private readonly IRepository<Vaccination> _vaccinationsWrite;
+    private readonly IReadRepository<Administration> _administrations;
 
     public UpdateVaccinationCommandHandler(
         ITenantContext tenantContext,
@@ -41,7 +44,8 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
         IReadRepository<Examination> examinations,
         IReadRepository<VaccineDefinition> vaccineDefinitions,
         IReadRepository<Vaccination> vaccinationsRead,
-        IRepository<Vaccination> vaccinationsWrite)
+        IRepository<Vaccination> vaccinationsWrite,
+        IReadRepository<Administration> administrations)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -53,6 +57,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
         _vaccineDefinitions = vaccineDefinitions;
         _vaccinationsRead = vaccinationsRead;
         _vaccinationsWrite = vaccinationsWrite;
+        _administrations = administrations;
     }
 
     public async Task<Result> Handle(UpdateVaccinationCommand request, CancellationToken ct)
@@ -172,6 +177,15 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
             _examinations, tenantId, [request.ExaminationId, v.ExaminationId], ct);
         if (!locked.IsSuccess)
             return locked;
+
+        if (await _administrations.AnyAsync(new AdministrationByVaccinationIdSpec(tenantId, v.Id), ct)
+            && (v.PetId != request.PetId || v.ClinicId != effectiveClinicId || v.ExaminationId != request.ExaminationId
+                || v.VaccineDefinitionId != definition.Id || v.Status != request.Status || v.AppliedAtUtc != appliedUtc))
+        {
+            return Result.Failure(
+                "Vaccinations.LinkedToAdministration",
+                "Uygulamaya (stok düşümü) bağlı aşı kaydında yalnız notlar ve sonraki doz tarihi değişebilir; iptal için uygulama iptal edilmelidir.");
+        }
 
         var domain = v.UpdateDetails(
             request.PetId,

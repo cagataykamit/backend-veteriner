@@ -1,11 +1,16 @@
+using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Products.Specs;
+using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Vaccinations.Specs;
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
 using MediatR;
@@ -21,6 +26,9 @@ public sealed class GetVaccinationByIdQueryHandler
     private readonly IUserOperationClaimRepository _userOperationClaims;
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Vaccination> _vaccinations;
+    private readonly IReadRepository<Administration> _administrations;
+    private readonly IReadRepository<Product> _products;
+    private readonly IReadRepository<StockBatch> _batches;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
 
@@ -31,6 +39,9 @@ public sealed class GetVaccinationByIdQueryHandler
         IUserOperationClaimRepository userOperationClaims,
         IUserClinicRepository userClinics,
         IReadRepository<Vaccination> vaccinations,
+        IReadRepository<Administration> administrations,
+        IReadRepository<Product> products,
+        IReadRepository<StockBatch> batches,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients)
     {
@@ -40,6 +51,9 @@ public sealed class GetVaccinationByIdQueryHandler
         _userOperationClaims = userOperationClaims;
         _userClinics = userClinics;
         _vaccinations = vaccinations;
+        _administrations = administrations;
+        _products = products;
+        _batches = batches;
         _pets = pets;
         _clients = clients;
     }
@@ -89,6 +103,27 @@ public sealed class GetVaccinationByIdQueryHandler
             clientName = clients.FirstOrDefault()?.FullName ?? string.Empty;
         }
 
+        var administration = await _administrations.FirstOrDefaultAsync(
+            new AdministrationByVaccinationIdSpec(tenantId, v.Id), ct);
+        VaccinationAdministrationDto? administrationDto = null;
+        if (administration is not null)
+        {
+            var product = await _products.FirstOrDefaultAsync(
+                new ProductByIdSpec(tenantId, administration.ProductId), ct);
+            var batch = administration.BatchId is { } batchId
+                ? await _batches.FirstOrDefaultAsync(new StockBatchByIdSpec(tenantId, batchId), ct)
+                : null;
+            administrationDto = new VaccinationAdministrationDto(
+                administration.Id,
+                administration.ProductId,
+                product?.Name ?? string.Empty,
+                administration.Quantity,
+                product?.Unit ?? string.Empty,
+                administration.BatchId,
+                batch?.LotNumber,
+                batch?.ExpiryDate);
+        }
+
         var dto = new VaccinationDetailDto(
             v.Id,
             v.TenantId,
@@ -105,7 +140,8 @@ public sealed class GetVaccinationByIdQueryHandler
             v.Status,
             v.Notes,
             v.CreatedAtUtc,
-            v.UpdatedAtUtc);
+            v.UpdatedAtUtc,
+            administrationDto);
         return Result<VaccinationDetailDto>.Success(dto);
     }
 }

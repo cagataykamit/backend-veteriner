@@ -14,4 +14,5 @@ public sealed record VaccinationListItemDto(
     string VaccineName,
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,
-    VaccinationStatus Status);
+    VaccinationStatus Status,
+    Guid? AdministrationId = null);
