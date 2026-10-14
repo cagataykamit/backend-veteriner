@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9_READINESS.md` Dilim 7. Tasarım gerekçesi, akış, riskler ve kullanıcı kararları: `ASAMA9_IMPORT_DESIGN.md`. Tüm uçlar `api/v1` altında, JSON (dosya yükleme ve indirme hariç), standart `ProblemDetails` + `extensions.code` hata zarfı, sayfalama mevcut liste uçlarındaki biçimde.
 
-> **Durum:** Kararlar kesinleşti: ADR-019 (ürün deposu, K1–K12 önerilen seçeneklerle kabul). `[K#]` işaretleri o karara bağlıdır. **Uygulanan dilimler: B1 (temel)** — parti kaydı, durum makinesi, izinler, migration `AddDataImportBatches`; **B2 (okuma ve eşleme)** — XLSX/CSV okuyucu, dosya yükleme, sütun/değer eşleme, şablon (yeni migration yok); **B3 (doğrulama / kuru çalıştırma)** — satır kuralları, mükerrer ve çip denetimi, hatırlatma etkisi, preview/rows/errors uçları (yeni migration yok); **B4 (uygulama)** — commit, arka plan işi (kira/devralma, geri basınç), progress, hatırlatma dışlaması ve serbest bırakma (yeni migration yok). B5 uçları aşağıda **taslak**tır; dilim başında kesinleşir (bölüm 0).
+> **Durum:** Kararlar kesinleşti: ADR-019 (ürün deposu, K1–K12 önerilen seçeneklerle kabul). `[K#]` işaretleri o karara bağlıdır. **Uygulanan dilimler: B1 (temel)** — parti kaydı, durum makinesi, izinler, migration `AddDataImportBatches`; **B2 (okuma ve eşleme)** — XLSX/CSV okuyucu, dosya yükleme, sütun/değer eşleme, şablon (yeni migration yok); **B3 (doğrulama / kuru çalıştırma)** — satır kuralları, mükerrer ve çip denetimi, hatırlatma etkisi, preview/rows/errors uçları (yeni migration yok); **B4 (uygulama)** — commit, arka plan işi (kira/devralma, geri basınç), progress, hatırlatma dışlaması ve serbest bırakma (yeni migration yok); **B5 (geri alma ve temizlik)** — rollback-preview, rollback (arka plan, sahip bazlı), silme olayları (`client.deleted.v1`, `pet.deleted.v1`) ve projeksiyon desteği, 30 gün satır verisi temizliği, 7 gün `Expired` işi (yeni migration yok).
 
 ## 0) Dilim durumu ve frontend için değişenler
 
@@ -12,7 +12,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | B2 | `POST /imports/batches` dosya alanları (`file`, `customersFile`…), `GET /imports/template`, `PUT .../mapping`, yanıtta `tables[]` | **Uygulandı** |
 | B3 | `POST .../validate`, `GET .../preview`, `GET .../rows`, `GET .../errors` | **Uygulandı** |
 | B4 | `POST .../commit`, `GET .../progress`, `POST .../release-reminders`, hatırlatma dışlaması, arka plan işi | **Uygulandı** |
-| B5 | `GET .../rollback-preview`, `POST .../rollback`, 30 gün temizlik, `Expired` işi | Taslak |
+| B5 | `GET .../rollback-preview`, `POST .../rollback`, silme olayları + projeksiyon, 30 gün temizlik, `Expired` işi | **Uygulandı** |
 
 **Frontend için değişenler (B1):**
 - Yeni izinler `Imports.Read`, `Imports.Manage`, `Imports.Commit` yalnız yönetici düzeyine (Admin, Owner, ClinicAdmin) bağlanır. Seed çalışıp kullanıcı çıkış-giriş yapana kadar bu uçlar `403` döner; menü öğesi izinle gizlenmelidir.
@@ -48,6 +48,15 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - `POST .../release-reminders` kullanılabilir (bölüm 7.10); yanıt gövdesi `{ batch, reminderImpact, alreadyReleased, note }`.
 - Yeni hata kodları: `Imports.CommitBlocked` (409), `Imports.AccessDenied` (403; commit için ek `Clients/Pets/Vaccinations.Create` izni yok). Satır düzeyi yeni kodlar: `Imports.OwnerUnitFailed`, `Imports.MatchedAtCommit`, `Imports.ApplyFailed` (bölüm 6.5).
 - B4'te yeni migration **yoktur** (B1 alanları yeterli: kira, sayaçlar, satır sonucu, `Vaccinations.ImportBatchId`, `RemindersReleasedAtUtc`).
+
+**Frontend için değişenler (B5):**
+- `GET .../rollback-preview` kullanılabilir (bölüm 7.11). İzin taslaktaki `Imports.Read` yerine **`Imports.Commit`**dir (yıkıcı işlemin ön adımı; kayıt kimlikleri döner). Yanıt şekli taslaktan farklıdır: `blocked` artık sayılardır, engelli kayıt listesi `blockedItems` (en çok 200; `blockedItemsTruncated`), ayrıca `canRollback`, `canDeleteUnblockedOnly`, `rolledBack`, `warnings` eklendi.
+- `POST .../rollback` kullanılabilir (bölüm 7.12). Gövdeye **`requestId` (zorunlu)** eklendi; `reason` zorunlu (≤ 500). `blockedPolicy` değerleri `Fail` (varsayılan) | **`DeleteUnblockedOnly`** (taslaktaki `KeepBlocked` adı değişti). Yeni iş `202` + parti (`RollingBack`), aynı `requestId` ile tekrar `200` + parti. Engel varsa ve politika `Fail` ise `409 Imports.RollbackBlocked` (+ `extensions.blocked`, `extensions.blockedItems`).
+- İlerleme yine `GET .../progress` ile yoklanır: `RollingBack` iken `phase = "RollingBack"`, `processed`/`total` geri alma satırlarıdır (bölüm 7.14); yanıta `rolledBackAtUtc` eklendi.
+- Son durumlar: `RolledBack` (partinin oluşturduğu kayıtların hepsi silindi), `PartiallyRolledBack` (bağı olanlar kaldı), `RollbackFailed` (yeniden denenebilir; `Fail` politikasında iş başlarken engel çıktıysa da bu durum). Parti özetindeki `created` sayaçları tarihçe olarak kalır; silinen/kalan sayıları `rollback-preview.rolledBack` ve satırların `RolledBack`/`Kept` uygulama durumu verir.
+- Geri alma onay ekranı: `warnings` içinde `Imports.PetEditsNotTracked` (hayvan düzenlemeleri izlenemez, silinen hayvandaki düzenleme kaybolur; tasarım §9.3) ve `Imports.RemindersAlreadyReleased` (gönderilmiş hatırlatma e-postaları geri alınamaz) gösterilmelidir.
+- `Expired` (7 gün hareketsiz taslak) partide hazırlık satırları **hemen** silinir (`Discarded` gibi; `payloadPurgedAtUtc` dolar). Uygulanmış/geri alınmış partilerde satır verisi son durum değişikliğinden 30 gün sonra temizlenir; temizlenen partide `rows`/`errors` `410 Imports.PayloadPurged` döner (davranış B3'ten beri aynı, artık işçi çalışıyor).
+- B5'te yeni migration **yoktur**: geri alma isteği (`requestId`, politika) parti seçeneklerinde (`OptionsJson`) saklanır.
 
 ## 1) Kapsam ve sınırlar
 
@@ -86,7 +95,7 @@ Parti durumları (`status`): `Uploaded` → `Mapped` → `Validating` → `Valid
 | Geri alma bitti | `RollingBack` | `RolledBack` \| `PartiallyRolledBack` \| `RollbackFailed` |
 | Hatırlatmaları serbest bırak | `Committed`, `PartiallyRolledBack`; yalnız bir kez | durum değişmez, `remindersReleasedAtUtc` dolar |
 | Taslağı sil | `Uploaded`, `Mapped`, `Validated`, `ValidationFailed` | `Discarded` |
-| Süre doldu | taslak durumları + son hareketten ≥ 7 gün | `Expired` |
+| Süre doldu | taslak durumları + son hareketten ≥ 7 gün | `Expired` (hazırlık satırları aynı işlemde silinir; B5 bakım işi) |
 
 Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (açık taslak sınırı için sayılır). Aktif iş = `Validating`, `Committing`, `RollingBack`. Son durumlar: `Committed` (geri alınabilir), `RolledBack`, `Discarded`, `Expired`. Kiracı başına en fazla **5 açık taslak** (`409 Imports.TooManyOpenDrafts`; uygulama düzeyi sınır, eşzamanlı iki istekte 6. oluşabilir).
 
@@ -464,18 +473,40 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 ```
 `note` yalnız kiracı aşı hatırlatması kapalıysa doludur (taslaktaki `extensions.note` yerine gövdede; başarı yanıtında `ProblemDetails` yoktur). İşlem **geri alınamaz**; arayüz onay metninde bunu ve sayıyı göstermelidir. Serbest bırakma e-postayı hemen göndermez: hatırlatma işçisinin sonraki turunda (varsayılan 5 dk) pencere kuralıyla değerlendirilir. Audit: `ImportBatch.ReleaseReminders` (payload: parti kimliği, `confirmEmailCount`).
 
-### 7.11 `GET /imports/batches/{id}/rollback-preview`
-`Imports.Read`; durum `Committed|PartiallyRolledBack`. Silinecek / silinemeyecek kayıt sayıları ve nedenleri (bölüm 9):
+### 7.11 `GET /imports/batches/{id}/rollback-preview` (B5, uygulandı)
+`Imports.Commit` (taslakta `Imports.Read`idi; yıkıcı işlemin ön adımıdır ve kayıt kimlikleri döner). Durum: uygulama başlamış parti (`Committed`, `CommitFailed`, `RollingBack`, `RolledBack`, `PartiallyRolledBack`, `RollbackFailed`); diğerlerinde `409 Imports.InvalidState`. Görünürlük bölüm 7.5 (başka kiracı/erişilemeyen klinik `404`). Hiçbir şey yazmaz; sabit sayıda sorgu (satır sayısına bağlı değil). `Cache-Control: no-store`.
 
 ```json
-{ "deletable": { "vaccinations": 3100, "pets": 1900, "clients": 1200 },
-  "blocked": [ { "entity": "client", "id": "guid", "reason": "HasVisits" } ],
+{ "status": "Committed",
+  "canRollback": false, "canDeleteUnblockedOnly": true,
+  "deletable": { "clients": 1199, "pets": 1898, "vaccinations": 3100 },
+  "blocked":   { "clients": 1, "pets": 2, "vaccinations": 0 },
+  "blockedItems": [ { "entity": "Pet", "id": "guid", "table": "pets", "rowNumber": 12, "reasons": ["HasVisits"] } ],
+  "blockedItemsTruncated": false,
   "kept": { "matchedClients": 150, "matchedPets": 80 },
-  "remindersAlreadyReleased": false }
+  "rolledBack": { "clients": 0, "pets": 0, "vaccinations": 0 },
+  "remindersAlreadyReleased": false,
+  "warnings": [ "Imports.PetEditsNotTracked" ] }
 ```
+- Hesap yalnız uygulama sonucu `Created` (veya önceki kısmi geri almada `Kept`) satırların hedef kayıtları üzerindendir; kural ve neden kodları bölüm 9 (kodda tek yer: `ImportRollbackPlanner`; geri alma işi aynı kuralı birim işleminde yeniden çalıştırır).
+- `deletable` / `blocked`: tablo başına kayıt sayısı. `blockedItems`: engelli kayıtlar (`entity` = `Client|Pet|Vaccination`, kaydı oluşturan satırın `table`/`rowNumber`'ı, `reasons` neden kodları); en çok 200 öğe, fazlası varsa `blockedItemsTruncated = true`. Kişisel veri (ad, telefon) dönmez; satır ayrıntısı `rows` ucundan okunur.
+- `kept`: mevcut kayıtla eşleşen (`Matched`) satırlar; bunlar **hiçbir zaman** silinmez.
+- `rolledBack`: daha önce geri alınmış (`RolledBack`) satır sayıları.
+- `canRollback`: durum geri alınabilir (`Committed|CommitFailed|PartiallyRolledBack|RollbackFailed`) ve `blocked` toplamı 0 (varsayılan `Fail` politikası). `canDeleteUnblockedOnly`: durum geri alınabilir, `blocked` > 0 ve `deletable` > 0.
+- `warnings`: `Imports.PetEditsNotTracked` (silinecek hayvan varsa: `Pet`'te düzenleme zamanı tutulmadığından sonradan yapılan düzenleme tespit edilemez ve hayvanla birlikte silinir; tasarım §9.3), `Imports.RemindersAlreadyReleased` (hatırlatmalar serbest bırakılmış: gönderilmiş e-postalar geri alınamaz). Arayüz onay metninde gösterir.
 
-### 7.12 `POST /imports/batches/{id}/rollback`
-`Imports.Commit`. Gövde: `{ "reason": "string (zorunlu, ≤ 500)", "blockedPolicy": "Fail" }`. `blockedPolicy` `[K7]`: `Fail` (öneri; engellenen kayıt varsa `409 Imports.RollbackBlocked` + liste, hiçbir şey silinmez) | `KeepBlocked` (silinebilenler silinir, engelliler kalır → `PartiallyRolledBack`). `202 Accepted`; `RollingBack` → `RolledBack|PartiallyRolledBack|RollbackFailed`. Yalnız o partinin oluşturduğu kayıtlar silinir. Tekrar çağrı: zaten `RollingBack/RolledBack` ise `200` aynı özet.
+### 7.12 `POST /imports/batches/{id}/rollback` (B5, uygulandı)
+`Imports.Commit` + parti tablolarına göre `Clients.Create` / `Pets.Create` / `Vaccinations.Create` (commit ile aynı kural, tek yer `ImportWritePermissions`; eksikse `403 Imports.AccessDenied`). Gövde:
+
+```json
+{ "requestId": "guid", "reason": "Yanlış dosya yüklendi", "blockedPolicy": "Fail" }
+```
+- `requestId` zorunlu (istek anahtarı). `reason` zorunlu, kırpılmış 1–500 karakter; audit'e yazılır (kişisel veri yazmayın). `blockedPolicy` `[K7]`: `Fail` (varsayılan) | `DeleteUnblockedOnly`. Geçersiz gövde `400 Validation.FluentValidation`.
+- Sıra: kiracı → görünürlük (`404 Imports.BatchNotFound`) → **tekrar**: partinin son geri alma isteği bu `requestId` ise ve durum `RollingBack|RolledBack|PartiallyRolledBack|RollbackFailed` ise `200` + parti (iş yeniden başlamaz; aynı `requestId` farklı `blockedPolicy` ile gelirse `409 Imports.RequestIdConflict`) → durum `Committed|CommitFailed|PartiallyRolledBack|RollbackFailed` değilse `409 Imports.InvalidState` → ek izinler → pasif kiracı `403 Tenants.TenantInactive` → **plan** (bölüm 7.11 ile aynı hesap): `Fail` ve engelli kayıt varsa, ya da hiç silinebilir kayıt yokken engelli kayıt varsa `409 Imports.RollbackBlocked` + `extensions.blocked` (sayılar) + `extensions.blockedItems` (en çok 50) — hiçbir şey silinmez, durum değişmez → durum `RollingBack` kaydedilir (kiracıda başka aktif iş `409 Imports.AnotherJobRunning`; eşzamanlı ikinci istek aynı `requestId` ise `200` tekrar, aksi `409 Imports.ConcurrencyConflict`) → `202` + parti.
+- **Arka plan işi** (commit işiyle aynı desen: iş kuyruğu parti tablosu, kira 2 dk + devralma, parça başına geri basınç; `Imports:Commit` ayarları geri alma işine de uygulanır): iş başında plan yeniden hesaplanır; `Fail` politikasında bu arada engel doğduysa hiçbir şey silinmez ve parti `RollbackFailed` olur (audit nedeni `Imports.RollbackBlocked`). Sonra **sahip birimleri** (bir müşteri + o müşterinin partide oluşturulan hastaları + bu hastaların ya da müşterinin mevcut hastalarının partide oluşturulan aşıları) sırayla, her biri **tek veritabanı işleminde** işlenir: bağımlılık denetimi silmeyle aynı işlemde yeniden yapılır (denetimle silme arasında açılan geliş/ücret yarışına karşı), sıra aşı → hasta → müşteri. `Fail` politikasında birimde iş sırasında engel doğarsa **birimin hiçbir kaydı silinmez** (satırlar `Kept`, neden `OwnerUnitBlocked`); `DeleteUnblockedOnly` politikasında birimin silinebilir kayıtları silinir, engelliler kalır. Satır sonucu (`RolledBack` / `Kept` + neden) ve kira yenilemesi silmeyle aynı işlemde yazılır; kirayı başka işçi devraldıysa birim geri alınır.
+- Son durum: tüm hedef satırlar `RolledBack` → `RolledBack`; en az bir `Kept` → `PartiallyRolledBack`; beklenmeyen hata → `RollbackFailed` (silinmiş birimler silinmiş kalır; yeniden denenebilir). `PartiallyRolledBack` ve `RollbackFailed` partide **yeni `requestId`** ile tekrar geri alma başlatılabilir (yalnız kalan `Created`/`Kept` satırlar değerlendirilir).
+- Silinen müşteri/hasta için `client.deleted.v1` / `pet.deleted.v1` outbox olayı silmeyle aynı işlemde yazılır (bölüm 9). Geri alma partinin içerik özetini serbest bırakır (`RolledBack`): aynı dosya yeniden yüklenebilir. `PartiallyRolledBack` serbest bırakmaz.
+- Audit: istek `ImportBatch.Rollback` (payload: `id`, `requestId`, `reason`, `blockedPolicy`); iş bitince `ImportBatch.RollbackCompleted` (aktör yok; payload yalnız durum, politika ve tablo başına silinen/kalan sayılar; başarısızlıkta `failureReason` kodu).
 
 ### 7.13 `DELETE /imports/batches/{id}`
 `Imports.Manage`; yalnız taslak durumları (`Uploaded|Mapped|Validated|ValidationFailed`). Hazırlık verisini siler (ürün verisine dokunmaz) → `Discarded`; `204`. `Committing/Committed` partide `409 Imports.InvalidState`.
@@ -483,12 +514,13 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 **Davranış (B1 + B2, uygulandı):** Parti kaydı silinmez, durumu `Discarded` olur (liste/geçmişte görünür, içerik özeti serbest kalır). B2'den itibaren partinin hazırlık satırları (`ImportBatchRows`) **aynı işlemde silinir** ve `payloadPurgedAtUtc` silme anıyla dolar. Zaten `Discarded` parti için tekrar çağrı `409 Imports.InvalidState`. Başka kiracı/erişilemeyen klinik → `404 Imports.BatchNotFound`.
 
 ### 7.14 `GET /imports/batches/{id}/progress` (B4, uygulandı)
-`Imports.Read`; her durumda çalışır (görünürlük bölüm 7.5). Hafif yoklama ucu (en çok iki sorgu), `Cache-Control: no-store`:
+`Imports.Read`; her durumda çalışır (görünürlük bölüm 7.5). Hafif yoklama ucu (en çok üç sorgu), `Cache-Control: no-store`:
 
 ```json
 { "id": "guid", "status": "Committing", "phase": "Committing", "processed": 4300, "total": 12000,
-  "updatedAtUtc": "...", "committedAtUtc": null, "leaseActive": true }
+  "updatedAtUtc": "...", "committedAtUtc": null, "rolledBackAtUtc": null, "leaseActive": true }
 ```
+**Geri alma (B5):** durum `RollingBack` iken `phase = "RollingBack"`, `total` = geri alma hedefi satırlar (uygulama durumu `Created|RolledBack|Kept`), `processed` = sonucu yazılmış olanlar (`RolledBack|Kept`; yeniden denemede önceki `Kept` satırlar baştan sayılır). `leaseActive` uygulama veya geri alma kirası için aynı anlamdadır. Geri alma bitince (`RolledBack|PartiallyRolledBack|RollbackFailed`) aynı sayım döner.
 `total` = partinin tüm satırları (üç tablo); `processed` = uygulama sonucu yazılmış (`ApplyStatus` ≠ `Pending`) satırlar — hatalı satırlar işin başında `Skipped` yazıldığından sayı başta sıçrayabilir. `phase` yalnız `Committing` iken `"Committing"`, aksi `null`. Uygulama bitmiş partide (`Committed|CommitFailed` ve sonrası) `processed` yazılmış satır sayısıdır (`Committed`'da `total`'e eşittir). `leaseActive`: bir işçi şu an partiyi tutuyor mu (kira süresi dolmamış); `Committing` + `leaseActive = false` "işçi bekleniyor / devralınacak" anlamındadır. Önerilen yoklama aralığı 2 sn; durum `Committing` dışına çıkınca yoklama bırakılır ve parti/önizleme yeniden okunur.
 
 ## 8) Hata kodları
@@ -515,7 +547,8 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 | 409 | `Imports.ReminderImpactChanged` | Onaylanan e-posta sayısı güncel değil (`extensions.emailsWithinReminderWindow` güncel sayı) |
 | 409 | `Imports.CommitBlocked` | Önizlemedeki `canCommit` kuralı tutmuyor (`extensions.blockers`; `willCreate` = 0 ise `Imports.NoImportableRows`) |
 | 403 | `Imports.AccessDenied` | Commit için ek `Clients.Create` / `Pets.Create` / `Vaccinations.Create` izni yok |
-| 409 | `Imports.RollbackBlocked` | `Fail` politikasında engelli kayıt var |
+| 409 | `Imports.RollbackBlocked` | `Fail` politikasında engelli kayıt var, ya da silinebilir kayıt yokken engelli kayıt var (`extensions.blocked` sayılar, `extensions.blockedItems` en çok 50 öğe; bölüm 7.12) |
+| 409 | `Imports.RequestIdConflict` | (geri alma) Aynı `requestId` farklı `blockedPolicy` ile |
 | 403/409 | `Tenants.TenantInactive` / abonelik yazma koruması | Mevcut kiracı kodları |
 | 500 | — | Beklenmeyen; parti `CommitFailed` olur, uygulanmış satırlar korunur ve geri alınabilir |
 
@@ -534,12 +567,28 @@ Bir kayıt **silinebilir** sayılır ancak ve ancak:
 3. Müşteri: partinin oluşturduğudur, **hiç güncellenmemiştir** (`UpdatedAtUtc` null), bağlı tüm hastaları da partinin oluşturduğu ve silinebilir olanlardır ve müşteriye bağlı ücret/ödeme/randevu/geliş yoktur.
 4. Ödeme, ücret ve muayene içermediği garantisi **bağımlılık denetimiyle** sağlanır (varsayım değil): bu tablolardan biri kayda bağlıysa kayıt silinmez.
 
-Silinmeyen kayıt `Kept` ve nedeni (`HasVisits`, `HasCharges`, `HasExaminations`, `ManuallyAddedVaccination`, `ClientModified`, `Matched`, …) satır sonucunda ve `rollback-preview` çıktısında görünür. Silinen müşteri/hasta için Query DB projeksiyon tarafında silme olayı üretilir (mevcut `*.created.v1` / `*.updated.v1` yanında yeni silme olayı tipi gerekir; bkz. tasarım belgesi bölüm 9.4). Geri alma audit'e yazılır (aktör, gerekçe, sayılar). `ReminderDispatchLog` kayıtları silinmez (gönderim tarihçesi).
+Silinmeyen kayıt `Kept` ve nedeni (kodlar aşağıdaki B5 tablosunda; taslaktaki `ManuallyAddedVaccination` → `HasOtherVaccinations`, `Matched` satırlar ise `Kept` olmaz, `Matched` kalır) satır sonucunda ve `rollback-preview` çıktısında görünür. Silinen müşteri/hasta için Query DB projeksiyon tarafında silme olayı üretilir (tasarım belgesi §9.4 seçenek (a); aşağıda). Geri alma audit'e yazılır (aktör, gerekçe, sayılar). `ReminderDispatchLog` kayıtları silinmez (gönderim tarihçesi).
+
+**B5 uygulaması (kesin kural; kodda tek yer `ImportRollbackPlanner`, bağımlılık okuması `IImportRollbackDependencyReader`):**
+
+| Kayıt | Silinir ancak ve ancak | Neden kodları (`Kept`) |
+|-------|------------------------|------------------------|
+| Aşı | Partinin oluşturduğu (`Created` satır) aşıdır, muayeneye bağlı değildir, uygulama kaydı (`Administration.VaccinationId`) yoktur ve sonradan düzenlenmemiştir (`UpdatedAtUtc` boş) | `LinkedToExamination`, `HasAdministration`, `VaccinationModified` |
+| Hasta | Partinin oluşturduğu hastadır; randevu, geliş, muayene, tedavi, reçete, lab sonucu, yatış, uygulama kaydı, ücret (iptal edilmiş dahil), ödeme (iptal edilmiş dahil), bakım talimatı, ücret önerisi yoktur; aşılarının tamamı bu partinin oluşturduğu **ve silinebilir** aşılardır | `HasAppointments`, `HasVisits`, `HasExaminations`, `HasTreatments`, `HasPrescriptions`, `HasLabResults`, `HasHospitalizations`, `HasAdministrations`, `HasCharges`, `HasPayments`, `HasCareInstructions`, `HasChargeSuggestions`, `HasOtherVaccinations` (elle ya da başka partiyle eklenmiş aşı), `HasKeptVaccinations` |
+| Müşteri | Partinin oluşturduğu müşteridir, hiç güncellenmemiştir (`UpdatedAtUtc` boş), ücret/ödeme (iptal edilmiş dahil)/satış yoktur ve tüm hastaları bu partinin oluşturduğu **ve silinebilir** hastalardır | `ClientModified`, `HasCharges`, `HasPayments`, `HasSales`, `HasOtherPets`, `HasKeptPets` |
+
+- Birim içi ek neden: `OwnerUnitBlocked` (yalnız `Fail` politikasında, iş sırasında birimde engel doğduğu için birimin silinebilir kaydı da bırakıldı).
+- Hedef kaydı zaten yoksa (önceki denemede silinmiş) satır `RolledBack` sayılır.
+- Aşının kendi bağı yoksa, hastası kalsa bile (`DeleteUnblockedOnly`) silinir; sonra hasta yalnız kendi bağları ve kalan aşıları üzerinden değerlendirilir.
+- `Matched`/`Skipped`/`Failed` satırlar geri almada değişmez (eşleşen mevcut kayıt asla silinmez); yalnız `Created` (ve önceki kısmi geri almadan `Kept`) satırlar `RolledBack` veya `Kept` olur. `Kept` nedeni satır sorunlarına `Imports.RollbackKept` (Info; `value` = virgülle ayrılmış neden kodları) olarak eklenir (satır verisi temizlenmemişse; yeniden denemede önceki neden değiştirilir).
+- **Silme yolu:** ürün kodunda müşteri/hasta/aşı silme komutu yoktur ve açılmaz; silme yalnız geri alma birim komutunda (`RollbackImportOwnerUnitCommand`) yapılır. Silinen müşteri için `client.deleted.v1` (`{ eventId, occurredAtUtc, clientId, tenantId }`), hasta için `pet.deleted.v1` (`{ eventId, occurredAtUtc, petId, tenantId }`) outbox olayı aynı işlemde yazılır; aşı için olay yoktur (aşı okuma modeli yok). Projeksiyon işleyicileri silme olayında okuma modeli satırını siler (olay okuma modelindeki son olaydan eskiyse yok sayılır; satır yoksa iş yapılmaz). Pilot ayarında hasta projeksiyonu kapalıdır (`PetProjection:Enabled = false`): `pet.deleted.v1` olayları `pet.created.v1` gibi kuyrukta bekler ve projeksiyon açıldığında sırayla işlenir; müşteri projeksiyonu açıktır.
+- **Bilinen sınır:** denetim ve silme aynı işlemdedir (okuma kararlı/`READ COMMITTED`); ilgili tablolarda veritabanı yabancı anahtarı olmadığından, denetimden hemen sonra ve işlem bitmeden başka istekle eklenen bağlı kayıt (milisaniyelik pencere) tespit edilemez. Pilot hacminde kabul edildi; kesin güvence için `SERIALIZABLE` veya kilit ipucu ayrı iştir.
 
 ## 10) Audit ve gizlilik
 
 - Audit (`AuditBehavior`, `IAuditableRequest`): parti oluşturma, eşleme değişikliği, doğrulama, uygulama, hatırlatma serbest bırakma, geri alma, taslak silme, hata raporu indirme. Payload'a **dosya içeriği ve satır verisi yazılmaz**; yalnız parti kimliği, sayılar, içerik özeti, durum.
 - Satır verisi (kişisel veri) yalnız `ImportBatchRows` tablosunda tutulur; `Committed/RolledBack/Discarded/Expired` sonrası **30 gün** içinde `SourceJson`/`NormalizedJson` temizlenir (`payloadPurgedAtUtc`); sayılar ve sonuç özeti kalır `[K9]`. Temizlenmiş partide `rows`/`errors` uçları `410 Imports.PayloadPurged` döner. **B3 (saklama zamanlaması hazır, temizlik işi B5):** `ImportBatch.PayloadPurgeDueAtUtc` (hesaplanan alan; sütun yok) `Committed`, `RolledBack`, `PartiallyRolledBack` ve `Expired` partide son durum değişikliğinden (`updatedAtUtc`) **30 gün** sonrasıdır, temizlenmişse veya başka durumdaysa null; `Discarded` parti taslak silinirken zaten temizlenir. `ImportBatch.PurgePayload` `payloadPurgedAtUtc`'yi doldurur, `ImportBatchRow.PurgePayload` kaynak/normalize/sorun alanlarını (kişisel veri) boşaltır; süresi gelen partileri seçen sorgu (`ImportBatchesDuePayloadPurgeSpec`) B5 işçisi içindir. Süre `Imports` yapılandırmasına bağlanmadı: sabit 30 gün (K9; KVKK danışmanı farklı süre derse tek sabit değişir).
+- **B5 (uygulandı) bakım işi** (`ImportMaintenanceHostedService`, `Imports:Maintenance`): her turda (varsayılan 60 dk; uygulama açılışından 1 dk sonra ilk tur) (1) **süresi dolan taslaklar**: `Uploaded|Mapped|Validated|ValidationFailed` ve son hareketten (`updatedAtUtc`, yoksa `createdAtUtc`) ≥ 7 gün → `Expired`; hazırlık satırları aynı işlemde **silinir** ve `payloadPurgedAtUtc` dolar (`Discarded` ile aynı; `Expired` partinin satırları hiçbir uçtan okunamadığı için 30 gün tutulmaz). `Validating` (iş sürüyor) süresi dolmaz. (2) **satır verisi temizliği**: saklanan son durumlar `Committed`, `RolledBack`, `PartiallyRolledBack` ve (B5 ile eklenen) `CommitFailed`, `RollbackFailed` — "işlem bitti" durumları; son durum değişikliğinden ≥ 30 gün geçmiş partilerin satırlarında `SourceJson`, `NormalizedJson`, `IssuesJson` boşaltılır (`ImportBatchRow.PurgePayload`, 500'lük parçalar), sonra `payloadPurgedAtUtc` yazılır (`ImportBatch.PurgePayload`). Satır kimliği, durumları ve hedef kayıt kimliği **kalır** (geri alma temizlenmiş partide de çalışır); sayaçlar ve özet kalır. `Expired` artık bu kümede değildir (süre dolarken temizlenir). Yarıda kesilen temizlik sonraki turda kaldığı yerden sürer (parti işaretlenmeden önce satırlar boşaltılır). Tur başına en çok `BatchSize` (varsayılan 20) parti / tür. Çok örnekli kurulumda iki örnek aynı partiyi işlerse rowversion ikinciyi reddeder; satır boşaltma tekrar zararsızdır. Audit: `ImportBatch.Expired` ve `ImportBatch.PayloadPurged` (aktör yok, hedef parti; payload yalnız satır sayısı). Günlüklere yalnız parti kimliği ve sayılar yazılır.
 - Günlüklere (Serilog) satır verisi, telefon, e-posta, ad yazılmaz; yalnız parti kimliği, tablo, satır numarası, kod.
 - Ham dosya sunucuda **saklanmaz** (dosya deposu kodu yok); yükleme sırasında bellekte okunur, satırlar normalize edilmiş biçimde saklanır.
 
@@ -553,5 +602,6 @@ Silinmeyen kayıt `Kept` ve nedeni (`HasVisits`, `HasCharges`, `HasExaminations`
 - B2 audit eylemleri: `ImportBatch.Create` (payload'a ek olarak `encoding`, `delimiter`; dosya içeriği ve satır verisi yok), `ImportBatch.Mapping` (hedef `ImportBatchId`; eşleme gövdesi yok). B2 migration gerektirmez: yeni alan yok, yalnız mevcut `ContentHash`, sayaç `Total` alanları ve `ImportBatchRows` kullanılır.
 - B3 audit eylemleri: `ImportBatch.Validate` (hedef `ImportBatchId`; payload yalnız parti kimliği), `ImportBatch.ErrorReport` (hata raporu indirme; hedef `ImportBatchId`, `format`). B3 migration gerektirmez: satır sonuçları mevcut `ImportBatchRows` sütunlarına (`NormalizedJson`, `ValidationStatus`, `IssuesJson`), sayaçlar mevcut parti sayaç sütunlarına, kira `LeaseOwner`/`LeaseUntilUtc` sütunlarına yazılır. Değişen mevcut kod: `ImportBatch` (kira, saklama zamanlaması), `ImportBatchRow` (doğrulama sonucu, temizleme), `VaccinationDueAtWindow` (`MaxFutureYears` sabiti ortak).
 - B4 audit eylemleri: `ImportBatch.Commit` (payload: `id`, `validationId`, `onErrors`), `ImportBatch.CommitCompleted` (arka plan; aktör ve rota yok, hedef `ImportBatchId`, payload yalnız durum + tablo başına `created/matched/skipped/failed`), `ImportBatch.ReleaseReminders` (payload: `id`, `confirmEmailCount`). Uygulama birim komutu ve içinden çağrılan müşteri/hasta/aşı komutları audit'lenmez (satır verisi = kişisel veri); günlüklere yalnız parti kimliği, birim sayısı, satır numarası ve kod yazılır. B4 migration gerektirmez. Değişen mevcut kod: `ReminderProcessorService` (aday sorgusu dışlaması), `TenantContext` (HTTP bağlamı yokken arka plan kiracı kapsamı; HTTP isteği varken davranış aynı), `Vaccination.CreateImported` (yeni fabrika), `ImportBatch` (commit kirası), `ImportBatchRow` (uygulama sonucu), önizleme (`reminderImpact` uygulama sonrası gerçek kayıtlardan). Yapılandırma `Imports:Commit`: `WorkerEnabled` (true), `PollIntervalSeconds` (2), `OwnersPerChunk` (50), `Backpressure:Enabled` (true), `Backpressure:HeadroomRatio` (0,6), `Backpressure:ProjectionPendingLimit` (200), `Backpressure:WaitSeconds` (2), `Backpressure:MaxWaitSeconds` (600).
+- B5 audit eylemleri: `ImportBatch.Rollback` (payload: `id`, `requestId`, `reason`, `blockedPolicy`), `ImportBatch.RollbackCompleted` (arka plan; payload durum, politika, tablo başına `deleted`/`kept`), `ImportBatch.Expired`, `ImportBatch.PayloadPurged` (bakım işi; payload satır sayısı). Geri alma birim komutu audit'lenmez. B5 migration gerektirmez: geri alma isteği (`requestId`, `blockedPolicy`) parti `OptionsJson` belgesinde (`rollback` alanı) saklanır; satır sonucu mevcut `ApplyStatus` (`RolledBack`/`Kept`) ve `IssuesJson` sütunlarına yazılır. Yeni outbox olay tipleri `client.deleted.v1`, `pet.deleted.v1` (mevcut `Type` sütununa sığar; tüketici filtreleri tip listelerinden türediği için kendiliğinden kapsanır). Değişen mevcut kod: `ImportBatch` (geri alma kirası, `Expire` satır temizliği, `PayloadRetained` kümesi), `ImportBatchRow` (geri alma sonucu), müşteri/hasta projeksiyon işleyicileri (silme), `ImportOptionsDocument` (`rollback`), `GET .../progress` (geri alma fazı). Yapılandırma: geri alma işi `Imports:Commit` ayarlarını kullanır (`WorkerEnabled`, `PollIntervalSeconds`, `OwnersPerChunk`, `Backpressure:*`); bakım işi `Imports:Maintenance`: `Enabled` (true), `IntervalMinutes` (60), `BatchSize` (20).
 - Ortak hata zarfı: `Error` değeri isteğe bağlı `Extensions` taşır; `ProblemDetails.extensions` alanına (örn. `batchId`) kopyalanır.
 - Mevcut müşteri/hasta/aşı uçlarının sözleşmesi **değişmez**.
