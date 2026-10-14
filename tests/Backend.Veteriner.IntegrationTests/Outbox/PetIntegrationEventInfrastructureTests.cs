@@ -127,5 +127,6 @@ public sealed class PetIntegrationEventInfrastructureTests
     {
         yield return [PetIntegrationEventTypes.Created, typeof(PetCreatedIntegrationEvent)];
         yield return [PetIntegrationEventTypes.Updated, typeof(PetUpdatedIntegrationEvent)];
+        yield return [PetIntegrationEventTypes.Deleted, typeof(PetDeletedIntegrationEvent)];
     }
 }

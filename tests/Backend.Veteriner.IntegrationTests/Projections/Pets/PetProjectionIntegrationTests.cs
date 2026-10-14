@@ -104,6 +104,47 @@ public sealed class PetProjectionIntegrationTests
     }
 
     [Fact]
+    public async Task DeletedEvent_Should_RemoveReadModelRow_And_Ignore_Stale_Or_Missing()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IPetProjectionProcessor>();
+
+        await PetProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await PetProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var tenantId = Guid.NewGuid();
+        var deletedPet = Guid.NewGuid();
+        var stalePet = Guid.NewGuid();
+        var createdAt = new DateTime(2026, 6, 20, 9, 0, 0, DateTimeKind.Utc);
+
+        foreach (var petId in new[] { deletedPet, stalePet })
+        {
+            await PetProjectionTestSupport.EnqueueIntegrationEventAsync(
+                commandDb,
+                PetIntegrationEventTypes.Created,
+                new PetCreatedIntegrationEvent(Guid.NewGuid(), createdAt, PetProjectionTestSupport.CreateSnapshot(petId, tenantId, Guid.NewGuid())));
+        }
+
+        // İçe aktarma geri alması: silme olayı; eski tarihli silme yeni satırı silmez; olmayan satır için iş yok.
+        await PetProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, PetIntegrationEventTypes.Deleted, new PetDeletedIntegrationEvent(Guid.NewGuid(), createdAt.AddHours(1), deletedPet, tenantId));
+        await PetProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, PetIntegrationEventTypes.Deleted, new PetDeletedIntegrationEvent(Guid.NewGuid(), createdAt.AddHours(-1), stalePet, tenantId));
+        var missing = await PetProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, PetIntegrationEventTypes.Deleted, new PetDeletedIntegrationEvent(Guid.NewGuid(), createdAt, Guid.NewGuid(), tenantId));
+
+        (await processor.ProcessBatchAsync(CancellationToken.None)).Should().Be(5);
+
+        (await queryDb.PetReadModels.AnyAsync(x => x.PetId == deletedPet)).Should().BeFalse();
+        (await queryDb.PetReadModels.AnyAsync(x => x.PetId == stalePet)).Should().BeTrue();
+        await commandDb.Entry(missing).ReloadAsync();
+        missing.ProcessedAtUtc.Should().NotBeNull();
+        missing.DeadLetterAtUtc.Should().BeNull();
+    }
+
+    [Fact]
     public async Task DuplicateEvent_Should_BeIdempotent()
     {
         await using var scope = _factory.Services.CreateAsyncScope();

@@ -134,5 +134,6 @@ public sealed class ClientIntegrationEventInfrastructureTests
     {
         yield return [ClientIntegrationEventTypes.Created, typeof(ClientCreatedIntegrationEvent)];
         yield return [ClientIntegrationEventTypes.Updated, typeof(ClientUpdatedIntegrationEvent)];
+        yield return [ClientIntegrationEventTypes.Deleted, typeof(ClientDeletedIntegrationEvent)];
     }
 }

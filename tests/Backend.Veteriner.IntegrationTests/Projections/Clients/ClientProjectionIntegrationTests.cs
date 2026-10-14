@@ -60,6 +60,47 @@ public sealed class ClientProjectionIntegrationTests
     }
 
     [Fact]
+    public async Task DeletedEvent_Should_RemoveReadModelRow_And_Ignore_Stale_Or_Missing()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
+
+        await ClientProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await ClientProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var tenantId = Guid.NewGuid();
+        var deletedClient = Guid.NewGuid();
+        var staleClient = Guid.NewGuid();
+        var createdAt = new DateTime(2026, 6, 19, 9, 0, 0, DateTimeKind.Utc);
+
+        foreach (var clientId in new[] { deletedClient, staleClient })
+        {
+            await ClientProjectionTestSupport.EnqueueIntegrationEventAsync(
+                commandDb,
+                ClientIntegrationEventTypes.Created,
+                new ClientCreatedIntegrationEvent(Guid.NewGuid(), createdAt, ClientProjectionTestSupport.CreateSnapshot(clientId, tenantId)));
+        }
+
+        // İçe aktarma geri alması: silme olayı; eski tarihli silme yeni satırı silmez; olmayan satır için iş yok.
+        await ClientProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, ClientIntegrationEventTypes.Deleted, new ClientDeletedIntegrationEvent(Guid.NewGuid(), createdAt.AddHours(1), deletedClient, tenantId));
+        await ClientProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, ClientIntegrationEventTypes.Deleted, new ClientDeletedIntegrationEvent(Guid.NewGuid(), createdAt.AddHours(-1), staleClient, tenantId));
+        var missing = await ClientProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, ClientIntegrationEventTypes.Deleted, new ClientDeletedIntegrationEvent(Guid.NewGuid(), createdAt, Guid.NewGuid(), tenantId));
+
+        (await processor.ProcessBatchAsync(CancellationToken.None)).Should().Be(5);
+
+        (await queryDb.ClientReadModels.AnyAsync(x => x.ClientId == deletedClient)).Should().BeFalse();
+        (await queryDb.ClientReadModels.AnyAsync(x => x.ClientId == staleClient)).Should().BeTrue();
+        await commandDb.Entry(missing).ReloadAsync();
+        missing.ProcessedAtUtc.Should().NotBeNull();
+        missing.DeadLetterAtUtc.Should().BeNull();
+    }
+
+    [Fact]
     public async Task UpdatedEvent_Should_UpdateExistingReadModelRow()
     {
         await using var scope = _factory.Services.CreateAsyncScope();
