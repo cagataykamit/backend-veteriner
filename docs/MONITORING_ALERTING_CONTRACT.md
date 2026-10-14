@@ -31,6 +31,8 @@ Mevcut tasarım: [`cqrs/cqrs-11c-monitoring-alerts.md`](cqrs/cqrs-11c-monitoring
 | `UnhealthyAfterSeconds` | 600 | En eski bekleyen mesajın yaşı ≥ bu ise Unhealthy |
 | `DeadLetterIsUnhealthy` | true | Dead-letter sayısı > 0 ise Unhealthy |
 
+**Bekleyen** yalnız generic `OutboxProcessor`'ın tükettiği mesajlardır (e-posta, domain event). Appointment/Client/Pet/Payment projeksiyon integration event'leri sayıma ve yaşa dahil değildir (kendi processor ve `*-projection` kontrolleri var); aksi halde kapalı projeksiyonların (pilotta Pet/Payment, K6) bekleyen olayları sürekli alarm üretirdi. **Dead-letter** sayımı tüm tipleri kapsar.
+
 Önem sırası: dead-letter (Unhealthy) → en eski yaş ≥ Unhealthy → en eski yaş ≥ Degraded → bekleyen sayısı eşiği → Healthy. `/health/ready` Degraded ve Unhealthy'yi 503 döndürür (mevcut davranış korunur). Geri bekleme (retry) yükünü hesaba katmak için varsayılan yaş eşikleri worker döngüsünden (5 sn) belirgin büyüktür.
 
 Projeksiyon gecikme eşikleri değişmedi: `AppointmentProjectionHealth`, `ClientProjectionHealth`, `PetProjectionHealth`, `PaymentProjectionHealth` (`DegradedAfterSeconds`/`UnhealthyAfterSeconds`).

@@ -6,7 +6,7 @@ using Backend.Veteriner.Infrastructure.Persistence.Entities;
 
 namespace Backend.Veteriner.Infrastructure.Outbox;
 
-internal static class OutboxMessageQueryFilters
+public static class OutboxMessageQueryFilters
 {
     private static readonly string[] AppointmentIntegrationEventTypeValues =
         AppointmentIntegrationEventTypes.All.ToArray();

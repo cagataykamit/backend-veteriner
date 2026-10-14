@@ -1,6 +1,7 @@
 using Backend.Veteriner.Api.Observability;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Outbox;
+using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -24,7 +25,10 @@ public sealed class OutboxHealthCheck : IHealthCheck
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken cancellationToken = default)
     {
-        var pendingQuery = _db.OutboxMessages.AsNoTracking()
+        // Projeksiyon integration event'lerini generic OutboxProcessor tüketmez; kendi processor ve health kontrolleri vardır.
+        // Kapalı projeksiyonların (örn. Pet/Payment) bekleyen olayları burada yaş alarmı üretmemeli.
+        var pendingQuery = OutboxMessageQueryFilters
+            .ExcludingProjectionIntegrationEvents(_db.OutboxMessages.AsNoTracking())
             .Where(x => x.ProcessedAtUtc == null && x.DeadLetterAtUtc == null);
 
         var pending = await pendingQuery.CountAsync(cancellationToken);
