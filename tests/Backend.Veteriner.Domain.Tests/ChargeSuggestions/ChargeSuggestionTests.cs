@@ -1,5 +1,6 @@
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.ChargeSuggestions;
+using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Products;
 using FluentAssertions;
 
@@ -54,6 +55,35 @@ public sealed class ChargeSuggestionTests
         var other = new Product(TenantId, "Başka", "Adet", 10m, "TRY");
 
         ChargeSuggestion.ForAdministration(administration, other, null).Error!.Code.Should().Be("ChargeSuggestions.Validation");
+    }
+
+    [Fact]
+    public void ForExaminationService_Should_Be_Its_Own_Source_With_Catalog_Price()
+    {
+        var exam = new Examination(TenantId, Guid.NewGuid(), Guid.NewGuid(), null, Now, "Kontrol", null, null, null, visitId: Guid.NewGuid());
+        var service = new Product(TenantId, "Pansuman", "Seans", 150m, "TRY", kind: ProductKind.Service);
+
+        var s = ChargeSuggestion.ForExaminationService(exam, service, 2m, Now).Value!;
+
+        s.SourceType.Should().Be(ChargeSuggestion.ExaminationServiceSource);
+        s.SourceId.Should().Be(s.Id);
+        (s.ClinicId, s.PetId, s.ExaminationId, s.VisitId).Should().Be((exam.ClinicId, exam.PetId, exam.Id, exam.VisitId));
+        (s.ProductId, s.Description, s.Quantity, s.Unit, s.SuggestedUnitPrice).Should().Be((service.Id, "Pansuman", 2m, "Seans", 150m));
+        s.Status.Should().Be(ChargeSuggestionStatus.Pending);
+        s.OccurredAtUtc.Should().Be(Now);
+    }
+
+    [Fact]
+    public void ForExaminationService_Should_Reject_Stock_Product_Foreign_Tenant_And_Bad_Quantity()
+    {
+        var exam = new Examination(TenantId, Guid.NewGuid(), Guid.NewGuid(), null, Now, "Kontrol", null, null, null);
+        var stockProduct = new Product(TenantId, "İlaç", "Adet", 10m, "TRY");
+        var foreignService = new Product(Guid.NewGuid(), "Pansuman", "Seans", 150m, "TRY", kind: ProductKind.Service);
+        var service = new Product(TenantId, "Pansuman", "Seans", 150m, "TRY", kind: ProductKind.Service);
+
+        ChargeSuggestion.ForExaminationService(exam, stockProduct, 1m, Now).Error!.Code.Should().Be("ChargeSuggestions.Validation");
+        ChargeSuggestion.ForExaminationService(exam, foreignService, 1m, Now).Error!.Code.Should().Be("ChargeSuggestions.Validation");
+        ChargeSuggestion.ForExaminationService(exam, service, 0m, Now).Error!.Code.Should().Be("ChargeSuggestions.Validation");
     }
 
     [Theory]

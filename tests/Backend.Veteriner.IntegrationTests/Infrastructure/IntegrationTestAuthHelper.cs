@@ -1417,6 +1417,12 @@ internal static class IntegrationTestAuthHelper
             _ when permissionCode == PermissionCatalog.Imports.Commit => EnsureIntegrationPermissionClaimAsync(db, "IntegrationImportCommitter", permissionCode, "Imports"),
             _ when permissionCode == PermissionCatalog.Clients.Create => EnsureIntegrationPermissionClaimAsync(db, "IntegrationClientCreator", permissionCode, "Clients"),
             _ when permissionCode == PermissionCatalog.Pets.Create => EnsureIntegrationPermissionClaimAsync(db, "IntegrationPetCreator", permissionCode, "Pets"),
+            _ when permissionCode == PermissionCatalog.Examinations.Update => EnsureIntegrationPermissionClaimAsync(db, "IntegrationExaminationUpdater", permissionCode, "Examinations"),
+            _ when permissionCode == PermissionCatalog.ExaminationTemplates.Read => EnsureIntegrationPermissionClaimAsync(db, "IntegrationExaminationTemplateReader", permissionCode, "ExaminationTemplates"),
+            _ when permissionCode == PermissionCatalog.ExaminationTemplates.Create => EnsureIntegrationPermissionClaimAsync(db, "IntegrationExaminationTemplateCreator", permissionCode, "ExaminationTemplates"),
+            _ when permissionCode == PermissionCatalog.ExaminationTemplates.Update => EnsureIntegrationPermissionClaimAsync(db, "IntegrationExaminationTemplateUpdater", permissionCode, "ExaminationTemplates"),
+            _ when permissionCode == PermissionCatalog.ExaminationTemplates.Deactivate => EnsureIntegrationPermissionClaimAsync(db, "IntegrationExaminationTemplateDeactivator", permissionCode, "ExaminationTemplates"),
+            _ when permissionCode == PermissionCatalog.ExaminationTemplates.Apply => EnsureIntegrationPermissionClaimAsync(db, "IntegrationExaminationTemplateApplier", permissionCode, "ExaminationTemplates"),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(permissionCode),
                 permissionCode,

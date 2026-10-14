@@ -1,12 +1,13 @@
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.ChargeSuggestions;
 
 /// <summary>
-/// "Ücret bekliyor" kalemi (ADR-018): hekimin ücretlendirilebilir işleminden (bugün: stoktan düşen uygulama) aynı transaction'da doğar,
+/// "Ücret bekliyor" kalemi (ADR-018): hekimin ücretlendirilebilir işleminden (stoktan düşen uygulama veya muayenede yapılan hizmet) aynı transaction'da doğar,
 /// ücret kaydı değildir. Resepsiyon ücrete çevirir veya gerekçeyle ücretsiz sayar; kaynak işlem iptal edilirse kalem düşer.
 /// Durum yalnız <see cref="ChargeSuggestionStatus.Pending"/>'den bir kez değişir ve geri dönmez (ücret iptali kalemi yeniden açmaz).
 /// Eşzamanlı kararları <see cref="RowVersion"/> ayırır: tek kazanan olur.
@@ -15,6 +16,12 @@ public sealed class ChargeSuggestion : AggregateRoot
 {
     /// <summary>Kaynak türü: stoktan düşen uygulama (aşı kaydıyla yazılanlar dahil).</summary>
     public const string AdministrationSource = "Administration";
+
+    /// <summary>
+    /// Kaynak türü: muayenede yapılan hizmet (stoksuz katalog kalemi; bugün yalnız muayene şablonu uygulamasından, ADR-020 S4).
+    /// Ayrı bir işlem kaydı yoktur; kalemin kendisi hizmet kaydıdır (<see cref="SourceId"/> = <see cref="Id"/>).
+    /// </summary>
+    public const string ExaminationServiceSource = "ExaminationService";
 
     public const int MaxSourceTypeLength = 50;
     public const int MaxUnitLength = 50;
@@ -93,6 +100,41 @@ public sealed class ChargeSuggestion : AggregateRoot
             CreatedAtUtc = administration.CreatedAtUtc,
             Status = ChargeSuggestionStatus.Pending,
         });
+    }
+
+    /// <summary>
+    /// Muayenede yapılan hizmetten kalem üretir (stok yok); fiyat ürün kataloğundan (kalem doğduğu andaki) alınır.
+    /// Bedelsiz hizmet için çağıran <see cref="IsChargeable"/> ile kalem üretmez (uygulamayla aynı kural).
+    /// </summary>
+    public static Result<ChargeSuggestion> ForExaminationService(
+        Examination examination, Product product, decimal quantity, DateTime nowUtc)
+    {
+        if (product.Kind != ProductKind.Service || examination.TenantId != product.TenantId)
+            return Result<ChargeSuggestion>.Failure("ChargeSuggestions.Validation", "Hizmet kalemi yalnız kiracının hizmet ürünüyle oluşur.");
+
+        if (quantity <= 0 || quantity > Charge.MaxQuantity || decimal.Round(quantity, Charge.QuantityDecimals) != quantity)
+            return Result<ChargeSuggestion>.Failure("ChargeSuggestions.Validation", "Hizmet miktarı geçersiz.");
+
+        var occurredAtUtc = NormalizeUtc(nowUtc);
+        var suggestion = new ChargeSuggestion
+        {
+            TenantId = examination.TenantId,
+            ClinicId = examination.ClinicId,
+            PetId = examination.PetId,
+            ExaminationId = examination.Id,
+            VisitId = examination.VisitId,
+            SourceType = ExaminationServiceSource,
+            ProductId = product.Id,
+            Description = Truncate(product.Name, Charge.MaxDescriptionLength),
+            Quantity = quantity,
+            Unit = Truncate(product.Unit, MaxUnitLength),
+            SuggestedUnitPrice = CatalogPrice(product),
+            OccurredAtUtc = occurredAtUtc,
+            CreatedAtUtc = occurredAtUtc,
+            Status = ChargeSuggestionStatus.Pending,
+        };
+        suggestion.SourceId = suggestion.Id;
+        return Result<ChargeSuggestion>.Success(suggestion);
     }
 
     /// <summary>Kalem hâlâ karar bekliyor mu; değilse son duruma göre tek hata kodu.</summary>

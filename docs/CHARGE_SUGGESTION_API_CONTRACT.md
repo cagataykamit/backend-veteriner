@@ -8,8 +8,8 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-018-ch
 
 ## 1) Kavramlar ve kurallar
 
-- **"Ücret bekliyor" kalemi kalıcı bir kayıttır (`ChargeSuggestion`), ücret değildir.** Hekimin ücretlendirilebilir işlemi kaydedildiği **aynı transaction'da** doğar. Bugün tek kaynak: **uygulama** (`sourceType = "Administration"`: stoktan düşen uygulama; aşı kaydıyla birlikte yazılan uygulama dahil).
-- **Kalem doğar:** ürünün katalog fiyatı `> 0` ise. Katalogda bedelsiz (fiyat 0) tanımlı ürün kalem doğurmaz (bilinçli ücretsiz). Hizmet (`Service`) uygulanamadığı için bugün kaynağı yoktur (bölüm 7).
+- **"Ücret bekliyor" kalemi kalıcı bir kayıttır (`ChargeSuggestion`), ücret değildir.** Hekimin ücretlendirilebilir işlemi kaydedildiği **aynı transaction'da** doğar. Kaynaklar: **uygulama** (`sourceType = "Administration"`: stoktan düşen uygulama; aşı kaydıyla birlikte yazılan uygulama dahil) ve **muayenede yapılan hizmet** (`sourceType = "ExaminationService"`, ADR-020 S4: bugün yalnız muayene şablonu uygulamasından; ayrı işlem kaydı yoktur, `sourceId` = kalemin kendi `id`'si; bkz. `EXAMINATION_TEMPLATE_API_CONTRACT.md`).
+- **Kalem doğar:** ürünün katalog fiyatı `> 0` ise. Katalogda bedelsiz (fiyat 0) tanımlı ürün kalem doğurmaz (bilinçli ücretsiz). Hizmet (`Service`) uygulama kaydı olamaz; hizmet kalemi yalnız şablon uygulamasıyla doğar (bölüm 7). `ExaminationService` kaleminin iptal edilecek kaynak işlemi yoktur: istenmiyorsa **ücretsiz say** ile kapatılır.
 - **Ön değerler (kalem doğduğu andaki):** açıklama = ürün adı, miktar = uygulama miktarı, birim = ürün birimi, `suggestedUnitPrice` = katalog fiyatı. Fiyat TRY değilse veya ücret kuralına uymuyorsa (> 2 ondalık, üst sınır) `null`: resepsiyon girer. Sonraki katalog fiyat değişikliği bekleyen kalemi **değiştirmez**.
 - **Durum makinesi:** `Pending` → `Converted` | `Waived` | `Cancelled`. Yalnız `Pending` listede görünür ve karar alır; diğerleri **son durumdur, geri dönmez**.
 - **Kaynak izi:** kiracıda `(sourceType, sourceId)` benzersizdir (bir işlemden en çok bir kalem); `chargeId` benzersizdir (bir ücret en çok bir kalemi kapatır). `Charge` değişmedi; bağ kalemdedir.
@@ -27,8 +27,8 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-018-ch
 | Alan | Tip | Not |
 |---|---|---|
 | `id` | guid | Kalem kimliği (çevirme/ücretsiz sayma uçları bununla) |
-| `sourceType` | string | `"Administration"` |
-| `sourceId` | guid | Uygulama kimliği |
+| `sourceType` | string | `"Administration"` \| `"ExaminationService"` |
+| `sourceId` | guid | Uygulama kimliği; `ExaminationService` için kalemin kendi `id`'si |
 | `clinicId` | guid | |
 | `clientId` | guid | Hayvanın **güncel** sahibi (ücretin müşterisi) |
 | `clientName` | string | |
@@ -103,7 +103,7 @@ Yeni izin **yok**; seed gerekmez.
 - `ProductKind` değerine **`Service`** (= 3) eklendi; mevcut `POST/PUT /products` aynı: `name`, `unit` (örn. `"Adet"`), `unitPrice`, `currency`, istekte `kind: 3` (sayı; diğer türlerle aynı biçim), yanıtta `kind: "Service"`. Hizmette `controlledClass` `None` olmalıdır (`Products.Validation`, 400).
 - Hizmet **stok takipli değildir**: uygulama, stok hareketi (giriş/çıkış/sayım), doğrudan satış ve reçete satırında kullanılamaz → `Products.NotStockTracked` (400). `ProductDto` değişmez (`kind` yeni değeri alır).
 - Tür değişimi: ürün `Service`'e veya `Service`'ten çevrilemez (`Products.KindChangeNotAllowed`, 400); yanlış kayıt pasif yapılır, yenisi açılır.
-- Pilot: kalem kaynağı yalnız uygulama olduğundan hizmet bugün **fiyat kataloğudur**; resepsiyon serbest ücret yazarken katalogdan (`GET /products`, `kind = Service` istemcide ayıklanır) ad ve fiyatı doldurur. Hekimin işlemde hizmet seçmesi (hizmet kaynaklı kalem) sonraki dilim. KDV, birim dönüşümü, paket yok. `GET /products` listesine `kind` süzgeci eklenmedi.
+- Hizmet **fiyat kataloğudur**; resepsiyon serbest ücret yazarken katalogdan (`GET /products`, `kind = Service` istemcide ayıklanır) ad ve fiyatı doldurur. Hekimin işlemde hizmet seçmesi muayene şablonu satırıyla yapılır (ADR-020 S4, `sourceType = "ExaminationService"`); şablon dışında tek hizmet seçme ucu yoktur. KDV, birim dönüşümü, paket yok. `GET /products` listesine `kind` süzgeci eklenmedi.
 
 ---
 

@@ -13,6 +13,8 @@ using Backend.Veteriner.Application.Examinations.Queries.GetAddenda;
 using Backend.Veteriner.Application.Examinations.Queries.GetById;
 using Backend.Veteriner.Application.Examinations.Queries.GetList;
 using Backend.Veteriner.Application.Examinations.Queries.GetRelatedSummary;
+using Backend.Veteriner.Application.ExaminationTemplates.Commands.Apply;
+using Backend.Veteriner.Application.ExaminationTemplates.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -144,6 +146,30 @@ public sealed class ExaminationsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new FinalizeExaminationCommand(id, body.RowVersion), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Muayene şablonunu uygular (ADR-020 S4): metinleri mevcut içeriği silmeden birleştirir, satırları uygulama kaydı (stok düşer)
+    /// veya hizmet kalemi olarak yazar; ücret önerisi ADR-018 akışıyla doğar. Tek transaction; kesinleşmiş muayeneye uygulanamaz.
+    /// Şablon izninin yanında muayene güncelleme ve uygulama kaydı oluşturma izni de gerekir.
+    /// </summary>
+    [HttpPost("{id:guid}/apply-template")]
+    [Authorize(Policy = PermissionCatalog.ExaminationTemplates.Apply)]
+    [Authorize(Policy = PermissionCatalog.Examinations.Update)]
+    [Authorize(Policy = PermissionCatalog.Administrations.Create)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ExaminationTemplateApplyResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ApplyTemplate([FromRoute] Guid id, [FromBody] ApplyExaminationTemplateBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ApplyExaminationTemplateCommand(id, body.TemplateId, body.RowVersion), ct);
         return result.ToActionResult(this);
     }
 

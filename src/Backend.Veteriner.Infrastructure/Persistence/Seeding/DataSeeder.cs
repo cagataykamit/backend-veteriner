@@ -34,6 +34,7 @@ public static class DataSeeder
 
         await VaccineDefinitionSeeder.SeedAsync(db, logger, ct);
         await ClinicalTermSeeder.SeedAsync(db, logger, ct);
+        await ExaminationTemplateSeeder.SeedAsync(db, logger, ct);
     }
 
     private static async Task SeedDefaultAdminAsync(

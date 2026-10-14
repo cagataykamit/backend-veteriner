@@ -76,6 +76,13 @@ public sealed class FinalizeExaminationBody
     public string? RowVersion { get; init; }
 }
 
+/// <summary>POST /examinations/{id}/apply-template gövdesi. <see cref="RowVersion"/>: muayenenin istemcide görülen sürümü (Base64); zorunlu.</summary>
+public sealed class ApplyExaminationTemplateBody
+{
+    public Guid TemplateId { get; init; }
+    public string? RowVersion { get; init; }
+}
+
 /// <summary>POST /examinations/{id}/addenda gövdesi. Gerekçe ve metin zorunludur.</summary>
 public sealed class AddExaminationAddendumBody
 {
