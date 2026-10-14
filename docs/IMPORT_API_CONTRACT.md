@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9_READINESS.md` Dilim 7. Tasarım gerekçesi, akış, riskler ve kullanıcı kararları: `ASAMA9_IMPORT_DESIGN.md`. Tüm uçlar `api/v1` altında, JSON (dosya yükleme ve indirme hariç), standart `ProblemDetails` + `extensions.code` hata zarfı, sayfalama mevcut liste uçlarındaki biçimde.
 
-> **Durum:** Kararlar kesinleşti: ADR-019 (ürün deposu, K1–K12 önerilen seçeneklerle kabul). `[K#]` işaretleri o karara bağlıdır. **Uygulanan dilimler: B1 (temel)** — parti kaydı, durum makinesi, izinler, migration `AddDataImportBatches`; **B2 (okuma ve eşleme)** — XLSX/CSV okuyucu, dosya yükleme, sütun/değer eşleme, şablon (yeni migration yok). B3–B5 uçları aşağıda **taslak**tır; dilim başında kesinleşir (bölüm 0).
+> **Durum:** Kararlar kesinleşti: ADR-019 (ürün deposu, K1–K12 önerilen seçeneklerle kabul). `[K#]` işaretleri o karara bağlıdır. **Uygulanan dilimler: B1 (temel)** — parti kaydı, durum makinesi, izinler, migration `AddDataImportBatches`; **B2 (okuma ve eşleme)** — XLSX/CSV okuyucu, dosya yükleme, sütun/değer eşleme, şablon (yeni migration yok); **B3 (doğrulama / kuru çalıştırma)** — satır kuralları, mükerrer ve çip denetimi, hatırlatma etkisi, preview/rows/errors uçları (yeni migration yok). B4–B5 uçları aşağıda **taslak**tır; dilim başında kesinleşir (bölüm 0).
 
 ## 0) Dilim durumu ve frontend için değişenler
 
@@ -10,7 +10,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 |-------|------------|-------|
 | B1 | `POST /imports/batches` (dosyasız iskelet), `GET /imports/batches`, `GET /imports/batches/{id}`, `DELETE /imports/batches/{id}`; izinler; durum makinesi; `Vaccination.ImportBatchId` | **Uygulandı** |
 | B2 | `POST /imports/batches` dosya alanları (`file`, `customersFile`…), `GET /imports/template`, `PUT .../mapping`, yanıtta `tables[]` | **Uygulandı** |
-| B3 | `POST .../validate`, `GET .../preview`, `GET .../rows`, `GET .../errors` | Taslak |
+| B3 | `POST .../validate`, `GET .../preview`, `GET .../rows`, `GET .../errors` | **Uygulandı** |
 | B4 | `POST .../commit`, `POST .../release-reminders`, `progress`, hatırlatma dışlaması | Taslak |
 | B5 | `GET .../rollback-preview`, `POST .../rollback`, 30 gün temizlik, `Expired` işi | Taslak |
 
@@ -29,6 +29,15 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - Tür/ırk/renk/aşı **değer eşleme çözücüsü** B2'de iç servis olarak vardır; kullanıcıya dönük "eşlenemeyen değerler" listesi B3 `preview` ile gelir. `PUT mapping` yalnız hedefin varlığını/aktifliğini doğrular.
 - Taslak silinince (`DELETE`) hazırlık satırları da silinir; parti `payloadPurgedAtUtc` ile görünür ve `tables[].columns` boş döner.
 - Aktarma kapsamı yalnız veri okumadır: bu dilimde müşteri/hasta/aşı kaydı **oluşmaz**; doğrulama (B3) ve uygulama (B4) sonraki dilimlerdir.
+
+**Frontend için değişenler (B3):**
+- `POST /imports/batches/{id}/validate` **senkron** çalışır ve `202` yerine `200` + güncel parti nesnesi döner (`status` = `Validated` | `ValidationFailed`); istek bitince sonuç hazırdır, yoklama gerekmez (bölüm 7.4). Bu yüzden `progress` alanı B3'te yoktur.
+- Doğrulama bitince `summary.<tablo>` `valid/warning/error/willCreate/willMatch/willSkip` alanları dolar. Değişmezler: `valid + warning + error = total`; `willCreate + willMatch + willSkip = valid + warning`.
+- `GET .../preview`, `GET .../rows` ve `GET .../errors` doğrulaması bitmiş partide çalışır (`ValidationFailed` dahil; dosya düzeyi nedenler `blockers` içindedir). Eşleme değişince parti `Mapped`'a düşer ve bu üç uç `409 Imports.InvalidState` döner (sonuç güncel değil).
+- Satır sorunları `{ severity: "Info|Warning|Error", code, field, message, value? }` biçimindedir; kural kodlarının tam listesi ve davranışı bölüm 6.4'te, hata kodları bölüm 8'dedir.
+- `reminderImpact` yalnız bilgidir: içe aktarılan aşılar varsayılan olarak hatırlatma dışıdır (bölüm 6.3); sayılar çağrı anındaki saate göre hesaplanır.
+- `GET .../errors` hata raporunu `xlsx`/`csv` dosya olarak indirir. Satır verisi temizlenmiş partide `rows`/`errors` `410 Imports.PayloadPurged` döner; `preview` yalnız sayıları verir.
+- B3 ürün tablolarına (müşteri/hasta/aşı) **hiçbir şey yazmaz**; uygulama (B4), geri alma ve temizlik işi (B5) sonraki dilimlerdir. B3'te yeni migration yoktur.
 
 ## 1) Kapsam ve sınırlar
 
@@ -59,7 +68,7 @@ Parti durumları (`status`): `Uploaded` → `Mapped` → `Validating` → `Valid
 |-------|-------------------|-------|
 | Oluştur | — | `Uploaded` |
 | Eşleme kaydet | `Uploaded`, `Mapped`, `Validated`, `ValidationFailed` | `Mapped` (önceki `validationId` geçersizleşir) |
-| Doğrulama başlat | `Mapped`, `Validated`, `ValidationFailed` | `Validating` |
+| Doğrulama başlat | `Mapped`, `Validated`, `ValidationFailed`; kirası dolmuş `Validating` (çökme sonrası devralma) | `Validating` |
 | Doğrulama bitti | `Validating` | `Validated` (yeni `validationId`) \| `ValidationFailed` |
 | Uygula | `Validated` + güncel `validationId` (aksi `Imports.ValidationStale`) | `Committing` |
 | Uygulama bitti | `Committing` | `Committed` \| `CommitFailed` |
@@ -71,7 +80,7 @@ Parti durumları (`status`): `Uploaded` → `Mapped` → `Validating` → `Valid
 
 Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (açık taslak sınırı için sayılır). Aktif iş = `Validating`, `Committing`, `RollingBack`. Son durumlar: `Committed` (geri alınabilir), `RolledBack`, `Discarded`, `Expired`. Kiracı başına en fazla **5 açık taslak** (`409 Imports.TooManyOpenDrafts`; uygulama düzeyi sınır, eşzamanlı iki istekte 6. oluşabilir).
 
-- Doğrulama ve uygulama **arka plan işidir** (`202 Accepted`); istemci `GET /imports/batches/{id}` ile durumu ve ilerlemeyi yoklar (önerilen aralık 2 sn).
+- Doğrulama B3'te **senkrondur** (`200`, bölüm 7.4); uygulama ve geri alma **arka plan işidir** (`202 Accepted`); istemci `GET /imports/batches/{id}` ile durumu ve ilerlemeyi yoklar (önerilen aralık 2 sn).
 - Aynı kiracıda aynı anda **tek** aktif iş (`Validating`, `Committing`, `RollingBack`) olabilir; ikincisi `409 Imports.AnotherJobRunning`.
 - Doğrulama tekrarlanabilir (eşleme değişince); her doğrulama yeni bir `validationId` üretir. `commit` yalnız en son `validationId` ile kabul edilir.
 
@@ -205,6 +214,60 @@ Doğrulama sonrası her satır: `Valid`, `Warning` (aktarılır, not düşülür
 - Hastanın bir sonraki aşı tarihi `DueAtUtc` olarak saklanır; bu, uygulama ekranlarındaki "sonraki aşı" gösterimlerini besler, hatırlatma serbest bırakılmasa da görünür.
 - Serbest bırakma sonrası gönderilmiş e-postalar geri alınamaz; geri alma onayında bu uyarı gösterilir.
 
+### 6.4 Doğrulama kuralları (B3, uygulandı)
+
+Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tanımlıdır (`ImportRules`); aşağıdaki liste onun belgesidir. Her satır sorunu `{ severity, code, field, message, value? }`: `field` kanonik alan adı, `value` yalnız kullanıcının düzeltmesi için gereken kaynak değer (geçersiz telefon/e-posta, eşlenmeyen tür/aşı/ırk/renk adı). Satır durumu: herhangi bir `Error` → `Error`; yoksa herhangi bir `Warning` → `Warning`; yoksa `Valid` (`Info` durumu değiştirmez). Satırın planlanan eylemi (`action`): `Create` | `Match` (mevcut kayıtla eşleşir) | `Skip`; hatalı satırın eylemi yoktur. İşlem sırası: müşteri → hasta → aşı; her tablo dosya sırasıyla (ilk görülen kazanır).
+
+| Kod | Önem | Kural |
+|-----|------|-------|
+| `Imports.RequiredMissing` | Error | Zorunlu alan boş (`AdSoyad`, `HayvanAdi`, `Tur`, `AsiAdi`, `UygulamaTarihi`). |
+| `Imports.NameTooShort` | Error | Müşteri adı < 2 karakter (kırpılmış, art arda boşluk teke inmiş). |
+| `Imports.FieldTooLong` | Error | Ad > 300 (müşteri) / 200 (hayvan), e-posta > 320 hariç (bkz. EmailInvalid), adres > 500, ırk serbest metni > 150, karne > 50, hasta notu > 2000 (Renk satırıyla birlikte), aşı notu > 4000. |
+| `Imports.PhoneInvalid` | Warning | Telefon cep standardına uymuyor (sabit hat, yabancı, eksik hane); telefon boş aktarılır `[K5]`, `value` özgün numara. Sahip telefonu (hasta/aşı tablosu) geçersizse sahip yalnız ad ile aranır (aşağıda). |
+| `Imports.EmailInvalid` | Warning | E-posta mevcut müşteri kuralıyla (FluentValidation `EmailAddress`, ≤ 320) geçersiz; boş aktarılır, `value` özgün. |
+| `Imports.DateInvalid` | Error | Tarih ayrıştırılamadı veya takvimde yok (`31.02.2024`). |
+| `Imports.DateFormatAmbiguous` | Error | Biçim belirsiz ve reddedilen sınıfta: iki haneli yıl, yalnız ay/yıl, ay adı (bölüm 4.4). |
+| `Imports.DateOutOfRange` | Error | Uygulama tarihi 1990-01-01'den eski. |
+| `Pets.BirthDateInFuture` | Error | Doğum tarihi bugünden (İstanbul takvim günü) sonra. |
+| `Imports.BirthDateImplausible` | Warning | Doğum tarihi 40 yıldan eski (aktarılır). |
+| `Vaccinations.AppliedAtMustNotBeFuture` | Error | Uygulama tarihi bugünden sonra. |
+| `Vaccinations.DueAtMustBeAfterAppliedAt` | Error | Sonraki aşı tarihi uygulama tarihinden sonra değil. |
+| `Vaccinations.DueTooFarInFuture` | Error | Sonraki aşı tarihi bugünden 5 yıl ötede (geçmiş sınırı yok). |
+| `Imports.AppliedBeforeBirth` | Warning | Uygulama tarihi hastanın doğum tarihinden önce (dosyadaki veya mevcut hasta). |
+| `Imports.MicrochipInvalid` | Error | Boşluk/`-`/`.` temizlendikten sonra rakam dışı karakter var veya > 50 hane. |
+| `Imports.MicrochipScientificNotation` | Error | Değer bilimsel gösterimde (`9,85121E+14`); hücreyi metin yapın. |
+| `Imports.MicrochipLength` | Warning | Çip 15 hane değil (eski çip olabilir). |
+| `Imports.MicrochipConflict` | Error | Aynı çip dosyada önceki başka hayvanda **veya** kiracıda başka bir hayvanda `[K10]`; mesaj çakışan satırı/kaydı belirtir. Aynı hayvanın tekrarı (hasta mükerrer kuralı) çakışma sayılmaz. |
+| `Imports.SpeciesUnmapped` / `Imports.VaccineUnmapped` | Error | Tür/aşı adı katalogda yok ve kullanıcı eşlememiş `[K6]`; `value` kaynak değer. Yeni tanım oluşmaz. |
+| `Imports.ValueSkipped` | Warning | Tür/aşı değeri kullanıcı tarafından bilinçli atlanmış (`targetId = null`); satır eylemi `Skip`. |
+| `Imports.ParentSkipped` | Warning | Bağlı üst satır (hasta) bilinçli atlandığı için satır da atlanır. |
+| `Imports.BreedFreeText` | Info | Irk katalogda yok / atlandı → serbest metin; `value` kaynak. |
+| `Imports.ColorFreeText` | Info | Renk katalogda yok / atlandı → `Notes`'a `Renk: <değer>` eklenir; `value` kaynak. |
+| `Pets.BreedSpeciesMismatch` | Error | Kullanıcının eşlediği ırk, satırın türüne ait değil. |
+| `VaccineDefinitions.InvalidSpecies` | Error | Kullanıcının eşlediği aşı tanımı hastanın türüyle uyumsuz. |
+| `Imports.GenderUnrecognized` | Warning | Cinsiyet tanınmadı; boş aktarılır. |
+| `Imports.NeuteredUnrecognized` | Warning | Kısır değeri tanınmadı; `false` aktarılır. |
+| `Imports.WeightInvalid` | Warning | Ağırlık sayı değil veya 0–9999,99 dışında; boş aktarılır. |
+| `Imports.DuplicateReference` | Error | `MusteriNo`/`HayvanNo` dosyada daha önce kullanılmış (kırpılmış, büyük/küçük harf duyarsız). |
+| `Imports.DuplicateInFile` | Warning | Satır, aynı dosyada önceki bir satırla aynı kayıt (müşteri: aynı ad+telefon veya ad+e-posta; hasta: aynı sahip+ad+tür); eylem `Skip`, bağlı satırlar ilk satıra bağlanır. |
+| `Imports.DuplicateClient` | Error | Mevcut müşteriyle eşleşti ve `options.onDuplicateClient = Error`. |
+| `Imports.MatchedExisting` | Info | Mevcut müşteri/hasta ile eşleşti (`Match`: eylem `Match`; `Skip` modu: eylem `Skip`). Mevcut alanlar güncellenmez `[K4]`. |
+| `Imports.SharedPhone` | Info | Aynı telefon başka adlı müşteride var (dosyada veya kiracıda); yeni müşteri oluşur. |
+| `Imports.PossibleDuplicate` | Warning | Telefon ve e-posta yok ve aynı (katlanmış) ad dosyada/kiracıda zaten var; yeni müşteri oluşur. |
+| `Imports.OwnerNotFound` | Error | Hasta satırının sahibi dosyada veya kiracıda bulunamadı / belirsiz. |
+| `Imports.OwnerRowInvalid` | Error | Sahip müşteri satırı hatalı olduğundan hasta aktarılamaz. |
+| `Imports.PetNotFound` | Error | Aşı satırının hastası dosyada veya kiracıda bulunamadı / belirsiz. |
+| `Imports.PetRowInvalid` | Error | Hasta satırı hatalı olduğundan aşı aktarılamaz. |
+| `Imports.DuplicateVaccination` | Info | Aynı hasta + aynı aşı tanımı + aynı uygulama günü dosyada önceden var veya kiracıda kayıtlı; eylem `Skip`. |
+
+Bağlantı çözümü: **Hasta→müşteri:** `MusteriNo` doluysa yalnız dosyadaki müşteri satırı aranır (bulunamazsa `OwnerNotFound`, `MusteriNo` kiracıdaki kayıtlara bağlanmaz). `MusteriNo` yoksa/eşlenmemişse `SahipAdSoyad + SahipTelefon`: telefon geçerliyse önce dosyadaki müşteri (ad+telefon), sonra kiracıdaki müşteri (ad+telefon); telefon boş/geçersizse (`PhoneInvalid` uyarısı) dosyadaki müşteri tablosunda **aynı katlanmış adlı tek** müşteri aranır (birden çok ya da yoksa `OwnerNotFound`; kiracı tarafında telefonsuz ad eşleşmesi yapılmaz). Müşteri satırı mevcut müşteriyle eşleştiyse (`Match`/`Skip` modu) hasta o kiracı müşterisine bağlanır. **Aşı→hasta:** `HayvanNo` doluysa dosyadaki hasta satırı; yoksa sahip (yukarıdaki kural) + `HayvanAdi` + `Tur` ile dosyadaki hasta, sonra sahibin kiracıdaki hastaları. Hasta mevcut hastayla eşleştiyse (aynı müşteri + küçük harf ad + tür) aşı o hastaya bağlanır.
+
+Katalog değerleri satır bağlamında `ImportValueResolver` ile çözülür (bölüm 5): tür → ırk (türün ırkları) → renk; aşı → hastanın türü. Sonuç `Empty` zorunlu alanda `RequiredMissing`; `Unmapped` tür/aşı `Error`, ırk/renk `Info` (serbest metin).
+
+Normalize değerler: telefon `905XXXXXXXXX`; e-posta küçük harf; tarih `yyyy-MM-dd`; cinsiyet `Male|Female`; mikroçip yalnız rakam; aşı tarihleri bölüm 4.4'teki gibi İstanbul 12:00 → UTC. Normalize satır `NormalizedJson` içinde saklanır (kişisel veri: bölüm 10). Planlanan eylem ve bağlı kayıt kimliği de buradadır; B4 eşleşmeleri uygulama anında yeniden çözer.
+
+Toplu sorgular (N+1 yok): doğrulama kiracının mevcut verisini sabit sayıda sorguyla okur — katalog (tür, ırk, renk, aşı tanımı), hatırlatma ayarı, dosyadaki tüm telefon/e-posta/ad kümeleriyle **tek** müşteri sorgusu, bulunan müşterilerin ve dosyadaki çiplerin hastaları için **tek** hasta sorgusu, bulunan hastaların uygulanmış aşıları için **tek** aşı sorgusu; satır sonuçları toplu yazılır. Sorgu sayısı satır sayısına bağlı değildir.
+
 ## 7) Uçlar
 
 Hata zarfı için bölüm 8. `{id}` = parti kimliği.
@@ -269,7 +332,12 @@ Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBac
 Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `Mapped`, önceki `validationId` silinir); diğer durumda `409 Imports.InvalidState`. Yanıt `200` + parti nesnesi (`tables[].columns[].mapped` kayıtlı eşlemeyi gösterir). Audit eylemi `ImportBatch.Mapping` (hedef `ImportBatchId`; payload'da sütun/değer eşleme gövdesi **yazılmaz**: kaynak değerler kişisel veri taşıyabilir).
 
 ### 7.4 `POST /imports/batches/{id}/validate`
-`Imports.Manage`; durum `Mapped|Validated|ValidationFailed`. **Veritabanına müşteri/hasta/aşı yazmaz** (yalnız parti ve satır sonuçları). `202 Accepted` + parti özeti (`status = Validating`). Bittiğinde `Validated` (satır hataları olsa da) veya `ValidationFailed` (dosya düzeyi sorun: zorunlu sütun yok, yapısal bozukluk, hiç geçerli satır yok). Aynı kiracıda başka aktif iş varsa `409 Imports.AnotherJobRunning`. Tekrar çağrılabilir; idempotent (aynı eşleme → aynı sonuç, yeni `validationId`).
+`Imports.Manage`; durum `Mapped|Validated|ValidationFailed`. **Veritabanına müşteri/hasta/aşı yazmaz** (yalnız parti ve satır sonuçları). Taslak sözleşme `202 Accepted` + arka plan idi; B3'te senkron `200` (aşağıda). Sonuçta `Validated` (satır hataları olsa da) veya `ValidationFailed` (dosya düzeyi sorun: zorunlu sütun yok, yapısal bozukluk, hiç geçerli satır yok). Aynı kiracıda başka aktif iş varsa `409 Imports.AnotherJobRunning`. Tekrar çağrılabilir; idempotent (aynı eşleme → aynı sonuç, yeni `validationId`).
+
+**B3 davranışı (uygulandı):** İş **kısa ve senkrondur**: istek `Validating` durumuna geçirip kaydeder (kiracıdaki tek-aktif-iş benzersiz indeksi ikinci eşzamanlı doğrulamayı/uygulamayı `409 Imports.AnotherJobRunning` ile reddeder), tüm satırları bellekte işler, satır sonuçlarını ve parti durumunu **tek veritabanı işleminde** yazar ve `200` + parti nesnesi döner (`202`/yoklama yok; sınırlar 25.000 satırı aşmadığından arka plan işi gereksiz bulundu — süre ölçümü ve gerekirse arka plana taşıma kararı T diliminde). Kira (`leaseOwner`, `leaseUntilUtc`, 5 dakika) bir çökme sonrası takılı kalan `Validating` partiyi korur: kira dolduktan sonra aynı parti yeniden doğrulanabilir (`Validating` kaynak durum olur); kira dolmadan `409 Imports.AnotherJobRunning`. Beklenmeyen hata partiyi `ValidationFailed` yapar ve yeniden fırlatılır (500). Durum kuralları: kaynak `Mapped|Validated|ValidationFailed` (süresi dolmuş kirayla `Validating`); aksi `409 Imports.InvalidState` (eşlemesiz `Uploaded` dahil).
+- **Dosya düzeyi başarısızlık** (`ValidationFailed`, satırlar işlenmez; nedenler `preview.blockers`): hasta tablosu yalnız `MusteriNo` ile bağlanıyorsa (sahip adı+telefon eşlenmemişse) müşteri tablosu partide yok veya orada `MusteriNo` eşlenmemiş (`Imports.OwnerLinkUnavailable`); aşı tablosu yalnız `HayvanNo` ile bağlanıyorsa hasta tablosu partide yok veya orada `HayvanNo` eşlenmemiş (`Imports.PetLinkUnavailable`); işlenen tüm satırlar hatalı (`valid + warning = 0` tüm tablolarda; `Imports.NoImportableRows`).
+- Eşleme çok geç bozulmuşsa (zorunlu alan kaybı; olağan akışta `PUT mapping` engeller) `400 Imports.MappingIncomplete`.
+- Önceki doğrulamanın satır sonuçları yeni sonuçlarla tamamen yer değiştirir; `validationId` her seferinde yenilenir.
 
 ### 7.5 `GET /imports/batches/{id}` ve `GET /imports/batches`
 `Imports.Read`. Ayrıntı:
@@ -307,26 +375,47 @@ Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `M
 - Görünürlük: yalnız çağıranın kiracısı. Klinik bağlı parti (`clinicId` dolu) yalnız o kliniğe erişebilen kullanıcıya görünür; erişemeyen için ayrıntı `404 Imports.BatchNotFound`, listede görünmez. Klinik bağsız parti kiracıdaki `Imports.Read` sahiplerine görünür (müşteri/hasta kiracı genelidir).
 
 ### 7.6 `GET /imports/batches/{id}/preview` (kuru çalıştırma sonucu)
-`Imports.Read`; durum `Validated`, `Committing`, `Committed`, … Yanıt:
+`Imports.Read`; doğrulaması bitmiş parti: `Validated`, `ValidationFailed`, `Committing`, `Committed`, `CommitFailed`, `RollingBack`, `RolledBack`, `PartiallyRolledBack`, `RollbackFailed`; diğer durumda (`Uploaded`, `Mapped`, `Validating`, `Discarded`, `Expired`) `409 Imports.InvalidState`. Yanıt (`Cache-Control: no-store`):
 
 ```json
 {
-  "validationId": "guid",
+  "validationId": "guid|null",
+  "status": "Validated",
   "summary": { "customers": {…}, "pets": {…}, "vaccinations": {…} },
-  "unmappedValues": [ { "kind": "species", "source": "Kopek", "rowCount": 41 } ],
-  "reminderImpact": { "vaccinationsWithFutureDueDate": 830, "clientsWithEmail": 410, "emailsWithinReminderWindow": 95 },
+  "unmappedValues": [ { "kind": "species", "source": "Kopek", "rowCount": 41, "blocking": true } ],
+  "reminderImpact": {
+    "vaccinationsWithDueDate": 900, "vaccinationsWithFutureDueDate": 830, "vaccinationsWithPastDueDate": 70,
+    "clientsWithEmail": 410, "emailsWithinReminderWindow": 95, "reminderWindowDays": 3,
+    "tenantRemindersEnabled": false, "excludedByDefault": true
+  },
   "issueCounts": [ { "code": "Imports.PhoneInvalid", "severity": "Warning", "rowCount": 37 } ],
   "canCommit": true,
-  "blockers": [ "Imports.VaccineUnmapped" ]
+  "blockers": [ "Imports.VaccineUnmapped" ],
+  "payloadPurged": false
 }
 ```
-`canCommit`: en az bir geçerli satır var, eşlenmemiş değer yok (veya `targetId: null` ile bilinçli atlanmış), parti `Validated` ve doğrulama güncel. `reminderImpact` yalnız bilgidir; hatırlatma varsayılan olarak kapalıdır (bölüm 6.3).
+- `unmappedValues`: eşlenemeyen benzersiz kaynak değerler (katlanmış anahtarla tekilleştirilir; `source` ilk görülen yazım), `kind` = `species|vaccine|breed|color`, `rowCount` değerin geçtiği satır sayısı. `blocking`: tür/aşı için `true` (satırlar hatalıdır; kullanıcı `valueMappings` ile eşler veya `targetId: null` ile atlar), ırk/renk için `false` (serbest metin/nota düşer, eşleme isteğe bağlı). Sıralama: `kind`, sonra `rowCount` azalan.
+- `reminderImpact` (yalnız bilgi; ADR-019 K3, bölüm 6.3): yalnız **`action = Create` ve hatasız** aşı satırları sayılır. `vaccinationsWithDueDate` sonraki aşı tarihi dolu olanlar; `vaccinationsWithFutureDueDate` / `vaccinationsWithPastDueDate` bunların çağrı anına göre gelecekte / geçmişte kalanı (geçmişte kalan hatırlatma **üretmez**); `clientsWithEmail` gelecek vadeli aşıların sahiplerinden e-postası olan benzersiz müşteri sayısı (dosyadaki veya eşleşen mevcut müşteri); `emailsWithinReminderWindow` vadesi `(şimdi, şimdi + reminderWindowDays]` içinde olan ve sahibinin e-postası bulunan aşı sayısı (hatırlatma serbest bırakılırsa mevcut işçi kuralının üreteceği e-posta üst sınırı; `BatchSize` turlarına bölünür); `reminderWindowDays` kiracı ayarı `VaccinationReminderDaysBefore` (ayar kaydı yoksa varsayılan 3); `tenantRemindersEnabled` kiracı aşı hatırlatması açık mı; `excludedByDefault` her zaman `true` (içe aktarılan aşılar varsayılan dışlanır). İleri tarihli e-postalar pencere ilerledikçe de oluşur; bu sayı yalnız bugünkü pencereyi gösterir.
+- `issueCounts`: sorun kodu + önem başına etkilenen satır sayısı (aynı satırda aynı kod bir kez), `rowCount` azalan.
+- `canCommit`: durum `Validated`, `validationId` dolu, `blockers` boş ve `willCreate` toplamı > 0.
+- `blockers`: dosya düzeyi nedenler (`Imports.OwnerLinkUnavailable`, `Imports.PetLinkUnavailable`, `Imports.NoImportableRows`) ve satırı olan **bloklayan** eşlenmemiş değer kodları (`Imports.SpeciesUnmapped`, `Imports.VaccineUnmapped`). Hatalı satırların varlığı tek başına engel değildir `[K2]` (`onErrors`, bölüm 7.9).
+- Satır verisi temizlenmişse (`payloadPurgedAtUtc` dolu) `summary` korunur; `unmappedValues`, `reminderImpact`, `issueCounts` boş/sıfır, `payloadPurged = true`, `canCommit = false`.
 
 ### 7.7 `GET /imports/batches/{id}/rows`
-`Imports.Read`. `?table=customers|pets|vaccinations&status=Valid|Warning|Error|Created|Matched|Skipped|Failed&code=&page=&pageSize=` (`pageSize` ≤ 200). Her öğe: `table`, `rowNumber`, `validation` (`status`), `apply` (`status`, `targetId?`), `issues[]`, `values` (normalize edilmiş özet alanlar). Kişisel veri içerdiğinden `Cache-Control: no-store`.
+`Imports.Read`; durum kuralı bölüm 7.6 ile aynı. Sorgu: `table=customers|pets|vaccinations` (verilmezse üç tablo: müşteri, hasta, aşı sırasıyla), `status=Valid|Warning|Error` (doğrulama durumu; uygulama sonrası `Created|Matched|Skipped|Failed|RolledBack|Kept` uygulama durumunu süzer), `code=<kural kodu>` (satırın sorunlarından birinin kodu), `page` (varsayılan 1), `pageSize` (varsayılan 50, 1–200). Sıralama: tablo, `rowNumber`. Yanıt `{ items, page, pageSize, totalItems, totalPages }`; öğe:
+
+```json
+{ "table": "pets", "rowNumber": 12,
+  "validation": { "status": "Warning", "action": "Create" },
+  "apply": { "status": "Pending", "targetId": null },
+  "issues": [ { "severity": "Warning", "code": "Imports.MicrochipLength", "field": "Mikrocip", "message": "…" } ],
+  "values": { "name": "Pamuk", "speciesId": "guid", "…": "…" },
+  "source": { "Hayvan Adı": "Pamuk", "Tür": "Kedi" } }
+```
+`values` normalize edilmiş alanlardır (bölüm 6.4; tablo başına küçük camelCase nesne), `source` özgün satırdır (başlık → metin). Geçersiz `table`/`status`/sayfa parametresi `400 Validation.FluentValidation`. Kişisel veri içerdiğinden `Cache-Control: no-store`; temizlenmiş partide `410 Imports.PayloadPurged`.
 
 ### 7.8 `GET /imports/batches/{id}/errors?format=xlsx|csv`
-`Imports.Read`. Hata raporu indirme: yalnız `Error` (ve `Failed`) satırlar; **orijinal kaynak sütunları + `SatirNo`, `Durum`, `HataKodu`, `Aciklama`** (Türkçe). Kullanıcı düzeltip aynı şablonla **yeni parti** olarak yükleyebilir; daha önce oluşan kayıtlar `Matched`/`DuplicateVaccination` olacağından çift kayıt oluşmaz. İndirme audit'e yazılır. Formül enjeksiyonu: `= + - @` ile başlayan hücre değerleri başına `'` eklenir. `Cache-Control: no-store`.
+`Imports.Read`; durum kuralı bölüm 7.6 ile aynı; `format` zorunlu değil, varsayılan `xlsx` (geçersizse `400`). Hata raporu indirme: yalnız doğrulama durumu `Error` (veya uygulama durumu `Failed`) satırlar; her tablo için bölüm 4.3'teki **kanonik başlıklar değil, özgün kaynak sütunlar** (dosyadaki başlık sırasıyla, özgün değerlerle) ve ek sütunlar `SatirNo`, `Durum`, `HataKodu`, `Aciklama` (Türkçe; satırın birden çok hatası `;` ile ayrılır, `HataKodu`/`Aciklama` aynı sırada). XLSX'te tablo başına bir sayfa (`Musteriler`, `Hayvanlar`, `Asilar`; yalnız hatalı satırı olanlar; hata yoksa tek `Hatasiz` sayfası), CSV'de tablolar farklı başlık taşıdığından tek dosya sabit sütunlarla yazılır (UTF-8 BOM'lu, `;` ayırıcılı): `Tablo`, `SatirNo`, `Durum`, `HataKodu`, `Aciklama`, `Kaynak` (özgün satır `başlık=değer` çiftleri, `|` ile ayrılmış); düzeltilip yeniden yüklenecek rapor için XLSX önerilir. Düzeltilen dosya aynı şablonla **yeni parti** olarak yüklenebilir; daha önce oluşan kayıtlar `Matched`/`DuplicateVaccination` olacağından çift kayıt oluşmaz. Formül enjeksiyonu: `= + - @` (ve sekme/CR) ile başlayan **tüm** hücre değerlerinin başına `'` eklenir (`ImportCellSafety.ForExport`). `Content-Disposition` dosya adı `vetinity-iceaktar-hatalar.xlsx|csv`; `Cache-Control: no-store`; temizlenmiş partide `410 Imports.PayloadPurged`. İndirme audit'e yazılır (`ImportBatch.ErrorReport`, hedef `ImportBatchId`; satır verisi yok).
 
 ### 7.9 `POST /imports/batches/{id}/commit`
 `Imports.Commit` + bölüm 2'deki ek izinler. Gövde:
@@ -372,7 +461,8 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 | 403 | — | İzin yok; klinik yazma erişimi yok (`Vaccinations.*` mevcut kodlar) |
 | 409 | `Imports.DuplicateFile` | Aynı içerik özeti aktif partide (`batchId` ile) |
 | 409 | `Imports.RequestIdConflict` | Aynı `requestId`, farklı içerik |
-| 409 | `Imports.AnotherJobRunning` | Kiracıda aktif iş |
+| 409 | `Imports.AnotherJobRunning` | Kiracıda aktif iş (veya süresi dolmamış doğrulama kirası) |
+| 410 | `Imports.PayloadPurged` | Satır verisi saklama süresi sonunda temizlendi (`rows`, `errors`) |
 | 409 | `Imports.InvalidState` | Durum bu işleme uygun değil |
 | 409 | `Imports.ConcurrencyConflict` | Parti aynı anda başka istekle değişti (rowversion); yeniden okuyup deneyin |
 | 409 | `Imports.TooManyOpenDrafts` | Kiracıda 5 açık taslak parti var |
@@ -384,7 +474,7 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 | 403/409 | `Tenants.TenantInactive` / abonelik yazma koruması | Mevcut kiracı kodları |
 | 500 | — | Beklenmeyen; parti `CommitFailed` olur, uygulanmış satırlar korunur ve geri alınabilir |
 
-Satır düzeyi kodlar (`rows` çıktısında, HTTP hatası değil): `Imports.RequiredMissing`, `Imports.NameTooShort`, `Imports.PhoneInvalid` (uyarı), `Imports.EmailInvalid` (uyarı), `Imports.DateInvalid`, `Imports.DateOutOfRange`, `Imports.DateFormatAmbiguous`, `Imports.OwnerNotFound`, `Imports.PetNotFound`, `Imports.SpeciesUnmapped`, `Imports.VaccineUnmapped`, `Imports.BreedFreeText` (bilgi), `Imports.MicrochipInvalid`, `Imports.MicrochipScientificNotation`, `Imports.MicrochipConflict`, `Imports.SharedPhone` (bilgi), `Imports.PossibleDuplicate` (uyarı), `Imports.DuplicateInFile`, `Imports.DuplicateVaccination`, `Imports.DuplicateReference`, `Imports.EncodingSuspect`, ayrıca mevcut oluşturma kurallarından gelen kodlar (`Pets.BreedSpeciesMismatch`, `Pets.BirthDateInFuture`, `Vaccinations.DueAtMustBeAfterAppliedAt` …) aynen taşınır.
+Satır düzeyi kodlar (`rows` çıktısında, HTTP hatası değil): **tam liste, önem derecesi ve kural bölüm 6.4'tedir** (kodda tek yerde: `ImportRules`). Dosya düzeyi (HTTP hatası değil, `preview.blockers`): `Imports.OwnerLinkUnavailable`, `Imports.PetLinkUnavailable`, `Imports.NoImportableRows`. Yükleme uyarısı: `Imports.EncodingSuspect`, `Imports.TableEmpty` (bölüm 7.2). Mevcut oluşturma kurallarından gelen kodlar (`Pets.BreedSpeciesMismatch`, `Pets.BirthDateInFuture`, `Vaccinations.AppliedAtMustNotBeFuture`, `Vaccinations.DueAtMustBeAfterAppliedAt`, `Vaccinations.DueTooFarInFuture`, `VaccineDefinitions.InvalidSpecies`) aynen taşınır.
 
 ## 9) Geri alma ve güvenli silme kuralı
 
@@ -402,7 +492,7 @@ Silinmeyen kayıt `Kept` ve nedeni (`HasVisits`, `HasCharges`, `HasExaminations`
 ## 10) Audit ve gizlilik
 
 - Audit (`AuditBehavior`, `IAuditableRequest`): parti oluşturma, eşleme değişikliği, doğrulama, uygulama, hatırlatma serbest bırakma, geri alma, taslak silme, hata raporu indirme. Payload'a **dosya içeriği ve satır verisi yazılmaz**; yalnız parti kimliği, sayılar, içerik özeti, durum.
-- Satır verisi (kişisel veri) yalnız `ImportBatchRows` tablosunda tutulur; `Committed/RolledBack/Discarded/Expired` sonrası **30 gün** içinde `SourceJson`/`NormalizedJson` temizlenir (`payloadPurgedAtUtc`); sayılar ve sonuç özeti kalır `[K9]`. Temizlenmiş partide `rows`/`errors` uçları `410 Imports.PayloadPurged` döner.
+- Satır verisi (kişisel veri) yalnız `ImportBatchRows` tablosunda tutulur; `Committed/RolledBack/Discarded/Expired` sonrası **30 gün** içinde `SourceJson`/`NormalizedJson` temizlenir (`payloadPurgedAtUtc`); sayılar ve sonuç özeti kalır `[K9]`. Temizlenmiş partide `rows`/`errors` uçları `410 Imports.PayloadPurged` döner. **B3 (saklama zamanlaması hazır, temizlik işi B5):** `ImportBatch.PayloadPurgeDueAtUtc` (hesaplanan alan; sütun yok) `Committed`, `RolledBack`, `PartiallyRolledBack` ve `Expired` partide son durum değişikliğinden (`updatedAtUtc`) **30 gün** sonrasıdır, temizlenmişse veya başka durumdaysa null; `Discarded` parti taslak silinirken zaten temizlenir. `ImportBatch.PurgePayload` `payloadPurgedAtUtc`'yi doldurur, `ImportBatchRow.PurgePayload` kaynak/normalize/sorun alanlarını (kişisel veri) boşaltır; süresi gelen partileri seçen sorgu (`ImportBatchesDuePayloadPurgeSpec`) B5 işçisi içindir. Süre `Imports` yapılandırmasına bağlanmadı: sabit 30 gün (K9; KVKK danışmanı farklı süre derse tek sabit değişir).
 - Günlüklere (Serilog) satır verisi, telefon, e-posta, ad yazılmaz; yalnız parti kimliği, tablo, satır numarası, kod.
 - Ham dosya sunucuda **saklanmaz** (dosya deposu kodu yok); yükleme sırasında bellekte okunur, satırlar normalize edilmiş biçimde saklanır.
 
@@ -414,5 +504,6 @@ Silinmeyen kayıt `Kept` ve nedeni (`HasVisits`, `HasCharges`, `HasExaminations`
 - **B1 migration `AddDataImportBatches`** (tek migration): `ImportBatches`, `ImportBatchRows` tabloları, `Vaccinations.ImportBatchId` (nullable, filtreli indeks, `ImportBatches`'e `NO ACTION` FK). Veritabanı güvenceleri: `UX_ImportBatches_TenantId_RequestId`; `UX_ImportBatches_TenantId_ContentHash` (özet dolu ve durum `CommitFailed/RolledBack/Discarded/Expired` dışı); `UX_ImportBatches_TenantId_ActiveJob` (durum `Validating/Committing/RollingBack` iken kiracı başına tek satır); `UX_ImportBatchRows_BatchId_Table_RowNumber`; `ImportBatchRows.TargetEntityId` indeksi; `ImportBatches.RowVersion`.
 - B1 audit eylemleri: `ImportBatch.Create` (hedef `RequestId`), `ImportBatch.Discard` (hedef `ImportBatchId`). Payload yalnız `requestId`, `name`, `clinicId` / parti kimliği taşır.
 - B2 audit eylemleri: `ImportBatch.Create` (payload'a ek olarak `encoding`, `delimiter`; dosya içeriği ve satır verisi yok), `ImportBatch.Mapping` (hedef `ImportBatchId`; eşleme gövdesi yok). B2 migration gerektirmez: yeni alan yok, yalnız mevcut `ContentHash`, sayaç `Total` alanları ve `ImportBatchRows` kullanılır.
+- B3 audit eylemleri: `ImportBatch.Validate` (hedef `ImportBatchId`; payload yalnız parti kimliği), `ImportBatch.ErrorReport` (hata raporu indirme; hedef `ImportBatchId`, `format`). B3 migration gerektirmez: satır sonuçları mevcut `ImportBatchRows` sütunlarına (`NormalizedJson`, `ValidationStatus`, `IssuesJson`), sayaçlar mevcut parti sayaç sütunlarına, kira `LeaseOwner`/`LeaseUntilUtc` sütunlarına yazılır. Değişen mevcut kod: `ImportBatch` (kira, saklama zamanlaması), `ImportBatchRow` (doğrulama sonucu, temizleme), `VaccinationDueAtWindow` (`MaxFutureYears` sabiti ortak).
 - Ortak hata zarfı: `Error` değeri isteğe bağlı `Extensions` taşır; `ProblemDetails.extensions` alanına (örn. `batchId`) kopyalanır.
 - Mevcut müşteri/hasta/aşı uçlarının sözleşmesi **değişmez**.
