@@ -31,10 +31,12 @@ public sealed class ChargeSuggestionBySourceForUpdateSpec : Specification<Charge
     }
 }
 
-/// <summary>Klinik kapsamlı bekleyen kalemler; sayfalama <see cref="PendingChargeSuggestionsPagedSpec"/> ile eklenir.</summary>
+/// <summary>Klinik kapsamlı bekleyen kalemler; sayfalama <see cref="PendingChargeSuggestionsPagedSpec"/> ile eklenir.
+/// <c>petIds</c> verilirse yalnız bu hayvanların kalemleri (müşteri süzgeci: müşterinin güncel hayvanları).</summary>
 public class PendingChargeSuggestionsSpec : Specification<ChargeSuggestion>
 {
-    public PendingChargeSuggestionsSpec(Guid tenantId, Guid clinicId, Guid? petId, Guid? examinationId, Guid? visitId)
+    public PendingChargeSuggestionsSpec(
+        Guid tenantId, Guid clinicId, Guid? petId, Guid? examinationId, Guid? visitId, IReadOnlyCollection<Guid>? petIds = null)
     {
         Query.AsNoTracking();
         Query.Where(s => s.TenantId == tenantId && s.ClinicId == clinicId && s.Status == ChargeSuggestionStatus.Pending);
@@ -44,14 +46,17 @@ public class PendingChargeSuggestionsSpec : Specification<ChargeSuggestion>
             Query.Where(s => s.ExaminationId == examinationId.Value);
         if (visitId.HasValue)
             Query.Where(s => s.VisitId == visitId.Value);
+        if (petIds is not null)
+            Query.Where(s => petIds.Contains(s.PetId));
     }
 }
 
 public sealed class PendingChargeSuggestionsPagedSpec : PendingChargeSuggestionsSpec
 {
     public PendingChargeSuggestionsPagedSpec(
-        Guid tenantId, Guid clinicId, Guid? petId, Guid? examinationId, Guid? visitId, int page, int pageSize)
-        : base(tenantId, clinicId, petId, examinationId, visitId)
+        Guid tenantId, Guid clinicId, Guid? petId, Guid? examinationId, Guid? visitId, int page, int pageSize,
+        IReadOnlyCollection<Guid>? petIds = null)
+        : base(tenantId, clinicId, petId, examinationId, visitId, petIds)
     {
         Query.OrderByDescending(s => s.OccurredAtUtc)
             .ThenByDescending(s => s.Id)

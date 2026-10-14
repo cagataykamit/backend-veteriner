@@ -67,11 +67,25 @@ public sealed class GetChargeSuggestionsQueryHandler
         if (!scope.IsSuccess)
             return Result<PagedResult<ChargeSuggestionDto>>.Failure(scope.Error);
 
+        // Müşteri süzgeci: kalemin müşterisi hayvanın güncel sahibi olduğundan müşterinin bugünkü hayvanları üzerinden süzülür.
+        IReadOnlyCollection<Guid>? clientPetIds = null;
+        if (request.ClientId is { } requestedClientId)
+        {
+            clientPetIds = (await _pets.ListAsync(new PetsByTenantClientIdSpec(tenantId, requestedClientId), ct))
+                .Select(p => p.Id)
+                .ToArray();
+            if (clientPetIds.Count == 0)
+            {
+                return Result<PagedResult<ChargeSuggestionDto>>.Success(
+                    PagedResult<ChargeSuggestionDto>.Create([], 0, request.Page, request.PageSize));
+            }
+        }
+
         var total = await _suggestions.CountAsync(
-            new PendingChargeSuggestionsSpec(tenantId, clinicId, request.PetId, request.ExaminationId, request.VisitId), ct);
+            new PendingChargeSuggestionsSpec(tenantId, clinicId, request.PetId, request.ExaminationId, request.VisitId, clientPetIds), ct);
         var rows = await _suggestions.ListAsync(
             new PendingChargeSuggestionsPagedSpec(
-                tenantId, clinicId, request.PetId, request.ExaminationId, request.VisitId, request.Page, request.PageSize), ct);
+                tenantId, clinicId, request.PetId, request.ExaminationId, request.VisitId, request.Page, request.PageSize, clientPetIds), ct);
 
         var petIds = rows.Select(r => r.PetId).Distinct().ToArray();
         var pets = petIds.Length == 0

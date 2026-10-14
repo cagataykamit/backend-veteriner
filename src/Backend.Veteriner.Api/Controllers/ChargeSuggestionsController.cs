@@ -35,7 +35,8 @@ public sealed class ChargeSuggestionsController : ControllerBase
         _tenantContext = tenantContext;
     }
 
-    /// <summary>Bekleyen kalemler. Klinik kapsamı zorunlu: <c>clinicId</c> veya aktif klinik bağlamı. Sıralama: işlem zamanı azalan.</summary>
+    /// <summary>Bekleyen kalemler. Klinik kapsamı zorunlu: <c>clinicId</c> veya aktif klinik bağlamı. Sıralama: işlem zamanı azalan.
+    /// <c>clientId</c>: müşterinin güncel hayvanlarının kalemleri (müşteri kartı tek istekle okur).</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Charges.Read)]
     [ProducesResponseType(typeof(PagedResult<ChargeSuggestionDto>), StatusCodes.Status200OK)]
@@ -48,13 +49,14 @@ public sealed class ChargeSuggestionsController : ControllerBase
         [FromQuery] Guid? petId = null,
         [FromQuery] Guid? examinationId = null,
         [FromQuery] Guid? visitId = null,
+        [FromQuery] Guid? clientId = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
         var result = await _mediator.Send(
-            new GetChargeSuggestionsQuery(page, pageSize, clinicId, petId, examinationId, visitId), ct);
+            new GetChargeSuggestionsQuery(page, pageSize, clinicId, petId, examinationId, visitId, clientId), ct);
         return result.ToActionResult(this);
     }
 
