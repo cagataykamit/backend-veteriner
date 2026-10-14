@@ -65,9 +65,7 @@ public sealed class ImportUploadReader
     {
         var files = upload.Files;
         if (files.Workbook is not null)
-        {
             return XlsxTableReader.Read(files.Workbook.Content, _limits);
-        }
 
         var tables = new List<ImportSourceTable>();
         var warnings = new List<ImportReadWarning>();

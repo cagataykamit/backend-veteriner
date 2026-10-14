@@ -7,6 +7,7 @@ using Backend.Veteriner.Application;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Infrastructure;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Security;
@@ -151,6 +152,7 @@ public static class WebApplicationBuilderExtensions
         });
 
         builder.Services.Configure<OutboxHealthOptions>(builder.Configuration.GetSection(OutboxHealthOptions.SectionName));
+        builder.Services.Configure<ImportFileLimits>(builder.Configuration.GetSection(ImportFileLimits.SectionName));
         builder.Services.AddSingleton<OperationsMetrics>();
         builder.Services.AddSingleton<IErrorReporter, LoggingErrorReporter>();
 

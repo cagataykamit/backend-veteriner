@@ -247,6 +247,10 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
     private static async Task<HttpResponseMessage> PostAsync(HttpClient client, Guid requestId, string? name, Guid? clinicId)
     {
         var form = new MultipartFormDataContent { { new StringContent(requestId.ToString()), "requestId" } };
+        // B2: dosya zorunlu; içerik requestId'den türetilir (aynı requestId = aynı dosya, farklı requestId = farklı özet).
+        var csv = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes($"AdSoyad;Telefon\nTest {requestId};05321234567\n"));
+        csv.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+        form.Add(csv, "customersFile", "musteriler.csv");
         if (name is not null)
             form.Add(new StringContent(name), "name");
         if (clinicId is { } c)

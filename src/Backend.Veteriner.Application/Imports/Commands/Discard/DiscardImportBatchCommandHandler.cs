@@ -10,7 +10,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.Veteriner.Application.Imports.Commands.Discard;
 
 /// <summary>
-/// Taslağı siler (durum <c>Discarded</c>). B1'de parti satırsızdır; hazırlık satırlarının silinmesi satırları yazan B2 ile gelir.
+/// Taslağı siler (durum <c>Discarded</c>). Hazırlık satırları (kişisel veri) partiyle aynı kayıt işleminde silinir;
+/// ürün verisine dokunulmaz.
 /// </summary>
 public sealed class DiscardImportBatchCommandHandler : IRequestHandler<DiscardImportBatchCommand, Result>
 {
@@ -18,6 +19,7 @@ public sealed class DiscardImportBatchCommandHandler : IRequestHandler<DiscardIm
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IRepository<ImportBatch> _batches;
+    private readonly IRepository<ImportBatchRow> _rows;
     private readonly TimeProvider _timeProvider;
 
     public DiscardImportBatchCommandHandler(
@@ -25,12 +27,14 @@ public sealed class DiscardImportBatchCommandHandler : IRequestHandler<DiscardIm
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IRepository<ImportBatch> batches,
+        IRepository<ImportBatchRow> rows,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _batches = batches;
+        _rows = rows;
         _timeProvider = timeProvider;
     }
 
@@ -53,7 +57,8 @@ public sealed class DiscardImportBatchCommandHandler : IRequestHandler<DiscardIm
 
         try
         {
-            await _batches.SaveChangesAsync(ct);
+            // Silme kaydı hemen kalıcılaştırır; izlenen parti değişikliği (Discarded) aynı SaveChanges'te, tek işlemde yazılır.
+            await _rows.DeleteRangeAsync(new ImportBatchRowsByBatchSpec(batch.Id), ct);
         }
         catch (DbUpdateConcurrencyException)
         {

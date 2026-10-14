@@ -3,6 +3,9 @@ using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
+using Backend.Veteriner.Application.Imports;
+using Backend.Veteriner.Application.Imports.Mapping;
+using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Application.Pets.Timeline;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Sales;
@@ -38,6 +41,12 @@ public static class DependencyInjection
         services.AddScoped<ExpiredStockReader>();
         services.AddScoped<SaleDtoAssembler>();
         services.AddScoped<RegisterReportRunner>();
+
+        // Veri içe aktarma (ADR-019): dosya okuma, katalog çözümü, parti yanıtı sütun bilgisi.
+        services.AddOptions<ImportFileLimits>();
+        services.AddScoped<ImportUploadReader>();
+        services.AddScoped<ImportCatalogLoader>();
+        services.AddScoped<ImportTableInfoLoader>();
 
         // Pet timeline: her kayıt türü kendi okuyucusuyla bağlanır (ödeme okuyucusu Aşama 3 sonrası eklenecek).
         services.AddScoped<IPetTimelineSource, VisitTimelineSource>();
