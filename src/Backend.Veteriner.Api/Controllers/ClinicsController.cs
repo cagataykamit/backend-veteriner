@@ -7,12 +7,14 @@ using Backend.Veteriner.Application.Clinics.Commands.Activate;
 using Backend.Veteriner.Application.Clinics.Commands.AppointmentSettings.UpdateClinicAppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Commands.Create;
 using Backend.Veteriner.Application.Clinics.Commands.Deactivate;
+using Backend.Veteriner.Application.Clinics.Commands.KvkkFormTemplate.UpdateClinicKvkkFormTemplate;
 using Backend.Veteriner.Application.Clinics.Commands.Update;
 using Backend.Veteriner.Application.Clinics.Commands.WorkingHours.UpdateClinicWorkingHours;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.Queries.AppointmentSettings.GetClinicAppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Queries.GetById;
 using Backend.Veteriner.Application.Clinics.Queries.GetList;
+using Backend.Veteriner.Application.Clinics.Queries.KvkkFormTemplate.GetClinicKvkkFormTemplate;
 using Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkingHours;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -169,6 +171,57 @@ public sealed class ClinicsController : ControllerBase
             body.DefaultAppointmentDurationMinutes,
             body.SlotIntervalMinutes,
             body.AllowOverlappingAppointments), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Klinik KVKK açık rıza formu şablon metni (ADR-021). Kayıt yoksa yer tutucu varsayılan metin döner (<c>isDefault=true</c>).
+    /// Yer tutucular istemcide doldurulur. Bkz. docs/KVKK_CONSENT_API_CONTRACT.md.
+    /// </summary>
+    /// <remarks>Okuma yetkisi composite "any-of": <c>Clinics.Read</c>, <c>Clinics.Update</c> veya <c>Clients.Read</c>.</remarks>
+    [HttpGet("{id:guid}/kvkk-form-template")]
+    [Authorize(Policy = AuthorizationPolicyNames.ClinicsKvkkFormRead)]
+    [ProducesResponseType(typeof(ClinicKvkkFormTemplateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetKvkkFormTemplate([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClinicKvkkFormTemplateQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Klinik KVKK form şablon metnini kaydeder. Kayıt yokken <c>rowVersion</c> boş, varken GET'teki değer; uyuşmazlık 409.
+    /// </summary>
+    [HttpPut("{id:guid}/kvkk-form-template")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ClinicKvkkFormTemplateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> PutKvkkFormTemplate(
+        [FromRoute] Guid id,
+        [FromBody] UpdateClinicKvkkFormTemplateRequest? body,
+        CancellationToken ct)
+    {
+        if (body is null)
+        {
+            return Result<ClinicKvkkFormTemplateDto>.Failure(
+                    "Clinics.KvkkFormTemplate.Validation.InvalidRequestBody",
+                    "Istek govdesi bos veya hatali JSON.")
+                .ToActionResult(this);
+        }
+
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new UpdateClinicKvkkFormTemplateCommand(id, body.Text, body.RowVersion), ct);
         return result.ToActionResult(this);
     }
 
