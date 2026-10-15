@@ -146,10 +146,11 @@ public sealed class GetVaccinationsListQueryHandler
             MarkStep("searchPetIdsLookup");
         }
 
-        IReadOnlyCollection<Guid>? overdueExcludedPetIds = null;
-        if (request.OnlyOverdue)
+        // Gecikmiş liste her zaman, diğer listeler istenirse bakım dışı hayvanları dışlar (ADR-020 S5).
+        IReadOnlyCollection<Guid>? notReceivingCarePetIds = null;
+        if (request.OnlyOverdue || request.OnlyReceivingCare)
         {
-            overdueExcludedPetIds = await _pets.ListAsync(new PetIdsNotReceivingCareSpec(tenantId), ct);
+            notReceivingCarePetIds = await _pets.ListAsync(new PetIdsNotReceivingCareSpec(tenantId), ct);
             MarkStep("petsNotReceivingCareLookup");
         }
 
@@ -169,7 +170,7 @@ public sealed class GetVaccinationsListQueryHandler
                 request.OnlyOverdue,
                 listAsOfUtc,
                 request.ExaminationId,
-                overdueExcludedPetIds,
+                notReceivingCarePetIds,
                 clientPetIds,
                 request.DateFromUtc,
                 request.DateToUtc),
@@ -194,7 +195,7 @@ public sealed class GetVaccinationsListQueryHandler
                 request.OnlyOverdue,
                 listAsOfUtc,
                 request.ExaminationId,
-                overdueExcludedPetIds,
+                notReceivingCarePetIds,
                 clientPetIds,
                 request.DateFromUtc,
                 request.DateToUtc,

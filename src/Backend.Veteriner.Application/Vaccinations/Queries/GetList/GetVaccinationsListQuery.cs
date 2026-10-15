@@ -19,5 +19,6 @@ public sealed record GetVaccinationsListQuery(
     Guid? ExaminationId = null,
     Guid? ClientId = null,
     DateTime? DateFromUtc = null,
-    DateTime? DateToUtc = null)
+    DateTime? DateToUtc = null,
+    bool OnlyReceivingCare = false)
     : IRequest<Result<PagedResult<VaccinationListItemDto>>>;

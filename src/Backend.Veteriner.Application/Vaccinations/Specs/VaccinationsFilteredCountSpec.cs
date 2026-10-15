@@ -21,7 +21,7 @@ public sealed class VaccinationsFilteredCountSpec : Specification<Vaccination>
         bool onlyOverdue = false,
         DateTime? listAsOfUtc = null,
         Guid? examinationId = null,
-        IReadOnlyCollection<Guid>? overdueExcludedPetIds = null,
+        IReadOnlyCollection<Guid>? notReceivingCarePetIds = null,
         IReadOnlyCollection<Guid>? clientPetIds = null,
         DateTime? dateFromUtc = null,
         DateTime? dateToUtc = null)
@@ -48,14 +48,15 @@ public sealed class VaccinationsFilteredCountSpec : Specification<Vaccination>
             var now = listAsOfUtc ?? DateTime.UtcNow;
             Query.Where(v => v.Status == VaccinationStatus.Scheduled);
             Query.Where(v => v.DueAtUtc != null && v.DueAtUtc.Value < now);
-            // Vefat eden hayvanın planlı aşısı gecikmiş sayılmaz (ADR-020 S5; kimlikler Pet.ReceivesCare ile çözülür).
-            if (overdueExcludedPetIds is { Count: > 0 })
-                Query.Where(v => !overdueExcludedPetIds.Contains(v.PetId));
         }
         else if (status.HasValue)
         {
             Query.Where(v => v.Status == status.Value);
         }
+
+        // Bakım dışı (vefat eden) hayvanların aşıları: gecikmiş liste ve onlyReceivingCare (ADR-020 S5; kimlikler Pet.ReceivesCare ile çözülür).
+        if (notReceivingCarePetIds is { Count: > 0 })
+            Query.Where(v => !notReceivingCarePetIds.Contains(v.PetId));
 
         if (dueFromUtc.HasValue)
             Query.Where(v => v.DueAtUtc != null && v.DueAtUtc >= dueFromUtc.Value);

@@ -99,6 +99,27 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             item.GetProperty("id").GetGuid().Should().NotBe(b.OverdueScheduledId);
     }
 
+    [Fact]
+    public async Task GetList_OnlyReceivingCareTrue_ExcludesDeceasedPetScheduled_DefaultStillReturnsIt()
+    {
+        var ctx = await SeedOverdueScenarioAsync(withDeceasedPetScheduled: true);
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var filtered = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/vaccinations?page=1&pageSize=50&status=0&onlyReceivingCare=true&clinicId={ctx.ClinicId:D}");
+        var filteredIds = filtered.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid()).ToList();
+        filtered.GetProperty("totalItems").GetInt32().Should().Be(3);
+        filteredIds.Should().NotContain(ctx.DeceasedPetScheduledId!.Value);
+        filteredIds.Should().Contain(ctx.FutureScheduledId);
+
+        var unfiltered = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/vaccinations?page=1&pageSize=50&status=0&clinicId={ctx.ClinicId:D}");
+        unfiltered.GetProperty("totalItems").GetInt32().Should().Be(4);
+        unfiltered.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid())
+            .Should().Contain(ctx.DeceasedPetScheduledId.Value);
+    }
+
     private sealed record OverdueSeedCtx(
         string Token,
         Guid ClinicId,
@@ -106,9 +127,10 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
         Guid FutureScheduledId,
         Guid NullDueScheduledId,
         Guid AppliedPastDueId,
-        Guid CancelledPastDueId);
+        Guid CancelledPastDueId,
+        Guid? DeceasedPetScheduledId = null);
 
-    private async Task<OverdueSeedCtx> SeedOverdueScenarioAsync()
+    private async Task<OverdueSeedCtx> SeedOverdueScenarioAsync(bool withDeceasedPetScheduled = false)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -187,6 +209,27 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             null);
 
         db.AddRange(tenant, clinic, client, pet, overdue, future, nullDue, appliedPast, cancelledPast);
+
+        Guid? deceasedPetScheduledId = null;
+        if (withDeceasedPetScheduled)
+        {
+            var deceasedPet = new Pet(tenant.Id, client.Id, "PetVacDeceased", speciesId);
+            var today = DateOnly.FromDateTime(now);
+            deceasedPet.SetStatus(PetStatus.Deceased, today, today).IsSuccess.Should().BeTrue();
+            var deceasedScheduled = new Vaccination(
+                tenant.Id,
+                deceasedPet.Id,
+                clinic.Id,
+                null,
+                catalogVaccine.Id,
+                "DeceasedPetFutureCase",
+                VaccinationStatus.Scheduled,
+                null,
+                now.AddDays(5),
+                null);
+            db.AddRange(deceasedPet, deceasedScheduled);
+            deceasedPetScheduledId = deceasedScheduled.Id;
+        }
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
@@ -207,6 +250,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             future.Id,
             nullDue.Id,
             appliedPast.Id,
-            cancelledPast.Id);
+            cancelledPast.Id,
+            deceasedPetScheduledId);
     }
 }

@@ -131,7 +131,7 @@ public sealed class VaccinationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>): aşı adı, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>onlyOverdue</c>: planlı ve vadesi geçmiş aşılar (Scheduled, DueAtUtc dolu ve &lt; UTC şimdi); açıkken istek <c>status</c> değerini yok sayar. <c>examinationId</c>: yalnız bu muayeneye bağlı aşılar (kiracı/klinik kapsamı yine uygulanır).
+    /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>): aşı adı, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>onlyOverdue</c>: planlı ve vadesi geçmiş aşılar (Scheduled, DueAtUtc dolu ve &lt; UTC şimdi); açıkken istek <c>status</c> değerini yok sayar; vefat eden hayvanın aşısı çıkmaz. <c>onlyReceivingCare</c>: yalnız bakımdaki (vefat etmemiş) hayvanların aşıları; verilmezse tümü. <c>examinationId</c>: yalnız bu muayeneye bağlı aşılar (kiracı/klinik kapsamı yine uygulanır).
     /// <c>clientId</c>: yalnız bu müşterinin hayvanlarının aşıları. <c>dateFromUtc</c>/<c>dateToUtc</c> (iki uç dahil): birleşik tarih — Uygulandı ise <c>AppliedAtUtc</c>, değilse <c>DueAtUtc</c>
     /// (<c>dueFromUtc</c>/<c>dueToUtc</c>, <c>appliedFromUtc</c>/<c>appliedToUtc</c> geriye uyumluluk için korunur). Tüm süzgeçler AND.
     /// Sıralama: <c>sort=dueAtUtc|appliedAtUtc</c> (<c>nextDueAtUtc</c> = <c>dueAtUtc</c>), <c>order=asc|desc</c>; tarihi boş kayıtlar sonda. Sort yoksa birleşik tarih azalan.</summary>
@@ -154,6 +154,7 @@ public sealed class VaccinationsController : ControllerBase
         [FromQuery] Guid? clientId = null,
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
+        [FromQuery] bool onlyReceivingCare = false,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -174,7 +175,8 @@ public sealed class VaccinationsController : ControllerBase
                 examinationId,
                 clientId,
                 dateFromUtc,
-                dateToUtc),
+                dateToUtc,
+                onlyReceivingCare),
             ct);
         return result.ToActionResult(this);
     }
