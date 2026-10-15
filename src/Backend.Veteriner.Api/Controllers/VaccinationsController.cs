@@ -131,7 +131,10 @@ public sealed class VaccinationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>): aşı adı, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>sort</c>/<c>order</c> işlenmez. <c>onlyOverdue</c>: planlı ve vadesi geçmiş aşılar (Scheduled, DueAtUtc dolu ve &lt; UTC şimdi); açıkken istek <c>status</c> değerini yok sayar. <c>examinationId</c>: yalnız bu muayeneye bağlı aşılar (kiracı/klinik kapsamı yine uygulanır).</summary>
+    /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>): aşı adı, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>onlyOverdue</c>: planlı ve vadesi geçmiş aşılar (Scheduled, DueAtUtc dolu ve &lt; UTC şimdi); açıkken istek <c>status</c> değerini yok sayar. <c>examinationId</c>: yalnız bu muayeneye bağlı aşılar (kiracı/klinik kapsamı yine uygulanır).
+    /// <c>clientId</c>: yalnız bu müşterinin hayvanlarının aşıları. <c>dateFromUtc</c>/<c>dateToUtc</c> (iki uç dahil): birleşik tarih — Uygulandı ise <c>AppliedAtUtc</c>, değilse <c>DueAtUtc</c>
+    /// (<c>dueFromUtc</c>/<c>dueToUtc</c>, <c>appliedFromUtc</c>/<c>appliedToUtc</c> geriye uyumluluk için korunur). Tüm süzgeçler AND.
+    /// Sıralama: <c>sort=dueAtUtc|appliedAtUtc</c> (<c>nextDueAtUtc</c> = <c>dueAtUtc</c>), <c>order=asc|desc</c>; tarihi boş kayıtlar sonda. Sort yoksa birleşik tarih azalan.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
     [ProducesResponseType(typeof(PagedResult<VaccinationListItemDto>), StatusCodes.Status200OK)]
@@ -148,6 +151,9 @@ public sealed class VaccinationsController : ControllerBase
         [FromQuery] DateTime? appliedToUtc = null,
         [FromQuery] bool onlyOverdue = false,
         [FromQuery] Guid? examinationId = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] DateTime? dateFromUtc = null,
+        [FromQuery] DateTime? dateToUtc = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -165,7 +171,10 @@ public sealed class VaccinationsController : ControllerBase
                 appliedFromUtc,
                 appliedToUtc,
                 onlyOverdue,
-                examinationId),
+                examinationId,
+                clientId,
+                dateFromUtc,
+                dateToUtc),
             ct);
         return result.ToActionResult(this);
     }

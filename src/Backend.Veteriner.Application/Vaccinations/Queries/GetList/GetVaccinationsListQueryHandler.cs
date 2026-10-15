@@ -118,6 +118,18 @@ public sealed class GetVaccinationsListQueryHandler
         var effectiveClinicId = scopeResult.Value!.SingleClinicId;
         var accessibleClinicIds = scopeResult.Value!.AccessibleClinicIds;
 
+        var clientPetIds = await ClientListPetIds.ResolveAsync(tenantId, request.ClientId, _pets, ct);
+        if (clientPetIds is { Length: 0 })
+        {
+            return Result<PagedResult<VaccinationListItemDto>>.Success(
+                PagedResult<VaccinationListItemDto>.Create([], 0, page, pageSize));
+        }
+
+        if (clientPetIds is not null)
+            MarkStep("clientPetIdsLookup");
+
+        var sort = VaccinationListSort.Catalog.Resolve(request.PageRequest);
+
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
         Guid[] searchPetIds = [];
@@ -157,7 +169,10 @@ public sealed class GetVaccinationsListQueryHandler
                 request.OnlyOverdue,
                 listAsOfUtc,
                 request.ExaminationId,
-                overdueExcludedPetIds),
+                overdueExcludedPetIds,
+                clientPetIds,
+                request.DateFromUtc,
+                request.DateToUtc),
             ct);
         MarkStep("vaccinationsCount");
 
@@ -179,7 +194,11 @@ public sealed class GetVaccinationsListQueryHandler
                 request.OnlyOverdue,
                 listAsOfUtc,
                 request.ExaminationId,
-                overdueExcludedPetIds),
+                overdueExcludedPetIds,
+                clientPetIds,
+                request.DateFromUtc,
+                request.DateToUtc,
+                sort),
             ct);
         MarkStep("vaccinationsPage");
 

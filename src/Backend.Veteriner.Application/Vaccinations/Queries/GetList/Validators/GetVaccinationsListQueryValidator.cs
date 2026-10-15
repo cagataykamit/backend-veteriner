@@ -23,5 +23,21 @@ public sealed class GetVaccinationsListQueryValidator : AbstractValidator<GetVac
         RuleFor(x => x)
             .Must(x => !x.AppliedFromUtc.HasValue || !x.AppliedToUtc.HasValue || x.AppliedFromUtc <= x.AppliedToUtc)
             .WithMessage("appliedFromUtc, appliedToUtc'den küçük veya eşit olmalıdır.");
+
+        RuleFor(x => x)
+            .Must(x => !x.DateFromUtc.HasValue || !x.DateToUtc.HasValue || x.DateFromUtc <= x.DateToUtc)
+            .WithMessage("dateFromUtc, dateToUtc'den küçük veya eşit olmalıdır.");
+
+        RuleFor(x => x.ClientId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("clientId is invalid.");
+
+        RuleFor(x => x.PageRequest.Sort)
+            .Must(VaccinationListSort.Catalog.IsAllowedSort)
+            .WithMessage(VaccinationListSort.Catalog.InvalidSortMessage);
+
+        RuleFor(x => x.PageRequest.Order)
+            .Must(ListSortOrder.IsAllowed)
+            .WithMessage(ListSortOrder.InvalidMessage);
     }
 }

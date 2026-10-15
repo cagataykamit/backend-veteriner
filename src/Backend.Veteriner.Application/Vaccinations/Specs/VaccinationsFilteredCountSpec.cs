@@ -21,7 +21,10 @@ public sealed class VaccinationsFilteredCountSpec : Specification<Vaccination>
         bool onlyOverdue = false,
         DateTime? listAsOfUtc = null,
         Guid? examinationId = null,
-        IReadOnlyCollection<Guid>? overdueExcludedPetIds = null)
+        IReadOnlyCollection<Guid>? overdueExcludedPetIds = null,
+        IReadOnlyCollection<Guid>? clientPetIds = null,
+        DateTime? dateFromUtc = null,
+        DateTime? dateToUtc = null)
     {
         Query.Where(v => v.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -62,6 +65,8 @@ public sealed class VaccinationsFilteredCountSpec : Specification<Vaccination>
             Query.Where(v => v.AppliedAtUtc != null && v.AppliedAtUtc >= appliedFromUtc.Value);
         if (appliedToUtc.HasValue)
             Query.Where(v => v.AppliedAtUtc != null && v.AppliedAtUtc <= appliedToUtc.Value);
+        VaccinationsListCriteria.WhereListDateInRange(Query, dateFromUtc, dateToUtc);
+        VaccinationsListCriteria.WhereClientPetIds(Query, clientPetIds);
 
         if (searchContainsLikePattern is not null)
         {

@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Vaccinations;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,7 +24,11 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
         bool onlyOverdue = false,
         DateTime? listAsOfUtc = null,
         Guid? examinationId = null,
-        IReadOnlyCollection<Guid>? overdueExcludedPetIds = null)
+        IReadOnlyCollection<Guid>? overdueExcludedPetIds = null,
+        IReadOnlyCollection<Guid>? clientPetIds = null,
+        DateTime? dateFromUtc = null,
+        DateTime? dateToUtc = null,
+        ListSortChoice<VaccinationListSortField>? sort = null)
     {
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId);
@@ -65,6 +70,8 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
             Query.Where(v => v.AppliedAtUtc != null && v.AppliedAtUtc >= appliedFromUtc.Value);
         if (appliedToUtc.HasValue)
             Query.Where(v => v.AppliedAtUtc != null && v.AppliedAtUtc <= appliedToUtc.Value);
+        VaccinationsListCriteria.WhereListDateInRange(Query, dateFromUtc, dateToUtc);
+        VaccinationsListCriteria.WhereClientPetIds(Query, clientPetIds);
 
         if (searchContainsLikePattern is not null)
         {
@@ -76,9 +83,7 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
                 || (pids.Length > 0 && pids.Contains(v.PetId)));
         }
 
-        // Önce gerçekleşen / planlanan zamana göre (uygulama varsa o, yoksa vade); sonra Id.
-        Query.OrderByDescending(v => v.AppliedAtUtc ?? v.DueAtUtc)
-            .ThenByDescending(v => v.Id)
+        VaccinationsListCriteria.OrderBy(Query, sort)
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
     }
