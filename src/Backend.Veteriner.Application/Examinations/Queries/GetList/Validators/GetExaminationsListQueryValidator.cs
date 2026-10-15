@@ -32,6 +32,18 @@ public sealed class GetExaminationsListQueryValidator : AbstractValidator<GetExa
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("visitId is invalid.");
 
+        RuleFor(x => x.ClientId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("clientId is invalid.");
+
+        RuleFor(x => x.PageRequest.Sort)
+            .Must(ExaminationListSort.Catalog.IsAllowedSort)
+            .WithMessage(ExaminationListSort.Catalog.InvalidSortMessage);
+
+        RuleFor(x => x.PageRequest.Order)
+            .Must(ListSortOrder.IsAllowed)
+            .WithMessage(ListSortOrder.InvalidMessage);
+
         RuleFor(x => x)
             .Must(x => !x.ExaminedOnLocalDate.HasValue || (!x.DateFromUtc.HasValue && !x.DateToUtc.HasValue))
             .WithMessage("examinedOnLocalDate ile dateFromUtc/dateToUtc birlikte kullanılamaz.");

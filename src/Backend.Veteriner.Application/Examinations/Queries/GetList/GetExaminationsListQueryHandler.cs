@@ -122,6 +122,18 @@ public sealed class GetExaminationsListQueryHandler
 
         var (dateFromUtc, dateToUtcExclusive) = dateBounds.Value!;
 
+        var clientPetIds = await ClientListPetIds.ResolveAsync(tenantId, request.ClientId, _pets, ct);
+        if (clientPetIds is { Length: 0 })
+        {
+            return Result<PagedResult<ExaminationListItemDto>>.Success(
+                PagedResult<ExaminationListItemDto>.Create([], 0, page, pageSize));
+        }
+
+        if (clientPetIds is not null)
+            MarkStep("clientPetIdsLookup");
+
+        var sort = ExaminationListSort.Catalog.Resolve(request.PageRequest);
+
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
         Guid[] searchPetIds = [];
@@ -144,7 +156,8 @@ public sealed class GetExaminationsListQueryHandler
                 searchPattern,
                 searchPetIds,
                 accessibleClinicIds,
-                request.VisitId),
+                request.VisitId,
+                clientPetIds),
             ct);
         MarkStep("examinationsCount");
 
@@ -161,7 +174,9 @@ public sealed class GetExaminationsListQueryHandler
                 searchPattern,
                 searchPetIds,
                 accessibleClinicIds,
-                request.VisitId),
+                request.VisitId,
+                clientPetIds,
+                sort),
             ct);
         MarkStep("examinationsPage");
 

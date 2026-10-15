@@ -16,7 +16,8 @@ public sealed class ExaminationsFilteredCountSpec : Specification<Examination>
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
-        Guid? visitId = null)
+        Guid? visitId = null,
+        IReadOnlyCollection<Guid>? clientPetIds = null)
     {
         Query.AsNoTracking();
         Query.Where(e => e.TenantId == tenantId);
@@ -37,6 +38,8 @@ public sealed class ExaminationsFilteredCountSpec : Specification<Examination>
             Query.Where(e => e.AppointmentId == appointmentId.Value);
         if (visitId.HasValue)
             Query.Where(e => e.VisitId == visitId.Value);
+        if (clientPetIds is not null)
+            Query.Where(e => clientPetIds.Contains(e.PetId));
         if (dateFromUtc.HasValue)
             Query.Where(e => e.ExaminedAtUtc >= dateFromUtc.Value);
         if (dateToUtc.HasValue)

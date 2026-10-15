@@ -13,5 +13,6 @@ public sealed record GetExaminationsListQuery(
     DateOnly? ExaminedOnLocalDate = null,
     DateTime? DateFromUtc = null,
     DateTime? DateToUtc = null,
-    Guid? VisitId = null)
+    Guid? VisitId = null,
+    Guid? ClientId = null)
     : IRequest<Result<PagedResult<ExaminationListItemDto>>>;

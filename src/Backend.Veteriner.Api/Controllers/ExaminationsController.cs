@@ -245,10 +245,10 @@ public sealed class ExaminationsController : ControllerBase
 
     /// <summary>
     /// Sayfalı muayene listesi.
-    /// Filtreler (hepsi AND): opsiyonel <c>clinicId</c>, <c>petId</c>, <c>appointmentId</c>, <c>visitId</c>,
+    /// Filtreler (hepsi AND): opsiyonel <c>clinicId</c>, <c>clientId</c> (müşterinin hayvanları), <c>petId</c>, <c>appointmentId</c>, <c>visitId</c>,
     /// <c>examinedOnLocalDate</c> (İstanbul takvim günü → UTC <c>[start,end)</c>) veya <c>dateFromUtc</c> (dahil) / <c>dateToUtc</c> (hariç) (<c>ExaminedAtUtc</c>).
     /// Metin araması: <c>search</c> veya <c>page.search</c> — başvuru nedeni, bulgular, değerlendirme, notlar; müşteri + hayvan metin eşlemesi ile pet id kümesi (hayvan listesi ile aynı örüntü). Arama doluysa mevcut LIKE/OR metin kuralları diğer filtrelerle AND birleşir.
-    /// <c>sort</c>/<c>order</c> işlenmez.
+    /// Sıralama: <c>sort=examinedAtUtc</c> (<c>examinationDateUtc</c> eş adı), <c>order=asc|desc</c>; sort yoksa en yeni üstte.
     /// </summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Examinations.Read)]
@@ -264,6 +264,7 @@ public sealed class ExaminationsController : ControllerBase
         [FromQuery] DateOnly? examinedOnLocalDate = null,
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
+        [FromQuery] Guid? clientId = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -279,7 +280,8 @@ public sealed class ExaminationsController : ControllerBase
                 examinedOnLocalDate,
                 dateFromUtc,
                 dateToUtc,
-                visitId),
+                visitId,
+                clientId),
             ct);
         return result.ToActionResult(this);
     }

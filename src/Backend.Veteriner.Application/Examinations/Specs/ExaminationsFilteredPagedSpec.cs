@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Examinations;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,7 +29,9 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, E
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
-        Guid? visitId = null)
+        Guid? visitId = null,
+        IReadOnlyCollection<Guid>? clientPetIds = null,
+        ListSortChoice<ExaminationListSortField>? sort = null)
     {
         Query.AsNoTracking();
         Query.Where(e => e.TenantId == tenantId);
@@ -49,6 +52,8 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, E
             Query.Where(e => e.AppointmentId == appointmentId.Value);
         if (visitId.HasValue)
             Query.Where(e => e.VisitId == visitId.Value);
+        if (clientPetIds is not null)
+            Query.Where(e => clientPetIds.Contains(e.PetId));
         if (dateFromUtc.HasValue)
             Query.Where(e => e.ExaminedAtUtc >= dateFromUtc.Value);
         if (dateToUtc.HasValue)
@@ -66,8 +71,12 @@ public sealed class ExaminationsFilteredPagedSpec : Specification<Examination, E
                 || (pids.Length > 0 && pids.Contains(e.PetId)));
         }
 
-        Query.OrderByDescending(e => e.ExaminedAtUtc)
-            .ThenByDescending(e => e.Id)
+        // Tek izinli alan ExaminedAtUtc; sort yoksa azalan (bkz. ExaminationListSort).
+        var ordered = (sort?.Descending ?? true)
+            ? Query.OrderByDescending(e => e.ExaminedAtUtc).ThenByDescending(e => e.Id)
+            : Query.OrderBy(e => e.ExaminedAtUtc).ThenBy(e => e.Id);
+
+        ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(e => new ExaminationListRow(
