@@ -20,7 +20,8 @@ namespace Backend.IntegrationTests.Clients;
 
 /// <summary>
 /// ADR-021: müşteri KVKK rıza durumu (Kabul/Ret/Yok, tarih, işaretleyen, RowVersion/409, hatırlatma tercihine dokunmama)
-/// ve klinik KVKK form şablonu (varsayılan, oluştur/güncelle, 409, izinler). HTTP + gerçek SQL Server (LocalDB).
+/// ve klinik KVKK şablonları: açık rıza formu ve aydınlatma metni (ADR-024) (varsayılan, oluştur/güncelle, 409, izinler,
+/// türlerin birbirinden bağımsızlığı). HTTP + gerçek SQL Server (LocalDB).
 /// </summary>
 [Collection("pilot-smoke-api")]
 public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplicationFactory>
@@ -167,6 +168,61 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
         var admin = await SeedAsync();
         var printer = await SeedAsync([PermissionCatalog.Clients.Read], admin.ClinicId);
         var url = $"/api/v1/clinics/{admin.ClinicId}/kvkk-form-template";
+
+        (await printer.Http.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await printer.Http.PutAsJsonAsync(url, new { text = "Metin" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var outsider = await SeedAsync([PermissionCatalog.Pets.Read], admin.ClinicId);
+        (await outsider.Http.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task DisclosureTemplate_Should_Return_Default_Create_Update_Conflict_And_Stay_Separate_From_Consent()
+    {
+        var ctx = await SeedAsync();
+        var url = $"/api/v1/clinics/{ctx.ClinicId}/kvkk-disclosure-template";
+        var consentUrl = $"/api/v1/clinics/{ctx.ClinicId}/kvkk-form-template";
+
+        var initial = await ctx.Http.GetFromJsonAsync<JsonElement>(url);
+        initial.GetProperty("isDefault").GetBoolean().Should().BeTrue();
+        initial.GetProperty("rowVersion").ValueKind.Should().Be(JsonValueKind.Null);
+        initial.GetProperty("text").GetString().Should().Contain("AYDINLATMA METNİ").And.Contain("hukuk danışmanınızca onaylanmış");
+        initial.GetProperty("placeholders").EnumerateArray().Select(p => p.GetString())
+            .Should().Equal("{{clinicName}}", "{{clientName}}", "{{date}}");
+
+        // Açık rıza metni kaydedilince aydınlatma varsayılanda kalır (ayrı kayıt).
+        (await ctx.Http.PutAsJsonAsync(consentUrl, new { text = "Rıza metni" })).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ctx.Http.GetFromJsonAsync<JsonElement>(url)).GetProperty("isDefault").GetBoolean().Should().BeTrue();
+
+        var create = await ctx.Http.PutAsJsonAsync(url, new { text = "Aydınlatma {{clinicName}} {{date}}" });
+        create.StatusCode.Should().Be(HttpStatusCode.OK, await create.Content.ReadAsStringAsync());
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>();
+        created.GetProperty("isDefault").GetBoolean().Should().BeFalse();
+        var createdRv = created.GetProperty("rowVersion").GetString();
+
+        var raced = await ctx.Http.PutAsJsonAsync(url, new { text = "Başka metin" });
+        raced.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(raced)).Should().Be("Clinics.KvkkFormTemplate.ConcurrencyConflict");
+
+        var update = await ctx.Http.PutAsJsonAsync(url, new { text = "Güncel aydınlatma", rowVersion = createdRv });
+        update.StatusCode.Should().Be(HttpStatusCode.OK, await update.Content.ReadAsStringAsync());
+
+        var stale = await ctx.Http.PutAsJsonAsync(url, new { text = "Eski sürüm", rowVersion = createdRv });
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var empty = await ctx.Http.PutAsJsonAsync(url, new { text = "   ", rowVersion = createdRv });
+        empty.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        (await ctx.Http.GetFromJsonAsync<JsonElement>(url)).GetProperty("text").GetString().Should().Be("Güncel aydınlatma");
+        (await ctx.Http.GetFromJsonAsync<JsonElement>(consentUrl)).GetProperty("text").GetString().Should().Be("Rıza metni");
+    }
+
+    [Fact]
+    public async Task DisclosureTemplate_Read_Should_Allow_Clients_Read_And_Put_Should_Require_Clinics_Update()
+    {
+        var admin = await SeedAsync();
+        var printer = await SeedAsync([PermissionCatalog.Clients.Read], admin.ClinicId);
+        var url = $"/api/v1/clinics/{admin.ClinicId}/kvkk-disclosure-template";
 
         (await printer.Http.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.OK);
         (await printer.Http.PutAsJsonAsync(url, new { text = "Metin" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);

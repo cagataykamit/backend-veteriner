@@ -11,9 +11,14 @@ using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Clinics.KvkkFormTemplate;
 
-/// <summary>ADR-021: klinik KVKK form şablonu okuma (varsayılan) ve kaydetme (oluştur/güncelle, sürüm çakışması).</summary>
+/// <summary>
+/// ADR-021 / ADR-024: klinik KVKK şablonları (açık rıza formu, aydınlatma metni) okuma (varsayılan) ve kaydetme
+/// (oluştur/güncelle, sürüm çakışması).
+/// </summary>
 public sealed class ClinicKvkkFormTemplateHandlerTests
 {
+    private const ClinicKvkkFormKind Consent = ClinicKvkkFormKind.Consent;
+    private const ClinicKvkkFormKind Disclosure = ClinicKvkkFormKind.Disclosure;
     private static readonly string ValidRowVersion = Convert.ToBase64String(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
 
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -50,8 +55,8 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
             .ReturnsAsync(row);
     }
 
-    private ClinicKvkkFormTemplate ExistingTemplate()
-        => ClinicKvkkFormTemplate.Create(_tenantId, _clinicId, "Klinik metni", _userId).Value!;
+    private ClinicKvkkFormTemplate ExistingTemplate(ClinicKvkkFormKind kind = Consent)
+        => ClinicKvkkFormTemplate.Create(_tenantId, _clinicId, kind, "Klinik metni", _userId).Value!;
 
     private GetClinicKvkkFormTemplateQueryHandler CreateQueryHandler()
         => new(_tenantContext.Object, _clientContext.Object, _assignmentGuard.Object, _userClinics.Object, _clinics.Object, _templatesRead.Object);
@@ -61,19 +66,42 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
             _userClinics.Object, _clinics.Object, _templates.Object);
 
     [Fact]
-    public async Task Get_Should_Return_Placeholder_Default_When_No_Row()
+    public async Task Get_Should_Return_Draft_Consent_Default_When_No_Row()
     {
         ReturnTemplate(null);
 
-        var result = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId), CancellationToken.None);
+        var result = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId, Consent), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.IsDefault.Should().BeTrue();
         result.Value.RowVersion.Should().BeNull();
         result.Value.Text.Should().Be(ClinicKvkkFormTemplateDefaults.Text);
-        result.Value.Text.Should().Contain("hukuk danışmanınızca onaylanmış");
+        result.Value.Text.Should().StartWith("Bu metin hukuk danışmanınızca onaylanmış açık rıza metniyle");
+        result.Value.Text.Should().Contain("{{clinicName}} — KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AÇIK RIZA BEYANI");
         result.Value.Placeholders.Should().Equal("{{clinicName}}", "{{clientName}}", "{{date}}");
         result.Value.MaxLength.Should().Be(ClinicKvkkFormTemplate.MaxTextLength);
+    }
+
+    [Fact]
+    public async Task Get_Should_Return_Draft_Disclosure_Default_When_No_Row()
+    {
+        ReturnTemplate(null);
+
+        var result = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId, Disclosure), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.IsDefault.Should().BeTrue();
+        result.Value.RowVersion.Should().BeNull();
+        result.Value.Text.Should().Be(ClinicKvkkFormTemplateDefaults.DisclosureText);
+        result.Value.Text.Should().StartWith("Bu metin hukuk danışmanınızca onaylanmış aydınlatma metniyle");
+        result.Value.Text.Should().Contain("{{clinicName}} — KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AYDINLATMA METNİ")
+            .And.Contain("{{date}}").And.Contain("{{clientName}}").And.NotContain("**");
+        result.Value.Text.Length.Should().BeLessThan(ClinicKvkkFormTemplate.MaxTextLength);
+        result.Value.Placeholders.Should().Equal("{{clinicName}}", "{{clientName}}", "{{date}}");
+        _templatesRead.Verify(x => x.FirstOrDefaultAsync(
+            It.Is<ClinicKvkkFormTemplateByClinicSpec>(s => s.IsSatisfiedBy(ExistingTemplate(Disclosure))
+                && !s.IsSatisfiedBy(ExistingTemplate(Consent))),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -81,7 +109,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
     {
         ReturnTemplate(ExistingTemplate());
 
-        var result = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId), CancellationToken.None);
+        var result = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId, Consent), CancellationToken.None);
 
         result.Value!.IsDefault.Should().BeFalse();
         result.Value.Text.Should().Be("Klinik metni");
@@ -95,36 +123,39 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
             .ReturnsAsync(true);
         _userClinics.Setup(x => x.ExistsAsync(_userId, _clinicId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
-        var result = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId), CancellationToken.None);
+        var result = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId, Disclosure), CancellationToken.None);
 
         result.Error.Code.Should().Be("Clinics.AccessDenied");
     }
 
-    [Fact]
-    public async Task Update_Should_Create_When_No_Row_And_No_RowVersion()
+    [Theory]
+    [InlineData(ClinicKvkkFormKind.Consent)]
+    [InlineData(ClinicKvkkFormKind.Disclosure)]
+    public async Task Update_Should_Create_When_No_Row_And_No_RowVersion(ClinicKvkkFormKind kind)
     {
         ReturnTemplate(null);
 
         var result = await CreateCommandHandler().Handle(
-            new UpdateClinicKvkkFormTemplateCommand(_clinicId, "Yeni metin {{clientName}}", null), CancellationToken.None);
+            new UpdateClinicKvkkFormTemplateCommand(_clinicId, kind, "Yeni metin {{clientName}}", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.IsDefault.Should().BeFalse();
         result.Value.Text.Should().Be("Yeni metin {{clientName}}");
-        _templates.Verify(x => x.AddAsync(It.IsAny<ClinicKvkkFormTemplate>(), It.IsAny<CancellationToken>()), Times.Once);
+        _templates.Verify(x => x.AddAsync(It.Is<ClinicKvkkFormTemplate>(t => t.Kind == kind), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task Update_Should_Modify_Existing_With_RowVersion()
     {
-        var existing = ExistingTemplate();
+        var existing = ExistingTemplate(Disclosure);
         ReturnTemplate(existing);
 
         var result = await CreateCommandHandler().Handle(
-            new UpdateClinicKvkkFormTemplateCommand(_clinicId, "Güncel metin", ValidRowVersion), CancellationToken.None);
+            new UpdateClinicKvkkFormTemplateCommand(_clinicId, Disclosure, "Güncel metin", ValidRowVersion), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         existing.Text.Should().Be("Güncel metin");
+        existing.Kind.Should().Be(Disclosure);
         _templates.Verify(x => x.UpdateAsync(existing, It.IsAny<CancellationToken>()), Times.Once);
         _templates.Verify(x => x.AddAsync(It.IsAny<ClinicKvkkFormTemplate>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -135,7 +166,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         ReturnTemplate(ExistingTemplate());
 
         var result = await CreateCommandHandler().Handle(
-            new UpdateClinicKvkkFormTemplateCommand(_clinicId, "Metin", null), CancellationToken.None);
+            new UpdateClinicKvkkFormTemplateCommand(_clinicId, Consent, "Metin", null), CancellationToken.None);
 
         result.Error.Code.Should().Be("Clinics.KvkkFormTemplate.ConcurrencyConflict");
         _templates.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -147,7 +178,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         ReturnTemplate(null);
 
         var result = await CreateCommandHandler().Handle(
-            new UpdateClinicKvkkFormTemplateCommand(_clinicId, "Metin", ValidRowVersion), CancellationToken.None);
+            new UpdateClinicKvkkFormTemplateCommand(_clinicId, Consent, "Metin", ValidRowVersion), CancellationToken.None);
 
         result.Error.Code.Should().Be("Clinics.KvkkFormTemplate.ConcurrencyConflict");
     }
@@ -160,7 +191,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
             .ThrowsAsync(new DbUpdateConcurrencyException());
 
         var result = await CreateCommandHandler().Handle(
-            new UpdateClinicKvkkFormTemplateCommand(_clinicId, "Metin", ValidRowVersion), CancellationToken.None);
+            new UpdateClinicKvkkFormTemplateCommand(_clinicId, Consent, "Metin", ValidRowVersion), CancellationToken.None);
 
         result.Error.Code.Should().Be("Clinics.KvkkFormTemplate.ConcurrencyConflict");
     }
@@ -173,7 +204,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         ReturnTemplate(null);
 
         var result = await CreateCommandHandler().Handle(
-            new UpdateClinicKvkkFormTemplateCommand(_clinicId, text, null), CancellationToken.None);
+            new UpdateClinicKvkkFormTemplateCommand(_clinicId, Disclosure, text, null), CancellationToken.None);
 
         result.Error.Code.Should().Be("Clinics.KvkkFormTemplate.Validation");
         _templates.Verify(x => x.AddAsync(It.IsAny<ClinicKvkkFormTemplate>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -185,8 +216,28 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Clinics.Update)).Returns(false);
 
         var result = await CreateCommandHandler().Handle(
-            new UpdateClinicKvkkFormTemplateCommand(_clinicId, "Metin", null), CancellationToken.None);
+            new UpdateClinicKvkkFormTemplateCommand(_clinicId, Disclosure, "Metin", null), CancellationToken.None);
 
         result.Error.Code.Should().Be("Auth.PermissionDenied");
+    }
+
+    [Fact]
+    public void Update_Audit_Action_Should_Distinguish_Kind()
+    {
+        new UpdateClinicKvkkFormTemplateCommand(_clinicId, Consent, "M", null).AuditAction
+            .Should().Be("Clinic.KvkkFormTemplate.Update");
+        new UpdateClinicKvkkFormTemplateCommand(_clinicId, Disclosure, "M", null).AuditAction
+            .Should().Be("Clinic.KvkkDisclosureTemplate.Update");
+    }
+
+    [Fact]
+    public void Validators_Should_Reject_Undefined_Kind()
+    {
+        new GetClinicKvkkFormTemplateQueryValidator()
+            .Validate(new GetClinicKvkkFormTemplateQuery(_clinicId, (ClinicKvkkFormKind)99)).IsValid.Should().BeFalse();
+        new UpdateClinicKvkkFormTemplateCommandValidator()
+            .Validate(new UpdateClinicKvkkFormTemplateCommand(_clinicId, (ClinicKvkkFormKind)99, "M", null)).IsValid.Should().BeFalse();
+        new UpdateClinicKvkkFormTemplateCommandValidator()
+            .Validate(new UpdateClinicKvkkFormTemplateCommand(_clinicId, Disclosure, "M", null)).IsValid.Should().BeTrue();
     }
 }
