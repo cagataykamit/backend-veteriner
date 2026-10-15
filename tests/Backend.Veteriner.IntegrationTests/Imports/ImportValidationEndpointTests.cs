@@ -251,7 +251,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         response.Headers.CacheControl!.NoStore.Should().BeTrue();
 
         using var wb = new XLWorkbook(new MemoryStream(await response.Content.ReadAsByteArrayAsync()));
-        wb.Worksheets.Select(s => s.Name).Should().Equal("Musteriler", "Hayvanlar", "Asilar");
+        wb.Worksheets.Select(s => s.Name).Should().Equal("Musteriler", "Hastalar", "Asilar");
 
         var customers = wb.Worksheet("Musteriler");
         var header = customers.Row(1).CellsUsed().Select(c => c.GetString()).ToList();
@@ -268,7 +268,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         address.GetString().Should().StartWith("=HYPERLINK");
         address.Style.IncludeQuotePrefix.Should().BeTrue();
 
-        wb.Worksheet("Hayvanlar").RowsUsed().Count().Should().Be(3, "başlık + 2 hatalı hasta");
+        wb.Worksheet("Hastalar").RowsUsed().Count().Should().Be(3, "başlık + 2 hatalı hasta");
         wb.Worksheet("Asilar").RowsUsed().Count().Should().Be(3, "başlık + 2 hatalı aşı");
     }
 

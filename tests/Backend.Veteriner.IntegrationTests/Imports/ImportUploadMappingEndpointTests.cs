@@ -79,6 +79,35 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
                                        && r.NormalizedJson == null);
     }
 
+    [Theory]
+    // Yeni şablon (ADR-022 "hasta" başlıkları) ve eski şablon aynı API anahtarlarına kesin eşlenir.
+    [InlineData("Hastalar", "HastaNo", "HastaAdi")]
+    [InlineData("Hayvanlar", "HayvanNo", "HayvanAdi")]
+    public async Task Template_Pet_Headers_Old_And_New_Should_Suggest_Same_Api_Keys_And_Map(string sheet, string noHeader, string nameHeader)
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var bytes = Workbook((sheet, [["MusteriNo", noHeader, nameHeader, "Tur"], ["M1", $"H-{sheet}", "Pamuk", "Kedi"]]));
+
+        var response = await PostAsync(client, Guid.NewGuid(), null, null, ("file", "veri.xlsx", bytes, XlsxType));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var columns = json.GetProperty("tables").EnumerateArray().Single().GetProperty("columns").EnumerateArray().ToList();
+        columns.Select(c => c.GetProperty("suggested").GetString()).Should().Equal("MusteriNo", "HayvanNo", "HayvanAdi", "Tur");
+        columns.Should().OnlyContain(c => c.GetProperty("confidence").GetString() == "Exact");
+
+        var mapped = await PutMappingAsync(client, json.GetProperty("id").GetGuid(), new
+        {
+            columns = new { pets = Map("MusteriNo", "MusteriNo", "HayvanNo", noHeader, "HayvanAdi", nameHeader, "Tur", "Tur") },
+        });
+
+        mapped.StatusCode.Should().Be(HttpStatusCode.OK, await mapped.Content.ReadAsStringAsync());
+        var mappedColumns = (await mapped.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("tables")[0].GetProperty("columns").EnumerateArray().ToList();
+        mappedColumns.Select(c => c.GetProperty("mapped").GetString()).Should().Equal("MusteriNo", "HayvanNo", "HayvanAdi", "Tur");
+    }
+
     [Fact]
     public async Task Csv_Upload_Should_Read_Windows1254_With_Three_Tables_And_Clinic()
     {
@@ -583,13 +612,13 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         response.Content.Headers.ContentDisposition!.FileNameStar.Should().Be("vetinity-iceaktar-sablon.xlsx");
         response.Headers.CacheControl!.NoStore.Should().BeTrue();
         using var workbook = new XLWorkbook(new MemoryStream(await response.Content.ReadAsByteArrayAsync()));
-        workbook.Worksheets.Select(w => w.Name).Should().Equal("Musteriler", "Hayvanlar", "Asilar", "Aciklama");
+        workbook.Worksheets.Select(w => w.Name).Should().Equal("Musteriler", "Hastalar", "Asilar", "Aciklama");
     }
 
     [Theory]
     [InlineData("customers", "vetinity-iceaktar-musteriler.csv", "MusteriNo;AdSoyad;Telefon;Eposta;Adres")]
-    [InlineData("pets", "vetinity-iceaktar-hayvanlar.csv", "MusteriNo;SahipAdSoyad")]
-    [InlineData("vaccinations", "vetinity-iceaktar-asilar.csv", "HayvanNo;SahipAdSoyad")]
+    [InlineData("pets", "vetinity-iceaktar-hastalar.csv", "MusteriNo;SahipAdSoyad")]
+    [InlineData("vaccinations", "vetinity-iceaktar-asilar.csv", "HastaNo;SahipAdSoyad")]
     public async Task Template_Csv_Should_Be_Downloadable_Per_Table(string table, string fileName, string headerPrefix)
     {
         var ctx = await SeedAsync();

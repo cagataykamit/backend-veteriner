@@ -77,7 +77,7 @@ public static class XlsxTableReader
         {
             return Failure(
                 "Imports.UnsupportedFile",
-                "Tanınan sayfa yok; sayfa adları Musteriler, Hayvanlar, Asilar olmalıdır (şablonu indirebilirsiniz).");
+                "Tanınan sayfa yok; sayfa adları Musteriler, Hastalar, Asilar olmalıdır (şablonu indirebilirsiniz).");
         }
 
         if (tables.Count == 0)

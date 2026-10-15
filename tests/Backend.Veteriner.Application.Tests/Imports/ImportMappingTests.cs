@@ -124,7 +124,8 @@ public sealed class ImportMappingTests
         ImportCanonicalSchema.MissingRequired(ImportTable.Pets, ["HayvanAdi", "Tur", "SahipAdSoyad", "SahipTelefon"]).Should().BeEmpty();
         ImportCanonicalSchema.MissingRequired(ImportTable.Pets, ["HayvanAdi", "Tur", "SahipAdSoyad"])
             .Should().ContainSingle().Which.Should().Contain("MusteriNo").And.Contain("SahipAdSoyad + SahipTelefon");
-        ImportCanonicalSchema.MissingRequired(ImportTable.Pets, ["MusteriNo"]).Should().Equal("HayvanAdi", "Tur");
+        // Okunabilir liste şablon başlığıyla (ADR-022 "hasta"); girdi API anahtarıdır.
+        ImportCanonicalSchema.MissingRequired(ImportTable.Pets, ["MusteriNo"]).Should().Equal("HastaAdi", "Tur");
 
         // Aşı: HayvanNo VEYA SahipAdSoyad+SahipTelefon+HayvanAdi+Tur.
         ImportCanonicalSchema.MissingRequired(ImportTable.Vaccinations, ["AsiAdi", "UygulamaTarihi", "HayvanNo"]).Should().BeEmpty();
@@ -132,7 +133,32 @@ public sealed class ImportMappingTests
             ImportTable.Vaccinations,
             ["AsiAdi", "UygulamaTarihi", "SahipAdSoyad", "SahipTelefon", "HayvanAdi", "Tur"]).Should().BeEmpty();
         ImportCanonicalSchema.MissingRequired(ImportTable.Vaccinations, ["AsiAdi", "UygulamaTarihi", "SahipAdSoyad", "SahipTelefon"])
-            .Should().ContainSingle();
+            .Should().ContainSingle().Which.Should().Be("HastaNo veya SahipAdSoyad + SahipTelefon + HastaAdi + Tur");
+    }
+
+    [Theory]
+    // Eski şablon başlıkları (API anahtarı) kesin eşleşmeye devam eder.
+    [InlineData(ImportTable.Pets, "HayvanNo", "HayvanNo", ImportSuggestionConfidence.Exact)]
+    [InlineData(ImportTable.Pets, "HayvanAdi", "HayvanAdi", ImportSuggestionConfidence.Exact)]
+    [InlineData(ImportTable.Vaccinations, "HAYVANNO", "HayvanNo", ImportSuggestionConfidence.Exact)]
+    [InlineData(ImportTable.Vaccinations, "hayvan_adi", "HayvanAdi", ImportSuggestionConfidence.Exact)]
+    // Yeni şablon başlıkları (Türkçe/aksan duyarsız katlama aynı).
+    [InlineData(ImportTable.Pets, "HastaNo", "HayvanNo", ImportSuggestionConfidence.Exact)]
+    [InlineData(ImportTable.Pets, "HASTA ADI", "HayvanAdi", ImportSuggestionConfidence.Exact)]
+    [InlineData(ImportTable.Vaccinations, "Hasta-No", "HayvanNo", ImportSuggestionConfidence.Exact)]
+    [InlineData(ImportTable.Vaccinations, "hastaadı", "HayvanAdi", ImportSuggestionConfidence.Exact)]
+    // Eski elle yazılmış başlıklar takma ad olarak kalır.
+    [InlineData(ImportTable.Pets, "Hayvan No", "HayvanNo", ImportSuggestionConfidence.Exact)]
+    [InlineData(ImportTable.Pets, "Hayvan Numarası", "HayvanNo", ImportSuggestionConfidence.Alias)]
+    [InlineData(ImportTable.Vaccinations, "Hayvan", "HayvanAdi", ImportSuggestionConfidence.Alias)]
+    [InlineData(ImportTable.Vaccinations, "Hasta", "HayvanAdi", ImportSuggestionConfidence.Alias)]
+    public void Pet_Number_And_Name_Should_Accept_Old_And_New_Headers(
+        ImportTable table, string header, string expectedKey, ImportSuggestionConfidence expectedConfidence)
+    {
+        var suggestion = ImportCanonicalSchema.Suggest(table, [header]).Single();
+
+        suggestion.Suggested.Should().Be(expectedKey);
+        suggestion.Confidence.Should().Be(expectedConfidence);
     }
 
     [Fact]

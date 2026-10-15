@@ -128,7 +128,7 @@ public sealed class ImportsController : ControllerBase
     }
 
     /// <summary>
-    /// Doldurulacak şablon: <c>format=xlsx</c> (Musteriler, Hayvanlar, Asilar, Aciklama sayfaları) veya
+    /// Doldurulacak şablon: <c>format=xlsx</c> (Musteriler, Hastalar, Asilar, Aciklama sayfaları) veya
     /// <c>format=csv&amp;table=customers|pets|vaccinations</c>.
     /// </summary>
     [HttpGet("template")]

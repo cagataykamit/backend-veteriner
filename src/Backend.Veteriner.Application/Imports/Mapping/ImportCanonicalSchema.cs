@@ -6,6 +6,9 @@ namespace Backend.Veteriner.Application.Imports.Mapping;
 /// Kanonik alanın tanımı. <see cref="Aliases"/> yalnız kanonik adın dışındaki yaygın başlık yazımlarıdır (katlanmış
 /// karşılaştırılır). <see cref="Description"/>/<see cref="Example"/>/<see cref="IsText"/> şablonun açıklama sayfasını ve
 /// sütun biçimini besler (kural metni IMPORT_API_CONTRACT.md §4.3 ile aynıdır).
+/// <see cref="Name"/> API anahtarıdır (eşleme isteği/yanıtı, sorun <c>field</c>) ve değişmez; <see cref="Header"/> şablonda
+/// kullanıcıya görünen başlıktır (ADR-022: hayvan kaydına "hasta" denir). İkisi de kesin (Exact) eşleşir; böylece eski
+/// şablonun başlığı da tanınır.
 /// </summary>
 public sealed record ImportCanonicalField(
     string Name,
@@ -13,7 +16,10 @@ public sealed record ImportCanonicalField(
     string Description,
     string Example,
     bool IsText,
-    params string[] Aliases);
+    params string[] Aliases)
+{
+    public string Header { get; init; } = Name;
+}
 
 /// <summary>Bir tablonun zorunlu alan kuralı: <see cref="AllOf"/> hepsi, <see cref="AnyOf"/> gruplardan en az biri tam dolu.</summary>
 public sealed record ImportRequirement(string[] AllOf, string[][] AnyOf);
@@ -30,6 +36,10 @@ public sealed record ImportColumnSuggestion(string Source, string? Suggested, Im
 /// <summary>Kanonik başlıklar, takma adlar ve zorunlu alan kuralları — tek yer (IMPORT_API_CONTRACT.md §4.2-4.3).</summary>
 public static class ImportCanonicalSchema
 {
+    private const string PetNoHeader = "HastaNo";
+    private const string PetNameHeader = "HastaAdi";
+    private const string VaccinationPetLinkNote = "Evet (biri): HastaNo veya SahipAdSoyad + SahipTelefon + HastaAdi + Tur";
+
     private static readonly ImportCanonicalField[] CustomerFields =
     [
         new("MusteriNo", "Hayır (hasta bu anahtarla bağlanacaksa evet)", "Eski sistemdeki müşteri referansı; dosya içinde benzersiz olmalı.", "M-1001", true,
@@ -53,9 +63,9 @@ public static class ImportCanonicalSchema
         new("SahipTelefon", "Evet (biri): MusteriNo veya SahipAdSoyad + SahipTelefon", "Sahibin cep telefonu.", "05321234567", true,
             "Sahip Tel", "Sahip Cep", "Sahip Telefonu", "Müşteri Telefon", "Müşteri Tel", "Telefon", "Cep"),
         new("HayvanNo", "Hayır (aşı bu anahtarla bağlanacaksa evet)", "Eski sistemdeki hasta referansı.", "H-2001", true,
-            "Hayvan No", "Hasta No", "Hayvan Numarası", "Hasta Numarası", "Hasta Kodu", "Hayvan Kodu"),
+            "Hayvan No", "Hasta No", "Hayvan Numarası", "Hasta Numarası", "Hasta Kodu", "Hayvan Kodu") { Header = PetNoHeader },
         new("HayvanAdi", "Evet", "1-200 karakter.", "Pamuk", false,
-            "Hayvan Adı", "Hasta Adı", "Hayvan", "Adı", "Ad", "İsim", "Pet Adı", "Evcil Hayvan"),
+            "Hayvan Adı", "Hasta Adı", "Hayvan", "Hasta", "Adı", "Ad", "İsim", "Pet Adı", "Evcil Hayvan") { Header = PetNameHeader },
         new("Tur", "Evet", "Katalogdaki hayvan türü (Köpek, Kedi, ...).", "Kedi", false,
             "Tür", "Hayvan Türü", "Hayvan Tür"),
         new("Irk", "Hayır", "Türe ait ırk; katalogda yoksa serbest metin olarak saklanır.", "Tekir", false,
@@ -80,15 +90,15 @@ public static class ImportCanonicalSchema
 
     private static readonly ImportCanonicalField[] VaccinationFields =
     [
-        new("HayvanNo", "Evet (biri): HayvanNo veya SahipAdSoyad + SahipTelefon + HayvanAdi + Tur", "Hasta sayfasındaki HayvanNo ile aynı değer.", "H-2001", true,
-            "Hayvan No", "Hasta No", "Hayvan Numarası", "Hasta Numarası", "Hasta Kodu", "Hayvan Kodu"),
-        new("SahipAdSoyad", "Evet (biri): HayvanNo veya SahipAdSoyad + SahipTelefon + HayvanAdi + Tur", "Sahibin adı soyadı.", "Ayşe Yılmaz", false,
+        new("HayvanNo", VaccinationPetLinkNote, "Hasta sayfasındaki HastaNo ile aynı değer.", "H-2001", true,
+            "Hayvan No", "Hasta No", "Hayvan Numarası", "Hasta Numarası", "Hasta Kodu", "Hayvan Kodu") { Header = PetNoHeader },
+        new("SahipAdSoyad", VaccinationPetLinkNote, "Sahibin adı soyadı.", "Ayşe Yılmaz", false,
             "Sahip Ad Soyad", "Sahip", "Sahip Adı", "Sahibi", "Müşteri", "Müşteri Adı"),
-        new("SahipTelefon", "Evet (biri): HayvanNo veya SahipAdSoyad + SahipTelefon + HayvanAdi + Tur", "Sahibin cep telefonu.", "05321234567", true,
+        new("SahipTelefon", VaccinationPetLinkNote, "Sahibin cep telefonu.", "05321234567", true,
             "Sahip Tel", "Sahip Cep", "Müşteri Telefon", "Telefon", "Cep"),
-        new("HayvanAdi", "Evet (biri): HayvanNo veya SahipAdSoyad + SahipTelefon + HayvanAdi + Tur", "Hayvanın adı.", "Pamuk", false,
-            "Hayvan Adı", "Hasta Adı", "Hayvan", "Pet Adı"),
-        new("Tur", "Evet (biri): HayvanNo veya SahipAdSoyad + SahipTelefon + HayvanAdi + Tur", "Hayvan türü.", "Kedi", false,
+        new("HayvanAdi", VaccinationPetLinkNote, "Hastanın adı.", "Pamuk", false,
+            "Hayvan Adı", "Hasta Adı", "Hayvan", "Hasta", "Pet Adı") { Header = PetNameHeader },
+        new("Tur", VaccinationPetLinkNote, "Hayvan türü.", "Kedi", false,
             "Tür", "Hayvan Türü"),
         new("AsiAdi", "Evet", "Katalogdaki aşı tanımı (Kuduz, Karma, ...).", "Kuduz", false,
             "Aşı Adı", "Aşı", "Aşı Türü", "Uygulanan Aşı", "Vaccine"),
@@ -118,7 +128,7 @@ public static class ImportCanonicalSchema
     private static readonly Dictionary<ImportTable, string[]> SheetNames = new()
     {
         [ImportTable.Customers] = ["Musteriler", "Musteri", "Customers"],
-        [ImportTable.Pets] = ["Hayvanlar", "Hayvan", "Hastalar", "Hasta", "Pets"],
+        [ImportTable.Pets] = ["Hastalar", "Hasta", "Hayvanlar", "Hayvan", "Pets"],
         [ImportTable.Vaccinations] = ["Asilar", "Asi", "Vaccinations"],
     };
 
@@ -153,8 +163,8 @@ public static class ImportCanonicalSchema
         => Fields(table).Any(f => string.Equals(f.Name, name, StringComparison.Ordinal));
 
     /// <summary>
-    /// Başlıklar için eşleme önerisi: önce kanonik adla, sonra takma adla eşit olanlar; bir kanonik alan en çok bir
-    /// sütuna, bir sütun en çok bir alana önerilir (başlık sırasında ilk gelen kazanır).
+    /// Başlıklar için eşleme önerisi: önce şablon başlığı veya kanonik adla (eski şablon), sonra takma adla eşit olanlar;
+    /// bir kanonik alan en çok bir sütuna, bir sütun en çok bir alana önerilir (başlık sırasında ilk gelen kazanır).
     /// </summary>
     public static IReadOnlyList<ImportColumnSuggestion> Suggest(ImportTable table, IReadOnlyList<string> headers)
     {
@@ -163,7 +173,7 @@ public static class ImportCanonicalSchema
         var assigned = new (string Field, ImportSuggestionConfidence Confidence)?[headers.Count];
         var claimed = new HashSet<string>(StringComparer.Ordinal);
 
-        AssignPass(ImportSuggestionConfidence.Exact, f => [f.Name]);
+        AssignPass(ImportSuggestionConfidence.Exact, f => [f.Header, f.Name]);
         AssignPass(ImportSuggestionConfidence.Alias, f => f.Aliases);
 
         return headers
@@ -190,18 +200,21 @@ public static class ImportCanonicalSchema
         }
     }
 
-    /// <summary>Eşlenmiş kanonik alanlara göre eksik zorunlu alanların okunabilir listesi (boşsa tam).</summary>
+    /// <summary>Eşlenmiş kanonik alanlara göre eksik zorunlu alanların okunabilir listesi (şablon başlıklarıyla; boşsa tam).</summary>
     public static IReadOnlyList<string> MissingRequired(ImportTable table, IEnumerable<string> mappedFields)
     {
         var mapped = mappedFields.ToHashSet(StringComparer.Ordinal);
         var requirement = Requirements[table];
-        var missing = requirement.AllOf.Where(f => !mapped.Contains(f)).ToList();
+        var missing = requirement.AllOf.Where(f => !mapped.Contains(f)).Select(f => Header(table, f)).ToList();
 
         if (requirement.AnyOf.Length > 0 && !requirement.AnyOf.Any(group => group.All(mapped.Contains)))
         {
-            missing.Add(string.Join(" veya ", requirement.AnyOf.Select(g => string.Join(" + ", g))));
+            missing.Add(string.Join(" veya ", requirement.AnyOf.Select(g => string.Join(" + ", g.Select(f => Header(table, f))))));
         }
 
         return missing;
     }
+
+    private static string Header(ImportTable table, string name)
+        => Fields(table).First(f => string.Equals(f.Name, name, StringComparison.Ordinal)).Header;
 }

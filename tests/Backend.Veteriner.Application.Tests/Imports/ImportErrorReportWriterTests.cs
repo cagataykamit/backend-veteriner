@@ -35,7 +35,7 @@ public sealed class ImportErrorReportWriterTests
         ]);
 
         using var wb = Open(bytes);
-        wb.Worksheets.Select(s => s.Name).Should().Equal("Musteriler", "Hayvanlar");
+        wb.Worksheets.Select(s => s.Name).Should().Equal("Musteriler", "Hastalar");
 
         var customers = wb.Worksheet("Musteriler");
         customers.Row(1).Cells(1, 6).Select(c => c.GetString()).Should()
@@ -45,7 +45,7 @@ public sealed class ImportErrorReportWriterTests
         customers.Cell(2, 4).GetString().Should().Be("Hata");
         customers.Cell(2, 5).GetString().Should().Be("Imports.RequiredMissing");
 
-        var pets = wb.Worksheet("Hayvanlar");
+        var pets = wb.Worksheet("Hastalar");
         pets.Cell(2, 5).GetString().Should().Be("Imports.SpeciesUnmapped; Imports.OwnerNotFound");
         pets.Cell(2, 6).GetString().Should().Contain("; ").And.Contain("katalogda bulunamadı");
     }

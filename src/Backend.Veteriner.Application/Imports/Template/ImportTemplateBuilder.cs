@@ -35,7 +35,7 @@ public static class ImportTemplateBuilder
     /// <summary>UTF-8 BOM'lu, <c>;</c> ayırıcılı, yalnız başlık satırı (Türkçe Excel doğrudan açar).</summary>
     public static byte[] BuildCsv(ImportTable table)
     {
-        var header = string.Join(';', ImportCanonicalSchema.Fields(table).Select(f => f.Name));
+        var header = string.Join(';', ImportCanonicalSchema.Fields(table).Select(f => f.Header));
         var preamble = Encoding.UTF8.GetPreamble();
         var body = Encoding.UTF8.GetBytes(header + "\r\n");
         return [.. preamble, .. body];
@@ -54,7 +54,7 @@ public static class ImportTemplateBuilder
         {
             var column = i + 1;
             var cell = sheet.Cell(1, column);
-            cell.Value = ImportCellSafety.ForExport(fields[i].Name);
+            cell.Value = ImportCellSafety.ForExport(fields[i].Header);
             cell.Style.Font.Bold = true;
             cell.Style.Fill.BackgroundColor = XLColor.LightGray;
 
@@ -62,7 +62,7 @@ public static class ImportTemplateBuilder
             if (fields[i].IsText)
                 sheet.Column(column).Style.NumberFormat.Format = "@";
 
-            sheet.Column(column).Width = Math.Max(14, fields[i].Name.Length + 4);
+            sheet.Column(column).Width = Math.Max(14, fields[i].Header.Length + 4);
         }
 
         sheet.SheetView.FreezeRows(1);
@@ -86,7 +86,7 @@ public static class ImportTemplateBuilder
             foreach (var field in ImportCanonicalSchema.Fields(table))
             {
                 sheet.Cell(row, 1).Value = ImportCellSafety.ForExport(ImportCanonicalSchema.SheetName(table));
-                sheet.Cell(row, 2).Value = ImportCellSafety.ForExport(field.Name);
+                sheet.Cell(row, 2).Value = ImportCellSafety.ForExport(field.Header);
                 sheet.Cell(row, 3).Value = ImportCellSafety.ForExport(field.RequiredNote);
                 sheet.Cell(row, 4).Value = ImportCellSafety.ForExport(field.Description);
                 sheet.Cell(row, 5).Value = ImportCellSafety.ForExport(field.Example);
