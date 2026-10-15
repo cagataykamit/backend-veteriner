@@ -17,7 +17,8 @@ public sealed class AppointmentsFilteredPagedSpec : Specification<Appointment>
         int pageSize,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
-        bool scheduledAtDescending)
+        bool scheduledAtDescending,
+        IReadOnlyCollection<Guid>? clientPetIds = null)
     {
         Query.AsNoTracking();
         Query.Where(a => a.TenantId == tenantId);
@@ -25,6 +26,8 @@ public sealed class AppointmentsFilteredPagedSpec : Specification<Appointment>
             Query.Where(a => a.ClinicId == clinicId.Value);
         if (petId.HasValue)
             Query.Where(a => a.PetId == petId.Value);
+        if (clientPetIds is not null)
+            Query.Where(a => clientPetIds.Contains(a.PetId));
         if (status.HasValue)
             Query.Where(a => a.Status == status.Value);
         if (dateFromUtc.HasValue)

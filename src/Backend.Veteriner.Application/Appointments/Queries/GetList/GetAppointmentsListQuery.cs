@@ -12,5 +12,6 @@ public sealed record GetAppointmentsListQuery(
     Guid? PetId = null,
     AppointmentStatus? Status = null,
     DateTime? DateFromUtc = null,
-    DateTime? DateToUtc = null)
+    DateTime? DateToUtc = null,
+    Guid? ClientId = null)
     : IRequest<Result<PagedResult<AppointmentListItemDto>>>;

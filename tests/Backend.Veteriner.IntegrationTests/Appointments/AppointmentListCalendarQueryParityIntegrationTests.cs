@@ -265,6 +265,36 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests : IClassF
         await AssertListParityAsync(query);
     }
 
+    [Fact]
+    public async Task List_ClientIdFilter_Should_MatchCommandPath_And_ExcludeOtherClients()
+    {
+        await ResetAsync();
+        var (tenantId, clinicId, petId, clientId) = await SeedScenarioAsync();
+        var otherPetId = await SeedOtherClientPetAsync(tenantId);
+        await SeedAppointmentAsync(tenantId, clinicId, petId, SlotAlignedUtcPlusDays(2), AppointmentStatus.Scheduled);
+        await SeedAppointmentAsync(tenantId, clinicId, otherPetId, SlotAlignedUtcPlusDays(3), AppointmentStatus.Scheduled);
+        await RebuildAsync();
+
+        var query = new GetAppointmentsListQuery(new PageRequest { Page = 1, PageSize = 20 }, clinicId, ClientId: clientId);
+
+        await AssertListParityAsync(query);
+        var commandResult = (await InvokeListHandlerAsync(query, false)).Value!;
+        commandResult.TotalItems.Should().Be(1);
+        commandResult.Items.Should().OnlyContain(x => x.ClientId == clientId && x.PetId == petId);
+    }
+
+    private async Task<Guid> SeedOtherClientPetAsync(Guid tenantId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+        var client = new Client(tenantId, "Parity Other Client", "905551110098");
+        var pet = new Pet(tenantId, client.Id, "ParityOtherPet", speciesId);
+        db.AddRange(client, pet);
+        await db.SaveChangesAsync();
+        return pet.Id;
+    }
+
     private async Task AssertListParityAsync(GetAppointmentsListQuery query)
     {
         var commandResult = await InvokeListHandlerAsync(query, appointmentsEnabled: false);

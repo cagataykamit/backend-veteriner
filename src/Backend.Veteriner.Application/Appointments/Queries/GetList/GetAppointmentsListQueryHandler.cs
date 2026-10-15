@@ -142,7 +142,8 @@ public sealed class GetAppointmentsListQueryHandler
                 page,
                 pageSize,
                 searchPattern,
-                scheduledAtDescending),
+                scheduledAtDescending,
+                request.ClientId),
             ct);
 
         _logger.LogInformation(
@@ -184,6 +185,16 @@ public sealed class GetAppointmentsListQueryHandler
             stepSw.Restart();
         }
 
+        var clientPetIds = await ClientListPetIds.ResolveAsync(tenantId, request.ClientId, _pets, ct);
+        if (clientPetIds is { Length: 0 })
+        {
+            return Result<PagedResult<AppointmentListItemDto>>.Success(
+                PagedResult<AppointmentListItemDto>.Create([], 0, page, pageSize));
+        }
+
+        if (clientPetIds is not null)
+            MarkStep("clientPetIdsLookup");
+
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         string? searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
         Guid[] searchPetIds = [];
@@ -211,7 +222,8 @@ public sealed class GetAppointmentsListQueryHandler
                 request.DateFromUtc,
                 request.DateToUtc,
                 searchPattern,
-                searchPetIds),
+                searchPetIds,
+                clientPetIds),
             ct);
         MarkStep("appointmentsCount");
 
@@ -227,7 +239,8 @@ public sealed class GetAppointmentsListQueryHandler
                 pageSize,
                 searchPattern,
                 searchPetIds,
-                scheduledAtDescending),
+                scheduledAtDescending,
+                clientPetIds),
             ct);
         MarkStep("appointmentsPage");
 

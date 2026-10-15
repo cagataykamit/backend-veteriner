@@ -1,6 +1,12 @@
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Models;
 
 namespace Backend.Veteriner.Application.Appointments;
+
+internal enum AppointmentListSortField
+{
+    ScheduledAtUtc
+}
 
 /// <summary>
 /// Randevu listesi sıralaması: yalnızca <c>scheduledAtUtc</c> (büyük/küçük harf duyarsız).
@@ -8,24 +14,12 @@ namespace Backend.Veteriner.Application.Appointments;
 /// </summary>
 internal static class AppointmentListSort
 {
-    public const string ScheduledAtUtcSortKey = "scheduledAtUtc";
+    public static readonly ListSortCatalog<AppointmentListSortField> Catalog = new(
+        ("scheduledAtUtc", AppointmentListSortField.ScheduledAtUtc));
 
     /// <summary>
     /// <see cref="Appointment.ScheduledAtUtc"/> için azalan mı (en yeni önce).
     /// </summary>
     public static bool ResolveScheduledAtDescending(PageRequest page)
-    {
-        var sort = page.Sort?.Trim();
-        if (string.IsNullOrEmpty(sort))
-            return true;
-
-        if (!string.Equals(sort, ScheduledAtUtcSortKey, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Sort alanı doğrulanmış olmalıdır.");
-
-        var order = page.Order?.Trim();
-        if (string.IsNullOrEmpty(order))
-            return true;
-
-        return string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
-    }
+        => Catalog.Resolve(page)?.Descending ?? true;
 }

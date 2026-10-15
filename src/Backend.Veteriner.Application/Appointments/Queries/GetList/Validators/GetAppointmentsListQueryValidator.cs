@@ -18,15 +18,16 @@ public sealed class GetAppointmentsListQueryValidator : AbstractValidator<GetApp
             .When(x => x.PageRequest.Search != null);
 
         RuleFor(x => x.PageRequest.Sort)
-            .Must(s => string.IsNullOrWhiteSpace(s)
-                || string.Equals(s.Trim(), AppointmentListSort.ScheduledAtUtcSortKey, StringComparison.OrdinalIgnoreCase))
-            .WithMessage("sort yalnızca ScheduledAtUtc olabilir (veya boş).");
+            .Must(AppointmentListSort.Catalog.IsAllowedSort)
+            .WithMessage(AppointmentListSort.Catalog.InvalidSortMessage);
 
         RuleFor(x => x.PageRequest.Order)
-            .Must(o => string.IsNullOrWhiteSpace(o)
-                || string.Equals(o.Trim(), "asc", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(o.Trim(), "desc", StringComparison.OrdinalIgnoreCase))
-            .WithMessage("order asc veya desc olmalıdır.");
+            .Must(ListSortOrder.IsAllowed)
+            .WithMessage(ListSortOrder.InvalidMessage);
+
+        RuleFor(x => x.ClientId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("clientId is invalid.");
 
         RuleFor(x => x)
             .Must(q =>

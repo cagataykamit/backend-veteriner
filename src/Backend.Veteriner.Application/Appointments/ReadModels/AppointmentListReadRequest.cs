@@ -11,4 +11,5 @@ public sealed record AppointmentListReadRequest(
     int Page,
     int PageSize,
     string? SearchContainsLikePattern,
-    bool ScheduledAtDescending);
+    bool ScheduledAtDescending,
+    Guid? ClientId = null);

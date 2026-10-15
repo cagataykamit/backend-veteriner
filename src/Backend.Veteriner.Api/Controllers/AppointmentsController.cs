@@ -105,7 +105,7 @@ public sealed class AppointmentsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Sayfalı randevu listesi. <c>search</c> (veya <c>page.search</c>): randevu notlarında; müşteri ad/e-posta/telefonda; hayvan ad/tür/ırk metinlerinde (hayvan listesi ile aynı küme). Sıralama: <c>sort=ScheduledAtUtc</c> (küçük/büyük harf duyarsız), <c>order=asc|desc</c>. Sort yoksa varsayılan en yeni randevu üstte (<c>scheduledAtUtc</c> azalan).</summary>
+    /// <summary>Sayfalı randevu listesi. <c>search</c> (veya <c>page.search</c>): randevu notlarında; müşteri ad/e-posta/telefonda; hayvan ad/tür/ırk metinlerinde (hayvan listesi ile aynı küme). <c>clientId</c>: yalnız bu müşterinin hayvanlarının randevuları (diğer süzgeçlerle AND). Sıralama: <c>sort=ScheduledAtUtc</c> (küçük/büyük harf duyarsız), <c>order=asc|desc</c>. Sort yoksa varsayılan en yeni randevu üstte (<c>scheduledAtUtc</c> azalan).</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Appointments.Read)]
     [ProducesResponseType(typeof(PagedResult<AppointmentListItemDto>), StatusCodes.Status200OK)]
@@ -118,6 +118,7 @@ public sealed class AppointmentsController : ControllerBase
         [FromQuery] AppointmentStatus? status = null,
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
+        [FromQuery] Guid? clientId = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -130,7 +131,8 @@ public sealed class AppointmentsController : ControllerBase
                 petId,
                 status,
                 dateFromUtc,
-                dateToUtc),
+                dateToUtc,
+                clientId),
             ct);
         return result.ToActionResult(this);
     }

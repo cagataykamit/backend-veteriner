@@ -67,6 +67,10 @@ public sealed class AppointmentReadModelReader : IAppointmentReadModelReader
         if (request.PetId.HasValue)
             query = query.Where(x => x.PetId == request.PetId.Value);
 
+        // Command DB yolunda müşterinin hayvan kimlikleri (ClientListPetIds) ile aynı küme; okuma modeli sahibi taşır.
+        if (request.ClientId.HasValue)
+            query = query.Where(x => x.ClientId == request.ClientId.Value);
+
         if (request.Status.HasValue)
             query = query.Where(x => x.Status == (int)request.Status.Value);
 
