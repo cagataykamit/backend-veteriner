@@ -398,8 +398,9 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **List/filter/search/pagination:**
 
-- Query: `page`, `pageSize`, `search`/`page.search`, `clinicId`, `clientId`, `petId`, `status`, `onlyOverdue`, `examinationId`, `dateFromUtc`, `dateToUtc`, `dueFromUtc`, `dueToUtc`, `appliedFromUtc`, `appliedToUtc`, `sort`, `order`.
+- Query: `page`, `pageSize`, `search`/`page.search`, `clinicId`, `clientId`, `petId`, `status`, `onlyOverdue`, `onlyReceivingCare`, `examinationId`, `dateFromUtc`, `dateToUtc`, `dueFromUtc`, `dueToUtc`, `appliedFromUtc`, `appliedToUtc`, `sort`, `order`.
 - Tüm yapısal filtreler birbiriyle **AND** birleşir.
+- `onlyReceivingCare` (bool, varsayılan `false`): `true` ise bakım dışı (vefat eden) hayvanların aşıları çıkmaz; koşul `Pet.ReceivesCare` (ADR-020 S5), kiracı içinde çözülür. Verilmezse **tümü** (geçmiş kayıtlar görünür; önceki davranış değişmedi). Pano "yaklaşan aşılar" kartı içindir. `onlyOverdue=true` bu dışlamayı zaten her zaman uygular (`PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md`).
 - `clientId`: yalnız o müşterinin (kiracı içindeki) hayvanlarının aşıları; müşterinin hayvanı yoksa / başka kiracıdaysa boş sayfa (hata değil); `Guid.Empty` → 400.
 - **Birleşik tarih aralığı (`dateFromUtc`/`dateToUtc`, liste ekranının tek “Başlangıç/Bitiş” süzgeci):** kayıt tarihi durum **Uygulandı** (`Applied`) ise `AppliedAtUtc`, değilse (`Scheduled`/`Cancelled`) `DueAtUtc`; iki uç **dahil** (`>=`, `<=`); tarihi boş kayıt aralığa girmez. Aşı raporu (§31) ile aynı eksen; varsayılan liste sırasının dayandığı `AppliedAtUtc ?? DueAtUtc` ile domain kuralları gereği aynı değerdir (Applied’da `AppliedAtUtc` zorunlu, diğerlerinde yasak). `dateFromUtc > dateToUtc` → 400.
 - `dueFromUtc`/`dueToUtc` ve `appliedFromUtc`/`appliedToUtc` **geriye uyumluluk** için korunur (ayrı alanlarda, iki uç dahil); birleşik aralıkla birlikte verilirse hepsi AND.

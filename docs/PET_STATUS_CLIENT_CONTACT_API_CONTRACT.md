@@ -55,6 +55,7 @@ Yanıt **200**:
 | `POST /examinations` | **409 `Pets.Deceased`** |
 | Otomatik aşı ve randevu e-posta hatırlatması | Aday değil; gönderilmez, günlük (dispatch log) yazılmaz |
 | `GET /vaccinations?onlyOverdue=true` (gecikmiş aşı listesi) | Vefat eden hayvanın aşısı çıkmaz |
+| `GET /vaccinations?onlyReceivingCare=true` (pano yaklaşan aşılar; opsiyonel süzgeç) | Vefat eden hayvanın aşısı çıkmaz. Süzgeçsiz genel liste değişmedi (tümü görünür) |
 | Pano operasyon uyarıları: `overdueVaccinationsCount`, `upcomingVaccinationsNext7DaysCount` | Sayılmaz |
 | Pano `overdueScheduledAppointmentsCount` (saati geçmiş planlı randevu) | **Sayılmaz** (K12). Randevu açık kalır (K4); yalnız gecikmiş iş sayısına girmez |
 | Hasta özeti `GET /pets/{id}/summary` | Yanıta `status` eklendi; `vaccinations.nextDue` görünür ama `isOverdue` hep `false` |
