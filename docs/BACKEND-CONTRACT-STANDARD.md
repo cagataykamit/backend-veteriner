@@ -251,16 +251,32 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 - Kanonik query parametre adı: **`search`**. `PageRequest` ile bağlanan listelerde ayrıca **`page.search`** kullanılabilir; **üst düzey `search` doluysa** (trim sonrası) o değer kullanılır (`PageRequestQuery.WithMergedSearch`).
 - Normalizasyon: `ListQueryTextSearch.Normalize` (trim, max 200 karakter); SQL `LIKE` için `%term%` ve joker kaçışı (`ListQueryTextSearch.BuildContainsLikePattern`).
-- **Sort/order:** Çoğu listede `PageRequest.Sort` / `Order` **işlenmez** (controller özetlerinde belirtilir). **İstisna:** `GET /api/v1/appointments` — yalnızca `sort=ScheduledAtUtc` (büyük/küçük harf duyarsız) ve `order=asc|desc`; sort yoksa varsayılan **en yeni üstte** (`scheduledAtUtc` azalan).
+- **Sort/order:** Çoğu listede `PageRequest.Sort` / `Order` **işlenmez** (controller özetlerinde belirtilir). **Klinik listeler** (randevu, muayene, aşı, tedavi, reçete, lab, yatış) **beyaz liste** uygular (`ListSortCatalog`, kural tek yerde):
+  - `sort` büyük/küçük harf duyarsız; listede olmayan değer → **400** (`Validation.FluentValidation`). `order` yalnız `asc` | `desc`, diğer değer → 400; `sort` dolu ve `order` boşsa `desc`.
+  - `sort` **boşsa** liste bugünkü varsayılan sırasını aynen korur ve `order` yok sayılır.
+  - Eşitlikte `id` aynı yönde kırıcıdır.
+
+  | Liste | İzinli `sort` | Varsayılan (sort yok) |
+  |---|---|---|
+  | `GET /api/v1/appointments` | `scheduledAtUtc` | `scheduledAtUtc` azalan |
+  | `GET /api/v1/examinations` | `examinedAtUtc` (eş ad: `examinationDateUtc`) | `examinedAtUtc` azalan |
+  | `GET /api/v1/vaccinations` | `dueAtUtc` (eş ad: `nextDueAtUtc`), `appliedAtUtc` — seçilen tarihi boş kayıtlar **her iki yönde sonda** | birleşik tarih (`AppliedAtUtc ?? DueAtUtc`) azalan |
+  | `GET /api/v1/treatments` | `treatmentDateUtc` | `treatmentDateUtc` azalan |
+  | `GET /api/v1/prescriptions` | `prescribedAtUtc` | `prescribedAtUtc` azalan |
+  | `GET /api/v1/lab-results` | `requestedAtUtc` | `requestedAtUtc` azalan |
+  | `GET /api/v1/hospitalizations` | `admittedAtUtc` | `admittedAtUtc` azalan |
+
+  Eş adlar (`examinationDateUtc`, `nextDueAtUtc`) frontend panosunun (dashboard) bugün gönderdiği değerlerle geriye uyumluluk içindir; yeni istemciler kanonik adı kullanmalıdır.
+- **Müşteri süzgeci (`clientId`):** Randevu, muayene ve aşı listelerinde opsiyonel `clientId` — yalnız o müşterinin (kiracı içindeki) hayvanlarına ait kayıtlar (`ClientListPetIds`; randevu Query read-model yolunda satırdaki `ClientId`). Diğer süzgeçler ve `search` ile **AND**. Müşterinin hayvanı yoksa / müşteri başka kiracıdaysa **boş sayfa** (200, hata değil). `Guid.Empty` → 400.
 - **Kiracı:** `ITenantContext.TenantId` zorunlu; klinik bağlamı olan listelerde `clinicId` istek parametresi ile JWT/header clinic uyumsuzluğunda iş kuralı hatası.
 
 | Modül | GET endpoint | `search` | Metin hangi alanlarda |
 |--------|----------------|----------|------------------------|
 | Clients | `GET /api/v1/clients` | Evet | `FullName`, `Email`, `Phone`, `PhoneNormalized` |
 | Pets | `GET /api/v1/pets` | Evet | Hayvan: `Name`, `Breed`, `Species.Name`, `BreedRef.Name`; müşteri metni: `ClientsByTenantTextSearchSpec` ile eşleşen sahiplerin petleri. **AND** `clientId`, `speciesId` filtreleri. |
-| Appointments | `GET /api/v1/appointments` | Evet | Randevu `Notes`; pet id’ler: müşteri metni + hayvan metin alanları (`PetsByTenantTextFieldsSearchSpec` ile hayvan listesi ile aynı küme). **AND** `clinicId`, `petId`, `status`, tarih aralığı. **Sıralama:** `sort`/`order` yalnızca `ScheduledAtUtc` + `asc`/`desc`; sort yoksa en yeni üstte. |
-| Examinations | `GET /api/v1/examinations` | Evet | `VisitReason`, `Findings`, `Assessment`, `Notes`; pet id’ler: müşteri + hayvan metin (yukarıdaki gibi). **AND** `clinicId`, `petId`, **`appointmentId`** (randevuya bağlı muayene), `dateFromUtc`, `dateToUtc` (hepsi AND). |
-| Vaccinations | `GET /api/v1/vaccinations` | Evet | `VaccineName`, `Notes`; pet id’ler: müşteri + hayvan metin. **AND** klinik/pet/durum/tarih filtreleri. |
+| Appointments | `GET /api/v1/appointments` | Evet | Randevu `Notes`; pet id’ler: müşteri metni + hayvan metin alanları (`PetsByTenantTextFieldsSearchSpec` ile hayvan listesi ile aynı küme). **AND** `clinicId`, **`clientId`**, `petId`, `status`, tarih aralığı. **Sıralama:** `sort`/`order` yalnızca `ScheduledAtUtc` + `asc`/`desc`; sort yoksa en yeni üstte. |
+| Examinations | `GET /api/v1/examinations` | Evet | `VisitReason`, `Findings`, `Assessment`, `Notes`; pet id’ler: müşteri + hayvan metin (yukarıdaki gibi). **AND** `clinicId`, **`clientId`**, `petId`, **`appointmentId`** (randevuya bağlı muayene), `visitId`, `dateFromUtc`, `dateToUtc` (hepsi AND). **Sıralama:** yukarıdaki beyaz liste. |
+| Vaccinations | `GET /api/v1/vaccinations` | Evet | `VaccineName`, `Notes`; pet id’ler: müşteri + hayvan metin. **AND** klinik/**müşteri**/pet/durum/tarih filtreleri (birleşik `dateFromUtc`/`dateToUtc` dahil, §11.2). **Sıralama:** yukarıdaki beyaz liste. |
 | Payments | `GET /api/v1/payments` | Evet | `Notes`, `Currency`; eşleşen `ClientId` / `PetId` ön kümesi (müşteri metni + `PetsByTenantTextFieldsSearchSpec`). **AND** klinik, müşteri, hayvan, yöntem, ödeme tarihi. |
 | Treatments | `GET /api/v1/treatments` | Evet | `Title`, `Description`, `Notes`; pet id’ler: müşteri + hayvan metin (examinations ile aynı `ListSearchPetIds` örüntüsü). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc` (liste query). |
 | Prescriptions | `GET /api/v1/prescriptions` | Evet | `Title`, `Content`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. |
@@ -287,7 +303,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **Frontend:** Form ve state tek alan: `visitReason`. Eski `complaint` gönderen kodlar kademeli kaldırılabilir; yeni kod yalnızca `visitReason` kullanmalı.
 
-**Liste `GET /api/v1/examinations`:** `PageRequest` (`page`, `pageSize`, `search` / `page.search`), opsiyonel `clinicId`, `petId`, **`appointmentId`** (`Examination.AppointmentId` eşitliği; randevu detayından doğrudan muayene listesi için), `dateFromUtc`, `dateToUtc`. Tüm yapılandırılmış filtreler birbiri ile **AND**; `search` doluysa mevcut metin + pet kümesi kuralları bu filtrelerle **AND** birleşir. `sort`/`order` işlenmez. Boş GUID filtre değerleri 400 (validasyon).
+**Liste `GET /api/v1/examinations`:** `PageRequest` (`page`, `pageSize`, `search` / `page.search`), opsiyonel `clinicId`, **`clientId`** (müşterinin hayvanları; §10), `petId`, **`appointmentId`** (`Examination.AppointmentId` eşitliği; randevu detayından doğrudan muayene listesi için), `dateFromUtc`, `dateToUtc`. Tüm yapılandırılmış filtreler birbiri ile **AND**; `search` doluysa mevcut metin + pet kümesi kuralları bu filtrelerle **AND** birleşir. `sort=examinedAtUtc` (eş ad `examinationDateUtc`) + `order=asc|desc`; sort yoksa en yeni üstte (§10 beyaz liste). Boş GUID filtre değerleri 400 (validasyon).
 
 ### 11.1) Examinations — CRUD / list / detail / update sözleşmesi
 
@@ -345,7 +361,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 - `POST /api/v1/vaccinations` → `Vaccinations.Create`, başarı `201 Created`, gövde **çıplak `Guid`** (oluşan `id`). **Opsiyonel `productId` (+ `quantity`, `batchId`, `requestId`) verilirse** aynı işlemde stoktan düşen uygulama da yazılır ve ayrıca `Administrations.Create` gerekir; yanıt `{ created, id, administration, stock }` olur, `requestId` tekrarında 200. Kurallar ve iptal tutarlılığı: `ADMINISTRATIONS_API_CONTRACT.md` bölüm 9.
 - `PUT /api/v1/vaccinations/{id}` → `Vaccinations.Update`, başarı `204 NoContent`.
 - `GET /api/v1/vaccinations/{id}` → `Vaccinations.Read`, başarı `200` + `VaccinationDetailDto`.
-- `GET /api/v1/vaccinations` → `Vaccinations.Read`, başarı `200` + `PagedResult<VaccinationListItemDto>`. Opsiyonel süzgeç `examinationId` (Guid): yalnız `Vaccination.ExaminationId` bu değere eşit kayıtlar; kiracı ve klinik kapsamı süzgeçten bağımsız uygulanır (başka kiracı/klinik muayene kimliği boş sayfa döner, hata değil). Diğer süzgeçlerle AND.
+- `GET /api/v1/vaccinations` → `Vaccinations.Read`, başarı `200` + `PagedResult<VaccinationListItemDto>`. Opsiyonel süzgeç `examinationId` (Guid): yalnız `Vaccination.ExaminationId` bu değere eşit kayıtlar; kiracı ve klinik kapsamı süzgeçten bağımsız uygulanır (başka kiracı/klinik muayene kimliği boş sayfa döner, hata değil). Diğer süzgeçlerle AND. `clientId`, birleşik `dateFromUtc`/`dateToUtc` ve `sort`/`order` için aşağıdaki liste bölümüne bakın.
 
 **Canonical alan notu:**
 
@@ -382,10 +398,13 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 **List/filter/search/pagination:**
 
-- Query: `page`, `pageSize`, `search`/`page.search`, `clinicId`, `petId`, `status`, `dueFromUtc`, `dueToUtc`, `appliedFromUtc`, `appliedToUtc`.
+- Query: `page`, `pageSize`, `search`/`page.search`, `clinicId`, `clientId`, `petId`, `status`, `onlyOverdue`, `examinationId`, `dateFromUtc`, `dateToUtc`, `dueFromUtc`, `dueToUtc`, `appliedFromUtc`, `appliedToUtc`, `sort`, `order`.
 - Tüm yapısal filtreler birbiriyle **AND** birleşir.
+- `clientId`: yalnız o müşterinin (kiracı içindeki) hayvanlarının aşıları; müşterinin hayvanı yoksa / başka kiracıdaysa boş sayfa (hata değil); `Guid.Empty` → 400.
+- **Birleşik tarih aralığı (`dateFromUtc`/`dateToUtc`, liste ekranının tek “Başlangıç/Bitiş” süzgeci):** kayıt tarihi durum **Uygulandı** (`Applied`) ise `AppliedAtUtc`, değilse (`Scheduled`/`Cancelled`) `DueAtUtc`; iki uç **dahil** (`>=`, `<=`); tarihi boş kayıt aralığa girmez. Aşı raporu (§31) ile aynı eksen; varsayılan liste sırasının dayandığı `AppliedAtUtc ?? DueAtUtc` ile domain kuralları gereği aynı değerdir (Applied’da `AppliedAtUtc` zorunlu, diğerlerinde yasak). `dateFromUtc > dateToUtc` → 400.
+- `dueFromUtc`/`dueToUtc` ve `appliedFromUtc`/`appliedToUtc` **geriye uyumluluk** için korunur (ayrı alanlarda, iki uç dahil); birleşik aralıkla birlikte verilirse hepsi AND.
 - `search` doluysa `VaccineName`, `Notes` ve müşteri+hayvan metninden türetilen pet kümesi üzerinden eşleşme yapılır.
-- `sort`/`order` işlenmez; liste sırası `AppliedAtUtc ?? DueAtUtc` azalan, sonra `Id` azalan.
+- Sıralama (§10 beyaz liste): `sort=dueAtUtc` (eş ad `nextDueAtUtc`) veya `appliedAtUtc`, `order=asc|desc`; seçilen tarih alanı boş olan kayıtlar her iki yönde **sonda**, eşitlikte `Id` aynı yönde. `sort` yoksa sıra değişmedi: `AppliedAtUtc ?? DueAtUtc` azalan, sonra `Id` azalan.
 - Handler `page >= 1`, `pageSize 1..200` clamp uygular.
 
 **Liste/detay DTO farkı:**
@@ -533,7 +552,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 ## 13) Treatments — request/response ve OpenAPI
 
-**Liste** `GET /api/v1/treatments` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `Treatments.ClinicContextMismatch`. `sort`/`order` işlenmez.
+**Liste** `GET /api/v1/treatments` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `Treatments.ClinicContextMismatch`. `sort=treatmentDateUtc` + `order=asc|desc` (§10 beyaz liste; diğer sort → 400); sort yoksa en yeni üstte.
 
 **Create** `POST /api/v1/treatments` gövdesi: `CreateTreatmentCommand`.
 
@@ -572,7 +591,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 ## 14) Prescriptions — request/response ve OpenAPI
 
-**Liste** `GET /api/v1/prescriptions` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `Prescriptions.ClinicContextMismatch`. `sort`/`order` işlenmez.
+**Liste** `GET /api/v1/prescriptions` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `Prescriptions.ClinicContextMismatch`. `sort=prescribedAtUtc` + `order=asc|desc` (§10 beyaz liste; diğer sort → 400); sort yoksa en yeni üstte.
 
 **Create** `POST /api/v1/prescriptions` gövdesi: `CreatePrescriptionCommand`.
 
@@ -613,7 +632,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 ## 15) Lab Results — request/response ve OpenAPI
 
-**Liste** `GET /api/v1/lab-results` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `LabResults.ClinicContextMismatch`. `sort`/`order` işlenmez. Boş `clinicId` / `petId` GUID filtreleri liste validator’ünde reddedilir.
+**Liste** `GET /api/v1/lab-results` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `LabResults.ClinicContextMismatch`. `sort=requestedAtUtc` + `order=asc|desc` (§10 beyaz liste; diğer sort → 400); sort yoksa en yeni üstte. Boş `clinicId` / `petId` GUID filtreleri liste validator’ünde reddedilir.
 
 **Create** `POST /api/v1/lab-results` gövdesi: `CreateLabResultCommand`.
 
@@ -653,7 +672,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 ## 16) Hospitalizations — request/response ve OpenAPI
 
-**Liste** `GET /api/v1/hospitalizations` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, **`activeOnly`** (`true` → yalnız `dischargedAtUtc == null`; `false` → yalnız taburcu edilmiş; **omit** → tümü), `dateFromUtc`, `dateToUtc` (**`admittedAtUtc`** alanına göre). JWT/header clinic ile `clinicId` uyumsuzsa `Hospitalizations.ClinicContextMismatch`. `sort`/`order` işlenmez. Boş `clinicId` / `petId` GUID filtreleri liste validator’ünde reddedilir.
+**Liste** `GET /api/v1/hospitalizations` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, **`activeOnly`** (`true` → yalnız `dischargedAtUtc == null`; `false` → yalnız taburcu edilmiş; **omit** → tümü), `dateFromUtc`, `dateToUtc` (**`admittedAtUtc`** alanına göre). JWT/header clinic ile `clinicId` uyumsuzsa `Hospitalizations.ClinicContextMismatch`. `sort=admittedAtUtc` + `order=asc|desc` (§10 beyaz liste; diğer sort → 400); sort yoksa en yeni üstte. Boş `clinicId` / `petId` GUID filtreleri liste validator’ünde reddedilir.
 
 **Create** `POST /api/v1/hospitalizations` gövdesi: `CreateHospitalizationCommand`.
 
@@ -923,11 +942,11 @@ FluentValidation → `400` `ValidationProblemDetails`.
 
 ### Liste davranışı (filter/search/paging/sort)
 
-- Query: `page`, `pageSize`, `search`/`page.search`, `clinicId`, `petId`, `status`, `dateFromUtc`, `dateToUtc`.
+- Query: `page`, `pageSize`, `search`/`page.search`, `clinicId`, `clientId`, `petId`, `status`, `dateFromUtc`, `dateToUtc`.
 - `search` metin kümesi:
   - randevu `notes`
   - pet metni (`name`, `species`, `breed`) + müşteri metni ile eşleşen pet id kümesi (`ListSearchPetIds`)
-- Filtreler (`clinicId/petId/status/date`) birbirleri ile **AND** uygulanır.
+- Filtreler (`clinicId/clientId/petId/status/date`) birbirleri ile **AND** uygulanır. `clientId`: müşterinin hayvanlarının randevuları (Command DB: `ClientListPetIds`; `QueryReadModels:AppointmentsEnabled` açıkken read-model satırındaki `ClientId` — aynı küme).
 - Sort yalnızca `scheduledAtUtc` + `asc|desc`; sort boşsa varsayılan **desc** (en yeni önce).
 - `page/pageSize` handler içinde clamp edilir (`1..200`).
 
