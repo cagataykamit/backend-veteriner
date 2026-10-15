@@ -16,6 +16,14 @@ public sealed class GetPrescriptionsListQueryValidator : AbstractValidator<GetPr
             .MaximumLength(ListQueryTextSearch.MaxTermLength)
             .When(x => x.PageRequest.Search != null);
 
+        RuleFor(x => x.PageRequest.Sort)
+            .Must(PrescriptionListSort.Catalog.IsAllowedSort)
+            .WithMessage(PrescriptionListSort.Catalog.InvalidSortMessage);
+
+        RuleFor(x => x.PageRequest.Order)
+            .Must(ListSortOrder.IsAllowed)
+            .WithMessage(ListSortOrder.InvalidMessage);
+
         RuleFor(x => x)
             .Must(x => !x.DateFromUtc.HasValue || !x.DateToUtc.HasValue || x.DateFromUtc <= x.DateToUtc)
             .WithMessage("dateFromUtc, dateToUtc'den küçük veya eşit olmalıdır.");

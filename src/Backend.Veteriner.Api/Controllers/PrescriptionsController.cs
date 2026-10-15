@@ -105,7 +105,7 @@ public sealed class PrescriptionsController : ControllerBase
 
     /// <summary>
     /// Paged list. <c>search</c> (or <c>page.search</c>): title, content, notes, and pet/client name match (same pattern as treatments).
-    /// <c>sort</c>/<c>order</c> on <see cref="PageRequest"/> are not applied.
+    /// Sorting: <c>sort=prescribedAtUtc</c>, <c>order=asc|desc</c>; other sort values return 400. Without sort: newest first.
     /// </summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]

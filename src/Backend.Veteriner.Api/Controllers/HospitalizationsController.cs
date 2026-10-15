@@ -127,7 +127,7 @@ public sealed class HospitalizationsController : ControllerBase
     /// <summary>
     /// Paged list. <c>search</c> (or <c>page.search</c>): reason, notes, and pet/client name match.
     /// <c>activeOnly=true</c> limits to open stays; <c>false</c> to discharged only; omit for all.
-    /// <c>sort</c>/<c>order</c> on <see cref="PageRequest"/> are not applied.
+    /// Sorting: <c>sort=admittedAtUtc</c>, <c>order=asc|desc</c>; other sort values return 400. Without sort: newest first.
     /// </summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Hospitalizations.Read)]

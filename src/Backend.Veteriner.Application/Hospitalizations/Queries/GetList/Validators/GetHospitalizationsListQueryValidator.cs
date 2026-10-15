@@ -16,6 +16,14 @@ public sealed class GetHospitalizationsListQueryValidator : AbstractValidator<Ge
             .MaximumLength(ListQueryTextSearch.MaxTermLength)
             .When(x => x.PageRequest.Search != null);
 
+        RuleFor(x => x.PageRequest.Sort)
+            .Must(HospitalizationListSort.Catalog.IsAllowedSort)
+            .WithMessage(HospitalizationListSort.Catalog.InvalidSortMessage);
+
+        RuleFor(x => x.PageRequest.Order)
+            .Must(ListSortOrder.IsAllowed)
+            .WithMessage(ListSortOrder.InvalidMessage);
+
         RuleFor(x => x.ClinicId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("clinicId is invalid.");

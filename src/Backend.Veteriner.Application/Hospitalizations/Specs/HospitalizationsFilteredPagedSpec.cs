@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,7 +18,8 @@ public sealed class HospitalizationsFilteredPagedSpec : Specification<Hospitaliz
         int pageSize,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        ListSortChoice<HospitalizationListSortField>? sort = null)
     {
         Query.Where(x => x.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -53,8 +55,12 @@ public sealed class HospitalizationsFilteredPagedSpec : Specification<Hospitaliz
                 || (pids.Length > 0 && pids.Contains(x.PetId)));
         }
 
-        Query.OrderByDescending(x => x.AdmittedAtUtc)
-            .ThenByDescending(x => x.Id)
+        // Tek izinli alan AdmittedAtUtc; sort yoksa azalan (bkz. HospitalizationListSort).
+        var ordered = (sort?.Descending ?? true)
+            ? Query.OrderByDescending(x => x.AdmittedAtUtc).ThenByDescending(x => x.Id)
+            : Query.OrderBy(x => x.AdmittedAtUtc).ThenBy(x => x.Id);
+
+        ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
     }

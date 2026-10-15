@@ -125,7 +125,8 @@ public sealed class GetPrescriptionsListQueryHandler
                 pageSize,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                PrescriptionListSort.Catalog.Resolve(request.PageRequest)),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();

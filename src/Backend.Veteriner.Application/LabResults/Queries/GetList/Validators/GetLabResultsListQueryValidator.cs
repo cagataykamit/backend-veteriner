@@ -16,6 +16,14 @@ public sealed class GetLabResultsListQueryValidator : AbstractValidator<GetLabRe
             .MaximumLength(ListQueryTextSearch.MaxTermLength)
             .When(x => x.PageRequest.Search != null);
 
+        RuleFor(x => x.PageRequest.Sort)
+            .Must(LabResultListSort.Catalog.IsAllowedSort)
+            .WithMessage(LabResultListSort.Catalog.InvalidSortMessage);
+
+        RuleFor(x => x.PageRequest.Order)
+            .Must(ListSortOrder.IsAllowed)
+            .WithMessage(ListSortOrder.InvalidMessage);
+
         RuleFor(x => x.ClinicId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("clinicId is invalid.");

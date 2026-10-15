@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Treatments;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,7 +17,8 @@ public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment, Treat
         int pageSize,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        ListSortChoice<TreatmentListSortField>? sort = null)
     {
         Query.AsNoTracking();
         Query.Where(t => t.TenantId == tenantId);
@@ -49,9 +51,12 @@ public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment, Treat
                 || (pids.Length > 0 && pids.Contains(t.PetId)));
         }
 
-        Query
-            .OrderByDescending(t => t.TreatmentDateUtc)
-            .ThenByDescending(t => t.Id)
+        // Tek izinli alan TreatmentDateUtc; sort yoksa azalan (bkz. TreatmentListSort).
+        var ordered = (sort?.Descending ?? true)
+            ? Query.OrderByDescending(t => t.TreatmentDateUtc).ThenByDescending(t => t.Id)
+            : Query.OrderBy(t => t.TreatmentDateUtc).ThenBy(t => t.Id);
+
+        ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
 

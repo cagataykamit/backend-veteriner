@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.LabResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,7 +18,8 @@ public sealed class LabResultsFilteredPagedSpec : Specification<LabResult>
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
-        LabResultStatus? status = null)
+        LabResultStatus? status = null,
+        ListSortChoice<LabResultListSortField>? sort = null)
     {
         Query.Where(x => x.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -54,8 +56,12 @@ public sealed class LabResultsFilteredPagedSpec : Specification<LabResult>
                 || (pids.Length > 0 && pids.Contains(x.PetId)));
         }
 
-        Query.OrderByDescending(x => x.RequestedAtUtc)
-            .ThenByDescending(x => x.Id)
+        // Tek izinli alan RequestedAtUtc; sort yoksa azalan (bkz. LabResultListSort).
+        var ordered = (sort?.Descending ?? true)
+            ? Query.OrderByDescending(x => x.RequestedAtUtc).ThenByDescending(x => x.Id)
+            : Query.OrderBy(x => x.RequestedAtUtc).ThenBy(x => x.Id);
+
+        ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
     }

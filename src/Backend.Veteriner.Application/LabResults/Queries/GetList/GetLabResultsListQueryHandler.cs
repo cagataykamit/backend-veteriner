@@ -127,7 +127,8 @@ public sealed class GetLabResultsListQueryHandler
                 searchPattern,
                 searchPetIds,
                 accessibleClinicIds,
-                request.Status),
+                request.Status,
+                LabResultListSort.Catalog.Resolve(request.PageRequest)),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();

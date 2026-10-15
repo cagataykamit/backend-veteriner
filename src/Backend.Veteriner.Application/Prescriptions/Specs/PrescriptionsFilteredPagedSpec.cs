@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Prescriptions;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,7 +17,8 @@ public sealed class PrescriptionsFilteredPagedSpec : Specification<Prescription>
         int pageSize,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        ListSortChoice<PrescriptionListSortField>? sort = null)
     {
         Query.Where(p => p.TenantId == tenantId);
         if (clinicId.HasValue)
@@ -48,8 +50,12 @@ public sealed class PrescriptionsFilteredPagedSpec : Specification<Prescription>
                 || (pids.Length > 0 && pids.Contains(p.PetId)));
         }
 
-        Query.OrderByDescending(p => p.PrescribedAtUtc)
-            .ThenByDescending(p => p.Id)
+        // Tek izinli alan PrescribedAtUtc; sort yoksa azalan (bkz. PrescriptionListSort).
+        var ordered = (sort?.Descending ?? true)
+            ? Query.OrderByDescending(p => p.PrescribedAtUtc).ThenByDescending(p => p.Id)
+            : Query.OrderBy(p => p.PrescribedAtUtc).ThenBy(p => p.Id);
+
+        ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize);
     }

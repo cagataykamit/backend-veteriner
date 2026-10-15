@@ -152,7 +152,8 @@ public sealed class GetTreatmentsListQueryHandler
                 pageSize,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                TreatmentListSort.Catalog.Resolve(request.PageRequest)),
             ct);
         MarkStep("treatmentsPage");
 

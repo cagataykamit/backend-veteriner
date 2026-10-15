@@ -126,7 +126,7 @@ public sealed class LabResultsController : ControllerBase
 
     /// <summary>
     /// Paged list. <c>search</c> (or <c>page.search</c>): testName, resultText, interpretation, notes, and pet/client name match (same pattern as prescriptions/treatments).
-    /// <c>sort</c>/<c>order</c> on <see cref="PageRequest"/> are not applied.
+    /// Sorting: <c>sort=requestedAtUtc</c>, <c>order=asc|desc</c>; other sort values return 400. Without sort: newest first.
     /// </summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.LabResults.Read)]

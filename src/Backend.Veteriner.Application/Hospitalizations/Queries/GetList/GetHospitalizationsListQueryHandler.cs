@@ -127,7 +127,8 @@ public sealed class GetHospitalizationsListQueryHandler
                 pageSize,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                HospitalizationListSort.Catalog.Resolve(request.PageRequest)),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
