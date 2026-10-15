@@ -163,7 +163,7 @@ public sealed partial class ImportValidationEngine
         {
             if (!_petByRef.TryGetValue(reference, out var node))
             {
-                issues.Add(ImportRules.PetNotFound.At("HayvanNo", $"'{reference}' numaralı hayvan dosyada bulunamadı.", reference));
+                issues.Add(ImportRules.PetNotFound.At("HayvanNo", $"'{reference}' numaralı hasta dosyada bulunamadı.", reference));
                 return (null, false);
             }
 
@@ -172,7 +172,7 @@ public sealed partial class ImportValidationEngine
 
             if (node.Ref is null)
             {
-                issues.Add(ImportRules.PetRowInvalid.At("HayvanNo", $"Hayvan satırı ({node.Row}) hatalı.", reference));
+                issues.Add(ImportRules.PetRowInvalid.At("HayvanNo", $"Hasta satırı ({node.Row}) hatalı.", reference));
                 return (null, false);
             }
 
@@ -186,7 +186,7 @@ public sealed partial class ImportValidationEngine
         var petName = ImportValueParsers.NormalizeText(reader.Raw("HayvanAdi"));
         if (petName is null)
         {
-            issues.Add(ImportRules.PetNotFound.At("HayvanAdi", "Hayvan adı boş; hayvan bulunamadı."));
+            issues.Add(ImportRules.PetNotFound.At("HayvanAdi", "Hasta adı boş; hasta bulunamadı."));
             return (null, false);
         }
 
@@ -199,7 +199,7 @@ public sealed partial class ImportValidationEngine
         {
             issues.Add(species.Kind == ImportValueResolutionKind.Unmapped
                 ? ImportRules.SpeciesUnmapped.At("Tur", value: rawSpecies)
-                : ImportRules.PetNotFound.At("Tur", "Hayvan türü boş; hayvan bulunamadı."));
+                : ImportRules.PetNotFound.At("Tur", "Hayvan türü boş; hasta bulunamadı."));
             return (null, false);
         }
 
@@ -211,7 +211,7 @@ public sealed partial class ImportValidationEngine
         if (owner.ClientId is { } clientId && _dbPetByIdentity.TryGetValue((clientId, nameKey, speciesId), out var dbPet))
             return (new PetRef($"db:{dbPet.Id}", dbPet.Id, dbPet.SpeciesId, dbPet.BirthDate, owner), false);
 
-        issues.Add(ImportRules.PetNotFound.At("HayvanAdi", "Hayvan dosyada veya sahibinin kayıtlı hayvanları arasında bulunamadı.", petName));
+        issues.Add(ImportRules.PetNotFound.At("HayvanAdi", "Hasta dosyada veya sahibinin kayıtlı hastaları arasında bulunamadı.", petName));
         return (null, false);
     }
 

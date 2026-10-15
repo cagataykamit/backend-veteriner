@@ -212,7 +212,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
                 {
                     var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(unit.TenantId, petId), ct);
                     if (pet is null)
-                        return Fail(row, "Pets.NotFound", "Eşleşen hayvan artık bulunamadı.");
+                        return Fail(row, "Pets.NotFound", "Eşleşen hasta artık bulunamadı.");
                     unit.PetIds[key!] = pet.Id;
                     unit.ExistingPetIds.Add(pet.Id);
                     unit.Add(row, ImportRowApplyStatus.Matched, PetEntity, pet.Id, matched: true);

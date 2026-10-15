@@ -61,7 +61,7 @@ public static class ImportRules
     public static readonly ImportRule DueTooFarInFuture = new("Vaccinations.DueTooFarInFuture", ImportIssueSeverity.Error,
         "Sonraki aşı tarihi en fazla 5 yıl ileriye girilebilir.");
     public static readonly ImportRule AppliedBeforeBirth = new("Imports.AppliedBeforeBirth", ImportIssueSeverity.Warning,
-        "Uygulama tarihi hayvanın doğum tarihinden önce.");
+        "Uygulama tarihi hastanın doğum tarihinden önce.");
 
     // Mikroçip (K10)
     public static readonly ImportRule MicrochipInvalid = new("Imports.MicrochipInvalid", ImportIssueSeverity.Error,
@@ -71,7 +71,7 @@ public static class ImportRules
     public static readonly ImportRule MicrochipLength = new("Imports.MicrochipLength", ImportIssueSeverity.Warning,
         "Mikroçip 15 haneli değil (eski çip olabilir).");
     public static readonly ImportRule MicrochipConflict = new("Imports.MicrochipConflict", ImportIssueSeverity.Error,
-        "Aynı mikroçip başka bir hayvanda kayıtlı.");
+        "Aynı mikroçip başka bir hastada kayıtlı.");
 
     // Değer eşleme (K6)
     public static readonly ImportRule SpeciesUnmapped = new("Imports.SpeciesUnmapped", ImportIssueSeverity.Error,
@@ -81,7 +81,7 @@ public static class ImportRules
     public static readonly ImportRule ValueSkipped = new("Imports.ValueSkipped", ImportIssueSeverity.Warning,
         "Bu değer eşlemede bilinçli olarak atlandı; satır aktarılmayacak.");
     public static readonly ImportRule ParentSkipped = new("Imports.ParentSkipped", ImportIssueSeverity.Warning,
-        "Bağlı olduğu hayvan satırı atlandığı için bu satır da atlanacak.");
+        "Bağlı olduğu hasta satırı atlandığı için bu satır da atlanacak.");
     public static readonly ImportRule BreedFreeText = new("Imports.BreedFreeText", ImportIssueSeverity.Info,
         "Irk katalogda bulunamadı; serbest metin olarak aktarılacak.");
     public static readonly ImportRule ColorFreeText = new("Imports.ColorFreeText", ImportIssueSeverity.Info,
@@ -91,7 +91,7 @@ public static class ImportRules
     public static readonly ImportRule VaccineInvalidSpecies = new("VaccineDefinitions.InvalidSpecies", ImportIssueSeverity.Error,
         "Eşlenen aşı tanımı hayvan türü ile uyumlu değil.");
 
-    // Hayvan alanları
+    // Hasta alanları
     public static readonly ImportRule GenderUnrecognized = new("Imports.GenderUnrecognized", ImportIssueSeverity.Warning,
         "Cinsiyet tanınmadı; boş aktarılacak.");
     public static readonly ImportRule NeuteredUnrecognized = new("Imports.NeuteredUnrecognized", ImportIssueSeverity.Warning,
@@ -113,17 +113,17 @@ public static class ImportRules
     public static readonly ImportRule PossibleDuplicate = new("Imports.PossibleDuplicate", ImportIssueSeverity.Warning,
         "Telefon ve e-posta yok; aynı adlı bir müşteri zaten var. Ayırt edilemediği için yeni müşteri oluşacak.");
     public static readonly ImportRule DuplicateVaccination = new("Imports.DuplicateVaccination", ImportIssueSeverity.Info,
-        "Aynı hayvan, aynı aşı ve aynı uygulama günü için kayıt zaten var; bu satır atlanacak.");
+        "Aynı hasta, aynı aşı ve aynı uygulama günü için kayıt zaten var; bu satır atlanacak.");
 
     // Bağlantılar
     public static readonly ImportRule OwnerNotFound = new("Imports.OwnerNotFound", ImportIssueSeverity.Error,
-        "Hayvanın sahibi dosyada veya kayıtlı müşterilerde bulunamadı.");
+        "Hastanın sahibi dosyada veya kayıtlı müşterilerde bulunamadı.");
     public static readonly ImportRule OwnerRowInvalid = new("Imports.OwnerRowInvalid", ImportIssueSeverity.Error,
         "Sahip müşteri satırı hatalı olduğu için bu satır aktarılamaz.");
     public static readonly ImportRule PetNotFound = new("Imports.PetNotFound", ImportIssueSeverity.Error,
-        "Aşının hayvanı dosyada veya kayıtlı hayvanlarda bulunamadı.");
+        "Aşının hastası dosyada veya kayıtlı hastalarda bulunamadı.");
     public static readonly ImportRule PetRowInvalid = new("Imports.PetRowInvalid", ImportIssueSeverity.Error,
-        "Hayvan satırı hatalı olduğu için bu aşı satırı aktarılamaz.");
+        "Hasta satırı hatalı olduğu için bu aşı satırı aktarılamaz.");
 
     // Uygulama (B4; satır sonucu yazılırken sorun listesine eklenir, doğrulama durumu değişmez)
     public static readonly ImportRule OwnerUnitFailed = new("Imports.OwnerUnitFailed", ImportIssueSeverity.Error,
@@ -141,7 +141,7 @@ public static class ImportRules
     public static readonly ImportRule OwnerLinkUnavailable = new("Imports.OwnerLinkUnavailable", ImportIssueSeverity.Error,
         "Hasta tablosu yalnız MusteriNo ile bağlanıyor ancak müşteri tablosu yok veya MusteriNo sütunu eşlenmemiş.");
     public static readonly ImportRule PetLinkUnavailable = new("Imports.PetLinkUnavailable", ImportIssueSeverity.Error,
-        "Aşı tablosu yalnız HayvanNo ile bağlanıyor ancak hasta tablosu yok veya HayvanNo sütunu eşlenmemiş.");
+        "Aşı tablosu yalnız HastaNo ile bağlanıyor ancak hasta tablosu yok veya HastaNo sütunu eşlenmemiş.");
     public static readonly ImportRule NoImportableRows = new("Imports.NoImportableRows", ImportIssueSeverity.Error,
         "Aktarılabilir (geçerli) satır yok.");
 

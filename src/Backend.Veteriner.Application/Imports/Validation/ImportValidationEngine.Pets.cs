@@ -48,7 +48,7 @@ public sealed partial class ImportValidationEngine
         if (name is null)
             issues.Add(ImportRules.RequiredMissing.At("HayvanAdi"));
         else if (name.Length > MaxPetNameLength)
-            issues.Add(ImportRules.FieldTooLong.At("HayvanAdi", $"Hayvan adı en fazla {MaxPetNameLength} karakter olabilir."));
+            issues.Add(ImportRules.FieldTooLong.At("HayvanAdi", $"Hasta adı en fazla {MaxPetNameLength} karakter olabilir."));
 
         var owner = ResolveOwnerForPet(reader, issues);
 
@@ -177,7 +177,7 @@ public sealed partial class ImportValidationEngine
             if (_petByRef.TryGetValue(reference, out var first))
             {
                 issues.Add(ImportRules.DuplicateReference.At(
-                    "HayvanNo", $"Bu hayvan numarası {first.Row}. satırda da kullanılmış.", reference));
+                    "HayvanNo", $"Bu hasta numarası {first.Row}. satırda da kullanılmış.", reference));
             }
             else
             {
@@ -207,7 +207,7 @@ public sealed partial class ImportValidationEngine
         if (_petByIdentity.TryGetValue(identity, out var canonical))
         {
             node.Ref = canonical.Ref;
-            issues.Add(ImportRules.DuplicateInFile.At(null, $"Aynı hayvan {canonical.Row}. satırda da var; bu satır atlanacak."));
+            issues.Add(ImportRules.DuplicateInFile.At(null, $"Aynı hasta {canonical.Row}. satırda da var; bu satır atlanacak."));
             return Complete(node, Finish(
                 ImportTable.Pets, reader.RowNumber, issues, normalized, ImportRowAction.Skip, mergedIntoRow: canonical.Row));
         }
@@ -255,10 +255,10 @@ public sealed partial class ImportValidationEngine
     private string? FindChipConflict(string chip, string petKey, Guid? matchedPetId)
     {
         if (_fileChips.TryGetValue(chip, out var seen) && seen.PetKey != petKey)
-            return $"Aynı mikroçip {seen.Row}. satırdaki başka bir hayvanda da var.";
+            return $"Aynı mikroçip {seen.Row}. satırdaki başka bir hastada da var.";
 
         if (_dbPetsByChip.TryGetValue(chip, out var dbPets) && dbPets.Any(p => p.Id != matchedPetId))
-            return "Aynı mikroçip kayıtlı başka bir hayvanda var.";
+            return "Aynı mikroçip kayıtlı başka bir hastada var.";
 
         return null;
     }
