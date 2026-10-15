@@ -33,7 +33,7 @@ namespace Backend.Veteriner.Api.Auth
                         PermissionCatalog.Appointments.Reschedule,
                     })));
 
-                // Composite (any-of) policy: KVKK form şablonu okuma (ADR-021). Formu müşteri kartından
+                // Composite (any-of) policy: KVKK şablonları okuma (açık rıza ADR-021, aydınlatma ADR-024). Formu müşteri kartından
                 // yazdıran (Clients.Read) ve metni Ayarlar'da düzenleyen kullanıcı aynı metni okur.
                 options.AddPolicy(AuthorizationPolicyNames.ClinicsKvkkFormRead, p =>
                     p.Requirements.Add(new PermissionAnyOfRequirement(new[]

@@ -5,8 +5,8 @@ using Backend.Veteriner.Domain.Clinics;
 namespace Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 
 /// <summary>
-/// Klinik KVKK açık rıza formu şablonu (ham metin; yer tutucular istemcide doldurulur).
-/// <paramref name="IsDefault"/> true iken kayıt yoktur ve <paramref name="RowVersion"/> null'dır.
+/// Klinik KVKK şablonu: açık rıza formu veya aydınlatma metni (ham metin; yer tutucular istemcide doldurulur).
+/// <paramref name="IsDefault"/> true iken o türde kayıt yoktur ve <paramref name="RowVersion"/> null'dır.
 /// </summary>
 public sealed record ClinicKvkkFormTemplateDto(
     Guid ClinicId,
@@ -17,10 +17,10 @@ public sealed record ClinicKvkkFormTemplateDto(
     int MaxLength,
     IReadOnlyList<string> Placeholders)
 {
-    public static ClinicKvkkFormTemplateDto Default(Guid clinicId)
+    public static ClinicKvkkFormTemplateDto Default(Guid clinicId, ClinicKvkkFormKind kind)
         => new(
             clinicId,
-            ClinicKvkkFormTemplateDefaults.Text,
+            ClinicKvkkFormTemplateDefaults.TextFor(kind),
             IsDefault: true,
             RowVersion: null,
             UpdatedAtUtc: null,

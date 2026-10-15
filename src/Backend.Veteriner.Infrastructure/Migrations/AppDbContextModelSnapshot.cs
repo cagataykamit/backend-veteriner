@@ -1194,6 +1194,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -1218,7 +1221,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("ClinicId");
 
-                    b.HasIndex("TenantId", "ClinicId")
+                    b.HasIndex("TenantId", "ClinicId", "Kind")
                         .IsUnique();
 
                     b.ToTable("ClinicKvkkFormTemplates", (string)null);

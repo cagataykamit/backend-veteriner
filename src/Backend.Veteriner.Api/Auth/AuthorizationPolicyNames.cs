@@ -21,7 +21,7 @@ public static class AuthorizationPolicyNames
     public const string ClinicsSchedulingRead = "Clinics_SchedulingRead";
 
     /// <summary>
-    /// Klinik KVKK açık rıza formu şablonunu okuma (ADR-021): müşteri kartından form yazdıran
+    /// Klinik KVKK şablonlarını (açık rıza formu ADR-021, aydınlatma metni ADR-024) okuma: müşteri kartından form yazdıran
     /// (<c>Clients.Read</c>) ve Ayarlar'da metni düzenleyen (<c>Clinics.Read</c> / <c>Clinics.Update</c>)
     /// kullanıcıya açıktır. PUT <c>Clinics.Update</c> ile korunur.
     /// </summary>

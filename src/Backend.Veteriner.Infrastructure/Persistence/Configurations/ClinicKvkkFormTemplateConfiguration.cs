@@ -14,6 +14,7 @@ public sealed class ClinicKvkkFormTemplateConfiguration : IEntityTypeConfigurati
 
         b.Property(x => x.TenantId).IsRequired();
         b.Property(x => x.ClinicId).IsRequired();
+        b.Property(x => x.Kind).IsRequired();
         b.Property(x => x.Text)
             .IsRequired()
             .HasMaxLength(ClinicKvkkFormTemplate.MaxTextLength);
@@ -24,7 +25,7 @@ public sealed class ClinicKvkkFormTemplateConfiguration : IEntityTypeConfigurati
             .IsRowVersion()
             .IsConcurrencyToken();
 
-        b.HasIndex(x => new { x.TenantId, x.ClinicId }).IsUnique();
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.Kind }).IsUnique();
 
         b.HasOne<Clinic>()
             .WithMany()

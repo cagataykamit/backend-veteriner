@@ -8,5 +8,6 @@ public sealed class UpdateClinicKvkkFormTemplateCommandValidator : AbstractValid
     public UpdateClinicKvkkFormTemplateCommandValidator()
     {
         RuleFor(x => x.ClinicId).NotEmpty();
+        RuleFor(x => x.Kind).IsInEnum();
     }
 }

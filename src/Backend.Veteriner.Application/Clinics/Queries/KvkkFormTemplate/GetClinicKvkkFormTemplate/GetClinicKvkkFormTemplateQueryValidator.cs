@@ -7,5 +7,6 @@ public sealed class GetClinicKvkkFormTemplateQueryValidator : AbstractValidator<
     public GetClinicKvkkFormTemplateQueryValidator()
     {
         RuleFor(x => x.ClinicId).NotEmpty();
+        RuleFor(x => x.Kind).IsInEnum();
     }
 }

@@ -3,8 +3,9 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Domain.Clinics;
 
 /// <summary>
-/// Klinik başına yazdırılabilir KVKK açık rıza formu şablon metni (ADR-021). Tenant + Clinic benzersizdir.
-/// Metni klinik yazar (hukuk danışmanının onayladığı metin); yer tutucular istemcide doldurulur, sunucu ham metni saklar.
+/// Klinik başına yazdırılabilir KVKK şablon metni: açık rıza formu (ADR-021) veya aydınlatma metni (ADR-024).
+/// Tenant + Clinic + <see cref="Kind"/> benzersizdir. Metni klinik yazar (hukuk danışmanının onayladığı metin);
+/// yer tutucular istemcide doldurulur, sunucu ham metni saklar.
 /// </summary>
 public sealed class ClinicKvkkFormTemplate
 {
@@ -13,6 +14,7 @@ public sealed class ClinicKvkkFormTemplate
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
+    public ClinicKvkkFormKind Kind { get; private set; }
     public string Text { get; private set; } = default!;
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
@@ -25,17 +27,25 @@ public sealed class ClinicKvkkFormTemplate
 
     private ClinicKvkkFormTemplate() { }
 
-    public static Result<ClinicKvkkFormTemplate> Create(Guid tenantId, Guid clinicId, string? text, Guid userId)
+    public static Result<ClinicKvkkFormTemplate> Create(
+        Guid tenantId,
+        Guid clinicId,
+        ClinicKvkkFormKind kind,
+        string? text,
+        Guid userId)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
         if (clinicId == Guid.Empty)
             throw new ArgumentException("ClinicId geçersiz.", nameof(clinicId));
+        if (!Enum.IsDefined(kind))
+            throw new ArgumentException("Şablon türü geçersiz.", nameof(kind));
 
         var row = new ClinicKvkkFormTemplate
         {
             TenantId = tenantId,
             ClinicId = clinicId,
+            Kind = kind,
             CreatedAtUtc = DateTime.UtcNow,
         };
         var applied = row.ApplyText(text, userId);

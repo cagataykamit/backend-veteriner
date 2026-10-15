@@ -19,6 +19,7 @@ using Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkin
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -185,14 +186,8 @@ public sealed class ClinicsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetKvkkFormTemplate([FromRoute] Guid id, CancellationToken ct)
-    {
-        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
-            return problem!;
-
-        var result = await _mediator.Send(new GetClinicKvkkFormTemplateQuery(id), ct);
-        return result.ToActionResult(this);
-    }
+    public Task<IActionResult> GetKvkkFormTemplate([FromRoute] Guid id, CancellationToken ct)
+        => GetKvkkTemplate(id, ClinicKvkkFormKind.Consent, ct);
 
     /// <summary>
     /// Klinik KVKK form şablon metnini kaydeder. Kayıt yokken <c>rowVersion</c> boş, varken GET'teki değer; uyuşmazlık 409.
@@ -205,9 +200,56 @@ public sealed class ClinicsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> PutKvkkFormTemplate(
+    public Task<IActionResult> PutKvkkFormTemplate(
         [FromRoute] Guid id,
         [FromBody] UpdateClinicKvkkFormTemplateRequest? body,
+        CancellationToken ct)
+        => PutKvkkTemplate(id, ClinicKvkkFormKind.Consent, body, ct);
+
+    /// <summary>
+    /// Klinik KVKK aydınlatma metni şablonu (ADR-024). Açık rıza formu şablonuyla aynı sözleşme, izin ve sürüm kuralı;
+    /// kayıt yoksa taslak varsayılan aydınlatma metni döner (<c>isDefault=true</c>). Bkz. docs/KVKK_CONSENT_API_CONTRACT.md.
+    /// </summary>
+    /// <remarks>Okuma yetkisi composite "any-of": <c>Clinics.Read</c>, <c>Clinics.Update</c> veya <c>Clients.Read</c>.</remarks>
+    [HttpGet("{id:guid}/kvkk-disclosure-template")]
+    [Authorize(Policy = AuthorizationPolicyNames.ClinicsKvkkFormRead)]
+    [ProducesResponseType(typeof(ClinicKvkkFormTemplateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public Task<IActionResult> GetKvkkDisclosureTemplate([FromRoute] Guid id, CancellationToken ct)
+        => GetKvkkTemplate(id, ClinicKvkkFormKind.Disclosure, ct);
+
+    /// <summary>
+    /// Klinik aydınlatma metni şablonunu kaydeder. Kayıt yokken <c>rowVersion</c> boş, varken GET'teki değer; uyuşmazlık 409.
+    /// </summary>
+    [HttpPut("{id:guid}/kvkk-disclosure-template")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ClinicKvkkFormTemplateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public Task<IActionResult> PutKvkkDisclosureTemplate(
+        [FromRoute] Guid id,
+        [FromBody] UpdateClinicKvkkFormTemplateRequest? body,
+        CancellationToken ct)
+        => PutKvkkTemplate(id, ClinicKvkkFormKind.Disclosure, body, ct);
+
+    private async Task<IActionResult> GetKvkkTemplate(Guid id, ClinicKvkkFormKind kind, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClinicKvkkFormTemplateQuery(id, kind), ct);
+        return result.ToActionResult(this);
+    }
+
+    private async Task<IActionResult> PutKvkkTemplate(
+        Guid id,
+        ClinicKvkkFormKind kind,
+        UpdateClinicKvkkFormTemplateRequest? body,
         CancellationToken ct)
     {
         if (body is null)
@@ -221,7 +263,7 @@ public sealed class ClinicsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new UpdateClinicKvkkFormTemplateCommand(id, body.Text, body.RowVersion), ct);
+        var result = await _mediator.Send(new UpdateClinicKvkkFormTemplateCommand(id, kind, body.Text, body.RowVersion), ct);
         return result.ToActionResult(this);
     }
 

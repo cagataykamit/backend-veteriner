@@ -50,7 +50,7 @@ public sealed class UpdateClinicKvkkFormTemplateCommandHandler
         {
             return Result<ClinicKvkkFormTemplateDto>.Failure(
                 "Auth.PermissionDenied",
-                "KVKK form metnini güncellemek için Clinics.Update yetkisi gerekir.");
+                "KVKK şablon metnini güncellemek için Clinics.Update yetkisi gerekir.");
         }
 
         if (_tenantContext.TenantId is not { } tenantId)
@@ -87,7 +87,7 @@ public sealed class UpdateClinicKvkkFormTemplateCommandHandler
         }
 
         var existing = await _templates.FirstOrDefaultAsync(
-            new ClinicKvkkFormTemplateByClinicSpec(tenantId, request.ClinicId), ct);
+            new ClinicKvkkFormTemplateByClinicSpec(tenantId, request.ClinicId, request.Kind), ct);
 
         // Varsayılan metni görüp kaydeden istemci sürüm göndermez; arada kayıt oluştuysa (veya tersi) çakışmadır.
         if ((existing is null) != (expectedRowVersion is null))
@@ -96,7 +96,7 @@ public sealed class UpdateClinicKvkkFormTemplateCommandHandler
         ClinicKvkkFormTemplate row;
         if (existing is null)
         {
-            var created = ClinicKvkkFormTemplate.Create(tenantId, request.ClinicId, request.Text, userId);
+            var created = ClinicKvkkFormTemplate.Create(tenantId, request.ClinicId, request.Kind, request.Text, userId);
             if (!created.IsSuccess)
                 return Result<ClinicKvkkFormTemplateDto>.Failure(created.Error);
             row = created.Value!;
@@ -124,7 +124,7 @@ public sealed class UpdateClinicKvkkFormTemplateCommandHandler
         }
         catch (DbUpdateException) when (existing is null)
         {
-            // Aynı klinik için eşzamanlı ilk kayıt: (TenantId, ClinicId) benzersiz indeksi kaybedene çarptı.
+            // Aynı klinik ve tür için eşzamanlı ilk kayıt: (TenantId, ClinicId, Kind) benzersiz indeksi kaybedene çarptı.
             return Result<ClinicKvkkFormTemplateDto>.Failure(ConflictCode, ConflictMessage);
         }
 

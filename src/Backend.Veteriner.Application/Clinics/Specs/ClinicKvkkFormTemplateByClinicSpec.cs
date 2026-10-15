@@ -8,9 +8,9 @@ namespace Backend.Veteriner.Application.Clinics.Specs;
 /// </summary>
 public sealed class ClinicKvkkFormTemplateByClinicSpec : Specification<ClinicKvkkFormTemplate>
 {
-    public ClinicKvkkFormTemplateByClinicSpec(Guid tenantId, Guid clinicId)
+    public ClinicKvkkFormTemplateByClinicSpec(Guid tenantId, Guid clinicId, ClinicKvkkFormKind kind)
     {
         Query.AsNoTracking();
-        Query.Where(x => x.TenantId == tenantId && x.ClinicId == clinicId);
+        Query.Where(x => x.TenantId == tenantId && x.ClinicId == clinicId && x.Kind == kind);
     }
 }
