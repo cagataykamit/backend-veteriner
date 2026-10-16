@@ -261,7 +261,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
   | `GET /api/v1/appointments` | `scheduledAtUtc` | `scheduledAtUtc` azalan |
   | `GET /api/v1/examinations` | `examinedAtUtc` (eş ad: `examinationDateUtc`) | `examinedAtUtc` azalan |
   | `GET /api/v1/vaccinations` | `dueAtUtc` (eş ad: `nextDueAtUtc`), `appliedAtUtc` — seçilen tarihi boş kayıtlar **her iki yönde sonda** | birleşik tarih (`AppliedAtUtc ?? DueAtUtc`) azalan |
-  | `GET /api/v1/treatments` | `treatmentDateUtc` | `treatmentDateUtc` azalan |
+  | `GET /api/v1/treatments` | `treatmentDateUtc` | `treatmentDateUtc` azalan (`active=true` iken: `followUpDateUtc` artan) |
   | `GET /api/v1/prescriptions` | `prescribedAtUtc` | `prescribedAtUtc` azalan |
   | `GET /api/v1/lab-results` | `requestedAtUtc` | `requestedAtUtc` azalan |
   | `GET /api/v1/hospitalizations` | `admittedAtUtc` | `admittedAtUtc` azalan |
@@ -278,7 +278,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | Examinations | `GET /api/v1/examinations` | Evet | `VisitReason`, `Findings`, `Assessment`, `Notes`; pet id’ler: müşteri + hayvan metin (yukarıdaki gibi). **AND** `clinicId`, **`clientId`**, `petId`, **`appointmentId`** (randevuya bağlı muayene), `visitId`, `dateFromUtc`, `dateToUtc` (hepsi AND). **Sıralama:** yukarıdaki beyaz liste. |
 | Vaccinations | `GET /api/v1/vaccinations` | Evet | `VaccineName`, `Notes`; pet id’ler: müşteri + hayvan metin. **AND** klinik/**müşteri**/pet/durum/tarih filtreleri (birleşik `dateFromUtc`/`dateToUtc` dahil, §11.2). **Sıralama:** yukarıdaki beyaz liste. |
 | Payments | `GET /api/v1/payments` | Evet | `Notes`, `Currency`; eşleşen `ClientId` / `PetId` ön kümesi (müşteri metni + `PetsByTenantTextFieldsSearchSpec`). **AND** klinik, müşteri, hayvan, yöntem, ödeme tarihi. |
-| Treatments | `GET /api/v1/treatments` | Evet | `Title`, `Description`, `Notes`; pet id’ler: müşteri + hayvan metin (examinations ile aynı `ListSearchPetIds` örüntüsü). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc` (liste query). |
+| Treatments | `GET /api/v1/treatments` | Evet | `Title`, `Description`, `Notes`; pet id’ler: müşteri + hayvan metin (examinations ile aynı `ListSearchPetIds` örüntüsü). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`, `active` (liste query). |
 | Prescriptions | `GET /api/v1/prescriptions` | Evet | `Title`, `Content`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. |
 | Lab Results | `GET /api/v1/lab-results` | Evet | `TestName`, `ResultText`, `Interpretation`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc` (`requestedAtUtc` üzerinden, §15). |
 | Hospitalizations | `GET /api/v1/hospitalizations` | Evet | `Reason`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, **`activeOnly`** (`true` = yalnız açık yatış, `false` = yalnız taburcu), `dateFromUtc`, `dateToUtc` (`admittedAtUtc` üzerinden). |
@@ -554,6 +554,8 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 ## 13) Treatments — request/response ve OpenAPI
 
 **Liste** `GET /api/v1/treatments` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `Treatments.ClinicContextMismatch`. `sort=treatmentDateUtc` + `order=asc|desc` (§10 beyaz liste; diğer sort → 400); sort yoksa en yeni üstte.
+
+**Aktif tedavi (ADR-025 madde 2):** `active=true` (varsayılan `false` = tümü) yalnız **takip tarihi (`followUpDateUtc`) Europe/Istanbul günüyle bugün veya sonrası** olan tedavileri döndürür; takip tarihi olmayan tedavi aktif sayılmaz, takip günü geçince kendiliğinden düşer (elle kapatma yok). Sınır: isteğin anındaki İstanbul gününün başlangıcı (UTC; `OperationDayBounds`). Diğer süzgeçlerle AND; `sort` verilmezse en yakın takip önce (`followUpDateUtc` artan, sonra `id`), `sort=treatmentDateUtc` verilirse o uygulanır. **Tanım tek yerde:** `Application/Treatments/ActiveTreatmentRule.cs`; hasta kartı, muayene hasta bağlamı ve olası sayaçlar bu süzgeci kullanır, sayaç = yanıttaki `totalItems` (istemci yerel hesap yapmaz). Yeni izin yok (`Treatments.Read`), migration yok.
 
 **Create** `POST /api/v1/treatments` gövdesi: `CreateTreatmentCommand`.
 

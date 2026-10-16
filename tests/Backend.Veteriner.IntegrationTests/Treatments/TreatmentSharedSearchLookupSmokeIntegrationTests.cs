@@ -124,6 +124,35 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
         result.Value.Items.Should().NotContain(x => x.Id == seedB.TreatmentId);
     }
 
+    [Fact]
+    public async Task ActiveOnly_Should_Return_Only_Today_Or_Later_FollowUps_Nearest_First()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Tohum tedavisinin takip tarihi yok: aktif sayılmaz (ADR-025 madde 2).
+        var seed = await SeedTreatmentAsync(commandDb, clientFullName: "Ayşe Yılmaz", petName: "Pamuk");
+        Treatment FollowUp(DateTime followUpUtc) => new(
+            seed.TenantId, seed.ClinicId, seed.PetId, examinationId: null, DateTime.UtcNow.AddDays(-3), "Takip", "Kontrol", null, followUpUtc);
+        var past = FollowUp(DateTime.UtcNow.AddDays(-2));
+        var later = FollowUp(DateTime.UtcNow.AddDays(10));
+        var sooner = FollowUp(DateTime.UtcNow.AddDays(3));
+        commandDb.Treatments.AddRange(past, later, sooner);
+        await commandDb.SaveChangesAsync();
+
+        var result = await InvokeHandlerAsync(
+            scope.ServiceProvider,
+            seed.TenantId,
+            seed.ClinicId,
+            search: null,
+            sharedSearchLookupEnabled: false,
+            activeOnly: true);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TotalItems.Should().Be(2);
+        result.Value.Items.Select(x => x.Id).Should().Equal(sooner.Id, later.Id);
+    }
+
     private static async Task ResetQueryPetsAsync(QueryDbContext queryDb)
     {
         await PetProjectionTestSupport.ResetQuerySideAsync(queryDb);
@@ -202,8 +231,9 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
         IServiceProvider sp,
         Guid tenantId,
         Guid clinicId,
-        string search,
-        bool sharedSearchLookupEnabled)
+        string? search,
+        bool sharedSearchLookupEnabled,
+        bool activeOnly = false)
     {
         var handler = new GetTreatmentsListQueryHandler(
             new FixedTenantContext(tenantId),
@@ -221,7 +251,8 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
         return await handler.Handle(
             new GetTreatmentsListQuery(
                 new PageRequest { Page = 1, PageSize = 50, Search = search },
-                clinicId),
+                clinicId,
+                ActiveOnly: activeOnly),
             CancellationToken.None);
     }
 

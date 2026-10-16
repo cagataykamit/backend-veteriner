@@ -32,6 +32,7 @@ public sealed class GetTreatmentsListQueryHandler
     private readonly IPetReadModelLookupReader _petLookupReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetTreatmentsListQueryHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public GetTreatmentsListQueryHandler(
         ITenantContext tenantContext,
@@ -42,7 +43,8 @@ public sealed class GetTreatmentsListQueryHandler
         IReadRepository<Client> clients,
         IPetReadModelLookupReader petLookupReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
-        ILogger<GetTreatmentsListQueryHandler>? logger = null)
+        ILogger<GetTreatmentsListQueryHandler>? logger = null,
+        TimeProvider? timeProvider = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -53,6 +55,7 @@ public sealed class GetTreatmentsListQueryHandler
         _petLookupReader = petLookupReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetTreatmentsListQueryHandler>.Instance;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<Result<PagedResult<TreatmentListItemDto>>> Handle(
@@ -128,6 +131,10 @@ public sealed class GetTreatmentsListQueryHandler
                 ct);
         }
 
+        DateTime? activeFollowUpFromUtc = request.ActiveOnly
+            ? ActiveTreatmentRule.FollowUpFromUtc(_timeProvider.GetUtcNow().UtcDateTime)
+            : null;
+
         var total = await _treatments.CountAsync(
             new TreatmentsFilteredCountSpec(
                 tenantId,
@@ -137,7 +144,8 @@ public sealed class GetTreatmentsListQueryHandler
                 request.DateToUtc,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                activeFollowUpFromUtc),
             ct);
         MarkStep("treatmentsCount");
 
@@ -153,7 +161,8 @@ public sealed class GetTreatmentsListQueryHandler
                 searchPattern,
                 searchPetIds,
                 accessibleClinicIds,
-                TreatmentListSort.Catalog.Resolve(request.PageRequest)),
+                TreatmentListSort.Catalog.Resolve(request.PageRequest),
+                activeFollowUpFromUtc),
             ct);
         MarkStep("treatmentsPage");
 

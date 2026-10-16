@@ -29,7 +29,7 @@ public sealed class GetTreatmentsListQueryHandlerTests
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
-    private GetTreatmentsListQueryHandler CreateHandler(bool sharedSearchLookupEnabled = false)
+    private GetTreatmentsListQueryHandler CreateHandler(bool sharedSearchLookupEnabled = false, TimeProvider? clock = null)
         => new(
             _tenantContext.Object,
             _clinicContext.Object,
@@ -41,7 +41,8 @@ public sealed class GetTreatmentsListQueryHandlerTests
             Options.Create(new QueryReadModelsOptions
             {
                 SharedSearchLookupEnabled = sharedSearchLookupEnabled
-            }));
+            }),
+            timeProvider: clock);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -271,5 +272,41 @@ public sealed class GetTreatmentsListQueryHandlerTests
         _treatments.Verify(
             r => r.ListAsync(It.IsAny<TreatmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ActiveOnly_Should_Filter_By_Istanbul_Today_In_Count_And_Page()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        // 2026-10-15 21:30 UTC = İstanbul 2026-10-16 00:30; sınır 2026-10-15 21:00 UTC.
+        var nowUtc = new DateTime(2026, 10, 15, 21, 30, 0, DateTimeKind.Utc);
+        var dayStartUtc = new DateTime(2026, 10, 15, 21, 0, 0, DateTimeKind.Utc);
+        Treatment New(DateTime? followUp) => new(tid, clinicId, Guid.NewGuid(), null, nowUtc.AddDays(-1), "T", "D", null, followUp);
+        var active = New(dayStartUtc);
+        Treatment[] all = [New(null), New(dayStartUtc.AddMinutes(-1)), active];
+
+        TreatmentsFilteredCountSpec? countSpec = null;
+        TreatmentsFilteredPagedSpec? pagedSpec = null;
+        _treatments.Setup(r => r.CountAsync(It.IsAny<TreatmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .Callback<ISpecification<Treatment>, CancellationToken>((s, _) => countSpec = (TreatmentsFilteredCountSpec)s)
+            .ReturnsAsync(1);
+        _treatments.Setup(r => r.ListAsync(It.IsAny<TreatmentsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
+            .Callback<ISpecification<Treatment, TreatmentListRow>, CancellationToken>((s, _) => pagedSpec = (TreatmentsFilteredPagedSpec)s)
+            .ReturnsAsync(new List<TreatmentListRow>());
+
+        var result = await CreateHandler(clock: new FixedClock(nowUtc)).Handle(
+            new GetTreatmentsListQuery(new PageRequest { Page = 1, PageSize = 20 }, clinicId, ActiveOnly: true),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        countSpec!.Evaluate(all).Should().ContainSingle().Which.Id.Should().Be(active.Id);
+        pagedSpec!.Evaluate(all).Select(r => r.Id).Should().Equal(active.Id);
+    }
+
+    private sealed class FixedClock(DateTime utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(utcNow, TimeSpan.Zero);
     }
 }

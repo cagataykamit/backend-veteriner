@@ -104,6 +104,7 @@ public sealed class TreatmentsController : ControllerBase
     /// <summary>
     /// Paged list. <c>search</c> (or <c>page.search</c>): title, description, notes, and pet/client name match (same pattern as examinations).
     /// Sorting: <c>sort=treatmentDateUtc</c>, <c>order=asc|desc</c>; other sort values return 400. Without sort: newest first.
+    /// <c>active=true</c>: yalnız aktif tedaviler (takip tarihi İstanbul günüyle bugün veya sonrası; ADR-025); sort yoksa en yakın takip önce.
     /// </summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Treatments.Read)]
@@ -118,6 +119,7 @@ public sealed class TreatmentsController : ControllerBase
         [FromQuery] Guid? petId = null,
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
+        [FromQuery] bool active = false,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -130,7 +132,8 @@ public sealed class TreatmentsController : ControllerBase
                 clinicId,
                 petId,
                 dateFromUtc,
-                dateToUtc),
+                dateToUtc,
+                active),
             ct);
         return result.ToActionResult(this);
     }

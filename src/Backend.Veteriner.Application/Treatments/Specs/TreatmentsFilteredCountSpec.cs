@@ -14,7 +14,8 @@ public sealed class TreatmentsFilteredCountSpec : Specification<Treatment>
         DateTime? dateToUtc,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        DateTime? activeFollowUpFromUtc = null)
     {
         Query.AsNoTracking();
         Query.Where(t => t.TenantId == tenantId);
@@ -35,6 +36,8 @@ public sealed class TreatmentsFilteredCountSpec : Specification<Treatment>
             Query.Where(t => t.TreatmentDateUtc >= dateFromUtc.Value);
         if (dateToUtc.HasValue)
             Query.Where(t => t.TreatmentDateUtc <= dateToUtc.Value);
+        if (activeFollowUpFromUtc.HasValue)
+            Query.Where(ActiveTreatmentRule.IsActive(activeFollowUpFromUtc.Value));
 
         if (searchContainsLikePattern is not null)
         {
