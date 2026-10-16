@@ -1,10 +1,12 @@
-# KVKK açık rıza formu ve aydınlatma metni — API sözleşmesi (ADR-021, ADR-024, ADR-025)
+# KVKK açık rıza formu ve aydınlatma metni — API sözleşmesi (ADR-021, ADR-024, ADR-025, ADR-032)
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-021-kvkk-consent-form.md`, `decisions/ADR-024-hukuki-metin-taslaklari.md`, `decisions/ADR-025-hasta-listesi-aktif-tedavi-kvkk-ret.md` (madde 4: Ret → hatırlatma kapanır). İlgili: `PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md` (§2 `remindersOptedOut`), ADR-019 K3. Uçlar `api/v1` altında; hata zarfı standart `ProblemDetails` + `extensions.code`.
 
 > **Durum:** Uygulandı (kod + test), dal `feat/kvkk-riza-formu`. Migration `20261014211943_AddClientKvkkConsentAndClinicKvkkFormTemplate` üretildi, **hiçbir paylaşılan/geliştirme veritabanına uygulanmadı**. **Yeni izin yok**, seed gerekmez (yalnız yeni composite okuma policy'si, aşağıda).
 
 > **Aydınlatma şablonu (ADR-024):** dal `feat/aydinlatma-sablonu`. Migration `20261015160213_AddClinicKvkkDisclosureFormTemplate` üretildi (`ClinicKvkkFormTemplates.Kind` + benzersiz indeks `(TenantId, ClinicId, Kind)`; mevcut kayıtlar `Kind = 0` = açık rıza olur, metinleri değişmez), **hiçbir veritabanına uygulanmadı**. Yeni izin yok.
+
+> **Rıza metni sürümü (ADR-032 madde 1):** dal `feat/kvkk-riza-surum`. Migration `20261016042924_AddKvkkConsentTemplateVersion` üretildi (`ClinicKvkkFormTemplates.TextVersion` int + `TextHash` char(64); `Clients.KvkkConsentTemplateVersion` int null + `KvkkConsentTemplateHash` char(64) null), **hiçbir paylaşılan/geliştirme veritabanına uygulanmadı**. Mevcut şablon satırları sürüm 1 ve metinlerinin özetiyle doldurulur (SQL Server 2019+ UTF-8 harmanlaması); mevcut müşteri rıza kayıtları **doldurulmaz** (null = sürüm bilinmiyor). Yeni izin yok.
 
 > **Hukuki metinler taslaktır (ADR-024, ADR-021 madde 2'yi değiştirir):** Varsayılan açık rıza ve aydınlatma metinleri ürün ekibinin yazdığı, **hukuki onaydan geçmemiş** taslaklardır (ürün deposu `legal/acik-riza-metni.md`, `legal/aydinlatma-metni.md`). İlk satırları "Bu metin hukuk danışmanınızca onaylanmış … metniyle değiştirilmelidir." uyarısıdır; köşeli parantezli alanları (`[klinik adresi]`, `[başvuru kanalı …]` vb.) klinik doldurur. Varsayılan **yalnız klinikte o türde kayıt yokken** GET'te döner; kayıtlı (kliniğin yapıştırdığı) metin hiçbir zaman ezilmez, varsayılan veritabanına yazılmaz.
 
@@ -22,6 +24,8 @@ Akış: müşteri kartından "KVKK formu yazdır" → istemci şablonu (`GET /cl
 | `kvkkConsentRecordedOn` | `yyyy-MM-dd` \| null | null | İmzalı formun tarihi (İstanbul takvim günü); yalnız `Accepted`/`Declined` iken dolu |
 | `kvkkConsentRecordedByUserId` | guid \| null | null | Durumu işaretleyen kullanıcı |
 | `kvkkConsentRecordedByName` | string \| null | null | İşaretleyenin görünen adı (bulunamazsa null) |
+| `kvkkConsentTemplateVersion` | int \| null | null | İşaretleme anında geçerli açık rıza metninin sürümü (ADR-032): `0` = taslak varsayılan metin, `1+` = kliniğin kaydettiği metnin sürümü, `null` = **sürüm bilinmiyor** (ADR-032 öncesi kayıtlar, klinik bağlamı olmayan istek veya `None`) |
+| `kvkkConsentTemplateHash` | string \| null | null | O metnin SHA-256 özeti (64 karakter, küçük harf hex; **tam** değer). `kvkkConsentTemplateVersion` ile birlikte dolu/boş |
 | `rowVersion` | string (Base64) | — | Müşteri kaydının sürümü; `PUT …/kvkk-consent` için zorunlu |
 
 Liste (`GET /clients`), hızlı kayıt ve müşteri oluşturma **değişmedi**; rıza yalnız aşağıdaki uçla değişir.
@@ -36,7 +40,8 @@ Liste (`GET /clients`), hızlı kayıt ve müşteri oluşturma **değişmedi**; 
 
 - `status` zorunlu (`"None"` \| `"Accepted"` \| `"Declined"`; sayı `0`/`1`/`2` de kabul edilir).
 - `recordedOn` opsiyonel; **verilmezse bugün** (İstanbul). Gelecek tarih reddedilir; geçmiş tarih serbest (eski kâğıt formlar).
-- `status = "None"`: yanlış girişin geri alınması; `recordedOn` **verilemez**; tarih ve işaretleyen temizlenir (geçmiş, audit kaydında kalır).
+- `status = "None"`: yanlış girişin geri alınması; `recordedOn` **verilemez**; tarih, işaretleyen ve metin sürümü/özeti temizlenir (geçmiş, audit kaydında kalır).
+- **Metin sürümü (ADR-032):** `Accepted`/`Declined` işaretlenirken sunucu, isteğin **klinik bağlamındaki** (JWT `clinic_id`, yoksa `X-Clinic-Id` / `clinicId`) o anki açık rıza şablonunun sürümünü ve özetini kayda yazar; değerler `GET /clinics/{clinicId}/kvkk-form-template` yanıtındaki `textVersion` / `textHash` ile aynıdır (kayıt yoksa varsayılan metin: `0`). İstemci sürüm göndermez. Klinik bağlamı yoksa veya klinik kiracıda bulunamazsa ikisi de `null` yazılır (işaretleme yine başarılı). Tekrar işaretleme (tarih düzeltme dahil) o anki sürümü yeniden yazar.
 - Zaten `Accepted` iken tekrar `Accepted` göndermek tarihi/işaretleyeni düzeltir; `Accepted` ↔ `Declined` doğrudan geçilebilir.
 - `rowVersion` zorunlu: `GET /clients/{id}` yanıtındaki değer. Arada kayıt değiştiyse 409.
 - **Ret hatırlatmayı kapatır (ADR-025 madde 4, ADR-021 madde 4'ü değiştirir):** `Declined` işaretlemek `remindersOptedOut = true` yapar (zaten açıksa açık kalır; tarih düzeltmek için tekrar `Declined` göndermek de bayrağı açar). `Accepted` veya `None`'a geçmek bayrağı **kapatmaz**; bayrak yalnız müşteri formundaki "Hatırlatma istemiyor" ile elle kapanır (güvenli taraf). Denetim izi: `Client.KvkkConsent.Declined` audit kaydı bayrak değişikliğini de kapsar (ayrı audit satırı yazılmaz).
@@ -50,6 +55,8 @@ Yanıt **200** (`ClientKvkkConsentDto`, alan adları detay yanıtıyla aynı). `
   "kvkkConsentRecordedOn": "2026-10-15",
   "kvkkConsentRecordedByUserId": "guid",
   "kvkkConsentRecordedByName": "Ayşe Yılmaz",
+  "kvkkConsentTemplateVersion": 2,
+  "kvkkConsentTemplateHash": "3f1c…(64 karakter hex)",
   "remindersOptedOut": false,
   "rowVersion": "AAAAAAAAB9I="
 }
@@ -88,10 +95,13 @@ Klinik başına tek kayıt (mevcut `appointment-settings` deseni: kayıt yoksa v
   "rowVersion": null,
   "updatedAtUtc": null,
   "maxLength": 20000,
-  "placeholders": ["{{clinicName}}", "{{clientName}}", "{{date}}"]
+  "placeholders": ["{{clinicName}}", "{{clientName}}", "{{date}}"],
+  "textVersion": 0,
+  "textHash": "…(64 karakter hex)"
 }
 ```
 
+- `textVersion` / `textHash` (ADR-032): metnin sürümü ve ham metnin (yer tutucular doldurulmadan) SHA-256 özeti. Varsayılan metin `0`; kliniğin ilk kaydı `1`, kırpılmış metin her değiştiğinde `+1`; **aynı metin** tekrar kaydedilirse sürüm ve özet değişmez (`rowVersion` yine yenilenir). Eski bir metne dönmek de yeni sürümdür. Aydınlatma şablonu (§2b) aynı alanları aynı kuralla taşır; rıza kaydına yalnız açık rıza şablonunun sürümü yazılır.
 - `isDefault = true`: kayıt yok; `text` taslak varsayılan açık rıza metnidir (ilk satır “Bu metin hukuk danışmanınızca onaylanmış açık rıza metniyle değiştirilmelidir.”, ardından “{{clinicName}} — KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AÇIK RIZA BEYANI” gövdesi: hatırlatma/iletişim izni, kapsam dışı, serbestlik ve geri alma, haklar), `rowVersion = null`.
 - `isDefault = false`: kliniğin kaydettiği metin; `rowVersion` dolu; `updatedAtUtc` son kayıt zamanı.
 - `placeholders` ve `maxLength` sabittir (istemci editörde gösterebilir/sayaç için kullanabilir).
@@ -181,6 +191,10 @@ Açık rıza formu şablonuyla (§2) **birebir aynı sözleşme**: aynı yanıt 
 | K13 | Aydınlatma şablonu saklama | Aynı tablo `ClinicKvkkFormTemplates`, `Kind` sütunu (`0` Consent, `1` Disclosure); benzersiz `(TenantId, ClinicId, Kind)`. Aynı command/query, türü yol belirler. | ADR-024 "ADR-021 ile aynı desen"; boş/uzunluk kuralı tek yerde (`ClinicKvkkFormTemplate`) kalır, ikinci tablo ve kopya kod gerekmez. |
 | K14 | Varsayılan metinler | ADR-024 taslakları (`legal/`), uyarı satırıyla; yalnız kayıt yokken döner, veritabanına yazılmaz. | Kliniğin yapıştırdığı metin ezilmez; taslak güncellenince kaydı olmayan klinikler yeni taslağı otomatik görür. |
 | K15 | Açık rıza metnindeki kutu/imza satırları | Taslaktaki "☐ Kabul ediyorum ☐ Kabul etmiyorum" ve "Veri Sahibi … İmza" satırları varsayılan metne **konmadı**. | Bunlar yazdırma görünümünün sabit düzenidir (§2); metne konsaydı iki kez basılırdı. |
+| K16 | Şablon metin sürümü | `ClinicKvkkFormTemplate.TextVersion`: ilk kayıt 1, kırpılmış metin değişince +1, aynı metin artırmaz; varsayılan metin 0 (`DefaultTextVersion`). Kural yalnız `ClinicKvkkFormTemplate.ApplyText`'te. Klinik + tür başına bağımsız sayaç. | ADR-032 madde 1; "aynı metin" yeni sürüm sayılsaydı içeriği aynı iki sürüm ispatı bulandırırdı. |
+| K17 | Metin özeti | SHA-256, metnin UTF-8 baytları, küçük harf hex, tam 64 karakter (`ClinicKvkkFormTemplate.ComputeTextHash`); ham şablon metni (yer tutucular doldurulmadan). Metnin kendisi rıza kaydında saklanmaz. | ADR-032 "metnin kendisi tekrar saklanmaz"; varsayılan taslak sonradan güncellenirse sürüm 0 aynı kalır, hangi taslak olduğu özetle ayırt edilir. |
+| K18 | Rıza kaydına yazım | `Accepted`/`Declined` işaretlenirken isteğin klinik bağlamındaki açık rıza şablonunun sürüm+özeti `Client` satırına yazılır (`Client.RecordKvkkConsent`); istemci göndermez. `None` temizler. Klinik bağlamı yoksa null. | Müşteri kiracı düzeyinde, şablon klinik düzeyinde; formu yazdıran aktif klinik ile işaretleyen aynı oturumdur. Sunucu belirler ki istemci uydurmasın. |
+| K19 | Eski kayıtlar | Müşteri rıza kayıtları geriye dönük doldurulmaz (null = bilinmiyor); mevcut şablon satırları migration'da sürüm 1 + özetle doldurulur. | ADR-032 "geriye dönük uydurulmaz" rıza kaydı içindir; şablonun kendi metni zaten saklıdır, özeti ondan türetilir. |
 
 ---
 
@@ -192,13 +206,15 @@ Açık rıza formu şablonuyla (§2) **birebir aynı sözleşme**: aynı yanıt 
 4. Yeni hata kodları: `Clients.ConcurrencyConflict` (409; ayrıca tam müşteri PUT'unda da dönebilir), `Clinics.KvkkFormTemplate.Validation` (400), `Clinics.KvkkFormTemplate.ConcurrencyConflict` (409).
 5. **Ayarlar – Aydınlatma metni (ADR-024):** KVKK form metni ekranıyla aynı bileşen, yol `/clinics/{id}/kvkk-disclosure-template`. `isDefault = true` iken "Taslak metin; hukuk danışmanınızca onaylanmadan kullanmayın, köşeli parantezli alanları doldurun" uyarısı önerilir (açık rıza için de aynı).
 6. **Müşteri kartı – Aydınlatma metni yazdır:** GET → yer tutucuları doldur → `@media print`; kutu/imza bloğu yok (§2b).
+7. **Müşteri kartı – Metin sürümü (ADR-032):** rıza durumunun yanında "Metin sürümü: N" (`kvkkConsentTemplateVersion`); `0` → "Varsayılan metin", `null` (Kabul/Ret iken) → "Bilinmiyor"; `None` iken gösterilmez. `PUT …/kvkk-consent` yanıtındaki değerle güncellenir. Açık rıza formu yazdırmada şablonun `textVersion`'ı aynı biçimde basılabilir (işaretleme anında geçerli sürüm, yazdırılan sürümle aynı olmalıdır; metin arada değiştiyse yeni form yazdırılmalı).
 
 ---
 
 ## 5) Bilinen eksikler ve açık sorular
 
 - **Hukuki metinler ve saklama süresi doğrulanmadı;** varsayılan açık rıza ve aydınlatma metinleri taslaktır, pilot canlı verisinden önce KVKK danışmanı onaylamalı (ADR-021 riskler, ADR-024 madde 5).
-- Şablonlar sürüm numarası taşımaz; ADR-024 madde 4 (kabul kayıtları sürümü tutar) bu uçlar için uygulanmadı (rıza kaydı sürüm tutmaz).
+- Rıza kaydı yalnız **işaretleme anındaki** sürümü tutar (ADR-032); müşteriye yazdırılan kâğıdın sürümüyle eşleştiğini sunucu doğrulayamaz (form yazdırıldıktan sonra metin değiştiyse kayıt yeni sürümü gösterir). Eski sürümlerin metinleri saklanmaz; ispat için klinik eski metni kendi arşivinde tutmalı, sistem yalnız özetle eşleşmeyi doğrular.
+- Klinik bağlamı olmayan istekte (token'da `clinic_id` yok, header/query yok) sürüm `null` yazılır.
 - Ret → hatırlatma bağı tek yönlüdür (K7, ADR-025); hukuki görüş (A4) gelince gözden geçirilir.
 - Rıza geçmişi (sürümleme), tarama/dosya ekleme, e-imza, SMS/e-posta onayı, İYS: kapsam dışı (ADR-021 madde 5). Geri almada önceki değer yalnız audit kaydında.
 - Şablon için "varsayılana dön" (DELETE) ucu yok; gerekirse eklenir.
