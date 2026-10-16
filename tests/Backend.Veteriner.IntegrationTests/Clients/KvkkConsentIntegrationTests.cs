@@ -64,22 +64,24 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
         stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await IntegrationTestProblemDetails.ReadCodeAsync(stale)).Should().Be("Clients.ConcurrencyConflict");
 
-        // Detay yanıtı aynı alanları taşır; hatırlatma tercihi değişmez.
+        // Detay yanıtı aynı alanları taşır; Kabul hatırlatma tercihini değiştirmez.
         var detail = await ctx.GetClientAsync();
         detail.GetProperty("kvkkConsentStatus").GetString().Should().Be("Accepted");
         detail.GetProperty("kvkkConsentRecordedOn").GetString().Should().Be("2026-01-02");
         detail.GetProperty("kvkkConsentRecordedByUserId").GetGuid().Should().Be(ctx.UserId);
         detail.GetProperty("remindersOptedOut").GetBoolean().Should().BeFalse();
+        accepted.GetProperty("remindersOptedOut").GetBoolean().Should().BeFalse();
 
-        // Ret, tarih verilmezse bugün; hatırlatma tercihi yine değişmez (ADR-021 madde 4).
+        // Ret, tarih verilmezse bugün; hatırlatma istemiyor bayrağını açar (ADR-025 madde 4).
         var decline = await ctx.Http.PutAsJsonAsync($"/api/v1/clients/{ctx.ClientId}/kvkk-consent",
             new { status = "Declined", rowVersion = accepted.GetProperty("rowVersion").GetString() });
         decline.StatusCode.Should().Be(HttpStatusCode.OK, await decline.Content.ReadAsStringAsync());
         var declined = await decline.Content.ReadFromJsonAsync<JsonElement>();
         declined.GetProperty("kvkkConsentRecordedOn").GetString().Should().NotBeNullOrWhiteSpace();
-        (await ctx.GetClientAsync()).GetProperty("remindersOptedOut").GetBoolean().Should().BeFalse();
+        declined.GetProperty("remindersOptedOut").GetBoolean().Should().BeTrue();
+        (await ctx.GetClientAsync()).GetProperty("remindersOptedOut").GetBoolean().Should().BeTrue();
 
-        // "Yok"a geri alma: tarih ve işaretleyen temizlenir.
+        // "Yok"a geri alma: tarih ve işaretleyen temizlenir; bayrak kendiliğinden kapanmaz.
         var revert = await ctx.Http.PutAsJsonAsync($"/api/v1/clients/{ctx.ClientId}/kvkk-consent",
             new { status = "None", rowVersion = declined.GetProperty("rowVersion").GetString() });
         revert.StatusCode.Should().Be(HttpStatusCode.OK, await revert.Content.ReadAsStringAsync());
@@ -87,6 +89,7 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
         reverted.GetProperty("kvkkConsentStatus").GetString().Should().Be("None");
         reverted.GetProperty("kvkkConsentRecordedOn").ValueKind.Should().Be(JsonValueKind.Null);
         reverted.GetProperty("kvkkConsentRecordedByUserId").ValueKind.Should().Be(JsonValueKind.Null);
+        reverted.GetProperty("remindersOptedOut").GetBoolean().Should().BeTrue();
     }
 
     [Fact]

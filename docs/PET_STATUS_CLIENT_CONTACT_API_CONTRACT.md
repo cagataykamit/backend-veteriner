@@ -79,7 +79,7 @@ Mevcut `Client`'ta iletişim tercihi, onay veya hatırlatma izni alanı **yoktu*
 - `GET /api/v1/clients/{id}` (`ClientDetailDto`): iki alan her zaman döner.
 - Geçersiz kanal → 400 (`Validation` / model doğrulama).
 - Liste (`GET /clients`) ve hızlı kayıt (`POST /clients/quick-register`) **değişmedi**.
-- **KVKK:** Bu alanlar onay metni veya rıza kaydı **değildir**; yalnız müşterinin beyan ettiği tercih ve otomatik hatırlatmadan dışlamadır. İmzalı KVKK formu sonucu ayrı alanlarda tutulur ve bu bayrağı değiştirmez: bkz. `KVKK_CONSENT_API_CONTRACT.md` (ADR-021).
+- **KVKK:** Bu alanlar onay metni veya rıza kaydı **değildir**; yalnız müşterinin beyan ettiği tercih ve otomatik hatırlatmadan dışlamadır. İmzalı KVKK formu sonucu ayrı alanlarda tutulur; **Ret işaretlenince bu bayrak `true` olur**, Kabul/Yok bayrağı kapatmaz (ADR-025 madde 4): bkz. `KVKK_CONSENT_API_CONTRACT.md` K7.
 
 ---
 

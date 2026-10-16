@@ -8,7 +8,8 @@ namespace Backend.Veteriner.Application.Clients.Commands.SetKvkkConsent;
 
 /// <summary>
 /// İmzalı KVKK açık rıza formunun sonucunu (Kabul/Ret) ve tarihini işaretler veya yanlış girişi "Yok"a geri alır (ADR-021).
-/// <see cref="RowVersion"/> zorunludur; eski sürümle yazım 409 döner. Hatırlatma tercihine dokunmaz.
+/// <see cref="RowVersion"/> zorunludur; eski sürümle yazım 409 döner. Ret hatırlatma istemiyor bayrağını açar (ADR-025);
+/// denetim kaydı <c>Client.KvkkConsent.Declined</c> bu değişikliği de kapsar.
 /// </summary>
 public sealed record SetClientKvkkConsentCommand(
     Guid Id,

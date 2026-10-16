@@ -101,7 +101,8 @@ public sealed class Client : AggregateRoot
     /// <summary>
     /// KVKK açık rıza formu sonucunu kaydeder (ADR-021). Kabul/Ret: tarih verilmezse bugün, bugünden ileri olamaz;
     /// işaretleyen kullanıcı yazılır. Yok (yanlış girişin geri alınması): tarih verilemez, tarih ve kullanıcı temizlenir.
-    /// Hatırlatma tercihine (<see cref="RemindersOptedOut"/>) dokunmaz. Kural yalnızca burada yaşar.
+    /// Ret, hatırlatma istemiyor bayrağını (<see cref="RemindersOptedOut"/>) açar (ADR-025 madde 4); Kabul ve Yok bayrağa dokunmaz,
+    /// bayrak yalnız elle kapanır (yanlışlıkla hatırlatma gitmesin diye güvenli taraf). Kural yalnızca burada yaşar.
     /// </summary>
     public Result RecordKvkkConsent(KvkkConsentStatus status, DateOnly? recordedOn, DateOnly today, Guid recordedByUserId)
     {
@@ -124,6 +125,8 @@ public sealed class Client : AggregateRoot
                 KvkkConsentStatus = status;
                 KvkkConsentRecordedOn = recordedOn ?? today;
                 KvkkConsentRecordedByUserId = recordedByUserId;
+                if (status == KvkkConsentStatus.Declined)
+                    RemindersOptedOut = true;
                 break;
 
             default:

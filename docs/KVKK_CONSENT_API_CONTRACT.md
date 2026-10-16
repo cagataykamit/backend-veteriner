@@ -1,6 +1,6 @@
-# KVKK açık rıza formu ve aydınlatma metni — API sözleşmesi (ADR-021, ADR-024)
+# KVKK açık rıza formu ve aydınlatma metni — API sözleşmesi (ADR-021, ADR-024, ADR-025)
 
-Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-021-kvkk-consent-form.md`, `decisions/ADR-024-hukuki-metin-taslaklari.md`. İlgili: `PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md` (§2 `remindersOptedOut`), ADR-019 K3. Uçlar `api/v1` altında; hata zarfı standart `ProblemDetails` + `extensions.code`.
+Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-021-kvkk-consent-form.md`, `decisions/ADR-024-hukuki-metin-taslaklari.md`, `decisions/ADR-025-hasta-listesi-aktif-tedavi-kvkk-ret.md` (madde 4: Ret → hatırlatma kapanır). İlgili: `PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md` (§2 `remindersOptedOut`), ADR-019 K3. Uçlar `api/v1` altında; hata zarfı standart `ProblemDetails` + `extensions.code`.
 
 > **Durum:** Uygulandı (kod + test), dal `feat/kvkk-riza-formu`. Migration `20261014211943_AddClientKvkkConsentAndClinicKvkkFormTemplate` üretildi, **hiçbir paylaşılan/geliştirme veritabanına uygulanmadı**. **Yeni izin yok**, seed gerekmez (yalnız yeni composite okuma policy'si, aşağıda).
 
@@ -39,9 +39,9 @@ Liste (`GET /clients`), hızlı kayıt ve müşteri oluşturma **değişmedi**; 
 - `status = "None"`: yanlış girişin geri alınması; `recordedOn` **verilemez**; tarih ve işaretleyen temizlenir (geçmiş, audit kaydında kalır).
 - Zaten `Accepted` iken tekrar `Accepted` göndermek tarihi/işaretleyeni düzeltir; `Accepted` ↔ `Declined` doğrudan geçilebilir.
 - `rowVersion` zorunlu: `GET /clients/{id}` yanıtındaki değer. Arada kayıt değiştiyse 409.
-- **Hatırlatma tercihini değiştirmez:** `Declined` işaretlemek `remindersOptedOut`'u açmaz (ADR-021 madde 4). Gerekiyorsa müşteri formunda ayrıca "Hatırlatma istemiyor" işaretlenir.
+- **Ret hatırlatmayı kapatır (ADR-025 madde 4, ADR-021 madde 4'ü değiştirir):** `Declined` işaretlemek `remindersOptedOut = true` yapar (zaten açıksa açık kalır; tarih düzeltmek için tekrar `Declined` göndermek de bayrağı açar). `Accepted` veya `None`'a geçmek bayrağı **kapatmaz**; bayrak yalnız müşteri formundaki "Hatırlatma istemiyor" ile elle kapanır (güvenli taraf). Denetim izi: `Client.KvkkConsent.Declined` audit kaydı bayrak değişikliğini de kapsar (ayrı audit satırı yazılmaz).
 
-Yanıt **200** (`ClientKvkkConsentDto`, alan adları detay yanıtıyla aynı):
+Yanıt **200** (`ClientKvkkConsentDto`, alan adları detay yanıtıyla aynı). `remindersOptedOut` yazımdan sonraki bayraktır (ADR-025; istemci müşteri kartındaki "Hatırlatma istemiyor" görünümünü bununla günceller):
 
 ```json
 {
@@ -50,6 +50,7 @@ Yanıt **200** (`ClientKvkkConsentDto`, alan adları detay yanıtıyla aynı):
   "kvkkConsentRecordedOn": "2026-10-15",
   "kvkkConsentRecordedByUserId": "guid",
   "kvkkConsentRecordedByName": "Ayşe Yılmaz",
+  "remindersOptedOut": false,
   "rowVersion": "AAAAAAAAB9I="
 }
 ```
@@ -171,7 +172,7 @@ Açık rıza formu şablonuyla (§2) **birebir aynı sözleşme**: aynı yanıt 
 | K4 | Tarih | Opsiyonel; verilmezse bugün; gelecek yok; geçmiş serbest. | Form çoğunlukla aynı gün işaretlenir; eski kâğıt formlar geriye tarihli girilebilmeli. |
 | K5 | Geri alma | `None` tarih ve işaretleyeni temizler; geçmiş audit kaydında. | Yanlış girişin düzeltilmesi; ayrı rıza geçmişi modeli kapsam dışı (ADR-021 madde 5). |
 | K6 | İşaretleyen | `kvkkConsentRecordedByUserId` müşteri satırında + audit (`IAuditableRequest`). | ADR-021 "kim işaretledi"; ayrı tablo gerekmedi. |
-| K7 | Hatırlatma | Rıza durumu `remindersOptedOut`'u değiştirmez, hatırlatma adaylarını etkilemez. | ADR-021 madde 4 (hukuki görüşe göre sonra). |
+| K7 | Hatırlatma | **Ret → `remindersOptedOut = true`** (kural `Client.RecordKvkkConsent`'te); Kabul/Yok bayrağa dokunmaz, bayrak yalnız elle kapanır. Hatırlatma adayları mevcut `Client.AcceptsReminders` kuralıyla dışlanır. | ADR-025 madde 4 (ADR-021 madde 4'ü değiştirir); yanlışlıkla hatırlatma gitmesin diye güvenli taraf. Hukuki görüş (HUKUKI-ONAY-LISTESI A4) gelince gözden geçirilir. |
 | K8 | Şablon kapsamı | **Klinik başına** (kiracı değil); ayrı tablo `ClinicKvkkFormTemplates`; kayıt yoksa varsayılan. | ADR-021 "klinik başına"; başlıkta klinik adı var; `ClinicAppointmentSettings` deseni. |
 | K9 | Yer tutucu doldurma | İstemcide; sunucu ham metin, yalnız boş/uzunluk denetimi. | Yazdırma görünümü istemcide; sunucu tarafı biçimlendirme/tarih yerelleştirmesi gerekmez. |
 | K10 | Şablon okuma izni | Composite `Clinics_KvkkFormRead` (`Clinics.Read` \| `Clinics.Update` \| `Clients.Read`). | Formu yazdıran resepsiyonda `Clinics.Read` olmayabilir; metin gizli veri değildir. Yeni izin değil, policy. |
@@ -185,7 +186,7 @@ Açık rıza formu şablonuyla (§2) **birebir aynı sözleşme**: aynı yanıt 
 
 ## 4) Frontend için değişenler
 
-1. **Müşteri kartı – Rıza durumu:** `kvkkConsentStatus` rozeti (`None` = "KVKK formu alınmadı"), tarih ve işaretleyen adı. "İşaretle" diyaloğu: Kabul / Ret, tarih (varsayılan bugün, ileri tarih seçilemez), "Yok'a geri al". `PUT /clients/{id}/kvkk-consent`, `rowVersion` `GET /clients/{id}`'den; 409 → detayı yenile; yanıttaki `rowVersion` sonraki yazımda kullanılır.
+1. **Müşteri kartı – Rıza durumu:** `kvkkConsentStatus` rozeti (`None` = "KVKK formu alınmadı"), tarih ve işaretleyen adı. "İşaretle" diyaloğu: Kabul / Ret, tarih (varsayılan bugün, ileri tarih seçilemez), "Yok'a geri al". `PUT /clients/{id}/kvkk-consent`, `rowVersion` `GET /clients/{id}`'den; 409 → detayı yenile; yanıttaki `rowVersion` sonraki yazımda kullanılır. Yanıttaki `remindersOptedOut` ile "Hatırlatma istemiyor" görünümü güncellenir; Ret sonrası kısa bildirim önerilir ("Ret işaretlendi; hatırlatmalar kapatıldı.").
 2. **Müşteri kartı – KVKK formu yazdır:** `GET /clinics/{aktifKlinikId}/kvkk-form-template` → yer tutucuları doldur → `@media print` görünümü (başlıkta klinik adı, metin, Kabul ediyorum / Kabul etmiyorum kutuları, Veri Sahibi Adı Soyadı/Tarih/İmza bloğu). `isDefault = true` ise ekranda "Metin henüz düzenlenmedi" uyarısı önerilir.
 3. **Ayarlar – KVKK form metni:** GET ile yükle, `placeholders` listesini ve `maxLength` sayacını göster, PUT ile kaydet (`rowVersion` `isDefault` iken null). 409 → yeniden yükle.
 4. Yeni hata kodları: `Clients.ConcurrencyConflict` (409; ayrıca tam müşteri PUT'unda da dönebilir), `Clinics.KvkkFormTemplate.Validation` (400), `Clinics.KvkkFormTemplate.ConcurrencyConflict` (409).
@@ -198,7 +199,7 @@ Açık rıza formu şablonuyla (§2) **birebir aynı sözleşme**: aynı yanıt 
 
 - **Hukuki metinler ve saklama süresi doğrulanmadı;** varsayılan açık rıza ve aydınlatma metinleri taslaktır, pilot canlı verisinden önce KVKK danışmanı onaylamalı (ADR-021 riskler, ADR-024 madde 5).
 - Şablonlar sürüm numarası taşımaz; ADR-024 madde 4 (kabul kayıtları sürümü tutar) bu uçlar için uygulanmadı (rıza kaydı sürüm tutmaz).
-- **Ret → hatırlatma bağı** yok (K7); hukuki görüşe göre karar verilecek.
+- Ret → hatırlatma bağı tek yönlüdür (K7, ADR-025); hukuki görüş (A4) gelince gözden geçirilir.
 - Rıza geçmişi (sürümleme), tarama/dosya ekleme, e-imza, SMS/e-posta onayı, İYS: kapsam dışı (ADR-021 madde 5). Geri almada önceki değer yalnız audit kaydında.
 - Şablon için "varsayılana dön" (DELETE) ucu yok; gerekirse eklenir.
 - Müşteri listesinde rıza durumu/süzgeci yok ("formu alınmamış müşteriler" listesi istenirse ayrı iş).

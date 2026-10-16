@@ -127,6 +127,35 @@ public sealed class SetClientKvkkConsentCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Declined_Should_Opt_Out_Of_Reminders_And_Return_Flag()
+    {
+        var client = ReturnClient();
+
+        var result = await CreateHandler().Handle(
+            new SetClientKvkkConsentCommand(client.Id, KvkkConsentStatus.Declined, null, ValidRowVersion), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.RemindersOptedOut.Should().BeTrue();
+        client.RemindersOptedOut.Should().BeTrue();
+        new SetClientKvkkConsentCommand(client.Id, KvkkConsentStatus.Declined, null, ValidRowVersion)
+            .AuditAction.Should().Be("Client.KvkkConsent.Declined");
+        _clients.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Accepted_After_Declined_Should_Keep_Reminder_OptOut()
+    {
+        var client = ReturnClient();
+        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, IstanbulToday, _userId);
+
+        var result = await CreateHandler().Handle(
+            new SetClientKvkkConsentCommand(client.Id, KvkkConsentStatus.Accepted, null, ValidRowVersion), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.RemindersOptedOut.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Handle_Should_Revert_To_None_Without_Touching_Reminders()
     {
         var client = ReturnClient();

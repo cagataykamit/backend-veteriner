@@ -67,14 +67,47 @@ public sealed class ClientKvkkConsentTests
     }
 
     [Fact]
-    public void Declined_Should_Not_Change_Reminder_OptOut()
+    public void Declined_Should_Opt_Out_Of_Reminders()
     {
         var client = CreateClient();
 
+        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, Today, UserId).IsSuccess.Should().BeTrue();
+
+        client.RemindersOptedOut.Should().BeTrue();
+        Client.AcceptsReminders.Compile()(client).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(KvkkConsentStatus.Accepted)]
+    [InlineData(KvkkConsentStatus.None)]
+    public void Leaving_Declined_Should_Keep_Reminder_OptOut(KvkkConsentStatus next)
+    {
+        var client = CreateClient();
         client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, Today, UserId);
 
+        client.RecordKvkkConsent(next, null, Today, UserId).IsSuccess.Should().BeTrue();
+
+        client.RemindersOptedOut.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Accepted_Should_Not_Change_Reminder_OptOut()
+    {
+        var client = CreateClient();
+
+        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId);
+
         client.RemindersOptedOut.Should().BeFalse();
-        Client.AcceptsReminders.Compile()(client).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Failed_Declined_Should_Not_Change_Reminder_OptOut()
+    {
+        var client = CreateClient();
+
+        client.RecordKvkkConsent(KvkkConsentStatus.Declined, Today.AddDays(1), Today, UserId).IsSuccess.Should().BeFalse();
+
+        client.RemindersOptedOut.Should().BeFalse();
     }
 
     [Fact]
