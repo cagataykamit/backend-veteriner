@@ -249,7 +249,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
             var clientName = $"Veri Sahibi {Guid.NewGuid():N}"[..20];
             var client = new Client(tenant.Id, clientName, "905551110071", $"veri-{Guid.NewGuid():N}@example.com", "Izmir Konak");
             client.ApplyContactPreferences(ContactChannel.Phone, true);
-            client.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 1, 2), DateOnly.FromDateTime(DateTime.UtcNow), user.Id);
+            client.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 1, 2), DateOnly.FromDateTime(DateTime.UtcNow), user.Id, 1, new string('a', 64));
             db.Clients.Add(client);
             await db.SaveChangesAsync();
 
