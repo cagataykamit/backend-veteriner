@@ -1,8 +1,12 @@
+using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Invites;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
+using Backend.Veteriner.Domain.Auth;
+using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
@@ -19,6 +23,8 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
     private readonly IUserRepository _usersWrite;
     private readonly IPasswordHasher _hasher;
     private readonly TenantInviteAcceptanceService _acceptance;
+    private readonly IReadRepository<OperationClaim> _operationClaims;
+    private readonly IRepository<LegalAcceptance> _legalAcceptances;
 
     public SignupAndAcceptTenantInviteCommandHandler(
         ITokenHashService tokenHash,
@@ -26,7 +32,9 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
         IReadRepository<User> usersRead,
         IUserRepository usersWrite,
         IPasswordHasher hasher,
-        TenantInviteAcceptanceService acceptance)
+        TenantInviteAcceptanceService acceptance,
+        IReadRepository<OperationClaim> operationClaims,
+        IRepository<LegalAcceptance> legalAcceptances)
     {
         _tokenHash = tokenHash;
         _invites = invites;
@@ -34,6 +42,8 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
         _usersWrite = usersWrite;
         _hasher = hasher;
         _acceptance = acceptance;
+        _operationClaims = operationClaims;
+        _legalAcceptances = legalAcceptances;
     }
 
     public async Task<Result<TenantInviteAcceptResultDto>> Handle(
@@ -82,9 +92,23 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
                 "Bu e-posta ile hesap zaten var; giriş yapıp daveti kabul edin.");
         }
 
+        // Sunucu da doğrular (ADR-029 madde 4); hesap oluşturulmadan önce.
+        var inviteClaim = await _operationClaims.FirstOrDefaultAsync(new OperationClaimByIdSpec(invite.OperationClaimId), ct);
+        var requiredLegalDocuments = LegalDocumentCatalog.RequiredFor(inviteClaim is null ? [] : [inviteClaim.Name]);
+        var legalCheck = LegalDocumentCatalog.EnsureAcceptsCurrent(requiredLegalDocuments, request.AcceptedLegalDocuments);
+        if (!legalCheck.IsSuccess)
+            return Result<TenantInviteAcceptResultDto>.Failure(legalCheck.Error);
+
         var user = new User(invite.Email, _hasher.Hash(request.Password));
         await _usersWrite.AddAsync(user, ct);
 
-        return await _acceptance.AcceptAsync(invite, user, ct);
+        var accepted = await _acceptance.AcceptAsync(invite, user, ct);
+        if (!accepted.IsSuccess)
+            return accepted;
+
+        await _legalAcceptances.AddRangeAsync(
+            LegalDocumentCatalog.CreateAcceptances(user.Id, invite.TenantId, requiredLegalDocuments, DateTime.UtcNow), ct);
+
+        return accepted;
     }
 }

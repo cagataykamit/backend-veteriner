@@ -1,5 +1,8 @@
+using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.LegalAcceptances;
+using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -22,6 +25,7 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
     private readonly IReadRepository<User> _usersRead;
     private readonly IUserTenantRepository _userTenantRepo;
     private readonly TenantSubscriptionSeatEvaluator _seatEvaluator;
+    private readonly IReadRepository<OperationClaim> _operationClaims;
 
     public GetPublicTenantInviteDetailQueryHandler(
         ITokenHashService tokenHash,
@@ -30,8 +34,10 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
         IReadRepository<Clinic> clinics,
         IReadRepository<User> usersRead,
         IUserTenantRepository userTenantRepo,
-        TenantSubscriptionSeatEvaluator seatEvaluator)
+        TenantSubscriptionSeatEvaluator seatEvaluator,
+        IReadRepository<OperationClaim> operationClaims)
     {
+        _operationClaims = operationClaims;
         _tokenHash = tokenHash;
         _invites = invites;
         _tenants = tenants;
@@ -105,6 +111,8 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
                 blockedByUser = true;
         }
 
+        var inviteClaim = await _operationClaims.FirstOrDefaultAsync(new OperationClaimByIdSpec(invite.OperationClaimId), ct);
+
         var actionable = isPending && !timeExpired;
         var canJoin = actionable && subscriptionOk && roomForNewMember && clinicOk && !blockedByUser && tenant is { IsActive: true };
 
@@ -120,7 +128,8 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
             isPending,
             canJoin,
             requiresLogin,
-            requiresSignup);
+            requiresSignup,
+            LegalDocumentCatalog.ToDtos(LegalDocumentCatalog.RequiredFor(inviteClaim is null ? [] : [inviteClaim.Name])));
 
         return Result<PublicTenantInviteDetailDto>.Success(dto);
     }

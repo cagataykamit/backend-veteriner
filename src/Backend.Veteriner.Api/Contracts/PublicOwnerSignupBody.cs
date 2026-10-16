@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.LegalAcceptances;
+
 namespace Backend.Veteriner.Api.Contracts;
 
 public sealed class PublicOwnerSignupBody
@@ -8,4 +10,7 @@ public sealed class PublicOwnerSignupBody
     public string ClinicCity { get; set; } = default!;
     public string Email { get; set; } = default!;
     public string Password { get; set; } = default!;
+
+    /// <summary>Kabul edilen belgeler ve sürümleri; Kullanım Şartları, Gizlilik ve Veri İşleme'nin güncel sürümü zorunlu (ADR-029).</summary>
+    public List<LegalDocumentAcceptanceInput>? AcceptedLegalDocuments { get; set; }
 }

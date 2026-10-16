@@ -1,11 +1,13 @@
 using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
@@ -29,6 +31,7 @@ public sealed class PublicOwnerSignupCommandHandler
     private readonly IReadRepository<OperationClaim> _operationClaimsRead;
     private readonly IUserOperationClaimRepository _userOperationClaims;
     private readonly IRepository<TenantSubscription> _subscriptionsWrite;
+    private readonly IRepository<LegalAcceptance> _legalAcceptancesWrite;
     private readonly IPasswordHasher _hasher;
     private readonly IUnitOfWork _uow;
     private readonly ILogger<PublicOwnerSignupCommandHandler> _logger;
@@ -44,6 +47,7 @@ public sealed class PublicOwnerSignupCommandHandler
         IReadRepository<OperationClaim> operationClaimsRead,
         IUserOperationClaimRepository userOperationClaims,
         IRepository<TenantSubscription> subscriptionsWrite,
+        IRepository<LegalAcceptance> legalAcceptancesWrite,
         IPasswordHasher hasher,
         IUnitOfWork uow,
         ILogger<PublicOwnerSignupCommandHandler>? logger = null)
@@ -58,6 +62,7 @@ public sealed class PublicOwnerSignupCommandHandler
         _operationClaimsRead = operationClaimsRead;
         _userOperationClaims = userOperationClaims;
         _subscriptionsWrite = subscriptionsWrite;
+        _legalAcceptancesWrite = legalAcceptancesWrite;
         _hasher = hasher;
         _uow = uow;
         _logger = logger ?? NullLogger<PublicOwnerSignupCommandHandler>.Instance;
@@ -120,6 +125,12 @@ public sealed class PublicOwnerSignupCommandHandler
                 "Sistem rol konfigürasyonu eksik. Lütfen yöneticinizle iletişime geçin.");
         }
 
+        // Sunucu da doğrular (ADR-029 madde 4): kayıt olan klinik yöneticisi gereken belgelerin güncel sürümünü kabul etmiş olmalı.
+        var requiredLegalDocuments = LegalDocumentCatalog.RequiredFor([adminClaim.Name]);
+        var legalCheck = LegalDocumentCatalog.EnsureAcceptsCurrent(requiredLegalDocuments, request.AcceptedLegalDocuments);
+        if (!legalCheck.IsSuccess)
+            return Result<PublicOwnerSignupResultDto>.Failure(legalCheck.Error);
+
         var user = new User(email, _hasher.Hash(request.Password));
         MarkStep("hashAndCreateUser");
         var roleResult = user.AddRole("Admin");
@@ -143,6 +154,8 @@ public sealed class PublicOwnerSignupCommandHandler
         await _userTenantsWrite.AddAsync(new UserTenant(user.Id, tenant.Id), ct);
         await _userClinicsWrite.AddAsync(new UserClinic(user.Id, clinic.Id), ct);
         await _userOperationClaims.AddAsync(new UserOperationClaim(user.Id, adminClaim.Id), ct);
+        await _legalAcceptancesWrite.AddRangeAsync(
+            LegalDocumentCatalog.CreateAcceptances(user.Id, tenant.Id, requiredLegalDocuments, utcNow), ct);
         MarkStep("stageEntities");
 
         await _uow.SaveChangesAsync(ct);

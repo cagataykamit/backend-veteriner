@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Api.Contracts;
+using Backend.Veteriner.Application.LegalAcceptances;
+using Backend.Veteriner.Application.LegalAcceptances.Queries.GetCurrentVersions;
 using Backend.Veteriner.Application.Public.Commands.AcceptInvite;
 using Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
@@ -48,11 +50,19 @@ public sealed class PublicController : ControllerBase
             body.ClinicName,
             body.ClinicCity,
             body.Email,
-            body.Password);
+            body.Password,
+            body.AcceptedLegalDocuments);
 
         var result = await _mediator.Send(command, ct);
         return result.ToActionResult(this);
     }
+
+    /// <summary>Hukuki belgelerin güncel sürümleri (ADR-029); hukuki sayfalar ve kayıt formu sürümü buradan gösterir.</summary>
+    [AllowAnonymous]
+    [HttpGet("legal-documents")]
+    [ProducesResponseType(typeof(IReadOnlyList<LegalDocumentVersionDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLegalDocumentVersions(CancellationToken ct)
+        => Ok(await _mediator.Send(new GetCurrentLegalDocumentVersionsQuery(), ct));
 
     /// <summary>Public davet doğrulama (join ekranı).</summary>
     [AllowAnonymous]
@@ -106,7 +116,7 @@ public sealed class PublicController : ControllerBase
                 .ToActionResult(this);
         }
 
-        var result = await _mediator.Send(new SignupAndAcceptTenantInviteCommand(token, body.Password), ct);
+        var result = await _mediator.Send(new SignupAndAcceptTenantInviteCommand(token, body.Password, body.AcceptedLegalDocuments), ct);
         return result.ToActionResult(this);
     }
 }

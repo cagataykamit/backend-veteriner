@@ -5,6 +5,8 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Legal;
+using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using FluentAssertions;
@@ -25,6 +27,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     private readonly Mock<IReadRepository<OperationClaim>> _operationClaimsRead = new();
     private readonly Mock<IUserOperationClaimRepository> _userOperationClaims = new();
     private readonly Mock<IRepository<TenantSubscription>> _subscriptionsWrite = new();
+    private readonly Mock<IRepository<LegalAcceptance>> _legalAcceptancesWrite = new();
     private readonly Mock<IPasswordHasher> _hasher = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<ILogger<PublicOwnerSignupCommandHandler>> _logger = new();
@@ -41,6 +44,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             _operationClaimsRead.Object,
             _userOperationClaims.Object,
             _subscriptionsWrite.Object,
+            _legalAcceptancesWrite.Object,
             _hasher.Object,
             _uow.Object,
             _logger.Object);
@@ -78,7 +82,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     public async Task Handle_Should_CreateOwnerTenantClinicMembershipsAndSubscription_When_Successful()
     {
         var handler = CreateHandler();
-        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!");
+        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments());
         var adminClaim = new OperationClaim("Admin");
 
         _usersRead.Setup(r => r.AnyAsync(It.IsAny<UserExistsByEmailSpec>(), It.IsAny<CancellationToken>()))
@@ -111,5 +115,58 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         _userClinicsWrite.Verify(r => r.AddAsync(It.IsAny<UserClinic>(), It.IsAny<CancellationToken>()), Times.Once);
         _userOperationClaims.Verify(r => r.AddAsync(It.IsAny<UserOperationClaim>(), It.IsAny<CancellationToken>()), Times.Once);
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _legalAcceptancesWrite.Verify(r => r.AddRangeAsync(
+            It.Is<IEnumerable<LegalAcceptance>>(rows => rows.Count() == 3
+                && rows.All(a => a.Version == LegalDocumentCatalog.CurrentVersion(a.DocumentType))
+                && rows.Select(a => a.DocumentType).Distinct().Count() == 3),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_Should_ReturnLegalRequired_And_CreateNothing_When_DataProcessingNotAccepted()
+    {
+        SetupHappyPathLookups();
+        var handler = CreateHandler();
+        var documents = AllCurrentDocuments().Where(d => d.DocumentType != LegalDocumentType.DataProcessing).ToArray();
+        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", documents);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("LegalAcceptances.Required");
+        _usersWrite.Verify(r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+        _legalAcceptancesWrite.Verify(r => r.AddRangeAsync(It.IsAny<IEnumerable<LegalAcceptance>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnVersionOutdated_When_SubmittedVersionIsNotCurrent()
+    {
+        SetupHappyPathLookups();
+        var handler = CreateHandler();
+        var documents = AllCurrentDocuments()
+            .Select(d => d.DocumentType == LegalDocumentType.Terms ? d with { Version = "0.0" } : d)
+            .ToArray();
+        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", documents);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("LegalAcceptances.VersionOutdated");
+        _usersWrite.Verify(r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private void SetupHappyPathLookups()
+    {
+        _usersRead.Setup(r => r.AnyAsync(It.IsAny<UserExistsByEmailSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _tenantsRead.Setup(r => r.AnyAsync(It.IsAny<TenantByNameCaseInsensitiveSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _operationClaimsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<OperationClaimByNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OperationClaim("Admin"));
+    }
+
+    private static LegalDocumentAcceptanceInput[] AllCurrentDocuments() =>
+        LegalDocumentCatalog.CurrentVersions
+            .Select(kv => new LegalDocumentAcceptanceInput(kv.Key, kv.Value))
+            .ToArray();
 }
