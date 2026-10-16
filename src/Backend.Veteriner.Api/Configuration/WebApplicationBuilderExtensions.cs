@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Imports.Reading;
+using Backend.Veteriner.Application.OwnerPortal;
 using Backend.Veteriner.Infrastructure;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Security;
@@ -172,6 +173,10 @@ public static class WebApplicationBuilderExtensions
 
         StartupConfigurationValidator.EnsureRequiredSettings(builder.Configuration, builder.Environment);
 
+        var portal = builder.Configuration.GetSection(OwnerPortalOptions.SectionName).Get<OwnerPortalOptions>() ?? new OwnerPortalOptions();
+        if (string.Equals(portal.Audience, jwt.Audience, StringComparison.Ordinal))
+            throw new InvalidOperationException("OwnerPortal:Audience, Jwt:Audience ile aynı olamaz (portal ve personel token'ları ayrılmalı).");
+
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(opt =>
             {
@@ -190,6 +195,25 @@ public static class WebApplicationBuilderExtensions
 
                     NameClaimType = JwtRegisteredClaimNames.Sub,
                     RoleClaimType = "role"
+                };
+            })
+            // Hasta sahibi portalı (ADR-031 K6): ayrı şema, ayrı hedef kitle. Yalnız portal politikası bu şemayı kullanır.
+            .AddJwtBearer(OwnerPortalAuth.Scheme, opt =>
+            {
+                opt.MapInboundClaims = false;
+
+                opt.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidateLifetime = true,
+                    ValidIssuer = jwt.Issuer,
+                    ValidAudience = portal.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
+                    ClockSkew = TimeSpan.Zero,
+
+                    NameClaimType = JwtRegisteredClaimNames.Sub,
                 };
             });
 

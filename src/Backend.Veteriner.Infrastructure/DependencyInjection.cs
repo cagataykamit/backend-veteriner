@@ -205,6 +205,7 @@ public static class DependencyInjection
 
         // ===== Hasta sahibi portalı (ADR-031): ayrı hedef kitleli token, jeton/kod üretimi =====
         services.Configure<OwnerPortalOptions>(configuration.GetSection(OwnerPortalOptions.SectionName));
+        services.AddScoped<IOwnerPortalTokenService, OwnerPortalTokenService>();
         services.AddSingleton<IOwnerPortalSecretGenerator, OwnerPortalSecretGenerator>();
 
         // ===== HttpContext & App URL & Audit =====

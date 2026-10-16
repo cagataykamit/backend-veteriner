@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.OwnerPortal;
 
 namespace Backend.Veteriner.Api.Auth
 {
@@ -42,6 +43,13 @@ namespace Backend.Veteriner.Api.Auth
                         PermissionCatalog.Clinics.Update,
                         PermissionCatalog.Clients.Read,
                     })));
+
+                // Hasta sahibi portalı (ADR-031 K6): yalnız portal şeması ve portal hesabı. Personel token'ı bu şemada
+                // hedef kitle uyuşmazlığıyla doğrulanmaz; personel politikaları da portal şemasını kullanmaz.
+                options.AddPolicy(OwnerPortalAuth.Policy, p => p
+                    .AddAuthenticationSchemes(OwnerPortalAuth.Scheme)
+                    .RequireAuthenticatedUser()
+                    .RequireClaim(OwnerPortalAuth.PrincipalTypeClaim, OwnerPortalAuth.OwnerPrincipalType));
             });
 
             return services;
