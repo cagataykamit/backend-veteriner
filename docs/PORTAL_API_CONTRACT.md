@@ -2,9 +2,9 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-031-hasta-sahibi-portali-ve-mobil-uygulama.md` (K3, K4, K6; AK-2 giriş ikisi birden, AK-3 tek hesap çok klinik, AK-6 v0 SMS yok, AK-8, AK-9), ADR-029 (sürümlü kabul), ADR-025 (KVKK Ret → hatırlatma kapalı), ADR-021/024 (aydınlatma metni). Hata zarfı standart `ProblemDetails` + `extensions.code` (`BACKEND-CONTRACT-STANDARD.md` §9).
 
-> **Durum:** Dilim **A** (hesap, davet, giriş, güvenlik temeli) uygulandı, dal `feat/portal-a-hesap-giris`. Dilim **B** (okuma uçları) bu belgede **taslak**tır; B ajanı ve portal frontend'i bu şekle uyar, değişiklik önce burada yapılır. Migration `AddOwnerPortalAccounts` üretildi, **hiçbir paylaşılan/geliştirme veritabanına uygulanmadı**. Yeni izin `OwnerPortal.Manage` kataloğa ve rol bağlarına eklendi; seed çalıştırılmadı.
+> **Durum:** Dilim **A** (hesap, davet, giriş, güvenlik temeli) uygulandı, dal `feat/portal-a-hesap-giris`. Dilim **B** (salt okunur uçlar, §6) uygulandı, dal `feat/portal-b-okuma-uclari`; B migration gerektirmez. Portal frontend'i bu şekle uyar, değişiklik önce burada yapılır. Migration `AddOwnerPortalAccounts` üretildi, **hiçbir paylaşılan/geliştirme veritabanına uygulanmadı**. Yeni izin `OwnerPortal.Manage` kataloğa ve rol bağlarına eklendi; seed çalıştırılmadı.
 
-İşaretler: **[A]** uygulandı · **[B]** taslak, sonraki dilim · **[v1]** v0 dışında, taslak yer tutucu.
+İşaretler: **[A]** dilim A, uygulandı · **[B]** dilim B, uygulandı · **[v1]** v0 dışında, taslak yer tutucu (uç yok).
 
 ## 1) Yüzeyler ve kimlik
 
@@ -45,7 +45,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-031-ha
 | Hız sınırı (IP) | `portal-auth` 10/dk (anonim kimlik uçları), `portal-refresh` ~30/dk, `portal` 120/dk (oturumlu uçlar). Üçü de IP anahtarlıdır (hız sınırı kimlik doğrulamadan önce çalışır). **Hesap bazlı** koruma kilit + kod deneme hakkı + kod bekleme süresidir (veritabanında, `Domain/OwnerPortal`) | `RateLimitingExtensions` |
 | Refresh | Her yenilemede döndürülür; iptal edilmiş token tekrar kullanılırsa hesabın **tüm** portal oturumları kapanır | `RefreshPortalSessionCommandHandler` |
 | Sahiplik | Her bağ kapsamlı uç `OwnerPortalAccess.ResolveLinkAsync`: bağ bu hesaba ait, `Active`, kiracı aktif; değilse **404** `Portal.Links.NotFound` (başka hesabın/kiracının bağı ile ayırt edilemez) | `OwnerPortalAccess` |
-| Denetim | AuditBehavior: davet oluşturma/iptal, bağ kapatma, davet kabulü, kod isteği, kodla/parolayla giriş, şifre sıfırlama, çıkış, kabul, aydınlatma onayı. Parola, token, `oneTimeCode` maskelenir. Portal isteklerinde `ActorUserId` boştur (personel kimliğiyle karışmaz); hedef `OwnerAccountId=...` | `AuditBehavior` |
+| Denetim | AuditBehavior: davet oluşturma/iptal, bağ kapatma, davet kabulü, kod isteği, kodla/parolayla giriş, şifre sıfırlama, çıkış, kabul, aydınlatma onayı ve dilim B okuma uçları (`Portal.Read.*`, §6; içerik yazılmaz). Parola, token, `oneTimeCode` maskelenir. Portal isteklerinde `ActorUserId` boştur (personel kimliğiyle karışmaz); hedef `OwnerAccountId=...` | `AuditBehavior` |
 
 ## 4) Klinik paneli uçları [A]
 
@@ -222,22 +222,139 @@ Personel belgeleri (`Terms`, `Privacy`, `DataProcessing`) ve personel uçları d
 
 Hatalar: bağ bu hesabın değil/kapalı → 404 `Portal.Links.NotFound`.
 
-## 6) Portal uçları — Dilim B [B] (taslak)
+## 6) Portal uçları — Dilim B [B] (salt okunur)
 
-Tüm uçlar oturumlu, `portal` hız sınırı, **`OwnerPortalAccess.ResolveLinkAsync(ownerAccountId, linkId)` ile başlar**, sorgular bağın `TenantId` + `ClientId` (+ klinik bilgisi için `ClinicId`) filtresiyle çalışır. Genel arama/liste ucu yoktur; yalnız kimlikle erişim. Her başarılı okuma denetim kaydına yazılır (kim, ne zaman, hangi kayıt; **içerik değil**, K4) — B dilimi `IAuditableRequest`'i okuma sorgularında da uygular, eylem adları `Portal.Read.*`. Başka hesabın/kiracının/müşterinin kaydı: **404** (`Portal.Links.NotFound`, `Portal.Pets.NotFound`). Vefat etmiş hasta listede görünür, `status` ile işaretlidir (öneri; B ajanı ürün kararı gerekirse sorar).
+Ortak kurallar:
 
-| Uç | Yanıt (alanlar) | Sayfalama |
+- Tüm uçlar oturumlu (`PortalBearer`, `PortalOwner` politikası), `portal` hız sınırı (IP, 120/dk), yalnız `GET`. Personel token'ı **401**.
+- Her uç **`OwnerPortalAccess.ResolveLinkAsync(ownerAccountId, linkId)` ile başlar**; sorgular bağın `TenantId` + `ClientId` filtresiyle çalışır. Klinik bilgisi ve bakiye ayrıca bağın `ClinicId`'siyle sınırlıdır; hayvan, randevu ve aşı müşterinin kiracıdaki tüm kayıtlarıdır (müşteri kiracı düzeyindedir; randevuda `clinicName` döner).
+- Genel arama/liste ucu yoktur; yalnız bağ ve hayvan kimliğiyle erişim.
+- Başka hesabın, kapalı ya da pasif kiracıdaki bağ: **404** `Portal.Links.NotFound`. Bağın müşterisine ait olmayan (başka müşterinin/kiracının ya da hiç olmayan) hayvan: **404** `Portal.Pets.NotFound`. İkisi de sebebini ayırt etmez.
+- **Okuma denetim kaydı:** her istek (başarılı veya değil) `AuditLogs`'a yazılır: eylem `Portal.Read.*` (tablo aşağıda), hedef `OwnerAccountId=…;LinkId=…[;PetId=…]`, `ActorUserId` boş. `RequestPayload` yalnız istek parametreleridir (kimlikler, `scope`, `page`, `pageSize`); **yanıt içeriği yazılmaz** (K4).
+- **Ayrı DTO:** personel DTO'ları kullanılmaz. Şu alanlar **hiçbir yanıtta yoktur**: `tenantId`, `rowVersion`/`mutationSequence`, kullanıcı kimlikleri (`createdByUserId` vb.), not alanları (`notes`, hayvan uyarı notu, iptal/gelmedi gerekçesi, ödeme notu), muayene/lab/görüntü/reçete/tedavi verisi, ücret kalemi ve açıklaması.
+- Enum alanları metin. Tarih-saat UTC (`…Utc`), takvim tarihi `yyyy-MM-dd`, saat `HH:mm:ss`.
+- **Vefat:** vefat eden hayvan listede `status: "Deceased"` ile görünür; aşı geçmişi döner, **yaklaşan/gecikmiş aşı listesi boştur** (ADR-028 kuralı: vefat eden hastanın aşısı ne gecikmiş ne yaklaşan sayılır; `Pet.ReceivesCare`, ADR-020 S5 / ADR-025).
+- İptal edilmiş randevu ve aşı listeden düşmez, `status: "Cancelled"` ile gelir.
+
+| Uç | Denetim eylemi | Sayfalama |
 |---|---|---|
-| `GET /api/portal/v1/links/{linkId}/clinic` | `{ clinicId, name, phone, email, address, city, workingHours: [{ dayOfWeek, opensAt, closesAt, isClosed }] }` | — |
-| `GET /api/portal/v1/links/{linkId}/pets` | `[{ petId, name, speciesName, breedName, gender, birthDate, microchipNumber, weightKg, status }]` | yok (müşteri başına küçük) |
-| `GET /api/portal/v1/links/{linkId}/pets/{petId}` | Liste öğesi + `isNeutered`, `colorName` | — |
-| `GET /api/portal/v1/links/{linkId}/appointments?scope=upcoming\|past&page=1&pageSize=20` | `PagedResult` `{ items: [{ appointmentId, petId, petName, scheduledAtUtc, durationMinutes, appointmentType, status }], page, pageSize, totalCount }`. `upcoming`: bugünden sonra, artan; `past`: son 12 ay, azalan. Notlar dönmez | `pageSize` en fazla 50 |
-| `GET /api/portal/v1/links/{linkId}/pets/{petId}/vaccinations` | `{ history: [{ vaccinationId, vaccineName, appliedAtUtc }], upcoming: [{ vaccinationId, vaccineName, dueAtUtc, isOverdue }] }` — gecikme tanımı ADR-028 (backend tek kural). Notlar dönmez | yok |
-| `GET /api/portal/v1/links/{linkId}/balance` | `{ currency, totalCharged, totalPaid, outstanding, lastPaymentAtUtc }` — yalnız tutar/durum (AK-9); kalem, açıklama, fatura yok. Bağın kliniğiyle sınırlı | — |
-| `GET /api/portal/v1/links/{linkId}/pets/{petId}/prescriptions` **[v1]** | `[{ prescriptionId, issuedAtUtc, items: [{ name, dosageText }] }]` sade dil | AK-8 (b) kararı; sıralama notu "v1" onay bekliyor, klinik bazlı açma anahtarı + hukuki görüş (AK-5) |
-| `GET /api/portal/v1/links/{linkId}/pets/{petId}/treatments` **[v1]** | `[{ treatmentId, title, startedOn, followUpOn }]` sade özet; muayene notu/lab/görüntü **yok** | aynı |
+| `GET /api/portal/v1/links/{linkId}/clinic` | `Portal.Read.Clinic` | — |
+| `GET /api/portal/v1/links/{linkId}/pets` | `Portal.Read.Pets` | yok (müşteri başına küçük liste) |
+| `GET /api/portal/v1/links/{linkId}/pets/{petId}` | `Portal.Read.Pet` | — |
+| `GET /api/portal/v1/links/{linkId}/pets/{petId}/vaccinations` | `Portal.Read.Vaccinations` | yok |
+| `GET /api/portal/v1/links/{linkId}/appointments?scope=upcoming\|past&page=1&pageSize=20` | `Portal.Read.Appointments` | `page` ≥ 1, `pageSize` 1–50 (varsayılan 20) |
+| `GET /api/portal/v1/links/{linkId}/balance` | `Portal.Read.Balance` | — |
+| `GET /api/portal/v1/links/{linkId}/payments?page=1&pageSize=20` | `Portal.Read.Payments` | `page` ≥ 1, `pageSize` 1–50 (varsayılan 20) |
 
-B için ortak hata: `Portal.Links.NotFound` 404, `Portal.Pets.NotFound` 404, validation 400 (`scope`, `pageSize`).
+### 6.1 `GET /links/{linkId}/clinic`
+
+Bağın kliniği (daveti gönderen klinik; AK-10 marka). Alanlar `Clinic` kaydındaki mevcut alanlardır; boş olan `null` döner. `workingHours` kliniğin tanımlı haftalık satırlarıdır (Pazartesi → Pazar); tanım yoksa boş dizi. Açık günde `opensAt`/`closesAt` dolu, mola opsiyonel; kapalı günde saatler `null`.
+
+```json
+{
+  "clinicId": "…", "name": "Merkez", "city": "İstanbul",
+  "phone": "0212 000 00 00", "email": "info@klinik.com", "address": "Örnek Cad. 1",
+  "workingHours": [
+    { "dayOfWeek": "Monday", "isClosed": false, "opensAt": "09:00:00", "closesAt": "18:00:00", "breakStartsAt": "12:30:00", "breakEndsAt": "13:30:00" },
+    { "dayOfWeek": "Sunday", "isClosed": true, "opensAt": null, "closesAt": null, "breakStartsAt": null, "breakEndsAt": null }
+  ]
+}
+```
+
+### 6.2 `GET /links/{linkId}/pets` ve `/pets/{petId}`
+
+Liste: bağın müşterisinin hayvanları, önce `Active`, sonra ada göre.
+
+```json
+[
+  { "petId": "…", "name": "Pamuk", "speciesName": "Kedi", "breedName": "Tekir", "gender": "Female",
+    "birthDate": "2022-03-01", "microchipNumber": "900000000000001", "weightKg": 4.2, "status": "Active" }
+]
+```
+
+- `breedName`: katalog ırkı varsa onun adı, yoksa serbest metin ırk; ikisi de yoksa `null`. `gender`: `Male`/`Female`/`null`. `status`: `Active`/`Deceased`. `weightKg`: klinikteki son kayıtlı kilo (kg) veya `null`.
+
+Detay: liste öğesi + `isNeutered` (bool), `colorName` (katalog rengi veya `null`). Karne/küpe ve özel protokol numarası, uyarı bayrakları/notu, klinik notu, vefat tarihi **dönmez**.
+
+### 6.3 `GET /links/{linkId}/pets/{petId}/vaccinations`
+
+```json
+{
+  "history": [
+    { "vaccinationId": "…", "vaccineName": "Kuduz", "status": "Applied", "appliedAtUtc": "2026-09-01T08:00:00Z", "dueAtUtc": null },
+    { "vaccinationId": "…", "vaccineName": "Karma", "status": "Cancelled", "appliedAtUtc": null, "dueAtUtc": "2026-08-01T08:00:00Z" }
+  ],
+  "upcoming": [
+    { "vaccinationId": "…", "vaccineName": "Karma", "dueAtUtc": "2026-10-15T21:00:00Z", "isOverdue": false }
+  ]
+}
+```
+
+- `history`: `Applied` ve `Cancelled` kayıtlar; en yeni önce (uygulama tarihi, yoksa vade, yoksa oluşturma zamanı).
+- `upcoming`: `Scheduled` kayıtlar, vadeye göre artan (vadesiz planlı kayıt sonda, `dueAtUtc: null`, `isOverdue: false`).
+- `isOverdue`: **ADR-028 gün bazlı tanım, tek kural `VaccinationDueRule`**: vade, İstanbul gününün başından (UTC) önceyse gecikmiş; bugün vadesi olan aşı saati geçse de gecikmiş değildir.
+- Vefat eden hayvanda `upcoming` boş (ortak kurallar).
+
+### 6.4 `GET /links/{linkId}/appointments`
+
+`scope` (büyük/küçük harf duyarsız, varsayılan `upcoming`):
+
+- `upcoming`: `scheduledAtUtc` ≥ istek anı, artan.
+- `past`: istek anından önce ve son 12 ay içinde (`scheduledAtUtc` ≥ istek anı − 12 ay), azalan.
+
+Tüm durumlar döner (`Scheduled`, `Completed`, `Cancelled`, `NoShow`).
+
+```json
+{
+  "items": [
+    { "appointmentId": "…", "petId": "…", "petName": "Pamuk", "clinicId": "…", "clinicName": "Merkez",
+      "scheduledAtUtc": "2026-10-20T07:00:00Z", "durationMinutes": 30, "appointmentType": "Vaccination", "status": "Scheduled" }
+  ],
+  "page": 1, "pageSize": 20, "totalItems": 1, "totalPages": 1
+}
+```
+
+`appointmentType`: `Examination`, `Vaccination`, `Checkup`, `Surgery`, `Grooming`, `Consultation`, `Other`. Randevu notu dönmez.
+
+### 6.5 `GET /links/{linkId}/balance` ve `/payments`
+
+Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıdır**; iptal edilmiş ücret ve ödeme sayılmaz. Hesap klinik panelindeki müşteri bakiyesiyle **aynı kuraldır** (`ClientBalanceTotals`, `GET /api/v1/clients/{id}/balance` ile ortak):
+
+```json
+{ "clinicId": "…", "currency": "TRY", "totalCharged": 1500.00, "totalPaid": 1000.00, "outstanding": 500.00,
+  "unallocatedPaymentsAmount": 0.00, "lastPaymentAtUtc": "2026-10-10T09:00:00Z" }
+```
+
+- `totalCharged`: ücretlerin toplamı; `totalPaid`: ücretlere tahsis edilmiş ödeme; `outstanding` = `totalCharged` − `totalPaid`.
+- `unallocatedPaymentsAmount`: hiçbir ücrete bağlanmamış (eski kayıt) TRY ödemelerin toplamı; personel bakiyesindeki "bağlanmamış ödeme" ile aynı. `outstanding`'den düşülmez.
+- `lastPaymentAtUtc`: bu klinikteki son ödeme; yoksa `null`.
+
+Ödeme geçmişi `GET /links/{linkId}/payments` — en yeni önce, satırda yalnız tarih/tutar/yöntem:
+
+```json
+{ "items": [ { "paidAtUtc": "2026-10-10T09:00:00Z", "amount": 1000.00, "currency": "TRY", "method": "Card" } ],
+  "page": 1, "pageSize": 20, "totalItems": 1, "totalPages": 1 }
+```
+
+`method`: `Cash`, `Card`, `Transfer`. Ödeme kimliği, not, tahsis ve kalem bilgisi dönmez.
+
+### 6.6 v1 (uç yok)
+
+| Uç | Not |
+|---|---|
+| `GET /api/portal/v1/links/{linkId}/pets/{petId}/prescriptions` **[v1]** | AK-8 (b) kapsamında; ADR-031 aşamalı teslimde v1. Taslak şekil `[{ prescriptionId, issuedAtUtc, items: [{ name, dosageText }] }]`, klinik bazlı açma anahtarı + hukuki görüş (AK-5) |
+| `GET /api/portal/v1/links/{linkId}/pets/{petId}/treatments` **[v1]** | aynı; taslak `[{ treatmentId, title, startedOn, followUpOn }]`; muayene notu/lab/görüntü **yok** (AK-8) |
+
+### 6.7 Hatalar
+
+| Kod | HTTP | Durum |
+|---|---|---|
+| `Portal.Links.NotFound` | 404 | Bağ bu hesabın değil, kapalı ya da kiracı pasif |
+| `Portal.Pets.NotFound` | 404 | Hayvan bağın müşterisine ait değil |
+| `Portal.Auth.Unauthorized.AccountUnavailable` | 401 | Oturumdaki hesap pasif |
+| (validation) | 400 | `scope` `upcoming`/`past` dışı, `page` < 1, `pageSize` 1–50 dışı |
+| — | 401 | Token yok, personel token'ı veya süresi dolmuş portal token'ı |
+| — | 429 | `portal` hız sınırı |
 
 ## 7) Uç tablosu (özet)
 
@@ -262,7 +379,7 @@ B için ortak hata: `Portal.Links.NotFound` 404, `Portal.Pets.NotFound` 404, val
 | GET/POST | `/api/portal/v1/me/legal-acceptances` | A | Portal |
 | GET | `/api/portal/v1/links/{linkId}/clinic-disclosure` | A | Portal |
 | POST | `/api/portal/v1/links/{linkId}/clinic-disclosure/acknowledge` | A | Portal |
-| GET | `/api/portal/v1/links/{linkId}/clinic`, `/pets`, `/pets/{petId}`, `/appointments`, `/pets/{petId}/vaccinations`, `/balance` | B | Portal |
+| GET | `/api/portal/v1/links/{linkId}/clinic`, `/pets`, `/pets/{petId}`, `/appointments`, `/pets/{petId}/vaccinations`, `/balance`, `/payments` | B | Portal |
 | GET | `/api/portal/v1/links/{linkId}/pets/{petId}/prescriptions`, `/treatments` | v1 | Portal |
 
 ## 8) Yapılandırma (`OwnerPortal` bölümü)
