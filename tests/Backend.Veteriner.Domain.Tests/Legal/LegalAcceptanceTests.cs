@@ -69,4 +69,31 @@ public sealed class LegalAcceptanceTests
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
+
+    [Fact]
+    public void RecordForOwnerAccount_Should_Store_OwnerAccount_Without_User_And_Tenant()
+    {
+        var ownerAccountId = Guid.NewGuid();
+        var at = new DateTime(2026, 10, 16, 9, 30, 0, DateTimeKind.Utc);
+
+        var acceptance = LegalAcceptance.RecordForOwnerAccount(ownerAccountId, LegalDocumentType.PortalTerms, "0.1", at);
+
+        acceptance.OwnerAccountId.Should().Be(ownerAccountId);
+        acceptance.UserId.Should().BeNull();
+        acceptance.TenantId.Should().BeNull();
+        acceptance.DocumentType.Should().Be(LegalDocumentType.PortalTerms);
+        acceptance.AcceptedAtUtc.Should().Be(at);
+    }
+
+    [Fact]
+    public void Record_Should_Not_Set_OwnerAccount()
+        => LegalAcceptance.Record(UserId, TenantId, LegalDocumentType.Terms, "0.1", DateTime.UtcNow).OwnerAccountId.Should().BeNull();
+
+    [Fact]
+    public void RecordForOwnerAccount_Should_Throw_When_OwnerAccountId_Empty()
+    {
+        var act = () => LegalAcceptance.RecordForOwnerAccount(Guid.Empty, LegalDocumentType.PortalPrivacy, "0.1", DateTime.UtcNow);
+
+        act.Should().Throw<ArgumentException>();
+    }
 }

@@ -71,7 +71,8 @@ public sealed class LegalAcceptanceEndpointIntegrationTests : IClassFixture<Cust
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         json.EnumerateArray()
             .Select(d => (d.GetProperty("documentType").GetString(), d.GetProperty("version").GetString()))
-            .Should().BeEquivalentTo(LegalDocumentCatalog.CurrentVersions.Select(kv => (kv.Key.ToString(), kv.Value)));
+            .Should().BeEquivalentTo(LegalDocumentCatalog.StaffDocuments.Select(t => (t.ToString(), LegalDocumentCatalog.CurrentVersion(t))),
+                "portal belgeleri (ADR-031) personel listesinde yer almaz");
     }
 
     [Fact]
