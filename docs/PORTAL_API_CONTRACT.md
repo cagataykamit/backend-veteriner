@@ -232,7 +232,8 @@ Ortak kurallar:
 - Başka hesabın, kapalı ya da pasif kiracıdaki bağ: **404** `Portal.Links.NotFound`. Bağın müşterisine ait olmayan (başka müşterinin/kiracının ya da hiç olmayan) hayvan: **404** `Portal.Pets.NotFound`. İkisi de sebebini ayırt etmez.
 - **Okuma denetim kaydı:** her istek (başarılı veya değil) `AuditLogs`'a yazılır: eylem `Portal.Read.*` (tablo aşağıda), hedef `OwnerAccountId=…;LinkId=…[;PetId=…]`, `ActorUserId` boş. `RequestPayload` yalnız istek parametreleridir (kimlikler, `scope`, `page`, `pageSize`); **yanıt içeriği yazılmaz** (K4).
 - **Ayrı DTO:** personel DTO'ları kullanılmaz. Şu alanlar **hiçbir yanıtta yoktur**: `tenantId`, `rowVersion`/`mutationSequence`, kullanıcı kimlikleri (`createdByUserId` vb.), not alanları (`notes`, hayvan uyarı notu, iptal/gelmedi gerekçesi, ödeme notu), muayene/lab/görüntü/reçete/tedavi verisi, ücret kalemi ve açıklaması.
-- Enum alanları metin. Tarih-saat UTC (`…Utc`), takvim tarihi `yyyy-MM-dd`, saat `HH:mm:ss`.
+- Enum alanları metin. Tarih-saat alanları (`…Utc`) UTC'dir; veritabanından okunduğu için personel API'leriyle aynı biçimde **`Z` soneki olmadan** döner (ör. `2026-10-19T05:48:39.0565737`), istemci UTC kabul eder. Takvim tarihi `yyyy-MM-dd`, saat `HH:mm:ss`. Tutarlar sayı, iki ondalık.
+- Örnek yanıtlar entegrasyon testindeki gerçek yanıtlardan alınmıştır (kimlikler kısaltıldı).
 - **Vefat:** vefat eden hayvan listede `status: "Deceased"` ile görünür; aşı geçmişi döner, **yaklaşan/gecikmiş aşı listesi boştur** (ADR-028 kuralı: vefat eden hastanın aşısı ne gecikmiş ne yaklaşan sayılır; `Pet.ReceivesCare`, ADR-020 S5 / ADR-025).
 - İptal edilmiş randevu ve aşı listeden düşmez, `status: "Cancelled"` ile gelir.
 
@@ -252,8 +253,8 @@ Bağın kliniği (daveti gönderen klinik; AK-10 marka). Alanlar `Clinic` kaydı
 
 ```json
 {
-  "clinicId": "…", "name": "Merkez", "city": "İstanbul",
-  "phone": "0212 000 00 00", "email": "info@klinik.com", "address": "Örnek Cad. 1",
+  "clinicId": "982daa08-…", "name": "Merkez", "city": "Ankara",
+  "phone": null, "email": null, "address": null,
   "workingHours": [
     { "dayOfWeek": "Monday", "isClosed": false, "opensAt": "09:00:00", "closesAt": "18:00:00", "breakStartsAt": "12:30:00", "breakEndsAt": "13:30:00" },
     { "dayOfWeek": "Sunday", "isClosed": true, "opensAt": null, "closesAt": null, "breakStartsAt": null, "breakEndsAt": null }
@@ -267,9 +268,19 @@ Liste: bağın müşterisinin hayvanları, önce `Active`, sonra ada göre.
 
 ```json
 [
-  { "petId": "…", "name": "Pamuk", "speciesName": "Kedi", "breedName": "Tekir", "gender": "Female",
-    "birthDate": "2022-03-01", "microchipNumber": "900000000000001", "weightKg": 4.2, "status": "Active" }
+  { "petId": "6930f4f1-…", "name": "Pamuk", "speciesName": "Kedi", "breedName": "Tekir", "gender": "Female",
+    "birthDate": "2022-03-01", "microchipNumber": "900000000000001", "weightKg": 4.20, "status": "Active" },
+  { "petId": "222845f5-…", "name": "Boncuk", "speciesName": "Kedi", "breedName": null, "gender": null,
+    "birthDate": null, "microchipNumber": null, "weightKg": null, "status": "Deceased" }
 ]
+```
+
+Detay örneği:
+
+```json
+{ "petId": "6930f4f1-…", "name": "Pamuk", "speciesName": "Kedi", "breedName": "Tekir", "gender": "Female",
+  "birthDate": "2022-03-01", "microchipNumber": "900000000000001", "weightKg": 4.20, "status": "Active",
+  "isNeutered": true, "colorName": "Siyah" }
 ```
 
 - `breedName`: katalog ırkı varsa onun adı, yoksa serbest metin ırk; ikisi de yoksa `null`. `gender`: `Male`/`Female`/`null`. `status`: `Active`/`Deceased`. `weightKg`: klinikteki son kayıtlı kilo (kg) veya `null`.
@@ -281,11 +292,12 @@ Detay: liste öğesi + `isNeutered` (bool), `colorName` (katalog rengi veya `nul
 ```json
 {
   "history": [
-    { "vaccinationId": "…", "vaccineName": "Kuduz", "status": "Applied", "appliedAtUtc": "2026-09-01T08:00:00Z", "dueAtUtc": null },
-    { "vaccinationId": "…", "vaccineName": "Karma", "status": "Cancelled", "appliedAtUtc": null, "dueAtUtc": "2026-08-01T08:00:00Z" }
+    { "vaccinationId": "5f324f82-…", "vaccineName": "Lösemi", "status": "Cancelled", "appliedAtUtc": null, "dueAtUtc": "2026-10-06T05:48:39.0565737" },
+    { "vaccinationId": "5f292872-…", "vaccineName": "Karma", "status": "Applied", "appliedAtUtc": "2026-09-16T05:48:39.0565737", "dueAtUtc": null }
   ],
   "upcoming": [
-    { "vaccinationId": "…", "vaccineName": "Karma", "dueAtUtc": "2026-10-15T21:00:00Z", "isOverdue": false }
+    { "vaccinationId": "d65bcb83-…", "vaccineName": "Karma", "dueAtUtc": "2026-10-13T05:48:39.0565737", "isOverdue": true },
+    { "vaccinationId": "ee6c744b-…", "vaccineName": "Kuduz", "dueAtUtc": "2026-11-05T05:48:39.0565737", "isOverdue": false }
   ]
 }
 ```
@@ -307,10 +319,12 @@ Tüm durumlar döner (`Scheduled`, `Completed`, `Cancelled`, `NoShow`).
 ```json
 {
   "items": [
-    { "appointmentId": "…", "petId": "…", "petName": "Pamuk", "clinicId": "…", "clinicName": "Merkez",
-      "scheduledAtUtc": "2026-10-20T07:00:00Z", "durationMinutes": 30, "appointmentType": "Vaccination", "status": "Scheduled" }
+    { "appointmentId": "ffcfd93c-…", "petId": "6930f4f1-…", "petName": "Pamuk", "clinicId": "982daa08-…", "clinicName": "Merkez",
+      "scheduledAtUtc": "2026-10-19T05:48:39.0565737", "durationMinutes": 30, "appointmentType": "Vaccination", "status": "Scheduled" },
+    { "appointmentId": "646c1b64-…", "petId": "6930f4f1-…", "petName": "Pamuk", "clinicId": "788caac5-…", "clinicName": "Şube",
+      "scheduledAtUtc": "2026-10-21T05:48:39.0565737", "durationMinutes": 30, "appointmentType": "Other", "status": "Cancelled" }
   ],
-  "page": 1, "pageSize": 20, "totalItems": 1, "totalPages": 1
+  "page": 1, "pageSize": 20, "totalItems": 2, "totalPages": 1
 }
 ```
 
@@ -321,8 +335,8 @@ Tüm durumlar döner (`Scheduled`, `Completed`, `Cancelled`, `NoShow`).
 Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıdır**; iptal edilmiş ücret ve ödeme sayılmaz. Hesap klinik panelindeki müşteri bakiyesiyle **aynı kuraldır** (`ClientBalanceTotals`, `GET /api/v1/clients/{id}/balance` ile ortak):
 
 ```json
-{ "clinicId": "…", "currency": "TRY", "totalCharged": 1500.00, "totalPaid": 1000.00, "outstanding": 500.00,
-  "unallocatedPaymentsAmount": 0.00, "lastPaymentAtUtc": "2026-10-10T09:00:00Z" }
+{ "clinicId": "982daa08-…", "currency": "TRY", "totalCharged": 1500.00, "totalPaid": 1000.00, "outstanding": 500.00,
+  "unallocatedPaymentsAmount": 200.00, "lastPaymentAtUtc": "2026-10-14T05:48:39.0565737" }
 ```
 
 - `totalCharged`: ücretlerin toplamı; `totalPaid`: ücretlere tahsis edilmiş ödeme; `outstanding` = `totalCharged` − `totalPaid`.
@@ -332,8 +346,10 @@ Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıd
 Ödeme geçmişi `GET /links/{linkId}/payments` — en yeni önce, satırda yalnız tarih/tutar/yöntem:
 
 ```json
-{ "items": [ { "paidAtUtc": "2026-10-10T09:00:00Z", "amount": 1000.00, "currency": "TRY", "method": "Card" } ],
-  "page": 1, "pageSize": 20, "totalItems": 1, "totalPages": 1 }
+{ "items": [
+    { "paidAtUtc": "2026-10-14T05:48:39.0565737", "amount": 1000.00, "currency": "TRY", "method": "Card" },
+    { "paidAtUtc": "2026-09-06T05:48:39.0565737", "amount": 200.00, "currency": "TRY", "method": "Cash" } ],
+  "page": 1, "pageSize": 20, "totalItems": 2, "totalPages": 1 }
 ```
 
 `method`: `Cash`, `Card`, `Transfer`. Ödeme kimliği, not, tahsis ve kalem bilgisi dönmez.
@@ -352,7 +368,7 @@ Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıd
 | `Portal.Links.NotFound` | 404 | Bağ bu hesabın değil, kapalı ya da kiracı pasif |
 | `Portal.Pets.NotFound` | 404 | Hayvan bağın müşterisine ait değil |
 | `Portal.Auth.Unauthorized.AccountUnavailable` | 401 | Oturumdaki hesap pasif |
-| (validation) | 400 | `scope` `upcoming`/`past` dışı, `page` < 1, `pageSize` 1–50 dışı |
+| `Validation.FluentValidation` | 400 | `scope` `upcoming`/`past` dışı, `page` < 1, `pageSize` 1–50 dışı; alan hataları `errors.scope` / `errors.page` / `errors.pageSize` |
 | — | 401 | Token yok, personel token'ı veya süresi dolmuş portal token'ı |
 | — | 429 | `portal` hız sınırı |
 
