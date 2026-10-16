@@ -280,7 +280,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 | Payments | `GET /api/v1/payments` | Evet | `Notes`, `Currency`; eşleşen `ClientId` / `PetId` ön kümesi (müşteri metni + `PetsByTenantTextFieldsSearchSpec`). **AND** klinik, müşteri, hayvan, yöntem, ödeme tarihi. |
 | Treatments | `GET /api/v1/treatments` | Evet | `Title`, `Description`, `Notes`; pet id’ler: müşteri + hayvan metin (examinations ile aynı `ListSearchPetIds` örüntüsü). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc` (liste query). |
 | Prescriptions | `GET /api/v1/prescriptions` | Evet | `Title`, `Content`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. |
-| Lab Results | `GET /api/v1/lab-results` | Evet | `TestName`, `ResultText`, `Interpretation`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. |
+| Lab Results | `GET /api/v1/lab-results` | Evet | `TestName`, `ResultText`, `Interpretation`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, `dateFromUtc`, `dateToUtc` (`requestedAtUtc` üzerinden, §15). |
 | Hospitalizations | `GET /api/v1/hospitalizations` | Evet | `Reason`, `Notes`; pet id’ler: müşteri + hayvan metin (`ListSearchPetIds`). **AND** `clinicId`, `petId`, **`activeOnly`** (`true` = yalnız açık yatış, `false` = yalnız taburcu), `dateFromUtc`, `dateToUtc` (`admittedAtUtc` üzerinden). |
 
 **Performans notu:** `LIKE '%...%'` ve çok kiracılı indeks kullanımı; arama terimi uzunluğu üst sınırlı; pet tarafında ön liste id’leri ile `Contains` birleşimi kullanılır.
@@ -633,7 +633,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 
 ## 15) Lab Results — request/response ve OpenAPI
 
-**Liste** `GET /api/v1/lab-results` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. JWT/header clinic ile `clinicId` uyumsuzsa `LabResults.ClinicContextMismatch`. `sort=requestedAtUtc` + `order=asc|desc` (§10 beyaz liste; diğer sort → 400); sort yoksa en yeni üstte. Boş `clinicId` / `petId` GUID filtreleri liste validator’ünde reddedilir.
+**Liste** `GET /api/v1/lab-results` query: `PageRequest` (`page`, `pageSize`, `search` / `page.search` birleşimi), isteğe bağlı `clinicId`, `petId`, `dateFromUtc`, `dateToUtc`. `dateFromUtc` / `dateToUtc` **istem tarihi** (`requestedAtUtc`) üzerinden süzer, iki uç dahil; sonuç tarihi (`resultDateUtc`) süzgece ve sıralamaya girmez (sonucu henüz gelmemiş istemler de aralıkta görünür). Liste ekranı iki tarihi ayrı sütunda gösterir ("İstem tarihi", "Sonuç tarihi"). JWT/header clinic ile `clinicId` uyumsuzsa `LabResults.ClinicContextMismatch`. `sort=requestedAtUtc` + `order=asc|desc` (§10 beyaz liste; diğer sort → 400); sort yoksa istem tarihine göre en yeni üstte. Boş `clinicId` / `petId` GUID filtreleri liste validator’ünde reddedilir.
 
 **Create** `POST /api/v1/lab-results` gövdesi: `CreateLabResultCommand`.
 
