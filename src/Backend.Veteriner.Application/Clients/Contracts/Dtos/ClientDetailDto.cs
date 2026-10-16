@@ -9,6 +9,8 @@ namespace Backend.Veteriner.Application.Clients.Contracts.Dtos;
 /// <param name="KvkkConsentRecordedOn">İmzalı formun tarihi (yyyy-MM-dd); yalnız Kabul/Ret iken dolu.</param>
 /// <param name="KvkkConsentRecordedByUserId">Rıza durumunu işaretleyen kullanıcı.</param>
 /// <param name="KvkkConsentRecordedByName">İşaretleyen kullanıcının görünen adı (bulunamazsa null).</param>
+/// <param name="KvkkConsentTemplateVersion">İşaretleme anındaki açık rıza metni sürümü (ADR-032; 0 = varsayılan metin, null = bilinmiyor).</param>
+/// <param name="KvkkConsentTemplateHash">İşaretleme anındaki açık rıza metninin SHA-256 özeti (64 karakter hex) veya null.</param>
 /// <param name="RowVersion">Base64 kayıt sürümü; <c>PUT /clients/{id}/kvkk-consent</c> için zorunlu.</param>
 public sealed record ClientDetailDto(
     Guid Id,
@@ -25,4 +27,6 @@ public sealed record ClientDetailDto(
     DateOnly? KvkkConsentRecordedOn,
     Guid? KvkkConsentRecordedByUserId,
     string? KvkkConsentRecordedByName,
+    int? KvkkConsentTemplateVersion,
+    string? KvkkConsentTemplateHash,
     string RowVersion);

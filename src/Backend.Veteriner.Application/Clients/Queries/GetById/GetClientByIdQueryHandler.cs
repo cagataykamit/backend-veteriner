@@ -57,6 +57,8 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
             client.KvkkConsentRecordedOn,
             client.KvkkConsentRecordedByUserId,
             kvkkRecordedByName,
+            client.KvkkConsentTemplateVersion,
+            client.KvkkConsentTemplateHash,
             ExaminationRowVersion.Encode(client.RowVersion));
         return Result<ClientDetailDto>.Success(dto);
     }

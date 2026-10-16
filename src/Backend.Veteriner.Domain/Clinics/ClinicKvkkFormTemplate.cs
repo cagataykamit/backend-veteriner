@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Clinics;
@@ -11,11 +13,27 @@ public sealed class ClinicKvkkFormTemplate
 {
     public const int MaxTextLength = 20_000;
 
+    /// <summary>Kaydı olmayan klinikte geçerli taslak varsayılan metnin sürümü (ADR-032).</summary>
+    public const int DefaultTextVersion = 0;
+
+    /// <summary><see cref="TextHash"/> uzunluğu (SHA-256, hex).</summary>
+    public const int TextHashLength = 64;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
     public ClinicKvkkFormKind Kind { get; private set; }
     public string Text { get; private set; } = default!;
+
+    /// <summary>
+    /// Kaydedilen metnin sürümü (ADR-032): ilk kayıt 1, metin her değiştiğinde +1; aynı metin tekrar kaydedilirse değişmez.
+    /// Kaydı olmayan klinikte geçerli olan taslak varsayılan metin <see cref="DefaultTextVersion"/> sayılır.
+    /// </summary>
+    public int TextVersion { get; private set; }
+
+    /// <summary><see cref="Text"/> metninin SHA-256 özeti (64 karakter, küçük harf hex); bkz. <see cref="ComputeTextHash"/>.</summary>
+    public string TextHash { get; private set; } = default!;
+
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
@@ -73,7 +91,20 @@ public sealed class ClinicKvkkFormTemplate
         RowVersion = expectedRowVersion;
     }
 
-    /// <summary>Boş olamaz, <see cref="MaxTextLength"/> karakteri aşamaz; baştaki/sondaki boşluk kırpılır. Kural yalnızca burada yaşar.</summary>
+    /// <summary>
+    /// Metnin özeti: UTF-8 baytlarının SHA-256'sı, küçük harf hex (ADR-032). Metnin kendisi rıza kaydında tekrar saklanmaz;
+    /// hangi metne rıza verildiği bu özetle ispatlanır. Kayıtlı ve varsayılan metin için tek hesap.
+    /// </summary>
+    public static string ComputeTextHash(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+    }
+
+    /// <summary>
+    /// Boş olamaz, <see cref="MaxTextLength"/> karakteri aşamaz; baştaki/sondaki boşluk kırpılır.
+    /// Kırpılmış metin öncekinden farklıysa <see cref="TextVersion"/> bir artar ve <see cref="TextHash"/> yenilenir. Kural yalnızca burada yaşar.
+    /// </summary>
     private Result ApplyText(string? text, Guid userId)
     {
         if (userId == Guid.Empty)
@@ -87,7 +118,13 @@ public sealed class ClinicKvkkFormTemplate
                 "Clinics.KvkkFormTemplate.Validation",
                 $"Form metni en fazla {MaxTextLength} karakter olabilir.");
 
-        Text = trimmed;
+        if (!string.Equals(Text, trimmed, StringComparison.Ordinal))
+        {
+            Text = trimmed;
+            TextVersion++;
+            TextHash = ComputeTextHash(trimmed);
+        }
+
         UpdatedByUserId = userId;
         return Result.Success();
     }

@@ -15,6 +15,8 @@ public sealed record ClientKvkkConsentDto(
     DateOnly? KvkkConsentRecordedOn,
     Guid? KvkkConsentRecordedByUserId,
     string? KvkkConsentRecordedByName,
+    int? KvkkConsentTemplateVersion,
+    string? KvkkConsentTemplateHash,
     bool RemindersOptedOut,
     string RowVersion)
 {
@@ -25,6 +27,8 @@ public sealed record ClientKvkkConsentDto(
             client.KvkkConsentRecordedOn,
             client.KvkkConsentRecordedByUserId,
             recordedByName,
+            client.KvkkConsentTemplateVersion,
+            client.KvkkConsentTemplateHash,
             client.RemindersOptedOut,
             ExaminationRowVersion.Encode(client.RowVersion));
 }

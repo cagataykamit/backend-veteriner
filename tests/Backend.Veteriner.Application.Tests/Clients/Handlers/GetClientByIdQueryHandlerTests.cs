@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using FluentAssertions;
 using Moq;
@@ -79,6 +80,8 @@ public sealed class GetClientByIdQueryHandlerTests
         dto.KvkkConsentStatus.Should().Be(KvkkConsentStatus.None);
         dto.KvkkConsentRecordedOn.Should().BeNull();
         dto.KvkkConsentRecordedByName.Should().BeNull();
+        dto.KvkkConsentTemplateVersion.Should().BeNull();
+        dto.KvkkConsentTemplateHash.Should().BeNull();
         _userNames.Verify(
             r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -90,7 +93,8 @@ public sealed class GetClientByIdQueryHandlerTests
         var tid = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var entity = new Client(tid, "Ali Veli", "05321234567");
-        entity.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 15), userId);
+        entity.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 15), userId,
+            4, ClinicKvkkFormTemplate.ComputeTextHash("Rıza metni"));
         typeof(Client).GetProperty(nameof(Client.RowVersion))!.SetValue(entity, new byte[] { 0, 0, 0, 0, 0, 0, 0, 7 });
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -105,6 +109,8 @@ public sealed class GetClientByIdQueryHandlerTests
         dto.KvkkConsentRecordedOn.Should().Be(new DateOnly(2026, 10, 1));
         dto.KvkkConsentRecordedByUserId.Should().Be(userId);
         dto.KvkkConsentRecordedByName.Should().Be("Dr. Can");
+        dto.KvkkConsentTemplateVersion.Should().Be(4);
+        dto.KvkkConsentTemplateHash.Should().Be(ClinicKvkkFormTemplate.ComputeTextHash("Rıza metni"));
         dto.RowVersion.Should().Be(Convert.ToBase64String(new byte[] { 0, 0, 0, 0, 0, 0, 0, 7 }));
     }
 }

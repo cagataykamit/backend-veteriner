@@ -8,6 +8,8 @@ namespace Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 /// Klinik KVKK şablonu: açık rıza formu veya aydınlatma metni (ham metin; yer tutucular istemcide doldurulur).
 /// <paramref name="IsDefault"/> true iken o türde kayıt yoktur ve <paramref name="RowVersion"/> null'dır.
 /// </summary>
+/// <param name="TextVersion">Metin sürümü (ADR-032): varsayılan metin 0, kayıtlı metin 1'den başlar ve metin değiştikçe artar.</param>
+/// <param name="TextHash">Ham metnin SHA-256 özeti (64 karakter hex).</param>
 public sealed record ClinicKvkkFormTemplateDto(
     Guid ClinicId,
     string Text,
@@ -15,17 +17,24 @@ public sealed record ClinicKvkkFormTemplateDto(
     string? RowVersion,
     DateTime? UpdatedAtUtc,
     int MaxLength,
-    IReadOnlyList<string> Placeholders)
+    IReadOnlyList<string> Placeholders,
+    int TextVersion,
+    string TextHash)
 {
     public static ClinicKvkkFormTemplateDto Default(Guid clinicId, ClinicKvkkFormKind kind)
-        => new(
+    {
+        var text = ClinicKvkkFormTemplateDefaults.TextFor(kind);
+        return new(
             clinicId,
-            ClinicKvkkFormTemplateDefaults.TextFor(kind),
+            text,
             IsDefault: true,
             RowVersion: null,
             UpdatedAtUtc: null,
             ClinicKvkkFormTemplate.MaxTextLength,
-            ClinicKvkkFormTemplateDefaults.Placeholders);
+            ClinicKvkkFormTemplateDefaults.Placeholders,
+            ClinicKvkkFormTemplate.DefaultTextVersion,
+            ClinicKvkkFormTemplate.ComputeTextHash(text));
+    }
 
     public static ClinicKvkkFormTemplateDto From(ClinicKvkkFormTemplate row)
         => new(
@@ -35,5 +44,7 @@ public sealed record ClinicKvkkFormTemplateDto(
             ExaminationRowVersion.Encode(row.RowVersion),
             row.UpdatedAtUtc ?? row.CreatedAtUtc,
             ClinicKvkkFormTemplate.MaxTextLength,
-            ClinicKvkkFormTemplateDefaults.Placeholders);
+            ClinicKvkkFormTemplateDefaults.Placeholders,
+            row.TextVersion,
+            row.TextHash);
 }

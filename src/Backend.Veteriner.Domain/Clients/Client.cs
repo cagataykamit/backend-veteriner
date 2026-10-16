@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Clients;
@@ -46,6 +47,15 @@ public sealed class Client : AggregateRoot
 
     /// <summary>Rıza durumunu işaretleyen kullanıcı; yalnız Kabul/Ret iken dolu.</summary>
     public Guid? KvkkConsentRecordedByUserId { get; private set; }
+
+    /// <summary>
+    /// İşaretleme anında geçerli klinik açık rıza metninin sürümü (ADR-032; 0 = taslak varsayılan metin). Yalnız Kabul/Ret iken dolu;
+    /// null = sürüm bilinmiyor (ADR-032 öncesi kayıtlar geriye dönük doldurulmaz).
+    /// </summary>
+    public int? KvkkConsentTemplateVersion { get; private set; }
+
+    /// <summary>İşaretleme anındaki açık rıza metninin SHA-256 özeti (64 karakter hex); <see cref="KvkkConsentTemplateVersion"/> ile birlikte dolu/boş.</summary>
+    public string? KvkkConsentTemplateHash { get; private set; }
 
     /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
     public byte[] RowVersion { get; private set; } = default!;
@@ -102,9 +112,17 @@ public sealed class Client : AggregateRoot
     /// KVKK açık rıza formu sonucunu kaydeder (ADR-021). Kabul/Ret: tarih verilmezse bugün, bugünden ileri olamaz;
     /// işaretleyen kullanıcı yazılır. Yok (yanlış girişin geri alınması): tarih verilemez, tarih ve kullanıcı temizlenir.
     /// Ret, hatırlatma istemiyor bayrağını (<see cref="RemindersOptedOut"/>) açar (ADR-025 madde 4); Kabul ve Yok bayrağa dokunmaz,
-    /// bayrak yalnız elle kapanır (yanlışlıkla hatırlatma gitmesin diye güvenli taraf). Kural yalnızca burada yaşar.
+    /// bayrak yalnız elle kapanır (yanlışlıkla hatırlatma gitmesin diye güvenli taraf).
+    /// Kabul/Ret, o anki açık rıza metninin sürümünü ve özetini yazar (ADR-032; ikisi birlikte verilir ya da ikisi de null = bilinmiyor);
+    /// Yok bunları da temizler. Kural yalnızca burada yaşar.
     /// </summary>
-    public Result RecordKvkkConsent(KvkkConsentStatus status, DateOnly? recordedOn, DateOnly today, Guid recordedByUserId)
+    public Result RecordKvkkConsent(
+        KvkkConsentStatus status,
+        DateOnly? recordedOn,
+        DateOnly today,
+        Guid recordedByUserId,
+        int? templateVersion,
+        string? templateHash)
     {
         switch (status)
         {
@@ -114,6 +132,8 @@ public sealed class Client : AggregateRoot
                 KvkkConsentStatus = KvkkConsentStatus.None;
                 KvkkConsentRecordedOn = null;
                 KvkkConsentRecordedByUserId = null;
+                KvkkConsentTemplateVersion = null;
+                KvkkConsentTemplateHash = null;
                 break;
 
             case KvkkConsentStatus.Accepted:
@@ -122,9 +142,15 @@ public sealed class Client : AggregateRoot
                     return Result.Failure("Clients.Validation", "Rıza tarihi gelecekte olamaz.");
                 if (recordedByUserId == Guid.Empty)
                     return Result.Failure("Clients.Validation", "İşaretleyen kullanıcı geçersiz.");
+                if (templateVersion.HasValue != (templateHash is not null)
+                    || templateVersion < ClinicKvkkFormTemplate.DefaultTextVersion
+                    || (templateHash is not null && templateHash.Length != ClinicKvkkFormTemplate.TextHashLength))
+                    return Result.Failure("Clients.Validation", "Rıza metni sürümü geçersiz.");
                 KvkkConsentStatus = status;
                 KvkkConsentRecordedOn = recordedOn ?? today;
                 KvkkConsentRecordedByUserId = recordedByUserId;
+                KvkkConsentTemplateVersion = templateVersion;
+                KvkkConsentTemplateHash = templateHash;
                 if (status == KvkkConsentStatus.Declined)
                     RemindersOptedOut = true;
                 break;
