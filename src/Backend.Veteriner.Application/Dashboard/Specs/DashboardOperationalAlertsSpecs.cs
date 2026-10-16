@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Dashboard;
+using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Vaccinations;
 
@@ -48,44 +49,39 @@ public sealed class DashboardUpcomingAppointmentsNext24HoursCountSpec : Specific
     }
 }
 
+/// <summary>Gecikmiş aşılar (<see cref="VaccinationDueRule.IsOverdue"/>, ADR-028); <paramref name="excludedPetIds"/>: vefat edenler.</summary>
 public sealed class DashboardOverdueVaccinationsCountSpec : Specification<Vaccination>
 {
     public DashboardOverdueVaccinationsCountSpec(
         Guid tenantId,
         Guid? clinicId,
-        DateTime nowUtc,
+        DateTime overdueBeforeUtc,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         IReadOnlyCollection<Guid>? excludedPetIds = null)
     {
         Query.AsNoTracking();
-        Query.Where(v =>
-            v.TenantId == tenantId
-            && v.Status == VaccinationStatus.Scheduled
-            && v.DueAtUtc.HasValue
-            && v.DueAtUtc.Value < nowUtc);
+        Query.Where(v => v.TenantId == tenantId);
+        Query.Where(VaccinationDueRule.IsOverdue(overdueBeforeUtc));
         if (excludedPetIds is { Count: > 0 })
             Query.Where(v => !excludedPetIds.Contains(v.PetId));
         DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);
     }
 }
 
+/// <summary>Önümüzdeki 7 gün (bugün dahil) içinde vadesi gelen aşılar (<see cref="VaccinationDueRule.IsUpcoming"/>, ADR-028).</summary>
 public sealed class DashboardUpcomingVaccinationsNext7DaysCountSpec : Specification<Vaccination>
 {
     public DashboardUpcomingVaccinationsNext7DaysCountSpec(
         Guid tenantId,
         Guid? clinicId,
-        DateTime nowUtc,
-        DateTime next7DaysUtcExclusive,
+        DateTime fromUtc,
+        DateTime toUtcExclusive,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         IReadOnlyCollection<Guid>? excludedPetIds = null)
     {
         Query.AsNoTracking();
-        Query.Where(v =>
-            v.TenantId == tenantId
-            && v.Status == VaccinationStatus.Scheduled
-            && v.DueAtUtc.HasValue
-            && v.DueAtUtc.Value >= nowUtc
-            && v.DueAtUtc.Value < next7DaysUtcExclusive);
+        Query.Where(v => v.TenantId == tenantId);
+        Query.Where(VaccinationDueRule.IsUpcoming(fromUtc, toUtcExclusive));
         if (excludedPetIds is { Count: > 0 })
             Query.Where(v => !excludedPetIds.Contains(v.PetId));
         DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);

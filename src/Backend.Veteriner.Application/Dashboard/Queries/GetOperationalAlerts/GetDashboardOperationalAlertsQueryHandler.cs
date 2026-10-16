@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
 using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Dashboard.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -73,8 +74,11 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
 
         var nowUtc = DateTime.UtcNow;
         var next24HoursUtcExclusive = nowUtc.AddHours(24);
-        var next7DaysUtcExclusive = nowUtc.AddDays(7);
         var (dayStartUtc, dayEndUtc) = OperationDayBounds.ForUtcNow(nowUtc);
+        // Aşı gecikmiş/yaklaşan tanımı gün bazlıdır (ADR-028); randevu sayaçları saat bazlı kalır.
+        var overdueVaccinationsBeforeUtc = VaccinationDueRule.OverdueBeforeUtc(nowUtc);
+        var (upcomingVaccinationsFromUtc, upcomingVaccinationsToUtcExclusive) =
+            VaccinationDueRule.UpcomingWindow(nowUtc, VaccinationDueRule.DashboardUpcomingDays);
 
         var todayCounts = await _todayAppointmentCounts.GetAsync(
             tenantId, singleClinicId, dayStartUtc, dayEndUtc, accessibleClinicIds, ct);
@@ -87,10 +91,16 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
             new DashboardUpcomingAppointmentsNext24HoursCountSpec(
                 tenantId, singleClinicId, nowUtc, next24HoursUtcExclusive, accessibleClinicIds), ct);
         var overdueVaccinationsCount = await _vaccinations.CountAsync(
-            new DashboardOverdueVaccinationsCountSpec(tenantId, singleClinicId, nowUtc, accessibleClinicIds, petIdsNotReceivingCare), ct);
+            new DashboardOverdueVaccinationsCountSpec(
+                tenantId, singleClinicId, overdueVaccinationsBeforeUtc, accessibleClinicIds, petIdsNotReceivingCare), ct);
         var upcomingVaccinationsNext7DaysCount = await _vaccinations.CountAsync(
             new DashboardUpcomingVaccinationsNext7DaysCountSpec(
-                tenantId, singleClinicId, nowUtc, next7DaysUtcExclusive, accessibleClinicIds, petIdsNotReceivingCare), ct);
+                tenantId,
+                singleClinicId,
+                upcomingVaccinationsFromUtc,
+                upcomingVaccinationsToUtcExclusive,
+                accessibleClinicIds,
+                petIdsNotReceivingCare), ct);
 
         var dto = new DashboardOperationalAlertsDto(
             OverdueScheduledAppointmentsCount: overdueScheduledAppointmentsCount,
