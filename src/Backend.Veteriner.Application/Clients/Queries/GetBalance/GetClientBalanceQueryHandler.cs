@@ -126,27 +126,22 @@ public sealed class GetClientBalanceQueryHandler
             .ThenBy(p => p.PetId)
             .ToList();
 
-        var tryPayments = unallocated
-            .Where(p => string.Equals(p.Currency, Charge.DefaultCurrency, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        var chargedAmount = charges.Sum(c => c.Amount);
-        var allocatedAmount = charges.Sum(c => c.AllocatedAmount);
+        var totals = ClientBalanceTotals.From(charges, unallocated);
 
         return new ClientBalanceDto(
             client.Id,
             client.FullName,
             clinicId,
             Charge.DefaultCurrency,
-            chargedAmount,
-            allocatedAmount,
-            chargedAmount - allocatedAmount,
+            totals.ChargedAmount,
+            totals.AllocatedAmount,
+            totals.OutstandingAmount,
             open.Count,
             pets,
             new ClientBalanceUnallocatedPaymentsDto(
-                tryPayments.Sum(p => p.UnallocatedAmount),
-                tryPayments.Count,
-                tryPayments.Count != unallocated.Count,
+                totals.UnallocatedPaymentsAmount,
+                totals.UnallocatedPaymentsCount,
+                totals.UnallocatedPaymentsCount != unallocated.Count,
                 unallocated
                     .Take(UnallocatedItemsTake)
                     .Select(p => new ClientBalanceUnallocatedPaymentDto(
