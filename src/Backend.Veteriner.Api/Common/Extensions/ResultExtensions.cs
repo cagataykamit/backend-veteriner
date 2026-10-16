@@ -92,6 +92,12 @@ public static class ResultExtensions
             return (StatusCodes.Status410Gone, "https://httpstatuses.io/410");
         }
 
+        // İstemcinin gösterdiği hukuki belge sürümü güncel değil (ADR-029): yenileyip tekrar kabul etmeli.
+        if (normalized is "legalacceptances.versionoutdated")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         if (normalized.Contains("duplicate"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");

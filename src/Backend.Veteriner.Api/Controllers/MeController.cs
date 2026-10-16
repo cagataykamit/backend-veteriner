@@ -7,6 +7,9 @@ using Backend.Veteriner.Application.Auth.Queries.Me;
 using Backend.Veteriner.Application.Auth.Queries.Sessions;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.Queries.GetMyClinics;
+using Backend.Veteriner.Application.LegalAcceptances;
+using Backend.Veteriner.Application.LegalAcceptances.Commands.AcceptMy;
+using Backend.Veteriner.Application.LegalAcceptances.Queries.GetMyStatus;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -63,6 +66,35 @@ public sealed class MeController : ControllerBase
     public async Task<IActionResult> SetDisplayName([FromBody] SetMyDisplayNameBody body, CancellationToken ct)
     {
         var result = await _mediator.Send(new SetMyDisplayNameCommand(body.DisplayName), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Oturumdaki kullanıcının güncel sürümünü henüz kabul etmediği hukuki belgeler (ADR-029). Bekleyen varsa istemci
+    /// paneli kabul edilene kadar engeller.
+    /// </summary>
+    [HttpGet("legal-acceptances")]
+    [ProducesResponseType(typeof(MyLegalAcceptanceStatusDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetLegalAcceptanceStatus(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetMyLegalAcceptanceStatusQuery(), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Bekleyen hukuki belgelerin güncel sürümünü kabul eder; her belge için yeni kabul kaydı yazılır (ADR-029).
+    /// Eski sürüm gönderilirse 409 <c>LegalAcceptances.VersionOutdated</c>.
+    /// </summary>
+    [HttpPost("legal-acceptances")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(MyLegalAcceptanceStatusDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AcceptLegalDocuments([FromBody] AcceptMyLegalDocumentsBody? body, CancellationToken ct)
+    {
+        var result = await _mediator.Send(new AcceptMyLegalDocumentsCommand(body?.Documents), ct);
         return result.ToActionResult(this);
     }
 
