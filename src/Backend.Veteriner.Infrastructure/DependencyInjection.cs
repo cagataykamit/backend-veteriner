@@ -203,6 +203,10 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IJwtOptionsProvider, JwtOptionsProvider>();
 
+        // ===== Hasta sahibi portalı (ADR-031): ayrı hedef kitleli token, jeton/kod üretimi =====
+        services.Configure<OwnerPortalOptions>(configuration.GetSection(OwnerPortalOptions.SectionName));
+        services.AddSingleton<IOwnerPortalSecretGenerator, OwnerPortalSecretGenerator>();
+
         // ===== HttpContext & App URL & Audit =====
         services.AddHttpContextAccessor();
         services.AddScoped<IClientContext, ClientContext>();

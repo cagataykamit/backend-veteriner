@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Application.Imports.Validation;
+using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.Pets.Timeline;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Sales;
@@ -43,6 +44,9 @@ public static class DependencyInjection
         services.AddScoped<ExpiredStockReader>();
         services.AddScoped<SaleDtoAssembler>();
         services.AddScoped<RegisterReportRunner>();
+
+        // Hasta sahibi portalı (ADR-031): sahiplik kontrolü, davet çözümü, oturum ve kod.
+        services.AddScoped<OwnerPortalStaffAccess>();
 
         // Veri içe aktarma (ADR-019): dosya okuma, katalog çözümü, parti yanıtı sütun bilgisi.
         services.AddOptions<ImportFileLimits>();

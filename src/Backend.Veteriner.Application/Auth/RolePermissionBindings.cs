@@ -177,6 +177,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.Imports.Read,
                 PermissionCatalog.Imports.Manage,
                 PermissionCatalog.Imports.Commit,
+
+                // Hasta sahibi portalı daveti ve erişim yönetimi yalnız yönetici düzeyi (ADR-031).
+                PermissionCatalog.OwnerPortal.Manage,
             ],
 
             // Tenant sahibi: Admin ile aynı operasyonel paket (ürün kararı: Owner ≈ Admin).
@@ -302,6 +305,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.Imports.Read,
                 PermissionCatalog.Imports.Manage,
                 PermissionCatalog.Imports.Commit,
+
+                // Hasta sahibi portalı daveti ve erişim yönetimi yalnız yönetici düzeyi (ADR-031).
+                PermissionCatalog.OwnerPortal.Manage,
             ],
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini
@@ -426,6 +432,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.Imports.Read,
                 PermissionCatalog.Imports.Manage,
                 PermissionCatalog.Imports.Commit,
+
+                // Hasta sahibi portalı daveti ve erişim yönetimi yalnız yönetici düzeyi (ADR-031).
+                PermissionCatalog.OwnerPortal.Manage,
             ],
 
             // Tıbbi operasyon: klinik kayıtlarını (muayene/aşı/tedavi/reçete/lab/yatış) yönetir.

@@ -251,6 +251,12 @@ public static class PermissionCatalog
         public const string Commit = "Imports.Commit";
     }
 
+    /// <summary>Hasta sahibi portalı yönetimi (ADR-031 K6): davet gönderme/iptal, bağ durumu, erişimi kapatma. Yönetici düzeyi.</summary>
+    public static class OwnerPortal
+    {
+        public const string Manage = "OwnerPortal.Manage";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -400,6 +406,8 @@ public static class PermissionCatalog
         new(Imports.Read, "İçe aktarma partilerini, önizlemeyi ve hata raporunu görüntüleme yetkisi", "Imports"),
         new(Imports.Manage, "İçe aktarma partisi yükleme, eşleme, doğrulama ve taslak silme yetkisi", "Imports"),
         new(Imports.Commit, "İçe aktarmayı onaylayıp uygulama, hatırlatmaları serbest bırakma ve geri alma yetkisi", "Imports"),
+
+        new(OwnerPortal.Manage, "Hasta sahibi portalı daveti gönderme/iptal etme, bağ durumunu görme ve erişimi kapatma yetkisi", "OwnerPortal"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 

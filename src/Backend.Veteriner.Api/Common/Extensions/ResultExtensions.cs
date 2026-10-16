@@ -98,6 +98,14 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Hasta sahibi portalı (ADR-031): müşteri/davet/bağ durumu işlemle çakışıyor.
+        if (normalized is "ownerportal.clientoptedout" or "ownerportal.clientemailmissing" or "ownerportal.clientnotinvitable"
+            or "ownerportal.alreadylinked" or "ownerportal.invitenotpending" or "ownerportal.linkalreadyclosed"
+            or "portal.invites.passwordalreadyset")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         if (normalized.Contains("duplicate"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
