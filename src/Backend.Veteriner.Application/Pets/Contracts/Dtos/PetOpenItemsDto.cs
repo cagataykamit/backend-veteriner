@@ -10,7 +10,7 @@ public sealed record PetOpenItemsVaccinationDto(
     DateTime DueAtUtc,
     Guid ClinicId);
 
-/// <summary>Gecikmiş (vade &lt; şimdi) ve yaklaşan (vade 30 gün içinde) planlı aşılar; ikisi de en erken vade önce.</summary>
+/// <summary>Gecikmiş (vade &lt; bugünün İstanbul başı) ve yaklaşan (bugün dahil 30 takvim günü) planlı aşılar; ikisi de en erken vade önce (ADR-028).</summary>
 public sealed record PetOpenItemsVaccinationsDto(
     IReadOnlyList<PetOpenItemsVaccinationDto> Overdue,
     IReadOnlyList<PetOpenItemsVaccinationDto> Upcoming);

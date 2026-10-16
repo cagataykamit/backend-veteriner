@@ -210,6 +210,27 @@ public sealed class GetPetSummaryQueryHandlerTests
         result.Value.Vaccinations.Data.LastApplied.Should().BeNull();
     }
 
+    // ADR-028: Now = İstanbul 2026-10-11 12:00; bugünün başı 2026-10-10 21:00 UTC.
+    [Fact]
+    public async Task Today_Vaccination_Past_Its_Hour_Is_Not_Overdue()
+    {
+        AddVaccination(VaccinationStatus.Scheduled, null, Now.AddHours(-3));
+
+        var result = await Run(CreateHandler());
+
+        result.Value!.Vaccinations.Data!.NextDue!.IsOverdue.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Yesterday_Late_Vaccination_Is_Overdue()
+    {
+        AddVaccination(VaccinationStatus.Scheduled, null, new DateTime(2026, 10, 10, 20, 59, 0, DateTimeKind.Utc));
+
+        var result = await Run(CreateHandler());
+
+        result.Value!.Vaccinations.Data!.NextDue!.IsOverdue.Should().BeTrue();
+    }
+
     [Fact]
     public async Task Deceased_Pet_Next_Due_Vaccination_Is_Not_Overdue_And_Status_Is_Returned()
     {

@@ -184,6 +184,23 @@ public sealed class GetPetOpenItemsQueryHandlerTests
         data.Upcoming.Select(v => v.Id).Should().Equal(upcoming.Id);
     }
 
+    // ADR-028: Now = İstanbul 2026-10-11 12:00; bugünün başı 2026-10-10 21:00 UTC, pencere sonu 2026-11-09 21:00 UTC (bugün dahil 30 gün).
+    [Fact]
+    public async Task Vaccinations_Split_Is_Day_Based()
+    {
+        var todayStartUtc = new DateTime(2026, 10, 10, 21, 0, 0, DateTimeKind.Utc);
+        var yesterdayLate = AddVaccination(VaccinationStatus.Scheduled, todayStartUtc.AddMinutes(-1));
+        var todayPastHour = AddVaccination(VaccinationStatus.Scheduled, Now.AddHours(-3));
+        var lastWindowDay = AddVaccination(VaccinationStatus.Scheduled, todayStartUtc.AddDays(30).AddMinutes(-1));
+        AddVaccination(VaccinationStatus.Scheduled, todayStartUtc.AddDays(30));
+
+        var result = await Run(CreateHandler());
+
+        var data = result.Value!.Vaccinations.Data!;
+        data.Overdue.Select(v => v.Id).Should().Equal(yesterdayLate.Id);
+        data.Upcoming.Select(v => v.Id).Should().Equal(todayPastHour.Id, lastWindowDay.Id);
+    }
+
     [Fact]
     public async Task Deceased_Pet_Has_No_Vaccination_Items_And_Is_Not_Queried()
     {

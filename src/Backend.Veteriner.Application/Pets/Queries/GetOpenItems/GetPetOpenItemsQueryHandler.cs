@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Access;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ChargeSuggestions;
@@ -27,7 +28,7 @@ namespace Backend.Veteriner.Application.Pets.Queries.GetOpenItems;
 /// </summary>
 public sealed class GetPetOpenItemsQueryHandler : IRequestHandler<GetPetOpenItemsQuery, Result<PetOpenItemsDto>>
 {
-    /// <summary>Yaklaşan aşı penceresi: vade <c>[şimdi, şimdi + 30 gün)</c>.</summary>
+    /// <summary>Yaklaşan aşı penceresi: bugün dahil 30 İstanbul takvim günü (<see cref="VaccinationDueRule.UpcomingWindow"/>).</summary>
     public const int UpcomingVaccinationDays = 30;
 
     private readonly ITenantContext _tenantContext;
@@ -104,16 +105,19 @@ public sealed class GetPetOpenItemsQueryHandler : IRequestHandler<GetPetOpenItem
                 if (!pet.IsReceivingCare)
                     return null;
 
+                // Gün bazlı (ADR-028): gecikmiş = vade bugünün başından önce; yaklaşan = bugün dahil 30 takvim günü.
+                var overdueBeforeUtc = VaccinationDueRule.OverdueBeforeUtc(nowUtc);
+                var (_, upcomingToUtcExclusive) = VaccinationDueRule.UpcomingWindow(nowUtc, UpcomingVaccinationDays);
                 var rows = await _vaccinations.ListAsync(
                     new ScheduledVaccinationsDueForPetSpec(
-                        tenantId, clinicId, pet.Id, nowUtc.AddDays(UpcomingVaccinationDays), accessibleClinicIds), ct);
+                        tenantId, clinicId, pet.Id, upcomingToUtcExclusive, accessibleClinicIds), ct);
                 if (rows.Count == 0)
                     return null;
 
                 var items = rows.Select(v => new PetOpenItemsVaccinationDto(v.Id, v.VaccineName, v.DueAtUtc!.Value, v.ClinicId)).ToList();
                 return new PetOpenItemsVaccinationsDto(
-                    items.Where(v => v.DueAtUtc < nowUtc).ToList(),
-                    items.Where(v => v.DueAtUtc >= nowUtc).ToList());
+                    items.Where(v => VaccinationDueRule.IsOverdueAt(v.DueAtUtc, overdueBeforeUtc)).ToList(),
+                    items.Where(v => !VaccinationDueRule.IsOverdueAt(v.DueAtUtc, overdueBeforeUtc)).ToList());
             }, _logger, "Vaccinations", ct);
 
         var labResults = await PetSectionLoader.LoadAsync(

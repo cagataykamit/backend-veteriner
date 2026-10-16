@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Access;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
@@ -120,8 +121,8 @@ public sealed class GetPetSummaryQueryHandler : IRequestHandler<GetPetSummaryQue
                         due.Id,
                         due.VaccineName,
                         due.DueAtUtc!.Value,
-                        // Vefat eden hayvanın planlı aşısı gecikmiş sayılmaz (ADR-020 S5; Pet.ReceivesCare).
-                        pet.IsReceivingCare && due.DueAtUtc.Value < nowUtc,
+                        // Gün bazlı gecikme (ADR-028); vefat eden hayvanın planlı aşısı gecikmiş sayılmaz (ADR-020 S5; Pet.ReceivesCare).
+                        pet.IsReceivingCare && VaccinationDueRule.IsOverdueAt(due.DueAtUtc.Value, VaccinationDueRule.OverdueBeforeUtc(nowUtc)),
                         due.ClinicId));
         }, ct);
 
