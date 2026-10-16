@@ -151,6 +151,7 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
             db.VaccineDefinitions.Add(vaccine);
             await db.SaveChangesAsync();
             db.Vaccinations.Add(NewScheduledVaccination(s, vaccine, now.AddDays(-5)));
+            db.Vaccinations.Add(NewScheduledVaccination(s, vaccine, now.AddDays(3)));
             db.Appointments.Add(new Appointment(s.TenantId, s.ClinicId, s.PetId, now.AddHours(-3)));
             db.Appointments.Add(new Appointment(s.TenantId, s.ClinicId, s.PetId, now.AddDays(3)));
             await db.SaveChangesAsync();
@@ -159,8 +160,12 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
         var summaryBefore = await env.GetJsonAsync($"/api/v1/pets/{env.PetId}/summary");
         summaryBefore.GetProperty("status").GetString().Should().Be("Active");
         Section(summaryBefore, "vaccinations", "Ok").GetProperty("nextDue").GetProperty("isOverdue").GetBoolean().Should().BeTrue();
-        (await env.GetJsonAsync("/api/v1/dashboard/operational-alerts"))
-            .GetProperty("overdueScheduledAppointmentsCount").GetInt32().Should().Be(1);
+        var alertsBefore = await env.GetJsonAsync("/api/v1/dashboard/operational-alerts");
+        alertsBefore.GetProperty("overdueScheduledAppointmentsCount").GetInt32().Should().Be(1);
+        alertsBefore.GetProperty("overdueVaccinationsCount").GetInt32().Should().Be(1);
+        alertsBefore.GetProperty("upcomingVaccinationsNext7DaysCount").GetInt32().Should().Be(1);
+        (await env.GetTotalItemsAsync(env.OverdueVaccinationsUrl)).Should().Be(1);
+        (await env.GetTotalItemsAsync(env.DashboardUpcomingVaccinationsUrl)).Should().Be(1);
 
         var rowVersion = (await env.GetJsonAsync($"/api/v1/pets/{env.PetId}")).GetProperty("rowVersion").GetString();
         (await env.Http.PutAsJsonAsync($"/api/v1/pets/{env.PetId}/status", new { status = "Deceased", rowVersion }))
@@ -176,8 +181,17 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
         summary.GetProperty("status").GetString().Should().Be("Deceased");
         Section(summary, "vaccinations", "Ok").GetProperty("nextDue").GetProperty("isOverdue").GetBoolean().Should().BeFalse();
 
-        (await env.GetJsonAsync("/api/v1/dashboard/operational-alerts"))
-            .GetProperty("overdueScheduledAppointmentsCount").GetInt32().Should().Be(0);
+        // Pano uyarıları, "Geciken aşı takipleri" listesi (?overdue=true) ve pano yaklaşan aşı kartı vefat edeni saymaz.
+        var alerts = await env.GetJsonAsync("/api/v1/dashboard/operational-alerts");
+        alerts.GetProperty("overdueScheduledAppointmentsCount").GetInt32().Should().Be(0);
+        alerts.GetProperty("overdueVaccinationsCount").GetInt32().Should().Be(0);
+        alerts.GetProperty("upcomingVaccinationsNext7DaysCount").GetInt32().Should().Be(0);
+        (await env.GetTotalItemsAsync(env.OverdueVaccinationsUrl)).Should().Be(0);
+        (await env.GetTotalItemsAsync(env.DashboardUpcomingVaccinationsUrl)).Should().Be(0);
+
+        // Geçmiş kayıt görünür kalır: süzgeçsiz hasta aşı listesi iki planlı kaydı da döndürür.
+        (await env.GetTotalItemsAsync($"/api/v1/vaccinations?page=1&pageSize=50&status=0&petId={env.PetId}&clinicId={env.ClinicId}"))
+            .Should().Be(2);
     }
 
     // ---- Yardımcılar ----
@@ -237,6 +251,18 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
     {
         public HttpClient Http { get; } = http;
         public Guid PetId => ids.PetId;
+        public Guid ClinicId => ids.ClinicId;
+
+        /// <summary>Pano "Geciken aşı takipleri" bağlantısının listesi (frontend <c>?overdue=true</c>).</summary>
+        public string OverdueVaccinationsUrl =>
+            $"/api/v1/vaccinations?page=1&pageSize=50&status=0&onlyOverdue=true&clinicId={ids.ClinicId}";
+
+        /// <summary>Pano yaklaşan aşı kartının sorgusu (bugünden itibaren, bakım alanlar).</summary>
+        public string DashboardUpcomingVaccinationsUrl =>
+            $"/api/v1/vaccinations?page=1&pageSize=50&status=0&onlyReceivingCare=true&dateFromUtc={DateTime.UtcNow.AddHours(-1):O}&clinicId={ids.ClinicId}";
+
+        public async Task<int> GetTotalItemsAsync(string url)
+            => (await GetJsonAsync(url)).GetProperty("totalItems").GetInt32();
 
         public async Task WithDbAsync(Func<AppDbContext, SeedIds, Task> action)
         {
