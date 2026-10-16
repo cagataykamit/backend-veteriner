@@ -1882,6 +1882,38 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("LabResults", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Legal.LegalAcceptance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AcceptedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId", "DocumentType");
+
+                    b.ToTable("LegalAcceptances", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Payments.Payment", b =>
                 {
                     b.Property<Guid>("Id")

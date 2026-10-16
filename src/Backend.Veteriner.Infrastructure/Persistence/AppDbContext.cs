@@ -18,6 +18,7 @@ using Backend.Veteriner.Domain.CareInstructions;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.LabResults;
+using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Treatments;
@@ -74,6 +75,7 @@ public class AppDbContext : DbContext
     public DbSet<BillingWebhookReceipt> BillingWebhookReceipts => Set<BillingWebhookReceipt>();
     public DbSet<UserTenant> UserTenants => Set<UserTenant>();
     public DbSet<TenantInvite> TenantInvites => Set<TenantInvite>();
+    public DbSet<LegalAcceptance> LegalAcceptances => Set<LegalAcceptance>();
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<UserClinic> UserClinics => Set<UserClinic>();
     public DbSet<ClinicWorkingHour> ClinicWorkingHours => Set<ClinicWorkingHour>();
