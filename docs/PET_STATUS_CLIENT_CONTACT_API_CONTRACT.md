@@ -121,6 +121,7 @@ GET /api/v1/charge-suggestions?clinicId={clinicId}&clientId={clientId}&pageSize=
 1. **Hasta kartı:** başlıkta `status = Deceased` rozeti (ve varsa `deceasedOn`); eylem çubuğunda Geldi / Muayene başlat / Randevu al vefat eden hayvanda gizli veya pasif (sunucu da 409 `Pets.Deceased` döner).
 2. **Vefat işaretle / geri al:** `PUT /pets/{id}/status` (onay diyaloğu, opsiyonel tarih), `rowVersion` `GET /pets/{id}`'den; 409 `Pets.ConcurrencyConflict` → detayı yenile. Yanıttaki yeni `rowVersion` sonraki yazımda kullanılır.
 3. **Müşteri kartı hayvan listesi:** `GET /pets?clientId=…&status=Active` (varsayılan sekme) / `status=Deceased`; süzgeçsiz çağrı tümünü döndürür ve satırda `status` vardır.
+3b. **Hasta listesi varsayılanı "Yaşayanlar" (ADR-025 madde 1):** liste ilk açıldığında `status=Active` gönderilir; süzgeçte "Tümü" (`status` yok) ve "Vefat edenler" (`status=Deceased`) seçilebilir. **API varsayılanı değişmedi** (`status` verilmezse tümü): süzgeci bilmeyen eski istemciler ve diğer çağrılar (müşteri kartı, seçiciler, raporlar) etkilenmez; varsayılan istemci kuralıdır.
 4. **İletişim tercihi:** müşteri formunda kanal seçimi ve "Hatırlatma istemiyor" anahtarı; kartta okuma. PUT'ta alanlar her zaman gönderilebilir; temizlemek için `"None"` / `false`.
 5. **Ücret bekleyenler:** müşteri kartında tek istek `GET /charge-suggestions?clinicId=…&clientId=…&pageSize=200`; sayı `totalItems`, tutar sayfadan.
 6. Yeni hata kodları: `Pets.Deceased` (409), `Pets.ConcurrencyConflict` (409).
