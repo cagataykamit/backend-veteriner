@@ -27,7 +27,7 @@ namespace Backend.IntegrationTests.OwnerPortal;
 /// KVKK Ret / hatırlatma istemeyen müşteriye davet gitmemesi, başka hesap/kiracı/kapalı bağla erişim reddi.
 /// Ham davet token'ı ve kod e-postadadır; testte üreteç kaydedilerek okunur (outbox içeriği ayrıştırılmaz).
 /// </summary>
-public sealed class OwnerPortalIntegrationTests : IClassFixture<CustomWebApplicationFactory>, IDisposable
+public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWebApplicationFactory>, IDisposable
 {
     private const string InvalidCredentials = "Portal.Auth.Unauthorized.InvalidCredentials";
     private const string Password = "Abc12345!";
