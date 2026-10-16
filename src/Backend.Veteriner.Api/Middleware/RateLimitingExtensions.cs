@@ -201,6 +201,57 @@ public static class RateLimitingExtensions
                     });
             });
 
+            // -- PORTAL (ADR-031): anonim kimlik uçları (kod iste/doğrula, parola girişi, sıfırlama, davet). Hesap bazlı koruma
+            //    alan kuralındadır (kilit + kod bekleme süresi); burada IP bazlı tavan.
+            options.AddPolicy("portal-auth", httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- PORTAL REFRESH: IP bazlı (~30/dk)
+            options.AddPolicy("portal-refresh", httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetTokenBucketLimiter(
+                    key,
+                    _ => new TokenBucketRateLimiterOptions
+                    {
+                        TokenLimit = 30,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0,
+                        ReplenishmentPeriod = TimeSpan.FromSeconds(2),
+                        TokensPerPeriod = 1,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- PORTAL: oturumlu uçlar. Hız sınırı kimlik doğrulamadan önce çalıştığı (pipeline sırası) ve portal şeması
+            //    yalnız yetkilendirmede doğrulandığı için anahtar IP'dir.
+            options.AddPolicy("portal", httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 120,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
             // -- CONTACT: spam korumas�
             options.AddPolicy("contact", httpContext =>
             {

@@ -19,7 +19,7 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
     private static readonly HashSet<string> SensitivePayloadKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         "Password", "CurrentPassword", "NewPassword", "ConfirmPassword", "Token", "RefreshToken", "AccessToken",
-        "Secret", "ApiKey", "ClientSecret", "Hash", "PasswordHash"
+        "Secret", "ApiKey", "ClientSecret", "Hash", "PasswordHash", "OneTimeCode"
     };
 
     private readonly IClientContext _client;

@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.OwnerPortal;
 using Microsoft.AspNetCore.Http;
 
 namespace Backend.Veteriner.Infrastructure.Web;
@@ -37,6 +38,10 @@ public sealed class ClientContext : IClientContext
         {
             var user = _accessor.HttpContext?.User;
             if (user is null)
+                return null;
+
+            // Hasta sahibi portal hesabı personel kullanıcısı değildir (ADR-031 K6); denetim ve handler'larda karışmasın.
+            if (user.HasClaim(OwnerPortalAuth.PrincipalTypeClaim, OwnerPortalAuth.OwnerPrincipalType))
                 return null;
 
             var sub =
