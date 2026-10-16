@@ -1050,6 +1050,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(0);
 
+                    b.Property<string>("KvkkConsentTemplateHash")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<int?>("KvkkConsentTemplateVersion")
+                        .HasColumnType("int");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1210,6 +1219,16 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(20000)
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TextHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<int>("TextVersion")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");

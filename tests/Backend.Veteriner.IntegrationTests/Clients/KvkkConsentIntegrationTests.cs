@@ -21,7 +21,8 @@ namespace Backend.IntegrationTests.Clients;
 /// <summary>
 /// ADR-021: müşteri KVKK rıza durumu (Kabul/Ret/Yok, tarih, işaretleyen, RowVersion/409, hatırlatma tercihine dokunmama)
 /// ve klinik KVKK şablonları: açık rıza formu ve aydınlatma metni (ADR-024) (varsayılan, oluştur/güncelle, 409, izinler,
-/// türlerin birbirinden bağımsızlığı). HTTP + gerçek SQL Server (LocalDB).
+/// türlerin birbirinden bağımsızlığı); ADR-032: rıza kaydına aktif kliniğin açık rıza metni sürümü ve özeti.
+/// HTTP + gerçek SQL Server (LocalDB).
 /// </summary>
 [Collection("pilot-smoke-api")]
 public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplicationFactory>
@@ -57,6 +58,8 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
         accepted.GetProperty("kvkkConsentRecordedOn").GetString().Should().Be("2026-01-02");
         accepted.GetProperty("kvkkConsentRecordedByUserId").GetGuid().Should().Be(ctx.UserId);
         accepted.GetProperty("rowVersion").GetString().Should().NotBe(rowVersion);
+        // Klinik bağlamı olmayan istek (token'da clinic_id yok): metin sürümü bilinmiyor (ADR-032).
+        accepted.GetProperty("kvkkConsentTemplateVersion").ValueKind.Should().Be(JsonValueKind.Null);
 
         // Eski sürümle ikinci yazım 409.
         var stale = await ctx.Http.PutAsJsonAsync($"/api/v1/clients/{ctx.ClientId}/kvkk-consent",
@@ -234,9 +237,83 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
         (await outsider.Http.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Consent_Should_Record_Template_Version_And_Hash_Of_Active_Clinic()
+    {
+        var ctx = await SeedAsync(clinicScopedToken: true);
+        var templateUrl = $"/api/v1/clinics/{ctx.ClinicId}/kvkk-form-template";
+        var consentUrl = $"/api/v1/clients/{ctx.ClientId}/kvkk-consent";
+
+        // Kayıt yokken taslak varsayılan metin: sürüm 0.
+        var defaultTemplate = await ctx.Http.GetFromJsonAsync<JsonElement>(templateUrl);
+        defaultTemplate.GetProperty("textVersion").GetInt32().Should().Be(0);
+        var defaultHash = defaultTemplate.GetProperty("textHash").GetString();
+        defaultHash.Should().Be(ClinicKvkkFormTemplate.ComputeTextHash(defaultTemplate.GetProperty("text").GetString()!));
+
+        var accept = await ctx.Http.PutAsJsonAsync(consentUrl,
+            new { status = "Accepted", rowVersion = (await ctx.GetClientAsync()).GetProperty("rowVersion").GetString() });
+        accept.StatusCode.Should().Be(HttpStatusCode.OK, await accept.Content.ReadAsStringAsync());
+        var accepted = await accept.Content.ReadFromJsonAsync<JsonElement>();
+        accepted.GetProperty("kvkkConsentTemplateVersion").GetInt32().Should().Be(0);
+        accepted.GetProperty("kvkkConsentTemplateHash").GetString().Should().Be(defaultHash);
+
+        // İlk kayıt 1; aynı metin sürümü artırmaz; değişen metin artırır.
+        var v1 = await (await ctx.Http.PutAsJsonAsync(templateUrl, new { text = "Metin A" })).Content.ReadFromJsonAsync<JsonElement>();
+        v1.GetProperty("textVersion").GetInt32().Should().Be(1);
+        var same = await ctx.Http.PutAsJsonAsync(templateUrl, new { text = " Metin A ", rowVersion = v1.GetProperty("rowVersion").GetString() });
+        same.StatusCode.Should().Be(HttpStatusCode.OK, await same.Content.ReadAsStringAsync());
+        var sameBody = await same.Content.ReadFromJsonAsync<JsonElement>();
+        sameBody.GetProperty("textVersion").GetInt32().Should().Be(1);
+        var v2 = await (await ctx.Http.PutAsJsonAsync(templateUrl, new { text = "Metin B", rowVersion = sameBody.GetProperty("rowVersion").GetString() }))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        v2.GetProperty("textVersion").GetInt32().Should().Be(2);
+        v2.GetProperty("textHash").GetString().Should().Be(ClinicKvkkFormTemplate.ComputeTextHash("Metin B"));
+
+        // Önceki rıza kaydı değişmez; yeni işaretleme güncel sürümü yazar.
+        var detail = await ctx.GetClientAsync();
+        detail.GetProperty("kvkkConsentTemplateVersion").GetInt32().Should().Be(0);
+        var decline = await ctx.Http.PutAsJsonAsync(consentUrl,
+            new { status = "Declined", rowVersion = detail.GetProperty("rowVersion").GetString() });
+        decline.StatusCode.Should().Be(HttpStatusCode.OK, await decline.Content.ReadAsStringAsync());
+        var afterDecline = await ctx.GetClientAsync();
+        afterDecline.GetProperty("kvkkConsentTemplateVersion").GetInt32().Should().Be(2);
+        afterDecline.GetProperty("kvkkConsentTemplateHash").GetString().Should().Be(ClinicKvkkFormTemplate.ComputeTextHash("Metin B"));
+
+        // "Yok"a dönüş sürümü de temizler.
+        var revert = await ctx.Http.PutAsJsonAsync(consentUrl,
+            new { status = "None", rowVersion = afterDecline.GetProperty("rowVersion").GetString() });
+        revert.StatusCode.Should().Be(HttpStatusCode.OK, await revert.Content.ReadAsStringAsync());
+        var reverted = await ctx.GetClientAsync();
+        reverted.GetProperty("kvkkConsentTemplateVersion").ValueKind.Should().Be(JsonValueKind.Null);
+        reverted.GetProperty("kvkkConsentTemplateHash").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Consent_Recorded_Before_Versioning_Should_Return_Unknown_Version()
+    {
+        var ctx = await SeedAsync(clinicScopedToken: true);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            // ADR-032 öncesi kayıt: Kabul işaretli, sürüm alanları null (geriye dönük doldurulmaz).
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var client = await db.Clients.SingleAsync(c => c.Id == ctx.ClientId);
+            client.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 1, 2), new DateOnly(2026, 1, 2), ctx.UserId, null, null)
+                .IsSuccess.Should().BeTrue();
+            await db.SaveChangesAsync();
+        }
+
+        var detail = await ctx.GetClientAsync();
+        detail.GetProperty("kvkkConsentStatus").GetString().Should().Be("Accepted");
+        detail.GetProperty("kvkkConsentTemplateVersion").ValueKind.Should().Be(JsonValueKind.Null);
+        detail.GetProperty("kvkkConsentTemplateHash").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
     // ---- Kurulum ----
 
-    private async Task<KvkkTestContext> SeedAsync(string[]? permissions = null, Guid? existingClinicId = null)
+    private async Task<KvkkTestContext> SeedAsync(
+        string[]? permissions = null,
+        Guid? existingClinicId = null,
+        bool clinicScopedToken = false)
     {
         var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
@@ -278,7 +355,8 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
             userId = user.Id;
         }
 
-        var token = await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(_factory.Services, email, permissions ?? AllPermissions);
+        var token = await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(
+            _factory.Services, email, permissions ?? AllPermissions, clinicScopedToken ? clinicId : null);
         var http = _factory.CreateClient();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return new KvkkTestContext(http, clinicId, clientId, userId);

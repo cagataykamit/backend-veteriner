@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Clinics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -62,6 +63,14 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
         b.Property(x => x.KvkkConsentRecordedOn);
 
         b.Property(x => x.KvkkConsentRecordedByUserId);
+
+        // ADR-032: mevcut satırlar null kalır ("sürüm bilinmiyor"); geriye dönük doldurulmaz.
+        b.Property(x => x.KvkkConsentTemplateVersion);
+
+        b.Property(x => x.KvkkConsentTemplateHash)
+            .IsUnicode(false)
+            .IsFixedLength()
+            .HasMaxLength(ClinicKvkkFormTemplate.TextHashLength);
 
         b.Property(x => x.RowVersion)
             .IsRowVersion()

@@ -18,6 +18,12 @@ public sealed class ClinicKvkkFormTemplateConfiguration : IEntityTypeConfigurati
         b.Property(x => x.Text)
             .IsRequired()
             .HasMaxLength(ClinicKvkkFormTemplate.MaxTextLength);
+        b.Property(x => x.TextVersion).IsRequired();
+        b.Property(x => x.TextHash)
+            .IsRequired()
+            .IsUnicode(false)
+            .IsFixedLength()
+            .HasMaxLength(ClinicKvkkFormTemplate.TextHashLength);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
         b.Property(x => x.UpdatedByUserId).IsRequired();
