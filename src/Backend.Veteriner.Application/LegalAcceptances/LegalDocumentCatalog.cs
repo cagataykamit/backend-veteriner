@@ -18,9 +18,19 @@ public static class LegalDocumentCatalog
             [LegalDocumentType.Terms] = "0.1",
             [LegalDocumentType.Privacy] = "0.1",
             [LegalDocumentType.DataProcessing] = "0.1",
+            [LegalDocumentType.PortalTerms] = "0.1",
+            [LegalDocumentType.PortalPrivacy] = "0.1",
         };
 
     public static string CurrentVersion(LegalDocumentType documentType) => CurrentVersions[documentType];
+
+    /// <summary>Klinik paneli (personel) belgeleri; herkese açık sürüm listesi yalnız bunları gösterir.</summary>
+    public static IReadOnlyList<LegalDocumentType> StaffDocuments { get; } =
+        [LegalDocumentType.Terms, LegalDocumentType.Privacy, LegalDocumentType.DataProcessing];
+
+    /// <summary>Hasta sahibi portal hesabının kabul etmesi gerekenler (ADR-031 K4): Kullanım Şartları + Gizlilik'in hasta sahibi varyantı.</summary>
+    public static IReadOnlyList<LegalDocumentType> RequiredForOwnerAccount { get; } =
+        [LegalDocumentType.PortalTerms, LegalDocumentType.PortalPrivacy];
 
     /// <summary>
     /// Kullanıcının kabul etmesi gereken belgeler: herkes Kullanım Şartları + Gizlilik; Veri İşleme Sözleşmesi'ni
@@ -90,6 +100,15 @@ public static class LegalDocumentCatalog
             .Select(t => LegalAcceptance.Record(userId, tenantId, t, CurrentVersion(t), utcNow))
             .ToArray();
 
+    /// <summary>Portal hesabı için belgelerin güncel sürümüne yeni kabul satırları (kiracı yok).</summary>
+    public static IReadOnlyList<LegalAcceptance> CreateOwnerAccountAcceptances(
+        Guid ownerAccountId,
+        IEnumerable<LegalDocumentType> documentTypes,
+        DateTime utcNow) =>
+        documentTypes
+            .Select(t => LegalAcceptance.RecordForOwnerAccount(ownerAccountId, t, CurrentVersion(t), utcNow))
+            .ToArray();
+
     public static IReadOnlyList<LegalDocumentVersionDto> ToDtos(IEnumerable<LegalDocumentType> documentTypes) =>
         documentTypes.Select(t => new LegalDocumentVersionDto(t, CurrentVersion(t))).ToArray();
 
@@ -98,6 +117,8 @@ public static class LegalDocumentCatalog
         LegalDocumentType.Terms => "Kullanım Şartları",
         LegalDocumentType.Privacy => "Gizlilik Politikası",
         LegalDocumentType.DataProcessing => "Veri İşleme Sözleşmesi",
+        LegalDocumentType.PortalTerms => "Kullanım Şartları",
+        LegalDocumentType.PortalPrivacy => "Gizlilik Politikası",
         _ => documentType.ToString(),
     };
 }
