@@ -401,6 +401,7 @@ Ayrıntılı alan ve iş kuralları için bkz. `docs/AUTH_TENANT_CONTRACT.md`.
 - Query: `page`, `pageSize`, `search`/`page.search`, `clinicId`, `clientId`, `petId`, `status`, `onlyOverdue`, `onlyReceivingCare`, `examinationId`, `dateFromUtc`, `dateToUtc`, `dueFromUtc`, `dueToUtc`, `appliedFromUtc`, `appliedToUtc`, `sort`, `order`.
 - Tüm yapısal filtreler birbiriyle **AND** birleşir.
 - `onlyReceivingCare` (bool, varsayılan `false`): `true` ise bakım dışı (vefat eden) hayvanların aşıları çıkmaz; koşul `Pet.ReceivesCare` (ADR-020 S5), kiracı içinde çözülür. Verilmezse **tümü** (geçmiş kayıtlar görünür; önceki davranış değişmedi). Pano "yaklaşan aşılar" kartı içindir. `onlyOverdue=true` bu dışlamayı zaten her zaman uygular (`PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md`).
+- `onlyOverdue` (bool): planlı (`Scheduled`) ve `dueAtUtc` **bugünün İstanbul gün başından önce** olan aşılar; bugün vadeli aşı saati geçse de gecikmiş sayılmaz, ertesi gün gecikmiş olur (ADR-028). Açıkken `status` yok sayılır. Tanım tek yerde: `VaccinationDueRule` (pano `overdueVaccinationsCount`, hasta özeti `isOverdue`, hasta "Yapılacaklar" aynı kural).
 - `clientId`: yalnız o müşterinin (kiracı içindeki) hayvanlarının aşıları; müşterinin hayvanı yoksa / başka kiracıdaysa boş sayfa (hata değil); `Guid.Empty` → 400.
 - **Birleşik tarih aralığı (`dateFromUtc`/`dateToUtc`, liste ekranının tek “Başlangıç/Bitiş” süzgeci):** kayıt tarihi durum **Uygulandı** (`Applied`) ise `AppliedAtUtc`, değilse (`Scheduled`/`Cancelled`) `DueAtUtc`; iki uç **dahil** (`>=`, `<=`); tarihi boş kayıt aralığa girmez. Aşı raporu (§31) ile aynı eksen; varsayılan liste sırasının dayandığı `AppliedAtUtc ?? DueAtUtc` ile domain kuralları gereği aynı değerdir (Applied’da `AppliedAtUtc` zorunlu, diğerlerinde yasak). `dateFromUtc > dateToUtc` → 400.
 - `dueFromUtc`/`dueToUtc` ve `appliedFromUtc`/`appliedToUtc` **geriye uyumluluk** için korunur (ayrı alanlarda, iki uç dahil); birleşik aralıkla birlikte verilirse hepsi AND.
@@ -1812,6 +1813,7 @@ Tüm zaman bazlı filtreler **Europe/Istanbul** operasyon takvimine göre hesapl
 | Bugün | `OperationDayBounds.ForUtcNow` | İstanbul 00:00 → ertesi İstanbul 00:00 (UTC'ye çevrilmiş). |
 | Hafta | `OperationPeriodBounds.WeekForUtcNow` | İstanbul Pazartesi 00:00 → sonraki Pazartesi 00:00. |
 | Ay | `OperationPeriodBounds.MonthForUtcNow` | İstanbul ayın 1'i 00:00 → sonraki ayın 1'i 00:00. |
+| Aşı gecikmiş / yaklaşan 7 gün (`operational-alerts`) | `VaccinationDueRule` | Gecikmiş: planlı ve `dueAtUtc <` bugünün başı. Yaklaşan: planlı ve `dueAtUtc` ∈ [bugünün başı, bugün + 7 günün başı) — bugün dahil 7 takvim günü (ADR-028). Vefat edenler sayılmaz. Liste karşılığı: `status=0&onlyReceivingCare=true&dateFromUtc=<bugün 00:00>&dateToUtc=<bugün+6 23:59:59.999>`. Randevu sayaçları (`overdueScheduledAppointmentsCount`, 24 saat) saat bazlı kalır. |
 | Son 7 gün (trend) | `OperationPeriodBounds.Last7DaysForUtcNow` | Bugün dahil 7 ardışık İstanbul takvim günü; her gün için yerel tarih + UTC `[start, end)` bucket. DST geçişlerinde her bucket bağımsız hesaplanır. |
 
 ### 27.4 `GET /api/v1/dashboard/summary` — `DashboardSummaryDto`
