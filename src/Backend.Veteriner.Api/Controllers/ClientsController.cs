@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Clients.Commands.Update;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetById;
 using Backend.Veteriner.Application.Clients.Queries.GetBalance;
+using Backend.Veteriner.Application.Clients.Queries.GetDataExport;
 using Backend.Veteriner.Application.Clients.Queries.GetList;
 using Backend.Veteriner.Application.Clients.Queries.GetPaymentSummary;
 using Backend.Veteriner.Application.Clients.Queries.GetRecentSummary;
@@ -190,6 +191,27 @@ public sealed class ClientsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetClientPaymentSummaryQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Müşteri veri kopyası (ADR-032 madde 2, KVKK bilgi talebi): müşteri bilgileri, rıza, hastalar, randevular, muayene özetleri,
+    /// aşılar, tedavi/reçete özeti, ücret/ödemeler (iptaller işaretli) ve toplu bakiye. Salt okunur; erişim audit'e yazılır
+    /// (<c>Client.DataExport</c>). Aktif klinik bağlamı varsa bu kliniğe indirgenir; bölüm başına üst sınır vardır.
+    /// Bkz. docs/CLIENT_DATA_EXPORT_API_CONTRACT.md.
+    /// </summary>
+    [HttpGet("{id:guid}/data-export")]
+    [Authorize(Policy = PermissionCatalog.Clients.Read)]
+    [ProducesResponseType(typeof(ClientDataExportDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetDataExport([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClientDataExportQuery(id), ct);
         return result.ToActionResult(this);
     }
 
