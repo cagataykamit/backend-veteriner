@@ -90,6 +90,7 @@ public class AppDbContext : DbContext
     public DbSet<ClinicWorkingHour> ClinicWorkingHours => Set<ClinicWorkingHour>();
     public DbSet<ClinicAppointmentSettings> ClinicAppointmentSettings => Set<ClinicAppointmentSettings>();
     public DbSet<ClinicKvkkFormTemplate> ClinicKvkkFormTemplates => Set<ClinicKvkkFormTemplate>();
+    public DbSet<ClinicTaxpayerSettings> ClinicTaxpayerSettings => Set<ClinicTaxpayerSettings>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Pet> Pets => Set<Pet>();
     public DbSet<Species> Species => Set<Species>();

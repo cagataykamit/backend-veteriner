@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Clinics.Commands.AppointmentSettings.UpdateC
 using Backend.Veteriner.Application.Clinics.Commands.Create;
 using Backend.Veteriner.Application.Clinics.Commands.Deactivate;
 using Backend.Veteriner.Application.Clinics.Commands.KvkkFormTemplate.UpdateClinicKvkkFormTemplate;
+using Backend.Veteriner.Application.Clinics.Commands.TaxpayerSettings.UpdateClinicTaxpayerSettings;
 using Backend.Veteriner.Application.Clinics.Commands.Update;
 using Backend.Veteriner.Application.Clinics.Commands.WorkingHours.UpdateClinicWorkingHours;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
@@ -15,6 +16,7 @@ using Backend.Veteriner.Application.Clinics.Queries.AppointmentSettings.GetClini
 using Backend.Veteriner.Application.Clinics.Queries.GetById;
 using Backend.Veteriner.Application.Clinics.Queries.GetList;
 using Backend.Veteriner.Application.Clinics.Queries.KvkkFormTemplate.GetClinicKvkkFormTemplate;
+using Backend.Veteriner.Application.Clinics.Queries.TaxpayerSettings.GetClinicTaxpayerSettings;
 using Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkingHours;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -236,6 +238,63 @@ public sealed class ClinicsController : ControllerBase
         [FromBody] UpdateClinicKvkkFormTemplateRequest? body,
         CancellationToken ct)
         => PutKvkkTemplate(id, ClinicKvkkFormKind.Disclosure, body, ct);
+
+    /// <summary>
+    /// Klinik mükellef ayarları (ADR-036 Dilim 1). Kayıt yoksa varsayılan döner (<c>isConfigured=false</c>, KDV %20).
+    /// Bkz. docs/INVOICING_IDENTITY_API_CONTRACT.md §3.
+    /// </summary>
+    [HttpGet("{id:guid}/taxpayer-settings")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Read)]
+    [ProducesResponseType(typeof(ClinicTaxpayerSettingsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetTaxpayerSettings([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClinicTaxpayerSettingsQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Klinik mükellef ayarlarını kaydeder (tam değiştirme; kayıt yoksa oluşur). Audit'te mükellef kimliği maskelenir.</summary>
+    [HttpPut("{id:guid}/taxpayer-settings")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ClinicTaxpayerSettingsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PutTaxpayerSettings(
+        [FromRoute] Guid id,
+        [FromBody] UpdateClinicTaxpayerSettingsRequest? body,
+        CancellationToken ct)
+    {
+        if (body is null)
+        {
+            return Result<ClinicTaxpayerSettingsDto>.Failure(
+                    "Clinics.TaxpayerSettings.Validation.InvalidRequestBody",
+                    "Istek govdesi bos veya hatali JSON.")
+                .ToActionResult(this);
+        }
+
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new UpdateClinicTaxpayerSettingsCommand(
+            id,
+            body.TaxpayerType,
+            body.TaxIdentityNumber,
+            body.TaxOffice,
+            body.TaxpayerName,
+            body.Province,
+            body.District,
+            body.AddressLine,
+            body.DefaultVatRate,
+            body.WithholdingRate), ct);
+        return result.ToActionResult(this);
+    }
 
     private async Task<IActionResult> GetKvkkTemplate(Guid id, ClinicKvkkFormKind kind, CancellationToken ct)
     {
