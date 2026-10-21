@@ -33,6 +33,10 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
         b.Property(x => x.Quantity).HasPrecision(18, Charge.QuantityDecimals).IsRequired();
         b.Property(x => x.UnitPrice).HasPrecision(18, Charge.UnitPriceDecimals).IsRequired();
         b.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
+
+        // ADR-036 Dilim 1: mevcut satırlar hizmet ve klinik varsayılanı KDV (null) olarak kalır.
+        b.Property(x => x.LineKind).IsRequired().HasConversion<int>().HasDefaultValue(ChargeLineKind.Service);
+        b.Property(x => x.VatRate).HasPrecision(5, TaxRatePercent.Decimals);
         b.Property(x => x.Currency).IsRequired().HasMaxLength(3);
 
         b.Property(x => x.CreatedByUserId).IsRequired();

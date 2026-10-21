@@ -179,7 +179,8 @@ public sealed class CreateChargeCommandHandler : IRequestHandler<CreateChargeCom
             request.UnitPrice,
             userId,
             _timeProvider.GetUtcNow().UtcDateTime,
-            request.RequestId);
+            request.RequestId,
+            request.Tax?.ToDomain());
         if (!created.IsSuccess)
             return Result<ChargeCreateResultDto>.Failure(created.Error);
 

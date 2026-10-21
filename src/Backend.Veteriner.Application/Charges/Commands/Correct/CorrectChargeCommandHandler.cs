@@ -65,7 +65,8 @@ public sealed class CorrectChargeCommandHandler : IRequestHandler<CorrectChargeC
         if (!clinicAccess.IsSuccess)
             return Result<ChargeDto>.Failure(clinicAccess.Error);
 
-        var correction = charge.Correct(request.Description, request.Quantity, request.UnitPrice, request.Reason);
+        var correction = charge.Correct(
+            request.Description, request.Quantity, request.UnitPrice, request.Reason, request.Tax?.ToDomain());
         if (!correction.IsSuccess)
             return Result<ChargeDto>.Failure(correction.Error);
 

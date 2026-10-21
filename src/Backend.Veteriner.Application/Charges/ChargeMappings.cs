@@ -23,5 +23,7 @@ internal static class ChargeMappings
             c.CreatedByUserId,
             c.CreatedAtUtc,
             c.AllocatedAmount,
-            c.OutstandingAmount);
+            c.OutstandingAmount,
+            c.LineKind,
+            c.VatRate);
 }

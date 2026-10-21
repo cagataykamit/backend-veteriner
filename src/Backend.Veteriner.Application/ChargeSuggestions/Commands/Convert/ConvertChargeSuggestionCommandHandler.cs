@@ -8,11 +8,13 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +39,7 @@ public sealed class ConvertChargeSuggestionCommandHandler
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Examination> _examinations;
+    private readonly IReadRepository<Product> _products;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
 
@@ -51,6 +54,7 @@ public sealed class ConvertChargeSuggestionCommandHandler
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
         IReadRepository<Examination> examinations,
+        IReadRepository<Product> products,
         ISender sender,
         TimeProvider timeProvider)
     {
@@ -64,6 +68,7 @@ public sealed class ConvertChargeSuggestionCommandHandler
         _pets = pets;
         _clients = clients;
         _examinations = examinations;
+        _products = products;
         _sender = sender;
         _timeProvider = timeProvider;
     }
@@ -119,6 +124,12 @@ public sealed class ConvertChargeSuggestionCommandHandler
             visitId = exam?.VisitId;
         }
 
+        // Satır türü kalemin katalog ürününden türer (ADR-036); KDV oranı boş = klinik varsayılanı.
+        var product = await _products.FirstOrDefaultAsync(new ProductByIdSpec(tenantId, suggestion.ProductId), ct);
+        var tax = product is null
+            ? null
+            : new ChargeTaxDto(ChargeLineKinds.FromProductKind(product.Kind), null);
+
         var charged = await _sender.Send(
             new CreateChargeCommand(
                 suggestion.ClinicId,
@@ -129,7 +140,8 @@ public sealed class ConvertChargeSuggestionCommandHandler
                 request.Description ?? suggestion.Description,
                 request.Quantity ?? suggestion.Quantity,
                 unitPrice.Value,
-                request.RequestId),
+                request.RequestId,
+                tax),
             ct);
         if (!charged.IsSuccess)
             return charged;

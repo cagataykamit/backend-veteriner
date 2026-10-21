@@ -62,7 +62,8 @@ public sealed class ChargesController : ControllerBase
                 body.Description,
                 body.Quantity,
                 body.UnitPrice,
-                body.RequestId),
+                body.RequestId,
+                body.Tax),
             ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
@@ -94,7 +95,7 @@ public sealed class ChargesController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(
-            new CorrectChargeCommand(id, body.Description, body.Quantity, body.UnitPrice, body.Reason),
+            new CorrectChargeCommand(id, body.Description, body.Quantity, body.UnitPrice, body.Reason, body.Tax),
             ct);
         return result.ToActionResult(this);
     }

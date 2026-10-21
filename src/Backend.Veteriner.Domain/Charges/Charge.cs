@@ -31,6 +31,12 @@ public sealed class Charge : AggregateRoot
 
     public string Currency { get; private set; } = DefaultCurrency;
 
+    /// <summary>Satır türü (ADR-036); varsayılan <see cref="ChargeLineKind.Service"/>.</summary>
+    public ChargeLineKind LineKind { get; private set; } = ChargeLineKind.Service;
+
+    /// <summary>KDV oranı (%); <c>null</c> = klinik varsayılanı (etkin oran belge kesilirken çözülür, Dilim 4).</summary>
+    public decimal? VatRate { get; private set; }
+
     /// <summary>Ödemelerden tahsis edilen toplam; <c>0 ≤ AllocatedAmount ≤ Amount</c>. Yalnızca <see cref="ApplyAllocation"/> değiştirir.</summary>
     public decimal AllocatedAmount { get; private set; }
 
@@ -65,7 +71,8 @@ public sealed class Charge : AggregateRoot
         decimal unitPrice,
         Guid createdByUserId,
         DateTime createdAtUtc,
-        Guid? requestId)
+        Guid? requestId,
+        ChargeTax? tax = null)
     {
         if (tenantId == Guid.Empty)
             return Invalid("TenantId geçersiz.");
@@ -84,6 +91,11 @@ public sealed class Charge : AggregateRoot
 
         var (text, amount) = details.Value;
 
+        var taxDetails = tax ?? ChargeTax.Default;
+        var taxCheck = taxDetails.Validate();
+        if (!taxCheck.IsSuccess)
+            return Result<Charge>.Failure(taxCheck.Error);
+
         return Result<Charge>.Success(new Charge
         {
             TenantId = tenantId,
@@ -97,6 +109,8 @@ public sealed class Charge : AggregateRoot
             UnitPrice = unitPrice,
             Amount = amount,
             Currency = DefaultCurrency,
+            LineKind = taxDetails.LineKind,
+            VatRate = taxDetails.VatRate,
             CreatedByUserId = createdByUserId,
             CreatedAtUtc = NormalizeUtc(createdAtUtc),
             RequestId = requestId,
@@ -105,9 +119,10 @@ public sealed class Charge : AggregateRoot
 
     /// <summary>
     /// Açıklama, miktar ve birim fiyatı düzeltir; tutar yeniden hesaplanır (tek hesap yeri <c>ValidateDetails</c>).
+    /// <paramref name="tax"/> <c>null</c> ise satır türü ve KDV oranına dokunulmaz; verilirse ikisi birlikte yazılır.
     /// Yeni tutar tahsis edilmiş tutarın altına inemez; hiçbir alan değişmiyorsa reddedilir.
     /// </summary>
-    public Result Correct(string? description, decimal quantity, decimal unitPrice, string? reason)
+    public Result Correct(string? description, decimal quantity, decimal unitPrice, string? reason, ChargeTax? tax = null)
     {
         if (IsVoided)
             return Result.Failure("Charges.AlreadyVoided", "İptal edilmiş ücret düzeltilemez.");
@@ -121,7 +136,14 @@ public sealed class Charge : AggregateRoot
             return Result.Failure(details.Error);
 
         var (text, newAmount) = details.Value;
-        if (text == Description && quantity == Quantity && unitPrice == UnitPrice)
+
+        var newTax = tax ?? new ChargeTax(LineKind, VatRate);
+        var taxCheck = newTax.Validate();
+        if (!taxCheck.IsSuccess)
+            return taxCheck;
+
+        if (text == Description && quantity == Quantity && unitPrice == UnitPrice
+            && newTax.LineKind == LineKind && newTax.VatRate == VatRate)
             return Result.Failure("Charges.Validation", "Düzeltme için en az bir alan değişmelidir.");
 
         if (newAmount < AllocatedAmount)
@@ -135,6 +157,8 @@ public sealed class Charge : AggregateRoot
         Quantity = quantity;
         UnitPrice = unitPrice;
         Amount = newAmount;
+        LineKind = newTax.LineKind;
+        VatRate = newTax.VatRate;
         MutationSequence++;
         return Result.Success();
     }
