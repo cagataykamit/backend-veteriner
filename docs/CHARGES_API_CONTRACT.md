@@ -4,6 +4,8 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-012 (vetinity-product, ka
 
 > **Durum:** Sözleşme (inceleme bekliyor). Kapsam: ücret satırı **ekleme ve okuma**. Tahsilat ilişkilendirme/bakiye (Dilim 2–3) ve düzeltme/iptal uçları (Dilim 5) bu sözleşmede **yoktur**; `Charges.Correct` izni şimdiden tanımlanır, ucu sonra gelir.
 
+> **Ek (ADR-036 Dilim 1):** `ChargeDto` → `lineKind` (`Service`/`Product`, varsayılan `Service`) ve `vatRate` (KDV %, null = klinik varsayılanı). `POST /charges` ve `PUT /charges/{id}` isteğe bağlı `tax: { lineKind, vatRate }` alır; ücrete çevirmede satır türü ürün türünden türer. Ayrıntı: `INVOICING_IDENTITY_API_CONTRACT.md` §5. Aşağıdaki "KDV modellenmez" notu bu ekle geçersizdir: `unitPrice` yine tek tutardır; KDV dahil/hariç yorumu belge dilimine (Dilim 4) bırakıldı.
+
 ---
 
 ## 1) Kavramlar

@@ -27,13 +27,15 @@ Amaç: KVKK bilgi talebinde klinik çalışanı müşteri kartından tek belge �
   "client": {
     "id": "guid", "fullName": "Ayşe Yılmaz", "phone": "905551112233", "email": "ayse@example.com",
     "address": "İzmir", "createdAtUtc": "2025-03-01T10:00:00Z",
-    "preferredContactChannel": "Phone", "remindersOptedOut": false
+    "preferredContactChannel": "Phone", "remindersOptedOut": false,
+    "invoicing": { "personType": "Individual", "nationalIdMasked": "100******46", "taxNumberMasked": null,
+      "taxOffice": null, "legalName": null, "billingProvince": "İzmir", "billingDistrict": "Konak", "billingAddressLine": "…" }
   },
   "kvkkConsent": { "status": "Accepted", "recordedOn": "2026-01-02", "recordedByName": "Mehmet Kaya" },
   "pets": { "isTruncated": false, "items": [
     { "id": "guid", "name": "Pamuk", "speciesName": "Kedi", "breed": "Tekir", "gender": "Female",
       "birthDate": "2021-05-01", "isNeutered": true, "microchipNumber": "…", "passportOrTagNumber": null,
-      "status": "Active", "deceasedOn": null } ] },
+      "status": "Active", "deceasedOn": null, "hbsAnimalId": null } ] },
   "appointments": { "isTruncated": false, "items": [
     { "scheduledAtUtc": "…", "durationMinutes": 30, "petId": "guid", "petName": "Pamuk",
       "appointmentType": "Vaccination", "status": "Cancelled" } ] },
@@ -48,7 +50,8 @@ Amaç: KVKK bilgi talebinde klinik çalışanı müşteri kartından tek belge �
     { "prescribedAtUtc": "…", "title": "Reçete", "itemNames": ["İlaç A", "İlaç B"], "petId": "guid", "petName": "Pamuk" } ] },
   "charges": { "isTruncated": false, "items": [
     { "createdAtUtc": "…", "description": "Muayene", "petId": "guid", "petName": "Pamuk", "amount": 500.00,
-      "allocatedAmount": 200.00, "outstandingAmount": 300.00, "currency": "TRY", "isVoided": false, "voidedAtUtc": null } ] },
+      "allocatedAmount": 200.00, "outstandingAmount": 300.00, "currency": "TRY", "isVoided": false, "voidedAtUtc": null,
+      "lineKind": "Service", "vatRate": null } ] },
   "payments": { "isTruncated": false, "items": [
     { "paidAtUtc": "…", "amount": 200.00, "allocatedAmount": 200.00, "unallocatedAmount": 0.00, "currency": "TRY",
       "method": "Cash", "petId": null, "petName": null, "isVoided": false, "voidedAtUtc": null } ] },
@@ -68,6 +71,9 @@ Amaç: KVKK bilgi talebinde klinik çalışanı müşteri kartından tek belge �
 | `charges[].allocatedAmount` | Ödemeyle karşılanan (ödenen); `outstandingAmount` kalan |
 | `payments[].unallocatedAmount` | Ücrete bağlanmamış kısım |
 | `isVoided` / `voidedAtUtc` | İptal edilmiş ücret/ödeme; satır **işaretli dahil**, bakiyeye girmez |
+| `client.invoicing` | Fatura kimliği (ADR-036); TCKN/VKN **yalnız maskeli** (ilk 3 + son 2 hane). Bkz. `INVOICING_IDENTITY_API_CONTRACT.md` |
+| `pets[].hbsAnimalId` | HBS hayvan kimlik no (ADR-036) |
+| `charges[].lineKind` / `vatRate` | Satır türü (`Service`/`Product`) ve KDV oranı (null = klinik varsayılanı) |
 | `balance` | `GET /clients/{id}/balance` toplamlarıyla aynı kural (yalnız TRY, iptaller hariç, aynı klinik kapsamı); `unallocatedPaymentAmount` = bağlanmamış TRY ödemeler |
 
 İptal edilmiş randevu (`status = "Cancelled"`), gelmedi (`NoShow`) ve iptal edilmiş aşı (`status = "Cancelled"`) da kendi durumlarıyla dahildir.
