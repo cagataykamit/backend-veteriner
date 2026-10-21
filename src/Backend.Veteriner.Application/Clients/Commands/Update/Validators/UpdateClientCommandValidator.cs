@@ -37,5 +37,9 @@ public sealed class UpdateClientCommandValidator : AbstractValidator<UpdateClien
         RuleFor(x => x.PreferredContactChannel!.Value)
             .IsInEnum().WithMessage("Geçersiz iletişim kanalı.")
             .When(x => x.PreferredContactChannel.HasValue);
+
+        RuleFor(x => x.InvoicingIdentity!)
+            .SetValidator(new ClientInvoicingIdentityValidator())
+            .When(x => x.InvoicingIdentity is not null);
     }
 }

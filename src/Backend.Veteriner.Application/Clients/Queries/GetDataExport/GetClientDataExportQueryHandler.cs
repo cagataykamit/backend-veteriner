@@ -140,7 +140,8 @@ public sealed class GetClientDataExportQueryHandler
                 client.Address,
                 client.CreatedAtUtc,
                 client.PreferredContactChannel,
-                client.RemindersOptedOut),
+                client.RemindersOptedOut,
+                ClientInvoicingSummaryDto.From(client)),
             new ClientDataExportKvkkConsentDto(
                 client.KvkkConsentStatus,
                 client.KvkkConsentRecordedOn,
@@ -161,7 +162,9 @@ public sealed class GetClientDataExportQueryHandler
                 c.OutstandingAmount,
                 c.Currency,
                 c.IsVoided,
-                c.VoidedAtUtc))),
+                c.VoidedAtUtc,
+                c.LineKind,
+                c.VatRate))),
             Section(payments.Select(p => new ClientDataExportPaymentDto(
                 p.PaidAtUtc,
                 p.Amount,

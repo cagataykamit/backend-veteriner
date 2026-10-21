@@ -95,6 +95,13 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
         if (!preferences.IsSuccess)
             return preferences;
 
+        if (request.InvoicingIdentity is { } invoicing)
+        {
+            var applied = invoicing.ApplyTo(client);
+            if (!applied.IsSuccess)
+                return applied;
+        }
+
         client.UpdateDetails(request.FullName, request.Email, request.Phone, request.Address);
 
         try

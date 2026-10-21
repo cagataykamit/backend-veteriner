@@ -89,6 +89,13 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
         if (!preferences.IsSuccess)
             return Result<ClientCreatedDto>.Failure(preferences.Error);
 
+        if (request.InvoicingIdentity is { } invoicing)
+        {
+            var applied = invoicing.ApplyTo(client);
+            if (!applied.IsSuccess)
+                return Result<ClientCreatedDto>.Failure(applied.Error);
+        }
+
         await _clientsWrite.AddAsync(client, ct);
 
         // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).

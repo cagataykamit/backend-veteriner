@@ -22,6 +22,15 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         "Secret", "ApiKey", "ClientSecret", "Hash", "PasswordHash", "OneTimeCode"
     };
 
+    /// <summary>
+    /// TCKN/VKN taşıyan özellik adları (case-insensitive; ADR-036): değer <see cref="TurkishTaxIdentity.Mask"/> ile
+    /// yanıtlardaki gibi kısmen maskelenir.
+    /// </summary>
+    private static readonly HashSet<string> IdentityNumberPayloadKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "NationalId", "TaxNumber", "TaxIdentityNumber"
+    };
+
     private readonly IClientContext _client;
     private readonly IAuditLogWriter _auditLogWriter;
 
@@ -140,6 +149,8 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
                     writer.WritePropertyName(prop.Name);
                     if (SensitivePayloadKeys.Contains(prop.Name))
                         writer.WriteStringValue("***");
+                    else if (IdentityNumberPayloadKeys.Contains(prop.Name) && prop.Value.ValueKind == JsonValueKind.String)
+                        writer.WriteStringValue(TurkishTaxIdentity.Mask(prop.Value.GetString()));
                     else
                         WriteElementMaskingSensitive(writer, prop.Value);
                 }

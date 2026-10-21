@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Payments;
@@ -39,7 +40,8 @@ public sealed record ClientDataExportClientDto(
     string? Address,
     DateTime CreatedAtUtc,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ContactChannel PreferredContactChannel,
-    bool RemindersOptedOut);
+    bool RemindersOptedOut,
+    ClientInvoicingSummaryDto Invoicing);
 
 public sealed record ClientDataExportKvkkConsentDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] KvkkConsentStatus Status,
@@ -57,7 +59,8 @@ public sealed record ClientDataExportPetDto(
     string? MicrochipNumber,
     string? PassportOrTagNumber,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] PetStatus Status,
-    DateOnly? DeceasedOn);
+    DateOnly? DeceasedOn,
+    string? HbsAnimalId);
 
 public sealed record ClientDataExportAppointmentDto(
     DateTime ScheduledAtUtc,
@@ -112,7 +115,9 @@ public sealed record ClientDataExportChargeDto(
     decimal OutstandingAmount,
     string Currency,
     bool IsVoided,
-    DateTime? VoidedAtUtc);
+    DateTime? VoidedAtUtc,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] ChargeLineKind LineKind,
+    decimal? VatRate);
 
 /// <param name="IsVoided">İptal edilmiş ödeme; bakiyeye girmez.</param>
 public sealed record ClientDataExportPaymentDto(

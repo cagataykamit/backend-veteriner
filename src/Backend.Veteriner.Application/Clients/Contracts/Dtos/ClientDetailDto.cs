@@ -12,6 +12,7 @@ namespace Backend.Veteriner.Application.Clients.Contracts.Dtos;
 /// <param name="KvkkConsentTemplateVersion">İşaretleme anındaki açık rıza metni sürümü (ADR-032; 0 = varsayılan metin, null = bilinmiyor).</param>
 /// <param name="KvkkConsentTemplateHash">İşaretleme anındaki açık rıza metninin SHA-256 özeti (64 karakter hex) veya null.</param>
 /// <param name="RowVersion">Base64 kayıt sürümü; <c>PUT /clients/{id}/kvkk-consent</c> için zorunlu.</param>
+/// <param name="Invoicing">Fatura kimliği, TCKN/VKN maskeli (ADR-036).</param>
 public sealed record ClientDetailDto(
     Guid Id,
     Guid TenantId,
@@ -29,4 +30,5 @@ public sealed record ClientDetailDto(
     string? KvkkConsentRecordedByName,
     int? KvkkConsentTemplateVersion,
     string? KvkkConsentTemplateHash,
-    string RowVersion);
+    string RowVersion,
+    ClientInvoicingSummaryDto Invoicing);

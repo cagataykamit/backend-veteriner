@@ -33,7 +33,8 @@ public sealed class PetsForClientDataExportSpec : Specification<Pet, ClientDataE
             p.MicrochipNumber,
             p.PassportOrTagNumber,
             p.Status,
-            p.DeceasedOn));
+            p.DeceasedOn,
+            p.HbsAnimalId));
     }
 }
 

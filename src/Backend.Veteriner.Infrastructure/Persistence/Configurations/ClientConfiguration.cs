@@ -1,5 +1,6 @@
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -71,6 +72,33 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
             .IsUnicode(false)
             .IsFixedLength()
             .HasMaxLength(ClinicKvkkFormTemplate.TextHashLength);
+
+        // ADR-036 Dilim 1: fatura kimliği; tümü isteğe bağlı, mevcut satırlar boş kalır.
+        b.Property(x => x.PersonType)
+            .HasConversion<int?>();
+
+        b.Property(x => x.NationalId)
+            .IsUnicode(false)
+            .HasMaxLength(TurkishTaxIdentity.NationalIdLength);
+
+        b.Property(x => x.TaxNumber)
+            .IsUnicode(false)
+            .HasMaxLength(TurkishTaxIdentity.TaxNumberLength);
+
+        b.Property(x => x.TaxOffice)
+            .HasMaxLength(Client.MaxTaxOfficeLength);
+
+        b.Property(x => x.LegalName)
+            .HasMaxLength(Client.MaxLegalNameLength);
+
+        b.Property(x => x.BillingProvince)
+            .HasMaxLength(Client.MaxBillingProvinceLength);
+
+        b.Property(x => x.BillingDistrict)
+            .HasMaxLength(Client.MaxBillingDistrictLength);
+
+        b.Property(x => x.BillingAddressLine)
+            .HasMaxLength(Client.MaxBillingAddressLineLength);
 
         b.Property(x => x.RowVersion)
             .IsRowVersion()

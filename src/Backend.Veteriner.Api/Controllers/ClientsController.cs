@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Queries.GetById;
 using Backend.Veteriner.Application.Clients.Queries.GetBalance;
 using Backend.Veteriner.Application.Clients.Queries.GetDataExport;
+using Backend.Veteriner.Application.Clients.Queries.GetInvoicingIdentity;
 using Backend.Veteriner.Application.Clients.Queries.GetList;
 using Backend.Veteriner.Application.Clients.Queries.GetPaymentSummary;
 using Backend.Veteriner.Application.Clients.Queries.GetRecentSummary;
@@ -156,6 +157,25 @@ public sealed class ClientsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var result = await _mediator.Send(new GetClientByIdQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Düzenleme formu için fatura kimliği, TCKN/VKN tam değerle (ADR-036). Yalnız <c>Clients.Update</c>; diğer okuma uçları maskeli döner.
+    /// Her okuma audit'e yazılır (<c>Client.InvoicingIdentity.Read</c>). Bkz. docs/INVOICING_IDENTITY_API_CONTRACT.md.
+    /// </summary>
+    [HttpGet("{id:guid}/invoicing-identity")]
+    [Authorize(Policy = PermissionCatalog.Clients.Update)]
+    [ProducesResponseType(typeof(ClientInvoicingIdentityDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetInvoicingIdentity([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClientInvoicingIdentityQuery(id), ct);
         return result.ToActionResult(this);
     }
 

@@ -57,6 +57,36 @@ public sealed class Client : AggregateRoot
     /// <summary>İşaretleme anındaki açık rıza metninin SHA-256 özeti (64 karakter hex); <see cref="KvkkConsentTemplateVersion"/> ile birlikte dolu/boş.</summary>
     public string? KvkkConsentTemplateHash { get; private set; }
 
+    public const int MaxTaxOfficeLength = 100;
+    public const int MaxLegalNameLength = 300;
+    public const int MaxBillingProvinceLength = 80;
+    public const int MaxBillingDistrictLength = 80;
+    public const int MaxBillingAddressLineLength = 500;
+
+    /// <summary>Fatura alıcısı türü (ADR-036); <c>null</c> = belirtilmemiş. Fatura kimliği alanları yalnız <see cref="ApplyInvoicingIdentity"/> ile değişir.</summary>
+    public ClientPersonType? PersonType { get; private set; }
+
+    /// <summary>TCKN (yalnız bireysel); yanıtlarda maskeli döner (<see cref="TurkishTaxIdentity.Mask"/>).</summary>
+    public string? NationalId { get; private set; }
+
+    /// <summary>VKN (yalnız kurumsal); yanıtlarda maskeli döner.</summary>
+    public string? TaxNumber { get; private set; }
+
+    /// <summary>Vergi dairesi (yalnız kurumsal).</summary>
+    public string? TaxOffice { get; private set; }
+
+    /// <summary>Unvan (yalnız kurumsal).</summary>
+    public string? LegalName { get; private set; }
+
+    /// <summary>Fatura adresi: il.</summary>
+    public string? BillingProvince { get; private set; }
+
+    /// <summary>Fatura adresi: ilçe.</summary>
+    public string? BillingDistrict { get; private set; }
+
+    /// <summary>Fatura adresi: adres satırı.</summary>
+    public string? BillingAddressLine { get; private set; }
+
     /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
     public byte[] RowVersion { get; private set; } = default!;
 
@@ -105,6 +135,66 @@ public sealed class Client : AggregateRoot
             PreferredContactChannel = newChannel;
         if (remindersOptedOut is { } optedOut)
             RemindersOptedOut = optedOut;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Fatura kimliğini tam değiştirir (ADR-036 Dilim 1; tüm alanlar isteğe bağlı). Kişi türü yokken kimlik/vergi alanı,
+    /// bireyselde VKN/vergi dairesi/unvan, kurumsalda TCKN verilemez; TCKN ve VKN doluysa resmî sağlamadan geçmelidir
+    /// (<see cref="TurkishTaxIdentity"/>). Adres alanları kişi türünden bağımsızdır. Kural yalnızca burada yaşar.
+    /// </summary>
+    public Result ApplyInvoicingIdentity(
+        ClientPersonType? personType,
+        string? nationalId,
+        string? taxNumber,
+        string? taxOffice,
+        string? legalName,
+        string? billingProvince,
+        string? billingDistrict,
+        string? billingAddressLine)
+    {
+        if (personType is { } type && !Enum.IsDefined(type))
+            return InvoicingInvalid("Geçersiz kişi türü.");
+
+        var tckn = TurkishTaxIdentity.Normalize(nationalId);
+        var vkn = TurkishTaxIdentity.Normalize(taxNumber);
+        var office = NormalizeOptional(taxOffice);
+        var name = NormalizeOptional(legalName);
+        var province = NormalizeOptional(billingProvince);
+        var district = NormalizeOptional(billingDistrict);
+        var addressLine = NormalizeOptional(billingAddressLine);
+
+        var hasCorporateFields = vkn is not null || office is not null || name is not null;
+        switch (personType)
+        {
+            case null when tckn is not null || hasCorporateFields:
+                return InvoicingInvalid("Kişi türü seçilmeden kimlik veya vergi bilgisi girilemez.");
+            case ClientPersonType.Individual when hasCorporateFields:
+                return InvoicingInvalid("Bireysel müşteride VKN, vergi dairesi ve unvan girilmez.");
+            case ClientPersonType.Corporate when tckn is not null:
+                return InvoicingInvalid("Kurumsal müşteride TCKN girilmez; VKN kullanın.");
+        }
+
+        if (tckn is not null && !TurkishTaxIdentity.IsValidNationalId(tckn))
+            return InvoicingInvalid("TCKN geçersiz.");
+        if (vkn is not null && !TurkishTaxIdentity.IsValidTaxNumber(vkn))
+            return InvoicingInvalid("VKN geçersiz.");
+        if (office is { Length: > MaxTaxOfficeLength }
+            || name is { Length: > MaxLegalNameLength }
+            || province is { Length: > MaxBillingProvinceLength }
+            || district is { Length: > MaxBillingDistrictLength }
+            || addressLine is { Length: > MaxBillingAddressLineLength })
+            return InvoicingInvalid("Fatura bilgisi alanı izin verilen uzunluğu aşıyor.");
+
+        PersonType = personType;
+        NationalId = tckn;
+        TaxNumber = vkn;
+        TaxOffice = office;
+        LegalName = name;
+        BillingProvince = province;
+        BillingDistrict = district;
+        BillingAddressLine = addressLine;
+        UpdatedAtUtc = DateTime.UtcNow;
         return Result.Success();
     }
 
@@ -207,4 +297,10 @@ public sealed class Client : AggregateRoot
 
     private static string? NormalizeAddress(string? address)
         => string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static Result InvoicingInvalid(string message)
+        => Result.Failure("Clients.Validation", message);
 }
