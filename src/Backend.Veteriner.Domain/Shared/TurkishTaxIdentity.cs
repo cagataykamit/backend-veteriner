@@ -9,6 +9,9 @@ public static class TurkishTaxIdentity
     public const int NationalIdLength = 11;
     public const int TaxNumberLength = 10;
 
+    /// <summary>Mükellef kimliği (VKN veya TCKN) için saklama uzunluğu.</summary>
+    public const int TaxpayerIdentityMaxLength = NationalIdLength;
+
     private const int MaskVisiblePrefix = 3;
     private const int MaskVisibleSuffix = 2;
 

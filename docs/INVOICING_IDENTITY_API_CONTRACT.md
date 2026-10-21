@@ -31,16 +31,16 @@ Tüm alanlar **isteğe bağlı** (az zorunlu alan ilkesi); belge kesilirken eksi
 |---|---|---|
 | `personType` | `"Individual"` \| `"Corporate"` \| null | null = belirtilmemiş |
 | `nationalId` | string? (11) | Yalnız `Individual`; doluysa geçerli TCKN |
-| `taxNumber` | string? (10) | Yalnız `Corporate`; doluysa geçerli VKN |
+| `taxNumber` | string? (≤11) | Vergi numarası; yalnız `Corporate`; doluysa 10 haneli geçerli VKN **veya** 11 haneli geçerli TCKN (şahıs şirketi) — `TurkishTaxIdentity.IsValidTaxpayerIdentity` |
 | `taxOffice` | string? (≤100) | Yalnız `Corporate` |
 | `legalName` | string? (≤300) | Unvan; yalnız `Corporate` |
 | `billingProvince` | string? (≤80) | İl; kişi türünden bağımsız |
 | `billingDistrict` | string? (≤80) | İlçe |
 | `billingAddressLine` | string? (≤500) | Adres satırı |
 
-Tutarlılık (ihlal `Clients.Validation`, 400): kişi türü yokken TCKN/VKN/vergi dairesi/unvan verilemez; `Individual` iken VKN/vergi dairesi/unvan verilemez; `Corporate` iken TCKN verilemez. İstemci, kişi türü değişince gizlenen alanları boşaltıp gönderir. Boş/whitespace değer `null` saklanır.
+Tutarlılık (ihlal `Clients.Validation`, 400): kişi türü yokken TCKN/VKN/vergi dairesi/unvan verilemez; `Individual` iken VKN/vergi dairesi/unvan verilemez; `Corporate` iken `nationalId` verilemez. İstemci, kişi türü değişince gizlenen alanları boşaltıp gönderir. Boş/whitespace değer `null` saklanır.
 
-Şahıs şirketi (VKN yerine TCKN kullanan kurumsal alıcı) bu dilimde desteklenmez: `Corporate` yalnız 10 haneli VKN alır (açık soru, rapora bakınız).
+Şahıs şirketi (VKN yerine TCKN kullanan kurumsal alıcı): TCKN **`taxNumber`** alanına yazılır; kural uzunluğa göre seçilir (`nationalId` kurumsalda yine verilemez). Maskeleme iki uzunlukta aynıdır (`10000000146` → `100******46`). Alan hatası (`InvoicingIdentity.TaxNumber`): "Vergi numarası 10 haneli geçerli VKN veya 11 haneli geçerli TCKN olmalıdır."
 
 ### Yazma — `POST /clients` ve `PUT /clients/{id}`
 
@@ -182,5 +182,6 @@ Yazma, iç içe isteğe bağlı nesne `tax`:
 ## 7) Uygulama notları (sözleşme dışı bilgi)
 
 - Aydınlatma metni varsayılanı (`ClinicKvkkFormTemplateDefaults.DisclosureText`) fatura/e-belge amacı, TCKN/VKN veri kategorisi ve e-belge entegratörü alıcı grubuyla güncellendi (ürün deposu `legal/aydinlatma-metni.md` v0.2). Yalnız kaydı olmayan klinikte döner; kayıtlı klinik metinleri değişmez. Aydınlatma metninde sürüm kaydı yoktur; varsayılan metin `textVersion: 0` kalır, özet (`textHash`) değişir.
+- Migration: `WidenClientTaxNumberForNationalId` — `Clients.TaxNumber` `varchar(10)` → `varchar(11)` (kurumsal alıcıda TCKN); yazıldı, paylaşılan veritabanına uygulanmadı.
 - Migration: `AddInvoicingIdentityFields` — `Clients` (8 sütun), `Pets.HbsAnimalId`, `Charges.LineKind` (int, varsayılan 0 = Service) ve `Charges.VatRate` (`decimal(5,2)`), yeni tablo `ClinicTaxpayerSettings` (`TenantId, ClinicId` benzersiz; `DefaultVatRate decimal(5,2)`, `WithholdingRate decimal(5,2)`).
 - Query DB okuma modelleri ve outbox anlık görüntüleri bu alanları **taşımaz** (liste/arama yüzeyinde tam değer olmaması bilinçli).

@@ -163,7 +163,31 @@ public sealed class ClientInvoicingIdentityHandlerTests
         create.Errors.Should().ContainSingle(e => e.PropertyName == "InvoicingIdentity.NationalId")
             .Which.ErrorMessage.Should().Be("TCKN 11 haneli ve geçerli olmalıdır.");
         update.Errors.Should().ContainSingle(e => e.PropertyName == "InvoicingIdentity.TaxNumber")
-            .Which.ErrorMessage.Should().Be("VKN 10 haneli ve geçerli olmalıdır.");
+            .Which.ErrorMessage.Should().Be("Vergi numarası 10 haneli geçerli VKN veya 11 haneli geçerli TCKN olmalıdır.");
+    }
+
+    [Theory]
+    [InlineData(Vkn, true)]
+    [InlineData(Tckn, true)] // şahıs şirketi: vergi numarası olarak TCKN
+    [InlineData("12345678901", false)]
+    public void Validator_Should_Accept_Vkn_Or_Tckn_As_Corporate_Tax_Number(string taxNumber, bool valid)
+        => new UpdateClientCommandValidator().Validate(new UpdateClientCommand(
+                _clientId, "Mehmet Kaya",
+                InvoicingIdentity: new ClientInvoicingIdentityDto(ClientPersonType.Corporate, null, taxNumber, null, null, null, null, null)))
+            .Errors.Any(e => e.PropertyName == "InvoicingIdentity.TaxNumber").Should().Be(!valid);
+
+    [Fact]
+    public async Task Update_Should_Store_Tckn_As_Corporate_Tax_Number_And_Mask_It()
+    {
+        var soleProprietor = new ClientInvoicingIdentityDto(ClientPersonType.Corporate, null, Tckn, "Kadıköy VD", "Ayşe Yılmaz", null, null, null);
+
+        var result = await UpdateHandler().Handle(
+            new UpdateClientCommand(_clientId, "Ayşe Yılmaz", InvoicingIdentity: soleProprietor), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _existing.TaxNumber.Should().Be(Tckn);
+        _existing.NationalId.Should().BeNull();
+        ClientInvoicingSummaryDto.From(_existing).TaxNumberMasked.Should().Be("100******46");
     }
 
     [Fact]

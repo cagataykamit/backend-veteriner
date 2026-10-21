@@ -22,9 +22,9 @@ public sealed class ClientInvoicingIdentityValidator : AbstractValidator<ClientI
             .WithMessage("TCKN 11 haneli ve geçerli olmalıdır.");
 
         RuleFor(x => x.TaxNumber)
-            .Must(TurkishTaxIdentity.IsValidTaxNumber)
+            .Must(TurkishTaxIdentity.IsValidTaxpayerIdentity)
             .When(x => !string.IsNullOrWhiteSpace(x.TaxNumber))
-            .WithMessage("VKN 10 haneli ve geçerli olmalıdır.");
+            .WithMessage("Vergi numarası 10 haneli geçerli VKN veya 11 haneli geçerli TCKN olmalıdır.");
 
         RuleFor(x => x.TaxOffice)
             .MaximumLength(Client.MaxTaxOfficeLength)

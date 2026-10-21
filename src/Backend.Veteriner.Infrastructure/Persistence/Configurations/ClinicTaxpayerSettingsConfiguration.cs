@@ -16,7 +16,7 @@ public sealed class ClinicTaxpayerSettingsConfiguration : IEntityTypeConfigurati
         b.Property(x => x.TenantId).IsRequired();
         b.Property(x => x.ClinicId).IsRequired();
         b.Property(x => x.TaxpayerType).HasConversion<int?>();
-        b.Property(x => x.TaxIdentityNumber).IsUnicode(false).HasMaxLength(TurkishTaxIdentity.NationalIdLength);
+        b.Property(x => x.TaxIdentityNumber).IsUnicode(false).HasMaxLength(TurkishTaxIdentity.TaxpayerIdentityMaxLength);
         b.Property(x => x.TaxOffice).HasMaxLength(ClinicTaxpayerSettings.MaxTaxOfficeLength);
         b.Property(x => x.TaxpayerName).HasMaxLength(ClinicTaxpayerSettings.MaxTaxpayerNameLength);
         b.Property(x => x.Province).HasMaxLength(ClinicTaxpayerSettings.MaxProvinceLength);

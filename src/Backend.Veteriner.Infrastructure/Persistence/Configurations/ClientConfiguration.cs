@@ -83,7 +83,7 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
 
         b.Property(x => x.TaxNumber)
             .IsUnicode(false)
-            .HasMaxLength(TurkishTaxIdentity.TaxNumberLength);
+            .HasMaxLength(TurkishTaxIdentity.TaxpayerIdentityMaxLength);
 
         b.Property(x => x.TaxOffice)
             .HasMaxLength(Client.MaxTaxOfficeLength);

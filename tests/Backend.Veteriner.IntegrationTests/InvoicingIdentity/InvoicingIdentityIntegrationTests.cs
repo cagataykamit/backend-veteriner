@@ -99,6 +99,30 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
     }
 
     [Fact]
+    public async Task Corporate_Client_Should_Accept_Tckn_As_Tax_Number_And_Mask_It()
+    {
+        var ctx = await SeedAsync(EditorPermissions);
+
+        var clientId = await ctx.CreateClientAsync(new { personType = "Corporate", taxNumber = Tckn, taxOffice = "Kadıköy VD", legalName = "Ayşe Yılmaz" });
+
+        var detailBody = await ctx.Http.GetStringAsync($"/api/v1/clients/{clientId}");
+        JsonDocument.Parse(detailBody).RootElement.GetProperty("invoicing")
+            .GetProperty("taxNumberMasked").GetString().Should().Be(MaskedTckn);
+        detailBody.Should().NotContain(Tckn);
+        var full = await ctx.Http.GetFromJsonAsync<JsonElement>($"/api/v1/clients/{clientId}/invoicing-identity");
+        full.GetProperty("taxNumber").GetString().Should().Be(Tckn);
+        full.GetProperty("nationalId").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var invalid = await ctx.Http.PostAsJsonAsync("/api/v1/clients", new
+        {
+            fullName = "Geçersiz Vergi No",
+            invoicingIdentity = new { personType = "Corporate", taxNumber = "12345678901" },
+        });
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await invalid.Content.ReadAsStringAsync()).Should().Contain("10 haneli geçerli VKN veya 11 haneli geçerli TCKN");
+    }
+
+    [Fact]
     public async Task Invalid_Or_Inconsistent_Identity_Should_Return_400()
     {
         var ctx = await SeedAsync(EditorPermissions);

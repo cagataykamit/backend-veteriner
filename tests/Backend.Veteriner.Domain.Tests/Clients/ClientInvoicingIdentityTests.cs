@@ -45,6 +45,19 @@ public sealed class ClientInvoicingIdentityTests
     }
 
     [Fact]
+    public void Corporate_With_Valid_Tckn_As_Tax_Number_Should_Be_Stored()
+    {
+        var client = NewClient();
+
+        var result = client.ApplyInvoicingIdentity(
+            ClientPersonType.Corporate, null, $" {Tckn} ", "Kadıköy VD", "Ayşe Yılmaz Veteriner Kliniği", null, null, null);
+
+        result.IsSuccess.Should().BeTrue();
+        client.TaxNumber.Should().Be(Tckn);
+        client.NationalId.Should().BeNull();
+    }
+
+    [Fact]
     public void All_Fields_Optional_Including_Empty_Identity()
     {
         var client = NewClient();
@@ -73,6 +86,9 @@ public sealed class ClientInvoicingIdentityTests
     [InlineData(ClientPersonType.Corporate, Tckn, null, null, null)]
     [InlineData(ClientPersonType.Individual, "12345678901", null, null, null)]
     [InlineData(ClientPersonType.Corporate, null, "1234567891", null, null)]
+    [InlineData(ClientPersonType.Corporate, null, "12345678901", null, null)] // 11 hane ama geçersiz TCKN
+    [InlineData(ClientPersonType.Corporate, null, "123456789012", null, null)]
+    [InlineData(ClientPersonType.Individual, null, Tckn, null, null)] // bireyselde vergi numarası alanı yok
     public void Inconsistent_Or_Invalid_Identity_Should_Be_Rejected_Without_Change(
         ClientPersonType? type, string? tckn, string? vkn, string? office, string? legalName)
     {

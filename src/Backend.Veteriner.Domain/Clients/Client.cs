@@ -69,7 +69,7 @@ public sealed class Client : AggregateRoot
     /// <summary>TCKN (yalnız bireysel); yanıtlarda maskeli döner (<see cref="TurkishTaxIdentity.Mask"/>).</summary>
     public string? NationalId { get; private set; }
 
-    /// <summary>VKN (yalnız kurumsal); yanıtlarda maskeli döner.</summary>
+    /// <summary>Vergi numarası (yalnız kurumsal): 10 haneli VKN veya şahıs şirketinde 11 haneli TCKN; yanıtlarda maskeli döner.</summary>
     public string? TaxNumber { get; private set; }
 
     /// <summary>Vergi dairesi (yalnız kurumsal).</summary>
@@ -140,8 +140,9 @@ public sealed class Client : AggregateRoot
 
     /// <summary>
     /// Fatura kimliğini tam değiştirir (ADR-036 Dilim 1; tüm alanlar isteğe bağlı). Kişi türü yokken kimlik/vergi alanı,
-    /// bireyselde VKN/vergi dairesi/unvan, kurumsalda TCKN verilemez; TCKN ve VKN doluysa resmî sağlamadan geçmelidir
-    /// (<see cref="TurkishTaxIdentity"/>). Adres alanları kişi türünden bağımsızdır. Kural yalnızca burada yaşar.
+    /// bireyselde vergi numarası/vergi dairesi/unvan, kurumsalda TCKN alanı verilemez; TCKN doluysa geçerli TCKN, vergi
+    /// numarası doluysa geçerli VKN veya (şahıs şirketi) geçerli TCKN olmalıdır (<see cref="TurkishTaxIdentity"/>).
+    /// Adres alanları kişi türünden bağımsızdır. Kural yalnızca burada yaşar.
     /// </summary>
     public Result ApplyInvoicingIdentity(
         ClientPersonType? personType,
@@ -172,13 +173,13 @@ public sealed class Client : AggregateRoot
             case ClientPersonType.Individual when hasCorporateFields:
                 return InvoicingInvalid("Bireysel müşteride VKN, vergi dairesi ve unvan girilmez.");
             case ClientPersonType.Corporate when tckn is not null:
-                return InvoicingInvalid("Kurumsal müşteride TCKN girilmez; VKN kullanın.");
+                return InvoicingInvalid("Kurumsal müşteride TCKN alanı kullanılmaz; şahıs şirketi TCKN'sini vergi numarası olarak girin.");
         }
 
         if (tckn is not null && !TurkishTaxIdentity.IsValidNationalId(tckn))
             return InvoicingInvalid("TCKN geçersiz.");
-        if (vkn is not null && !TurkishTaxIdentity.IsValidTaxNumber(vkn))
-            return InvoicingInvalid("VKN geçersiz.");
+        if (vkn is not null && !TurkishTaxIdentity.IsValidTaxpayerIdentity(vkn))
+            return InvoicingInvalid("Vergi numarası geçersiz (10 haneli VKN veya 11 haneli TCKN).");
         if (office is { Length: > MaxTaxOfficeLength }
             || name is { Length: > MaxLegalNameLength }
             || province is { Length: > MaxBillingProvinceLength }
