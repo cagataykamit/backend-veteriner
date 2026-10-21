@@ -6,7 +6,8 @@ namespace Backend.Veteriner.Application.Clinics.KvkkFormTemplate;
 /// KVKK şablonlarının (açık rıza formu ve aydınlatma metni) varsayılanları ve yer tutucuları (ADR-021, ADR-024). Varsayılan metinler
 /// ürün ekibinin yazdığı, HUKUKİ ONAYDAN GEÇMEMİŞ taslaklardır (kaynak: ürün deposunda legal/acik-riza-metni.md ve
 /// legal/aydinlatma-metni.md; onay listesi: roadmap/HUKUKI-ONAY-LISTESI.md); klinik, Ayarlar'dan hukuk danışmanının onayladığı
-/// metinle değiştirir. Yalnız klinikte o türde kayıt yokken döner; kayıtlı metni ezmez.
+/// metinle değiştirir. Yalnız klinikte o türde kayıt yokken döner; kayıtlı metni ezmez. Aydınlatma varsayılanı legal/aydinlatma-metni.md
+/// v0.2 ile aynıdır (ADR-036: fatura/e-belge amacı ve TCKN/VKN).
 /// Yer tutucular istemcide (yazdırma görünümü) doldurulur. Adres, başvuru kanalı gibi kliniğin doldurması gereken yerler köşeli
 /// parantezle bırakılmıştır. Açık rıza formunda "Kabul ediyorum / Kabul etmiyorum" kutuları ve imza bloğu yazdırma görünümünün
 /// sabit düzenidir, metne konmaz.
@@ -57,7 +58,8 @@ public static class ClinicKvkkFormTemplateDefaults
         + "Veri sorumlusu {{clinicName}}'dır (Adres: [klinik adresi]; Telefon: [klinik telefonu]; E-posta: [klinik e-postası]; "
         + "Vergi/ticaret sicil bilgisi: [varsa]).\n\n"
         + "2. İşlenen kişisel veriler\n"
-        + "- Kimlik: ad, soyad, [T.C. kimlik numarası: yalnız gerekli olduğunda].\n"
+        + "- Kimlik: ad, soyad; yalnız fatura/e-belge için gerektiğinde T.C. kimlik numarası, kurumsal alıcıda vergi kimlik numarası, "
+        + "vergi dairesi ve unvan.\n"
         + "- İletişim: telefon, e-posta, adres.\n"
         + "- Müşteri işlem: hayvanınıza ilişkin hasta kaydı, randevu, muayene, tedavi, aşı ve uygulama kayıtları (bu kayıtlar sizinle "
         + "ilişkilendirilir), reçete ve belge bilgileri.\n"
@@ -65,7 +67,9 @@ public static class ClinicKvkkFormTemplateDefaults
         + "- İşlem güvenliği: sistem kullanım ve erişim kayıtları (yalnız kliniğin çalışanları için).\n\n"
         + "3. Kişisel verilerin işlenme amaçları\n"
         + "Veteriner hizmetinin sunulması ve takibi; randevu ve geliş süreçlerinin yürütülmesi; aşı, tedavi ve kontrol takibi; "
-        + "ücretlendirme, tahsilat ve faturalandırma; mevzuattan doğan kayıt, defter ve raporlama yükümlülüklerinin yerine getirilmesi; "
+        + "ücretlendirme, tahsilat ve faturalandırma; fatura/e-belge (e-Arşiv fatura, e-Fatura, e-Serbest Meslek Makbuzu) düzenlenmesi "
+        + "ve resmî bildirim yükümlülüklerinin yerine getirilmesi (kimlik/vergi numarası yalnız gerektiğinde); mevzuattan doğan kayıt, "
+        + "defter ve raporlama yükümlülüklerinin yerine getirilmesi; "
         + "sizinle hizmete ilişkin iletişim kurulması; hak taleplerinin ve uyuşmazlıkların yönetilmesi; bilgi güvenliğinin sağlanması.\n\n"
         + "4. Hukuki sebepler\n"
         + "Kanun'un 5/2 maddesindeki şu sebeplere dayanılır: (c) hizmet sözleşmesinin kurulması ve ifası için gerekli olması; "
@@ -79,7 +83,8 @@ public static class ClinicKvkkFormTemplateDefaults
         + "6. Kişisel verilerin aktarılması\n"
         + "Verileriniz, hizmetin gereği ve mevzuatın izin verdiği ölçüde şu alıcı gruplarına aktarılabilir: mevzuatın zorunlu kıldığı "
         + "hallerde yetkili kamu kurum ve kuruluşları (örneğin Tarım ve Orman Bakanlığı ve bağlı birimleri, vergi ve adli makamlar); "
-        + "kliniğin yetkili çalışanları; hizmet aldığımız yazılım, barındırma, ödeme ve bildirim (SMS/e-posta) sağlayıcıları (veri işleyen "
+        + "kliniğin yetkili çalışanları; hizmet aldığımız yazılım, barındırma, ödeme, e-belge (özel entegratör) ve bildirim (SMS/e-posta) "
+        + "sağlayıcıları (veri işleyen "
         + "olarak, yalnız bizim talimatımızla); laboratuvarlar ve sevk edilen sağlık kuruluşları; hukuk, mali müşavirlik ve denetim "
         + "danışmanlarımız. [Yurt dışına aktarım: yok / varsa Kanun'un 9. maddesine uygun mekanizma — klinik doldurur.]\n\n"
         + "7. Saklama süresi\n"
