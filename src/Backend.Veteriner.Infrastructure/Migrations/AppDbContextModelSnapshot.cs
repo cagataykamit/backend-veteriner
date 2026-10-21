@@ -1117,9 +1117,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("rowversion");
 
                     b.Property<string>("TaxNumber")
-                        .HasMaxLength(10)
+                        .HasMaxLength(11)
                         .IsUnicode(false)
-                        .HasColumnType("varchar(10)");
+                        .HasColumnType("varchar(11)");
 
                     b.Property<string>("TaxOffice")
                         .HasMaxLength(100)
