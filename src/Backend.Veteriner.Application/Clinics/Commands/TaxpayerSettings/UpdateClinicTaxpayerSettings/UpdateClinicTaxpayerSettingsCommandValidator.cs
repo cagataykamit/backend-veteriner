@@ -11,9 +11,8 @@ public sealed class UpdateClinicTaxpayerSettingsCommandValidator : AbstractValid
     {
         RuleFor(x => x.ClinicId).NotEmpty();
 
-        RuleFor(x => x.TaxpayerType!.Value)
-            .IsInEnum().WithMessage("Geçersiz mükellef türü.")
-            .When(x => x.TaxpayerType.HasValue);
+        RuleFor(x => x.TaxpayerType)
+            .IsInEnum().WithMessage("Geçersiz mükellef türü.");
 
         RuleFor(x => x.TaxIdentityNumber)
             .Must(TurkishTaxIdentity.IsValidTaxpayerIdentity)
@@ -23,13 +22,11 @@ public sealed class UpdateClinicTaxpayerSettingsCommandValidator : AbstractValid
         RuleFor(x => x.DefaultVatRate)
             .NotNull().WithMessage("Varsayılan KDV oranı zorunludur.");
 
-        RuleFor(x => x.DefaultVatRate!.Value)
-            .Must(TaxRatePercent.IsValid).WithMessage(TaxRatePercent.InvalidMessage)
-            .When(x => x.DefaultVatRate.HasValue);
+        RuleFor(x => x.DefaultVatRate)
+            .Must(TaxRatePercent.IsValidOptional).WithMessage(TaxRatePercent.InvalidMessage);
 
-        RuleFor(x => x.WithholdingRate!.Value)
-            .Must(TaxRatePercent.IsValid).WithMessage(TaxRatePercent.InvalidMessage)
-            .When(x => x.WithholdingRate.HasValue);
+        RuleFor(x => x.WithholdingRate)
+            .Must(TaxRatePercent.IsValidOptional).WithMessage(TaxRatePercent.InvalidMessage);
 
         RuleFor(x => x.TaxOffice).MaximumLength(ClinicTaxpayerSettings.MaxTaxOfficeLength);
         RuleFor(x => x.TaxpayerName).MaximumLength(ClinicTaxpayerSettings.MaxTaxpayerNameLength);

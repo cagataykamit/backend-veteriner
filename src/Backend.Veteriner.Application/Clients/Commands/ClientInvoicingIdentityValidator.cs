@@ -13,9 +13,8 @@ public sealed class ClientInvoicingIdentityValidator : AbstractValidator<ClientI
 {
     public ClientInvoicingIdentityValidator()
     {
-        RuleFor(x => x.PersonType!.Value)
-            .IsInEnum().WithMessage("Geçersiz kişi türü.")
-            .When(x => x.PersonType.HasValue);
+        RuleFor(x => x.PersonType)
+            .IsInEnum().WithMessage("Geçersiz kişi türü.");
 
         RuleFor(x => x.NationalId)
             .Must(TurkishTaxIdentity.IsValidNationalId)
