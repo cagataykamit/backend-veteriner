@@ -145,6 +145,10 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         if (!alerts.IsSuccess)
             return Result<Guid>.Failure(alerts.Error);
 
+        var hbs = pet.ApplyHbsAnimalId(request.HbsAnimalId);
+        if (!hbs.IsSuccess)
+            return Result<Guid>.Failure(hbs.Error);
+
         await _petsWrite.AddAsync(pet, ct);
 
         // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).

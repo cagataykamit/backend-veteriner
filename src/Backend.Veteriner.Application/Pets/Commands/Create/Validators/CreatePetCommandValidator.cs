@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Pets.Commands.Create;
+using Backend.Veteriner.Domain.Pets;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Pets.Commands.Create.Validators;
@@ -18,6 +19,7 @@ public sealed class CreatePetCommandValidator : AbstractValidator<CreatePetComma
         RuleFor(x => x.MicrochipNumber).MaximumLength(50);
         RuleFor(x => x.PassportOrTagNumber).MaximumLength(50);
         RuleFor(x => x.SpecialProtocolNumber).MaximumLength(50);
+        RuleFor(x => x.HbsAnimalId).MaximumLength(Pet.MaxHbsAnimalIdLength);
         RuleFor(x => x.Gender!.Value)
             .IsInEnum()
             .When(x => x.Gender.HasValue);

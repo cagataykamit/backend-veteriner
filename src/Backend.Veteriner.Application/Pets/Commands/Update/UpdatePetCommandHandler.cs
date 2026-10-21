@@ -116,6 +116,10 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         if (!alerts.IsSuccess)
             return Result.Failure(alerts.Error);
 
+        var hbs = pet.ApplyHbsAnimalId(request.HbsAnimalId);
+        if (!hbs.IsSuccess)
+            return hbs;
+
         pet.UpdateDetails(
             request.Name,
             request.SpeciesId,

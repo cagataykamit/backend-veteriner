@@ -47,6 +47,9 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
         b.Property(x => x.SpecialProtocolNumber)
             .HasMaxLength(50);
 
+        b.Property(x => x.HbsAnimalId)
+            .HasMaxLength(Pet.MaxHbsAnimalIdLength);
+
         b.Property(x => x.IsNeutered)
             .IsRequired()
             .HasDefaultValue(false);

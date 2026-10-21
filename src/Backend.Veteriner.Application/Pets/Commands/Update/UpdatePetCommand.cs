@@ -4,6 +4,7 @@ using MediatR;
 
 namespace Backend.Veteriner.Application.Pets.Commands.Update;
 
+/// <param name="HbsAnimalId">HBS hayvan kimlik no (ADR-036): <c>null</c> = dokunma, <c>""</c> = temizle.</param>
 public sealed record UpdatePetCommand(
     Guid Id,
     Guid ClientId,
@@ -21,5 +22,6 @@ public sealed record UpdatePetCommand(
     string? SpecialProtocolNumber = null,
     bool IsNeutered = false,
     IReadOnlyList<string>? AlertFlags = null,
-    string? AlertNote = null)
+    string? AlertNote = null,
+    string? HbsAnimalId = null)
     : IRequest<Result>;

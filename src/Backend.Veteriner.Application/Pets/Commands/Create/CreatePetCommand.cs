@@ -20,5 +20,6 @@ public sealed record CreatePetCommand(
     string? SpecialProtocolNumber = null,
     bool IsNeutered = false,
     IReadOnlyList<string>? AlertFlags = null,
-    string? AlertNote = null)
+    string? AlertNote = null,
+    string? HbsAnimalId = null)
     : IRequest<Result<Guid>>;

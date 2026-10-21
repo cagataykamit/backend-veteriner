@@ -12,6 +12,7 @@ namespace Backend.Veteriner.Domain.Pets;
 public sealed class Pet : AggregateRoot
 {
     public const int MaxAlertNoteLength = 200;
+    public const int MaxHbsAnimalIdLength = 50;
 
     /// <summary>
     /// Aynı müşteri + ad + tür mükerreri için karşılaştırma anahtarı (yalnız karşılaştırma; saklanan <see cref="Name"/> değişmez).
@@ -49,6 +50,9 @@ public sealed class Pet : AggregateRoot
 
     /// <summary>Özel protokol numarası; opsiyonel.</summary>
     public string? SpecialProtocolNumber { get; private set; }
+
+    /// <summary>HBS (Hayvan Bilgi Sistemi) hayvan kimlik numarası (ADR-036); opsiyonel serbest metin. Yalnız <see cref="ApplyHbsAnimalId"/> ile değişir.</summary>
+    public string? HbsAnimalId { get; private set; }
 
     /// <summary>Kısırlaştırılmış mı; varsayılan false.</summary>
     public bool IsNeutered { get; private set; }
@@ -193,6 +197,23 @@ public sealed class Pet : AggregateRoot
 
         AlertFlags = flags;
         AlertNote = newNote;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// HBS hayvan kimlik numarasını yazar; <c>null</c> mevcut değere dokunmaz (PUT tam değiştirme olduğu için alanı bilmeyen
+    /// eski istemci silmesin), boş/whitespace temizler. En çok <see cref="MaxHbsAnimalIdLength"/> karakter.
+    /// </summary>
+    public Result ApplyHbsAnimalId(string? hbsAnimalId)
+    {
+        if (hbsAnimalId is null)
+            return Result.Success();
+
+        var value = NormalizeOptionalIdentityNumber(hbsAnimalId);
+        if (value is { Length: > MaxHbsAnimalIdLength })
+            return Result.Failure("Pets.Validation", $"HBS kimlik numarası en çok {MaxHbsAnimalIdLength} karakter olabilir.");
+
+        HbsAnimalId = value;
         return Result.Success();
     }
 

@@ -28,4 +28,5 @@ public sealed record PetDetailDto(
     PetAlertsDto PetAlerts,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] PetStatus Status,
     DateOnly? DeceasedOn,
-    string RowVersion);
+    string RowVersion,
+    string? HbsAnimalId = null);

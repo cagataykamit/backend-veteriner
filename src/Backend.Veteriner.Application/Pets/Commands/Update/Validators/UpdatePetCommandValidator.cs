@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Pets;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Pets.Commands.Update.Validators;
@@ -16,6 +17,7 @@ public sealed class UpdatePetCommandValidator : AbstractValidator<UpdatePetComma
         RuleFor(x => x.Breed).MaximumLength(150);
         RuleFor(x => x.Notes).MaximumLength(2000);
         RuleFor(x => x.MicrochipNumber).MaximumLength(50);
+        RuleFor(x => x.HbsAnimalId).MaximumLength(Pet.MaxHbsAnimalIdLength);
         RuleFor(x => x.PassportOrTagNumber).MaximumLength(50);
         RuleFor(x => x.SpecialProtocolNumber).MaximumLength(50);
         RuleFor(x => x.Gender!.Value)
