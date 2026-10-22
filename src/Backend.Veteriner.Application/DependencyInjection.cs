@@ -3,11 +3,15 @@ using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
+using Backend.Veteriner.Application.Files;
+using Backend.Veteriner.Application.Files.Access;
+using Backend.Veteriner.Application.Imaging.Access;
 using Backend.Veteriner.Application.Imports;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Application.Imports.Validation;
+using Backend.Veteriner.Application.LabResults.Access;
 using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Invites;
 using Backend.Veteriner.Application.OwnerPortal.Sessions;
@@ -73,6 +77,13 @@ public static class DependencyInjection
         services.AddScoped<IPetTimelineSource, VaccinationTimelineSource>();
         services.AddScoped<IPetTimelineSource, HospitalizationTimelineSource>();
         services.AddScoped<IPetTimelineSource, AdministrationTimelineSource>();
+        services.AddScoped<IPetTimelineSource, ImagingTimelineSource>();
+
+        // Dosya katmanı (IMAGING_API_CONTRACT.md): sahip türü başına erişim kuralı, ortak okuma ve iptalde erişim kapatma.
+        services.AddScoped<IStoredFileOwnerAccess, ImagingRecordFileOwnerAccess>();
+        services.AddScoped<IStoredFileOwnerAccess, LabResultFileOwnerAccess>();
+        services.AddScoped<StoredFileContentReader>();
+        services.AddScoped<StoredFileAccessCloser>();
 
         // =========================================================
         // FluentValidation

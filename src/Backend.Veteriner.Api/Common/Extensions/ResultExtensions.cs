@@ -86,6 +86,23 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Dosya katmanı (IMAGING_API_CONTRACT.md §2/§5).
+        switch (normalized)
+        {
+            case "files.toolarge":
+                return (StatusCodes.Status413PayloadTooLarge, "https://httpstatuses.io/413");
+            case "files.unsupportedtype":
+                return (StatusCodes.Status415UnsupportedMediaType, "https://httpstatuses.io/415");
+            case "files.limitreached":
+                return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+            case "files.malwaredetected":
+                return (StatusCodes.Status422UnprocessableEntity, "https://httpstatuses.io/422");
+            case "files.storageunavailable":
+                return (StatusCodes.Status503ServiceUnavailable, "https://httpstatuses.io/503");
+            case "files.accessurlinvalid":
+                return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
         // Saklama süresi sonunda temizlenen satır verisi (ADR-019 K9).
         if (normalized is "imports.payloadpurged")
         {

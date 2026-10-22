@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Domain.Examinations;
+using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
 
@@ -69,4 +70,29 @@ internal static class ExaminationLinkedRecordLock
         => existing.ChangesIdentity(clinicId, petId, examinationId, testName)
             ? await EnsureOpenAsync(examinations, tenantId, [examinationId, existing.ExaminationId], ct)
             : Result.Success();
+
+    /// <summary>
+    /// Görüntüleme kaydı (ADR-013 uyumu): kesinleşmiş muayeneye yeni görüntüleme bağlamak serbesttir (Create bu denetimi çağırmaz).
+    /// Muayene kesinleştiğinde var olan kayıt o muayenenin parçasıdır: düzenlenemez, dosya almaz (kural <see cref="ImagingRecord.IsFrozenBy"/>).
+    /// Muayene bağı değişiyorsa mevcut/hedef muayene açık olmalıdır. Dosya eklemede <paramref name="examinationId"/> mevcut bağdır.
+    /// Gerekçeli iptal kilitli değildir.
+    /// </summary>
+    public static async Task<Result> EnsureImagingEditableAsync(
+        IReadRepository<Examination> examinations,
+        Guid tenantId,
+        ImagingRecord existing,
+        Guid? examinationId,
+        CancellationToken ct)
+    {
+        if (existing.ExaminationId is { } currentId)
+        {
+            var current = await examinations.FirstOrDefaultAsync(new ExaminationByIdSpec(tenantId, currentId), ct);
+            if (current is not null && existing.IsFrozenBy(current.FinalizedAtUtc))
+                return current.EnsureAcceptsLinkedRecords();
+        }
+
+        return existing.ExaminationId != examinationId
+            ? await EnsureOpenAsync(examinations, tenantId, [examinationId, existing.ExaminationId], ct)
+            : Result.Success();
+    }
 }

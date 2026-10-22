@@ -1,9 +1,12 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Files;
+using Backend.Veteriner.Application.Files.Specs;
 using Backend.Veteriner.Application.LabResults.Commands.Cancel;
 using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
+using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
@@ -21,6 +24,7 @@ public sealed class CancelLabResultCommandHandlerTests
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IRepository<LabResult>> _labResultsWrite = new();
+    private readonly Mock<IRepository<StoredFile>> _files = new();
 
     private readonly Guid _tid = Guid.NewGuid();
     private readonly Guid _cid = Guid.NewGuid();
@@ -35,6 +39,8 @@ public sealed class CancelLabResultCommandHandlerTests
             .ReturnsAsync(new Tenant("A"));
         _labResultsWrite.Setup(r => r.UpdateAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _labResultsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _files.Setup(r => r.ListAsync(It.IsAny<StoredFilesOpenByOwnerSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
 
     private CancelLabResultCommandHandler CreateHandler()
@@ -44,7 +50,8 @@ public sealed class CancelLabResultCommandHandlerTests
             _clientContext.Object,
             _scopeResolver.Object,
             _tenants.Object,
-            _labResultsWrite.Object);
+            _labResultsWrite.Object,
+            new StoredFileAccessCloser(_files.Object));
 
     private LabResult Setup(bool withResult)
     {

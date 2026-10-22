@@ -1,10 +1,12 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
+using Backend.Veteriner.Application.Files;
 using Backend.Veteriner.Application.LabResults.Access;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -22,6 +24,7 @@ public sealed class CancelLabResultCommandHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IRepository<LabResult> _labResultsWrite;
+    private readonly StoredFileAccessCloser _fileCloser;
 
     public CancelLabResultCommandHandler(
         ITenantContext tenantContext,
@@ -29,7 +32,8 @@ public sealed class CancelLabResultCommandHandler
         IClientContext clientContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
-        IRepository<LabResult> labResultsWrite)
+        IRepository<LabResult> labResultsWrite,
+        StoredFileAccessCloser fileCloser)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -37,6 +41,7 @@ public sealed class CancelLabResultCommandHandler
         _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _labResultsWrite = labResultsWrite;
+        _fileCloser = fileCloser;
     }
 
     public async Task<Result<LabResultWriteResultDto>> Handle(CancelLabResultCommand request, CancellationToken ct)
@@ -78,6 +83,9 @@ public sealed class CancelLabResultCommandHandler
         if (!cancelled.IsSuccess)
             return Result<LabResultWriteResultDto>.Failure(cancelled.Error);
 
+        // Ekli dosyaların erişimi aynı SaveChanges ile kapanır (görüntüleme iptaliyle aynı kural).
+        await _fileCloser.MarkOwnerFilesDeletedAsync(
+            tenantId, StoredFileOwnerType.LabResult, existing.Id, userId, existing.CancelledAtUtc!.Value, ct);
         existing.SetExpectedRowVersion(expectedRowVersion);
 
         try

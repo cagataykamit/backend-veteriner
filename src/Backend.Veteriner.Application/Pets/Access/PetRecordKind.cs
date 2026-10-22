@@ -14,5 +14,6 @@ public enum PetRecordKind
     Hospitalization = 7,
     Appointment = 8,
     Payment = 9,
-    Administration = 10
+    Administration = 10,
+    Imaging = 11
 }

@@ -159,6 +159,10 @@
     "FrontendBaseUrl": "http://localhost:4200"
   },
 
+  "FileStorage": {
+    "RootPath": "C:\\VetinityData\\files"
+  },
+
   "PermissionChange": {
     "RevokeSessionsOnPermissionChange": false
   },

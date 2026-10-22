@@ -16,6 +16,8 @@ using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.CareInstructions;
 using Backend.Veteriner.Domain.Hospitalizations;
+using Backend.Veteriner.Domain.Files;
+using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Legal;
@@ -115,6 +117,8 @@ public class AppDbContext : DbContext
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<LabResult> LabResults => Set<LabResult>();
+    public DbSet<ImagingRecord> ImagingRecords => Set<ImagingRecord>();
+    public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<Hospitalization> Hospitalizations => Set<Hospitalization>();
     public DbSet<CareInstruction> CareInstructions => Set<CareInstruction>();
     public DbSet<TenantBillingProfile> TenantBillingProfiles => Set<TenantBillingProfile>();

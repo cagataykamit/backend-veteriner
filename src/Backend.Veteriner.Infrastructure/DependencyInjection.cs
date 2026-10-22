@@ -65,6 +65,8 @@ using Backend.Veteriner.Infrastructure.Reminders;
 using Backend.Veteriner.Application.Imports.Commit;
 using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Infrastructure.Imports;
+using Backend.Veteriner.Application.Files;
+using Backend.Veteriner.Infrastructure.Files;
 using Microsoft.Extensions.Logging;
 using Backend.Veteriner.Infrastructure.Security;                                  // JwtOptions, JwtTokenService, Sha256TokenHashService, BcryptPasswordHasher, JwtOptionsProvider
 using Backend.Veteriner.Infrastructure.Web;                                       // ClientContext, TenantContext, ClinicContext, AppUrlProvider, HttpAuditContext, CurrentUserPermissionChecker
@@ -377,6 +379,24 @@ public static class DependencyInjection
         services.Configure<ImportMaintenanceOptions>(configuration.GetSection(ImportMaintenanceOptions.SectionName));
         services.AddSingleton<ImportMaintenanceProcessor>();
         services.AddHostedService<ImportMaintenanceHostedService>();
+
+        // ===== Dosya katmanı (IMAGING_API_CONTRACT.md): yerel disk deposu, imzalı URL, tarama yeri (v1'de yok), yarım yükleme temizliği =====
+        services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
+        services.AddSingleton<IFileStorage, LocalDiskFileStorage>();
+        services.AddSingleton<IFileAccessSigner, HmacFileAccessSigner>();
+        services.AddSingleton<IFileMalwareScanner, NoMalwareScanner>();
+        services.Configure<StoredFileMaintenanceOptions>(configuration.GetSection(StoredFileMaintenanceOptions.SectionName));
+        services.AddSingleton<StoredFileMaintenanceProcessor>();
+        services.AddHostedService<StoredFileMaintenanceHostedService>();
+
+        // ===== Dosya katmanı (IMAGING_API_CONTRACT.md): yerel disk deposu, imzalı URL, tarama yeri (v1 yok), yarım yükleme temizliği =====
+        services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
+        services.AddSingleton<IFileStorage, LocalDiskFileStorage>();
+        services.AddSingleton<IFileAccessSigner, HmacFileAccessSigner>();
+        services.AddSingleton<IFileMalwareScanner, NoMalwareScanner>();
+        services.Configure<StoredFileMaintenanceOptions>(configuration.GetSection(StoredFileMaintenanceOptions.SectionName));
+        services.AddSingleton<StoredFileMaintenanceProcessor>();
+        services.AddHostedService<StoredFileMaintenanceHostedService>();
 
         // ===== Permission options =====
         services.Configure<PermissionChangeOptions>(configuration.GetSection("PermissionChange"));

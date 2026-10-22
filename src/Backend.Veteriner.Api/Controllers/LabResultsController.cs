@@ -3,12 +3,18 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Files.Commands.Upload;
+using Backend.Veteriner.Application.Files.Contracts.Dtos;
+using Backend.Veteriner.Application.Files.Queries.CreateAccessUrl;
+using Backend.Veteriner.Application.Files.Queries.GetContent;
+using Backend.Veteriner.Application.Files.Queries.GetList;
 using Backend.Veteriner.Application.LabResults.Commands.Cancel;
 using Backend.Veteriner.Application.LabResults.Commands.Create;
 using Backend.Veteriner.Application.LabResults.Commands.Update;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Queries.GetById;
 using Backend.Veteriner.Application.LabResults.Queries.GetList;
+using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
@@ -157,6 +163,81 @@ public sealed class LabResultsController : ControllerBase
                 dateToUtc,
                 status),
             ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Lab sonucunun hazır dosyaları (PDF/fotoğraf), yükleme sırasına göre (docs/IMAGING_API_CONTRACT.md §5).</summary>
+    [HttpGet("{id:guid}/files")]
+    [Authorize(Policy = PermissionCatalog.LabResults.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<StoredFileDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetFiles([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetStoredFilesQuery(StoredFileOwnerType.LabResult, id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Lab sonucuna tek dosya yükler (<c>multipart/form-data</c>, alan <c>file</c>); iptal edilmiş kayda eklenemez.</summary>
+    [HttpPost("{id:guid}/files")]
+    [Authorize(Policy = PermissionCatalog.LabResults.Update)]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(StoredFileHttpResults.MaxRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = StoredFileHttpResults.MaxRequestBytes)]
+    [ProducesResponseType(typeof(StoredFileDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status415UnsupportedMediaType)]
+    public async Task<IActionResult> UploadFile([FromRoute] Guid id, [FromForm] StoredFileUploadForm form, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var valid = StoredFileHttpResults.ValidateUpload(form.File);
+        if (!valid.IsSuccess)
+            return valid.ToActionResult(this);
+
+        await using var content = form.File!.OpenReadStream();
+        var result = await _mediator.Send(
+            new UploadStoredFileCommand(StoredFileOwnerType.LabResult, id, form.File.FileName, form.File.Length, content),
+            ct);
+        return result.IsSuccess ? StatusCode(StatusCodes.Status201Created, result.Value) : result.ToActionResult(this);
+    }
+
+    /// <summary>Dosya akışı (Bearer). <c>download=true</c> → <c>attachment</c>.</summary>
+    [HttpGet("{id:guid}/files/{fileId:guid}/content")]
+    [Authorize(Policy = PermissionCatalog.LabResults.Read)]
+    [Produces("application/octet-stream", "application/problem+json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetFileContent(
+        [FromRoute] Guid id,
+        [FromRoute] Guid fileId,
+        [FromQuery] bool download = false,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetStoredFileContentQuery(StoredFileOwnerType.LabResult, id, fileId), ct);
+        return result.ToFileResult(this, download);
+    }
+
+    /// <summary><c>&lt;img src&gt;</c> için kısa ömürlü imzalı URL.</summary>
+    [HttpPost("{id:guid}/files/{fileId:guid}/access-url")]
+    [Authorize(Policy = PermissionCatalog.LabResults.Read)]
+    [ProducesResponseType(typeof(StoredFileAccessUrlDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CreateFileAccessUrl([FromRoute] Guid id, [FromRoute] Guid fileId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CreateStoredFileAccessUrlQuery(StoredFileOwnerType.LabResult, id, fileId), ct);
         return result.ToActionResult(this);
     }
 }
