@@ -26,7 +26,7 @@ Mevcut abonelik/ödeme akışı koddan okundu; tasarım bu bulgulara göre en k�
 
 1. **İndirim checkout'ta uygulanır:** `StartSubscriptionCheckout` brüt tutarı (yenileme fiyatı ya da yükseltme farkı) hesapladıktan sonra kiracının kod kullanımı penceredeyse indirimi düşer; sağlayıcıya **net** tutar gider. Brüt ve indirim checkout oturumuna yazılır (`GrossAmountMinor`, `DiscountAmountMinor`).
 2. **Komisyon tahsilat olayında işlenir:** checkout oturumu **webhook ile** tamamlandığında (`BillingActivationSource.Webhook`) kullanımına bir tahsilat satırı yazılır. Panel `finalize` (doğrulanmamış) ve `Manual` sağlayıcı komisyon üretmez.
-3. **12 ay penceresi ilk gerçek tahsilatla başlar** (deneme süresi sayılmaz): pencere = ilk tahsilat anı + 12 ay. Aylık: fiyatlandırma anı pencere içindeyse indirim/komisyon uygulanır (aylık yenilemede bu en çok 12 tahsilat demektir; pencere içindeki plan yükseltme fark tahsilatları da indirimlidir). Yıllık: yalnız etkin (iptal edilmemiş) tahsilatı olmayan kullanımın ilk tahsilatı indirimlidir. Yıllık ödeme ürün kararıdır (kullanıcı, 2026-10-22: taban 12 × aylık, tek tahsilat; kod indirimi bu tek tahsilata, komisyon tek seferlik) ancak **faturalandırma altyapısı yıllık dönemi desteklemiyor** (dönem sabit 1 ay, fiyat yapılandırması plan başına tek tutar, checkout'ta dönem seçimi yok). Yıllık dönem desteği bu işin kapsamında değildir (ayrı iş); indirim/komisyon kuralı yıllık dönemi doğru hesaplayacak şekilde domain'de hazırdır ve testlidir, checkout bugün her zaman `Monthly` geçer.
+3. **12 ay penceresi ilk gerçek tahsilatla başlar** (deneme süresi sayılmaz): pencere = ilk tahsilat anı + 12 ay. Aylık: fiyatlandırma anı pencere içindeyse indirim/komisyon uygulanır (aylık yenilemede bu en çok 12 tahsilat demektir; pencere içindeki plan yükseltme fark tahsilatları da indirimlidir). Yıllık: yalnız etkin (iptal edilmemiş) tahsilatı olmayan kullanımın ilk tahsilatı indirimlidir. Yıllık ödeme ürün kararıdır (kullanıcı, 2026-10-22 "B": yıllık fiyat = 10 ay fiyatı, tek tahsilat; kod indirimi yıllık indirimin üzerine kalan tutara uygulanır, komisyon tüm indirimler sonrası net üzerinden ve tek seferlik) ancak **faturalandırma altyapısı yıllık dönemi desteklemiyor** (dönem sabit 1 ay, fiyat yapılandırması plan başına tek tutar, checkout'ta dönem seçimi yok). Yıllık dönem desteği bu işin kapsamında değildir (ayrı iş); indirim/komisyon kuralı yıllık dönemi doğru hesaplayacak şekilde domain'de hazırdır ve testlidir, checkout bugün her zaman `Monthly` geçer.
 4. **Uygunluk fiyatlandırma anına göre** (checkout oturumunun oluşma anı) belirlenir; aynı kural indirim ve komisyonda tek yerde (`DiscountRedemption`) yaşar.
 5. **Net tutar = çekilen tutar** (yapılandırılan fiyat KDV hariç kabul edilir; ödemeye KDV eklenmiyor). Fiyata KDV eklenirse komisyon tabanı KDV'siz net olarak kalmalıdır (açık nokta).
 6. **İade/iptal elle işaretlenir:** sağlayıcıdan iade olayı gelmediği için platform yöneticisi tahsilat satırını "İptal" yapar (gerekçe zorunlu). Komisyonu henüz ödenmemiş satır hak edişten düşer; ödenmiş satır "geri alınacak" toplamına girer.
@@ -55,8 +55,10 @@ Kırp; boşlukları at; Türkçe harfleri ASCII'ye indir (`ı/i/İ→I`, `ş→S
 
 Kod aktif **ve** ortak aktif **ve** `validFromUtc ≤ şimdi` (doluysa) **ve** `şimdi < validUntilUtc` (doluysa) **ve** limit doluysa kullanım sayısı `< maxRedemptions`.
 
-### Hesap (tek yer: `DiscountRedemption`)
+### Hesap (tek yer: `SubscriptionPricing` + `DiscountRedemption`)
 
+- Sıra: plan fiyatı (aylık) → **yıllık indirim** (dönem yıllıksa liste 12 × aylık, çekilen 10 × aylık; "2 ay hediye") → **kod indirimi** (yüzde, kalan tutara) → net. Örn. Temel ₺999: yıllık ₺9.990; %10 kodla ₺8.991 (listeye göre ≈ %25).
+- "Brüt" (`grossAmountMinor`) = kod indirimi öncesi tutar (yıllıkta yıllık indirim sonrası); yükseltme farkı gibi plan fiyatından türemeyen tutarda dönem indirimi yoktur.
 - `indirim = round(brüt × indirim% / 100)` (uzaklaşarak yuvarlama), çekilen `net = max(1, brüt − indirim)`.
 - `komisyon = round(net × komisyon% / 100)`.
 - Uygunluk (fiyatlandırma anı `t`): pencere başlamamışsa uygun; aylıkta `t < windowEndsAtUtc`; yıllıkta etkin tahsilat yok ve (pencere yoksa ya da `t < windowEndsAtUtc`).
@@ -218,6 +220,6 @@ Tablolar: `SalesPartners`, `DiscountCodes` (benzersiz `NormalizedCode`), `Discou
 ## 8. Açık noktalar
 
 - Sağlayıcıdan iade/iptal olayı yok; iade elle işaretlenir.
-- Yıllık ödeme (ürün kararı var) faturalandırmada yok: dönem (1 yıl), yıllık fiyat (12 × aylık), checkout'ta dönem seçimi ve `ActivatePaidPlan`'da yıllık pencere ayrı iş; checkout dönemi `Yearly` geçince indirim/komisyon kuralı hazır.
+- Yıllık ödeme (ürün kararı var) faturalandırmada yok: dönem (1 yıl), yıllık fiyat (10 × aylık, `SubscriptionPricing` hazır), checkout'ta dönem seçimi ve `ActivatePaidPlan`'da yıllık pencere ayrı iş; checkout dönemi `Yearly` geçince indirim/komisyon kuralı hazır.
 - KDV ödeme tutarına eklenirse komisyon tabanı KDV'siz kalmalı.
 - Ortağın kendi satışını görmesi sonraki sürüm (ADR-037 madde 7).
