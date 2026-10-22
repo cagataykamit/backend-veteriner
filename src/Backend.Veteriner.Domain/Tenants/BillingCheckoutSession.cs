@@ -18,6 +18,12 @@ public sealed class BillingCheckoutSession : AggregateRoot
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
+    /// <summary>Satış ortağı kodu indirimi öncesi tahsilat tutarı (kuruş); fiyat kaydı olmayan eski oturumlarda <c>null</c>.</summary>
+    public long? GrossAmountMinor { get; private set; }
+
+    /// <summary>Uygulanan satış ortağı kodu indirimi (kuruş); çekilen tutar = brüt − indirim (ADR-037).</summary>
+    public long? DiscountAmountMinor { get; private set; }
+
     private BillingCheckoutSession() { }
 
     public static BillingCheckoutSession CreatePending(
@@ -44,6 +50,18 @@ public sealed class BillingCheckoutSession : AggregateRoot
             CreatedAtUtc = now,
             UpdatedAtUtc = null,
         };
+    }
+
+    /// <summary>Checkout başlarken hesaplanan tutar; tahsilat olayında komisyon bu kayıttan hesaplanır.</summary>
+    public void RecordPricing(long grossAmountMinor, long discountAmountMinor)
+    {
+        if (grossAmountMinor <= 0)
+            throw new ArgumentOutOfRangeException(nameof(grossAmountMinor), "Brüt tutar pozitif olmalı.");
+        if (discountAmountMinor < 0 || discountAmountMinor >= grossAmountMinor)
+            throw new ArgumentOutOfRangeException(nameof(discountAmountMinor), "İndirim 0 ile brüt tutar arasında olmalı.");
+
+        GrossAmountMinor = grossAmountMinor;
+        DiscountAmountMinor = discountAmountMinor;
     }
 
     public bool IsOpen(DateTime utcNow)

@@ -40,6 +40,8 @@ public sealed class BillingCheckoutSessionConfiguration : IEntityTypeConfigurati
         b.Property(x => x.ExpiresAtUtc);
         b.Property(x => x.CompletedAtUtc);
         b.Property(x => x.FailedAtUtc);
+        b.Property(x => x.GrossAmountMinor);
+        b.Property(x => x.DiscountAmountMinor);
 
         b.HasIndex(x => new { x.TenantId, x.Status, x.ExpiresAtUtc })
             .HasDatabaseName("IX_BillingCheckoutSessions_Tenant_OpenStatus");
