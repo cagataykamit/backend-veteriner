@@ -23,11 +23,12 @@ public sealed partial class LocalDiskFileStorage : IFileStorage
         var path = ResolvePath(storageKey);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
+        // CreateNew var olan dosyada hata verir; o durumda dosya bu çağrının değildir ve silinmez.
+        var target = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, BufferSize, FileOptions.Asynchronous);
         var completed = false;
         try
         {
-            await using (var target = new FileStream(
-                             path, FileMode.CreateNew, FileAccess.Write, FileShare.None, BufferSize, FileOptions.Asynchronous))
+            await using (target)
             {
                 await content.CopyToAsync(target, BufferSize, ct);
                 await target.FlushAsync(ct);
@@ -37,7 +38,7 @@ public sealed partial class LocalDiskFileStorage : IFileStorage
         }
         finally
         {
-            if (!completed && File.Exists(path))
+            if (!completed)
                 TryDelete(path);
         }
     }
