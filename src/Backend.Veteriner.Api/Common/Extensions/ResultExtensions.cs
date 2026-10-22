@@ -159,6 +159,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Satış ortağı komisyonu (ADR-037): ödenmiş/iptal satır yeniden "ödendi" işaretlenemez (durum çakışması).
+        if (normalized is "discountredemptions.commissionnotaccrued")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         if (normalized.Contains("sameplan") || normalized.Contains("notopen") || normalized.Contains("finalized"))
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
