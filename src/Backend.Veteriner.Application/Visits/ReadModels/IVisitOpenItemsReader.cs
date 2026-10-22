@@ -15,7 +15,8 @@ public enum OpenItemSources
     Vaccinations = 8,
     Hospitalizations = 16,
     LabResults = 32,
-    Charges = 64
+    Charges = 64,
+    Prescriptions = 128
 }
 
 public sealed record OpenItemsScope(Guid TenantId, Guid ClinicId, OpenItemSources Visible)
@@ -33,6 +34,7 @@ public sealed record OpenItemsScope(Guid TenantId, Guid ClinicId, OpenItemSource
         Add(OpenItemSources.Hospitalizations, PermissionCatalog.Hospitalizations.Read);
         Add(OpenItemSources.LabResults, PermissionCatalog.LabResults.Read);
         Add(OpenItemSources.Charges, PermissionCatalog.Charges.Read);
+        Add(OpenItemSources.Prescriptions, PermissionCatalog.Prescriptions.Read);
         return new OpenItemsScope(tenantId, clinicId, visible);
 
         void Add(OpenItemSources source, string permission)
@@ -57,11 +59,15 @@ public sealed record VisitOpenItems(
 /// <param name="UnchargedFromUtc">Ücretsiz ziyaret sayımı penceresi başlangıcı (dahil).</param>
 /// <param name="UnchargedToUtc">Ücretsiz ziyaret sayımı penceresi sonu (hariç).</param>
 /// <param name="IncompleteBeforeUtc">Bu andan önce gelip tamamlanmamış geliş sayılır (içinde bulunulan günün başlangıcı).</param>
+/// <param name="HbsFromUtc">"HBS'e girilmedi" sayım penceresi başlangıcı (dahil); null ise HBS sayıları hesaplanmaz (gün sonu).</param>
+/// <param name="HbsToUtc">"HBS'e girilmedi" sayım penceresi sonu (hariç).</param>
 public sealed record OpenItemsSummaryRequest(
     OpenItemsScope Scope,
     DateTime UnchargedFromUtc,
     DateTime UnchargedToUtc,
-    DateTime IncompleteBeforeUtc);
+    DateTime IncompleteBeforeUtc,
+    DateTime? HbsFromUtc = null,
+    DateTime? HbsToUtc = null);
 
 /// <summary>
 /// Açık iş göstergelerinin (ücret yok, ödeme bekliyor, lab bekliyor, tamamlanmamış geliş) tek hesap yeri.

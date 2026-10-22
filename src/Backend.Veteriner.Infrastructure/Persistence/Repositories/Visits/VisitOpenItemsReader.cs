@@ -1,5 +1,7 @@
+using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
@@ -111,7 +113,31 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         var incomplete = await OpenVisits(scope)
             .CountAsync(v => v.CareStatus != VisitCareStatus.Completed && v.ArrivedAtUtc < request.IncompleteBeforeUtc, ct);
 
-        return new OpenItemsSummaryDto(uncharged, outstandingVisits, outstandingAmount, awaitingLabs, incomplete);
+        // HBS'e girilmedi (ADR-036 Dilim 2): takip kapsamı HbsTracking'den; yalnız pencere verilmişse (Bugün).
+        int? hbsPrescriptions = null;
+        int? hbsVaccinations = null;
+        if (request is { HbsFromUtc: { } hbsFrom, HbsToUtc: { } hbsTo })
+        {
+            if (scope.Sees(OpenItemSources.Prescriptions))
+            {
+                hbsPrescriptions = await _db.Prescriptions.AsNoTracking()
+                    .Where(p => p.TenantId == scope.TenantId && p.ClinicId == scope.ClinicId
+                                && p.PrescribedAtUtc >= hbsFrom && p.PrescribedAtUtc < hbsTo)
+                    .Where(HbsTracking.PrescriptionWithStatus(HbsEntryStatus.NotEntered))
+                    .CountAsync(ct);
+            }
+
+            if (scope.Sees(OpenItemSources.Vaccinations))
+            {
+                hbsVaccinations = await _db.Vaccinations.AsNoTracking()
+                    .Where(v => v.TenantId == scope.TenantId && v.ClinicId == scope.ClinicId
+                                && v.AppliedAtUtc >= hbsFrom && v.AppliedAtUtc < hbsTo)
+                    .Where(HbsTracking.VaccinationTrackedWithStatus(HbsEntryStatus.NotEntered))
+                    .CountAsync(ct);
+            }
+        }
+
+        return new OpenItemsSummaryDto(uncharged, outstandingVisits, outstandingAmount, awaitingLabs, incomplete, hbsPrescriptions, hbsVaccinations);
     }
 
     /// <summary>Ücret varsa açık tutara, yoksa işlemin varlığına göre ziyaret ücret durumu (tek yer).</summary>

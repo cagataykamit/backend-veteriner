@@ -20,10 +20,15 @@ public sealed record OpenItemsSummaryDto(
     int? OutstandingVisitCount,
     decimal? OutstandingAmount,
     int? AwaitingLabCount,
-    int IncompleteVisitCount);
+    int IncompleteVisitCount,
+    int? HbsNotEnteredPrescriptionCount = null,
+    int? HbsNotEnteredVaccinationCount = null);
 
 public static class OpenItemsDefaults
 {
     /// <summary>Ücretsiz ziyaret sayımının geriye bakış penceresi (İstanbul günü); ücret sistemi öncesi kayıtlar sayıma girmez.</summary>
     public const int UnchargedLookbackDays = 30;
+
+    /// <summary>"HBS'e girilmedi" sayımının geriye bakış penceresi (İstanbul günü); HBS yardımcısı öncesi kayıtlar sayıma girmez (ADR-036).</summary>
+    public const int HbsLookbackDays = 30;
 }
