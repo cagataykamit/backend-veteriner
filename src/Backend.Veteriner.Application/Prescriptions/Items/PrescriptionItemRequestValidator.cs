@@ -16,6 +16,9 @@ public sealed class PrescriptionItemRequestValidator : AbstractValidator<Prescri
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("ProductId is invalid.");
         RuleFor(x => x.Instructions).MaximumLength(PrescriptionItem.InstructionsMaxLength);
+        RuleFor(x => x.Dose).MaximumLength(PrescriptionItem.DoseMaxLength);
+        RuleFor(x => x.Unit).MaximumLength(PrescriptionItem.UnitMaxLength);
+        RuleFor(x => x.LotNumber).MaximumLength(PrescriptionItem.LotNumberMaxLength);
         RuleFor(x => x.Quantity)
             .GreaterThan(0)
             .LessThanOrEqualTo(PrescriptionItem.QuantityMax)

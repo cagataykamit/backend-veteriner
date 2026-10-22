@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Application.Prescriptions.Items;
 
 /// <summary>
 /// Reçete satırı isteklerini domain girdisine çevirir: katalog ürünü kiracıda var ve aktif olmalı,
-/// ürün verilip ad boşsa ürün adı kopyalanır. Stok okunmaz/yazılmaz (reçete stok düşmez).
+/// ürün verilip ad/birim boşsa ürün adı/stok birimi kopyalanır. Stok okunmaz/yazılmaz (reçete stok düşmez).
 /// </summary>
 internal static class PrescriptionItemResolver
 {
@@ -25,6 +25,7 @@ internal static class PrescriptionItemResolver
         foreach (var item in items)
         {
             var name = item.Name;
+            var unit = item.Unit;
             if (item.ProductId is { } productId && productId != Guid.Empty)
             {
                 if (!productsById.TryGetValue(productId, out var product))
@@ -56,9 +57,12 @@ internal static class PrescriptionItemResolver
 
                 if (string.IsNullOrWhiteSpace(name))
                     name = product.Name;
+                if (string.IsNullOrWhiteSpace(unit))
+                    unit = product.Unit;
             }
 
-            drafts.Add(new PrescriptionItemDraft(name ?? string.Empty, item.ProductId, item.Instructions, item.Quantity));
+            drafts.Add(new PrescriptionItemDraft(
+                name ?? string.Empty, item.ProductId, item.Instructions, item.Quantity, item.Dose, unit, item.LotNumber));
         }
 
         return Result<IReadOnlyList<PrescriptionItemDraft>>.Success(drafts);

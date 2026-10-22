@@ -6,4 +6,7 @@ public sealed record PrescriptionItemDto(
     string Name,
     Guid? ProductId,
     string? Instructions,
-    decimal? Quantity);
+    decimal? Quantity,
+    string? Dose = null,
+    string? Unit = null,
+    string? LotNumber = null);

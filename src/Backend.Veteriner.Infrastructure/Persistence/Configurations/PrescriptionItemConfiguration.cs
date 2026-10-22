@@ -20,6 +20,9 @@ public sealed class PrescriptionItemConfiguration : IEntityTypeConfiguration<Pre
         b.Property(x => x.ProductId);
         b.Property(x => x.Instructions).HasMaxLength(PrescriptionItem.InstructionsMaxLength);
         b.Property(x => x.Quantity).HasPrecision(18, 3);
+        b.Property(x => x.Dose).HasMaxLength(PrescriptionItem.DoseMaxLength);
+        b.Property(x => x.Unit).HasMaxLength(PrescriptionItem.UnitMaxLength);
+        b.Property(x => x.LotNumber).HasMaxLength(PrescriptionItem.LotNumberMaxLength);
 
         b.HasIndex(x => x.PrescriptionId);
         b.HasIndex(x => x.ProductId);
