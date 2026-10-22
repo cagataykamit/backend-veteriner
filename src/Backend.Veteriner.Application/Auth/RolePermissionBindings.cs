@@ -120,6 +120,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.LabResults.Create,
                 PermissionCatalog.LabResults.Update,
 
+                PermissionCatalog.Imaging.Read,
+                PermissionCatalog.Imaging.Create,
+                PermissionCatalog.Imaging.Update,
+                PermissionCatalog.Imaging.Cancel,
+
                 PermissionCatalog.Hospitalizations.Read,
                 PermissionCatalog.Hospitalizations.Create,
                 PermissionCatalog.Hospitalizations.Update,
@@ -248,6 +253,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.LabResults.Read,
                 PermissionCatalog.LabResults.Create,
                 PermissionCatalog.LabResults.Update,
+
+                PermissionCatalog.Imaging.Read,
+                PermissionCatalog.Imaging.Create,
+                PermissionCatalog.Imaging.Update,
+                PermissionCatalog.Imaging.Cancel,
 
                 PermissionCatalog.Hospitalizations.Read,
                 PermissionCatalog.Hospitalizations.Create,
@@ -384,6 +394,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.LabResults.Create,
                 PermissionCatalog.LabResults.Update,
 
+                PermissionCatalog.Imaging.Read,
+                PermissionCatalog.Imaging.Create,
+                PermissionCatalog.Imaging.Update,
+                PermissionCatalog.Imaging.Cancel,
+
                 PermissionCatalog.Hospitalizations.Read,
                 PermissionCatalog.Hospitalizations.Create,
                 PermissionCatalog.Hospitalizations.Update,
@@ -484,6 +499,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.LabResults.Create,
                 PermissionCatalog.LabResults.Update,
 
+                PermissionCatalog.Imaging.Read,
+                PermissionCatalog.Imaging.Create,
+                PermissionCatalog.Imaging.Update,
+                PermissionCatalog.Imaging.Cancel,
+
                 PermissionCatalog.Hospitalizations.Read,
                 PermissionCatalog.Hospitalizations.Create,
                 PermissionCatalog.Hospitalizations.Update,
@@ -546,6 +566,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Treatments.Read,
                 PermissionCatalog.Prescriptions.Read,
                 PermissionCatalog.LabResults.Read,
+                PermissionCatalog.Imaging.Read,
                 PermissionCatalog.Hospitalizations.Read,
                 PermissionCatalog.CareInstructions.Read,
 

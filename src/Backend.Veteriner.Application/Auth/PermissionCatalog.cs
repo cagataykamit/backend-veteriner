@@ -183,6 +183,14 @@ public static class PermissionCatalog
         public const string Update = "LabResults.Update";
     }
 
+    public static class Imaging
+    {
+        public const string Read = "Imaging.Read";
+        public const string Create = "Imaging.Create";
+        public const string Update = "Imaging.Update";
+        public const string Cancel = "Imaging.Cancel";
+    }
+
     public static class Hospitalizations
     {
         public const string Read = "Hospitalizations.Read";
@@ -368,6 +376,11 @@ public static class PermissionCatalog
         new(LabResults.Read, "Laboratuvar sonuçlarını listeleme ve görüntüleme yetkisi", "LabResults"),
         new(LabResults.Create, "Laboratuvar sonucu oluşturma yetkisi", "LabResults"),
         new(LabResults.Update, "Laboratuvar sonucu güncelleme yetkisi", "LabResults"),
+
+        new(Imaging.Read, "Görüntüleme kayıtlarını ve dosyalarını listeleme ve görüntüleme yetkisi", "Imaging"),
+        new(Imaging.Create, "Görüntüleme kaydı oluşturma ve dosya yükleme yetkisi", "Imaging"),
+        new(Imaging.Update, "Görüntüleme kaydını güncelleme yetkisi", "Imaging"),
+        new(Imaging.Cancel, "Görüntüleme kaydını gerekçeyle iptal etme yetkisi", "Imaging"),
 
         new(Hospitalizations.Read, "Yatış kayıtlarını listeleme ve görüntüleme yetkisi", "Hospitalizations"),
         new(Hospitalizations.Create, "Yatış kaydı oluşturma yetkisi", "Hospitalizations"),
