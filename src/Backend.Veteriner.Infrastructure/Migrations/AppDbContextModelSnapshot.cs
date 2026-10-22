@@ -3441,6 +3441,210 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.SalesPartners.DiscountCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<decimal>("CommissionPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DeactivatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("MaxRedemptions")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NormalizedCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid>("SalesPartnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidFromUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidUntilUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_DiscountCodes_NormalizedCode");
+
+                    b.HasIndex("SalesPartnerId");
+
+                    b.ToTable("DiscountCodes", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.SalesPartners.DiscountRedemption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<decimal>("CommissionPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<Guid>("DiscountCodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime>("RedeemedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("SalesPartnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("WindowEndsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("WindowStartsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DiscountCodeId");
+
+                    b.HasIndex("SalesPartnerId");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_DiscountRedemptions_TenantId");
+
+                    b.ToTable("DiscountRedemptions", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.SalesPartners.DiscountRedemptionCollection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("BillingPeriod")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CheckoutSessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CollectedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("CommissionAmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("DiscountAmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("DiscountRedemptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("GrossAmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("NetAmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("PaidAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaidNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CheckoutSessionId")
+                        .IsUnique();
+
+                    b.HasIndex("DiscountRedemptionId");
+
+                    b.ToTable("DiscountRedemptionCollections", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.SalesPartners.SalesPartner", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("LinkedTenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NormalizedEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("SalesPartners", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.BillingCheckoutSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3459,6 +3663,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int>("CurrentPlanCode")
                         .HasColumnType("int");
 
+                    b.Property<long?>("DiscountAmountMinor")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime?>("ExpiresAtUtc")
                         .HasColumnType("datetime2");
 
@@ -3468,6 +3675,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<DateTime?>("FailedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<long?>("GrossAmountMinor")
+                        .HasColumnType("bigint");
 
                     b.Property<int>("Provider")
                         .HasColumnType("int");
@@ -4661,6 +4871,39 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.SalesPartners.DiscountCode", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.SalesPartners.SalesPartner", null)
+                        .WithMany()
+                        .HasForeignKey("SalesPartnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.SalesPartners.DiscountRedemption", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.SalesPartners.DiscountCode", null)
+                        .WithMany()
+                        .HasForeignKey("DiscountCodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.SalesPartners.SalesPartner", null)
+                        .WithMany()
+                        .HasForeignKey("SalesPartnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.SalesPartners.DiscountRedemptionCollection", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.SalesPartners.DiscountRedemption", null)
+                        .WithMany("Collections")
+                        .HasForeignKey("DiscountRedemptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.BillingCheckoutSession", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Tenants.Tenant", null)
@@ -4809,6 +5052,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
             modelBuilder.Entity("Backend.Veteriner.Domain.Sales.Sale", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.SalesPartners.DiscountRedemption", b =>
+                {
+                    b.Navigation("Collections");
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Users.User", b =>
