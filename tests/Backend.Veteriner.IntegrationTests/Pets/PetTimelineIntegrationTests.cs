@@ -145,7 +145,7 @@ public sealed class PetTimelineIntegrationTests : IClassFixture<CustomWebApplica
         var page = await ctx.GetTimelineAsync("");
 
         page.Items.Should().ContainSingle().Which.Type.Should().Be(PetRecordKind.Visit);
-        page.OmittedTypes.Should().BeEquivalentTo("Examination", "Treatment", "Prescription", "LabResult", "Vaccination", "Hospitalization", "Administration");
+        page.OmittedTypes.Should().BeEquivalentTo("Examination", "Treatment", "Prescription", "LabResult", "Vaccination", "Hospitalization", "Administration", "Imaging");
     }
 
     [Fact]
