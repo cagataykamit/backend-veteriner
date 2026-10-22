@@ -190,7 +190,8 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         var today = await ctx.GetTodayAsync();
 
-        today.OpenItems.Should().BeEquivalentTo(new OpenItemsSummaryDto(0, 0, 0m, 0, 0));
+        // HBS: Vaccinations.Read var (sayı 0), Prescriptions.Read yok (null).
+        today.OpenItems.Should().BeEquivalentTo(new OpenItemsSummaryDto(0, 0, 0m, 0, 0, HbsNotEnteredVaccinationCount: 0));
         today.Items.Should().BeEmpty();
     }
 

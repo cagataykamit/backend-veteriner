@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.Hbs;
 
 namespace Backend.Veteriner.Application.Reports.Registers.Hbs;
@@ -17,7 +18,7 @@ public sealed record HbsPrescriptionRegisterItemDto(
     string Title,
     string Medications,
     string? VeterinarianName,
-    HbsEntryStatus HbsStatus,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] HbsEntryStatus HbsStatus,
     string? ReferenceNumber,
     DateTime? MarkedAtUtc);
 
@@ -36,6 +37,6 @@ public sealed record HbsVaccinationRegisterItemDto(
     string? LotNumber,
     DateOnly? ExpiryDate,
     string? VeterinarianName,
-    HbsEntryStatus HbsStatus,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] HbsEntryStatus HbsStatus,
     string? ReferenceNumber,
     DateTime? MarkedAtUtc);

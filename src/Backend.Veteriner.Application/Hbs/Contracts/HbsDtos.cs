@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.Hbs;
 
 namespace Backend.Veteriner.Application.Hbs.Contracts;
@@ -12,7 +13,7 @@ public enum HbsRecordKind
 /// Kaydın HBS geri kaydı. <see cref="IsTracked"/>: kayıt HBS takibi kapsamında mı (takip dışı aşıda arayüz rozet göstermez).
 /// </summary>
 public sealed record HbsEntryDto(
-    HbsEntryStatus Status,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] HbsEntryStatus Status,
     string? ReferenceNumber,
     string? NotRequiredReason,
     DateTime? MarkedAtUtc,
@@ -27,7 +28,7 @@ public sealed record HbsDataSectionDto(string Key, string Title, IReadOnlyList<H
 
 /// <summary>HBS'e girilecek verinin hazır dizisi (sözleşme: HBS_ASSISTANT_API_CONTRACT.md bölüm 4).</summary>
 public sealed record HbsDataDto(
-    HbsRecordKind RecordKind,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] HbsRecordKind RecordKind,
     Guid RecordId,
     HbsEntryDto Hbs,
     bool OwnerIdentityMasked,

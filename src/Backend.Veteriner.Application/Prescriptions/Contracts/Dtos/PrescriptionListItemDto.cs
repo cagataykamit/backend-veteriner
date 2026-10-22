@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.Hbs;
 
 namespace Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
@@ -14,4 +15,4 @@ public sealed record PrescriptionListItemDto(
     Guid? ExaminationId,
     Guid? TreatmentId,
     DateTime? FollowUpDateUtc,
-    HbsEntryStatus? HbsStatus = null);
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] HbsEntryStatus? HbsStatus = null);

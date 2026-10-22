@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Vaccinations;
 
@@ -17,4 +18,4 @@ public sealed record VaccinationListItemDto(
     DateTime? DueAtUtc,
     VaccinationStatus Status,
     Guid? AdministrationId = null,
-    HbsEntryStatus? HbsStatus = null);
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] HbsEntryStatus? HbsStatus = null);
