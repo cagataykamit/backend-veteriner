@@ -1,4 +1,6 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Hbs;
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Vaccinations;
 using Microsoft.EntityFrameworkCore;
@@ -28,8 +30,11 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
         IReadOnlyCollection<Guid>? clientPetIds = null,
         DateTime? dateFromUtc = null,
         DateTime? dateToUtc = null,
-        ListSortChoice<VaccinationListSortField>? sort = null)
+        ListSortChoice<VaccinationListSortField>? sort = null,
+        HbsEntryStatus? hbsStatus = null)
     {
+        if (hbsStatus is { } hbs)
+            Query.Where(HbsTracking.VaccinationTrackedWithStatus(hbs));
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId);
         if (clinicId.HasValue)

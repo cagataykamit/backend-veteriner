@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
 using MediatR;
@@ -20,5 +21,6 @@ public sealed record GetVaccinationsListQuery(
     Guid? ClientId = null,
     DateTime? DateFromUtc = null,
     DateTime? DateToUtc = null,
-    bool OnlyReceivingCare = false)
+    bool OnlyReceivingCare = false,
+    HbsEntryStatus? HbsStatus = null)
     : IRequest<Result<PagedResult<VaccinationListItemDto>>>;

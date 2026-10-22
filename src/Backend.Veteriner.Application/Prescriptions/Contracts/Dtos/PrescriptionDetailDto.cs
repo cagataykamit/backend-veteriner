@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.Hbs.Contracts;
+
 namespace Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 
 public sealed record PrescriptionDetailDto(
@@ -17,4 +19,5 @@ public sealed record PrescriptionDetailDto(
     DateTime? FollowUpDateUtc,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
-    IReadOnlyList<PrescriptionItemDto> Items);
+    IReadOnlyList<PrescriptionItemDto> Items,
+    HbsEntryDto? Hbs = null);

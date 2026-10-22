@@ -12,6 +12,8 @@ namespace Backend.Veteriner.Application.Examinations.Access;
 /// Hem hedef hem mevcut (taşınan/ayrılan) muayene verilmelidir; muayenesi bulunamayanlar burada atlanır, varlık denetimi çağıranındır.
 /// Kontrollü istisna (ADR-013): uygulama kaydı (administration) bu kilide takılmaz; kesinleşmiş muayeneye gerekçeli "sonradan ekleme" olarak
 /// yazılır (kural <c>CreateAdministrationCommandHandler</c> ve <c>Administration.Create</c> içinde), tedavi/reçete/aşı/yatış kilidi değişmez.
+/// HBS geri kaydı (e-Reçete No / ATS seri no, ADR-036 Dilim 2) klinik içerik değildir; ayrı PATCH uçları bu kilidi çağırmaz
+/// (<c>UpdatePrescriptionHbsCommandHandler</c>, <c>UpdateVaccinationHbsCommandHandler</c>).
 /// </summary>
 internal static class ExaminationLinkedRecordLock
 {

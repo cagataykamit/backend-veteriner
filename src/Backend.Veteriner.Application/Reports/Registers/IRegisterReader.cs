@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Hbs;
+
 namespace Backend.Veteriner.Application.Reports.Registers;
 
 /// <summary>
@@ -14,7 +16,8 @@ public interface IRegisterReader<TRow>
 /// <param name="ToUtcExclusive">Hariç (İstanbul gün sınırı).</param>
 /// <param name="IncludeVoided">İptal edilmiş kayıtlar da gelsin (muayene: uygulama; aşı/ilaç: geri alınan giriş; aşı bilgi: uygulama).</param>
 /// <param name="ProductId">Yalnız Aşı Bilgi Raporu.</param>
-/// <param name="VeterinarianUserId">Yalnız Aşı Bilgi Raporu.</param>
+/// <param name="VeterinarianUserId">Aşı Bilgi Raporu ve HBS takip listeleri.</param>
+/// <param name="HbsStatus">Yalnız HBS takip listeleri; null = "Girilmedi".</param>
 public sealed record RegisterReadRequest(
     Guid TenantId,
     Guid? ClinicId,
@@ -25,7 +28,8 @@ public sealed record RegisterReadRequest(
     Guid? ProductId,
     Guid? VeterinarianUserId,
     int Skip,
-    int Take);
+    int Take,
+    HbsEntryStatus? HbsStatus = null);
 
 /// <param name="TotalCount">Süzgece uyan kayıt sayısı (tüm sayfalar).</param>
 public sealed record RegisterReadResult<TRow>(int TotalCount, IReadOnlyList<TRow> Items);

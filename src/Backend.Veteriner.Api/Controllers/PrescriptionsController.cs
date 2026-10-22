@@ -5,6 +5,10 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Prescriptions.Commands.Create;
 using Backend.Veteriner.Application.Prescriptions.Commands.Update;
+using Backend.Veteriner.Application.Prescriptions.Commands.UpdateHbs;
+using Backend.Veteriner.Application.Prescriptions.Queries.GetHbsData;
+using Backend.Veteriner.Application.Hbs.Contracts;
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 using Backend.Veteriner.Application.Prescriptions.Queries.GetById;
 using Backend.Veteriner.Application.Prescriptions.Queries.GetList;
@@ -104,8 +108,49 @@ public sealed class PrescriptionsController : ControllerBase
     }
 
     /// <summary>
+    /// HBS e-Reçete ekranına girilecek hazır veri (alan alan, kopyalanabilir). Sahip kimlik no tam değeri yalnız <c>Clients.Update</c> ile.
+    /// Her okuma denetim kaydına yazılır. Bkz. docs/HBS_ASSISTANT_API_CONTRACT.md bölüm 4.
+    /// </summary>
+    [HttpGet("{id:guid}/hbs-data")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
+    [ProducesResponseType(typeof(HbsDataDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetHbsData([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetPrescriptionHbsDataQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// e-Reçete geri kaydı (durum, e-Reçete No, "Gerekmiyor" gerekçesi). Kesinleşmiş muayeneye bağlı reçetede de çalışır; klinik içerik değişmez.
+    /// Bkz. docs/HBS_ASSISTANT_API_CONTRACT.md bölüm 5.
+    /// </summary>
+    [HttpPatch("{id:guid}/hbs")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(HbsEntryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateHbs([FromRoute] Guid id, [FromBody] UpdateHbsEntryBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new UpdatePrescriptionHbsCommand(id, body.Status, body.ReferenceNumber, body.NotRequiredReason), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
     /// Paged list. <c>search</c> (or <c>page.search</c>): title, content, notes, and pet/client name match (same pattern as treatments).
     /// Sorting: <c>sort=prescribedAtUtc</c>, <c>order=asc|desc</c>; other sort values return 400. Without sort: newest first.
+    /// <c>hbsStatus</c>: HBS durumu süzgeci (<c>NotEntered|Entered|NotRequired</c>); satırda <c>hbsStatus</c> döner.
     /// </summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
@@ -120,6 +165,7 @@ public sealed class PrescriptionsController : ControllerBase
         [FromQuery] Guid? petId = null,
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -132,7 +178,8 @@ public sealed class PrescriptionsController : ControllerBase
                 clinicId,
                 petId,
                 dateFromUtc,
-                dateToUtc),
+                dateToUtc,
+                hbsStatus),
             ct);
         return result.ToActionResult(this);
     }

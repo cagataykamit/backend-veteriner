@@ -1,20 +1,23 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Reports.Registers;
 
 /// <summary>Ham defter sorgusu (İstanbul takvim günleri, ikisi dahil); <see cref="RegisterReportRunner"/> doğrular ve çözer.</summary>
 /// <param name="ProductId">Yalnız Aşı Bilgi Raporu: ürün süzgeci.</param>
-/// <param name="VeterinarianUserId">Yalnız Aşı Bilgi Raporu: uygulamayı kaydeden veteriner süzgeci.</param>
+/// <param name="VeterinarianUserId">Aşı Bilgi Raporu ve HBS takip listeleri: geliş kaydındaki sorumlu hekim süzgeci.</param>
+/// <param name="HbsStatus">Yalnız HBS takip listeleri; verilmezse "Girilmedi" (HBS_ASSISTANT_API_CONTRACT.md bölüm 6).</param>
 public sealed record RegisterQuery(
     DateOnly From,
     DateOnly To,
     Guid? ClinicId,
     bool IncludeVoided,
     Guid? ProductId = null,
-    Guid? VeterinarianUserId = null);
+    Guid? VeterinarianUserId = null,
+    HbsEntryStatus? HbsStatus = null);
 
 /// <summary>Doğrulanmış ve klinik kapsamı çözülmüş süzgeç; JSON ve dışa aktarma tek yerden okur.</summary>
 internal sealed record RegisterReportFilter(
@@ -25,10 +28,11 @@ internal sealed record RegisterReportFilter(
     DateTime ToUtcExclusive,
     bool IncludeVoided,
     Guid? ProductId,
-    Guid? VeterinarianUserId)
+    Guid? VeterinarianUserId,
+    HbsEntryStatus? HbsStatus)
 {
     public RegisterReadRequest ToReadRequest(int skip, int take)
-        => new(TenantId, ClinicId, AccessibleClinicIds, FromUtc, ToUtcExclusive, IncludeVoided, ProductId, VeterinarianUserId, skip, take);
+        => new(TenantId, ClinicId, AccessibleClinicIds, FromUtc, ToUtcExclusive, IncludeVoided, ProductId, VeterinarianUserId, skip, take, HbsStatus);
 
     public static async Task<Result<RegisterReportFilter>> ResolveAsync(
         ITenantContext tenantContext,
@@ -86,6 +90,7 @@ internal sealed record RegisterReportFilter(
             OperationDayBounds.ForLocalDate(query.To).DayEndUtc,
             query.IncludeVoided,
             query.ProductId,
-            query.VeterinarianUserId));
+            query.VeterinarianUserId,
+            query.HbsStatus));
     }
 }

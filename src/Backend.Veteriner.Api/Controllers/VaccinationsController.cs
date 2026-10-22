@@ -5,6 +5,10 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Vaccinations.Commands.Create;
 using Backend.Veteriner.Application.Vaccinations.Commands.Update;
+using Backend.Veteriner.Application.Vaccinations.Commands.UpdateHbs;
+using Backend.Veteriner.Application.Vaccinations.Queries.GetHbsData;
+using Backend.Veteriner.Application.Hbs.Contracts;
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetById;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetList;
@@ -131,10 +135,51 @@ public sealed class VaccinationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>
+    /// HBS ATS ekranına girilecek hazır veri (alan alan, kopyalanabilir). Sahip kimlik no tam değeri yalnız <c>Clients.Update</c> ile.
+    /// Her okuma denetim kaydına yazılır. Bkz. docs/HBS_ASSISTANT_API_CONTRACT.md bölüm 4.
+    /// </summary>
+    [HttpGet("{id:guid}/hbs-data")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(HbsDataDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetHbsData([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetVaccinationHbsDataQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// ATS geri kaydı (durum, aşı uygulama belgesi seri no, "Gerekmiyor" gerekçesi); yalnız uygulanmış aşıda. Kesinleşmiş muayeneye bağlı
+    /// aşıda da çalışır; klinik içerik değişmez. Bkz. docs/HBS_ASSISTANT_API_CONTRACT.md bölüm 5.
+    /// </summary>
+    [HttpPatch("{id:guid}/hbs")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(HbsEntryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateHbs([FromRoute] Guid id, [FromBody] UpdateHbsEntryBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new UpdateVaccinationHbsCommand(id, body.Status, body.ReferenceNumber, body.NotRequiredReason), ct);
+        return result.ToActionResult(this);
+    }
+
     /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>): aşı adı, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>onlyOverdue</c>: planlı ve vadesi geçmiş aşılar (Scheduled, DueAtUtc bugünün İstanbul gün başından önce; bugün vadeli aşı saati geçse de gecikmiş değildir, ADR-028); açıkken istek <c>status</c> değerini yok sayar; vefat eden hayvanın aşısı çıkmaz. <c>onlyReceivingCare</c>: yalnız bakımdaki (vefat etmemiş) hayvanların aşıları; verilmezse tümü. <c>examinationId</c>: yalnız bu muayeneye bağlı aşılar (kiracı/klinik kapsamı yine uygulanır).
     /// <c>clientId</c>: yalnız bu müşterinin hayvanlarının aşıları. <c>dateFromUtc</c>/<c>dateToUtc</c> (iki uç dahil): birleşik tarih — Uygulandı ise <c>AppliedAtUtc</c>, değilse <c>DueAtUtc</c>
     /// (<c>dueFromUtc</c>/<c>dueToUtc</c>, <c>appliedFromUtc</c>/<c>appliedToUtc</c> geriye uyumluluk için korunur). Tüm süzgeçler AND.
-    /// Sıralama: <c>sort=dueAtUtc|appliedAtUtc</c> (<c>nextDueAtUtc</c> = <c>dueAtUtc</c>), <c>order=asc|desc</c>; tarihi boş kayıtlar sonda. Sort yoksa birleşik tarih azalan.</summary>
+    /// Sıralama: <c>sort=dueAtUtc|appliedAtUtc</c> (<c>nextDueAtUtc</c> = <c>dueAtUtc</c>), <c>order=asc|desc</c>; tarihi boş kayıtlar sonda. Sort yoksa birleşik tarih azalan.
+    /// <c>hbsStatus</c>: HBS durumu süzgeci; yalnız takipteki (uygulanmış, içe aktarılmamış) aşılar eşleşir. Satırda <c>hbsStatus</c> takip dışı aşıda null.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
     [ProducesResponseType(typeof(PagedResult<VaccinationListItemDto>), StatusCodes.Status200OK)]
@@ -155,6 +200,7 @@ public sealed class VaccinationsController : ControllerBase
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
         [FromQuery] bool onlyReceivingCare = false,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -176,7 +222,8 @@ public sealed class VaccinationsController : ControllerBase
                 clientId,
                 dateFromUtc,
                 dateToUtc,
-                onlyReceivingCare),
+                onlyReceivingCare,
+                hbsStatus),
             ct);
         return result.ToActionResult(this);
     }

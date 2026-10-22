@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
@@ -173,7 +174,8 @@ public sealed class GetVaccinationsListQueryHandler
                 notReceivingCarePetIds,
                 clientPetIds,
                 request.DateFromUtc,
-                request.DateToUtc),
+                request.DateToUtc,
+                request.HbsStatus),
             ct);
         MarkStep("vaccinationsCount");
 
@@ -199,7 +201,8 @@ public sealed class GetVaccinationsListQueryHandler
                 clientPetIds,
                 request.DateFromUtc,
                 request.DateToUtc,
-                sort),
+                sort,
+                request.HbsStatus),
             ct);
         MarkStep("vaccinationsPage");
 
@@ -250,7 +253,8 @@ public sealed class GetVaccinationsListQueryHandler
                     v.AppliedAtUtc,
                     v.DueAtUtc,
                     v.Status,
-                    administrationByVaccinationId.TryGetValue(v.Id, out var administrationId) ? administrationId : null);
+                    administrationByVaccinationId.TryGetValue(v.Id, out var administrationId) ? administrationId : null,
+                    HbsTracking.IsTracked(v) ? v.HbsStatus : null);
             })
             .ToList();
 

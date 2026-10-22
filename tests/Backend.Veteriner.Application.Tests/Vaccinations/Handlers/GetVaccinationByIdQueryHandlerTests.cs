@@ -2,6 +2,7 @@ using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Products;
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tests;
@@ -48,7 +49,8 @@ public sealed class GetVaccinationByIdQueryHandlerTests
             new Mock<IReadRepository<Product>>().Object,
             new Mock<IReadRepository<StockBatch>>().Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            new Mock<IClinicVeterinarianReader>().Object);
 
     private void SetupTenant(Guid tenantId) => _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
 

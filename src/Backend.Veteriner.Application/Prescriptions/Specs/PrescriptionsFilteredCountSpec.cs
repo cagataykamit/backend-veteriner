@@ -1,4 +1,6 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Hbs;
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Prescriptions;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,8 +16,11 @@ public sealed class PrescriptionsFilteredCountSpec : Specification<Prescription>
         DateTime? dateToUtc,
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
-        IReadOnlyCollection<Guid>? accessibleClinicIds = null)
+        IReadOnlyCollection<Guid>? accessibleClinicIds = null,
+        HbsEntryStatus? hbsStatus = null)
     {
+        if (hbsStatus is { } hbs)
+            Query.Where(HbsTracking.PrescriptionWithStatus(hbs));
         Query.Where(p => p.TenantId == tenantId);
         if (clinicId.HasValue)
         {

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Hbs.Contracts;
 using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
@@ -19,4 +20,5 @@ public sealed record VaccinationDetailDto(
     string? Notes,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
-    VaccinationAdministrationDto? Administration = null);
+    VaccinationAdministrationDto? Administration = null,
+    HbsEntryDto? Hbs = null);

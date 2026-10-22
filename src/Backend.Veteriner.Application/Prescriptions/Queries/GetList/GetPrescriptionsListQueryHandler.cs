@@ -111,7 +111,8 @@ public sealed class GetPrescriptionsListQueryHandler
                 request.DateToUtc,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                request.HbsStatus),
             ct);
 
         var rows = await _prescriptions.ListAsync(
@@ -126,7 +127,8 @@ public sealed class GetPrescriptionsListQueryHandler
                 searchPattern,
                 searchPetIds,
                 accessibleClinicIds,
-                PrescriptionListSort.Catalog.Resolve(request.PageRequest)),
+                PrescriptionListSort.Catalog.Resolve(request.PageRequest),
+                request.HbsStatus),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
@@ -162,7 +164,8 @@ public sealed class GetPrescriptionsListQueryHandler
                     pr.Title,
                     pr.ExaminationId,
                     pr.TreatmentId,
-                    pr.FollowUpDateUtc);
+                    pr.FollowUpDateUtc,
+                    pr.HbsStatus);
             })
             .ToList();
 

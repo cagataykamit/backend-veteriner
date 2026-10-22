@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Prescriptions.Queries.GetById;
@@ -43,7 +44,8 @@ public sealed class GetPrescriptionByIdQueryHandlerTests
             _userClinics.Object,
             _prescriptions.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            new Mock<IClinicVeterinarianReader>().Object);
 
     private void SetupTenant(Guid tenantId) => _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
 

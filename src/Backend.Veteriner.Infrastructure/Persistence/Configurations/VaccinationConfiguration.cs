@@ -1,4 +1,6 @@
 using Backend.Veteriner.Domain.Catalog;
+using Backend.Veteriner.Domain.Hbs;
+using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Vaccinations;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +28,14 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
         b.Property(x => x.Notes).HasMaxLength(4000);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
+
+        // HBS ATS geri kaydı (ADR-036 Dilim 2); mevcut kayıtlar Girilmedi (0) başlar.
+        b.Property(x => x.HbsStatus).IsRequired();
+        b.Property(x => x.HbsReferenceNumber).HasMaxLength(HbsEntryRules.ReferenceNumberMaxLength);
+        b.Property(x => x.HbsNotRequiredReason).HasMaxLength(CorrectionReason.MaxLength);
+        b.Property(x => x.HbsMarkedAtUtc);
+        b.Property(x => x.HbsMarkedByUserId);
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.HbsStatus });
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.PetId });

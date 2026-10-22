@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 
@@ -10,5 +11,6 @@ public sealed record GetPrescriptionsListQuery(
     Guid? ClinicId = null,
     Guid? PetId = null,
     DateTime? DateFromUtc = null,
-    DateTime? DateToUtc = null)
+    DateTime? DateToUtc = null,
+    HbsEntryStatus? HbsStatus = null)
     : IRequest<Result<PagedResult<PrescriptionListItemDto>>>;

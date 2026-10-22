@@ -1,4 +1,6 @@
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Prescriptions;
+using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -25,6 +27,14 @@ public sealed class PrescriptionConfiguration : IEntityTypeConfiguration<Prescri
         b.Property(x => x.FollowUpDateUtc);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
+
+        // HBS geri kaydı (ADR-036 Dilim 2); mevcut kayıtlar Girilmedi (0) başlar.
+        b.Property(x => x.HbsStatus).IsRequired();
+        b.Property(x => x.HbsReferenceNumber).HasMaxLength(HbsEntryRules.ReferenceNumberMaxLength);
+        b.Property(x => x.HbsNotRequiredReason).HasMaxLength(CorrectionReason.MaxLength);
+        b.Property(x => x.HbsMarkedAtUtc);
+        b.Property(x => x.HbsMarkedByUserId);
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.HbsStatus });
 
         b.HasMany(x => x.Items)
             .WithOne()

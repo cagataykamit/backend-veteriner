@@ -1,7 +1,9 @@
 using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Application.StockBatches.Specs;
@@ -31,6 +33,7 @@ public sealed class GetVaccinationByIdQueryHandler
     private readonly IReadRepository<StockBatch> _batches;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IClinicVeterinarianReader _names;
 
     public GetVaccinationByIdQueryHandler(
         ITenantContext tenantContext,
@@ -43,8 +46,10 @@ public sealed class GetVaccinationByIdQueryHandler
         IReadRepository<Product> products,
         IReadRepository<StockBatch> batches,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IClinicVeterinarianReader names)
     {
+        _names = names;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clientContext = clientContext;
@@ -141,7 +146,8 @@ public sealed class GetVaccinationByIdQueryHandler
             v.Notes,
             v.CreatedAtUtc,
             v.UpdatedAtUtc,
-            administrationDto);
+            administrationDto,
+            await HbsEntryDtoFactory.ForVaccinationAsync(v, _names, ct));
         return Result<VaccinationDetailDto>.Success(dto);
     }
 }

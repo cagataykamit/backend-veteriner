@@ -1,6 +1,8 @@
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 using Backend.Veteriner.Application.Prescriptions.Specs;
@@ -23,6 +25,7 @@ public sealed class GetPrescriptionByIdQueryHandler
     private readonly IReadRepository<Prescription> _prescriptions;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IClinicVeterinarianReader _names;
 
     public GetPrescriptionByIdQueryHandler(
         ITenantContext tenantContext,
@@ -32,8 +35,10 @@ public sealed class GetPrescriptionByIdQueryHandler
         IUserClinicRepository userClinics,
         IReadRepository<Prescription> prescriptions,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IClinicVeterinarianReader names)
     {
+        _names = names;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clientContext = clientContext;
@@ -106,8 +111,9 @@ public sealed class GetPrescriptionByIdQueryHandler
             p.UpdatedAtUtc,
             p.Items
                 .OrderBy(i => i.SortOrder)
-                .Select(i => new PrescriptionItemDto(i.Id, i.SortOrder, i.Name, i.ProductId, i.Instructions, i.Quantity))
-                .ToList());
+                .Select(i => new PrescriptionItemDto(i.Id, i.SortOrder, i.Name, i.ProductId, i.Instructions, i.Quantity, i.Dose, i.Unit, i.LotNumber))
+                .ToList(),
+            await HbsEntryDtoFactory.ForPrescriptionAsync(p, _names, ct));
 
         return Result<PrescriptionDetailDto>.Success(dto);
     }

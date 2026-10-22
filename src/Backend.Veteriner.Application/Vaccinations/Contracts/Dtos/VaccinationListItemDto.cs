@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
@@ -15,4 +16,5 @@ public sealed record VaccinationListItemDto(
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,
     VaccinationStatus Status,
-    Guid? AdministrationId = null);
+    Guid? AdministrationId = null,
+    HbsEntryStatus? HbsStatus = null);

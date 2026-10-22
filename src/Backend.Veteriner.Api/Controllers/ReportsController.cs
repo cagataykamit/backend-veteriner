@@ -17,11 +17,13 @@ using Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.GetOutst
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Reports.Registers.ControlledSubstances;
 using Backend.Veteriner.Application.Reports.Registers.Examinations;
+using Backend.Veteriner.Application.Reports.Registers.Hbs;
 using Backend.Veteriner.Application.Reports.Registers.Medications;
 using Backend.Veteriner.Application.Reports.Registers.Prescriptions;
 using Backend.Veteriner.Application.Reports.Registers.VaccineInfo;
 using Backend.Veteriner.Application.Reports.Registers.Vaccines;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Shared;
@@ -848,6 +850,114 @@ public sealed class ReportsController : ControllerBase
             new ExportVaccineInfoRegisterQuery(
                 new RegisterQuery(from, to, clinicId, includeVoided, productId, veterinarianId), RegisterExportFormat.Xlsx),
             ct);
+
+    /// <summary>
+    /// HBS takibi — reçeteler (sayfalı; ADR-036 Dilim 2). <c>hbsStatus</c> verilmezse "Girilmedi" (iş listesi); <c>veterinarianId</c> geliş
+    /// sorumlu hekimi. Bkz. docs/HBS_ASSISTANT_API_CONTRACT.md bölüm 6.
+    /// </summary>
+    [HttpGet("registers/hbs-prescriptions")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
+    [ProducesResponseType(typeof(RegisterReadResult<HbsPrescriptionRegisterItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> GetHbsPrescriptionRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
+        CancellationToken ct = default)
+        => SendRegisterAsync(
+            new GetHbsPrescriptionRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), page, pageSize), ct);
+
+    /// <summary>HBS takibi — reçeteler CSV (UTF-8 BOM, <c>;</c>, Excel TR). Süzgeçler JSON ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/hbs-prescriptions/export")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportHbsPrescriptionRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportHbsPrescriptionRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), RegisterExportFormat.Csv), ct);
+
+    /// <summary>HBS takibi — reçeteler Excel. Süzgeçler CSV ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/hbs-prescriptions/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportHbsPrescriptionRegisterXlsx(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportHbsPrescriptionRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), RegisterExportFormat.Xlsx), ct);
+
+    /// <summary>
+    /// HBS takibi — aşılar (sayfalı; ADR-036 Dilim 2): yalnız uygulanmış ve içe aktarılmamış aşılar. <c>hbsStatus</c> verilmezse "Girilmedi".
+    /// </summary>
+    [HttpGet("registers/hbs-vaccinations")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(RegisterReadResult<HbsVaccinationRegisterItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> GetHbsVaccinationRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
+        CancellationToken ct = default)
+        => SendRegisterAsync(
+            new GetHbsVaccinationRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), page, pageSize), ct);
+
+    /// <summary>HBS takibi — aşılar CSV (UTF-8 BOM, <c>;</c>, Excel TR). Süzgeçler JSON ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/hbs-vaccinations/export")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportHbsVaccinationRegister(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportHbsVaccinationRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), RegisterExportFormat.Csv), ct);
+
+    /// <summary>HBS takibi — aşılar Excel. Süzgeçler CSV ile aynı; sayfa yok.</summary>
+    [HttpGet("registers/hbs-vaccinations/export-xlsx")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportHbsVaccinationRegisterXlsx(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportHbsVaccinationRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), RegisterExportFormat.Xlsx), ct);
+
+    private static RegisterQuery HbsRegisterQuery(DateOnly from, DateOnly to, Guid? clinicId, Guid? veterinarianId, HbsEntryStatus? hbsStatus)
+        => new(from, to, clinicId, IncludeVoided: false, VeterinarianUserId: veterinarianId, HbsStatus: hbsStatus);
 
     private async Task<IActionResult> SendRegisterAsync<T>(IRequest<Result<RegisterReadResult<T>>> request, CancellationToken ct)
     {

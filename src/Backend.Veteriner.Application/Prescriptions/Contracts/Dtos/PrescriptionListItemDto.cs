@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Hbs;
+
 namespace Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 
 public sealed record PrescriptionListItemDto(
@@ -11,4 +13,5 @@ public sealed record PrescriptionListItemDto(
     string Title,
     Guid? ExaminationId,
     Guid? TreatmentId,
-    DateTime? FollowUpDateUtc);
+    DateTime? FollowUpDateUtc,
+    HbsEntryStatus? HbsStatus = null);

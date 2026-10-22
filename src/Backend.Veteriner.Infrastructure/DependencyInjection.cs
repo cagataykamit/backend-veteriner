@@ -49,6 +49,9 @@ using Backend.Veteriner.Application.Reports.OutstandingBalances;
 using Backend.Veteriner.Application.Reports.DailyTransactions;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Reports.Registers.ControlledSubstances;
+using Backend.Veteriner.Application.Reports.Registers.Hbs;
+using Backend.Veteriner.Application.Hbs;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories.Hbs;
 using Backend.Veteriner.Application.Reports.Registers.Examinations;
 using Backend.Veteriner.Application.Reports.Registers.Medications;
 using Backend.Veteriner.Application.Reports.Registers.Prescriptions;
@@ -188,6 +191,9 @@ public static class DependencyInjection
         services.AddScoped<IRegisterReader<MedicationRegisterItemDto>, MedicationRegisterReader>();
         services.AddScoped<IRegisterReader<ControlledSubstanceRegisterItemDto>, ControlledSubstanceRegisterReader>();
         services.AddScoped<IRegisterReader<VaccineInfoRegisterItemDto>, VaccineInfoRegisterReader>();
+        services.AddScoped<IRegisterReader<HbsPrescriptionRegisterItemDto>, HbsPrescriptionRegisterReader>();
+        services.AddScoped<IRegisterReader<HbsVaccinationRegisterItemDto>, HbsVaccinationRegisterReader>();
+        services.AddScoped<IHbsSourceReader, HbsSourceReader>();
         services.AddScoped<IOutbox, EfOutbox>();
 
 
