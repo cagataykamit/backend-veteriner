@@ -26,4 +26,10 @@ public static class AuthorizationPolicyNames
     /// kullanıcıya açıktır. PUT <c>Clinics.Update</c> ile korunur.
     /// </summary>
     public const string ClinicsKvkkFormRead = "Clinics_KvkkFormRead";
+
+    /// <summary>
+    /// Platform yöneticisi (Vetinity'nin kendi yönetimi): JWT'de <c>platform_admin = true</c> claim'i gerekir. İzin tabanlı değildir;
+    /// <c>PlatformAdmin</c> claim'i tüm izinlere bağlı olduğundan izinle klinik yöneticisinden ayrılamaz. Satış ortağı uçları (ADR-037).
+    /// </summary>
+    public const string PlatformAdmin = "Platform_Admin";
 }

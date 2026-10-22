@@ -158,7 +158,7 @@ Tümü `Authorize(Policy = "Platform_Admin")`: JWT'de `platform_admin = true` ge
 - `revenueNetMinor`: etkin tahsilatların net toplamı (program kapsamındaki ciro).
 - `commissionEarnedMinor` = bekleyen + ödenen; `commissionClawbackMinor`: komisyonu ödendikten sonra iptal edilen satırların komisyonu (ortaktan geri alınacak).
 
-Detay (`GET …/{id}`) ortak alanlarına ek olarak `codes` dizisi döner.
+Detay (`GET …/{id}`): `{ "partner": { …yukarıdaki ortak yanıtı… }, "codes": [ …kod yanıtları… ] }`.
 
 ### Kod gövdesi ve yanıtı
 

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Api.Contracts;
+using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.LegalAcceptances.Queries.GetCurrentVersions;
 using Backend.Veteriner.Application.Public.Commands.AcceptInvite;
@@ -8,10 +9,13 @@ using Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Application.Public.Queries.InviteDetail;
+using Backend.Veteriner.Application.SalesPartners.Contracts;
+using Backend.Veteriner.Application.SalesPartners.Queries.ValidateCode;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Backend.Veteriner.Api.Controllers;
 
@@ -51,11 +55,23 @@ public sealed class PublicController : ControllerBase
             body.ClinicCity,
             body.Email,
             body.Password,
-            body.AcceptedLegalDocuments);
+            body.AcceptedLegalDocuments,
+            body.DiscountCode);
 
         var result = await _mediator.Send(command, ct);
         return result.ToActionResult(this);
     }
+
+    /// <summary>
+    /// Satış ortağı kodu doğrulama (ADR-037): her zaman 200; geçersiz her durumda aynı gövde, ortak bilgisi yok. IP bazlı hız sınırlı.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("discount-codes/validate")]
+    [EnableRateLimiting(RateLimitingExtensions.DiscountCodeValidatePolicy)]
+    [ProducesResponseType(typeof(DiscountCodeValidationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ValidateDiscountCode([FromBody] DiscountCodeBody? body, CancellationToken ct)
+        => Ok(await _mediator.Send(new ValidateDiscountCodeQuery(body?.Code), ct));
 
     /// <summary>Hukuki belgelerin güncel sürümleri (ADR-029); hukuki sayfalar ve kayıt formu sürümü buradan gösterir.</summary>
     [AllowAnonymous]

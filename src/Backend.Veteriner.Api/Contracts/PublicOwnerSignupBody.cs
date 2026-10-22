@@ -13,4 +13,7 @@ public sealed class PublicOwnerSignupBody
 
     /// <summary>Kabul edilen belgeler ve sürümleri; Kullanım Şartları, Gizlilik ve Veri İşleme'nin güncel sürümü zorunlu (ADR-029).</summary>
     public List<LegalDocumentAcceptanceInput>? AcceptedLegalDocuments { get; set; }
+
+    /// <summary>İsteğe bağlı satış ortağı kodu (ADR-037); geçersizse 400 <c>DiscountCodes.Invalid</c>.</summary>
+    public string? DiscountCode { get; set; }
 }

@@ -13,6 +13,8 @@ namespace Backend.Veteriner.Api.Middleware;
 
 public static class RateLimitingExtensions
 {
+    public const string DiscountCodeValidatePolicy = "discount-code-validate";
+
     public static IServiceCollection AddAppRateLimiting(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -254,6 +256,22 @@ public static class RateLimitingExtensions
 
             // -- CONTACT: spam korumas�
             options.AddPolicy("contact", httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- İNDİRİM KODU DOĞRULAMA (ADR-037): anonim; kod numaralandırmasına karşı IP bazlı tavan.
+            options.AddPolicy(DiscountCodeValidatePolicy, httpContext =>
             {
                 var key = GetClientIp(httpContext);
                 return RateLimitPartition.GetSlidingWindowLimiter(

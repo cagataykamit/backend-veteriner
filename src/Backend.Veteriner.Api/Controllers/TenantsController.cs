@@ -29,6 +29,9 @@ using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionCheckout;
 using Backend.Veteriner.Application.Tenants.Queries.GetAccessState;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionSummary;
 using Backend.Veteriner.Application.Tenants.Queries.GetPendingPlanChange;
+using Backend.Veteriner.Application.SalesPartners.Commands.ApplySubscriptionCode;
+using Backend.Veteriner.Application.SalesPartners.Contracts;
+using Backend.Veteriner.Application.SalesPartners.Queries.GetSubscriptionDiscount;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using System.Collections.Generic;
@@ -614,6 +617,40 @@ public sealed class TenantsController : ControllerBase
 
         var result = await _mediator.Send(
             new FinalizeSubscriptionCheckoutCommand(tenantId, checkoutSessionId, body?.ExternalReference), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Kiracının satış ortağı kodu durumu (ADR-037); ortak bilgisi ve komisyon dönmez.</summary>
+    [HttpGet("{tenantId:guid}/subscription-discount")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Read)]
+    [ProducesResponseType(typeof(SubscriptionDiscountDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetSubscriptionDiscount([FromRoute] Guid tenantId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetSubscriptionDiscountQuery(tenantId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>İlk ücretli ödemeden önce satış ortağı kodu girer (ADR-037 madde 5).</summary>
+    [HttpPost("{tenantId:guid}/subscription-discount")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(SubscriptionDiscountDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ApplySubscriptionDiscount(
+        [FromRoute] Guid tenantId,
+        [FromBody] DiscountCodeBody? body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ApplySubscriptionDiscountCodeCommand(tenantId, body?.Code ?? string.Empty), ct);
         return result.ToActionResult(this);
     }
 
