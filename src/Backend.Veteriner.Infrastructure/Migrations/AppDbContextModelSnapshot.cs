@@ -2561,6 +2561,23 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime?>("FollowUpDateUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("HbsMarkedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("HbsMarkedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("HbsNotRequiredReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("HbsReferenceNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("HbsStatus")
+                        .HasColumnType("int");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
@@ -2599,6 +2616,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "TreatmentId");
 
+                    b.HasIndex("TenantId", "ClinicId", "HbsStatus");
+
                     b.ToTable("Prescriptions", (string)null);
                 });
 
@@ -2607,9 +2626,17 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Dose")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("Instructions")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2628,6 +2655,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.HasKey("Id");
 
@@ -3799,6 +3830,23 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ExaminationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("HbsMarkedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("HbsMarkedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("HbsNotRequiredReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("HbsReferenceNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("HbsStatus")
+                        .HasColumnType("int");
+
                     b.Property<Guid?>("ImportBatchId")
                         .HasColumnType("uniqueidentifier");
 
@@ -3846,6 +3894,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "PetId");
 
                     b.HasIndex("TenantId", "Status");
+
+                    b.HasIndex("TenantId", "ClinicId", "HbsStatus");
 
                     b.ToTable("Vaccinations", (string)null);
                 });
