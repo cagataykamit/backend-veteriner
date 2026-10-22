@@ -10,6 +10,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA5_DISCOVERY.md` (D2, D3,
 
 - **Reçete satırı (`PrescriptionItem`)**: reçetenin bir kalemi. **Serbest ad** + **opsiyonel katalog ürün bağı** (D2): dışarıdan temin edilen veya katalogda olmayan ilaç yalnız adla yazılabilir.
 - **Reçete stok DÜŞMEZ** (K3). Satır oluşturma, güncelleme ve ürün bağı hiçbir stok hareketi üretmez ve stok okumaz. Stok tüketimi yalnız Uygulama kaydındadır (Dilim 2).
+- **Güncelleme (ADR-036 Dilim 2):** satıra isteğe bağlı `dose`, `unit`, `lotNumber` eklendi; ayrıntı `HBS_ASSISTANT_API_CONTRACT.md` bölüm 2. Aşağıdaki D4 notu tarihseldir.
 - **Birim yok (D4)**: satırda birim, lot, son kullanma alanı yoktur. `quantity` birimsizdir; katalog ürüne bağlıysa anlamı ürünün stok birimidir, serbest satırda birim `instructions` metninde yazılır (ör. "2 kutu").
 - **Geriye uyum**: `title` ve `content` (serbest metin) **olduğu gibi** kalır ve `content` hâlâ zorunludur. Satırı olmayan (eski) reçeteler değişmeden açılır; `items` boş dizi döner. Eski istemciler `items` göndermeden yazmaya devam edebilir.
 

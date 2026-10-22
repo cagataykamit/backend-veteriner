@@ -60,6 +60,7 @@ Yalnızca **Visit satırlarında** dolu olabilir; planlı (Visit'siz) randevu sa
 | `awaitingLabCount` | int? | Klinikteki tüm `Requested` lab kayıtları (ziyarete bağlı olmayanlar dahil) | `LabResults.Read` |
 | `incompleteVisitCount` | int | Tamamlanmamış geliş sayısı (madde 1) | `Visits.Read` (uç zaten gerektirir) |
 
+- **HBS (ADR-036 Dilim 2):** `hbsNotEnteredPrescriptionCount` (`Prescriptions.Read`) ve `hbsNotEnteredVaccinationCount` (`Vaccinations.Read`), son 30 İstanbul günü; ayrıntı `HBS_ASSISTANT_API_CONTRACT.md` bölüm 7. Gün sonu raporunda `null`.
 - **Pencere (yalnız `unchargedVisitCount`):** geliş zamanı `[bugünün İstanbul başlangıcı − 30 gün, şimdi)` aralığında. Gerekçe: ücret sistemi öncesi geliş kayıtlarının hiç ücreti yoktur; sınırsız sayım geçmişi sahte "kaybolan gelir" gösterir. Diğer sayılar ücret/lab sistemi sonrası verilerden oluştuğu veya gerçekten açık olduğu için pencere almaz. Sabit `OpenItemsDefaults.UnchargedLookbackDays = 30`.
 - **İzin süzmesi:** kullanıcının `Read` izni olmayan kayıt türü ne sayılır ne gösterilir; ilgili alan `null` döner. Ücretsiz-işlem sayımında yalnız görünür türler işlem sayılır (ör. `Administrations.Read` yoksa uygulama "ücret yok" nedeni olmaz); bu, yetkisiz kullanıcının yetkisi olmadığı türün varlığını çıkarsamasını önler. Varsayılan rollerin (Admin, Owner, ClinicAdmin, Veteriner, Sekreter) hepsi bu okuma izinlerine sahiptir.
 - Yeni izin yoktur; `Visits.Read` yeterlidir (ücret/lab alanları ek izne bağlı olarak `null` olur).
