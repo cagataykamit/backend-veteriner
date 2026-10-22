@@ -2,12 +2,15 @@ using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
+using Backend.Veteriner.Application.SalesPartners;
+using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Legal;
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
@@ -32,6 +35,8 @@ public sealed class PublicOwnerSignupCommandHandler
     private readonly IUserOperationClaimRepository _userOperationClaims;
     private readonly IRepository<TenantSubscription> _subscriptionsWrite;
     private readonly IRepository<LegalAcceptance> _legalAcceptancesWrite;
+    private readonly DiscountCodeRedemptionService _discountCodes;
+    private readonly IRepository<DiscountRedemption> _redemptionsWrite;
     private readonly IPasswordHasher _hasher;
     private readonly IUnitOfWork _uow;
     private readonly ILogger<PublicOwnerSignupCommandHandler> _logger;
@@ -48,6 +53,8 @@ public sealed class PublicOwnerSignupCommandHandler
         IUserOperationClaimRepository userOperationClaims,
         IRepository<TenantSubscription> subscriptionsWrite,
         IRepository<LegalAcceptance> legalAcceptancesWrite,
+        DiscountCodeRedemptionService discountCodes,
+        IRepository<DiscountRedemption> redemptionsWrite,
         IPasswordHasher hasher,
         IUnitOfWork uow,
         ILogger<PublicOwnerSignupCommandHandler>? logger = null)
@@ -63,6 +70,8 @@ public sealed class PublicOwnerSignupCommandHandler
         _userOperationClaims = userOperationClaims;
         _subscriptionsWrite = subscriptionsWrite;
         _legalAcceptancesWrite = legalAcceptancesWrite;
+        _discountCodes = discountCodes;
+        _redemptionsWrite = redemptionsWrite;
         _hasher = hasher;
         _uow = uow;
         _logger = logger ?? NullLogger<PublicOwnerSignupCommandHandler>.Instance;
@@ -147,6 +156,17 @@ public sealed class PublicOwnerSignupCommandHandler
             utcNow,
             SubscriptionTrialDefaults.TrialDays);
 
+        // Satış ortağı kodu (ADR-037): sunucuda yeniden doğrulanır; geçersizse (kendi kodu dahil, tek tip) kayıt yapılmaz.
+        DiscountRedemption? redemption = null;
+        if (!string.IsNullOrWhiteSpace(request.DiscountCode))
+        {
+            var redeemed = await _discountCodes.RedeemAsync(tenant.Id, email, request.DiscountCode, utcNow, ct);
+            MarkStep("discountCode");
+            if (!redeemed.IsSuccess)
+                return Result<PublicOwnerSignupResultDto>.Failure(redeemed.Error);
+            redemption = redeemed.Value!;
+        }
+
         await _usersWrite.AddAsync(user, ct);
         await _tenantsWrite.AddAsync(tenant, ct);
         await _subscriptionsWrite.AddAsync(subscription, ct);
@@ -156,6 +176,8 @@ public sealed class PublicOwnerSignupCommandHandler
         await _userOperationClaims.AddAsync(new UserOperationClaim(user.Id, adminClaim.Id), ct);
         await _legalAcceptancesWrite.AddRangeAsync(
             LegalDocumentCatalog.CreateAcceptances(user.Id, tenant.Id, requiredLegalDocuments, utcNow), ct);
+        if (redemption is not null)
+            await _redemptionsWrite.AddAsync(redemption, ct);
         MarkStep("stageEntities");
 
         await _uow.SaveChangesAsync(ct);
@@ -169,7 +191,8 @@ public sealed class PublicOwnerSignupCommandHandler
             subscription.TrialStartsAtUtc ?? utcNow,
             subscription.TrialEndsAtUtc ?? utcNow,
             true,
-            "login");
+            "login",
+            redemption is null ? null : new DiscountCodeSummaryDto(redemption.Code, redemption.DiscountPercent, DiscountRedemption.WindowMonths));
 
         _logger.LogInformation(
             "Public owner signup succeeded. TenantId={TenantId} UserId={UserId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",

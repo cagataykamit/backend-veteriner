@@ -6,6 +6,7 @@ using MediatR;
 namespace Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 
 /// <param name="AcceptedLegalDocuments">Kayıt formunda kabul edilen belgeler ve sürümleri; üç belgenin güncel sürümü zorunlu (ADR-029).</param>
+/// <param name="DiscountCode">İsteğe bağlı satış ortağı kodu (ADR-037); sunucuda yeniden doğrulanır, geçersizse kayıt yapılmaz.</param>
 public sealed record PublicOwnerSignupCommand(
     string PlanCode,
     string TenantName,
@@ -13,4 +14,5 @@ public sealed record PublicOwnerSignupCommand(
     string ClinicCity,
     string Email,
     string Password,
-    IReadOnlyList<LegalDocumentAcceptanceInput>? AcceptedLegalDocuments = null) : IRequest<Result<PublicOwnerSignupResultDto>>;
+    IReadOnlyList<LegalDocumentAcceptanceInput>? AcceptedLegalDocuments = null,
+    string? DiscountCode = null) : IRequest<Result<PublicOwnerSignupResultDto>>;

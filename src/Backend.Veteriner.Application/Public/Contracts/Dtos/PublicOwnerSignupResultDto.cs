@@ -1,5 +1,8 @@
+using Backend.Veteriner.Application.SalesPartners.Contracts;
+
 namespace Backend.Veteriner.Application.Public.Contracts.Dtos;
 
+/// <param name="Discount">Kayıtta kullanılan satış ortağı kodu (ADR-037); kod yoksa <c>null</c>.</param>
 public sealed record PublicOwnerSignupResultDto(
     Guid TenantId,
     Guid ClinicId,
@@ -8,4 +11,5 @@ public sealed record PublicOwnerSignupResultDto(
     DateTime TrialStartsAtUtc,
     DateTime TrialEndsAtUtc,
     bool CanLogin,
-    string NextStep);
+    string NextStep,
+    DiscountCodeSummaryDto? Discount = null);

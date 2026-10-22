@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
@@ -24,6 +25,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
     private readonly IReadRepository<BillingCheckoutSession> _checkoutSessionsRead;
     private readonly IOptions<BillingOptions> _billingOptions;
     private readonly IBillingCheckoutProviderResolver _checkoutProviderResolver;
+    private readonly ISalesPartnerDiscountBilling _partnerDiscounts;
     private readonly ILogger<StartSubscriptionCheckoutCommandHandler> _logger;
 
     public StartSubscriptionCheckoutCommandHandler(
@@ -37,6 +39,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         IReadRepository<BillingCheckoutSession> checkoutSessionsRead,
         IOptions<BillingOptions> billingOptions,
         IBillingCheckoutProviderResolver checkoutProviderResolver,
+        ISalesPartnerDiscountBilling partnerDiscounts,
         ILogger<StartSubscriptionCheckoutCommandHandler> logger)
     {
         _tenantContext = tenantContext;
@@ -49,6 +52,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         _checkoutSessionsRead = checkoutSessionsRead;
         _billingOptions = billingOptions;
         _checkoutProviderResolver = checkoutProviderResolver;
+        _partnerDiscounts = partnerDiscounts;
         _logger = logger;
     }
 
@@ -176,6 +180,17 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             prorationRatio = proration.ProrationRatio;
         }
 
+        // Satış ortağı kodu indirimi (ADR-037): sağlayıcıya indirimli (net) tutar gider; brüt ve indirim oturuma yazılır,
+        // tahsilat olayında komisyon bu kayıttan hesaplanır.
+        long? grossChargeMinor = proratedChargeMinor;
+        long? discountMinor = null;
+        if (proratedChargeMinor is > 0)
+        {
+            var price = await _partnerDiscounts.PriceAsync(request.TenantId, proratedChargeMinor.Value, now, ct);
+            proratedChargeMinor = price.NetAmountMinor;
+            discountMinor = price.CodeDiscountMinor > 0 ? price.CodeDiscountMinor : null;
+        }
+
         var existingOpen = await _checkoutSessionsRead.FirstOrDefaultAsync(
             new OpenBillingCheckoutSessionByTenantSpec(request.TenantId, now), ct);
 
@@ -197,7 +212,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             && existingOpen.IsOpen(now))
         {
             return Result<SubscriptionCheckoutSessionDto>.Success(
-                Map(existingOpen, now, chargeCurrency, proratedChargeMinor, prorationRatio));
+                Map(existingOpen, now, chargeCurrency, proratedChargeMinor, prorationRatio, discountMinor));
         }
 
         if (existingOpen is not null)
@@ -233,6 +248,8 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             providerKind,
             now,
             expiresAt);
+        if (grossChargeMinor is > 0)
+            session.RecordPricing(grossChargeMinor.Value, discountMinor ?? 0);
 
         await _checkoutSessionsWrite.AddAsync(session, ct);
         await _checkoutSessionsWrite.SaveChangesAsync(ct);
@@ -258,7 +275,8 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             await _checkoutSessionsWrite.SaveChangesAsync(ct);
         }
 
-        return Result<SubscriptionCheckoutSessionDto>.Success(Map(session, afterPrepare, chargeCurrency, proratedChargeMinor, prorationRatio));
+        return Result<SubscriptionCheckoutSessionDto>.Success(
+            Map(session, afterPrepare, chargeCurrency, proratedChargeMinor, prorationRatio, discountMinor));
     }
 
     /// <summary>
@@ -318,7 +336,8 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         DateTime utcNow,
         string? chargeCurrency = null,
         long? proratedChargeMinor = null,
-        decimal? prorationRatio = null)
+        decimal? prorationRatio = null,
+        long? discountAmountMinor = null)
     {
         return new SubscriptionCheckoutSessionDto(
             session.Id,
@@ -333,7 +352,8 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             chargeCurrency,
             proratedChargeMinor,
             prorationRatio,
-            TrialPlanChangeApplied: false);
+            TrialPlanChangeApplied: false,
+            DiscountAmountMinor: discountAmountMinor);
     }
 
     private static string ResolvePlanPriceCurrency(BillingOptions options)

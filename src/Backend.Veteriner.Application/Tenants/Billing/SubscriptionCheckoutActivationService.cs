@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
+using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
@@ -13,17 +14,20 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
     private readonly IRepository<TenantSubscription> _subscriptionsWrite;
     private readonly IReadRepository<BillingCheckoutSession> _sessionsRead;
     private readonly IRepository<BillingCheckoutSession> _sessionsWrite;
+    private readonly ISalesPartnerDiscountBilling _partnerDiscounts;
 
     public SubscriptionCheckoutActivationService(
         IReadRepository<TenantSubscription> subscriptionsRead,
         IRepository<TenantSubscription> subscriptionsWrite,
         IReadRepository<BillingCheckoutSession> sessionsRead,
-        IRepository<BillingCheckoutSession> sessionsWrite)
+        IRepository<BillingCheckoutSession> sessionsWrite,
+        ISalesPartnerDiscountBilling partnerDiscounts)
     {
         _subscriptionsRead = subscriptionsRead;
         _subscriptionsWrite = subscriptionsWrite;
         _sessionsRead = sessionsRead;
         _sessionsWrite = sessionsWrite;
+        _partnerDiscounts = partnerDiscounts;
     }
 
     public async Task<Result<SubscriptionCheckoutSessionDto>> TryActivateAsync(
@@ -99,6 +103,11 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
         var completionReference = ResolveCompletionReference(session, externalReference);
         sub.ActivatePaidPlan(session.TargetPlanCode, utcNow);
         session.MarkCompleted(utcNow, completionReference);
+
+        // Satış ortağı komisyonu yalnız gerçek tahsilatta (ADR-037 madde 4): imzası doğrulanan sağlayıcı olayı. Panel finalize
+        // ödemeyi sağlayıcıdan doğrulamadığı için (Manual) komisyon üretmez. Aynı iş biriminde kaydedilir.
+        if (source == BillingActivationSource.Webhook)
+            await _partnerDiscounts.RecordCollectionAsync(session, utcNow, ct);
 
         await _subscriptionsWrite.UpdateAsync(sub, ct);
         await _sessionsWrite.UpdateAsync(session, ct);

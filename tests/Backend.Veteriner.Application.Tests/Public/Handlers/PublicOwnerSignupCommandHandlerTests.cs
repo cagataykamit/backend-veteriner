@@ -6,7 +6,10 @@ using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Legal;
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Application.LegalAcceptances;
+using Backend.Veteriner.Application.SalesPartners;
+using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using FluentAssertions;
@@ -31,6 +34,10 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     private readonly Mock<IPasswordHasher> _hasher = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<ILogger<PublicOwnerSignupCommandHandler>> _logger = new();
+    private readonly Mock<IReadRepository<DiscountCode>> _codes = new();
+    private readonly Mock<IReadRepository<SalesPartner>> _partners = new();
+    private readonly Mock<IReadRepository<DiscountRedemption>> _redemptionsRead = new();
+    private readonly Mock<IRepository<DiscountRedemption>> _redemptionsWrite = new();
 
     private PublicOwnerSignupCommandHandler CreateHandler()
         => new(
@@ -45,6 +52,8 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             _userOperationClaims.Object,
             _subscriptionsWrite.Object,
             _legalAcceptancesWrite.Object,
+            new DiscountCodeRedemptionService(_codes.Object, _partners.Object, _redemptionsRead.Object),
+            _redemptionsWrite.Object,
             _hasher.Object,
             _uow.Object,
             _logger.Object);
@@ -153,6 +162,58 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("LegalAcceptances.VersionOutdated");
         _usersWrite.Verify(r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Write_Redemption_And_Return_Discount_When_Code_Valid()
+    {
+        SetupHappyPathLookups();
+        SetupCode(partnerEmail: "ortak@example.com");
+        _hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+        DiscountRedemption? written = null;
+        _redemptionsWrite.Setup(r => r.AddAsync(It.IsAny<DiscountRedemption>(), It.IsAny<CancellationToken>()))
+            .Callback<DiscountRedemption, CancellationToken>((r, _) => written = r)
+            .ReturnsAsync((DiscountRedemption r, CancellationToken _) => r);
+
+        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments(), " ışık10 ");
+        var result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Discount!.Code.Should().Be("ISIK10");
+        result.Value.Discount.DiscountPercent.Should().Be(10m);
+        result.Value.Discount.DiscountMonths.Should().Be(12);
+        written!.TenantId.Should().Be(result.Value.TenantId);
+        written.CommissionPercent.Should().Be(20m);
+    }
+
+    [Theory]
+    [InlineData("YOKKOD", "owner@a.com")]
+    [InlineData("ISIK10", "ORTAK@example.com")]
+    public async Task Handle_Should_Return_Uniform_Invalid_And_Create_Nothing_When_Code_Unknown_Or_Self_Use(string rawCode, string email)
+    {
+        SetupHappyPathLookups();
+        SetupCode(partnerEmail: "ortak@example.com");
+        _hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+
+        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", email, "Abc12345!", AllCurrentDocuments(), rawCode);
+        var result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(DiscountRedemption.InvalidCode);
+        _usersWrite.Verify(r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+        _tenantsWrite.Verify(r => r.AddAsync(It.IsAny<Tenant>(), It.IsAny<CancellationToken>()), Times.Never);
+        _redemptionsWrite.Verify(r => r.AddAsync(It.IsAny<DiscountRedemption>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private void SetupCode(string? partnerEmail)
+    {
+        var partner = SalesPartner.Create("Ortak", partnerEmail, null, null, DateTime.UtcNow);
+        var code = DiscountCode.Create(partner.Id, "ISIK10", 10m, 20m, null, null, null, DateTime.UtcNow).Value!;
+        _codes.Setup(r => r.FirstOrDefaultAsync(It.IsAny<DiscountCodeByNormalizedCodeSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DiscountCodeByNormalizedCodeSpec spec, CancellationToken _) =>
+                spec.Evaluate([code]).FirstOrDefault());
+        _partners.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SalesPartnerByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(partner);
     }
 
     private void SetupHappyPathLookups()

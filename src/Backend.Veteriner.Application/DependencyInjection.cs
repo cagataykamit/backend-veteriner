@@ -18,6 +18,7 @@ using Backend.Veteriner.Application.OwnerPortal.Sessions;
 using Backend.Veteriner.Application.Pets.Timeline;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Sales;
+using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Billing;
@@ -44,6 +45,10 @@ public static class DependencyInjection
         services.AddScoped<TenantSubscriptionSeatEvaluator>();
         services.AddScoped<TenantInviteAcceptanceService>();
         services.AddScoped<ISubscriptionCheckoutActivationService, SubscriptionCheckoutActivationService>();
+
+        // Satış ortağı indirim kodu (ADR-037): kod kullanımı, checkout indirimi ve tahsilat komisyonu.
+        services.AddScoped<DiscountCodeRedemptionService>();
+        services.AddScoped<ISalesPartnerDiscountBilling, SalesPartnerDiscountBilling>();
         services.AddScoped<IClinicAssignmentAccessGuard, ClinicAssignmentAccessGuard>();
         services.AddScoped<IClinicReadScopeResolver, ClinicReadScopeResolver>();
         services.AddScoped<StockBatchResolver>();

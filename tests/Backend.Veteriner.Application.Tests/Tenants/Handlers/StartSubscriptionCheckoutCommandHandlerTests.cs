@@ -1,8 +1,11 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.SalesPartners;
+using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Application.Tenants.Commands.Checkout;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
@@ -23,6 +26,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     private readonly Mock<IRepository<BillingCheckoutSession>> _checkoutSessionsWrite = new();
     private readonly Mock<IReadRepository<BillingCheckoutSession>> _checkoutSessionsRead = new();
     private readonly Mock<IBillingCheckoutProviderResolver> _resolver = new();
+    private readonly Mock<IRepository<DiscountRedemption>> _redemptions = new();
 
     private StartSubscriptionCheckoutCommandHandler CreateHandler(BillingOptions billing)
         => new(
@@ -36,6 +40,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
             _checkoutSessionsRead.Object,
             Options.Create(billing),
             _resolver.Object,
+            new SalesPartnerDiscountBilling(_redemptions.Object, NullLogger<SalesPartnerDiscountBilling>.Instance),
             NullLogger<StartSubscriptionCheckoutCommandHandler>.Instance);
 
     private static BillingOptions CreateBillingOptions()
@@ -557,5 +562,64 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         result.Value.CheckoutSessionId.Should().NotBeNull();
         _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
         _subscriptionsWrite.Verify(x => x.UpdateAsync(It.IsAny<TenantSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Charge_Discounted_Amount_And_Record_Pricing_When_Tenant_Has_Partner_Code()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Premium);
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+
+        var partner = SalesPartner.Create("Ortak", null, null, null, DateTime.UtcNow);
+        var code = DiscountCode.Create(partner.Id, "ISIK10", 10m, 20m, null, null, null, DateTime.UtcNow).Value!;
+        var redemption = DiscountRedemption.Redeem(tid, "klinik@example.com", code, partner, 0, DateTime.UtcNow).Value!;
+        _redemptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<DiscountRedemptionByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(redemption);
+
+        long? chargedMinor = null;
+        BillingCheckoutSession? created = null;
+        var provider = new Mock<IBillingCheckoutProvider>();
+        provider
+            .Setup(x => x.PrepareCheckoutAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<string?>(), It.IsAny<long?>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()))
+            .Callback<BillingCheckoutSession, string?, long?, decimal?, CancellationToken>((s, _, amount, _, _) =>
+            {
+                created = s;
+                chargedMinor = amount;
+            })
+            .ReturnsAsync(Result<CheckoutPrepareResult>.Success(new CheckoutPrepareResult("https://checkout/new", "ext-new")));
+        _resolver.Setup(x => x.Resolve(BillingProvider.Manual)).Returns(provider.Object);
+
+        var result = await CreateHandler(CreateBillingOptions()).Handle(new StartSubscriptionCheckoutCommand(tid, "Premium"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        chargedMinor.Should().Be(27_000L, "30.000 kuruş yenileme fiyatına %10 kod indirimi");
+        result.Value!.ProratedChargeMinor.Should().Be(27_000L);
+        result.Value.DiscountAmountMinor.Should().Be(3_000L);
+        created!.GrossAmountMinor.Should().Be(30_000L);
+        created.DiscountAmountMinor.Should().Be(3_000L);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Record_Gross_Without_Discount_When_Tenant_Has_No_Code()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Premium);
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+        SetupManualCheckoutProvider(30_000L);
+
+        BillingCheckoutSession? created = null;
+        _checkoutSessionsWrite.Setup(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()))
+            .Callback<BillingCheckoutSession, CancellationToken>((s, _) => created = s)
+            .ReturnsAsync((BillingCheckoutSession s, CancellationToken _) => s);
+
+        var result = await CreateHandler(CreateBillingOptions()).Handle(new StartSubscriptionCheckoutCommand(tid, "Premium"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.DiscountAmountMinor.Should().BeNull();
+        created!.GrossAmountMinor.Should().Be(30_000L);
+        created.DiscountAmountMinor.Should().Be(0L);
     }
 }

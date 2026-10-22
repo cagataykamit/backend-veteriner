@@ -1,9 +1,13 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
+using Backend.Veteriner.Application.SalesPartners;
+using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Application.Tenants.Billing;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;
@@ -15,8 +19,15 @@ public sealed class SubscriptionCheckoutActivationServiceTests
     private readonly Mock<IReadRepository<BillingCheckoutSession>> _sessionsRead = new();
     private readonly Mock<IRepository<BillingCheckoutSession>> _sessionsWrite = new();
 
+    private readonly Mock<IRepository<DiscountRedemption>> _redemptions = new();
+
     private SubscriptionCheckoutActivationService CreateService()
-        => new(_subscriptionsRead.Object, _subscriptionsWrite.Object, _sessionsRead.Object, _sessionsWrite.Object);
+        => new(
+            _subscriptionsRead.Object,
+            _subscriptionsWrite.Object,
+            _sessionsRead.Object,
+            _sessionsWrite.Object,
+            new SalesPartnerDiscountBilling(_redemptions.Object, NullLogger<SalesPartnerDiscountBilling>.Instance));
 
     [Fact]
     public async Task TryActivateAsync_Should_ReturnFailure_When_SessionNotFound()
@@ -192,5 +203,41 @@ public sealed class SubscriptionCheckoutActivationServiceTests
         var effectiveAfterRenewal = Backend.Veteriner.Application.Tenants.TenantSubscriptionEffectiveWriteEvaluator
             .GetEffectiveStatus(sub, utcNow);
         effectiveAfterRenewal.Should().Be(TenantSubscriptionStatus.Active);
+    }
+
+    [Theory]
+    [InlineData(BillingActivationSource.Webhook, 1)]
+    [InlineData(BillingActivationSource.Manual, 0)]
+    public async Task TryActivateAsync_Should_Record_Partner_Commission_Only_For_Verified_Webhook_Collection(
+        BillingActivationSource source, int expectedCollections)
+    {
+        var tenantId = Guid.NewGuid();
+        var session = BillingCheckoutSession.CreatePending(
+            tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Basic, BillingProvider.Iyzico, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
+        session.RecordPricing(99_900, 9_990);
+        var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-20), 14);
+
+        var partner = SalesPartner.Create("Ortak", null, null, null, DateTime.UtcNow);
+        var code = DiscountCode.Create(partner.Id, "ISIK10", 10m, 20m, null, null, null, DateTime.UtcNow).Value!;
+        var redemption = DiscountRedemption.Redeem(tenantId, null, code, partner, 0, DateTime.UtcNow).Value!;
+        _redemptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<DiscountRedemptionByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(redemption);
+        _sessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<BillingCheckoutSessionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var result = await CreateService().TryActivateAsync(session.Id, null, null, "pay-1", source, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        redemption.Collections.Should().HaveCount(expectedCollections);
+        if (expectedCollections == 1)
+        {
+            var collection = redemption.Collections.Single();
+            collection.CheckoutSessionId.Should().Be(session.Id);
+            collection.NetAmountMinor.Should().Be(89_910);
+            collection.CommissionAmountMinor.Should().Be(17_982);
+            redemption.WindowStartsAtUtc.Should().NotBeNull();
+        }
     }
 }

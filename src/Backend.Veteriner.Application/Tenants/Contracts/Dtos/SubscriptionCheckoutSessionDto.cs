@@ -7,6 +7,8 @@ namespace Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 /// hiçbir ödeme çağrılmadığından ve <see cref="BillingCheckoutSession"/> oluşturulmadığından,
 /// checkout'a özgü alanlar (CheckoutSessionId/Status/Provider/CheckoutUrl) null döner ve
 /// <see cref="TrialPlanChangeApplied"/> true olur. Bu durumda frontend ödeme akışı beklememelidir.
+/// <see cref="ProratedChargeMinor"/> çekilecek (satış ortağı kodu indirimi sonrası) tutardır; <see cref="DiscountAmountMinor"/>
+/// uygulanan kod indirimidir, yoksa <c>null</c> (ADR-037).
 /// </summary>
 public sealed record SubscriptionCheckoutSessionDto(
     Guid? CheckoutSessionId,
@@ -21,5 +23,6 @@ public sealed record SubscriptionCheckoutSessionDto(
     string? ChargeCurrencyCode,
     long? ProratedChargeMinor,
     decimal? ProrationRatio,
-    bool TrialPlanChangeApplied);
+    bool TrialPlanChangeApplied,
+    long? DiscountAmountMinor = null);
 
