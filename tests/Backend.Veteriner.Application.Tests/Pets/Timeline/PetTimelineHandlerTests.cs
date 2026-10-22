@@ -12,6 +12,7 @@ using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
+using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
@@ -48,6 +49,7 @@ public sealed class PetTimelineHandlerTests
     private readonly List<Hospitalization> _hosp = [];
     private readonly List<Administration> _administrations = [];
     private readonly List<Product> _products = [];
+    private readonly List<ImagingRecord> _imaging = [];
 
     public PetTimelineHandlerTests()
     {
@@ -77,7 +79,8 @@ public sealed class PetTimelineHandlerTests
                 new LabResultTimelineSource(InMemory(_labs).Object),
                 new VaccinationTimelineSource(InMemory(_vaccinations).Object),
                 new HospitalizationTimelineSource(InMemory(_hosp).Object),
-                new AdministrationTimelineSource(InMemory(_administrations).Object, InMemory(_products).Object)
+                new AdministrationTimelineSource(InMemory(_administrations).Object, InMemory(_products).Object),
+                new ImagingTimelineSource(InMemory(_imaging).Object)
             ]);
 
     /// <summary>Spec'i bellekte değerlendirir (EF'e çeviri entegrasyon testinde doğrulanır).</summary>
@@ -386,6 +389,45 @@ public sealed class PetTimelineHandlerTests
         hidden.Value.Items.Single(i => i.Status == "Resulted").RelatedVisitId.Should().Be(resulted.VisitId);
         shown.Value!.Items.Should().HaveCount(3);
         shown.Value.Items.Single(i => i.Status == "Cancelled").IsVoided.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Imaging_Row_Shows_Modality_Title_Late_Marker_And_Hides_Cancelled_By_Default()
+    {
+        var examId = Guid.NewGuid();
+        ImagingRecord New(ImagingModality modality, DateTime at, Guid? exam, bool finalized)
+            => ImagingRecord.Create(_tenantId, _clinicId, _petId, exam, finalized, at, modality, "Sol arka bacak", null, Guid.NewGuid(), at.AddHours(1)).Value!;
+
+        var xray = New(ImagingModality.XRay, T0, examId, finalized: true);
+        var photo = New(ImagingModality.ClinicalPhoto, T0.AddHours(2), null, finalized: false);
+        var cancelled = New(ImagingModality.Ultrasound, T0.AddHours(3), null, finalized: false);
+        cancelled.Cancel(Guid.NewGuid(), "Yanlış hastaya yüklendi", T0.AddHours(4)).IsSuccess.Should().BeTrue();
+        _imaging.AddRange([xray, photo, cancelled]);
+
+        var hidden = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+        var shown = await CreateHandler().Handle(new GetPetTimelineQuery(_petId, IncludeVoided: true), CancellationToken.None);
+
+        hidden.Value!.Items.Select(i => i.Title).Should().Equal("Klinik fotoğraf", "Röntgen");
+        var xrayRow = hidden.Value.Items.Single(i => i.SourceId == xray.Id);
+        xrayRow.Type.Should().Be(PetRecordKind.Imaging);
+        xrayRow.EventAtUtc.Should().Be(T0);
+        xrayRow.Summary.Should().Be("Sol arka bacak");
+        xrayRow.RelatedExaminationId.Should().Be(examId);
+        xrayRow.AddedAfterFinalization.Should().BeTrue();
+        shown.Value!.Items.Single(i => i.SourceId == cancelled.Id).IsVoided.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Imaging_Is_Omitted_Without_Imaging_Read()
+    {
+        _imaging.Add(ImagingRecord.Create(
+            _tenantId, _clinicId, _petId, null, false, T0, ImagingModality.XRay, null, null, Guid.NewGuid(), T0).Value!);
+        _permissions.Setup(p => p.HasPermission(PermissionCatalog.Imaging.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        result.Value!.Items.Should().BeEmpty();
+        result.Value.OmittedTypes.Should().Equal("Imaging");
     }
 
     [Fact]
