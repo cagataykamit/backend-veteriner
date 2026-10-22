@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Prescriptions;
@@ -20,6 +21,15 @@ public sealed class Prescription : AggregateRoot
     public DateTime? FollowUpDateUtc { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
+
+    /// <summary>HBS e-Reçete geri kaydı (ADR-036 Dilim 2); klinik içerik değildir, kesinleşmiş muayene kilidine tabi değildir.</summary>
+    public HbsEntryStatus HbsStatus { get; private set; } = HbsEntryStatus.NotEntered;
+
+    /// <summary>HBS'ten dönen e-Reçete No.</summary>
+    public string? HbsReferenceNumber { get; private set; }
+    public string? HbsNotRequiredReason { get; private set; }
+    public DateTime? HbsMarkedAtUtc { get; private set; }
+    public Guid? HbsMarkedByUserId { get; private set; }
 
     private readonly List<PrescriptionItem> _items = new();
 
@@ -119,6 +129,27 @@ public sealed class Prescription : AggregateRoot
         for (var i = 0; i < drafts.Count; i++)
             _items.Add(new PrescriptionItem(Id, i + 1, drafts[i]));
 
+        return Result.Success();
+    }
+
+    /// <summary>HBS geri kaydını yazar (kural <see cref="HbsEntryRules"/>); klinik alanlara ve <see cref="UpdatedAtUtc"/>'e dokunmaz.</summary>
+    public Result ApplyHbsEntry(
+        HbsEntryStatus status,
+        string? referenceNumber,
+        string? notRequiredReason,
+        Guid markedByUserId,
+        DateTime nowUtc)
+    {
+        var entry = HbsEntryRules.Resolve(
+            status, referenceNumber, notRequiredReason, markedByUserId, NormalizeUtc(nowUtc), "Prescriptions.HbsValidation");
+        if (!entry.IsSuccess)
+            return Result.Failure(entry.Error);
+
+        HbsStatus = entry.Value!.Status;
+        HbsReferenceNumber = entry.Value.ReferenceNumber;
+        HbsNotRequiredReason = entry.Value.NotRequiredReason;
+        HbsMarkedAtUtc = entry.Value.MarkedAtUtc;
+        HbsMarkedByUserId = entry.Value.MarkedByUserId;
         return Result.Success();
     }
 

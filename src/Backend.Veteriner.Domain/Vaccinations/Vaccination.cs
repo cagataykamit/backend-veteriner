@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Vaccinations;
@@ -32,6 +33,18 @@ public sealed class Vaccination : AggregateRoot
     /// kayıt hatırlatma adaylarından dışlanır (ADR-019 K3).
     /// </summary>
     public Guid? ImportBatchId { get; private set; }
+
+    /// <summary>
+    /// HBS ATS aşı kaydı geri kaydı (ADR-036 Dilim 2). ATS bir aşı olayını kaydettiği için aşı kaydında tutulur (uygulama yalnız stok düşümüdür);
+    /// klinik içerik değildir, kesinleşmiş muayene kilidine tabi değildir.
+    /// </summary>
+    public HbsEntryStatus HbsStatus { get; private set; } = HbsEntryStatus.NotEntered;
+
+    /// <summary>HBS'ten dönen ATS aşı uygulama belgesi seri no.</summary>
+    public string? HbsReferenceNumber { get; private set; }
+    public string? HbsNotRequiredReason { get; private set; }
+    public DateTime? HbsMarkedAtUtc { get; private set; }
+    public Guid? HbsMarkedByUserId { get; private set; }
 
     private Vaccination() { }
 
@@ -140,6 +153,37 @@ public sealed class Vaccination : AggregateRoot
         Status = VaccinationStatus.Cancelled;
         AppliedAtUtc = null;
         UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// HBS geri kaydını yazar (kural <see cref="HbsEntryRules"/>); yalnız uygulanmış aşıda. Klinik alanlara ve
+    /// <see cref="UpdatedAtUtc"/>'e dokunmaz.
+    /// </summary>
+    public Result ApplyHbsEntry(
+        HbsEntryStatus status,
+        string? referenceNumber,
+        string? notRequiredReason,
+        Guid markedByUserId,
+        DateTime nowUtc)
+    {
+        if (Status != VaccinationStatus.Applied)
+        {
+            return Result.Failure(
+                "Vaccinations.HbsNotApplicable",
+                "HBS kaydı yalnız uygulanmış aşı için işaretlenebilir.");
+        }
+
+        var entry = HbsEntryRules.Resolve(
+            status, referenceNumber, notRequiredReason, markedByUserId, NormalizeUtc(nowUtc), "Vaccinations.HbsValidation");
+        if (!entry.IsSuccess)
+            return Result.Failure(entry.Error);
+
+        HbsStatus = entry.Value!.Status;
+        HbsReferenceNumber = entry.Value.ReferenceNumber;
+        HbsNotRequiredReason = entry.Value.NotRequiredReason;
+        HbsMarkedAtUtc = entry.Value.MarkedAtUtc;
+        HbsMarkedByUserId = entry.Value.MarkedByUserId;
+        return Result.Success();
     }
 
     private static DateTime NormalizeUtc(DateTime value)
