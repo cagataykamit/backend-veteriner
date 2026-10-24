@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Hospitalizations.Commands.Create;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Visits.Specs;
@@ -336,5 +337,75 @@ public sealed class CreateHospitalizationCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Hospitalizations.VisitClinicMismatch");
+    }
+
+    // ---------------- HOSP-002: oda ataması ----------------
+
+    private (HospitalizationWard Ward, HospitalizationRoom Room) ArrangeRoom(Guid tid, Guid cid, bool roomActive = true, bool wardActive = true)
+    {
+        var ward = HospitalizationWard.Create(tid, cid, "Yoğun bakım", 1, DateTime.UtcNow);
+        if (!wardActive) ward.SetActive(false, DateTime.UtcNow);
+        var room = HospitalizationRoom.Create(ward, "Kafes 2", 1, DateTime.UtcNow);
+        if (!roomActive) room.SetActive(false, DateTime.UtcNow);
+        _rooms.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationRoomByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(room);
+        _wards.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationWardByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ward);
+        return (ward, room);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Return_RoomNotFound_When_Room_Not_In_Clinic()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        ArrangeAdd(tid, cid, petId);
+        _rooms.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationRoomByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((HospitalizationRoom?)null);
+
+        var result = await CreateHandler().Handle(Cmd(cid, petId) with { RoomId = Guid.NewGuid() }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Hospitalizations.RoomNotFound");
+        _hospitalizationsWrite.Verify(r => r.AddAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Return_RoomInactive_When_Room_Is_Passive()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        ArrangeAdd(tid, cid, petId);
+        var (_, room) = ArrangeRoom(tid, cid, roomActive: false);
+
+        var result = await CreateHandler().Handle(Cmd(cid, petId) with { RoomId = room.Id }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Hospitalizations.RoomInactive");
+        _hospitalizationsWrite.Verify(r => r.AddAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Assign_Room_And_Derive_Location_Ignoring_Free_Text()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        ArrangeAdd(tid, cid, petId);
+        var (_, room) = ArrangeRoom(tid, cid);
+        Hospitalization? added = null;
+        _hospitalizationsWrite.Setup(r => r.AddAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()))
+            .Callback<Hospitalization, CancellationToken>((p, _) => added = p)
+            .ReturnsAsync((Hospitalization p, CancellationToken _) => p);
+
+        var result = await CreateHandler().Handle(
+            Cmd(cid, petId) with { RoomId = room.Id, Location = "Serbest metin" },
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        added!.RoomId.Should().Be(room.Id);
+        added.Location.Should().Be("Yoğun bakım / Kafes 2");
     }
 }

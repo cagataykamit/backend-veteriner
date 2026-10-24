@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Hospitalizations.Commands.Update;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Visits.Specs;
@@ -454,5 +455,93 @@ public sealed class UpdateHospitalizationCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Hospitalizations.ConcurrencyConflict");
+    }
+
+    // ---------------- HOSP-002: oda ataması ----------------
+
+    private (HospitalizationWard Ward, HospitalizationRoom Room) ArrangeRoom(Guid tid, Guid cid, bool roomActive = true)
+    {
+        var ward = HospitalizationWard.Create(tid, cid, "Yoğun bakım", 1, DateTime.UtcNow);
+        var room = HospitalizationRoom.Create(ward, "Kafes 2", 1, DateTime.UtcNow);
+        if (!roomActive) room.SetActive(false, DateTime.UtcNow);
+        _rooms.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationRoomByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(room);
+        _wards.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationWardByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ward);
+        return (ward, room);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Return_RoomInactive_And_Not_Mutate_When_New_Room_Is_Passive()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var existing = OpenStay(tid, cid, petId);
+        ArrangeUpdate(existing, tid, cid, petId);
+        var (_, room) = ArrangeRoom(tid, cid, roomActive: false);
+
+        var result = await CreateHandler().Handle(Cmd(existing.Id, cid, petId) with { RoomId = room.Id }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Hospitalizations.RoomInactive");
+        existing.Reason.Should().Be("Eski");
+        _hospitalizationsWrite.Verify(r => r.UpdateAsync(It.IsAny<Hospitalization>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Keep_Same_Room_When_It_Became_Passive()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var existing = OpenStay(tid, cid, petId);
+        var (ward, room) = ArrangeRoom(tid, cid, roomActive: false);
+        room.SetActive(true, DateTime.UtcNow);
+        existing.AssignRoom(room, ward).IsSuccess.Should().BeTrue();
+        room.SetActive(false, DateTime.UtcNow);
+        ArrangeUpdate(existing, tid, cid, petId);
+
+        var result = await CreateHandler().Handle(Cmd(existing.Id, cid, petId) with { RoomId = room.Id }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        existing.RoomId.Should().Be(room.Id);
+        existing.Location.Should().Be("Yoğun bakım / Kafes 2");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Leave_Room_Untouched_When_RoomId_Omitted()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var existing = OpenStay(tid, cid, petId);
+        var (ward, room) = ArrangeRoom(tid, cid);
+        existing.AssignRoom(room, ward).IsSuccess.Should().BeTrue();
+        ArrangeUpdate(existing, tid, cid, petId);
+
+        var result = await CreateHandler().Handle(Cmd(existing.Id, cid, petId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        existing.RoomId.Should().Be(room.Id);
+        _rooms.Verify(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationRoomByIdSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Clear_Room_And_Keep_Location_Text_When_ClearRoom()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var existing = OpenStay(tid, cid, petId);
+        var (ward, room) = ArrangeRoom(tid, cid);
+        existing.AssignRoom(room, ward).IsSuccess.Should().BeTrue();
+        ArrangeUpdate(existing, tid, cid, petId);
+
+        var result = await CreateHandler().Handle(Cmd(existing.Id, cid, petId) with { ClearRoom = true }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        existing.RoomId.Should().BeNull();
+        existing.Location.Should().Be("Yoğun bakım / Kafes 2");
     }
 }
