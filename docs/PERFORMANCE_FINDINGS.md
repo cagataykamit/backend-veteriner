@@ -73,9 +73,13 @@ Ham çıktılar ve istek başına SQL metinleri `PERF_OUT` yolunda (`.md` ve `.s
 
 **N+1:** hiçbir uçta komut sayısı sonuç satırı sayısına bağlı değil (Bugün 100 ve 500 satırda aynı 8 komut). Hasta özeti'ndeki 2 tekrar, aynı şekle sahip iki ayrı filtreli sorgudur.
 
-## 5. Eksik indeks önerileri (UYGULANMADI — onay gerekir)
+## 5. Eksik indeks önerileri (UYGULANDI — 2026-10-24, migration `AddPerformanceIndexes`)
 
-Kaynak: `sys.dm_db_missing_index_*` (10k koşusu, "improvement" sırasıyla). Bunlar yalnız bu ölçüm iş yükünden çıkan **adaylardır**; her biri yazma maliyeti ve mevcut indekslerle çakışma açısından gözden geçirilmeli, uygulandıktan sonra yeniden ölçülmelidir (etkisi **ölçülmedi**).
+Kaynak: `sys.dm_db_missing_index_*` (10k koşusu, "improvement" sırasıyla). Kullanıcı onayıyla (2026-10-24) #1–#5 tek migration'da uygulandı; #3'te DMV'nin `VoidedAtUtc` anahtarı yerine sorgunun gerçek şekline göre `(TenantId, PetId, ArrivedAtUtc)` INCLUDE `(VoidedAtUtc, CareStatus, ClinicId)` seçildi. Yalnız test/yerel veritabanlarına uygulandı; paylaşılan veya üretim veritabanına uygulama ayrı onay ister.
+
+**Ölçülen etki (2026-10-24, aynı 10k ölçek, Release, ortanca ms; önce → sonra):** Hasta timeline yoğun 12 → 7, tipik 11 → 5; Hasta özeti 11 → 6; Müşteri bakiyesi 4 → 3; Borç raporu 57 → 45, arama 101 → 87; Defter: muayene 75 → 55; Muayene raporu 16 → 6; Defter: ilaç 9 → 2; Bugün (500 satır) 71 → 68. Değişmeyenler: Defter reçete/kontrollü madde, randevu ve tahsilat raporları, stok. Defter: muayene hâlâ kümelenmiş tarama seçiyor (müşteri adı birleşimi ve `Status` sütunu kapsayıcı indekste yok); sonraki aday `Status` ve `PetId` INCLUDE.
+
+**Ayrıca saptanan hata (indeksten bağımsız):** "Bugün (günlük hacim)" ucu 10k ölçekte hem indeks öncesi hem sonrası **HTTP 500, ~30 sn** döndü (12 SQL komutu toplam ~390 ms; kalan süre tek bir komutun 30 sn zaman aşımına işaret ediyor). 2026-10-14 ölçümünde aynı uç 37 ms idi; o tarihten sonra eklenen Bugün sorguları (açık işler özeti, HBS sayaçları) şüpheli. Teşhis için ölçüm testine 5xx gövdesi ve başarısız SQL komutu kaydı eklendi; sonuç aşağıda §7'de.
 
 | # | Tablo | Anahtar / INCLUDE (DMV önerisi) | Yarar |
 |---|---|---|---|
@@ -95,7 +99,7 @@ Kod tarafı (migration gerektirmez, ürün/tasarım kararı gerekebilir): Bugün
 - **Sentetik veri:** düzgün rastgele dağılım; gerçek klinikte yoğunlaşma (az sayıda yoğun hasta/müşteri, tatil günleri, uzun açık borç geçmişi) farklıdır. Yalnız "yoğun hasta" için tek örnek ölçüldü (yıl boyunca ~120+ geliş).
 - **Kapsam dışı kalan veri/uç:** Yatış, laboratuvar sonucu, tedavi, uygulama (Administration) kayıtları, hatırlatıcılar, Dashboard uçları ölçülmedi/üretilmedi. **Defter: aşı ve defter: ilaç boş yanıt (27 bayt) döndü** — bu defterler stok *giriş* hareketlerini okur ve üretici girişleri ölçüm penceresinin dışına (veri başlangıcından önce) yazdı; bu iki satırın süreleri boş sonuç içindir, anlamlı ölçüm sayılmaz. Kontrollü madde defteri (çıkış hareketleri) dolu döndü.
 - **Outbox:** `SaveChanges` kesişim noktası outbox satırlarını yazdı; işleyici (arka plan) çalıştırılmadı, dolayısıyla projeksiyon/outbox yükü ölçüme dahil değil.
-- **İndeks etkisi** uygulanmadı, dolayısıyla "iyileşir" iddiası ölçülmüş değildir.
+- **İndeks etkisi** 2026-10-24'te ölçüldü (bkz. §5); mutlak değerler yerel LocalDB içindir, yalnız oranlar anlamlıdır.
 - Soğuk başlangıç (ilk çağrı) etkisi tek kez gözlendi; derinlemesine incelenmedi.
 - Rapor uçlarının tarih penceresi en çok 93 gündür (`ReportsSharedLimits.MaxRangeDays`), defterler 366 gün; daha uzun aralık 400 döner (ölçüm sırasında ilk denemede görüldü).
 - Test sınırı: `PerformanceMeasurementTests` normal koşularda atlanır; tam test paketi çalıştırılmadı.
