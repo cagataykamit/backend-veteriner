@@ -6,7 +6,10 @@ using MediatR;
 
 namespace Backend.Veteriner.Application.Examinations.Commands.Create;
 
-/// <summary>Klinik metin alanları audit yüküne yazılmaz (<c>JsonIgnore</c>).</summary>
+/// <summary>
+/// Klinik metin alanları audit yüküne yazılmaz (<c>JsonIgnore</c>).
+/// Muayene, geliş durumu ve bağlı randevunun tamamlanması tek veritabanı işleminde yazılır; randevu tamamlanamazsa muayene de kalmaz.
+/// </summary>
 public sealed record CreateExaminationCommand(
     Guid? ClinicId,
     Guid? PetId,
@@ -24,7 +27,7 @@ public sealed record CreateExaminationCommand(
     int? RespiratoryRatePerMin = null,
     DateTime? VitalsMeasuredAtUtc = null,
     Guid? VisitId = null)
-    : IRequest<Result<ExaminationWriteResultDto>>, IAuditableRequest
+    : IRequest<Result<ExaminationWriteResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Examination.Create";
     public string? AuditTarget => $"PetId={PetId}";
