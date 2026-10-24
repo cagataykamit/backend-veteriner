@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Hospitalizations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
+using Backend.Veteriner.Application.Hospitalizations.Wards;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Visits.Access;
@@ -31,6 +32,8 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
     private readonly IReadRepository<Visit> _visits;
     private readonly IReadRepository<Hospitalization> _hospitalizationsRead;
     private readonly IRepository<Hospitalization> _hospitalizationsWrite;
+    private readonly IReadRepository<HospitalizationRoom> _rooms;
+    private readonly IReadRepository<HospitalizationWard> _wards;
 
     public CreateHospitalizationCommandHandler(
         ITenantContext tenantContext,
@@ -42,7 +45,9 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         IReadRepository<Examination> examinations,
         IReadRepository<Visit> visits,
         IReadRepository<Hospitalization> hospitalizationsRead,
-        IRepository<Hospitalization> hospitalizationsWrite)
+        IRepository<Hospitalization> hospitalizationsWrite,
+        IReadRepository<HospitalizationRoom> rooms,
+        IReadRepository<HospitalizationWard> wards)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -54,6 +59,8 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         _visits = visits;
         _hospitalizationsRead = hospitalizationsRead;
         _hospitalizationsWrite = hospitalizationsWrite;
+        _rooms = rooms;
+        _wards = wards;
     }
 
     public async Task<Result<Guid>> Handle(CreateHospitalizationCommand request, CancellationToken ct)
@@ -160,6 +167,16 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
                 "An active hospitalization already exists for this pet at this clinic.");
         }
 
+        HospitalizationRoomAssignment? roomAssignment = null;
+        if (request.RoomId is { } roomId)
+        {
+            var room = await HospitalizationRoomAssignmentResolver.ResolveAsync(
+                _rooms, _wards, tenantId, effectiveClinicId, roomId, currentRoomId: null, ct);
+            if (!room.IsSuccess)
+                return Result<Guid>.Failure(room.Error);
+            roomAssignment = room.Value;
+        }
+
         Hospitalization entity;
         try
         {
@@ -178,6 +195,13 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         catch (ArgumentException ex)
         {
             return Result<Guid>.Failure("Hospitalizations.Validation", ex.Message);
+        }
+
+        if (roomAssignment is not null)
+        {
+            var assigned = entity.AssignRoom(roomAssignment.Room, roomAssignment.Ward);
+            if (!assigned.IsSuccess)
+                return Result<Guid>.Failure(assigned.Error);
         }
 
         await _hospitalizationsWrite.AddAsync(entity, ct);

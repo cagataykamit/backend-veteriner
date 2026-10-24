@@ -33,6 +33,8 @@ public sealed class UpdateHospitalizationCommandHandlerTests
     private readonly Mock<IReadRepository<Visit>> _visits = new();
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizationsRead = new();
     private readonly Mock<IRepository<Hospitalization>> _hospitalizationsWrite = new();
+    private readonly Mock<IReadRepository<HospitalizationRoom>> _rooms = new();
+    private readonly Mock<IReadRepository<HospitalizationWard>> _wards = new();
 
     private UpdateHospitalizationCommandHandler CreateHandler()
         => new(
@@ -45,7 +47,9 @@ public sealed class UpdateHospitalizationCommandHandlerTests
             _examinations.Object,
             _visits.Object,
             _hospitalizationsRead.Object,
-            _hospitalizationsWrite.Object);
+            _hospitalizationsWrite.Object,
+            _rooms.Object,
+            _wards.Object);
 
     private static UpdateHospitalizationCommand Cmd(
         Guid id,

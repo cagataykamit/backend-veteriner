@@ -6,7 +6,8 @@ namespace Backend.Veteriner.Application.Hospitalizations.Commands.Create;
 
 /// <summary>
 /// <see cref="VisitId"/> opsiyoneldir; verilmezse bağlı muayenenin gelişi miras alınır. <see cref="Location"/> serbest metindir.
-/// Kesinleşmiş muayeneye bağlanamaz (<c>Examinations.Finalized</c>).
+/// <see cref="RoomId"/> verilirse oda kliniğe ait ve aktif olmalıdır; konum metni odadan türetilir ("Bölüm / Oda") ve
+/// <see cref="Location"/> yok sayılır. Kesinleşmiş muayeneye bağlanamaz (<c>Examinations.Finalized</c>).
 /// </summary>
 public sealed record CreateHospitalizationCommand(
     Guid ClinicId,
@@ -17,7 +18,8 @@ public sealed record CreateHospitalizationCommand(
     string Reason,
     string? Notes,
     Guid? VisitId = null,
-    string? Location = null)
+    string? Location = null,
+    Guid? RoomId = null)
     : IRequest<Result<Guid>>, ITransactionalRequest, IAuditableRequest
 {
     public string AuditAction => "Hospitalization.Create";

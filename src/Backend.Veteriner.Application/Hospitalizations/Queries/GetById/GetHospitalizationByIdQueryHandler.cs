@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
+using Backend.Veteriner.Application.Hospitalizations.Wards;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Hospitalizations;
@@ -24,6 +25,8 @@ public sealed class GetHospitalizationByIdQueryHandler
     private readonly IReadRepository<Hospitalization> _hospitalizations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IReadRepository<HospitalizationRoom> _rooms;
+    private readonly IReadRepository<HospitalizationWard> _wards;
 
     public GetHospitalizationByIdQueryHandler(
         ITenantContext tenantContext,
@@ -33,7 +36,9 @@ public sealed class GetHospitalizationByIdQueryHandler
         IUserClinicRepository userClinics,
         IReadRepository<Hospitalization> hospitalizations,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IReadRepository<HospitalizationRoom> rooms,
+        IReadRepository<HospitalizationWard> wards)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -43,6 +48,8 @@ public sealed class GetHospitalizationByIdQueryHandler
         _hospitalizations = hospitalizations;
         _pets = pets;
         _clients = clients;
+        _rooms = rooms;
+        _wards = wards;
     }
 
     public async Task<Result<HospitalizationDetailDto>> Handle(GetHospitalizationByIdQuery request, CancellationToken ct)
@@ -90,6 +97,9 @@ public sealed class GetHospitalizationByIdQueryHandler
 
         var isActive = row.DischargedAtUtc is null;
 
+        var roomNames = await HospitalizationRoomNamesLookup.ResolveAsync(_rooms, _wards, tenantId, [row.RoomId], ct);
+        var room = row.RoomId is { } roomId && roomNames.TryGetValue(roomId, out var names) ? names : null;
+
         var dto = new HospitalizationDetailDto(
             row.Id,
             row.TenantId,
@@ -110,7 +120,10 @@ public sealed class GetHospitalizationByIdQueryHandler
             row.VisitId,
             row.Location,
             row.DischargeNote,
-            ExaminationRowVersion.Encode(row.RowVersion));
+            ExaminationRowVersion.Encode(row.RowVersion),
+            row.RoomId,
+            room?.RoomName,
+            room?.WardName);
 
         return Result<HospitalizationDetailDto>.Success(dto);
     }

@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Files;
 using Backend.Veteriner.Application.Files.Access;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Access;
 using Backend.Veteriner.Application.Imaging.Access;
 using Backend.Veteriner.Application.Imports;
 using Backend.Veteriner.Application.Imports.Mapping;
@@ -51,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<ISalesPartnerDiscountBilling, SalesPartnerDiscountBilling>();
         services.AddScoped<IClinicAssignmentAccessGuard, ClinicAssignmentAccessGuard>();
         services.AddScoped<IClinicReadScopeResolver, ClinicReadScopeResolver>();
+        services.AddScoped<IHospitalizationWardClinicAccess, HospitalizationWardClinicAccess>();
         services.AddScoped<StockBatchResolver>();
         services.AddScoped<ExpiredStockReader>();
         services.AddScoped<SaleDtoAssembler>();

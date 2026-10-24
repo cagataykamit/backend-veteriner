@@ -14,4 +14,7 @@ public sealed record HospitalizationListItemDto(
     string Reason,
     bool IsActive,
     Guid? VisitId,
-    string? Location);
+    string? Location,
+    Guid? RoomId,
+    string? RoomName,
+    string? WardName);

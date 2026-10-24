@@ -23,6 +23,8 @@ public sealed class GetHospitalizationByIdQueryHandlerTests
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizations = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IReadRepository<HospitalizationRoom>> _rooms = new();
+    private readonly Mock<IReadRepository<HospitalizationWard>> _wards = new();
 
     private readonly Guid _userId = Guid.NewGuid();
 
@@ -43,7 +45,9 @@ public sealed class GetHospitalizationByIdQueryHandlerTests
             _userClinics.Object,
             _hospitalizations.Object,
             _pets.Object,
-            _clients.Object);
+            _clients.Object,
+            _rooms.Object,
+            _wards.Object);
 
     private void SetupTenant(Guid tenantId) => _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
 

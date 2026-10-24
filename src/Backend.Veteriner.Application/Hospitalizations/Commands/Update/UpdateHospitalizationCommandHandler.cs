@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Hospitalizations.Access;
 using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
+using Backend.Veteriner.Application.Hospitalizations.Wards;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Visits.Access;
@@ -35,6 +36,8 @@ public sealed class UpdateHospitalizationCommandHandler
     private readonly IReadRepository<Visit> _visits;
     private readonly IReadRepository<Hospitalization> _hospitalizationsRead;
     private readonly IRepository<Hospitalization> _hospitalizationsWrite;
+    private readonly IReadRepository<HospitalizationRoom> _rooms;
+    private readonly IReadRepository<HospitalizationWard> _wards;
 
     public UpdateHospitalizationCommandHandler(
         ITenantContext tenantContext,
@@ -46,7 +49,9 @@ public sealed class UpdateHospitalizationCommandHandler
         IReadRepository<Examination> examinations,
         IReadRepository<Visit> visits,
         IReadRepository<Hospitalization> hospitalizationsRead,
-        IRepository<Hospitalization> hospitalizationsWrite)
+        IRepository<Hospitalization> hospitalizationsWrite,
+        IReadRepository<HospitalizationRoom> rooms,
+        IReadRepository<HospitalizationWard> wards)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -58,6 +63,8 @@ public sealed class UpdateHospitalizationCommandHandler
         _visits = visits;
         _hospitalizationsRead = hospitalizationsRead;
         _hospitalizationsWrite = hospitalizationsWrite;
+        _rooms = rooms;
+        _wards = wards;
     }
 
     public async Task<Result<HospitalizationWriteResultDto>> Handle(UpdateHospitalizationCommand request, CancellationToken ct)
@@ -188,6 +195,18 @@ public sealed class UpdateHospitalizationCommandHandler
         if (!visit.IsSuccess)
             return Result<HospitalizationWriteResultDto>.Failure(visit.Error);
 
+        // Oda, UpdateDetails'ten önce çözülür ki hata durumunda kayıt hiç değişmesin; aynı oda yeniden gönderilirse
+        // pasifleşmiş olsa da korunur (mevcut yatış etkilenmez).
+        HospitalizationRoomAssignment? roomAssignment = null;
+        if (request.RoomId is { } roomId)
+        {
+            var room = await HospitalizationRoomAssignmentResolver.ResolveAsync(
+                _rooms, _wards, tenantId, effectiveClinicId, roomId, existing.RoomId, ct);
+            if (!room.IsSuccess)
+                return Result<HospitalizationWriteResultDto>.Failure(room.Error);
+            roomAssignment = room.Value;
+        }
+
         var update = existing.UpdateDetails(
             effectiveClinicId,
             request.PetId,
@@ -201,6 +220,14 @@ public sealed class UpdateHospitalizationCommandHandler
 
         if (!update.IsSuccess)
             return Result<HospitalizationWriteResultDto>.Failure(update.Error);
+
+        // Klinik değişince eski kliniğin odası bağlı kalamaz; açık oda verilmediyse bağ kaldırılır (konum metni kalır).
+        var clearRoom = request.ClearRoom || (roomAssignment is null && existing.RoomId.HasValue && existing.ClinicId != effectiveClinicId);
+        var roomChange = roomAssignment is not null
+            ? existing.AssignRoom(roomAssignment.Room, roomAssignment.Ward)
+            : clearRoom ? existing.ClearRoom() : Result.Success();
+        if (!roomChange.IsSuccess)
+            return Result<HospitalizationWriteResultDto>.Failure(roomChange.Error);
 
         if (expectedRowVersion is not null)
             existing.SetExpectedRowVersion(expectedRowVersion);

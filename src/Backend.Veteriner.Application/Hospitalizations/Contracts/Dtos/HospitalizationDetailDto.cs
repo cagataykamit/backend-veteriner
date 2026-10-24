@@ -20,4 +20,7 @@ public sealed record HospitalizationDetailDto(
     Guid? VisitId,
     string? Location,
     string? DischargeNote,
-    string RowVersion);
+    string RowVersion,
+    Guid? RoomId,
+    string? RoomName,
+    string? WardName);

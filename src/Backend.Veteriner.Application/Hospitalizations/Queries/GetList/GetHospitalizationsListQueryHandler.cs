@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
 using Backend.Veteriner.Application.Hospitalizations.Specs;
+using Backend.Veteriner.Application.Hospitalizations.Wards;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
@@ -28,6 +29,8 @@ public sealed class GetHospitalizationsListQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IPetReadModelLookupReader _petLookupReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
+    private readonly IReadRepository<HospitalizationRoom> _rooms;
+    private readonly IReadRepository<HospitalizationWard> _wards;
 
     public GetHospitalizationsListQueryHandler(
         ITenantContext tenantContext,
@@ -37,7 +40,9 @@ public sealed class GetHospitalizationsListQueryHandler
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
         IPetReadModelLookupReader petLookupReader,
-        IOptions<QueryReadModelsOptions> queryReadModelsOptions)
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        IReadRepository<HospitalizationRoom> rooms,
+        IReadRepository<HospitalizationWard> wards)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -47,6 +52,8 @@ public sealed class GetHospitalizationsListQueryHandler
         _clients = clients;
         _petLookupReader = petLookupReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
+        _rooms = rooms;
+        _wards = wards;
     }
 
     public async Task<Result<PagedResult<HospitalizationListItemDto>>> Handle(
@@ -143,6 +150,9 @@ public sealed class GetHospitalizationsListQueryHandler
             : await _clients.ListAsync(new ClientsByTenantIdsSpec(tenantId, clientIds), ct);
         var clientNameById = clients.ToDictionary(x => x.Id, x => x.FullName);
 
+        var roomNamesById = await HospitalizationRoomNamesLookup.ResolveAsync(
+            _rooms, _wards, tenantId, rows.Select(x => x.RoomId), ct);
+
         var items = rows
             .Select(h =>
             {
@@ -154,6 +164,7 @@ public sealed class GetHospitalizationsListQueryHandler
                     : string.Empty;
 
                 var isActive = h.DischargedAtUtc is null;
+                var room = h.RoomId is { } roomId && roomNamesById.TryGetValue(roomId, out var names) ? names : null;
 
                 return new HospitalizationListItemDto(
                     h.Id,
@@ -169,7 +180,10 @@ public sealed class GetHospitalizationsListQueryHandler
                     h.Reason,
                     isActive,
                     h.VisitId,
-                    h.Location);
+                    h.Location,
+                    h.RoomId,
+                    room?.RoomName,
+                    room?.WardName);
             })
             .ToList();
 

@@ -28,6 +28,8 @@ public sealed class GetHospitalizationsListQueryHandlerTests
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IPetReadModelLookupReader> _petLookupReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
+    private readonly Mock<IReadRepository<HospitalizationRoom>> _rooms = new();
+    private readonly Mock<IReadRepository<HospitalizationWard>> _wards = new();
 
     private GetHospitalizationsListQueryHandler CreateHandler(bool sharedSearchLookupEnabled = false)
         => new(
@@ -41,7 +43,9 @@ public sealed class GetHospitalizationsListQueryHandlerTests
             Options.Create(new QueryReadModelsOptions
             {
                 SharedSearchLookupEnabled = sharedSearchLookupEnabled
-            }));
+            }),
+            _rooms.Object,
+            _wards.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

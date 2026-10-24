@@ -19,8 +19,14 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped
     public string Reason { get; private set; } = default!;
     public string? Notes { get; private set; }
 
-    /// <summary>Serbest metin konum (ör. "Kafes 3"); kapasite/oda yönetimi yoktur.</summary>
+    /// <summary>
+    /// Serbest metin konum (ör. "Kafes 3"); geriye dönük uyum için kalır. Oda atanınca (<see cref="RoomId"/>) metin
+    /// odadan türetilir ("Bölüm / Oda"); kapasite/çakışma kontrolü yoktur.
+    /// </summary>
     public string? Location { get; private set; }
+
+    /// <summary>Klinik tanımlı oda (<see cref="HospitalizationRoom"/>); eski kayıtlarda ve oda seçilmemişse null.</summary>
+    public Guid? RoomId { get; private set; }
 
     /// <summary>Taburcu notu; giriş notunu (<see cref="Notes"/>) ezmemek için ayrı tutulur.</summary>
     public string? DischargeNote { get; private set; }
@@ -142,6 +148,41 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped
         UpdatedAtUtc = DateTime.UtcNow;
         return Result.Success();
     }
+
+    /// <summary>
+    /// Odayı bağlar ve konum metnini odadan türetir (<see cref="FormatRoomLocation"/>); serbest metin konum ezilir.
+    /// Oda–bölüm–klinik tutarlılığı çağıranın (handler) sorumluluğudur; burada yalnız savunma amaçlı denetlenir.
+    /// </summary>
+    public Result AssignRoom(HospitalizationRoom room, HospitalizationWard ward)
+    {
+        ArgumentNullException.ThrowIfNull(room);
+        ArgumentNullException.ThrowIfNull(ward);
+
+        if (DischargedAtUtc.HasValue)
+            return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
+        if (room.WardId != ward.Id)
+            throw new ArgumentException("Room does not belong to the given ward.", nameof(room));
+        if (room.TenantId != TenantId || room.ClinicId != ClinicId)
+            throw new ArgumentException("Room does not belong to the hospitalization clinic.", nameof(room));
+
+        RoomId = room.Id;
+        Location = FormatRoomLocation(ward.Name, room.Name);
+        return Result.Success();
+    }
+
+    /// <summary>Oda bağını kaldırır; konum metni (<see cref="Location"/>) olduğu gibi kalır.</summary>
+    public Result ClearRoom()
+    {
+        if (DischargedAtUtc.HasValue)
+            return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
+
+        RoomId = null;
+        return Result.Success();
+    }
+
+    /// <summary>Odadan türetilen konum metni biçimi tek yerde: "Bölüm / Oda".</summary>
+    public static string FormatRoomLocation(string wardName, string roomName)
+        => $"{wardName} / {roomName}";
 
     /// <summary>
     /// İstemcinin gördüğü sürüm: kalıcı yazma yalnızca veritabanındaki sürüm bu değere eşitse gerçekleşir.

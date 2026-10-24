@@ -34,6 +34,8 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
     private readonly Mock<IReadRepository<Visit>> _visits = new();
     private readonly Mock<IReadRepository<Hospitalization>> _hospitalizationsRead = new();
     private readonly Mock<IRepository<Hospitalization>> _hospitalizationsWrite = new();
+    private readonly Mock<IReadRepository<HospitalizationRoom>> _rooms = new();
+    private readonly Mock<IReadRepository<HospitalizationWard>> _wards = new();
 
     private CreateHospitalizationCommandHandler CreateCreateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -46,7 +48,9 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             _examinations.Object,
             _visits.Object,
             _hospitalizationsRead.Object,
-            _hospitalizationsWrite.Object);
+            _hospitalizationsWrite.Object,
+            _rooms.Object,
+            _wards.Object);
 
     private UpdateHospitalizationCommandHandler CreateUpdateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -59,7 +63,9 @@ public sealed class HospitalizationWriteClinicAssignmentCommandHandlerTests
             _examinations.Object,
             _visits.Object,
             _hospitalizationsRead.Object,
-            _hospitalizationsWrite.Object);
+            _hospitalizationsWrite.Object,
+            _rooms.Object,
+            _wards.Object);
 
     private DischargeHospitalizationCommandHandler CreateDischargeHandler(IClinicReadScopeResolver? resolver = null)
         => new(

@@ -15,6 +15,13 @@ public sealed class UpdateHospitalizationCommandValidator : AbstractValidator<Up
         RuleFor(x => x.VisitId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("VisitId is invalid.");
+        RuleFor(x => x.RoomId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("RoomId is invalid.");
+        RuleFor(x => x.RoomId)
+            .Null()
+            .When(x => x.ClearRoom)
+            .WithMessage("RoomId and ClearRoom cannot be combined.");
         RuleFor(x => x.AdmittedAtUtc).NotEqual(default(DateTime));
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(2000);
         RuleFor(x => x.Location)
