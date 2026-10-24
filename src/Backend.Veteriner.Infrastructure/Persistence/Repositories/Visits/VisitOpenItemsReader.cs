@@ -89,9 +89,12 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
                             && !charged.Contains(v.Id))
                 .CountAsync(ct);
 
-            // Borçlu çıkan: tamamlanmış ziyaretin açık tutarı > 0.
+            // Borçlu çıkan: tamamlanmış ziyaretin açık tutarı > 0. Yalnız açık ücretler (AllocatedAmount < Amount) toplanır:
+            // tahsisi tamamlanmış ücret toplama 0 katar (CK_Charges_AllocatedAmount_Range), bu yüzden sonuç aynıdır ama
+            // kliniğin tüm ücret geçmişi yerine küçük bir küme taranır (10k ölçekte tüm geçmiş 30 sn zaman aşımına giriyordu).
             var outstanding = await (
                     from c in ChargeFacts(scope)
+                    where c.AllocatedAmount < c.Amount
                     join v in OpenVisits(scope) on c.VisitId equals v.Id
                     where v.CareStatus == VisitCareStatus.Completed
                     group c by c.VisitId into g
@@ -156,18 +159,19 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         => _db.Visits.AsNoTracking()
             .Where(v => v.TenantId == scope.TenantId && v.ClinicId == scope.ClinicId && v.VoidedAtUtc == null);
 
-    /// <summary>İptal edilmemiş (global filtre) ücretler; ziyaret bağı <c>VisitId ?? muayenenin VisitId'si</c>. Ziyarete bağlanamayanlar dışarıda.</summary>
+    /// <summary>
+    /// İptal edilmemiş (global filtre) ücretler; ziyaret bağı <c>VisitId ?? muayenenin VisitId'si</c>. Ziyarete bağlanamayanlar dışarıda.
+    /// Muayene bağı sol birleşimle kurulur; ücret başına ilişkili alt sorgu (üç kez yineleniyordu) sorguyu ücret sayısıyla
+    /// çarpıyor ve 10k ölçekte zaman aşımına götürüyordu.
+    /// </summary>
     private IQueryable<ChargeFact> ChargeFacts(OpenItemsScope scope)
-        => _db.Charges.AsNoTracking()
-            .Where(c => c.TenantId == scope.TenantId && c.ClinicId == scope.ClinicId)
-            .Select(c => new
-            {
-                VisitId = c.VisitId ?? _db.Examinations.Where(e => e.Id == c.ExaminationId).Select(e => e.VisitId).FirstOrDefault(),
-                c.Amount,
-                c.AllocatedAmount,
-            })
-            .Where(c => c.VisitId != null)
-            .Select(c => new ChargeFact { VisitId = c.VisitId!.Value, Amount = c.Amount, AllocatedAmount = c.AllocatedAmount });
+        => from c in _db.Charges.AsNoTracking()
+           where c.TenantId == scope.TenantId && c.ClinicId == scope.ClinicId
+           join e in _db.Examinations.AsNoTracking() on c.ExaminationId equals e.Id into examinations
+           from e in examinations.DefaultIfEmpty()
+           let visitId = c.VisitId ?? (e != null ? e.VisitId : null)
+           where visitId != null
+           select new ChargeFact { VisitId = visitId!.Value, Amount = c.Amount, AllocatedAmount = c.AllocatedAmount };
 
     /// <summary>Sonuç girilmemiş (<c>Requested</c>) lab kayıtlarının ziyaret kimlikleri (kayıt başına bir satır).</summary>
     private IQueryable<Guid> AwaitingLabVisitIds(OpenItemsScope scope)
