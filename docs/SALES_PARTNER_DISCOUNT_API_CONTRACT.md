@@ -13,7 +13,7 @@ Mevcut abonelik/ödeme akışı koddan okundu; tasarım bu bulgulara göre en k�
 | Konu | Koddaki gerçek durum |
 |---|---|
 | Canlı kart çekimi | `IyzicoBillingCheckoutProvider` iyzico **Checkout Form** ile **tek seferlik** ödeme başlatır (`PaymentGroup.PRODUCT`, tek taksit). Kart saklanmaz, **otomatik yenileme/tekrarlayan çekim yok**. Üretim yapılandırması `DefaultCheckoutProvider = Iyzico`; geliştirme/test `Manual` (gerçek para yok). |
-| Tahsilat olayı | Ödeme sonucu **imzası doğrulanan webhook** ile gelir (`ProcessBillingWebhookCommandHandler` → `PaymentSucceeded` → `SubscriptionCheckoutActivationService.TryActivateAsync(source: Webhook)`). iyzico callback yalnız yönlendirme köprüsüdür. Panel `finalize` ucu (`source: Manual`) ödemeyi sağlayıcıdan **doğrulamaz**; arayüz onu yalnız `Manual` sağlayıcıda gösterir. |
+| Tahsilat olayı | Ödeme sonucu **imzası doğrulanan webhook** ile gelir (`ProcessBillingWebhookCommandHandler` → `PaymentSucceeded` → `SubscriptionCheckoutActivationService.TryActivateAsync(source: Webhook)`). iyzico callback yalnız yönlendirme köprüsüdür. Panel `finalize` ucu (`source: Manual`) ödemeyi sağlayıcıdan doğrulamaz; bu yüzden yalnız `Manual` (geliştirme/test) sağlayıcı oturumunu etkinleştirir, iyzico/Stripe oturumunda **409** `Billing.ManualFinalizeNotAllowed` döner (BILL-002). |
 | Tahsilat tutarı | `BillingCheckoutSession` tutar **saklamıyordu**; tutar checkout başlarken hesaplanıp sağlayıcıya geçiliyordu. |
 | Plan fiyatı | Kodda değil, yapılandırmada: `Billing:PlanPricesMinor` veya `Billing:Iyzico:PlanPricesTry`. Ödeme tutarına **KDV eklenmez**; yapılandırılan fiyat olduğu gibi çekilir. |
 | Dönem | Yalnız **aylık**: `ActivatedAtUtc` + 1 ay (`TenantSubscriptionPeriodCalculator`). Yıllık dönem kavramı yok. Süre dolunca abonelik salt okunura düşer; kiracı yeniden checkout ile öder (aylık manuel yenileme). |
@@ -34,9 +34,9 @@ Mevcut abonelik/ödeme akışı koddan okundu; tasarım bu bulgulara göre en k�
 8. **Kendi kodunu kullanma engeli:** ortak kaydında isteğe bağlı `linkedTenantId` (ortağın kendi kiracısı) ve e-posta; kodu kullanan kiracı ortağın kiracısıysa ya da kodu giren kullanıcının e-postası ortağın e-postasıysa kod geçersiz sayılır (tek tip hata).
 9. **Yetki:** platform uçları yeni izin yerine `platform_admin` claim'ine bakan `PlatformAdmin` politikasıyla korunur; klinik rolleri (yönetici dahil) **403**.
 
-Mevcut akışta görülen, bu işin kapsamı dışında kalan riskler (düzeltilmedi, raporlandı):
-- Panel `finalize` ucu ödemeyi sağlayıcıdan doğrulamadan aboneliği etkinleştirir (`Subscriptions.Manage` sahibi kullanıcı, `Manual` olmayan oturumda da çağırabilir).
-- Süresi dolmuş denemede üst plana geçişte yükseltme farkı deneme penceresine göre oranlanır; oran 0 olduğundan çekilen tutar 1 kuruşa iner (`SubscriptionProrationCalculator` + `Math.Max(1, …)`).
+Mevcut akışta görülen riskler (ilk uygulamada düzeltilmemişti; BILL-002/003 ile düzeltildi):
+- ~~Panel `finalize` ucu ödemeyi sağlayıcıdan doğrulamadan aboneliği etkinleştirir~~ — düzeltildi (BILL-002): finalize yalnız `Manual` sağlayıcı oturumunda çalışır; `ISubscriptionCheckoutActivationService.TryActivateAsync` `source: Manual` + `session.Provider != Manual` ise 409 `Billing.ManualFinalizeNotAllowed` döner, kayıt değişmez. Iyzico/Stripe yalnız imzası doğrulanan webhook ile etkinleşir.
+- ~~Süresi dolmuş denemede üst plana geçişte fark oranlanıp 1 kuruşa iniyordu~~ — düzeltildi (BILL-003): `StartSubscriptionCheckoutCommandHandler` süresi dolmuş deneme/ücretli dönemde (effective ReadOnly) plan yönü ne olursa olsun hedef planın **tam fiyatını** (oran 1.0) çeker; kod indirimi bu tutara ADR-037 sırasıyla uygulanır. Oranlama yalnız etkin ücretli dönem içindeki yükseltmede kalır.
 
 ---
 
