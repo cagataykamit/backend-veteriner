@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.Tenants.Commands.AssignMemberRole;
 using Backend.Veteriner.Application.Tenants.Commands.CancelInvite;
 using Backend.Veteriner.Application.Tenants.Commands.Create;
 using Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
+using Backend.Veteriner.Application.Tenants.Commands.LoadExampleClinic;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMember;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberClinic;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberRole;
@@ -651,6 +652,27 @@ public sealed class TenantsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new ApplySubscriptionDiscountCodeCommand(tenantId, body?.Code ?? string.Empty), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Kiracının ilk kliniğine Örnek Veteriner Kliniği verisini yükler (ADR-002). Yetki <c>Subscriptions.Manage</c>;
+    /// JWT <c>tenant_id</c> route ile aynı olmalı. Yalnız deneme (trial) aboneliğinde ve kiracıda henüz müşteri/hasta yokken
+    /// çalışır; ikinci çağrı 409 <c>Tenants.ExampleClinicAlreadyLoaded</c>. Tüm kayıtlar tek işlemde yazılır.
+    /// </summary>
+    [HttpPost("{tenantId:guid}/example-clinic")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [ProducesResponseType(typeof(ExampleClinicLoadSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> LoadExampleClinic([FromRoute] Guid tenantId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new LoadExampleClinicCommand(tenantId), ct);
         return result.ToActionResult(this);
     }
 

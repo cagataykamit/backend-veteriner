@@ -16,4 +16,10 @@ public sealed class PublicOwnerSignupBody
 
     /// <summary>İsteğe bağlı satış ortağı kodu (ADR-037); geçersizse 400 <c>DiscountCodes.Invalid</c>.</summary>
     public string? DiscountCode { get; set; }
+
+    /// <summary>
+    /// Onboarding seçimi (ADR-002): <c>true</c> ise yeni kliniğe Örnek Veteriner Kliniği verisi kayıtla aynı işlemde yüklenir
+    /// ve yanıtta <c>exampleClinic</c> özeti döner. Varsayılan <c>false</c> (boş klinik).
+    /// </summary>
+    public bool StartWithExampleClinic { get; set; }
 }

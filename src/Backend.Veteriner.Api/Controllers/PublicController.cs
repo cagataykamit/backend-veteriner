@@ -56,7 +56,8 @@ public sealed class PublicController : ControllerBase
             body.Email,
             body.Password,
             body.AcceptedLegalDocuments,
-            body.DiscountCode);
+            body.DiscountCode,
+            body.StartWithExampleClinic);
 
         var result = await _mediator.Send(command, ct);
         return result.ToActionResult(this);
