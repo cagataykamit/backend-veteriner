@@ -52,6 +52,16 @@ jobs:
       - name: Restore
         run: dotnet restore Veteriner.sln
 
+      # Bilinen açığı olan paket (doğrudan veya geçişli) varsa koşu başarısız olur; liste özette.
+      - name: Vulnerable packages
+        run: |
+          dotnet list Veteriner.sln package --vulnerable --include-transitive | tee vulnerable.txt
+          if grep -qE '^\s+>' vulnerable.txt; then
+            { echo "### Açığı olan paketler"; echo '```'; grep -E '^\s+>' vulnerable.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Bilinen güvenlik açığı olan NuGet paketi var (dotnet list package --vulnerable)."
+            exit 1
+          fi
+
       # Uyarılar derlemeyi bozmaz; sayısı ve listesi özette raporlanır.
       - name: Build
         run: |
