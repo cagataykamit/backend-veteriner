@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Examinations;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
@@ -20,6 +21,7 @@ public sealed class ExportExaminationsReportQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly ITrialLimitPolicy _trialLimitPolicy;
 
     public ExportExaminationsReportQueryHandler(
         ITenantContext tenantContext,
@@ -28,7 +30,8 @@ public sealed class ExportExaminationsReportQueryHandler
         IReadRepository<Examination> examinations,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        ITrialLimitPolicy trialLimitPolicy)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -37,6 +40,7 @@ public sealed class ExportExaminationsReportQueryHandler
         _clients = clients;
         _pets = pets;
         _clinics = clinics;
+        _trialLimitPolicy = trialLimitPolicy;
     }
 
     public async Task<Result<ExaminationsCsvExportResult>> Handle(
@@ -58,6 +62,7 @@ public sealed class ExportExaminationsReportQueryHandler
             request.PetId,
             request.AppointmentId,
             request.Search,
+            _trialLimitPolicy,
             ct);
         if (!loaded.IsSuccess)
             return Result<ExaminationsCsvExportResult>.Failure(loaded.Error);

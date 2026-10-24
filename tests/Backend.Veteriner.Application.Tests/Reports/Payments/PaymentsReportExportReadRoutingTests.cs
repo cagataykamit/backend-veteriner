@@ -616,6 +616,7 @@ public sealed class PaymentsReportExportReadRoutingTests
             _clientLookupReader.Object,
             _petLookupReader.Object,
             _exportReader.Object,
+            TrialLimitPolicyStub.Paid,
             CancellationToken.None);
 
         _clients.Verify(
@@ -654,6 +655,7 @@ public sealed class PaymentsReportExportReadRoutingTests
             _clientLookupReader.Object,
             _petLookupReader.Object,
             _exportReader.Object,
+            TrialLimitPolicyStub.Paid,
             CancellationToken.None);
 
         _clients.Verify(
@@ -753,7 +755,8 @@ public sealed class PaymentsReportExportReadRoutingTests
                 PaymentsReportReadEnabled = paymentsReportReadEnabled,
                 PaymentsReportExportReadEnabled = exportReadEnabled,
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
-            }));
+            }),
+            TrialLimitPolicyStub.Paid);
 
     private ExportPaymentsReportXlsxQueryHandler CreateXlsxHandler(
         bool exportReadEnabled = false,
@@ -772,5 +775,6 @@ public sealed class PaymentsReportExportReadRoutingTests
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsReportExportReadEnabled = exportReadEnabled
-            }));
+            }),
+            TrialLimitPolicyStub.Paid);
 }

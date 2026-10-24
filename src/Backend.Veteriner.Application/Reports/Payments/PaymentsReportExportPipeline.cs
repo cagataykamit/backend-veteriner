@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Payments.ReadModels;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
@@ -40,6 +41,7 @@ internal static class PaymentsReportExportPipeline
         IClientReadModelLookupReader clientLookupReader,
         IPetReadModelLookupReader petLookupReader,
         IPaymentsReportExportReadModelReader exportReadModelReader,
+        ITrialLimitPolicy trialLimitPolicy,
         CancellationToken ct)
     {
         var validated = await PaymentsReportQueryValidation.ValidateAsync(
@@ -54,6 +56,9 @@ internal static class PaymentsReportExportPipeline
             return Result<Loaded>.Failure(validated.Error);
 
         var (tenantId, effectiveClinicId, accessibleClinicIds, validatedFrom, validatedTo) = validated.Value;
+
+        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
+        var rowLimit = await trialLimitPolicy.GetExportRowLimitAsync(tenantId, ct);
 
         // CQRS-15J + 15N: payment export Query DB routing (PaymentReadModels).
         // Flag açık + scope represent edilebiliyorsa (tek klinik veya tenant-wide) Query DB'den okunur (search boş veya dolu).
@@ -92,12 +97,9 @@ internal static class PaymentsReportExportPipeline
                     querySearchPetIds),
                 ct);
 
-            if (readResult.TotalCount > PaymentsReportConstants.MaxExportRows)
-            {
-                return Result<Loaded>.Failure(
-                    "Payments.ReportExportTooManyRows",
-                    $"Dışa aktarma en fazla {PaymentsReportConstants.MaxExportRows} satır destekler; filtreyi daraltın.");
-            }
+            var withinQueryLimit = rowLimit.Ensure(readResult.TotalCount, "Payments.ReportExportTooManyRows");
+            if (!withinQueryLimit.IsSuccess)
+                return Result<Loaded>.Failure(withinQueryLimit.Error);
 
             return Result<Loaded>.Success(
                 new Loaded(readResult.Items, validatedFrom, validatedTo));
@@ -129,12 +131,9 @@ internal static class PaymentsReportExportPipeline
                 accessibleClinicIds),
             ct);
 
-        if (total > PaymentsReportConstants.MaxExportRows)
-        {
-            return Result<Loaded>.Failure(
-                "Payments.ReportExportTooManyRows",
-                $"Dışa aktarma en fazla {PaymentsReportConstants.MaxExportRows} satır destekler; filtreyi daraltın.");
-        }
+        var withinLimit = rowLimit.Ensure(total, "Payments.ReportExportTooManyRows");
+        if (!withinLimit.IsSuccess)
+            return Result<Loaded>.Failure(withinLimit.Error);
 
         var rows = await payments.ListAsync(
             new PaymentsFilteredOrderedForReportSpec(

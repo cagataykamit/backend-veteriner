@@ -226,5 +226,6 @@ public sealed class PaymentsReportExportPipelineTests
             _clientLookupReader.Object,
             _petLookupReader.Object,
             _exportReader.Object,
+            TrialLimitPolicyStub.Paid,
             CancellationToken.None);
 }

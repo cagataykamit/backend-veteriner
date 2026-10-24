@@ -180,7 +180,8 @@ public sealed class PaymentSearchQueryReadFlagIsolationTests
                 PaymentsListReadEnabled = true,
                 PaymentsReportReadEnabled = true,
                 PaymentsReportExportReadEnabled = false
-            }));
+            }),
+            TrialLimitPolicyStub.Paid);
 
         var result = await handler.Handle(
             new ExportPaymentsReportQuery(From, To, cid, null, null, null, search),
@@ -231,7 +232,8 @@ public sealed class PaymentSearchQueryReadFlagIsolationTests
                 PaymentsListReadEnabled = true,
                 PaymentsReportReadEnabled = true,
                 PaymentsReportExportReadEnabled = false
-            }));
+            }),
+            TrialLimitPolicyStub.Paid);
 
         var result = await handler.Handle(
             new ExportPaymentsReportXlsxQuery(From, To, cid, null, null, null, search),

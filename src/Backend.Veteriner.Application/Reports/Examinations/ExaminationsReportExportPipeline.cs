@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Examinations.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
@@ -29,6 +30,7 @@ internal static class ExaminationsReportExportPipeline
         Guid? petId,
         Guid? appointmentId,
         string? search,
+        ITrialLimitPolicy trialLimitPolicy,
         CancellationToken ct)
     {
         var validated = await ExaminationsReportQueryValidation.ValidateAsync(
@@ -78,12 +80,11 @@ internal static class ExaminationsReportExportPipeline
                 accessibleClinicIds),
             ct);
 
-        if (total > ExaminationsReportConstants.MaxExportRows)
-        {
-            return Result<Loaded>.Failure(
-                "Examinations.ReportExportTooManyRows",
-                $"Dışa aktarma en fazla {ExaminationsReportConstants.MaxExportRows} satır destekler; filtreyi daraltın.");
-        }
+        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
+        var rowLimit = await trialLimitPolicy.GetExportRowLimitAsync(tenantId, ct);
+        var withinLimit = rowLimit.Ensure(total, "Examinations.ReportExportTooManyRows");
+        if (!withinLimit.IsSuccess)
+            return Result<Loaded>.Failure(withinLimit.Error);
 
         var rows = await examinations.ListAsync(
             new ExaminationsReportFilteredOrderedForExportSpec(

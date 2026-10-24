@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Appointments;
 using Backend.Veteriner.Application.Reports.Appointments.Queries.ExportAppointmentReport;
 using Backend.Veteriner.Application.Reports.Appointments.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
@@ -27,8 +28,9 @@ public sealed class ExportAppointmentsReportQueryHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
-    private ExportAppointmentsReportQueryHandler CreateHandler()
-        => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _appointments.Object, _clients.Object, _pets.Object, _clinics.Object);
+    private ExportAppointmentsReportQueryHandler CreateHandler(ITrialLimitPolicy? trialLimitPolicy = null)
+        => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _appointments.Object, _clients.Object, _pets.Object, _clinics.Object,
+            trialLimitPolicy ?? TrialLimitPolicyStub.Paid);
 
     [Fact]
     public async Task Handle_Should_ReturnCsv_WithBomAndSemicolon()
@@ -189,6 +191,60 @@ public sealed class ExportAppointmentsReportQueryHandlerTests
 
         r.IsSuccess.Should().BeFalse();
         r.Error.Code.Should().Be("Appointments.ReportExportTooManyRows");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_With_TrialCode_When_TrialTenant_Exceeds_TrialExportRows()
+    {
+        var tid = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _appointments.Setup(x => x.CountAsync(It.IsAny<AppointmentsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TrialLimits.ExportMaxRows + 1);
+
+        var r = await CreateHandler(TrialLimitPolicyStub.Trial).Handle(
+            new ExportAppointmentsReportQuery(
+                new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 1, 20, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                null,
+                null,
+                null,
+                null),
+            CancellationToken.None);
+
+        r.IsSuccess.Should().BeFalse();
+        r.Error.Code.Should().Be("Trial.ExportLimitExceeded");
+        r.Error.Message.Should().Contain("Deneme sürümünde").And.Contain("abonelikle kalkar");
+        _appointments.Verify(
+            x => x.ListAsync(It.IsAny<AppointmentsReportFilteredOrderedForExportSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Not_Apply_TrialExportRows_When_PaidTenant()
+    {
+        var tid = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+        _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
+        _appointments.Setup(x => x.CountAsync(It.IsAny<AppointmentsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TrialLimits.ExportMaxRows + 1);
+        _appointments
+            .Setup(x => x.ListAsync(It.IsAny<AppointmentsReportFilteredOrderedForExportSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Appointment>());
+
+        var r = await CreateHandler(TrialLimitPolicyStub.Paid).Handle(
+            new ExportAppointmentsReportQuery(
+                new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 1, 20, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                null,
+                null,
+                null,
+                null),
+            CancellationToken.None);
+
+        r.IsSuccess.Should().BeTrue(r.Error.Message);
     }
 
     [Fact]

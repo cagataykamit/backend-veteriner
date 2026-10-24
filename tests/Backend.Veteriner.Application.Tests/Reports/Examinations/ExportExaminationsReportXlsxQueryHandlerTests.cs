@@ -26,7 +26,7 @@ public sealed class ExportExaminationsReportXlsxQueryHandlerTests
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
 
     private ExportExaminationsReportXlsxQueryHandler CreateHandler()
-        => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _examinations.Object, _clients.Object, _pets.Object, _clinics.Object);
+        => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _examinations.Object, _clients.Object, _pets.Object, _clinics.Object, TrialLimitPolicyStub.Paid);
 
     [Fact]
     public async Task Handle_Should_ReturnXlsx_WithUserFacingHeaders()

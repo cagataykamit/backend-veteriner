@@ -179,7 +179,8 @@ public sealed class PaymentsReportExportScopeGuardTests
             _clientLookupReader.Object,
             _petLookupReader.Object,
             _exportReader.Object,
-            Options.Create(new QueryReadModelsOptions()));
+            Options.Create(new QueryReadModelsOptions()),
+            TrialLimitPolicyStub.Paid);
 
         var from = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var to = new DateTime(2026, 1, 10, 0, 0, 0, DateTimeKind.Utc);
@@ -235,7 +236,8 @@ public sealed class PaymentsReportExportScopeGuardTests
                 PaymentsReportReadEnabled = paymentsReportReadEnabled,
                 PaymentsReportExportReadEnabled = paymentsReportExportReadEnabled,
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
-            }));
+            }),
+            TrialLimitPolicyStub.Paid);
 
     private ExportPaymentsReportXlsxQueryHandler CreateXlsxHandler(
         bool paymentsReportReadEnabled = false,
@@ -257,5 +259,6 @@ public sealed class PaymentsReportExportScopeGuardTests
                 PaymentsReportReadEnabled = paymentsReportReadEnabled,
                 PaymentsReportExportReadEnabled = paymentsReportExportReadEnabled,
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
-            }));
+            }),
+            TrialLimitPolicyStub.Paid);
 }

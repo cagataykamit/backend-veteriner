@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Application.Reports.Payments.ReadModels;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
@@ -29,6 +30,7 @@ public sealed class ExportPaymentsReportQueryHandler
     private readonly IPetReadModelLookupReader _petLookupReader;
     private readonly IPaymentsReportExportReadModelReader _exportReadModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
+    private readonly ITrialLimitPolicy _trialLimitPolicy;
 
     public ExportPaymentsReportQueryHandler(
         ITenantContext tenantContext,
@@ -41,7 +43,8 @@ public sealed class ExportPaymentsReportQueryHandler
         IClientReadModelLookupReader clientLookupReader,
         IPetReadModelLookupReader petLookupReader,
         IPaymentsReportExportReadModelReader exportReadModelReader,
-        IOptions<QueryReadModelsOptions> queryReadModelsOptions)
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        ITrialLimitPolicy trialLimitPolicy)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -54,6 +57,7 @@ public sealed class ExportPaymentsReportQueryHandler
         _petLookupReader = petLookupReader;
         _exportReadModelReader = exportReadModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
+        _trialLimitPolicy = trialLimitPolicy;
     }
 
     public async Task<Result<PaymentsCsvExportResult>> Handle(
@@ -80,6 +84,7 @@ public sealed class ExportPaymentsReportQueryHandler
             _clientLookupReader,
             _petLookupReader,
             _exportReadModelReader,
+            _trialLimitPolicy,
             ct);
         if (!loaded.IsSuccess)
             return Result<PaymentsCsvExportResult>.Failure(loaded.Error);

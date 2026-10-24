@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Appointments.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -29,6 +30,7 @@ internal static class AppointmentsReportExportPipeline
         Guid? clientId,
         Guid? petId,
         string? search,
+        ITrialLimitPolicy trialLimitPolicy,
         CancellationToken ct)
     {
         var validated = await AppointmentsReportQueryValidation.ValidateAsync(
@@ -78,12 +80,11 @@ internal static class AppointmentsReportExportPipeline
                 accessibleClinicIds),
             ct);
 
-        if (total > AppointmentsReportConstants.MaxExportRows)
-        {
-            return Result<Loaded>.Failure(
-                "Appointments.ReportExportTooManyRows",
-                $"Dışa aktarma en fazla {AppointmentsReportConstants.MaxExportRows} satır destekler; filtreyi daraltın.");
-        }
+        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
+        var rowLimit = await trialLimitPolicy.GetExportRowLimitAsync(tenantId, ct);
+        var withinLimit = rowLimit.Ensure(total, "Appointments.ReportExportTooManyRows");
+        if (!withinLimit.IsSuccess)
+            return Result<Loaded>.Failure(withinLimit.Error);
 
         var rows = await appointments.ListAsync(
             new AppointmentsReportFilteredOrderedForExportSpec(

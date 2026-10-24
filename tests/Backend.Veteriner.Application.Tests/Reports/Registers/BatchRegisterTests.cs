@@ -287,7 +287,7 @@ public sealed class BatchRegisterTests
         reader
             .Setup(r => r.ReadAsync(It.IsAny<RegisterReadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegisterReadResult<VaccineRegisterItemDto>(0, []));
-        var runner = new RegisterReportRunner(tenant.Object, clinic.Object, ClinicReadScopeResolverMock.Default().Object);
+        var runner = new RegisterReportRunner(tenant.Object, clinic.Object, ClinicReadScopeResolverMock.Default().Object, TrialLimitPolicyStub.Paid);
         var query = new RegisterQuery(MomentDay, MomentDay, null, false);
 
         var csv = await new ExportVaccineRegisterQueryHandler(runner, reader.Object)

@@ -8,6 +8,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
@@ -200,6 +201,44 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var bytes = await response.Content.ReadAsByteArrayAsync();
         bytes.Length.Should().BeGreaterThan(4);
         Encoding.ASCII.GetString(bytes.AsSpan(0, 4)).Should().Be("PK\u0003\u0004");
+    }
+
+    [Fact]
+    public async Task GetPaymentsExport_Should_Return422_TrialExportLimitExceeded_When_TrialTenant_Exceeds_1000Rows()
+    {
+        // TRIAL-004 / TRIAL_LIMITS_API_CONTRACT.md: deneme kiracısında 1.001 satır → 422 Trial.ExportLimitExceeded, açık mesaj.
+        var client = _factory.CreateClient();
+        var ctx = await SeedTenantWithManyPaymentsAsync(TrialLimits.ExportMaxRows + 1, new DateTime(2026, 11, 5, 10, 0, 0, DateTimeKind.Utc), paidPlan: false);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        var from = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 11, 30, 23, 59, 59, DateTimeKind.Utc);
+
+        var csv = await client.GetAsync($"/api/v1/reports/payments/export{Query(from, to)}");
+        var xlsx = await client.GetAsync($"/api/v1/reports/payments/export-xlsx{Query(from, to)}");
+
+        csv.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var problem = await csv.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().Should().Be("Trial.ExportLimitExceeded");
+        problem.GetProperty("detail").GetString().Should().Be(
+            "Deneme sürümünde dışa aktarma en fazla 1000 satır sınırı; abonelikle kalkar. Filtreyi daraltın.");
+        xlsx.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await ReadProblemCodeAsync(xlsx)).Should().Be("Trial.ExportLimitExceeded");
+    }
+
+    [Fact]
+    public async Task GetPaymentsExport_Should_Return200_When_PaidTenant_Exceeds_TrialRows()
+    {
+        var client = _factory.CreateClient();
+        var ctx = await SeedTenantWithManyPaymentsAsync(TrialLimits.ExportMaxRows + 1, new DateTime(2026, 12, 5, 10, 0, 0, DateTimeKind.Utc), paidPlan: true);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        var from = new DateTime(2026, 12, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+
+        var response = await client.GetAsync($"/api/v1/reports/payments/export{Query(from, to)}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var text = Encoding.UTF8.GetString(await response.Content.ReadAsByteArrayAsync()).TrimStart('﻿');
+        text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Should().HaveCount(TrialLimits.ExportMaxRows + 2);
     }
 
     [Fact]
@@ -452,6 +491,35 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         }
 
         return new SinglePaymentSeed(tenant.Id, token, payment.Id);
+    }
+
+    /// <summary>Tek klinik/müşteri/hayvana <paramref name="count"/> ödeme; <paramref name="paidPlan"/> ile abonelik Active, yoksa Trialing.</summary>
+    private async Task<(Guid TenantId, string Token)> SeedTenantWithManyPaymentsAsync(int count, DateTime firstPaidAtUtc, bool paidPlan)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
+        var client = new Client(tenant.Id, "Veli", "905551112244", "veli@example.com");
+        var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
+        var pet = new Pet(tenant.Id, client.Id, "Kedi", speciesId);
+        db.AddRange(tenant, clinic, client, pet);
+        db.AddRange(Enumerable.Range(0, count).Select(i =>
+            new Payment(tenant.Id, clinic.Id, client.Id, pet.Id, null, null, 10m, "TRY", PaymentMethod.Cash, firstPaidAtUtc.AddSeconds(i), null)));
+
+        var now = DateTime.UtcNow;
+        var subscription = TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now.AddDays(-1), 400);
+        if (paidPlan)
+            subscription.ActivatePaidPlan(SubscriptionPlanCode.Basic, now);
+        db.TenantSubscriptions.Add(subscription);
+        await db.SaveChangesAsync();
+
+        var token = await IntegrationTestAuthHelper.SeedReportReaderAndIssueTokenAsync(
+            db, jwt, hasher, tenant.Id, clinic.Id, PermissionCatalog.Payments.Read);
+        return (tenant.Id, token);
     }
 
     private sealed record TwoClinicSeed(Guid TenantId, Guid UserId, Guid ClinicAId, Guid ClinicBId);

@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Contracts.Dtos;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Reports.OutstandingBalances;
@@ -16,6 +17,7 @@ internal static class OutstandingBalancesReportExportPipeline
         Guid? clinicId,
         decimal? minAmount,
         string? search,
+        ITrialLimitPolicy trialLimitPolicy,
         CancellationToken ct)
     {
         var filter = await OutstandingBalancesReportFilter.ResolveAsync(
@@ -23,14 +25,13 @@ internal static class OutstandingBalancesReportExportPipeline
         if (!filter.IsSuccess)
             return Result<IReadOnlyList<OutstandingBalanceItemDto>>.Failure(filter.Error);
 
-        var read = await reader.ReadAsync(filter.Value!.ToReadRequest(0, OutstandingBalancesReportConstants.MaxExportRows), ct);
+        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
+        var rowLimit = await trialLimitPolicy.GetExportRowLimitAsync(filter.Value!.TenantId, ct);
+        var read = await reader.ReadAsync(filter.Value.ToReadRequest(0, rowLimit.MaxRows), ct);
 
-        if (read.TotalCount > OutstandingBalancesReportConstants.MaxExportRows)
-        {
-            return Result<IReadOnlyList<OutstandingBalanceItemDto>>.Failure(
-                "OutstandingBalances.ReportExportTooManyRows",
-                $"Dışa aktarma en fazla {OutstandingBalancesReportConstants.MaxExportRows} satır destekler; filtreyi daraltın.");
-        }
+        var withinLimit = rowLimit.Ensure(read.TotalCount, "OutstandingBalances.ReportExportTooManyRows");
+        if (!withinLimit.IsSuccess)
+            return Result<IReadOnlyList<OutstandingBalanceItemDto>>.Failure(withinLimit.Error);
 
         return Result<IReadOnlyList<OutstandingBalanceItemDto>>.Success(read.Items);
     }

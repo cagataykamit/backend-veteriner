@@ -34,7 +34,7 @@ public sealed class RegisterReportTests
             .ReturnsAsync(new RegisterReadResult<ExaminationRegisterItemDto>(0, []));
     }
 
-    private RegisterReportRunner Runner() => new(_tenant.Object, _clinic.Object, _scope.Object);
+    private RegisterReportRunner Runner() => new(_tenant.Object, _clinic.Object, _scope.Object, TrialLimitPolicyStub.Paid);
 
     private static RegisterQuery Query(DateOnly? from = null, DateOnly? to = null, Guid? clinicId = null, bool includeVoided = false)
         => new(from ?? Day, to ?? Day, clinicId, includeVoided);

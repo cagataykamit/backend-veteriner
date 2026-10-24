@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Reports.Registers;
@@ -14,15 +15,18 @@ public sealed class RegisterReportRunner
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _scopeResolver;
+    private readonly ITrialLimitPolicy _trialLimitPolicy;
 
     public RegisterReportRunner(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
-        IClinicReadScopeResolver scopeResolver)
+        IClinicReadScopeResolver scopeResolver,
+        ITrialLimitPolicy trialLimitPolicy)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _scopeResolver = scopeResolver;
+        _trialLimitPolicy = trialLimitPolicy;
     }
 
     public async Task<Result<RegisterReadResult<TRow>>> ReadPageAsync<TRow>(
@@ -52,14 +56,13 @@ public sealed class RegisterReportRunner
         if (!filter.IsSuccess)
             return Result<IReadOnlyList<TRow>>.Failure(filter.Error);
 
-        var read = await reader.ReadAsync(filter.Value!.ToReadRequest(0, RegisterReportConstants.MaxExportRows), ct);
+        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
+        var rowLimit = await _trialLimitPolicy.GetExportRowLimitAsync(filter.Value!.TenantId, ct);
+        var read = await reader.ReadAsync(filter.Value.ToReadRequest(0, rowLimit.MaxRows), ct);
 
-        if (read.TotalCount > RegisterReportConstants.MaxExportRows)
-        {
-            return Result<IReadOnlyList<TRow>>.Failure(
-                "Registers.ExportTooManyRows",
-                $"Dışa aktarma en fazla {RegisterReportConstants.MaxExportRows} satır destekler; filtreyi daraltın.");
-        }
+        var withinLimit = rowLimit.Ensure(read.TotalCount, "Registers.ExportTooManyRows");
+        if (!withinLimit.IsSuccess)
+            return Result<IReadOnlyList<TRow>>.Failure(withinLimit.Error);
 
         return Result<IReadOnlyList<TRow>>.Success(read.Items);
     }

@@ -53,7 +53,8 @@ public sealed class ExportPaymentsReportQueryHandlerTests
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled,
                 PaymentsReportExportReadEnabled = paymentsReportExportReadEnabled
-            }));
+            }),
+            TrialLimitPolicyStub.Paid);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

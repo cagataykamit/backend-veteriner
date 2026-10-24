@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Appointments;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -20,6 +21,7 @@ public sealed class ExportAppointmentsReportXlsxQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly ITrialLimitPolicy _trialLimitPolicy;
 
     public ExportAppointmentsReportXlsxQueryHandler(
         ITenantContext tenantContext,
@@ -28,7 +30,8 @@ public sealed class ExportAppointmentsReportXlsxQueryHandler
         IReadRepository<Appointment> appointments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        ITrialLimitPolicy trialLimitPolicy)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -37,6 +40,7 @@ public sealed class ExportAppointmentsReportXlsxQueryHandler
         _clients = clients;
         _pets = pets;
         _clinics = clinics;
+        _trialLimitPolicy = trialLimitPolicy;
     }
 
     public async Task<Result<AppointmentsXlsxExportResult>> Handle(
@@ -58,6 +62,7 @@ public sealed class ExportAppointmentsReportXlsxQueryHandler
             request.ClientId,
             request.PetId,
             request.Search,
+            _trialLimitPolicy,
             ct);
         if (!loaded.IsSuccess)
             return Result<AppointmentsXlsxExportResult>.Failure(loaded.Error);

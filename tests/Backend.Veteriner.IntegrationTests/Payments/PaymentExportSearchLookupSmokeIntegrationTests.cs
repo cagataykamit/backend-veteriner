@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
 using Backend.Veteriner.Application.Reports.Payments.ReadModels;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
@@ -261,7 +262,8 @@ public sealed class PaymentExportSearchLookupSmokeIntegrationTests
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
-            }));
+            }),
+            sp.GetRequiredService<ITrialLimitPolicy>());
 
         return await handler.Handle(
             new ExportPaymentsReportQuery(from, to, clinicId, null, null, null, search),
@@ -293,7 +295,8 @@ public sealed class PaymentExportSearchLookupSmokeIntegrationTests
             Options.Create(new QueryReadModelsOptions
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled
-            }));
+            }),
+            sp.GetRequiredService<ITrialLimitPolicy>());
 
         return await handler.Handle(
             new ExportPaymentsReportXlsxQuery(from, to, clinicId, null, null, null, search),

@@ -354,7 +354,8 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled,
                 PaymentsReportExportReadEnabled = paymentsReportExportReadEnabled
-            }));
+            }),
+            TrialLimitPolicyStub.Paid);
 
     private ExportPaymentsReportXlsxQueryHandler CreateXlsxHandler(
         bool paymentsSearchLookupEnabled,
@@ -374,5 +375,6 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
             {
                 PaymentsSearchLookupEnabled = paymentsSearchLookupEnabled,
                 PaymentsReportExportReadEnabled = paymentsReportExportReadEnabled
-            }));
+            }),
+            TrialLimitPolicyStub.Paid);
 }

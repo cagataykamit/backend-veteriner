@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Registers;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
@@ -74,17 +75,20 @@ public sealed class ExportDailyTransactionsReportQueryHandler
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _scopeResolver;
     private readonly IDailyTransactionsReader _reader;
+    private readonly ITrialLimitPolicy _trialLimitPolicy;
 
     public ExportDailyTransactionsReportQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver scopeResolver,
-        IDailyTransactionsReader reader)
+        IDailyTransactionsReader reader,
+        ITrialLimitPolicy trialLimitPolicy)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _scopeResolver = scopeResolver;
         _reader = reader;
+        _trialLimitPolicy = trialLimitPolicy;
     }
 
     public async Task<Result<RegisterExportResult>> Handle(ExportDailyTransactionsReportQuery request, CancellationToken ct)
@@ -95,13 +99,12 @@ public sealed class ExportDailyTransactionsReportQueryHandler
         if (!filter.IsSuccess)
             return Result<RegisterExportResult>.Failure(filter.Error);
 
-        var read = await _reader.ReadAsync(filter.Value!, 0, RegisterReportConstants.MaxExportRows, ct);
-        if (read.TotalCount > RegisterReportConstants.MaxExportRows)
-        {
-            return Result<RegisterExportResult>.Failure(
-                "Registers.ExportTooManyRows",
-                $"Dışa aktarma en fazla {RegisterReportConstants.MaxExportRows} satır destekler; filtreyi daraltın.");
-        }
+        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
+        var rowLimit = await _trialLimitPolicy.GetExportRowLimitAsync(filter.Value!.TenantId, ct);
+        var read = await _reader.ReadAsync(filter.Value, 0, rowLimit.MaxRows, ct);
+        var withinLimit = rowLimit.Ensure(read.TotalCount, "Registers.ExportTooManyRows");
+        if (!withinLimit.IsSuccess)
+            return Result<RegisterExportResult>.Failure(withinLimit.Error);
 
         return Result<RegisterExportResult>.Success(
             RegisterReportRunner.BuildFile(DailyTransactionsReportColumns.Export, read.Items, request.Format));

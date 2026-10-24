@@ -101,7 +101,7 @@ public sealed class DailyTransactionsReportTests
         _reader
             .Setup(r => r.ReadAsync(It.IsAny<FinanceEventFilter>(), 0, RegisterReportConstants.MaxExportRows, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DailyTransactionsReadResult(2, Totals(), [item, correction]));
-        var handler = new ExportDailyTransactionsReportQueryHandler(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object);
+        var handler = new ExportDailyTransactionsReportQueryHandler(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object, TrialLimitPolicyStub.Paid);
         var day = new DateOnly(2026, 10, 14);
 
         var csv = await handler.Handle(new ExportDailyTransactionsReportQuery(day, day, null, null, null, null, RegisterExportFormat.Csv), CancellationToken.None);
