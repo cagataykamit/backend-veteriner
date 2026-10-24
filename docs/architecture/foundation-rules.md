@@ -91,9 +91,10 @@ Bu belge **Backend.Veteriner** deposunun güncel mimari ve süreç kurallarını
 
 - **Correlation:** HTTP isteği boyunca correlation id üretimi / iletimi middleware ve header standardı ile yapılır.
 - **Audit:** `IAuditableRequest` işaretli command’ler (ve pipeline) denetim kaydı üretir; audit writer altyapıda uygulanır.
+- **Transaction:** Repository yazımları (`AddAsync` / `UpdateAsync` / `DeleteAsync`) anında commit eder. Birden fazla yazım yapan veya iç komut gönderen command `ITransactionalRollbackOnFailureRequest` ile işaretlenir; `TransactionBehavior` tek işlem açar, istisnada ve başarısız `Result`’ta geri alır. Tek yazımlı (ekle-ya-da-güncelle dallı) command’ler işaret gerektirmez.
 - **Outbox:** Yan etkiler (e-posta vb.) mümkün olduğunda transactional outbox ile kuyruklanır; işleyici hosted service veya ayrı worker ile tüketilir.
 
-Bu üçü **platform tutarlılığı** için foundation seviyesinde korunur; ürün modülleri aynı pattern’e uyum sağlar.
+Bu dördü **platform tutarlılığı** için foundation seviyesinde korunur; ürün modülleri aynı pattern’e uyum sağlar.
 
 ---
 

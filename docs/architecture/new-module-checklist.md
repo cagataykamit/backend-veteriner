@@ -18,6 +18,7 @@ Yeni bir **bounded context** foundation üzerine eklenirken aşağıdaki adımla
 - [ ] Her use-case için **Command** veya **Query** + **Handler** (+ gerekirse **Validator**).
 - [ ] `Result` / `Result<T>` ile hata senaryoları tanımlandı mı?
 - [ ] Gerekirse **IAuditableRequest** işaretleme (denetim gereksinimine göre).
+- [ ] Birden fazla repository yazımı veya iç komut gönderen command **ITransactionalRollbackOnFailureRequest** ile işaretlendi mi? (Yazımlar ayrı ayrı commit eder; işaret yoksa ortadaki hata yarım kayıt bırakır.)
 
 ---
 
