@@ -1,4 +1,5 @@
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -142,6 +143,71 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         log.Status.Should().Be(ReminderDispatchStatus.Enqueued);
         log.OutboxMessageId.Should().NotBeNull();
         (await db.OutboxMessages.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_Skip_Beyond_TrialDailyLimit_And_Log_Reason_When_TrialTenant()
+    {
+        // TRIAL-004: deneme kiracısında günde en fazla 20 e-posta; 21. aday gönderilmez, log Skipped + "TrialDailyLimit".
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        db.AddRange(tenant, SeedAppointmentsForTenant(db, tenant.Id, TrialLimits.ReminderEmailsPerDay + 1, now, await GetAnySpeciesIdAsync(db)));
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(TrialLimits.ReminderEmailsPerDay);
+        var logs = await db.ReminderDispatchLogs.AsNoTracking().ToListAsync();
+        logs.Count(l => l.Status == ReminderDispatchStatus.Enqueued).Should().Be(TrialLimits.ReminderEmailsPerDay);
+        var skipped = logs.Single(l => l.Status == ReminderDispatchStatus.Skipped);
+        skipped.LastError.Should().Be(TrialLimits.ReminderDailyLimitSkipReason);
+
+        // Aynı gün ikinci tur: günlük bütçe dolu, atlanan kayıt yeniden aday olmaz, yeni e-posta çıkmaz.
+        await service.ProcessOnceAsync(CancellationToken.None);
+        email.Enqueued.Count.Should().Be(TrialLimits.ReminderEmailsPerDay);
+    }
+
+    [Fact]
+    public async Task ProcessOnce_Should_Not_Apply_DailyLimit_When_PaidTenant()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A");
+        db.AddRange(tenant, SeedAppointmentsForTenant(db, tenant.Id, TrialLimits.ReminderEmailsPerDay + 1, now, await GetAnySpeciesIdAsync(db)));
+        var subscription = TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now.AddDays(-1), 14);
+        subscription.ActivatePaidPlan(SubscriptionPlanCode.Basic, now);
+        db.TenantSubscriptions.Add(subscription);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, email);
+        await service.ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Count.Should().Be(TrialLimits.ReminderEmailsPerDay + 1);
+        (await db.ReminderDispatchLogs.CountAsync(l => l.Status == ReminderDispatchStatus.Skipped)).Should().Be(0);
+    }
+
+    /// <summary>Kiracıya klinik, e-postalı müşteri, hatırlatma ayarı ve 24 saat penceresinde <paramref name="count"/> randevu (ayrı hayvanlar) ekler.</summary>
+    private static TenantReminderSettings SeedAppointmentsForTenant(AppDbContext db, Guid tenantId, int count, DateTime nowUtc, Guid speciesId)
+    {
+        var clinic = new Clinic(tenantId, "Klinik", "Istanbul");
+        var client = new Client(tenantId, "Ali Veli", "905555555555", "ali@example.com");
+        db.AddRange(clinic, client);
+        for (var i = 0; i < count; i++)
+        {
+            var pet = new Pet(tenantId, client.Id, $"Pamuk {i}", speciesId);
+            var appt = new Appointment(
+                tenantId, clinic.Id, pet.Id, nowUtc.AddHours(2).AddMinutes(30 * i), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
+            db.AddRange(pet, appt);
+        }
+
+        var settings = TenantReminderSettings.CreateDefault(tenantId);
+        settings.Update(true, 24, false, 3, true);
+        return settings;
     }
 
     [Fact]

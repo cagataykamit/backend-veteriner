@@ -71,6 +71,9 @@ public sealed class ReminderProcessorService
             if (!TenantSubscriptionEffectiveWriteEvaluator.WriteAllowed(effective))
                 continue;
 
+            // Deneme kiracısında günlük e-posta tavanı (TRIAL-004); randevu ve aşı hatırlatmaları aynı bütçeyi paylaşır.
+            var dailyBudget = await LoadDailyEmailBudgetAsync(settings.TenantId, sub, nowUtc, ct);
+
             if (settings.AppointmentRemindersEnabled)
             {
                 await ProcessAppointmentRemindersAsync(
@@ -78,6 +81,7 @@ public sealed class ReminderProcessorService
                     settings.AppointmentReminderHoursBefore,
                     nowUtc,
                     batchSize,
+                    dailyBudget,
                     ct);
             }
 
@@ -88,6 +92,7 @@ public sealed class ReminderProcessorService
                     settings.VaccinationReminderDaysBefore,
                     nowUtc,
                     batchSize,
+                    dailyBudget,
                     ct);
             }
         }
@@ -101,6 +106,7 @@ public sealed class ReminderProcessorService
         int hoursBefore,
         DateTime nowUtc,
         int batchSize,
+        DailyEmailBudget dailyBudget,
         CancellationToken ct)
     {
         // Reminder due = ScheduledAtUtc - hoursBefore. Include "missed window": reminder time may be in the past
@@ -205,6 +211,14 @@ public sealed class ReminderProcessorService
                 continue;
             }
 
+            if (!dailyBudget.TryConsume())
+            {
+                log.MarkSkipped(TrialLimits.ReminderDailyLimitSkipReason);
+                if (await TryInsertLogAsync(log, ct))
+                    dedupeSet.Add(dedupeKey);
+                continue;
+            }
+
             try
             {
                 var subject = "Randevu hatırlatması";
@@ -236,6 +250,7 @@ public sealed class ReminderProcessorService
         int daysBefore,
         DateTime nowUtc,
         int batchSize,
+        DailyEmailBudget dailyBudget,
         CancellationToken ct)
     {
         // Reminder due = DueAtUtc - daysBefore. Include "missed window": reminder time may be in the past
@@ -350,6 +365,14 @@ public sealed class ReminderProcessorService
                 continue;
             }
 
+            if (!dailyBudget.TryConsume())
+            {
+                log.MarkSkipped(TrialLimits.ReminderDailyLimitSkipReason);
+                if (await TryInsertLogAsync(log, ct))
+                    dedupeSet.Add(dedupeKey);
+                continue;
+            }
+
             try
             {
                 var subject = "Aşı hatırlatması";
@@ -394,6 +417,33 @@ public sealed class ReminderProcessorService
             .Where(p => p.TenantId == tenantId && acceptingClientIds.Contains(p.ClientId))
             .Where(Pet.ReceivesCare)
             .Select(p => p.Id);
+    }
+
+    /// <summary>
+    /// TRIAL-004: deneme kiracısında UTC gün içinde kuyruğa alınmış (Skipped dışı) günlük sayısı
+    /// <see cref="TrialLimits.ReminderEmailsPerDay"/>'den düşülür; ücretli kiracıda bütçe sınırsızdır.
+    /// </summary>
+    private async Task<DailyEmailBudget> LoadDailyEmailBudgetAsync(
+        Guid tenantId,
+        TenantSubscription subscription,
+        DateTime nowUtc,
+        CancellationToken ct)
+    {
+        if (!TrialLimitPolicy.IsTrial(subscription))
+            return DailyEmailBudget.Unlimited;
+
+        var dayStartUtc = nowUtc.Date;
+        var dayEndUtc = dayStartUtc.AddDays(1);
+        var sentToday = await _db.ReminderDispatchLogs
+            .AsNoTracking()
+            .CountAsync(
+                l => l.TenantId == tenantId
+                    && l.Status != ReminderDispatchStatus.Skipped
+                    && l.CreatedAtUtc >= dayStartUtc
+                    && l.CreatedAtUtc < dayEndUtc,
+                ct);
+
+        return new DailyEmailBudget(Math.Max(0, TrialLimits.ReminderEmailsPerDay - sentToday));
     }
 
     private async Task SyncEnqueuedDispatchLogsWithOutboxStatusAsync(int batchSize, CancellationToken ct)
@@ -546,6 +596,27 @@ public sealed class ReminderProcessorService
         DateTime DueAtUtc,
         string VaccineName,
         VaccinationStatus Status);
+
+    /// <summary>Kiracının bu turda kalan günlük e-posta hakkı; <c>null</c> kalan = sınırsız.</summary>
+    private sealed class DailyEmailBudget
+    {
+        public static DailyEmailBudget Unlimited { get; } = new(null);
+
+        private int? _remaining;
+
+        public DailyEmailBudget(int? remaining) => _remaining = remaining;
+
+        public bool TryConsume()
+        {
+            if (_remaining is null)
+                return true;
+            if (_remaining <= 0)
+                return false;
+
+            _remaining--;
+            return true;
+        }
+    }
 
     private sealed record PetClientRow(Guid PetId, Guid ClientId, string Name);
     private sealed record ClientRecipientRow(Guid ClientId, string FullName, string? Email);
