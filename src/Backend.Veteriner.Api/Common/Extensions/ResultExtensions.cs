@@ -153,6 +153,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Sağlayıcıdan doğrulanması gereken checkout oturumu panel finalize ile elle tamamlanamaz (BILL-002).
+        if (normalized is "billing.manualfinalizenotallowed")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Vefat etmiş hayvan için yeni randevu/geliş/muayene (ADR-020 S5): kaydın durumu ile çakışma.
         if (normalized is "pets.deceased")
         {

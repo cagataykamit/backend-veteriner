@@ -78,6 +78,15 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
                 "Checkout tamamlanmış ancak abonelik durumu beklenenle uyuşmuyor.");
         }
 
+        // Panel finalize (Manual) ödemeyi sağlayıcıdan doğrulamaz; yalnız Manual (geliştirme/test) sağlayıcı oturumunu
+        // etkinleştirebilir. Iyzico/Stripe oturumları imzası doğrulanan webhook ile etkinleşir (BILL-002).
+        if (source == BillingActivationSource.Manual && session.Provider != BillingProvider.Manual)
+        {
+            return Result<SubscriptionCheckoutSessionDto>.Failure(
+                "Billing.ManualFinalizeNotAllowed",
+                "Bu oturumun ödemesi sağlayıcı tarafından doğrulanmalıdır; elle tamamlanamaz.");
+        }
+
         if (!session.IsOpen(utcNow))
         {
             if (session.Status is BillingCheckoutSessionStatus.Pending or BillingCheckoutSessionStatus.RedirectReady)

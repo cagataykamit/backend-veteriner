@@ -266,6 +266,46 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
         (await IntegrationTestProblemDetails.ReadCodeAsync(late)).Should().Be("DiscountCodes.ApplyNotOpen");
     }
 
+    [Theory]
+    [InlineData(BillingProvider.Iyzico, HttpStatusCode.Conflict, "Billing.ManualFinalizeNotAllowed")]
+    [InlineData(BillingProvider.Manual, HttpStatusCode.OK, null)]
+    public async Task Panel_Finalize_Should_Activate_Only_Manual_Provider_Sessions(
+        BillingProvider provider, HttpStatusCode expectedStatus, string? expectedCode)
+    {
+        var signup = await SignupAsync(null);
+        var tenantId = (await signup.Response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("tenantId").GetGuid();
+
+        Guid sessionId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var session = BillingCheckoutSession.CreatePending(
+                tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Pro, provider, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
+            db.BillingCheckoutSessions.Add(session);
+            await db.SaveChangesAsync();
+            sessionId = session.Id;
+        }
+
+        var owner = _factory.CreateClient();
+        owner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(_factory.Services, signup.Email,
+                [PermissionCatalog.Subscriptions.Read, PermissionCatalog.Subscriptions.Manage]));
+        var response = await owner.PostAsJsonAsync(
+            $"/api/v1/tenants/{tenantId}/subscription-checkout/{sessionId}/finalize", new { externalReference = "panel-ref" });
+
+        response.StatusCode.Should().Be(expectedStatus, await response.Content.ReadAsStringAsync());
+        if (expectedCode is not null)
+            (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be(expectedCode);
+
+        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var sub = await verifyDb.TenantSubscriptions.SingleAsync(s => s.TenantId == tenantId);
+        if (provider == BillingProvider.Manual)
+            sub.PlanCode.Should().Be(SubscriptionPlanCode.Pro);
+        else
+            sub.PlanCode.Should().Be(SubscriptionPlanCode.Basic, "sağlayıcıdan doğrulanmamış ödeme planı değiştirmemeli");
+    }
+
     // ---- Kurulum ----
 
     private static string UniqueCode() => $"IT{Guid.NewGuid():N}"[..12].ToUpperInvariant();
@@ -343,7 +383,9 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var session = BillingCheckoutSession.CreatePending(
-                tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Basic, BillingProvider.Iyzico, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
+                tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Basic,
+                source == BillingActivationSource.Manual ? BillingProvider.Manual : BillingProvider.Iyzico,
+                DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
             session.RecordPricing(grossMinor, discountMinor);
             db.BillingCheckoutSessions.Add(session);
             await db.SaveChangesAsync();

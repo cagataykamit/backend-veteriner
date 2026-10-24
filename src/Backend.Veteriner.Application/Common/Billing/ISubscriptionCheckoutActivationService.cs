@@ -11,6 +11,8 @@ public interface ISubscriptionCheckoutActivationService
     /// <paramref name="tenantIdConstraint"/> doluysa session bu kiracıya ait olmalı (panel finalize).
     /// Webhook için null geçilir; session yalnızca id ile yüklenir.
     /// <paramref name="providerMustMatch"/> doluysa session oluşturulurken seçilen ödeme sağlayıcı ile eşleşmeli (webhook güvenliği).
+    /// <see cref="BillingActivationSource.Manual"/> (panel finalize) yalnız Manual sağlayıcı oturumunu etkinleştirir;
+    /// Iyzico/Stripe oturumları yalnız <see cref="BillingActivationSource.Webhook"/> (imzası doğrulanmış) ile etkinleşir.
     /// </summary>
     Task<Result<SubscriptionCheckoutSessionDto>> TryActivateAsync(
         Guid checkoutSessionId,

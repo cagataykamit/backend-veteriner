@@ -206,14 +206,41 @@ public sealed class SubscriptionCheckoutActivationServiceTests
     }
 
     [Theory]
-    [InlineData(BillingActivationSource.Webhook, 1)]
-    [InlineData(BillingActivationSource.Manual, 0)]
+    [InlineData(BillingProvider.Iyzico)]
+    [InlineData(BillingProvider.Stripe)]
+    public async Task TryActivateAsync_Should_Reject_Manual_Finalize_For_Provider_Verified_Sessions(BillingProvider provider)
+    {
+        // BILL-002: panel finalize sağlayıcıdan doğrulanmamış ödemeyle aboneliği etkinleştiremez.
+        var tenantId = Guid.NewGuid();
+        var session = BillingCheckoutSession.CreatePending(
+            tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Pro, provider, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
+        var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-20), 14);
+        _sessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<BillingCheckoutSessionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var result = await CreateService().TryActivateAsync(
+            session.Id, tenantId, null, "fake-ref", BillingActivationSource.Manual, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Billing.ManualFinalizeNotAllowed");
+        session.Status.Should().NotBe(BillingCheckoutSessionStatus.Completed);
+        sub.PlanCode.Should().Be(SubscriptionPlanCode.Basic);
+        sub.Status.Should().Be(TenantSubscriptionStatus.Trialing);
+        _subscriptionsWrite.Verify(x => x.UpdateAsync(It.IsAny<TenantSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+        _sessionsWrite.Verify(x => x.UpdateAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(BillingActivationSource.Webhook, BillingProvider.Iyzico, 1)]
+    [InlineData(BillingActivationSource.Manual, BillingProvider.Manual, 0)]
     public async Task TryActivateAsync_Should_Record_Partner_Commission_Only_For_Verified_Webhook_Collection(
-        BillingActivationSource source, int expectedCollections)
+        BillingActivationSource source, BillingProvider provider, int expectedCollections)
     {
         var tenantId = Guid.NewGuid();
         var session = BillingCheckoutSession.CreatePending(
-            tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Basic, BillingProvider.Iyzico, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
+            tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Basic, provider, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
         session.RecordPricing(99_900, 9_990);
         var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-20), 14);
 
