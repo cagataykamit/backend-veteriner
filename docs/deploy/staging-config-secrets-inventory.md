@@ -83,7 +83,7 @@ Aşağıdaki tablo **ilk staging deploy** için minimum env var envanteridir. Ke
 |---|---|---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | **Evet** | `Staging` | API | `appsettings.Staging.json` overlay'i yükler |
 | `ConnectionStrings__DefaultConnection` | **Evet*** | `Server=<SQL_HOST>;Database=VetinityCommandDb_Staging;User Id=<USER>;Password=<PASSWORD>;TrustServerCertificate=<true\|false>;MultipleActiveResultSets=True` | API, DbMigrator | Command DB (`AppDbContext`). *`SqlServer` fallback kullanılıyorsa bu satır yerine aşağıdaki key |
-| `ConnectionStrings__SqlServer` | Koşullu | Aynı Command placeholder | API, DbMigrator | `DefaultConnection` boşsa Infrastructure fallback (`DependencyInjection.cs`). Production şablonu bu key'i kullanır; staging'de **tek Command key** tutarlılığı önerilir |
+| `ConnectionStrings__SqlServer` | Koşullu | Aynı Command placeholder | API, DbMigrator | `DefaultConnection` boşsa Infrastructure fallback (`DependencyInjection.cs`); yalnız geriye dönük uyumluluk. Tüm appsettings şablonları (Production dahil, 2026-10-24) `DefaultConnection` kullanır; `StartupConfigurationValidator` da onu zorunlu kılar |
 | `ConnectionStrings__QueryConnection` | **Evet** | `Server=<SQL_HOST>;Database=VetinityQueryDb_Staging;User Id=<USER>;Password=<PASSWORD>;TrustServerCertificate=<true\|false>;MultipleActiveResultSets=True` | API, DbMigrator | Query DB (`QueryDbContext`). **Boş bırakılamaz** |
 | `Jwt__Key` | **Evet** | `<STAGING_JWT_SIGNING_KEY_MIN_32_CHARS>` | API | Symmetric signing key. Staging'de production key **kullanılmamalı** |
 | `App__BaseUrl` | **Evet** | `https://staging-api.<DOMAIN>` | API | Public API base URL (link/redirect üretimi) |
