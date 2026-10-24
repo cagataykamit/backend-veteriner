@@ -8,7 +8,7 @@ namespace Backend.Veteriner.Domain.Examinations;
 /// klinik bulgular/vital (<see cref="Findings"/>, vital alanları), değerlendirme (<see cref="Assessment"/>),
 /// plan (<see cref="Plan"/>). <see cref="Notes"/> bölüm dışı genel nottur.
 /// </summary>
-public sealed class Examination : AggregateRoot
+public sealed class Examination : AggregateRoot, IClinicScoped
 {
     public const int MaxVisitReasonLength = 2000;
     public const int MaxFindingsLength = 8000;

@@ -1,7 +1,8 @@
+using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Domain.Products;
 
 /// <summary>Eklenebilir stok defteri kaydı (append-only).</summary>
-public sealed class StockMovement
+public sealed class StockMovement : IClinicScoped
 {
     /// <summary>Tek hareketteki miktar üst sınırı (anlamsız değer ve SQL taşması koruması).</summary>
     public const decimal MaxQuantity = 1_000_000m;

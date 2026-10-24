@@ -1,6 +1,6 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Payments;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Payments.Specs;
 
@@ -15,7 +15,7 @@ public sealed class UnallocatedPaymentsForClientSpec : Specification<Payment>
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId && p.ClientId == clientId && p.AllocatedAmount < p.Amount);
-        DashboardSpecificationClinicScope.ApplyToPayment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(p => p.PaidAtUtc).ThenByDescending(p => p.Id);
     }
 }

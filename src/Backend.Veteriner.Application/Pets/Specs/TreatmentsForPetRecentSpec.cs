@@ -1,6 +1,6 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Treatments;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Pets.Specs;
 
@@ -14,7 +14,7 @@ public sealed class TreatmentsForPetRecentSpec : Specification<Treatment>
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.Where(t => t.TenantId == tenantId && t.PetId == petId);
-        DashboardSpecificationClinicScope.ApplyToTreatment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(t => t.TreatmentDateUtc)
             .ThenByDescending(t => t.Id)
             .Take(take);

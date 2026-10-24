@@ -1,6 +1,6 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Payments;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Pets.Specs;
 
@@ -14,7 +14,7 @@ public sealed class PaymentsForPetRecentSpec : Specification<Payment>
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.Where(p => p.TenantId == tenantId && p.PetId == petId);
-        DashboardSpecificationClinicScope.ApplyToPayment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(p => p.PaidAtUtc)
             .ThenByDescending(p => p.Id)
             .Take(take);

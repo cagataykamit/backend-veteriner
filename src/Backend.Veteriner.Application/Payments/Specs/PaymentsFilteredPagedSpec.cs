@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Payments.Specs;
 
@@ -23,17 +24,7 @@ public sealed class PaymentsFilteredPagedSpec : Specification<Payment>
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            Query.Where(p => p.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(p => false);
-            else
-                Query.Where(p => accessibleClinicIds.Contains(p.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (clientId.HasValue)
             Query.Where(p => p.ClientId == clientId.Value);
         if (petId.HasValue)

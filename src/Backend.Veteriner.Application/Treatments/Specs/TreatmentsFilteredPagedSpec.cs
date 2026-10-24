@@ -2,6 +2,7 @@ using Ardalis.Specification;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.Treatments;
 using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Treatments.Specs;
 
@@ -23,17 +24,7 @@ public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment, Treat
     {
         Query.AsNoTracking();
         Query.Where(t => t.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            Query.Where(t => t.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(t => false);
-            else
-                Query.Where(t => accessibleClinicIds.Contains(t.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(t => t.PetId == petId.Value);
         if (dateFromUtc.HasValue)

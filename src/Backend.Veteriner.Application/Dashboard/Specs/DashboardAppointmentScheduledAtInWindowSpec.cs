@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Dashboard.Specs;
 /// <summary>
@@ -24,6 +25,6 @@ public sealed class DashboardAppointmentScheduledAtInWindowSpec
             a.TenantId == tenantId
             && a.ScheduledAtUtc >= startUtcInclusive
             && a.ScheduledAtUtc < endUtcExclusive);
-        DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.Select(a => a.ScheduledAtUtc);
     }}

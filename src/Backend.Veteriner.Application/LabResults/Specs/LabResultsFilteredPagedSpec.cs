@@ -2,6 +2,7 @@ using Ardalis.Specification;
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Domain.LabResults;
 using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.LabResults.Specs;
 
@@ -22,17 +23,7 @@ public sealed class LabResultsFilteredPagedSpec : Specification<LabResult>
         ListSortChoice<LabResultListSortField>? sort = null)
     {
         Query.Where(x => x.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            Query.Where(x => x.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(x => false);
-            else
-                Query.Where(x => accessibleClinicIds.Contains(x.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(x => x.PetId == petId.Value);
         if (status.HasValue)

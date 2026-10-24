@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Appointments;
 using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Reports.Appointments.Specs;
 
@@ -20,17 +21,7 @@ public sealed class AppointmentsReportFilteredOrderedForExportSpec : Specificati
     {
         Query.AsNoTracking();
         Query.Where(a => a.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            Query.Where(a => a.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(a => false);
-            else
-                Query.Where(a => accessibleClinicIds.Contains(a.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(a => a.PetId == petId.Value);
         if (restrictedPetIdsForClient is { Count: > 0 })

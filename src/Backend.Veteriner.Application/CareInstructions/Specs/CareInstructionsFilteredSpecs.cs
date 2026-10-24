@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.CareInstructions;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.CareInstructions.Specs;
 
@@ -16,17 +17,7 @@ internal static class CareInstructionsFilter
         Guid? visitId)
     {
         query.Where(x => x.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            query.Where(x => x.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                query.Where(x => false);
-            else
-                query.Where(x => accessibleClinicIds.Contains(x.ClinicId));
-        }
+        query.ApplyClinicScope(clinicId, accessibleClinicIds);
 
         if (petId.HasValue)
             query.Where(x => x.PetId == petId.Value);

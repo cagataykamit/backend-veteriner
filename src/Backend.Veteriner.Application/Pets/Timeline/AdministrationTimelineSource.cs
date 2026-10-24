@@ -1,10 +1,10 @@
 using System.Globalization;
 using Backend.Veteriner.Application.Common.Abstractions;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Pets.Access;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Products;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Pets.Timeline;
 
@@ -25,7 +25,7 @@ internal sealed class AdministrationTimelineSource(
             q.IncludeVoided
                 ? a => a.TenantId == q.TenantId && a.PetId == q.PetId && a.VaccinationId == null
                 : a => a.TenantId == q.TenantId && a.PetId == q.PetId && a.VaccinationId == null && a.VoidedAtUtc == null,
-            builder => DashboardSpecificationClinicScope.ApplyToAdministration(builder, q.SingleClinicId, q.AccessibleClinicIds),
+            builder => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds),
             a => a.AdministeredAtUtc,
             a => a.Id,
             (int)Kind,

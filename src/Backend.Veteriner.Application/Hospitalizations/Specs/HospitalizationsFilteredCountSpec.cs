@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Specs;
 
@@ -18,17 +19,7 @@ public sealed class HospitalizationsFilteredCountSpec : Specification<Hospitaliz
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.Where(x => x.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            Query.Where(x => x.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(x => false);
-            else
-                Query.Where(x => accessibleClinicIds.Contains(x.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(x => x.PetId == petId.Value);
         if (activeOnly == true)

@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Domain.LabResults;
 /// Hayvan için lab kaydı: önce istenir (sonuçsuz), sonra sonuçlanır; yanlış kayıt gerekçeyle iptal edilir.
 /// İsteğe bağlı olarak muayeneye ve geliş (visit) kaydına bağlanır.
 /// </summary>
-public sealed class LabResult : AggregateRoot
+public sealed class LabResult : AggregateRoot, IClinicScoped
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

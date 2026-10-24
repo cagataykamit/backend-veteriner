@@ -1,9 +1,9 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Vaccinations;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Pets.Specs;
 
@@ -22,7 +22,7 @@ public sealed class ScheduledVaccinationsDueForPetSpec : Specification<Vaccinati
                          && v.Status == VaccinationStatus.Scheduled
                          && v.DueAtUtc != null
                          && v.DueAtUtc < dueBeforeUtc);
-        DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderBy(v => v.DueAtUtc)
             .ThenBy(v => v.Id)
             .AsNoTracking();
@@ -47,7 +47,7 @@ public sealed class OpenLabResultsForPetSpec : Specification<LabResult>
             Query.Where(LabResult.IsAwaitingInterpretation);
         else
             Query.Where(l => l.Status == LabResultStatus.Requested);
-        DashboardSpecificationClinicScope.ApplyToLabResult(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderBy(l => l.RequestedAtUtc)
             .ThenBy(l => l.Id)
             .AsNoTracking();
@@ -67,7 +67,7 @@ public sealed class PendingChargeSuggestionAmountsForPetSpec : Specification<Cha
     {
         Query.AsNoTracking();
         Query.Where(s => s.TenantId == tenantId && s.PetId == petId && s.Status == ChargeSuggestionStatus.Pending);
-        DashboardSpecificationClinicScope.ApplyToChargeSuggestion(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.Select(s => new PendingChargeSuggestionAmountRow(s.Quantity, s.SuggestedUnitPrice));
     }
 }
@@ -86,7 +86,7 @@ public sealed class NextScheduledAppointmentForPetSpec : Specification<Appointme
                          && a.PetId == petId
                          && a.Status == AppointmentStatus.Scheduled
                          && a.ScheduledAtUtc >= nowUtc);
-        DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderBy(a => a.ScheduledAtUtc)
             .ThenBy(a => a.Id)
             .Take(1)

@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Examinations;
 using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Reports.Examinations.Specs;
 
@@ -22,17 +23,7 @@ public sealed class ExaminationsReportFilteredPagedSpec : Specification<Examinat
     {
         Query.AsNoTracking();
         Query.Where(e => e.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            Query.Where(e => e.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(e => false);
-            else
-                Query.Where(e => accessibleClinicIds.Contains(e.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(e => e.PetId == petId.Value);
         if (restrictedPetIdsForClient is { Count: > 0 })

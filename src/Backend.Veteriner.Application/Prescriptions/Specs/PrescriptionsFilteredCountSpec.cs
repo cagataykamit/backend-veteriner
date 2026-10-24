@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Prescriptions;
 using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Prescriptions.Specs;
 
@@ -22,17 +23,7 @@ public sealed class PrescriptionsFilteredCountSpec : Specification<Prescription>
         if (hbsStatus is { } hbs)
             Query.Where(HbsTracking.PrescriptionWithStatus(hbs));
         Query.Where(p => p.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            Query.Where(p => p.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(p => false);
-            else
-                Query.Where(p => accessibleClinicIds.Contains(p.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(p => p.PetId == petId.Value);
         if (dateFromUtc.HasValue)

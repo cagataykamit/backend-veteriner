@@ -1,6 +1,6 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Charges.Specs;
 
@@ -15,6 +15,6 @@ public sealed class ChargesForClientBalanceSpec : Specification<Charge>
     {
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId && c.ClientId == clientId);
-        DashboardSpecificationClinicScope.ApplyToCharge(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
     }
 }

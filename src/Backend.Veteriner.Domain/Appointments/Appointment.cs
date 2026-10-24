@@ -5,7 +5,7 @@ namespace Backend.Veteriner.Domain.Appointments;
 /// <summary>
 /// Klinik ve hayvana bağlı randevu kaydı.
 /// </summary>
-public sealed class Appointment : AggregateRoot
+public sealed class Appointment : AggregateRoot, IClinicScoped
 {
     public const int MinDurationMinutes = 5;
     public const int MaxDurationMinutes = 240;

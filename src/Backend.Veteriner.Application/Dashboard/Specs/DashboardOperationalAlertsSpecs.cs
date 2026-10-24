@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Vaccinations;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Dashboard.Specs;
 
@@ -26,7 +27,7 @@ public sealed class DashboardOverdueScheduledAppointmentsCountSpec : Specificati
             && a.ScheduledAtUtc < nowUtc);
         if (excludedPetIds is { Count: > 0 })
             Query.Where(a => !excludedPetIds.Contains(a.PetId));
-        DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
     }
 }
 
@@ -45,7 +46,7 @@ public sealed class DashboardUpcomingAppointmentsNext24HoursCountSpec : Specific
             && a.Status == AppointmentStatus.Scheduled
             && a.ScheduledAtUtc >= nowUtc
             && a.ScheduledAtUtc < next24HoursUtcExclusive);
-        DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
     }
 }
 
@@ -64,7 +65,7 @@ public sealed class DashboardOverdueVaccinationsCountSpec : Specification<Vaccin
         Query.Where(VaccinationDueRule.IsOverdue(overdueBeforeUtc));
         if (excludedPetIds is { Count: > 0 })
             Query.Where(v => !excludedPetIds.Contains(v.PetId));
-        DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
     }
 }
 
@@ -84,6 +85,6 @@ public sealed class DashboardUpcomingVaccinationsNext7DaysCountSpec : Specificat
         Query.Where(VaccinationDueRule.IsUpcoming(fromUtc, toUtcExclusive));
         if (excludedPetIds is { Count: > 0 })
             Query.Where(v => !excludedPetIds.Contains(v.PetId));
-        DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
     }
 }

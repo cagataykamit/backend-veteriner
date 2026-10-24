@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Vaccinations;
 using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Reports.Vaccinations.Specs;
 
@@ -22,17 +23,7 @@ public sealed class VaccinationsReportFilteredPagedSpec : Specification<Vaccinat
     {
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            Query.Where(v => v.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(v => false);
-            else
-                Query.Where(v => accessibleClinicIds.Contains(v.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(v => v.PetId == petId.Value);
         if (restrictedPetIdsForClient is { Count: > 0 })

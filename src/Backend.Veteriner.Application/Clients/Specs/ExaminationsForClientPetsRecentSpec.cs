@@ -1,6 +1,6 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Examinations;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Clients.Specs;
 
@@ -14,7 +14,7 @@ public sealed class ExaminationsForClientPetsRecentSpec : Specification<Examinat
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.Where(e => e.TenantId == tenantId);
-        DashboardSpecificationClinicScope.ApplyToExamination(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.Where(e => petIds.Contains(e.PetId));
         Query.OrderByDescending(e => e.ExaminedAtUtc)
             .ThenByDescending(e => e.Id)

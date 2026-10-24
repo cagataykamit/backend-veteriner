@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Vaccinations;
 using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Vaccinations.Specs;
 
@@ -32,17 +33,7 @@ public sealed class VaccinationsFilteredCountSpec : Specification<Vaccination>
         if (hbsStatus is { } hbs)
             Query.Where(HbsTracking.VaccinationTrackedWithStatus(hbs));
         Query.Where(v => v.TenantId == tenantId);
-        if (clinicId.HasValue)
-        {
-            Query.Where(v => v.ClinicId == clinicId.Value);
-        }
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(v => false);
-            else
-                Query.Where(v => accessibleClinicIds.Contains(v.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(v => v.PetId == petId.Value);
         if (examinationId.HasValue)

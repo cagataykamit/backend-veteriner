@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Domain.Products;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.StockMovements.Specs;
 
@@ -31,14 +32,6 @@ public sealed class StockMovementsForProductFilteredCountSpec : Specification<St
 
     private void ApplyClinicScope(Guid? clinicId, IReadOnlyCollection<Guid>? accessibleClinicIds)
     {
-        if (clinicId.HasValue)
-            Query.Where(m => m.ClinicId == clinicId.Value);
-        else if (accessibleClinicIds is not null)
-        {
-            if (accessibleClinicIds.Count == 0)
-                Query.Where(m => false);
-            else
-                Query.Where(m => accessibleClinicIds.Contains(m.ClinicId));
-        }
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
     }
 }

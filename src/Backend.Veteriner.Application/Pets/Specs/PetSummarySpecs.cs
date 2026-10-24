@@ -1,9 +1,9 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Pets.Specs;
 
@@ -17,7 +17,7 @@ public sealed class ActiveHospitalizationForPetSummarySpec : Specification<Hospi
         IReadOnlyCollection<Guid>? accessibleClinicIds)
     {
         Query.Where(h => h.TenantId == tenantId && h.PetId == petId && h.DischargedAtUtc == null);
-        DashboardSpecificationClinicScope.ApplyToHospitalization(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(h => h.AdmittedAtUtc)
             .ThenByDescending(h => h.Id)
             .Take(1)
@@ -38,7 +38,7 @@ public sealed class LastAppliedVaccinationForPetSpec : Specification<Vaccination
                          && v.PetId == petId
                          && v.Status == VaccinationStatus.Applied
                          && v.AppliedAtUtc != null);
-        DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(v => v.AppliedAtUtc)
             .ThenByDescending(v => v.Id)
             .Take(1)
@@ -59,7 +59,7 @@ public sealed class NextDueVaccinationForPetSpec : Specification<Vaccination>
                          && v.PetId == petId
                          && v.Status == VaccinationStatus.Scheduled
                          && v.DueAtUtc != null);
-        DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderBy(v => v.DueAtUtc)
             .ThenBy(v => v.Id)
             .Take(1)
@@ -77,7 +77,7 @@ public sealed class LatestWeightExaminationForPetSpec : Specification<Examinatio
         IReadOnlyCollection<Guid>? accessibleClinicIds)
     {
         Query.Where(e => e.TenantId == tenantId && e.PetId == petId && e.WeightKg != null);
-        DashboardSpecificationClinicScope.ApplyToExamination(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(e => e.VitalsMeasuredAtUtc ?? e.ExaminedAtUtc)
             .ThenByDescending(e => e.Id)
             .Take(1)
@@ -96,7 +96,7 @@ public sealed class LastVisitForPetSpec : Specification<Visit>
     {
         Query.Where(v => v.TenantId == tenantId && v.PetId == petId && v.VoidedAtUtc == null);
 
-        PetVisitClinicScope.Apply(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
 
         Query.OrderByDescending(v => v.ArrivedAtUtc)
             .ThenByDescending(v => v.Id)

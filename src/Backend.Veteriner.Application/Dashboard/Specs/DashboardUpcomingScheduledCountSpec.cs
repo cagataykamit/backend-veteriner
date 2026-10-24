@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Dashboard.Specs;
 
@@ -17,6 +18,6 @@ public sealed class DashboardUpcomingScheduledCountSpec : Specification<Appointm
             a.TenantId == tenantId
             && a.Status == AppointmentStatus.Scheduled
             && a.ScheduledAtUtc > fromUtcExclusive);
-        DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
     }
 }

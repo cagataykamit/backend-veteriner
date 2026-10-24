@@ -12,7 +12,7 @@ namespace Backend.Veteriner.Domain.ChargeSuggestions;
 /// Durum yalnız <see cref="ChargeSuggestionStatus.Pending"/>'den bir kez değişir ve geri dönmez (ücret iptali kalemi yeniden açmaz).
 /// Eşzamanlı kararları <see cref="RowVersion"/> ayırır: tek kazanan olur.
 /// </summary>
-public sealed class ChargeSuggestion : AggregateRoot
+public sealed class ChargeSuggestion : AggregateRoot, IClinicScoped
 {
     /// <summary>Kaynak türü: stoktan düşen uygulama (aşı kaydıyla yazılanlar dahil).</summary>
     public const string AdministrationSource = "Administration";

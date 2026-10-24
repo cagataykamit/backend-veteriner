@@ -1,7 +1,6 @@
 using System.Linq.Expressions;
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Common.Abstractions;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Pets.Access;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Examinations;
@@ -11,6 +10,7 @@ using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Pets.Timeline;
 
@@ -29,7 +29,7 @@ internal sealed class VisitTimelineSource(IReadRepository<Visit> repository) : P
             : v => v.TenantId == q.TenantId && v.PetId == q.PetId && v.VoidedAtUtc == null;
 
     protected override ISpecificationBuilder<Visit> ApplyClinicScope(ISpecificationBuilder<Visit> builder, PetTimelineSourceQuery q)
-        => PetVisitClinicScope.Apply(builder, q.SingleClinicId, q.AccessibleClinicIds);
+        => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
 
     protected override PetTimelineRow ToRow(Visit v)
         => new(
@@ -60,7 +60,7 @@ internal sealed class ExaminationTimelineSource(IReadRepository<Examination> rep
         => e => e.TenantId == q.TenantId && e.PetId == q.PetId;
 
     protected override ISpecificationBuilder<Examination> ApplyClinicScope(ISpecificationBuilder<Examination> builder, PetTimelineSourceQuery q)
-        => DashboardSpecificationClinicScope.ApplyToExamination(builder, q.SingleClinicId, q.AccessibleClinicIds);
+        => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
 
     protected override PetTimelineRow ToRow(Examination e)
         => new(
@@ -91,7 +91,7 @@ internal sealed class TreatmentTimelineSource(IReadRepository<Treatment> reposit
         => t => t.TenantId == q.TenantId && t.PetId == q.PetId;
 
     protected override ISpecificationBuilder<Treatment> ApplyClinicScope(ISpecificationBuilder<Treatment> builder, PetTimelineSourceQuery q)
-        => DashboardSpecificationClinicScope.ApplyToTreatment(builder, q.SingleClinicId, q.AccessibleClinicIds);
+        => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
 
     protected override PetTimelineRow ToRow(Treatment t)
         => new(
@@ -122,7 +122,7 @@ internal sealed class PrescriptionTimelineSource(IReadRepository<Prescription> r
         => p => p.TenantId == q.TenantId && p.PetId == q.PetId;
 
     protected override ISpecificationBuilder<Prescription> ApplyClinicScope(ISpecificationBuilder<Prescription> builder, PetTimelineSourceQuery q)
-        => DashboardSpecificationClinicScope.ApplyToPrescription(builder, q.SingleClinicId, q.AccessibleClinicIds);
+        => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
 
     protected override PetTimelineRow ToRow(Prescription p)
         => new(
@@ -155,7 +155,7 @@ internal sealed class LabResultTimelineSource(IReadRepository<LabResult> reposit
             : l => l.TenantId == q.TenantId && l.PetId == q.PetId && l.Status != LabResultStatus.Cancelled;
 
     protected override ISpecificationBuilder<LabResult> ApplyClinicScope(ISpecificationBuilder<LabResult> builder, PetTimelineSourceQuery q)
-        => DashboardSpecificationClinicScope.ApplyToLabResult(builder, q.SingleClinicId, q.AccessibleClinicIds);
+        => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
 
     protected override PetTimelineRow ToRow(LabResult l)
         => new(
@@ -195,7 +195,7 @@ internal sealed class VaccinationTimelineSource(IReadRepository<Vaccination> rep
             : v => v.TenantId == q.TenantId && v.PetId == q.PetId && v.Status == VaccinationStatus.Applied;
 
     protected override ISpecificationBuilder<Vaccination> ApplyClinicScope(ISpecificationBuilder<Vaccination> builder, PetTimelineSourceQuery q)
-        => DashboardSpecificationClinicScope.ApplyToVaccination(builder, q.SingleClinicId, q.AccessibleClinicIds);
+        => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
 
     protected override PetTimelineRow ToRow(Vaccination v)
     {
@@ -230,7 +230,7 @@ internal sealed class HospitalizationTimelineSource(IReadRepository<Hospitalizat
         => h => h.TenantId == q.TenantId && h.PetId == q.PetId;
 
     protected override ISpecificationBuilder<Hospitalization> ApplyClinicScope(ISpecificationBuilder<Hospitalization> builder, PetTimelineSourceQuery q)
-        => DashboardSpecificationClinicScope.ApplyToHospitalization(builder, q.SingleClinicId, q.AccessibleClinicIds);
+        => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
 
     protected override PetTimelineRow ToRow(Hospitalization h)
         => new(

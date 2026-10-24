@@ -1,6 +1,5 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
-using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Examinations;
@@ -9,6 +8,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
+using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Clients.Specs;
 
@@ -45,7 +45,7 @@ public sealed class AppointmentsForClientDataExportSpec : Specification<Appointm
     {
         Query.AsNoTracking();
         Query.Where(a => a.TenantId == tenantId && petIds.Contains(a.PetId));
-        DashboardSpecificationClinicScope.ApplyToAppointment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(a => a.ScheduledAtUtc).ThenByDescending(a => a.Id).Take(take);
         Query.Select(a => new ClientDataExportAppointmentDto(
             a.ScheduledAtUtc, a.DurationMinutes, a.PetId, string.Empty, a.AppointmentType, a.Status));
@@ -59,7 +59,7 @@ public sealed class ExaminationsForClientDataExportSpec : Specification<Examinat
     {
         Query.AsNoTracking();
         Query.Where(e => e.TenantId == tenantId && petIds.Contains(e.PetId));
-        DashboardSpecificationClinicScope.ApplyToExamination(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(e => e.ExaminedAtUtc).ThenByDescending(e => e.Id).Take(take);
         Query.Select(e => new ClientDataExportExaminationDto(
             e.ExaminedAtUtc, e.PetId, string.Empty, e.VisitReason, e.Assessment, e.Status));
@@ -73,7 +73,7 @@ public sealed class VaccinationsForClientDataExportSpec : Specification<Vaccinat
     {
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId && petIds.Contains(v.PetId));
-        DashboardSpecificationClinicScope.ApplyToVaccination(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(v => v.AppliedAtUtc ?? v.DueAtUtc ?? v.CreatedAtUtc).ThenByDescending(v => v.Id).Take(take);
         Query.Select(v => new ClientDataExportVaccinationDto(
             v.VaccineName, v.AppliedAtUtc, v.DueAtUtc, v.PetId, string.Empty, v.Status));
@@ -87,7 +87,7 @@ public sealed class TreatmentsForClientDataExportSpec : Specification<Treatment,
     {
         Query.AsNoTracking();
         Query.Where(t => t.TenantId == tenantId && petIds.Contains(t.PetId));
-        DashboardSpecificationClinicScope.ApplyToTreatment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(t => t.TreatmentDateUtc).ThenByDescending(t => t.Id).Take(take);
         Query.Select(t => new ClientDataExportTreatmentDto(t.TreatmentDateUtc, t.Title, t.PetId, string.Empty));
     }
@@ -100,7 +100,7 @@ public sealed class PrescriptionsForClientDataExportSpec : Specification<Prescri
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId && petIds.Contains(p.PetId));
-        DashboardSpecificationClinicScope.ApplyToPrescription(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(p => p.PrescribedAtUtc).ThenByDescending(p => p.Id).Take(take);
         Query.Select(p => new ClientDataExportPrescriptionDto(
             p.PrescribedAtUtc,
@@ -122,7 +122,7 @@ public sealed class ChargesForClientDataExportSpec : Specification<Charge>
     {
         Query.AsNoTracking().IgnoreQueryFilters();
         Query.Where(c => c.TenantId == tenantId && c.ClientId == clientId);
-        DashboardSpecificationClinicScope.ApplyToCharge(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(c => c.CreatedAtUtc).ThenByDescending(c => c.Id).Take(take);
     }
 }
@@ -135,7 +135,7 @@ public sealed class PaymentsForClientDataExportSpec : Specification<Payment>
     {
         Query.AsNoTracking().IgnoreQueryFilters();
         Query.Where(p => p.TenantId == tenantId && p.ClientId == clientId);
-        DashboardSpecificationClinicScope.ApplyToPayment(Query, clinicId, accessibleClinicIds);
+        Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(p => p.PaidAtUtc).ThenByDescending(p => p.Id).Take(take);
     }
 }

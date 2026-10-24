@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Domain.Visits;
 /// randevusuz geliş takvime randevu yazmaz. Randevu planı bu varlıktan bağımsızdır.
 /// Yanlış geliş silinmez, <see cref="VoidedAtUtc"/> ile işaretlenir ve kuyruktan düşer.
 /// </summary>
-public sealed class Visit : AggregateRoot
+public sealed class Visit : AggregateRoot, IClinicScoped
 {
     public const int MinCorrectionReasonLength = 5;
     public const int MaxCorrectionReasonLength = 500;

@@ -1,7 +1,8 @@
+using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Domain.Products;
 
 /// <summary>Klinik bazlı operasyonel stok snapshot (<c>TenantId + ClinicId + ProductId</c> tek satır).</summary>
-public sealed class ProductStock
+public sealed class ProductStock : IClinicScoped
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
