@@ -90,12 +90,15 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
             .ReturnsAsync(existingOpenSession);
     }
 
+    private long? _chargedMinor;
+
     private void SetupManualCheckoutProvider(long chargeMinor = 30_000L)
     {
         var manualProvider = new Mock<IBillingCheckoutProvider>();
         manualProvider.SetupGet(x => x.Provider).Returns(BillingProvider.Manual);
         manualProvider
             .Setup(x => x.PrepareCheckoutAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<string?>(), It.IsAny<long?>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()))
+            .Callback<BillingCheckoutSession, string?, long?, decimal?, CancellationToken>((_, _, amount, _, _) => _chargedMinor = amount)
             .ReturnsAsync(Result<CheckoutPrepareResult>.Success(new CheckoutPrepareResult("https://checkout/new", "ext-new", "TRY", chargeMinor, 1.0m)));
         _resolver.Setup(x => x.Resolve(BillingProvider.Manual)).Returns(manualProvider.Object);
     }
@@ -475,7 +478,81 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.TargetPlanCode.Should().Be("Pro");
         result.Value.CurrentPlanCode.Should().Be("Basic");
+        // BILL-003: dolmuş ücretli dönemde yükseltme oranlanmaz, hedef planın tam fiyatı çekilir.
+        _chargedMinor.Should().Be(20_000L);
         _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("Basic", 10_000L)]
+    [InlineData("Pro", 20_000L)]
+    [InlineData("Premium", 30_000L)]
+    public async Task Handle_Should_Charge_Full_Target_Price_When_ExpiredTrial_Selects_Plan(string targetPlan, long expectedMinor)
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = TenantSubscription.StartTrial(
+            tid,
+            SubscriptionPlanCode.Basic,
+            new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            trialDays: 14);
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+
+        long? chargedMinor = null;
+        var provider = new Mock<IBillingCheckoutProvider>();
+        provider
+            .Setup(x => x.PrepareCheckoutAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<string?>(), It.IsAny<long?>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()))
+            .Callback<BillingCheckoutSession, string?, long?, decimal?, CancellationToken>((_, _, amount, _, _) => chargedMinor = amount)
+            .ReturnsAsync(Result<CheckoutPrepareResult>.Success(new CheckoutPrepareResult("https://checkout/new", "ext-new")));
+        _resolver.Setup(x => x.Resolve(BillingProvider.Manual)).Returns(provider.Object);
+
+        var result = await CreateHandler(CreateBillingOptions()).Handle(new StartSubscriptionCheckoutCommand(tid, targetPlan), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        chargedMinor.Should().Be(expectedMinor, "süresi dolmuş denemede oranlama yok; tam plan fiyatı");
+        result.Value!.ProratedChargeMinor.Should().Be(expectedMinor);
+        result.Value.ProrationRatio.Should().Be(1.0m);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Apply_Partner_Discount_To_Full_Price_When_ExpiredTrial_Upgrades()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = TenantSubscription.StartTrial(
+            tid,
+            SubscriptionPlanCode.Basic,
+            new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            trialDays: 14);
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+        SetupManualCheckoutProvider();
+
+        var partner = SalesPartner.Create("Ortak", null, null, null, DateTime.UtcNow);
+        var code = DiscountCode.Create(partner.Id, "ISIK10", 10m, 20m, null, null, null, DateTime.UtcNow).Value!;
+        var redemption = DiscountRedemption.Redeem(tid, "klinik@example.com", code, partner, 0, DateTime.UtcNow).Value!;
+        _redemptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<DiscountRedemptionByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(redemption);
+
+        var result = await CreateHandler(CreateBillingOptions()).Handle(new StartSubscriptionCheckoutCommand(tid, "Premium"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.DiscountAmountMinor.Should().Be(3_000L);
+        _chargedMinor.Should().Be(27_000L);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Charge_Full_Target_Price_When_ExpiredPaidPeriod_Upgrades()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = CreateTenant(tid);
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Basic);
+        SetupCheckoutInfrastructure(tid, tenant, sub);
+        SetupManualCheckoutProvider();
+
+        var result = await CreateHandler(CreateBillingOptions()).Handle(new StartSubscriptionCheckoutCommand(tid, "Pro"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _chargedMinor.Should().Be(20_000L, "dolmuş ücretli dönemde oranlama yok");
     }
 
     [Fact]

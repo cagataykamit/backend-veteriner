@@ -136,8 +136,9 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         long? proratedChargeMinor = null;
         decimal? prorationRatio = null;
         var prices = _billingOptions.Value;
-        if (isExpiredReadOnly
-            && decision is SubscriptionPlanChangeDecision.Same or SubscriptionPlanChangeDecision.Downgrade)
+        // Süresi dolmuş deneme/ücretli dönemde (effective ReadOnly) açık bir dönem kalmadığı için plan yönü ne olursa olsun
+        // hedef planın tam fiyatı çekilir (BILL-003); oranlama yalnız etkin ücretli dönem içindeki yükseltmede.
+        if (isExpiredReadOnly)
         {
             if (!TryGetPlanPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
             {
