@@ -1007,6 +1007,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "VisitId");
 
+                    b.HasIndex("TenantId", "VoidedAtUtc")
+                        .HasDatabaseName("IX_Charges_TenantId_VoidedAtUtc_Covering");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenantId", "VoidedAtUtc"), new[] { "ClinicId", "ClientId", "Amount", "AllocatedAmount", "CreatedAtUtc" });
+
                     b.HasIndex("TenantId", "ClinicId", "CreatedAtUtc");
 
                     b.ToTable("Charges", null, t =>
@@ -1527,6 +1532,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "ClinicId");
 
                     b.HasIndex("TenantId", "ExaminedAtUtc");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenantId", "ExaminedAtUtc"), new[] { "ClinicId", "CreatedAtUtc" });
 
                     b.HasIndex("TenantId", "PetId");
 
@@ -2531,6 +2538,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasDatabaseName("UX_Payments_TenantId_RequestId")
                         .HasFilter("[RequestId] IS NOT NULL");
 
+                    b.HasIndex("TenantId", "VoidedAtUtc")
+                        .HasDatabaseName("IX_Payments_TenantId_VoidedAtUtc_Covering");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenantId", "VoidedAtUtc"), new[] { "AppointmentId", "ExaminationId" });
+
                     b.ToTable("Payments", null, t =>
                         {
                             t.HasCheckConstraint("CK_Payments_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
@@ -3168,6 +3180,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasFilter("[ReversesMovementId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "ClinicId", "OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "MovementType", "OccurredAtUtc")
+                        .HasDatabaseName("IX_StockMovements_TenantId_MovementType_OccurredAtUtc");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenantId", "MovementType", "OccurredAtUtc"), new[] { "ClinicId", "ProductId" });
 
                     b.HasIndex("TenantId", "ClinicId", "ProductId", "OccurredAtUtc");
 
@@ -4334,6 +4351,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasFilter("[CareStatus] <> 2 AND [VoidedAtUtc] IS NULL");
 
                     b.HasIndex("TenantId", "ClinicId", "ArrivedAtUtc");
+
+                    b.HasIndex("TenantId", "PetId", "ArrivedAtUtc")
+                        .HasDatabaseName("IX_Visits_TenantId_PetId_ArrivedAtUtc");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenantId", "PetId", "ArrivedAtUtc"), new[] { "VoidedAtUtc", "CareStatus", "ClinicId" });
 
                     b.ToTable("Visits", (string)null);
                 });

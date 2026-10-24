@@ -44,7 +44,10 @@ public sealed class ExaminationConfiguration : IEntityTypeConfiguration<Examinat
             .IsConcurrencyToken();
 
         b.HasIndex(x => x.TenantId);
-        b.HasIndex(x => new { x.TenantId, x.ExaminedAtUtc });
+        // Muayene raporu/defteri ve CSV: tarih aralığı taraması klinik ve oluşturma zamanını da indeksten okur
+        // (PERFORMANCE_FINDINGS §5 #2; kapsayıcı olmayan hali planı kümelenmiş taramaya düşürüyordu, ~14.500 okuma).
+        b.HasIndex(x => new { x.TenantId, x.ExaminedAtUtc })
+            .IncludeProperties(x => new { x.ClinicId, x.CreatedAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ClinicId });
         b.HasIndex(x => new { x.TenantId, x.PetId });
         b.HasIndex(x => new { x.TenantId, x.AppointmentId });

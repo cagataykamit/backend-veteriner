@@ -42,6 +42,11 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.ProductId, x.OccurredAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ProductId });
 
+        // İlaç/aşı defterleri: kiracı + hareket türü + tarih aralığı (PERFORMANCE_FINDINGS §5 #5).
+        b.HasIndex(x => new { x.TenantId, x.MovementType, x.OccurredAtUtc })
+            .IncludeProperties(x => new { x.ClinicId, x.ProductId })
+            .HasDatabaseName("IX_StockMovements_TenantId_MovementType_OccurredAtUtc");
+
         // Aynı istemci isteği (RequestId) kiracıda en fazla bir hareket üretir.
         b.HasIndex(x => new { x.TenantId, x.RequestId })
             .IsUnique()

@@ -58,6 +58,12 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
         b.HasIndex(x => new { x.TenantId, x.VisitId });
         b.HasIndex(x => new { x.TenantId, x.ExaminationId });
 
+        // Bugün ücret tutarları, borç raporu (3 sorgu) ve müşteri bakiyesi: kiracı + iptal durumu üzerinden kapsayıcı okuma
+        // (PERFORMANCE_FINDINGS §5 #1; 10k ölçümünde Charges kümelenmiş tarama ~3.600 okuma/yürütme).
+        b.HasIndex(x => new { x.TenantId, x.VoidedAtUtc })
+            .IncludeProperties(x => new { x.ClinicId, x.ClientId, x.Amount, x.AllocatedAmount, x.CreatedAtUtc })
+            .HasDatabaseName("IX_Charges_TenantId_VoidedAtUtc_Covering");
+
         b.HasIndex(x => new { x.TenantId, x.RequestId })
             .IsUnique()
             .HasFilter("[RequestId] IS NOT NULL")

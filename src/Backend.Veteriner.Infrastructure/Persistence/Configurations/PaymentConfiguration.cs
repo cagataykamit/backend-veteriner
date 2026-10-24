@@ -56,6 +56,12 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.HasIndex(x => new { x.TenantId, x.PaidAtUtc });
         b.HasIndex(x => new { x.TenantId, x.Method });
 
+        // Bugün/randevu ödeme eşleştirmesi (randevu ve muayene kimlikleriyle), kiracı + iptal durumu üzerinden kapsayıcı
+        // (PERFORMANCE_FINDINGS §5 #4).
+        b.HasIndex(x => new { x.TenantId, x.VoidedAtUtc })
+            .IncludeProperties(x => new { x.AppointmentId, x.ExaminationId })
+            .HasDatabaseName("IX_Payments_TenantId_VoidedAtUtc_Covering");
+
         b.HasIndex(x => new { x.TenantId, x.RequestId })
             .IsUnique()
             .HasFilter("[RequestId] IS NOT NULL")

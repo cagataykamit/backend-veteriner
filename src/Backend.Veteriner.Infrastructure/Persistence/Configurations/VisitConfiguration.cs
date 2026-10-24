@@ -56,5 +56,12 @@ public sealed class VisitConfiguration : IEntityTypeConfiguration<Visit>
             .HasDatabaseName(VisitPerAppointmentIndexName);
 
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.ArrivedAtUtc });
+
+        // Hasta zaman çizelgesi, özet ve son geliş: hastanın geçmiş gelişleri (TenantId, PetId) ile aranır ve ArrivedAtUtc'ye
+        // göre sıralanır; iptal/bakım durumu ve klinik indeksten okunur. Aktif geliş indeksi filtreli olduğu için geçmişi kapsamıyordu
+        // (PERFORMANCE_FINDINGS §5 #3; DMV önerisi VoidedAtUtc anahtarlıydı, sorgunun sıralama sütunu ArrivedAtUtc).
+        b.HasIndex(x => new { x.TenantId, x.PetId, x.ArrivedAtUtc })
+            .IncludeProperties(x => new { x.VoidedAtUtc, x.CareStatus, x.ClinicId })
+            .HasDatabaseName("IX_Visits_TenantId_PetId_ArrivedAtUtc");
     }
 }
