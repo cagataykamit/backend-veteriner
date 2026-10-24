@@ -1704,6 +1704,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<Guid?>("RoomId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -1721,6 +1724,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("RoomId");
+
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "AdmittedAtUtc");
@@ -1731,11 +1736,102 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "PetId");
 
+                    b.HasIndex("TenantId", "RoomId");
+
                     b.HasIndex("TenantId", "ClinicId", "PetId")
                         .IsUnique()
                         .HasFilter("[DischargedAtUtc] IS NULL");
 
                     b.ToTable("Hospitalizations", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.HospitalizationRoom", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("WardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WardId");
+
+                    b.HasIndex("TenantId", "ClinicId");
+
+                    b.HasIndex("TenantId", "WardId");
+
+                    b.HasIndex("TenantId", "WardId", "Name")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("HospitalizationRooms", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.HospitalizationWard", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId", "Name")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("HospitalizationWards", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Imaging.ImagingRecord", b =>
@@ -4685,6 +4781,32 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Clinic");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.Hospitalization", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Hospitalizations.HospitalizationRoom", null)
+                        .WithMany()
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.HospitalizationRoom", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Hospitalizations.HospitalizationWard", null)
+                        .WithMany()
+                        .HasForeignKey("WardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.HospitalizationWard", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Imports.ImportBatchRow", b =>

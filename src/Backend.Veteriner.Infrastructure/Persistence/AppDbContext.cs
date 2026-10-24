@@ -120,6 +120,8 @@ public class AppDbContext : DbContext
     public DbSet<ImagingRecord> ImagingRecords => Set<ImagingRecord>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<Hospitalization> Hospitalizations => Set<Hospitalization>();
+    public DbSet<HospitalizationWard> HospitalizationWards => Set<HospitalizationWard>();
+    public DbSet<HospitalizationRoom> HospitalizationRooms => Set<HospitalizationRoom>();
     public DbSet<CareInstruction> CareInstructions => Set<CareInstruction>();
     public DbSet<TenantBillingProfile> TenantBillingProfiles => Set<TenantBillingProfile>();
     public DbSet<TenantReminderSettings> TenantReminderSettings => Set<TenantReminderSettings>();

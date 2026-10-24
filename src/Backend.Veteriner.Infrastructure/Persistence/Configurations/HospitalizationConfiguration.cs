@@ -24,6 +24,7 @@ public sealed class HospitalizationConfiguration : IEntityTypeConfiguration<Hosp
         b.Property(x => x.Reason).IsRequired().HasMaxLength(2000);
         b.Property(x => x.Notes).HasMaxLength(4000);
         b.Property(x => x.Location).HasMaxLength(200);
+        b.Property(x => x.RoomId);
         b.Property(x => x.DischargeNote).HasMaxLength(4000);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
@@ -37,6 +38,13 @@ public sealed class HospitalizationConfiguration : IEntityTypeConfiguration<Hosp
         b.HasIndex(x => new { x.TenantId, x.ClinicId });
         b.HasIndex(x => new { x.TenantId, x.PetId });
         b.HasIndex(x => new { x.TenantId, x.ExaminationId });
+        b.HasIndex(x => new { x.TenantId, x.RoomId });
+
+        // Oda tanımı silinmez (pasife alınır); yatış kaydı odaya referansını korur.
+        b.HasOne<HospitalizationRoom>()
+            .WithMany()
+            .HasForeignKey(x => x.RoomId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // At most one active (not discharged) stay per pet per clinic within a tenant.
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.PetId })
