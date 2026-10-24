@@ -5,9 +5,14 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Common.Behaviors;
 
+/// <summary>
+/// <see cref="IAuditableRequest"/> işaretli istekler için denetim kaydı yazar. Denetim yazımı iş sonucunu etkilemez:
+/// yazıcı (ayrı DbContext kapsamı) hata verirse hata loglanır, handler'ın yanıtı veya özgün istisnası aynen iletilir.
+/// </summary>
 public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
 {
@@ -33,13 +38,16 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
 
     private readonly IClientContext _client;
     private readonly IAuditLogWriter _auditLogWriter;
+    private readonly ILogger<AuditBehavior<TRequest, TResponse>> _logger;
 
     public AuditBehavior(
         IClientContext client,
-        IAuditLogWriter auditLogWriter)
+        IAuditLogWriter auditLogWriter,
+        ILogger<AuditBehavior<TRequest, TResponse>> logger)
     {
         _client = client;
         _auditLogWriter = auditLogWriter;
+        _logger = logger;
     }
 
     public async Task<TResponse> Handle(
@@ -56,47 +64,51 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
 
             var (success, failureReason) = ResultOutcome.Of(response);
 
-            await _auditLogWriter.WriteAsync(
-                new AuditLogEntry(
-                    ActorUserId: _client.UserId,
-                    Action: auditable.AuditAction,
-                    TargetType: typeof(TRequest).Name,
-                    TargetId: auditable.AuditTarget,
-                    Success: success,
-                    FailureReason: failureReason,
-                    Route: _client.Path,
-                    HttpMethod: _client.Method,
-                    IpAddress: _client.IpAddress,
-                    UserAgent: _client.UserAgent,
-                    CorrelationId: _client.CorrelationId,
-                    RequestName: typeof(TRequest).Name,
-                    RequestPayload: SerializeSafely(request),
-                    OccurredAtUtc: DateTime.UtcNow),
-                ct);
+            await TryWriteAsync(BuildEntry(request, auditable, success, failureReason), ct);
 
             return response;
         }
         catch (Exception ex)
         {
-            await _auditLogWriter.WriteAsync(
-                new AuditLogEntry(
-                    ActorUserId: _client.UserId,
-                    Action: auditable.AuditAction,
-                    TargetType: typeof(TRequest).Name,
-                    TargetId: auditable.AuditTarget,
-                    Success: false,
-                    FailureReason: ex.Message,
-                    Route: _client.Path,
-                    HttpMethod: _client.Method,
-                    IpAddress: _client.IpAddress,
-                    UserAgent: _client.UserAgent,
-                    CorrelationId: _client.CorrelationId,
-                    RequestName: typeof(TRequest).Name,
-                    RequestPayload: SerializeSafely(request),
-                    OccurredAtUtc: DateTime.UtcNow),
-                ct);
+            await TryWriteAsync(BuildEntry(request, auditable, success: false, failureReason: ex.Message), ct);
 
             throw;
+        }
+    }
+
+    private AuditLogEntry BuildEntry(TRequest request, IAuditableRequest auditable, bool success, string? failureReason)
+        => new(
+            ActorUserId: _client.UserId,
+            Action: auditable.AuditAction,
+            TargetType: typeof(TRequest).Name,
+            TargetId: auditable.AuditTarget,
+            Success: success,
+            FailureReason: failureReason,
+            Route: _client.Path,
+            HttpMethod: _client.Method,
+            IpAddress: _client.IpAddress,
+            UserAgent: _client.UserAgent,
+            CorrelationId: _client.CorrelationId,
+            RequestName: typeof(TRequest).Name,
+            RequestPayload: SerializeSafely(request),
+            OccurredAtUtc: DateTime.UtcNow);
+
+    /// <summary>
+    /// Denetim kaydı iş işleminden sonra ayrı bağlantıda yazılır; buradaki hata istemciye 500 olarak yansımamalı
+    /// ve handler'ın özgün istisnasını maskelememeli. İptal (<see cref="OperationCanceledException"/>) istisnası
+    /// da yutulur: istek zaten iptal edilmiştir, yanıt yolunu iptal nedeniyle değiştirmek yanıltıcı olur.
+    /// </summary>
+    private async Task TryWriteAsync(AuditLogEntry entry, CancellationToken ct)
+    {
+        try
+        {
+            await _auditLogWriter.WriteAsync(entry, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Denetim kaydı yazılamadı. Action={Action} RequestName={RequestName} CorrelationId={CorrelationId} Success={Success}",
+                entry.Action, entry.RequestName, entry.CorrelationId, entry.Success);
         }
     }
 

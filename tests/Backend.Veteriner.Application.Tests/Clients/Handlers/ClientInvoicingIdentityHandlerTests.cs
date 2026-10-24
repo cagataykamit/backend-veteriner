@@ -15,6 +15,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Clients.Handlers;
@@ -198,7 +199,8 @@ public sealed class ClientInvoicingIdentityHandlerTests
         writer.Setup(w => w.WriteAsync(It.IsAny<AuditLogEntry>(), It.IsAny<CancellationToken>()))
             .Callback<AuditLogEntry, CancellationToken>((e, _) => entry = e)
             .Returns(Task.CompletedTask);
-        var behavior = new AuditBehavior<UpdateClientCommand, Result>(new Mock<IClientContext>().Object, writer.Object);
+        var behavior = new AuditBehavior<UpdateClientCommand, Result>(
+            new Mock<IClientContext>().Object, writer.Object, NullLogger<AuditBehavior<UpdateClientCommand, Result>>.Instance);
         var command = new UpdateClientCommand(
             _clientId, "Ayşe Yılmaz",
             InvoicingIdentity: new ClientInvoicingIdentityDto(ClientPersonType.Corporate, null, Vkn, "VD", null, null, null, null));
