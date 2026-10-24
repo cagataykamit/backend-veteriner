@@ -238,7 +238,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
             AppointmentIntegrationEventTypes.Updated,
             new AppointmentUpdatedIntegrationEvent(
                 Guid.NewGuid(),
-                DateTime.UtcNow,
+                _timeProvider.GetUtcNow().UtcDateTime,
                 appointment.MutationSequence,
                 previous,
                 _appointmentSnapshotFactory.CreateScalarsFromPrevious(appointment, previous)),

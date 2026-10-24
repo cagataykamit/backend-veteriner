@@ -322,7 +322,7 @@ public sealed class ImportRollbackProcessor
                 CorrelationId: null,
                 RequestName: nameof(ImportRollbackProcessor),
                 RequestPayload: payload,
-                OccurredAtUtc: DateTime.UtcNow),
+                OccurredAtUtc: services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime),
             ct);
     }
 

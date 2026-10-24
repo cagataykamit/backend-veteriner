@@ -1,0 +1,5 @@
+P:System.DateTime.UtcNow;Application'da saat TimeProvider ile alınır: _timeProvider.GetUtcNow().UtcDateTime (kod incelemesi 2026-10-24, B4).
+P:System.DateTime.Now;Yerel saat kullanılmaz; TimeProvider.GetUtcNow().
+P:System.DateTime.Today;Yerel gün kullanılmaz; OperationDayBounds / TimeProvider.
+P:System.DateTimeOffset.UtcNow;Saat TimeProvider ile alınır: _timeProvider.GetUtcNow().
+P:System.DateTimeOffset.Now;Yerel saat kullanılmaz.

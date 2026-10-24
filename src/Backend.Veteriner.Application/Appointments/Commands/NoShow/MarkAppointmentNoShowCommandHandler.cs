@@ -91,7 +91,7 @@ public sealed class MarkAppointmentNoShowCommandHandler : IRequestHandler<MarkAp
             AppointmentIntegrationEventTypes.Updated,
             new AppointmentUpdatedIntegrationEvent(
                 Guid.NewGuid(),
-                DateTime.UtcNow,
+                _timeProvider.GetUtcNow().UtcDateTime,
                 appointment.MutationSequence,
                 previous,
                 _snapshotFactory.CreateScalarsFromPrevious(appointment, previous)),

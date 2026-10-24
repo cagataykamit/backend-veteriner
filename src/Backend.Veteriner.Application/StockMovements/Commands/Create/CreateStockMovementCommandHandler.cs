@@ -133,7 +133,7 @@ public sealed class CreateStockMovementCommandHandler
                 "Hizmet kalemi için stok hareketi oluşturulamaz.");
         }
 
-        var occurredAtUtc = request.OccurredAtUtc ?? DateTime.UtcNow;
+        var occurredAtUtc = request.OccurredAtUtc ?? _timeProvider.GetUtcNow().UtcDateTime;
         var createdBy = _clientContext.UserId;
         var referenceId = request.ReferenceId is { } rid && rid != Guid.Empty ? rid : (Guid?)null;
         var referenceType = string.IsNullOrWhiteSpace(request.ReferenceType) ? null : request.ReferenceType.Trim();
@@ -169,7 +169,7 @@ public sealed class CreateStockMovementCommandHandler
                         "Bu ürün için bu klinikte stok satırı zaten var; Initial kullanılamaz.");
                 }
 
-                var initialBatch = CreateEntryBatch(tenantId, request, product, createdBy, Today());
+                var initialBatch = CreateEntryBatch(tenantId, request, product, createdBy, Today(), _timeProvider.GetUtcNow().UtcDateTime);
                 if (!initialBatch.IsSuccess)
                     return Result<StockMovementCreateResult>.Failure(initialBatch.Error);
 
@@ -186,7 +186,7 @@ public sealed class CreateStockMovementCommandHandler
                 break;
 
             case StockMovementType.In:
-                var entryBatch = CreateEntryBatch(tenantId, request, product, createdBy, Today());
+                var entryBatch = CreateEntryBatch(tenantId, request, product, createdBy, Today(), _timeProvider.GetUtcNow().UtcDateTime);
                 if (!entryBatch.IsSuccess)
                     return Result<StockMovementCreateResult>.Failure(entryBatch.Error);
 
@@ -427,7 +427,8 @@ public sealed class CreateStockMovementCommandHandler
         CreateStockMovementCommand request,
         Product product,
         Guid? createdByUserId,
-        DateOnly today)
+        DateOnly today,
+        DateTime createdAtUtc)
     {
         var details = request.Batch;
         if (details is null || details.IsEmpty)
@@ -448,7 +449,7 @@ public sealed class CreateStockMovementCommandHandler
         }
 
         var created = StockBatch.Create(
-            tenantId, request.ClinicId, product, request.Quantity, details, createdByUserId, DateTime.UtcNow);
+            tenantId, request.ClinicId, product, request.Quantity, details, createdByUserId, createdAtUtc);
         return created.IsSuccess
             ? Result<StockBatch?>.Success(created.Value)
             : Result<StockBatch?>.Failure(created.Error);

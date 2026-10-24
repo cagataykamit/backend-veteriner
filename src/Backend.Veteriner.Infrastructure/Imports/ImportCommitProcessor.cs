@@ -390,7 +390,7 @@ public sealed class ImportCommitProcessor
                 CorrelationId: null,
                 RequestName: nameof(ImportCommitProcessor),
                 RequestPayload: payload,
-                OccurredAtUtc: DateTime.UtcNow),
+                OccurredAtUtc: services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime),
             ct);
     }
 

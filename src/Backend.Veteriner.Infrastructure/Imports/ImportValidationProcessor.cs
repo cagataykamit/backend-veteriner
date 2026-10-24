@@ -277,7 +277,7 @@ public sealed class ImportValidationProcessor
                 CorrelationId: null,
                 RequestName: nameof(ImportValidationProcessor),
                 RequestPayload: payload,
-                OccurredAtUtc: DateTime.UtcNow),
+                OccurredAtUtc: services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime),
             ct);
     }
 

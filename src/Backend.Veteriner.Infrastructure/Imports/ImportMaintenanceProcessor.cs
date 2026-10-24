@@ -184,6 +184,6 @@ public sealed class ImportMaintenanceProcessor
                 CorrelationId: null,
                 RequestName: nameof(ImportMaintenanceProcessor),
                 RequestPayload: JsonSerializer.Serialize(new { Status = batch.Status.ToString(), Rows = rows }, AuditJson),
-                OccurredAtUtc: DateTime.UtcNow),
+                OccurredAtUtc: services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime),
             ct);
 }

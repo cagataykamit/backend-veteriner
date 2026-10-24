@@ -15,3 +15,7 @@ charset = utf-8
 [*.cs]
 indent_style = space
 indent_size = 4
+
+# Saat kaynagi kurali (BannedSymbols.txt, Domain + Application): mevcut 180+ kullanim kademeli temizlenecek; o yuzden
+# oneri seviyesinde (IDE gosterir, derleme uyarisi vermez). Temizlik bitince warning/error yapilir.
+dotnet_diagnostic.RS0030.severity = suggestion

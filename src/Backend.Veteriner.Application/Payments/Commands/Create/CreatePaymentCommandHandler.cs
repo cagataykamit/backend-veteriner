@@ -303,7 +303,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
                 PaymentIntegrationEventTypes.Created,
                 new PaymentCreatedIntegrationEvent(
                     Guid.NewGuid(),
-                    DateTime.UtcNow,
+                    _timeProvider.GetUtcNow().UtcDateTime,
                     PaymentProjectionSnapshotFactory.Create(payment, client.FullName, clinic.Name, petName)),
                 ct);
 
