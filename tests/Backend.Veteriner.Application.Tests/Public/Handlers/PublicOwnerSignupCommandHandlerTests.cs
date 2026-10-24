@@ -10,6 +10,8 @@ using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.SalesPartners.Specs;
+using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
+using Backend.Veteriner.Application.Tenants.ExampleClinic;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using FluentAssertions;
@@ -38,6 +40,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     private readonly Mock<IReadRepository<SalesPartner>> _partners = new();
     private readonly Mock<IReadRepository<DiscountRedemption>> _redemptionsRead = new();
     private readonly Mock<IRepository<DiscountRedemption>> _redemptionsWrite = new();
+    private readonly Mock<IExampleClinicLoader> _exampleClinic = new();
 
     private PublicOwnerSignupCommandHandler CreateHandler()
         => new(
@@ -56,6 +59,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             _redemptionsWrite.Object,
             _hasher.Object,
             _uow.Object,
+            _exampleClinic.Object,
             _logger.Object);
 
     [Fact]
@@ -85,6 +89,47 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Users.DuplicateEmail");
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_LoadExampleClinic_InSameFlow_When_StartWithExampleClinic()
+    {
+        SetupHappyPathLookups();
+        _hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+        ExampleClinicLoadSummaryDto? summary = null;
+        _exampleClinic.Setup(x => x.LoadAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid tenantId, Guid clinicId, Guid _, CancellationToken _) =>
+                summary = new ExampleClinicLoadSummaryDto(tenantId, clinicId, 12, 20, 40, 25, 15, 8, 6, 60, 40, 10, 30));
+
+        var command = new PublicOwnerSignupCommand(
+            "Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments(), null, StartWithExampleClinic: true);
+        var result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.ExampleClinic.Should().Be(summary);
+        summary!.TenantId.Should().Be(result.Value.TenantId);
+        summary.ClinicId.Should().Be(result.Value.ClinicId);
+        _exampleClinic.Verify(
+            x => x.LoadAsync(result.Value.TenantId, result.Value.ClinicId, result.Value.UserId, It.IsAny<CancellationToken>()),
+            Times.Once);
+        // Önce kayıt yazılır (SaveChanges), sonra aynı işlemde örnek veri; ikisi de TransactionBehavior altında.
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotTouchExampleClinic_When_StartWithExampleClinicFalse()
+    {
+        SetupHappyPathLookups();
+        _hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+
+        var command = new PublicOwnerSignupCommand("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments());
+        var result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.ExampleClinic.Should().BeNull();
+        _exampleClinic.Verify(
+            x => x.LoadAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

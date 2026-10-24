@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Examinations.Commands.Create;
 using Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
 using Backend.Veteriner.Application.Tenants.Commands.Create;
+using Backend.Veteriner.Application.Tenants.Commands.LoadExampleClinic;
 using FluentAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Common;
@@ -19,6 +20,7 @@ public sealed class TransactionalCommandMarkerTests
     [InlineData(typeof(PublicOwnerSignupCommand))]
     [InlineData(typeof(SignupAndAcceptTenantInviteCommand))]
     [InlineData(typeof(CreateTenantCommand))]
+    [InlineData(typeof(LoadExampleClinicCommand))]
     [InlineData(typeof(CreateExaminationCommand))]
     [InlineData(typeof(UpdateClinicWorkingHoursCommand))]
     public void MultiWriteCommand_Should_RollBackOnFailure(Type commandType)
