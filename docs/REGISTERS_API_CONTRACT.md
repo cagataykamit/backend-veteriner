@@ -48,7 +48,7 @@ Süzgeçlere uyan satırların **tarih sıralı** konumudur (1'den başlar; sayf
 
 - CSV: UTF-8 BOM, `;` ayırıcı (Excel TR), tarih `dd.MM.yyyy` (Europe/Istanbul), teknik ID kolonu yok. XLSX: tarih hücresi tarih biçimli, sayı hücresi sayı biçimli, sabit başlık satırı, süzgeç.
 - Ekran ile dışa aktarma aynı okuyucu çağrısından geçer (aynı süzgeç, aynı sıra, aynı Sıra No); testle kanıtlanır.
-- Satır tavanı `ReportsSharedLimits.MaxExportRows` (50.000); aşılırsa `Registers.ExportTooManyRows` (400): "filtreyi daraltın".
+- Satır tavanı `ReportsSharedLimits.MaxExportRows` (50.000); aşılırsa `Registers.ExportTooManyRows` (400): "filtreyi daraltın". Deneme kiracısında tavan 1.000 ve kod `Trial.ExportLimitExceeded` (422) — `TRIAL_LIMITS_API_CONTRACT.md`.
 - Dosya adı: `muayene-defteri-yyyyMMdd.csv|xlsx`, `recete-defteri-yyyyMMdd.csv|xlsx` (İstanbul tarihi).
 - Boş (eksik alan) sütunlar dosyada başlığıyla ve boş hücreyle yer alır; böylece sütun seti defter biçimine uygun kalır ve alan eklenince değişmez.
 
@@ -166,6 +166,7 @@ Aşağıdakiler bu sürümde **boş** (veya kısmen doludur). Her biri ayrı bir
 | `Registers.ClinicContextMismatch` (savunma amaçlı; ara katmanda `Context.ClinicConflict`) | 400 |
 | `Context.ClinicConflict` (JWT clinic_id ≠ sorgu clinicId) | 403 |
 | `Registers.ExportTooManyRows` | 400 |
+| `Trial.ExportLimitExceeded` (deneme kiracısı, `TRIAL_LIMITS_API_CONTRACT.md`) | 422 |
 | `Clinics.AccessDenied` | 403 |
 | `Clinics.NotFound` | 404 |
 | (yetkisiz) | 401 / 403 |

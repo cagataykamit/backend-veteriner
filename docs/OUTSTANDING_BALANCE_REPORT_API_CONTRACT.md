@@ -73,7 +73,7 @@ Sıralama: `outstandingAmount` azalan, sonra `clientName`, sonra `clientId` (det
 
 - `GET /api/v1/reports/outstanding-balances/export` (CSV: UTF-8 BOM, `;` ayırıcı, Excel TR) ve `/export-xlsx`.
 - Parametreler listedeki ile aynıdır, **`page`/`pageSize` hariç**; tüm eşleşen satırlar gelir. Süzgeç semantiği ve sıralama JSON ile **aynı kod yolundan** geçer; ekran ile dışa aktarma aynı müşteri kümesini ve aynı sırayı verir (testle kanıtlanır).
-- Satır tavanı `ReportsSharedLimits.MaxExportRows` (50.000); aşılırsa `OutstandingBalances.ReportExportTooManyRows` (400): "filtreyi daraltın".
+- Satır tavanı `ReportsSharedLimits.MaxExportRows` (50.000); aşılırsa `OutstandingBalances.ReportExportTooManyRows` (400): "filtreyi daraltın". Deneme kiracısında tavan 1.000 ve kod `Trial.ExportLimitExceeded` (422) — `TRIAL_LIMITS_API_CONTRACT.md`.
 - Kolonlar (teknik ID yok): `Müşteri`, `Telefon`, `Kalan Tutar`, `Para Birimi`, `Açık Ücret Sayısı`, `En Eski Açık Ücret` (Europe/Istanbul, `dd.MM.yyyy`). XLSX'te tutar sayı biçimli, tarih tarih biçimli hücredir.
 - Dosya adı: `borc-raporu-yyyyMMdd.csv` / `.xlsx` (İstanbul tarihi).
 - Toplam satırı dosyaya eklenmez (süzgeç/Excel toplamı kullanıcıdadır); ekrandaki toplam `totalOutstandingAmount` ile gösterilir.
@@ -87,6 +87,7 @@ Sıralama: `outstandingAmount` azalan, sonra `clientName`, sonra `clientId` (det
 | `Context.ClinicConflict` (JWT clinic_id ≠ sorgu clinicId) | 403 |
 | `OutstandingBalances.ClinicContextMismatch` (savunma amaçlı) | 400 |
 | `OutstandingBalances.ReportExportTooManyRows` | 400 |
+| `Trial.ExportLimitExceeded` (deneme kiracısı, `TRIAL_LIMITS_API_CONTRACT.md`) | 422 |
 | `Clinics.AccessDenied` | 403 |
 | `Clinics.NotFound` | 404 |
 | (yetkisiz) | 401 / 403 |

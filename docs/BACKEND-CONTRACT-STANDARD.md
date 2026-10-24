@@ -1975,6 +1975,7 @@ Bu bölüm **§28–§31** altındaki dört panel raporu için ortak çerçeveyi
 
 - JSON: `page`, `pageSize`; üst sınır **200** (`ReportsSharedLimits.MaxPageSize`).
 - CSV/XLSX: **sayfa yok**; önce `Count`; eşleşen satır **>** **50.000** (`ReportsSharedLimits.MaxExportRows`) ise `*.ReportExportTooManyRows`.
+- **Deneme kiracısı (TRIAL-004):** tavan **1.000**; aşımda `Trial.ExportLimitExceeded` (**422**) — tüm rapor/defter export uçlarında aynı; bkz. `TRIAL_LIMITS_API_CONTRACT.md`.
 
 ### 27A.5 JSON vs kullanıcı dışa aktarım
 

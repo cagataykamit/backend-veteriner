@@ -95,7 +95,7 @@ Sıralama: `occurredAtUtc` artan, sonra `kind`, sonra `referenceId`. Örnek: 10:
 ### Dışa aktarma
 
 - `GET /reports/daily-transactions/export` (CSV: UTF-8 BOM, `;`, Excel TR) ve `/export-xlsx`. Parametreler listedekiyle aynı, **`page`/`pageSize` hariç**; tüm eşleşen olaylar gelir. Süzgeç ve sıralama JSON ile **aynı okuyucu çağrısından** geçer (ekran = CSV = XLSX).
-- Tavan `ReportsSharedLimits.MaxExportRows` (50.000); aşılırsa `Registers.ExportTooManyRows` (400).
+- Tavan `ReportsSharedLimits.MaxExportRows` (50.000); aşılırsa `Registers.ExportTooManyRows` (400). Deneme kiracısında tavan 1.000 ve kod `Trial.ExportLimitExceeded` (422) — `TRIAL_LIMITS_API_CONTRACT.md`.
 - Kolonlar (teknik ID yok): `Tarih Saat` (İstanbul, `dd.MM.yyyy HH:mm`), `Tür`, `Müşteri`, `Hayvan`, `Açıklama`, `Tutar`, `Ödeme Türü`, `Kaynak` (`Doğrudan satış` / boş), `Durum` (`Geçerli` / `İptal edildi`), `Gerekçe`, `İşlemi Yapan`. Tutar CSV'de `0,00`, XLSX'te sayı biçimli hücre; tarih-saat XLSX'te tarih-saat biçimli hücre. Düzeltme satırında tutar boş.
 - Toplam satırı dosyaya eklenmez (ekrandaki toplam `totals` ile gösterilir; dosyada Excel toplamı kullanıcıdadır).
 - Dosya adı: `gunluk-islem-dokumu-yyyyMMdd.csv` / `.xlsx` (İstanbul tarihi).
@@ -144,6 +144,7 @@ Not: Geçmiş bir günün gün sonu bugünkü durumu gösterir (açık iş anlı
 | `Registers.DateRangeInvalid`, `Registers.RangeTooLong` | 400 |
 | `Registers.ClinicContextMismatch` (savunma), `Context.ClinicConflict` | 400 / 403 |
 | `Registers.ExportTooManyRows` (daily-transactions) | 400 |
+| `Trial.ExportLimitExceeded` (daily-transactions, deneme kiracısı) | 422 |
 | `CashSummary.TooManyRows` | 400 |
 | `EndOfDay.ClinicScopeRequired` | 400 |
 | `Clinics.AccessDenied` | 403 |
