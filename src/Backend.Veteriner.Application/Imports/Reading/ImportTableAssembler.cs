@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Imports.Mapping;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
 
@@ -114,10 +115,13 @@ internal static class ImportTableAssembler
         }
     }
 
+    /// <summary>Deneme kiracısında tavan <see cref="TrialLimits.ImportMaxRowsPerTable"/> ve kod <c>Trial.ImportLimitExceeded</c> (TRIAL-004).</summary>
     private static Result<ImportSourceTable?> TooManyRows(ImportTable table, ImportFileLimits limits)
-        => Result<ImportSourceTable?>.Failure(
-            "Imports.TooManyRows",
-            $"{ImportCanonicalNames.Display(table)} tablosunda en fazla {limits.MaxRowsPerTable} veri satırı olabilir.");
+        => limits.IsTrial
+            ? Result<ImportSourceTable?>.Failure(TrialLimits.ImportLimitExceeded(ImportCanonicalNames.Display(table)))
+            : Result<ImportSourceTable?>.Failure(
+                "Imports.TooManyRows",
+                $"{ImportCanonicalNames.Display(table)} tablosunda en fazla {limits.MaxRowsPerTable} veri satırı olabilir.");
 }
 
 /// <summary>Okuyucunun ürettiği ham satır; boş/yalnız boşluk hücreler null'a indirilmiştir.</summary>

@@ -1,5 +1,6 @@
 using System.Text;
 using Backend.Veteriner.Application.Imports.Reading;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Imports;
 using FluentAssertions;
 
@@ -151,7 +152,7 @@ public sealed class ImportUploadReaderTests
             pets: ImportTestFiles.Csv("HayvanAdi;Tur\n"),
             vaccinations: ImportTestFiles.Csv("AsiAdi\nKuduz\n"));
 
-        var read = reader.Read(reader.Prepare(files, null, null).Value!);
+        var read = reader.Read(reader.Prepare(files, null, null).Value!, trialTenant: false);
 
         read.IsSuccess.Should().BeTrue(read.Error.Message);
         read.Value!.Tables.Select(t => (t.Table, t.Rows.Count)).Should().Equal(
@@ -165,7 +166,7 @@ public sealed class ImportUploadReaderTests
         var reader = ImportTestFiles.Reader();
         var files = Csv(customers: ImportTestFiles.Csv("AdSoyad;Telefon\n"));
 
-        reader.Read(reader.Prepare(files, null, null).Value!).Error.Code.Should().Be("Imports.EmptyFile");
+        reader.Read(reader.Prepare(files, null, null).Value!, trialTenant: false).Error.Code.Should().Be("Imports.EmptyFile");
     }
 
     [Fact]
@@ -176,7 +177,7 @@ public sealed class ImportUploadReaderTests
             customers: ImportTestFiles.Csv("AdSoyad\nA\nB\n"),
             pets: ImportTestFiles.Csv("HayvanAdi\nC\nD\n"));
 
-        reader.Read(reader.Prepare(files, null, null).Value!).Error.Code.Should().Be("Imports.TooManyRows");
+        reader.Read(reader.Prepare(files, null, null).Value!, trialTenant: false).Error.Code.Should().Be("Imports.TooManyRows");
     }
 
     [Fact]
@@ -187,10 +188,39 @@ public sealed class ImportUploadReaderTests
         var bytes = Encoding.GetEncoding(1254).GetBytes("Ad;Şehir\nİsmail;Işık\n");
         var files = Csv(customers: new ImportUploadedFile("veri.csv", "text/csv", bytes));
 
-        var read = reader.Read(reader.Prepare(files, "windows-1254", "semicolon").Value!);
+        var read = reader.Read(reader.Prepare(files, "windows-1254", "semicolon").Value!, trialTenant: false);
 
         var table = read.Value!.Tables.Single();
         table.Headers.Should().Equal("Ad", "Şehir");
         table.Rows.Single().Cells.Should().Equal("İsmail", "Işık");
+    }
+
+    [Fact]
+    public void Read_Should_Apply_Trial_RowsPerTable_Limit_With_Trial_Code()
+    {
+        // TRIAL-004: deneme kiracısında tablo başına 500 satır; yapılandırılmış 10.000 tavanı devre dışı kalır.
+        var reader = ImportTestFiles.Reader();
+        var rows = string.Join('\n', Enumerable.Range(1, TrialLimits.ImportMaxRowsPerTable + 1).Select(i => $"Musteri {i}"));
+        var files = Csv(customers: ImportTestFiles.Csv($"AdSoyad\n{rows}\n"));
+        var prepared = reader.Prepare(files, null, null).Value!;
+
+        var trial = reader.Read(prepared, trialTenant: true);
+        var paid = reader.Read(prepared, trialTenant: false);
+
+        trial.IsSuccess.Should().BeFalse();
+        trial.Error.Code.Should().Be("Trial.ImportLimitExceeded");
+        trial.Error.Message.Should().Contain("Deneme sürümünde").And.Contain("abonelikle kalkar");
+        paid.IsSuccess.Should().BeTrue(paid.Error.Message);
+        paid.Value!.Tables.Single().Rows.Should().HaveCount(TrialLimits.ImportMaxRowsPerTable + 1);
+    }
+
+    [Fact]
+    public void Read_Should_Keep_Configured_Code_When_Trial_Limit_Is_Not_Lower()
+    {
+        // Yapılandırılmış tavan deneme sınırından düşükse deneme kiracısı da yapılandırılmış tavanı ve kodu alır.
+        var reader = ImportTestFiles.Reader(l => l.MaxRowsPerTable = 2);
+        var files = Csv(customers: ImportTestFiles.Csv("AdSoyad\nA\nB\nC\n"));
+
+        reader.Read(reader.Prepare(files, null, null).Value!, trialTenant: true).Error.Code.Should().Be("Trial.ImportLimitExceeded");
     }
 }

@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Imports.Contracts.Dtos;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Application.Imports.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
@@ -28,6 +29,7 @@ public sealed class CreateImportBatchCommandHandler
     private readonly ImportUploadReader _reader;
     private readonly ImportTableInfoLoader _tableInfo;
     private readonly TimeProvider _timeProvider;
+    private readonly ITrialLimitPolicy _trialLimitPolicy;
 
     public CreateImportBatchCommandHandler(
         ITenantContext tenantContext,
@@ -40,7 +42,8 @@ public sealed class CreateImportBatchCommandHandler
         IRepository<ImportBatchRow> rowsWrite,
         ImportUploadReader reader,
         ImportTableInfoLoader tableInfo,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ITrialLimitPolicy trialLimitPolicy)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -53,6 +56,7 @@ public sealed class CreateImportBatchCommandHandler
         _reader = reader;
         _tableInfo = tableInfo;
         _timeProvider = timeProvider;
+        _trialLimitPolicy = trialLimitPolicy;
     }
 
     public async Task<Result<ImportBatchCreateResultDto>> Handle(CreateImportBatchCommand request, CancellationToken ct)
@@ -112,7 +116,8 @@ public sealed class CreateImportBatchCommandHandler
                 $"Kiracıda en fazla {ImportBatch.MaxOpenDraftsPerTenant} açık taslak parti olabilir; önce birini tamamlayın veya silin.");
         }
 
-        var read = _reader.Read(upload);
+        // Deneme kiracısında tablo başına satır tavanı düşüktür (TRIAL-004); aşım Trial.ImportLimitExceeded (422).
+        var read = _reader.Read(upload, trialTenant: await _trialLimitPolicy.IsTrialAsync(tenantId, ct));
         if (!read.IsSuccess)
             return Result<ImportBatchCreateResultDto>.Failure(read.Error);
 

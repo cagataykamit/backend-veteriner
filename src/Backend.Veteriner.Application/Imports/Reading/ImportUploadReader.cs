@@ -61,18 +61,23 @@ public sealed class ImportUploadReader
             new ImportPreparedUpload(files, ComputeHash(files), encoding, delimiter));
     }
 
-    public Result<ImportReadResult> Read(ImportPreparedUpload upload)
+    /// <summary>
+    /// Ayrıştırma ve tavan denetimi. <paramref name="trialTenant"/> ise tablo satır tavanı deneme sınırıdır
+    /// (<see cref="ImportFileLimits.ForTrial"/>, TRIAL-004); kararı <c>ITrialLimitPolicy</c> ile çağıran verir.
+    /// </summary>
+    public Result<ImportReadResult> Read(ImportPreparedUpload upload, bool trialTenant)
     {
+        var limits = trialTenant ? _limits.ForTrial() : _limits;
         var files = upload.Files;
         if (files.Workbook is not null)
-            return XlsxTableReader.Read(files.Workbook.Content, _limits);
+            return XlsxTableReader.Read(files.Workbook.Content, limits);
 
         var tables = new List<ImportSourceTable>();
         var warnings = new List<ImportReadWarning>();
         var total = 0;
         foreach (var (table, file) in CsvInputs(files))
         {
-            var read = CsvTableReader.Read(table, file.Content, upload.Encoding, upload.Delimiter, _limits, warnings);
+            var read = CsvTableReader.Read(table, file.Content, upload.Encoding, upload.Delimiter, limits, warnings);
             if (!read.IsSuccess)
                 return Result<ImportReadResult>.Failure(read.Error);
 
@@ -86,8 +91,8 @@ public sealed class ImportUploadReader
             }
 
             total += source.Rows.Count;
-            if (total > _limits.MaxTotalRows)
-                return Fail<ImportReadResult>("Imports.TooManyRows", $"Parti toplamı en fazla {_limits.MaxTotalRows} veri satırı olabilir.");
+            if (total > limits.MaxTotalRows)
+                return Fail<ImportReadResult>("Imports.TooManyRows", $"Parti toplamı en fazla {limits.MaxTotalRows} veri satırı olabilir.");
 
             tables.Add(source);
         }
