@@ -28,6 +28,13 @@ public static class AuthorizationPolicyNames
     public const string ClinicsKvkkFormRead = "Clinics_KvkkFormRead";
 
     /// <summary>
+    /// Klinik yatış bölüm/oda tanımlarını okuma (HOSP-002): yatış formunda oda seçen (<c>Hospitalizations.Read</c>) ve
+    /// Ayarlar &gt; Tanımlar'da listeyi düzenleyen (<c>Clinics.Read</c> / <c>Clinics.Update</c>) kullanıcıya açıktır.
+    /// Yazma uçları <c>Clinics.Update</c> ile korunur.
+    /// </summary>
+    public const string ClinicsHospitalizationWardsRead = "Clinics_HospitalizationWardsRead";
+
+    /// <summary>
     /// Platform yöneticisi (Vetinity'nin kendi yönetimi): JWT'de <c>platform_admin = true</c> claim'i gerekir. İzin tabanlı değildir;
     /// <c>PlatformAdmin</c> claim'i tüm izinlere bağlı olduğundan izinle klinik yöneticisinden ayrılamaz. Satış ortağı uçları (ADR-037).
     /// </summary>

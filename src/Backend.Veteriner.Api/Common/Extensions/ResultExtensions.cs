@@ -159,6 +159,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Pasif oda/bölüm yeni yatışa atanamaz (HOSP-002): tanımın durumu ile çakışma.
+        if (normalized is "hospitalizations.roominactive")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Vefat etmiş hayvan için yeni randevu/geliş/muayene (ADR-020 S5): kaydın durumu ile çakışma.
         if (normalized is "pets.deceased")
         {

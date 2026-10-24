@@ -84,7 +84,9 @@ public sealed class HospitalizationsController : ControllerBase
             body.Notes,
             body.VisitId,
             body.Location,
-            body.RowVersion);
+            body.RowVersion,
+            body.RoomId,
+            body.ClearRoom);
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);

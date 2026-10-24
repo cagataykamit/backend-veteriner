@@ -21,6 +21,14 @@ using Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkin
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Hospitalizations.Contracts.Dtos;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Commands.CreateRoom;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Commands.CreateWard;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Commands.SetRoomActive;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Commands.SetWardActive;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Commands.UpdateRoom;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Commands.UpdateWard;
+using Backend.Veteriner.Application.Hospitalizations.Wards.Queries.GetClinicWardsWithRooms;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
@@ -341,6 +349,192 @@ public sealed class ClinicsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var result = await _mediator.Send(new GetClinicVeterinariansQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    // =========================================================
+    // Yatış bölüm/oda tanımları (HOSP-002) — Ayarlar > Tanımlar; bkz. docs/HOSPITALIZATION_MODEL_API_CONTRACT.md §10.
+    // =========================================================
+
+    /// <summary>Kliniğin yatış bölümleri ve odaları (aktif/pasif dahil; sıra, sonra ad). Yatış formu aktifleri süzer.</summary>
+    /// <remarks>Okuma yetkisi composite "any-of": <c>Hospitalizations.Read</c>, <c>Clinics.Read</c> veya <c>Clinics.Update</c>.</remarks>
+    [HttpGet("{id:guid}/hospitalization-wards")]
+    [Authorize(Policy = AuthorizationPolicyNames.ClinicsHospitalizationWardsRead)]
+    [ProducesResponseType(typeof(IReadOnlyList<HospitalizationWardDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetHospitalizationWards([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var result = await _mediator.Send(new GetClinicWardsWithRoomsQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Yeni yatış bölümü; aktif bölümler arasında ad benzersizdir (409 <c>HospitalizationWards.DuplicateName</c>).</summary>
+    [HttpPost("{id:guid}/hospitalization-wards")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateHospitalizationWard(
+        [FromRoute] Guid id,
+        [FromBody] CreateHospitalizationWardBody body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CreateWardCommand(id, body.Name, body.SortOrder), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        return CreatedAtAction(
+            nameof(GetHospitalizationWards),
+            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
+            result.Value);
+    }
+
+    /// <summary>Bölüm adı ve sırası; yanıt bölümün güncel hali (odalarıyla).</summary>
+    [HttpPut("{id:guid}/hospitalization-wards/{wardId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(HospitalizationWardDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateHospitalizationWard(
+        [FromRoute] Guid id,
+        [FromRoute] Guid wardId,
+        [FromBody] UpdateHospitalizationWardBody body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        if (body.Id is { } bid && bid != Guid.Empty && bid != wardId)
+            return Result.Failure("HospitalizationWards.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+
+        var result = await _mediator.Send(new UpdateWardCommand(id, wardId, body.Name, body.SortOrder), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Bölümü pasife alır (idempotent). Pasif bölüm yeni yatışa atanamaz; mevcut yatışlar etkilenmez.</summary>
+    [HttpPost("{id:guid}/hospitalization-wards/{wardId:guid}/deactivate")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [ProducesResponseType(typeof(HospitalizationWardDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public Task<IActionResult> DeactivateHospitalizationWard([FromRoute] Guid id, [FromRoute] Guid wardId, CancellationToken ct)
+        => SetHospitalizationWardActive(id, wardId, isActive: false, ct);
+
+    /// <summary>Bölümü yeniden etkinleştirir (idempotent); ad çakışırsa 409 <c>HospitalizationWards.DuplicateName</c>.</summary>
+    [HttpPost("{id:guid}/hospitalization-wards/{wardId:guid}/activate")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [ProducesResponseType(typeof(HospitalizationWardDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public Task<IActionResult> ActivateHospitalizationWard([FromRoute] Guid id, [FromRoute] Guid wardId, CancellationToken ct)
+        => SetHospitalizationWardActive(id, wardId, isActive: true, ct);
+
+    private async Task<IActionResult> SetHospitalizationWardActive(Guid id, Guid wardId, bool isActive, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var result = await _mediator.Send(new SetWardActiveCommand(id, wardId, isActive), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Bölüme yeni oda/kafes; aynı bölümün aktif odaları arasında ad benzersizdir (409 <c>HospitalizationRooms.DuplicateName</c>).</summary>
+    [HttpPost("{id:guid}/hospitalization-wards/{wardId:guid}/rooms")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateHospitalizationRoom(
+        [FromRoute] Guid id,
+        [FromRoute] Guid wardId,
+        [FromBody] CreateHospitalizationRoomBody body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CreateRoomCommand(id, wardId, body.Name, body.SortOrder), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        return CreatedAtAction(
+            nameof(GetHospitalizationWards),
+            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
+            result.Value);
+    }
+
+    /// <summary>Oda adı ve sırası; oda bölümler arası taşınmaz. Yanıt odanın güncel hali.</summary>
+    [HttpPut("{id:guid}/hospitalization-wards/{wardId:guid}/rooms/{roomId:guid}")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(HospitalizationRoomDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateHospitalizationRoom(
+        [FromRoute] Guid id,
+        [FromRoute] Guid wardId,
+        [FromRoute] Guid roomId,
+        [FromBody] UpdateHospitalizationRoomBody body,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        if (body.Id is { } bid && bid != Guid.Empty && bid != roomId)
+            return Result.Failure("HospitalizationRooms.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+
+        var result = await _mediator.Send(new UpdateRoomCommand(id, wardId, roomId, body.Name, body.SortOrder), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Odayı pasife alır (idempotent). Pasif oda yeni yatışa atanamaz; odadaki mevcut yatışlar etkilenmez.</summary>
+    [HttpPost("{id:guid}/hospitalization-wards/{wardId:guid}/rooms/{roomId:guid}/deactivate")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [ProducesResponseType(typeof(HospitalizationRoomDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public Task<IActionResult> DeactivateHospitalizationRoom(
+        [FromRoute] Guid id, [FromRoute] Guid wardId, [FromRoute] Guid roomId, CancellationToken ct)
+        => SetHospitalizationRoomActive(id, wardId, roomId, isActive: false, ct);
+
+    /// <summary>Odayı yeniden etkinleştirir (idempotent); ad çakışırsa 409 <c>HospitalizationRooms.DuplicateName</c>.</summary>
+    [HttpPost("{id:guid}/hospitalization-wards/{wardId:guid}/rooms/{roomId:guid}/activate")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [ProducesResponseType(typeof(HospitalizationRoomDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public Task<IActionResult> ActivateHospitalizationRoom(
+        [FromRoute] Guid id, [FromRoute] Guid wardId, [FromRoute] Guid roomId, CancellationToken ct)
+        => SetHospitalizationRoomActive(id, wardId, roomId, isActive: true, ct);
+
+    private async Task<IActionResult> SetHospitalizationRoomActive(Guid id, Guid wardId, Guid roomId, bool isActive, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var result = await _mediator.Send(new SetRoomActiveCommand(id, wardId, roomId, isActive), ct);
         return result.ToActionResult(this);
     }
 

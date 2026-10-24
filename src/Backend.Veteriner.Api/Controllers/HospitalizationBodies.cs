@@ -17,8 +17,17 @@ public sealed class UpdateHospitalizationBody
     public string Reason { get; init; } = default!;
     public string? Notes { get; init; }
 
-    /// <summary>Free-text location; omit to leave unchanged, empty string clears.</summary>
+    /// <summary>Free-text location; omit to leave unchanged, empty string clears. Ignored when <see cref="RoomId"/> is set.</summary>
     public string? Location { get; init; }
+
+    /// <summary>
+    /// Clinic-defined room (HOSP-002); omit to keep the current room, set to assign (location text is derived as "Ward / Room").
+    /// Must belong to the hospitalization clinic and be active unless it is the room already assigned.
+    /// </summary>
+    public Guid? RoomId { get; init; }
+
+    /// <summary>Removes the room link; cannot be combined with <see cref="RoomId"/>. Location text follows the <see cref="Location"/> rule.</summary>
+    public bool ClearRoom { get; init; }
 
     /// <summary>Base64 version from GET; optional during the transition period, checked when sent.</summary>
     public string? RowVersion { get; init; }

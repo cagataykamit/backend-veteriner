@@ -45,6 +45,16 @@ namespace Backend.Veteriner.Api.Auth
                         PermissionCatalog.Clients.Read,
                     })));
 
+                // Composite (any-of) policy: yatış bölüm/oda tanımları okuma (HOSP-002). Yatış formunda oda seçen kullanıcı
+                // ile Ayarlar'da tanımları düzenleyen kullanıcı aynı listeyi okur; yazma Clinics.Update ile korunur.
+                options.AddPolicy(AuthorizationPolicyNames.ClinicsHospitalizationWardsRead, p =>
+                    p.Requirements.Add(new PermissionAnyOfRequirement(new[]
+                    {
+                        PermissionCatalog.Hospitalizations.Read,
+                        PermissionCatalog.Clinics.Read,
+                        PermissionCatalog.Clinics.Update,
+                    })));
+
                 // Hasta sahibi portalı (ADR-031 K6): yalnız portal şeması ve portal hesabı. Personel token'ı bu şemada
                 // hedef kitle uyuşmazlığıyla doğrulanmaz; personel politikaları da portal şemasını kullanmaz.
                 options.AddPolicy(AuthorizationPolicyNames.PlatformAdmin, p => p
