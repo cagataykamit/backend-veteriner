@@ -38,6 +38,8 @@ using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Query;
 using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
+using Backend.Veteriner.Infrastructure.Persistence.Seeding;                       // ExampleClinicDataGenerator
+using Backend.Veteriner.Application.Tenants.ExampleClinic;                        // IExampleClinicLoader
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;                 // EfRepository, EfReadRepository, UserRepository, RefreshTokenRepository, VerificationTokenRepository
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Payments;
@@ -175,6 +177,7 @@ public static class DependencyInjection
         services.AddScoped<IUserOperationClaimRepository, UserOperationClaimRepository>();
         services.AddScoped<IUserTenantRepository, UserTenantRepository>();
         services.AddScoped<IUserClinicRepository, UserClinicRepository>();
+        services.AddScoped<IExampleClinicLoader, ExampleClinicDataGenerator>();
         services.AddScoped<IDashboardTodayAppointmentStatusCountsReader, DashboardTodayAppointmentStatusCountsReader>();
         services.AddScoped<IDashboardClinicScopedReader, DashboardClinicScopedReader>();
         services.AddScoped<IVisitTodayReader, VisitTodayReader>();

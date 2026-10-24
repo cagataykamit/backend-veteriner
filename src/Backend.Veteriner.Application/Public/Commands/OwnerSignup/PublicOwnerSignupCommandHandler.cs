@@ -5,6 +5,8 @@ using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
+using Backend.Veteriner.Application.Tenants.ExampleClinic;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
@@ -39,6 +41,7 @@ public sealed class PublicOwnerSignupCommandHandler
     private readonly IRepository<DiscountRedemption> _redemptionsWrite;
     private readonly IPasswordHasher _hasher;
     private readonly IUnitOfWork _uow;
+    private readonly IExampleClinicLoader _exampleClinic;
     private readonly ILogger<PublicOwnerSignupCommandHandler> _logger;
 
     public PublicOwnerSignupCommandHandler(
@@ -57,6 +60,7 @@ public sealed class PublicOwnerSignupCommandHandler
         IRepository<DiscountRedemption> redemptionsWrite,
         IPasswordHasher hasher,
         IUnitOfWork uow,
+        IExampleClinicLoader exampleClinic,
         ILogger<PublicOwnerSignupCommandHandler>? logger = null)
     {
         _usersRead = usersRead;
@@ -74,6 +78,7 @@ public sealed class PublicOwnerSignupCommandHandler
         _redemptionsWrite = redemptionsWrite;
         _hasher = hasher;
         _uow = uow;
+        _exampleClinic = exampleClinic;
         _logger = logger ?? NullLogger<PublicOwnerSignupCommandHandler>.Instance;
     }
 
@@ -183,6 +188,14 @@ public sealed class PublicOwnerSignupCommandHandler
         await _uow.SaveChangesAsync(ct);
         MarkStep("saveChanges");
 
+        // Örnek klinik (ADR-002): aynı işlemde; yeni kiracı deneme sürecinde ve boş olduğu için ayrıca kural kontrolü gerekmez.
+        ExampleClinicLoadSummaryDto? exampleClinic = null;
+        if (request.StartWithExampleClinic)
+        {
+            exampleClinic = await _exampleClinic.LoadAsync(tenant.Id, clinic.Id, user.Id, ct);
+            MarkStep("exampleClinic");
+        }
+
         var response = new PublicOwnerSignupResultDto(
             tenant.Id,
             clinic.Id,
@@ -192,7 +205,8 @@ public sealed class PublicOwnerSignupCommandHandler
             subscription.TrialEndsAtUtc ?? utcNow,
             true,
             "login",
-            redemption is null ? null : new DiscountCodeSummaryDto(redemption.Code, redemption.DiscountPercent, DiscountRedemption.WindowMonths));
+            redemption is null ? null : new DiscountCodeSummaryDto(redemption.Code, redemption.DiscountPercent, DiscountRedemption.WindowMonths),
+            exampleClinic);
 
         _logger.LogInformation(
             "Public owner signup succeeded. TenantId={TenantId} UserId={UserId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",
