@@ -85,7 +85,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-unit
           path: test-results
@@ -119,21 +119,21 @@ jobs:
           done
 
       - name: Upload API artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: api-${{ steps.version.outputs.version }}
           path: artifacts/api
           retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 30 }}
 
       - name: Upload DbMigrator artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dbmigrator-${{ steps.version.outputs.version }}
           path: artifacts/dbmigrator
           retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 30 }}
 
       - name: Upload migration scripts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: migrations-${{ steps.version.outputs.version }}
           path: artifacts/migrations
@@ -177,7 +177,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-integration
           path: test-results
