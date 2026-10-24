@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -18,6 +19,7 @@ public sealed record ExaminationRelatedSummaryDto(
     IReadOnlyList<ExaminationRelatedHospitalizationItemDto> Hospitalizations,
     IReadOnlyList<ExaminationRelatedAdministrationItemDto> Administrations,
     IReadOnlyList<ExaminationRelatedVaccinationItemDto> Vaccinations,
+    IReadOnlyList<ExaminationRelatedImagingItemDto> Imaging,
     IReadOnlyList<ExaminationRelatedPaymentItemDto> Payments,
     int? PendingChargeCount = null);
 
@@ -85,3 +87,14 @@ public sealed record ExaminationRelatedPaymentItemDto(
     decimal Amount,
     string Currency,
     PaymentMethod Method);
+
+/// <summary>Muayeneye bağlı görüntüleme kaydı (her durum; iptal <see cref="Status"/> ile ayrılır); <see cref="AddedAfterFinalization"/> "kesinleştirmeden sonra eklendi" rozetidir.</summary>
+public sealed record ExaminationRelatedImagingItemDto(
+    Guid Id,
+    DateTime PerformedAtUtc,
+    Guid ClinicId,
+    string ClinicName,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] ImagingModality Modality,
+    string? Description,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] ImagingRecordStatus Status,
+    bool AddedAfterFinalization);

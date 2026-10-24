@@ -15,6 +15,7 @@ using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
+using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
@@ -46,6 +47,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
     private readonly IReadRepository<Administration> _administrations;
     private readonly IReadRepository<Product> _products;
     private readonly IReadRepository<Vaccination> _vaccinations;
+    private readonly IReadRepository<ImagingRecord> _imaging;
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<ChargeSuggestion> _chargeSuggestions;
     private readonly ICurrentUserPermissionChecker _permissionChecker;
@@ -67,6 +69,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         IReadRepository<Administration> administrations,
         IReadRepository<Product> products,
         IReadRepository<Vaccination> vaccinations,
+        IReadRepository<ImagingRecord> imaging,
         IReadRepository<Payment> payments,
         IReadRepository<ChargeSuggestion> chargeSuggestions,
         ICurrentUserPermissionChecker permissionChecker)
@@ -87,6 +90,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         _administrations = administrations;
         _products = products;
         _vaccinations = vaccinations;
+        _imaging = imaging;
         _payments = payments;
         _chargeSuggestions = chargeSuggestions;
         _permissionChecker = permissionChecker;
@@ -158,6 +162,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         var productById = productRows.ToDictionary(p => p.Id);
         var vaccs = !CanRead(PetRecordKind.Vaccination) ? [] : await _vaccinations.ListAsync(
             new VaccinationsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
+        var images = !CanRead(PetRecordKind.Imaging) ? [] : await _imaging.ListAsync(
+            new ImagingForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
         var pays = !CanRead(PetRecordKind.Payment) ? [] : await _payments.ListAsync(
             new PaymentsForExaminationRelatedSpec(tenantId, clinicId, examinationId, take), ct);
         int? pendingChargeCount = !_permissionChecker.HasPermission(PermissionCatalog.Charges.Read) ? null : await _chargeSuggestions.CountAsync(
@@ -170,6 +176,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         foreach (var h in hosp) clinicIds.Add(h.ClinicId);
         foreach (var a in admins) clinicIds.Add(a.ClinicId);
         foreach (var v in vaccs) clinicIds.Add(v.ClinicId);
+        foreach (var img in images) clinicIds.Add(img.ClinicId);
         foreach (var pay in pays) clinicIds.Add(pay.ClinicId);
 
         var clinicIdArr = clinicIds.ToArray();
@@ -246,6 +253,18 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 v.DueAtUtc))
             .ToList();
 
+        var imagingDtos = images
+            .Select(i => new ExaminationRelatedImagingItemDto(
+                i.Id,
+                i.PerformedAtUtc,
+                i.ClinicId,
+                ClinicName(i.ClinicId),
+                i.Modality,
+                i.Description,
+                i.Status,
+                i.AddedAfterExaminationFinalization))
+            .ToList();
+
         var payDtos = pays
             .Select(p => new ExaminationRelatedPaymentItemDto(
                 p.Id,
@@ -269,6 +288,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
             hospDtos,
             adminDtos,
             vaccDtos,
+            imagingDtos,
             payDtos,
             pendingChargeCount);
 

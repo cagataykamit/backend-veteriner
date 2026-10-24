@@ -11,6 +11,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
+using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
@@ -41,6 +42,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
     private readonly Mock<IReadRepository<Administration>> _administrations = new();
     private readonly Mock<IReadRepository<Product>> _products = new();
     private readonly Mock<IReadRepository<Vaccination>> _vaccinations = new();
+    private readonly Mock<IReadRepository<ImagingRecord>> _imaging = new();
     private readonly Mock<IReadRepository<Payment>> _payments = new();
     private readonly Mock<IReadRepository<Backend.Veteriner.Domain.ChargeSuggestions.ChargeSuggestion>> _chargeSuggestions = new();
     private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
@@ -74,6 +76,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             _administrations.Object,
             _products.Object,
             _vaccinations.Object,
+            _imaging.Object,
             _payments.Object,
             _chargeSuggestions.Object,
             _permissions.Object);
@@ -144,6 +147,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             .ReturnsAsync(new List<Administration>());
         _vaccinations.Setup(r => r.ListAsync(It.IsAny<VaccinationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Vaccination>());
+        _imaging.Setup(r => r.ListAsync(It.IsAny<ImagingForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ImagingRecord>());
         _payments.Setup(r => r.ListAsync(It.IsAny<PaymentsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Payment>());
         _clinics.Setup(r => r.ListAsync(It.IsAny<ClinicsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
@@ -354,6 +359,59 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
         item.ClinicName.Should().Be("Klinik");
         item.AppliedAtUtc.Should().Be(applied.AppliedAtUtc);
         item.DueAtUtc.Should().Be(applied.DueAtUtc);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Include_Imaging_Linked_To_Examination_With_Cancelled_And_Badge()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        SetupTenant(tid);
+        SetupTenantWideRole("Admin");
+        SetupExaminationFound(BuildExamination(tid, clinicId, petId, examId));
+        SetupSuccessGraph(tid, clinicId, petId, examId);
+        var now = DateTime.UtcNow;
+        var added = ImagingRecord.Create(tid, clinicId, petId, examId, true, now.AddHours(-1), ImagingModality.XRay, "Sol arka bacak", null, Guid.NewGuid(), now).Value!;
+        var cancelled = ImagingRecord.Create(tid, clinicId, petId, examId, false, now.AddHours(-2), ImagingModality.Ultrasound, null, null, Guid.NewGuid(), now).Value!;
+        cancelled.Cancel(Guid.NewGuid(), "Yanlis hasta secildi", now);
+        _imaging.Setup(r => r.ListAsync(It.IsAny<ImagingForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ImagingRecord> { added, cancelled });
+
+        var result = await CreateHandler().Handle(new GetExaminationRelatedSummaryQuery(examId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Imaging.Should().HaveCount(2);
+        var first = result.Value.Imaging[0];
+        first.Id.Should().Be(added.Id);
+        first.Modality.Should().Be(ImagingModality.XRay);
+        first.Description.Should().Be("Sol arka bacak");
+        first.Status.Should().Be(ImagingRecordStatus.Active);
+        first.AddedAfterFinalization.Should().BeTrue();
+        first.ClinicName.Should().Be("Klinik");
+        result.Value.Imaging[1].Status.Should().Be(ImagingRecordStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task Handle_Should_OmitImaging_When_UserLacksImagingReadPermission()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        SetupTenant(tid);
+        SetupTenantWideRole("Admin");
+        SetupExaminationFound(BuildExamination(tid, clinicId, petId, examId));
+        SetupSuccessGraph(tid, clinicId, petId, examId);
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Imaging.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetExaminationRelatedSummaryQuery(examId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Imaging.Should().BeEmpty();
+        result.Value.Treatments.Should().ContainSingle();
+        _imaging.Verify(r => r.ListAsync(It.IsAny<ISpecification<ImagingRecord>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

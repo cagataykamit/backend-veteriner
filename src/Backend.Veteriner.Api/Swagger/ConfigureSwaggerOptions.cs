@@ -321,7 +321,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             {
                 MarkRequired(schema,
                     "examinationId", "petId", "petName", "clientId", "clientName",
-                    "treatments", "prescriptions", "labResults", "hospitalizations", "administrations", "vaccinations", "payments");
+                    "treatments", "prescriptions", "labResults", "hospitalizations", "administrations", "vaccinations", "imaging", "payments");
                 return;
             }
 
@@ -364,6 +364,13 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 MarkRequired(schema, "id", "clinicId", "clinicName", "vaccineName", "status");
                 SetNullable(schema, "appliedAtUtc", true);
                 SetNullable(schema, "dueAtUtc", true);
+                return;
+            }
+
+            if (context.Type == typeof(ExaminationRelatedImagingItemDto))
+            {
+                MarkRequired(schema, "id", "performedAtUtc", "clinicId", "clinicName", "modality", "status", "addedAfterFinalization");
+                SetNullable(schema, "description", true);
                 return;
             }
 
