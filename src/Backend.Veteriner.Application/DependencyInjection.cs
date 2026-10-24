@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
 
         services.AddScoped<TenantSubscriptionEffectiveWriteEvaluator>();
+        services.AddScoped<ITrialLimitPolicy, TrialLimitPolicy>();
         services.AddScoped<TenantSubscriptionSeatEvaluator>();
         services.AddScoped<TenantInviteAcceptanceService>();
         services.AddScoped<ISubscriptionCheckoutActivationService, SubscriptionCheckoutActivationService>();

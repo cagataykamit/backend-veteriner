@@ -77,6 +77,12 @@ public static class ResultExtensions
 
         var normalized = code.ToLowerInvariant();
 
+        // Deneme kiracısı kısıtları (TRIAL_LIMITS_API_CONTRACT.md): istek geçerli, deneme sınırı nedeniyle işlenmez.
+        if (normalized.StartsWith("trial.", StringComparison.Ordinal))
+        {
+            return (StatusCodes.Status422UnprocessableEntity, "https://httpstatuses.io/422");
+        }
+
         // İçe aktarma partisi durum/tekrar çakışmaları (IMPORT_API_CONTRACT.md §8); "validationstale" aşağıdaki
         // "validation" dalına düşmesin diye önce değerlendirilir.
         if (normalized is "imports.invalidstate" or "imports.requestidconflict" or "imports.toomanyopendrafts"
