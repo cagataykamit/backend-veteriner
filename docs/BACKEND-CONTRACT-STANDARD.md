@@ -1031,15 +1031,19 @@ FluentValidation → `400` `ValidationProblemDetails`.
 
 **Amaç:** Muayene detay ekranında bu muayeneye bağlı tedavi, reçete, lab, yatış ve ödemeleri ayrı liste endpoint’leri yerine tek yanıtta sunmak.
 
-**Yanıt:** `ExaminationRelatedSummaryDto` — üst düzey `examinationId`, `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `treatments`, `prescriptions`, `labResults`, `hospitalizations`, `administrations`, `vaccinations`, `payments`. Her blok öğesi ilgili modülün özet alanlarını taşır (`clinicName` ile birlikte `clinicId`). Tedavi öğelerinde `examinationId` tekrarlanmaz (route’taki muayene zaten bağlamdır).
+**Yanıt:** `ExaminationRelatedSummaryDto` — üst düzey `examinationId`, `petId`, `petName`, `clientId`, `clientName` ve şu bloklar: `treatments`, `prescriptions`, `labResults`, `hospitalizations`, `administrations`, `vaccinations`, `imaging`, `payments`. Her blok öğesi ilgili modülün özet alanlarını taşır (`clinicName` ile birlikte `clinicId`). Tedavi öğelerinde `examinationId` tekrarlanmaz (route’taki muayene zaten bağlamdır).
 
-**Sıralama ve limit:** Her blok kendi tarih alanına göre **en yeni önce** (`treatmentDateUtc`, `prescribedAtUtc`, `resultDateUtc`, `admittedAtUtc`, `paidAtUtc`; `vaccinations` için `appliedAtUtc`, yoksa `dueAtUtc`); blok başına en fazla **10** kayıt (`ExaminationRelatedSummaryConstants.RelatedItemsTake`).
+**Sıralama ve limit:** Her blok kendi tarih alanına göre **en yeni önce** (`treatmentDateUtc`, `prescribedAtUtc`, `resultDateUtc`, `admittedAtUtc`, `paidAtUtc`; `vaccinations` için `appliedAtUtc`, yoksa `dueAtUtc`; `imaging` için `performedAtUtc`); blok başına en fazla **10** kayıt (`ExaminationRelatedSummaryConstants.RelatedItemsTake`).
 
 **`vaccinations` bloğu:** `Vaccination.ExaminationId` bu muayeneye eşit aşı kayıtları (tüm durumlar: `Scheduled`, `Applied`, `Cancelled`; `status` alanı ile ayrılır). Öğe: `id`, `vaccineName`, `status` (string enum), `appliedAtUtc` (null olabilir), `dueAtUtc` (null olabilir), `clinicId`, `clinicName`. Blok yalnız çağıranın `Vaccinations.Read` izni varsa dolar; izin yoksa `[]` döner (diğer bloklarla aynı izin süzmesi). Uygulamaya bağlı aşı (`ADMINISTRATIONS_API_CONTRACT.md` bölüm 9) yalnız burada aşı satırı olarak görünür, `administrations` bloğunda yoktur.
+
+**`imaging` bloğu:** `ImagingRecord.ExaminationId` bu muayeneye eşit görüntüleme kayıtları (tüm durumlar: `Active`, `Cancelled`; `status` alanı ile ayrılır, aşı bloğuyla aynı kural). Öğe: `id`, `performedAtUtc`, `modality` (string enum: `XRay`, `Ultrasound`, `CT`, `MRI`, `Endoscopy`, `ClinicalPhoto`, `Other`), `description` (null olabilir), `status`, `addedAfterFinalization` ("kesinleştirmeden sonra eklendi" rozeti; `addedAfterExaminationFinalization` ile aynı değer), `clinicId`, `clinicName`. Blok yalnız çağıranın `Imaging.Read` izni varsa dolar; izin yoksa `[]` döner. Detay rotası `/panel/imaging/{id}` (`IMAGING_API_CONTRACT.md`).
 
 **Klinik bağlamı:** `IClinicContext.ClinicId` doluysa önce muayenenin kendisi bu klinikte olmalıdır (aksi halde `Examinations.NotFound`, `GET /api/v1/examinations/{id}` ile aynı gizleme); ardından her blok yalnız bu klinikteki ve `ExaminationId` bu muayeneye eşit kayıtları içerir. Bağlam yoksa tenant içindeki tüm kliniklerde bu muayeneye bağlı kayıtlar dahildir (pet `history-summary` ile uyumlu yaklaşım).
 
 **Frontend için değişenler (additive, kırıcı değil):** yanıta `vaccinations` dizisi eklendi (her zaman mevcut, izin yoksa `[]`); `GET /vaccinations?examinationId=` süzgeci eklendi. Muayene çalışma alanı aşı satırlarını artık oturum dışı da buradan okuyabilir.
+
+**Frontend için değişenler (additive, kırıcı değil) — görüntüleme:** yanıta `imaging` dizisi eklendi (her zaman mevcut, izin yoksa `[]`). Muayene çalışma alanı "İşlemler" listesi görüntülemeyi ayrı liste ucu çağırmadan buradan okur.
 
 **Hatalar:** Tenant bağlamı yoksa `Tenants.ContextMissing`; muayene yok / tenant dışı / aktif klinik ile uyumsuzsa `Examinations.NotFound`. FluentValidation (boş route id) → 400.
 

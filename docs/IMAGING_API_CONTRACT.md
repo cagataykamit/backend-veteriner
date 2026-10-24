@@ -179,6 +179,8 @@ Bakım işi (`FileStorage:Maintenance`: `Enabled` varsayılan `true`, `IntervalM
 
 Hasta timeline'ına yeni tür `Imaging`: olay zamanı `performedAtUtc`, başlık türün Türkçe adı (ör. "Röntgen"), özet açıklama, `status` `Active` | `Cancelled`, iptal edilen varsayılan gizli (`includeVoided` ile görünür), `relatedExaminationId`, `addedAfterFinalization` = kesinleştirmeden sonra eklendi. Küçük resim/dosya bilgisi yoktur. İzin `Imaging.Read`; izni olmayan kullanıcıda tür `omittedTypes`'ta döner. Hedef rota: `/panel/imaging/{id}`.
 
+Muayene `related-summary` yanıtı `imaging` bloğunu taşır (muayeneye bağlı kayıtlar, iptaller `status` ile, `Imaging.Read` yoksa `[]`): `BACKEND-CONTRACT-STANDARD.md` §18.
+
 ## 8) Denetim kaydı
 
 `ImagingRecord.Create`, `ImagingRecord.Update`, `ImagingRecord.Cancel`, `ImagingRecord.FileUpload`, `LabResult.FileUpload`. Yükleme kaydında dosya adı ve boyut vardır, **içerik yazılmaz**. İndirme/gösterim ve imzalı URL üretimi denetime yazılmaz.
