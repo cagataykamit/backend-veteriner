@@ -853,7 +853,10 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
 
         var tenant = new Tenant($"imp-{Guid.NewGuid():N}"[..18]);
         db.Tenants.Add(tenant);
-        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
+        // Ice aktarma mekanigi testleri ucretli kiracida kosar; deneme kiracisinda tablo basina 500 satir siniri var (TRIAL-004).
+        var subscription = TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+        subscription.ActivatePaidPlan(SubscriptionPlanCode.Basic, DateTime.UtcNow);
+        db.TenantSubscriptions.Add(subscription);
         var clinic = new Clinic(tenant.Id, $"Imp-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
         await db.SaveChangesAsync();
