@@ -166,6 +166,13 @@ public sealed class PerformanceMeasurementTests
                 runs.Add((watch.ElapsedMilliseconds, (int)response.StatusCode, commands, sqlMs, repeat, body.Length));
                 if (i == WarmRuns)
                     slowSql.AppendLine(capture.Dump(name, response.StatusCode));
+                // 5xx: hata gövdesi (ProblemDetails) ve başarısız SQL komutu raporda görünsün; yoksa yalnız "500" görülür, neden kaybolur.
+                if ((int)response.StatusCode >= 500 && i == 0)
+                {
+                    slowSql.AppendLine($"=== {name}: HTTP {(int)response.StatusCode} gövdesi ===");
+                    slowSql.AppendLine(Encoding.UTF8.GetString(body));
+                    slowSql.AppendLine(capture.DumpFailed(name));
+                }
             }
 
             var warm = runs.Skip(1).OrderBy(r => r.Ms).ToList();
@@ -263,7 +270,11 @@ public sealed class PerformanceMeasurementTests
 
         public void Clear()
         {
-            lock (_gate) _commands.Clear();
+            lock (_gate)
+            {
+                _commands.Clear();
+                _failed.Clear();
+            }
         }
 
         public (int Commands, double SqlMs, int MaxRepeat) Summarize()
@@ -294,6 +305,34 @@ public sealed class PerformanceMeasurementTests
         private void Add(DbCommand command, CommandExecutedEventData data)
         {
             lock (_gate) _commands.Add((command.CommandText, data.Duration.TotalMilliseconds));
+        }
+
+        private readonly List<(string Text, double Ms, string Error)> _failed = [];
+
+        /// <summary>Zaman aşımı gibi başarısız komutlar (CommandExecuted'a düşmez); 5xx teşhisi için.</summary>
+        public string DumpFailed(string name)
+        {
+            lock (_gate)
+            {
+                if (_failed.Count == 0)
+                    return $"=== {name}: başarısız SQL komutu yok ===";
+
+                var sb = new StringBuilder();
+                sb.AppendLine($"=== {name}: başarısız SQL komutları ({_failed.Count}) ===");
+                foreach (var f in _failed)
+                {
+                    sb.AppendLine($"-- {f.Ms:F0} ms sonra hata: {f.Error}");
+                    sb.AppendLine(f.Text);
+                }
+
+                return sb.ToString();
+            }
+        }
+
+        public override Task CommandFailedAsync(DbCommand command, CommandErrorEventData eventData, CancellationToken cancellationToken = default)
+        {
+            lock (_gate) _failed.Add((command.CommandText, eventData.Duration.TotalMilliseconds, eventData.Exception.Message));
+            return Task.CompletedTask;
         }
 
         public override ValueTask<DbDataReader> ReaderExecutedAsync(
