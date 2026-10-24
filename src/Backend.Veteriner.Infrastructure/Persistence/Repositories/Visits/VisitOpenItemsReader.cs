@@ -32,8 +32,7 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         var ids = visitIds.ToList();
         var workCounts = scope.Visible == OpenItemSources.None
             ? new Dictionary<Guid, int>()
-            : await WorkVisitIds(scope)
-                .Where(id => ids.Contains(id))
+            : await WorkVisitIds(scope, ids)
                 .GroupBy(id => id)
                 .Select(g => new { VisitId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.VisitId, x => x.Count, ct);
@@ -184,27 +183,32 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
     /// <summary>
     /// Ücretlendirilebilir işlemlerin ziyaret kimlikleri (işlem başına bir satır); yalnızca kullanıcının görebildiği türler.
     /// Kapsam: muayene, tedavi, iptal edilmemiş uygulama, uygulanmış aşı (bağlı uygulaması yoksa), yatış.
+    /// <paramref name="visitIds"/> verilirse süzgeç her dala ayrı uygulanır: birleşimden sonra süzmek kliniğin tüm yılını
+    /// birleştiriyordu (10k ölçekte ~300 ms); dal başına süzgeç ilgili indeksleri kullanır.
     /// </summary>
-    private IQueryable<Guid> WorkVisitIds(OpenItemsScope scope)
+    private IQueryable<Guid> WorkVisitIds(OpenItemsScope scope, IReadOnlyCollection<Guid>? visitIds = null)
     {
         var tenantId = scope.TenantId;
         var clinicId = scope.ClinicId;
+        var ids = visitIds?.ToList();
         // Boş taban: türlerin hiçbiri görünür değilse sorgu yine geçerlidir.
         var result = _db.Visits.Where(_ => false).Select(v => v.Id);
 
+        // Muayene üzerinden ziyarete bağlanan kayıtlar için ortak kaynak: kapsamdaki, ziyaretli (ve istenirse seçili ziyaretlerdeki) muayeneler.
+        var examinations = _db.Examinations.AsNoTracking()
+            .Where(e => e.TenantId == tenantId && e.ClinicId == clinicId && e.VisitId != null);
+        if (ids is not null)
+            examinations = examinations.Where(e => ids.Contains(e.VisitId!.Value));
+
         if (scope.Sees(OpenItemSources.Examinations))
-        {
-            result = result.Concat(_db.Examinations.AsNoTracking()
-                .Where(e => e.TenantId == tenantId && e.ClinicId == clinicId && e.VisitId != null)
-                .Select(e => e.VisitId!.Value));
-        }
+            result = result.Concat(examinations.Select(e => e.VisitId!.Value));
 
         if (scope.Sees(OpenItemSources.Treatments))
         {
             result = result.Concat(
                 from t in _db.Treatments.AsNoTracking()
-                join e in _db.Examinations.AsNoTracking() on t.ExaminationId equals e.Id
-                where t.TenantId == tenantId && t.ClinicId == clinicId && e.VisitId != null
+                join e in examinations on t.ExaminationId equals e.Id
+                where t.TenantId == tenantId && t.ClinicId == clinicId
                 select e.VisitId!.Value);
         }
 
@@ -212,8 +216,8 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         {
             result = result.Concat(
                 from a in _db.Administrations.AsNoTracking()
-                join e in _db.Examinations.AsNoTracking() on a.ExaminationId equals e.Id
-                where a.TenantId == tenantId && a.ClinicId == clinicId && a.VoidedAtUtc == null && e.VisitId != null
+                join e in examinations on a.ExaminationId equals e.Id
+                where a.TenantId == tenantId && a.ClinicId == clinicId && a.VoidedAtUtc == null
                 select e.VisitId!.Value);
         }
 
@@ -221,10 +225,9 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         {
             result = result.Concat(
                 from v in _db.Vaccinations.AsNoTracking()
-                join e in _db.Examinations.AsNoTracking() on v.ExaminationId equals e.Id
+                join e in examinations on v.ExaminationId equals e.Id
                 where v.TenantId == tenantId && v.ClinicId == clinicId
                       && v.Status == VaccinationStatus.Applied
-                      && e.VisitId != null
                       // Stoklu aşı tek girişte uygulama da üretir; uygulama sayılırsa aşı ayrıca sayılmaz.
                       && !_db.Administrations.Any(a => a.VaccinationId == v.Id && a.VoidedAtUtc == null)
                 select e.VisitId!.Value);
@@ -232,11 +235,17 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
 
         if (scope.Sees(OpenItemSources.Hospitalizations))
         {
-            result = result.Concat(_db.Hospitalizations.AsNoTracking()
-                .Where(h => h.TenantId == tenantId && h.ClinicId == clinicId)
-                .Select(h => h.VisitId ?? _db.Examinations.Where(e => e.Id == h.ExaminationId).Select(e => e.VisitId).FirstOrDefault())
-                .Where(id => id != null)
-                .Select(id => id!.Value));
+            var hospitalizations =
+                from h in _db.Hospitalizations.AsNoTracking()
+                where h.TenantId == tenantId && h.ClinicId == clinicId
+                join e in _db.Examinations.AsNoTracking() on h.ExaminationId equals e.Id into hospitalizationExaminations
+                from e in hospitalizationExaminations.DefaultIfEmpty()
+                let visitId = h.VisitId ?? (e != null ? e.VisitId : null)
+                where visitId != null
+                select visitId!.Value;
+            if (ids is not null)
+                hospitalizations = hospitalizations.Where(id => ids.Contains(id));
+            result = result.Concat(hospitalizations);
         }
 
         return result;
