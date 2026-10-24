@@ -141,7 +141,9 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
         (await ClientCountAsync(name)).Should().Be(1);
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        (await db.Pets.CountAsync(p => p.Name == "Karamel")).Should().Be(0);
+        // Kiracı kapsamlı sayım: diğer kiracıların örnek verisinde de "Karamel" adlı hayvan olabilir (ExampleClinicDataGenerator).
+        var tenantId = await db.Clients.AsNoTracking().Where(c => c.FullName == name).Select(c => c.TenantId).SingleAsync();
+        (await db.Pets.CountAsync(p => p.TenantId == tenantId && p.Name == "Karamel")).Should().Be(0);
     }
 
     [Fact]
