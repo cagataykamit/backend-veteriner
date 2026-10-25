@@ -195,10 +195,12 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
                 client.Id,
                 seed.Name,
                 species.Id,
-                breed: breed is null ? seed.Breed : null,
+                // Liste ve kart ırkı metin alanından okur (CreatePet de ad + kimlik birlikte yazar); kimlik katalog bağı.
+                breed: breed?.Name ?? seed.Breed,
                 birthDate: ctx.Today.AddMonths(-seed.AgeMonths).AddDays(-ctx.Random.Next(0, 28)),
                 breedId: breed?.Id,
                 gender: seed.Gender,
+                colorId: ctx.Catalog.PickColor(ctx.Random, seed.Species),
                 weight: seed.Weight,
                 notes: Tag(seed.Note ?? "Örnek klinik hastası."),
                 microchipNumber: seed.Chip ? $"9920000{i + 1:D8}" : null,
@@ -226,7 +228,9 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         for (var offset = -PastDays; offset <= FutureDays; offset++)
         {
             var day = ctx.Today.AddDays(offset);
-            if (day.DayOfWeek == DayOfWeek.Sunday)
+            // Yükleme günü her zaman dolu: kullanıcı ilk açılışta Bugün ekranını boş görmesin (ADR-002, 5-10 dk değer);
+            // diğer Pazarlar kapalı.
+            if (day.DayOfWeek == DayOfWeek.Sunday && offset != 0)
                 continue;
 
             var count = offset == 0 ? Slots.Length : ctx.Random.Next(0, 3);
@@ -748,9 +752,24 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         public required IReadOnlyDictionary<string, Species> Species { get; init; }
         public required IReadOnlyList<Breed> Breeds { get; init; }
         public required IReadOnlyDictionary<string, VaccineDefinition> Vaccines { get; init; }
+        /// <summary>Aktif renk kataloğu ("Bilinmiyor" ve "Diğer" hariç); boşsa renk atanmaz.</summary>
+        public required IReadOnlyList<PetColor> Colors { get; init; }
 
         public Breed? FindBreed(Guid speciesId, string name)
             => Breeds.FirstOrDefault(b => b.SpeciesId == speciesId && string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>Türe uygun renk: kuşlarda sarı/yeşil/mavi tonları yoksa katalogdan rastgele; deterministik (sabit tohum).</summary>
+        public Guid? PickColor(Random random, string speciesCode)
+        {
+            if (Colors.Count == 0)
+                return null;
+
+            var preferred = speciesCode == "BIRD"
+                ? Colors.Where(c => c.Id == PetColorSeedConstants.Yellow || c.Id == PetColorSeedConstants.MultiColor || c.Id == PetColorSeedConstants.White).ToList()
+                : Colors.Where(c => c.Id != PetColorSeedConstants.Yellow).ToList();
+            var pool = preferred.Count > 0 ? preferred : Colors;
+            return pool[random.Next(pool.Count)].Id;
+        }
 
         public static async Task<ReferenceCatalog> LoadAsync(AppDbContext db, CancellationToken ct)
         {
@@ -768,12 +787,17 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
             var vaccines = await db.VaccineDefinitions.AsNoTracking()
                 .Where(v => v.TenantId == null && v.IsActive)
                 .ToListAsync(ct);
+            var colors = await db.PetColors.AsNoTracking()
+                .Where(c => c.IsActive && c.Id != PetColorSeedConstants.Unknown && c.Id != PetColorSeedConstants.Other)
+                .OrderBy(c => c.Code)
+                .ToListAsync(ct);
 
             return new ReferenceCatalog
             {
                 Species = species.ToDictionary(s => s.Code, StringComparer.Ordinal),
                 Breeds = breeds,
                 Vaccines = vaccines.GroupBy(v => v.Code, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal),
+                Colors = colors,
             };
         }
     }

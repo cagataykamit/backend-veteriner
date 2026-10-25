@@ -175,6 +175,15 @@ public sealed class ExampleClinicIntegrationTests : IClassFixture<CustomWebAppli
         appointments.Should().Contain(a => a.Status == AppointmentStatus.Cancelled);
         appointments.Should().Contain(a => a.Status == AppointmentStatus.NoShow);
         appointments.Where(a => a.Status == AppointmentStatus.Scheduled).Should().OnlyContain(a => a.ScheduledAtUtc > now);
+        // Yükleme günü hafta sonu da olsa Bugün boş kalmaz (ilk açılış değeri); günün İstanbul sınırları.
+        var (todayStartUtc, todayEndUtc) = Backend.Veteriner.Application.Common.Time.OperationDayBounds.ForUtcNow(now);
+        appointments.Count(a => a.ScheduledAtUtc >= todayStartUtc && a.ScheduledAtUtc < todayEndUtc)
+            .Should().BeGreaterThanOrEqualTo(2);
+
+        // Hastalar katalog ırkı (ad + kimlik) ve renk taşır; liste/kart boş görünmesin.
+        var pets = await db.Pets.Where(x => x.TenantId == tenantId).ToListAsync();
+        pets.Should().OnlyContain(p => p.Breed != null && p.ColorId != null);
+        pets.Should().Contain(p => p.BreedId != null);
 
         // Klinik kayıtları: kesinleşmiş ve taslak muayene, uygulanmış/planlı/gecikmiş aşı, bekleyen lab.
         var examinations = await db.Examinations.Where(x => x.TenantId == tenantId).ToListAsync();
