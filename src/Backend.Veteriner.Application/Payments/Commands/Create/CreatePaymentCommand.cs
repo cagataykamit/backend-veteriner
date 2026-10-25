@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using MediatR;
 
 namespace Backend.Veteriner.Application.Payments.Commands.Create;
@@ -26,8 +27,9 @@ public sealed record CreatePaymentCommand(
     string? Notes,
     Guid RequestId = default,
     IReadOnlyList<PaymentAllocationLineDto>? Allocations = null)
-    : IRequest<Result<PaymentCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
+    : IRequest<Result<PaymentCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest, IActivationSignalRequest
 {
+    public ActivationSignalKind ActivationSignal => ActivationSignalKind.PaymentCreated;
     public string AuditAction => "Payment.Create";
     public string? AuditTarget => $"ClientId={ClientId}";
 }

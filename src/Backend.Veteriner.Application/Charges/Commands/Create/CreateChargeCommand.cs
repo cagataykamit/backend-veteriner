@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Charges.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using MediatR;
 
 namespace Backend.Veteriner.Application.Charges.Commands.Create;
@@ -22,8 +23,9 @@ public sealed record CreateChargeCommand(
     decimal UnitPrice,
     Guid? RequestId,
     ChargeTaxDto? Tax = null)
-    : IRequest<Result<ChargeCreateResultDto>>, IAuditableRequest
+    : IRequest<Result<ChargeCreateResultDto>>, IAuditableRequest, IActivationSignalRequest
 {
+    public ActivationSignalKind ActivationSignal => ActivationSignalKind.ChargeCreated;
     public string AuditAction => "Charge.Create";
     public string? AuditTarget => $"ClientId={ClientId}";
 }

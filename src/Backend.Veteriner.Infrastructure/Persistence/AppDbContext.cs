@@ -73,6 +73,7 @@ public class AppDbContext : DbContext
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+    public DbSet<TenantActivation> TenantActivations => Set<TenantActivation>();
     public DbSet<ScheduledSubscriptionPlanChange> ScheduledSubscriptionPlanChanges => Set<ScheduledSubscriptionPlanChange>();
     public DbSet<BillingCheckoutSession> BillingCheckoutSessions => Set<BillingCheckoutSession>();
     public DbSet<BillingWebhookReceipt> BillingWebhookReceipts => Set<BillingWebhookReceipt>();

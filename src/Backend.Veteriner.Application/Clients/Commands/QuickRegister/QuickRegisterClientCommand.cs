@@ -1,9 +1,10 @@
-using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using System.Text.Json.Serialization;
 
 namespace Backend.Veteriner.Application.Clients.Commands.QuickRegister;
 
@@ -23,4 +24,7 @@ public sealed record QuickRegisterClientCommand(
     DateOnly? BirthDate = null,
     string? MicrochipNumber = null,
     bool IsNeutered = false)
-    : IRequest<Result<QuickRegisterClientResultDto>>, ITransactionalRollbackOnFailureRequest;
+    : IRequest<Result<QuickRegisterClientResultDto>>, ITransactionalRollbackOnFailureRequest, IActivationSignalRequest
+{
+    public ActivationSignalKind ActivationSignal => ActivationSignalKind.ClientCreated;
+}

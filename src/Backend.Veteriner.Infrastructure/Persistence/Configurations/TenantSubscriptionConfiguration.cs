@@ -28,6 +28,9 @@ public sealed class TenantSubscriptionConfiguration : IEntityTypeConfiguration<T
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
 
+        // Deneme kohortu dönem filtresi (TRIAL-008).
+        b.HasIndex(x => x.TrialStartsAtUtc);
+
         b.HasOne<Tenant>()
             .WithOne()
             .HasForeignKey<TenantSubscription>(x => x.TenantId)

@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Sales.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using MediatR;
 
 namespace Backend.Veteriner.Application.Sales.Commands.Create;
@@ -18,8 +19,9 @@ public sealed record CreateSaleCommand(
     string? Notes,
     IReadOnlyList<CreateSaleLineDto>? Lines,
     CreateSalePaymentDto? Payment)
-    : IRequest<Result<SaleCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
+    : IRequest<Result<SaleCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest, IActivationSignalRequest
 {
+    public ActivationSignalKind ActivationSignal => ActivationSignalKind.SaleCreated;
     public string AuditAction => "Sale.Create";
     public string? AuditTarget => $"ClientId={ClientId?.ToString() ?? "walk-in"}";
 }

@@ -3928,6 +3928,28 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Tenants", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.TenantActivation", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ExampleClinicLoadedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FirstActionAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FirstActionKind")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("FirstActionUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("TenantActivations", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.TenantBillingProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4081,6 +4103,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("TenantId");
+
+                    b.HasIndex("TrialStartsAtUtc");
 
                     b.ToTable("TenantSubscriptions", (string)null);
                 });
@@ -5062,6 +5086,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasOne("Backend.Veteriner.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.TenantActivation", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Tenants.Tenant", null)
+                        .WithOne()
+                        .HasForeignKey("Backend.Veteriner.Domain.Tenants.TenantActivation", "TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

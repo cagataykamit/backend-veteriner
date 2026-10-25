@@ -1,5 +1,7 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using MediatR;
 
 namespace Backend.Veteriner.Application.Pets.Commands.Create;
@@ -22,4 +24,7 @@ public sealed record CreatePetCommand(
     IReadOnlyList<string>? AlertFlags = null,
     string? AlertNote = null,
     string? HbsAnimalId = null)
-    : IRequest<Result<Guid>>;
+    : IRequest<Result<Guid>>, IActivationSignalRequest
+{
+    public ActivationSignalKind ActivationSignal => ActivationSignalKind.PetCreated;
+}

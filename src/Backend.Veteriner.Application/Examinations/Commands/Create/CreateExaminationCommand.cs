@@ -1,8 +1,9 @@
-using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using System.Text.Json.Serialization;
 
 namespace Backend.Veteriner.Application.Examinations.Commands.Create;
 
@@ -27,8 +28,9 @@ public sealed record CreateExaminationCommand(
     int? RespiratoryRatePerMin = null,
     DateTime? VitalsMeasuredAtUtc = null,
     Guid? VisitId = null)
-    : IRequest<Result<ExaminationWriteResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
+    : IRequest<Result<ExaminationWriteResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest, IActivationSignalRequest
 {
+    public ActivationSignalKind ActivationSignal => ActivationSignalKind.ExaminationCreated;
     public string AuditAction => "Examination.Create";
     public string? AuditTarget => $"PetId={PetId}";
 }

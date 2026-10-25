@@ -14,6 +14,7 @@ using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Products;
+using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
 using Microsoft.EntityFrameworkCore;
@@ -95,6 +96,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         var clinical = await WriteClinicalRecordsAsync(ctx, people, appointments, ct);
         var stock = await WriteProductsAndStockAsync(ctx, clinical, ct);
         var finance = await WriteChargesAndPaymentsAsync(ctx, clinical, ct);
+        await MarkExampleClinicLoadedAsync(tenantId, nowUtc, ct);
 
         var summary = new ExampleClinicLoadSummaryDto(
             tenantId,
@@ -116,6 +118,20 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
             tenantId, clinicId, summary.Clients, summary.Pets, summary.Appointments, summary.Examinations, summary.Charges, summary.Payments);
 
         return summary;
+    }
+
+    /// <summary>Aktivasyon ölçümü (TRIAL-008): "örnek klinik seçildi" işareti, yüklemeyle aynı işlemde.</summary>
+    private async Task MarkExampleClinicLoadedAsync(Guid tenantId, DateTime nowUtc, CancellationToken ct)
+    {
+        var activation = await _db.TenantActivations.FirstOrDefaultAsync(a => a.TenantId == tenantId, ct);
+        if (activation is null)
+        {
+            activation = new TenantActivation(tenantId);
+            _db.TenantActivations.Add(activation);
+        }
+
+        activation.MarkExampleClinicLoaded(nowUtc);
+        await _db.SaveChangesAsync(ct);
     }
 
     // ---------------------------------------------------------------------------------------------

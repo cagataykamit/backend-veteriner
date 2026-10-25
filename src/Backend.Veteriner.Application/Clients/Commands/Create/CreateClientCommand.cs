@@ -1,9 +1,10 @@
-using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using System.Text.Json.Serialization;
 
 namespace Backend.Veteriner.Application.Clients.Commands.Create;
 
@@ -18,8 +19,9 @@ public sealed record CreateClientCommand(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ContactChannel? PreferredContactChannel = null,
     bool? RemindersOptedOut = null,
     ClientInvoicingIdentityDto? InvoicingIdentity = null)
-    : IRequest<Result<ClientCreatedDto>>, IAuditableRequest
+    : IRequest<Result<ClientCreatedDto>>, IAuditableRequest, IActivationSignalRequest
 {
+    public ActivationSignalKind ActivationSignal => ActivationSignalKind.ClientCreated;
     public string AuditAction => "Client.Create";
     public string? AuditTarget => null;
 }

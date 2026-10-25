@@ -1,8 +1,10 @@
-using System.Text.Json.Serialization;
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Products.Contracts.Dtos;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Tenants;
 using MediatR;
+using System.Text.Json.Serialization;
 
 namespace Backend.Veteriner.Application.Products.Commands.Create;
 
@@ -20,4 +22,7 @@ public sealed record CreateProductCommand(
     string? PharmacologicalForm = null,
     string? PresentationForm = null,
     string? Packaging = null)
-    : IRequest<Result<ProductDto>>;
+    : IRequest<Result<ProductDto>>, IActivationSignalRequest
+{
+    public ActivationSignalKind ActivationSignal => ActivationSignalKind.ProductCreated;
+}
