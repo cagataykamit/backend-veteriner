@@ -699,4 +699,136 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         created!.GrossAmountMinor.Should().Be(30_000L);
         created.DiscountAmountMinor.Should().Be(0L);
     }
+
+    [Fact]
+    public async Task Handle_Should_Charge_Ten_Months_And_Mark_Session_Yearly_When_Expired_Renews_Yearly()
+    {
+        var tid = Guid.NewGuid();
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Premium);
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        SetupManualCheckoutProvider();
+        BillingCheckoutSession? created = null;
+        _checkoutSessionsWrite.Setup(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()))
+            .Callback<BillingCheckoutSession, CancellationToken>((s, _) => created = s)
+            .ReturnsAsync((BillingCheckoutSession s, CancellationToken _) => s);
+
+        var result = await CreateHandler(CreateBillingOptions())
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Premium", BillingPeriodKind.Yearly), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _chargedMinor.Should().Be(300_000L, "yıllık fiyat 10 aylık tutardır (2 ay hediye)");
+        created!.BillingPeriod.Should().Be(BillingPeriodKind.Yearly);
+        result.Value!.BillingPeriod.Should().Be("Yearly");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Renew_In_Current_Yearly_Period_When_Period_Not_Given()
+    {
+        var tid = Guid.NewGuid();
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-400), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Basic, BillingPeriodKind.Yearly, DateTime.UtcNow.AddDays(-380));
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        SetupManualCheckoutProvider();
+
+        var result = await CreateHandler(CreateBillingOptions())
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Basic"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _chargedMinor.Should().Be(100_000L);
+        result.Value!.BillingPeriod.Should().Be("Yearly");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Charge_Yearly_Price_Minus_Unused_Month_When_ActiveMonthly_Switches_To_Yearly()
+    {
+        var tid = Guid.NewGuid();
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Premium, DateTime.UtcNow.AddDays(-30), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Premium, DateTime.UtcNow.AddDays(-16));
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        SetupManualCheckoutProvider();
+
+        var result = await CreateHandler(CreateBillingOptions())
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Premium", BillingPeriodKind.Yearly), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _chargedMinor.Should().BeInRange(300_000L - 30_000L, 300_000L - 1, "kalan aylık günler yıllık fiyattan düşülür");
+        result.Value!.BillingPeriod.Should().Be("Yearly");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Prorate_Upgrade_With_Yearly_Prices_When_ActiveYearly()
+    {
+        var tid = Guid.NewGuid();
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-30), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Basic, BillingPeriodKind.Yearly, DateTime.UtcNow.AddDays(-16));
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        SetupManualCheckoutProvider();
+
+        var result = await CreateHandler(CreateBillingOptions())
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Pro"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _chargedMinor.Should().BeInRange(90_000L, 100_000L, "yıllık fark (200.000 - 100.000) kalan oranla çarpılır");
+        result.Value!.BillingPeriod.Should().Be("Yearly");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ActiveYearly_Requests_Monthly()
+    {
+        var tid = Guid.NewGuid();
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-30), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Basic, BillingPeriodKind.Yearly, DateTime.UtcNow.AddDays(-16));
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+
+        var result = await CreateHandler(CreateBillingOptions())
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Pro", BillingPeriodKind.Monthly), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.PeriodChangeAtPeriodEnd");
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_Yearly_Requested_With_Stripe()
+    {
+        var tid = Guid.NewGuid();
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Basic);
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        var billing = new BillingOptions
+        {
+            DefaultCheckoutProvider = "Stripe",
+            PlanPricesMinor = CreateBillingOptions().PlanPricesMinor,
+            Stripe = new StripeBillingOptions
+            {
+                SecretKey = "sk_test_x",
+                SuccessUrl = "https://x/ok",
+                CancelUrl = "https://x/cancel",
+                SubscriptionPriceIds = new Dictionary<string, string> { ["Basic"] = "p1", ["Pro"] = "p2", ["Premium"] = "p3" },
+            },
+        };
+
+        var result = await CreateHandler(billing)
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Basic", BillingPeriodKind.Yearly), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Billing.YearlyNotSupportedByProvider");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Not_Reuse_Open_Checkout_When_Period_Differs()
+    {
+        var tid = Guid.NewGuid();
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Basic);
+        var monthlyOpen = BillingCheckoutSession.CreatePending(
+            tid, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Basic, BillingProvider.Manual, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub, monthlyOpen);
+        SetupManualCheckoutProvider();
+
+        var result = await CreateHandler(CreateBillingOptions())
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Basic", BillingPeriodKind.Yearly), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        monthlyOpen.Status.Should().Be(BillingCheckoutSessionStatus.Cancelled);
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

@@ -10,10 +10,10 @@ namespace Backend.Veteriner.Application.SalesPartners;
 public interface ISalesPartnerDiscountBilling
 {
     /// <summary>
-    /// Checkout tutarına kiracının kod indirimini uygular. Faturalandırma bugün yalnız aylık dönem üretir; tutar zaten dönem
-    /// tutarıdır (yenileme fiyatı ya da yükseltme farkı), bu yüzden yalnız kod indirimi eklenir.
+    /// Checkout tutarına kiracının kod indirimini uygular. Tutar zaten dönem tutarıdır (yenileme fiyatı, yükseltme farkı ya da
+    /// dönem değişimi; yıllık indirim dahil), bu yüzden yalnız kod indirimi eklenir; uygunluk dönem türüne göredir (ADR-037).
     /// </summary>
-    Task<SubscriptionPriceBreakdown> PriceAsync(Guid tenantId, long amountMinor, DateTime pricedAtUtc, CancellationToken ct);
+    Task<SubscriptionPriceBreakdown> PriceAsync(Guid tenantId, long amountMinor, BillingPeriodKind period, DateTime pricedAtUtc, CancellationToken ct);
 
     /// <summary>
     /// Ödeme sağlayıcısının doğruladığı tahsilatı kiracının kod kullanımına yazar (kaydetmez; çağıran aynı iş biriminde kaydeder).
@@ -33,10 +33,10 @@ public sealed class SalesPartnerDiscountBilling : ISalesPartnerDiscountBilling
         _logger = logger;
     }
 
-    public async Task<SubscriptionPriceBreakdown> PriceAsync(Guid tenantId, long amountMinor, DateTime pricedAtUtc, CancellationToken ct)
+    public async Task<SubscriptionPriceBreakdown> PriceAsync(Guid tenantId, long amountMinor, BillingPeriodKind period, DateTime pricedAtUtc, CancellationToken ct)
     {
         var redemption = await _redemptions.FirstOrDefaultAsync(new DiscountRedemptionByTenantSpec(tenantId), ct);
-        return SubscriptionPricing.ForAmount(amountMinor, BillingPeriodKind.Monthly, redemption, pricedAtUtc);
+        return SubscriptionPricing.ForAmount(amountMinor, period, redemption, pricedAtUtc);
     }
 
     public async Task RecordCollectionAsync(BillingCheckoutSession session, DateTime collectedAtUtc, CancellationToken ct)
@@ -50,7 +50,7 @@ public sealed class SalesPartnerDiscountBilling : ISalesPartnerDiscountBilling
 
         var collection = redemption.RecordCollection(
             session.Id,
-            BillingPeriodKind.Monthly,
+            session.BillingPeriod,
             gross,
             session.DiscountAmountMinor ?? 0,
             session.CreatedAtUtc,

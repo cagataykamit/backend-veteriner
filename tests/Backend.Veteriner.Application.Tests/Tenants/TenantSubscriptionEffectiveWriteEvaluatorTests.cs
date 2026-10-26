@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Tenants;
 using FluentAssertions;
 
@@ -30,6 +31,20 @@ public sealed class TenantSubscriptionEffectiveWriteEvaluatorTests
         var effective = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, utcNow);
 
         effective.Should().Be(TenantSubscriptionStatus.Active);
+    }
+
+    [Fact]
+    public void GetEffectiveStatus_Should_StayActive_When_YearlySubscription_ActivatedMonthsAgo()
+    {
+        var utcNow = new DateTime(2026, 12, 15, 0, 0, 0, DateTimeKind.Utc);
+        var activatedAt = new DateTime(2026, 6, 5, 0, 0, 0, DateTimeKind.Utc);
+        var sub = TenantSubscription.StartTrial(Guid.NewGuid(), SubscriptionPlanCode.Pro, activatedAt.AddDays(-14), 14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Pro, BillingPeriodKind.Yearly, activatedAt);
+
+        TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, utcNow)
+            .Should().Be(TenantSubscriptionStatus.Active);
+        TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, activatedAt.AddYears(1))
+            .Should().Be(TenantSubscriptionStatus.ReadOnly);
     }
 
     [Fact]

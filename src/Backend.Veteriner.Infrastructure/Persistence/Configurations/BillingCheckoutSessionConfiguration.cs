@@ -29,6 +29,10 @@ public sealed class BillingCheckoutSessionConfiguration : IEntityTypeConfigurati
             .IsRequired()
             .HasConversion<int>();
 
+        b.Property(x => x.BillingPeriod)
+            .IsRequired()
+            .HasConversion<int>();
+
         b.Property(x => x.ExternalReference)
             .HasMaxLength(250);
 
