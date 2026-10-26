@@ -14,6 +14,7 @@ namespace Backend.Veteriner.Api.Middleware;
 public static class RateLimitingExtensions
 {
     public const string DiscountCodeValidatePolicy = "discount-code-validate";
+    public const string DemoRequestPolicy = "demo-request";
 
     public static IServiceCollection AddAppRateLimiting(
         this IServiceCollection services,
@@ -281,6 +282,22 @@ public static class RateLimitingExtensions
                         PermitLimit = 10,
                         Window = TimeSpan.FromMinutes(1),
                         SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- DEMO TALEBİ (TRIAL-005): anonim form; spam'e karşı IP başına 10 dakikada 3.
+            options.AddPolicy(DemoRequestPolicy, httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 3,
+                        Window = TimeSpan.FromMinutes(10),
+                        SegmentsPerWindow = 10,
                         QueueLimit = 0,
                         AutoReplenishment = true
                     });

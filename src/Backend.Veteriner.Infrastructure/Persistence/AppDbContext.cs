@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Catalog;
+using Backend.Veteriner.Domain.DemoRequests;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Visits;
@@ -74,6 +75,7 @@ public class AppDbContext : DbContext
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
     public DbSet<TenantActivation> TenantActivations => Set<TenantActivation>();
+    public DbSet<DemoRequest> DemoRequests => Set<DemoRequest>();
     public DbSet<ScheduledSubscriptionPlanChange> ScheduledSubscriptionPlanChanges => Set<ScheduledSubscriptionPlanChange>();
     public DbSet<BillingCheckoutSession> BillingCheckoutSessions => Set<BillingCheckoutSession>();
     public DbSet<BillingWebhookReceipt> BillingWebhookReceipts => Set<BillingWebhookReceipt>();

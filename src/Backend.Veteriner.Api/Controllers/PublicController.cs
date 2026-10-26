@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Api.Contracts;
 using Backend.Veteriner.Api.Middleware;
+using Backend.Veteriner.Application.DemoRequests.Commands.Create;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.LegalAcceptances.Queries.GetCurrentVersions;
 using Backend.Veteriner.Application.Public.Commands.AcceptInvite;
@@ -11,6 +12,7 @@ using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Application.Public.Queries.InviteDetail;
 using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.SalesPartners.Queries.ValidateCode;
+using Backend.Veteriner.Domain.DemoRequests;
 using Backend.Veteriner.Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -73,6 +75,47 @@ public sealed class PublicController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ValidateDiscountCode([FromBody] DiscountCodeBody? body, CancellationToken ct)
         => Ok(await _mediator.Send(new ValidateDiscountCodeQuery(body?.Code), ct));
+
+    /// <summary>
+    /// Tanıtım sitesinden canlı demo talebi (TRIAL-005): kayıt + yapılandırılmış adrese bildirim. Tuzak alan doluysa da 204. IP bazlı hız sınırlı.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("demo-requests")]
+    [Consumes("application/json")]
+    [EnableRateLimiting(RateLimitingExtensions.DemoRequestPolicy)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> CreateDemoRequest([FromBody] PublicDemoRequestBody? body, CancellationToken ct)
+    {
+        if (body is null)
+        {
+            return Result.Failure(
+                    "DemoRequests.Validation.InvalidRequestBody",
+                    "Istek govdesi bos veya hatali JSON.")
+                .ToActionResult(this);
+        }
+
+        DemoClinicSize? clinicSize = Enum.TryParse<DemoClinicSize>(body.ClinicSize, ignoreCase: true, out var parsed)
+            && Enum.IsDefined(parsed)
+                ? parsed
+                : null;
+
+        var command = new CreateDemoRequestCommand(
+            body.ContactName,
+            body.ClinicName,
+            body.City,
+            body.Email,
+            body.Phone,
+            clinicSize,
+            body.CurrentSoftware,
+            body.Message,
+            body.PrivacyNoticeAccepted,
+            body.Website);
+
+        var result = await _mediator.Send(command, ct);
+        return result.ToActionResult(this);
+    }
 
     /// <summary>Hukuki belgelerin güncel sürümleri (ADR-029); hukuki sayfalar ve kayıt formu sürümü buradan gösterir.</summary>
     [AllowAnonymous]
