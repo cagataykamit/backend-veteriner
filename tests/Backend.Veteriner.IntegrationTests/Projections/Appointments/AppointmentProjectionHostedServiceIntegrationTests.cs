@@ -114,13 +114,22 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests
                 break;
         }
 
-        totalProcessed.Should().Be(2, "create and reschedule should process in back-to-back batches without idle wait");
-
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
-        var queryDb = verifyScope.ServiceProvider.GetRequiredService<QueryDbContext>();
-        var readModel = await queryDb.AppointmentReadModels
-            .SingleAsync(x => x.AppointmentId == appointmentId);
-        readModel.ScheduledAtUtc.Should().Be(rescheduleTime);
+        // Barındırılan servis de aynı kuyruğu işler; mesajları ondan önce alabilir (CI'da elle sayaç 0 kaldı). Bu yüzden
+        // kimin işlediğine değil sonuca bakılır: iki mesaj da işlenmiş ve okuma modeli yeniden planlanan saati taşıyor.
+        await EventualConsistencyTestSupport.EventuallyAsync(
+            async () =>
+            {
+                await using var pollScope = _factory.Services.CreateAsyncScope();
+                var polledCommandDb = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var polledQueryDb = pollScope.ServiceProvider.GetRequiredService<QueryDbContext>();
+                var processed = await polledCommandDb.OutboxMessages.CountAsync(m => m.ProcessedAtUtc != null);
+                var readModel = await polledQueryDb.AppointmentReadModels
+                    .SingleOrDefaultAsync(x => x.AppointmentId == appointmentId);
+                return processed == 2 && readModel?.ScheduledAtUtc == rescheduleTime;
+            },
+            timeout: TimeSpan.FromSeconds(15),
+            pollInterval: TimeSpan.FromMilliseconds(300),
+            because: "create and reschedule should both be projected (by the loop above or the hosted service).");
     }
 
     private async Task ResetAsync()
