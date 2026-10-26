@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Imports.Validation;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Imports;
 

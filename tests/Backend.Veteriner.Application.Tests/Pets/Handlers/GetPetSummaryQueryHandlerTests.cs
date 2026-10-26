@@ -13,7 +13,7 @@ using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 

@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 
 using Backend.Veteriner.Application.Common.Abstractions;
 
-using FluentAssertions;
+using AwesomeAssertions;
 
 using Moq;
 

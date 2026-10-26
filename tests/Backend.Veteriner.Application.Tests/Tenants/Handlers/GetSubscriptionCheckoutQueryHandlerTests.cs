@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionCheckout;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;

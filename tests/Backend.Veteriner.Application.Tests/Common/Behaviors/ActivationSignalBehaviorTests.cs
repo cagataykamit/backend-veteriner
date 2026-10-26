@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Application.Tenants.Activation;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 

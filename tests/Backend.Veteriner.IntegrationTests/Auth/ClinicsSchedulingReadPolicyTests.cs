@@ -3,7 +3,7 @@ using System.Security.Claims;
 using Backend.Veteriner.Api.Auth;
 using Backend.Veteriner.Api.Controllers;
 using Backend.Veteriner.Application.Auth;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Veteriner.IntegrationTests.Auth;

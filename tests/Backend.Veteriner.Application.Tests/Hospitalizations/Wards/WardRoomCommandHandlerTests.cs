@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Hospitalizations.Wards.Queries.GetClinicWard
 using Backend.Veteriner.Application.Hospitalizations.Wards.Specs;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Hospitalizations.Wards;

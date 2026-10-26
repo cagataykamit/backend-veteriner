@@ -2,7 +2,7 @@ using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Products;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.ChargeSuggestions;
 

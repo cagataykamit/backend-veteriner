@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Auth.Commands.Sessions.Revoke;
 using Backend.Veteriner.Application.Auth.Commands.Sessions.Revoke.Validators;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Auth.Validators;
 

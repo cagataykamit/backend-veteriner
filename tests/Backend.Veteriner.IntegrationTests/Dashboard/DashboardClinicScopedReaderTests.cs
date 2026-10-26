@@ -6,7 +6,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.IntegrationTests.Dashboard;

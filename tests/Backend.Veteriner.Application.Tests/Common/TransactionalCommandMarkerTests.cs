@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
 using Backend.Veteriner.Application.Tenants.Commands.ClearExampleClinic;
 using Backend.Veteriner.Application.Tenants.Commands.Create;
 using Backend.Veteriner.Application.Tenants.Commands.LoadExampleClinic;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Common;
 

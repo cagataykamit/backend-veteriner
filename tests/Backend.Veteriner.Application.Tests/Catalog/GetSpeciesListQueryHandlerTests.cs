@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.SpeciesReference.Contracts.Dtos;
 using Backend.Veteriner.Application.SpeciesReference.Queries.GetList;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Domain.Catalog;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Catalog;

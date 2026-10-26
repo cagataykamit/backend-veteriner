@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Visits;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Visits;
 

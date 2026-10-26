@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Vaccinations;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Dashboard.Handlers;

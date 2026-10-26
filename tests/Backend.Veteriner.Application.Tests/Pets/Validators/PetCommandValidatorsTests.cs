@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Pets.Commands.Create.Validators;
 using Backend.Veteriner.Application.Pets.Commands.Update;
 using Backend.Veteriner.Application.Pets.Commands.Update.Validators;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Pets.Validators;
 

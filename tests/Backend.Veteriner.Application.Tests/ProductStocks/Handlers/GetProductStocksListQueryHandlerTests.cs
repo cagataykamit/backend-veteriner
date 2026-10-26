@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.ProductStocks.Handlers;

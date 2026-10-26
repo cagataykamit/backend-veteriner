@@ -10,7 +10,7 @@ using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Products;
 using ClosedXML.Excel;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Reports.Registers;

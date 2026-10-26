@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Reminders.Queries.GetLogs;
 using Backend.Veteriner.Application.Reminders.Queries.GetLogs.Validators;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Reminders.Validators;
 

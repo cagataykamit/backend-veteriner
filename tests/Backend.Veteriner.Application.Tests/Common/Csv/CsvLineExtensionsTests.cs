@@ -1,6 +1,6 @@
 using System.Text;
 using Backend.Veteriner.Application.Common.Csv;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Common.Csv;
 

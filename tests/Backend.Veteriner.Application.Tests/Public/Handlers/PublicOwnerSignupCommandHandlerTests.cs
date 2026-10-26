@@ -14,7 +14,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.ExampleClinic;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 using Microsoft.Extensions.Logging;
 

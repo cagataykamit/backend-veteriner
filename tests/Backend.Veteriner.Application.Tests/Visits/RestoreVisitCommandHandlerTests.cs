@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Visits.Commands.Restore;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Visits;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 

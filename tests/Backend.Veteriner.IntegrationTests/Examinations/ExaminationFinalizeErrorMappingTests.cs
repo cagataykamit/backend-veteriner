@@ -1,6 +1,6 @@
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 

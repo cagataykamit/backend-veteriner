@@ -7,7 +7,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 

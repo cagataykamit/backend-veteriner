@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Examinations.Queries.GetList;
 using Backend.Veteriner.Application.Examinations.Queries.GetList.Validators;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Domain.Examinations;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Examinations;
 

@@ -2,7 +2,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Common.Abstractions;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

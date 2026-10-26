@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Users.Commands.Claims.Remove;
 using Backend.Veteriner.Application.Users.Commands.Claims.Remove.Validators;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Users.Validators;
 

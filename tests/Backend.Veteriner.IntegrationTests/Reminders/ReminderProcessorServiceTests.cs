@@ -12,7 +12,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Reminders;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.StockMovements.Commands.Create;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 

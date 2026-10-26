@@ -10,7 +10,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 

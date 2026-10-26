@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.LabResults.Handlers;

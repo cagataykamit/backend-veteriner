@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Commands.Update;
 using Backend.Veteriner.Domain.Payments;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Payments.Validators;
 

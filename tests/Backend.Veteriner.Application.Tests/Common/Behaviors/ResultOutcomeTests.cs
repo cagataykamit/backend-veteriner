@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Common.Behaviors;
 

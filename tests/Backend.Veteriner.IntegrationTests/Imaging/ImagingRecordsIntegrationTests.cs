@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Infrastructure.Files;
 using Backend.Veteriner.Infrastructure.Persistence;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;

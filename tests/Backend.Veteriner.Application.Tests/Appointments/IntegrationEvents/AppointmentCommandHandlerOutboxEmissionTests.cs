@@ -18,7 +18,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using ClinicAppointmentSettingsEntity = Backend.Veteriner.Domain.Clinics.ClinicAppointmentSettings;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Appointments.IntegrationEvents;

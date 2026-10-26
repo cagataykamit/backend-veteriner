@@ -5,7 +5,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Common.Outbox;
 using Backend.Veteriner.Domain.DemoRequests;
 using Backend.Veteriner.Infrastructure.Persistence;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;

@@ -11,7 +11,7 @@ using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Appointments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

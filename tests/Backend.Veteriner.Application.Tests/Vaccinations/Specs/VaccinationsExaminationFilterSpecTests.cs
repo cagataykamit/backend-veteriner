@@ -1,7 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Vaccinations.Specs;
 using Backend.Veteriner.Domain.Vaccinations;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Vaccinations.Specs;
 

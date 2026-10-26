@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Domain.Payments;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Payments.IntegrationEvents;
 

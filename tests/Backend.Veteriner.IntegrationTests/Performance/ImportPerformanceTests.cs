@@ -24,7 +24,7 @@ using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Projections.Clients;
 using Backend.Veteriner.Infrastructure.Reminders;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

@@ -9,7 +9,7 @@ using Backend.Veteriner.Infrastructure.Projections.Payments;
 using Backend.IntegrationTests.Dashboard;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Payments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

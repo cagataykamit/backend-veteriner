@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

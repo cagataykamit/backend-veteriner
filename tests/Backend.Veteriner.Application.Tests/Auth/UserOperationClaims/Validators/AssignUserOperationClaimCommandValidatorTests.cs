@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Auth.Commands.UserOperationClaims.Assign;
 using Backend.Veteriner.Application.Auth.Commands.UserOperationClaims.Validators;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Auth.UserOperationClaims.Validators;
 

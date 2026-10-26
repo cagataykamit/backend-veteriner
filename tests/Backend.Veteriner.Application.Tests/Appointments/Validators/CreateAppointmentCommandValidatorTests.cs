@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Appointments.Commands.Create;
 using Backend.Veteriner.Application.Appointments.Commands.Create.Validators;
 using Backend.Veteriner.Domain.Appointments;
-using FluentAssertions;
+using AwesomeAssertions;
 using FluentValidation.TestHelper;
 
 namespace Backend.Veteriner.Application.Tests.Appointments.Validators;

@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Tenants;
 

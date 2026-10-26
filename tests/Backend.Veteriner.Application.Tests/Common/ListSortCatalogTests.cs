@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Models;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Common;
 

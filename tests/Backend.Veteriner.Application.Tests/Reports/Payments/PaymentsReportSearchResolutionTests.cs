@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Reports.Payments;

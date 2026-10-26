@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.IntegrationTests.Projections.Appointments;
 

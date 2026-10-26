@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeMy;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Users;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Auth.Commands;

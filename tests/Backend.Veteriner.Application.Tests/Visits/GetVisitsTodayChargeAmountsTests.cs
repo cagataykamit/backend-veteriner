@@ -12,7 +12,7 @@ using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Visits;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Visits;

@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Users;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Auth.UserOperationClaims.Handlers;

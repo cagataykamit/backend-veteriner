@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Infrastructure.Persistence;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Prescriptions;

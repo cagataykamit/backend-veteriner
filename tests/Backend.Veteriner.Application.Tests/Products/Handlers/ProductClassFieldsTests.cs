@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Products.Commands.Update;
 using Backend.Veteriner.Application.Products.Commands.Update.Validators;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Products;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Products.Handlers;

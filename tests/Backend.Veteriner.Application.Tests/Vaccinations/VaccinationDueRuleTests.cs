@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Dashboard.Specs;
 using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Application.Vaccinations.Specs;
 using Backend.Veteriner.Domain.Vaccinations;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Vaccinations;
 

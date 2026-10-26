@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Users;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;

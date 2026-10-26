@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Auth.PasswordReset.Commands.Confirm;
 using Backend.Veteriner.Application.Tests.Common.Validation;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Auth.Validators;
 

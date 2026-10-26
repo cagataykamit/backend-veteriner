@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Commands.AssignMemberRole;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberRole;
 using Backend.Veteriner.Domain.Auth;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;

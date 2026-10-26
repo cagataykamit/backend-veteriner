@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 using Backend.Veteriner.Application.Prescriptions.Items;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Products;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Prescriptions;

@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Tests.Common.Validation;
 using Backend.Veteriner.Application.Users.Commands.Create;
 using Backend.Veteriner.Application.Users.Commands.Create.Validators;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Users.Validators;
 

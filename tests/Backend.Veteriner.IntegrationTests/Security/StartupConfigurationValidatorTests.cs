@@ -1,5 +1,5 @@
 using Backend.Veteriner.Api.Configuration;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 

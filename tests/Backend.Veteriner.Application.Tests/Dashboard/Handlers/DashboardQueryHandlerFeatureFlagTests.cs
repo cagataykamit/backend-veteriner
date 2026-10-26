@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Dashboard.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 

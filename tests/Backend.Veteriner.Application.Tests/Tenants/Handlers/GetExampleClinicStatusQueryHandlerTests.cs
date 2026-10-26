@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.ExampleClinic;
 using Backend.Veteriner.Application.Tenants.Queries.GetExampleClinicStatus;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;

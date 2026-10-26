@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Common.Options;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Auth;
 

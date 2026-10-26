@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Auth.Commands.Permissions.Create;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Auth.Permissions.Validators;
 

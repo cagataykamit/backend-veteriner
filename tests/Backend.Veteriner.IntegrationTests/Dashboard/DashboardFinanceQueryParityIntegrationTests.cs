@@ -5,7 +5,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Projections.Payments;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Payments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Dashboard;

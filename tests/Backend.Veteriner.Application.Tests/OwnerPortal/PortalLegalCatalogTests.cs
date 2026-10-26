@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.LegalAcceptances.Queries.GetCurrentVersions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Domain.Legal;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.OwnerPortal;
 

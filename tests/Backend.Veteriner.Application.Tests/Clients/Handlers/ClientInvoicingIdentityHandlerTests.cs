@@ -14,7 +14,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 

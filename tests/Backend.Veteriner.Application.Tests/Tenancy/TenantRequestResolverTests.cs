@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Tenancy;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Tenancy;
 

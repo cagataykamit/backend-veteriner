@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Tenants.Activation;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Queries.GetTrialActivationMetrics;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Tenants;

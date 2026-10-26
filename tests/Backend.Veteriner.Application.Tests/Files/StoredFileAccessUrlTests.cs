@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Files.Queries.CreateAccessUrl;
 using Backend.Veteriner.Application.Files.Queries.GetSignedContent;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;

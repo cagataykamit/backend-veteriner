@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Clinics.Queries.KvkkFormTemplate.GetClinicKv
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clinics;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 

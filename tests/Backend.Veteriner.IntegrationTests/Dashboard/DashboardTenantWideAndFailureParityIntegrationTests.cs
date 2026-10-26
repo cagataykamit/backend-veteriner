@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Dashboard.Queries.GetOperationalAlerts;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

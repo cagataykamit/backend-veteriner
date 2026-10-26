@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Auth.Queries.Permissions.GetByUserId;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Auth.Permissions.Queries;

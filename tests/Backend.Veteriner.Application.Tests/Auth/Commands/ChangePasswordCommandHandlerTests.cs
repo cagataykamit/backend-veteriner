@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Auth.Commands.ChangePassword;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Users;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Auth.Commands;

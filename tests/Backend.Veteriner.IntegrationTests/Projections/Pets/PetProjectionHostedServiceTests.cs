@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Projections.Pets;
 using Backend.Veteriner.Infrastructure.Projections.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Imaging;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Imaging;
 

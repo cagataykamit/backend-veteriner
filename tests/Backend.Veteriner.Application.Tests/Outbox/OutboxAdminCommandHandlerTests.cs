@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Outbox.Commands.Delete;
 using Backend.Veteriner.Application.Outbox.Commands.Requeue;
 using Backend.Veteriner.Application.Outbox.Commands.RetryAllDeadLetters;
 using Backend.Veteriner.Application.Outbox.Commands.RetryDeadLetter;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 

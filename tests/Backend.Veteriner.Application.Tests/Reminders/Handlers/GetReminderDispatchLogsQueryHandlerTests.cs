@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Reminders.Contracts.Dtos;
 using Backend.Veteriner.Application.Reminders.Queries.GetLogs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Reminders;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Reminders.Handlers;

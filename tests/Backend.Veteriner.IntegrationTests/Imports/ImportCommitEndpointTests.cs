@@ -24,7 +24,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Reminders;
 using Backend.Veteriner.Infrastructure.Web;
 using ClosedXML.Excel;
-using FluentAssertions;
+using AwesomeAssertions;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

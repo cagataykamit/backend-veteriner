@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Users.Contracts.Dtos;
 using Backend.Veteriner.Application.Users.Queries.GetAll;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Users.Queries;

@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Dashboard;
 using Backend.Veteriner.Application.Payments.Specs;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Dashboard;
 

@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Clinics.Commands.WorkingHours.UpdateClinicWo
 using Backend.Veteriner.Application.Clinics.Commands.WorkingHours.UpdateClinicWorkingHours.Validators;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.WorkingHours;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Clinics.WorkingHours;
 

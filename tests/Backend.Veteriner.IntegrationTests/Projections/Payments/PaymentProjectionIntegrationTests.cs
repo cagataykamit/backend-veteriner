@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Projections.Payments;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

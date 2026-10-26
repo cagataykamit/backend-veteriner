@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Commands.Create;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using MediatR;
 using Moq;
 

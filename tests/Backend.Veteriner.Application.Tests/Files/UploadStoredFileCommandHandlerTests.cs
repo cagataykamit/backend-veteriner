@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Files.Access;
 using Backend.Veteriner.Application.Files.Commands.Upload;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;

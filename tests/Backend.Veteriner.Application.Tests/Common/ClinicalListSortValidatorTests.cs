@@ -13,7 +13,7 @@ using Backend.Veteriner.Application.Treatments.Queries.GetList;
 using Backend.Veteriner.Application.Treatments.Queries.GetList.Validators;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetList;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetList.Validators;
-using FluentAssertions;
+using AwesomeAssertions;
 using FluentValidation.Results;
 
 namespace Backend.Veteriner.Application.Tests.Common;

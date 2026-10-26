@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.OwnerPortal.Commands.PortalCodeSignIn;
 using Backend.Veteriner.Application.OwnerPortal.Commands.PortalPasswordSignIn;
 using Backend.Veteriner.Application.OwnerPortal.Commands.RequestPortalCode;
 using Backend.Veteriner.Domain.OwnerPortal;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.OwnerPortal;

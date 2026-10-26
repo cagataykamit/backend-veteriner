@@ -1,6 +1,6 @@
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Products;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Catalog;
 

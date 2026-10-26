@@ -8,7 +8,7 @@ using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Appointments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Projections.Appointments;

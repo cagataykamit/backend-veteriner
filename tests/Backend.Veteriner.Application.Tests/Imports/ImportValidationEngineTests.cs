@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Imports;
 

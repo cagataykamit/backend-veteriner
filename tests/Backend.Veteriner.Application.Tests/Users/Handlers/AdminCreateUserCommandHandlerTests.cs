@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Users.Commands.Create;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Users;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Users.Handlers;

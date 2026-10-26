@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.ProductStocks.Commands.UpdateMinimumStockLevel;
 using Backend.Veteriner.Application.ProductStocks.Commands.UpdateMinimumStockLevel.Validators;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.ProductStocks.Validators;
 

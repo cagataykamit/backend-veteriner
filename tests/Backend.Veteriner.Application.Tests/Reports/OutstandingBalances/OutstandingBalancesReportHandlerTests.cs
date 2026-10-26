@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.ExportOu
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.GetOutstandingBalancesReport;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using ClosedXML.Excel;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Reports.OutstandingBalances;

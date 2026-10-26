@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.ClinicalTerms.Commands.Update;
 using Backend.Veteriner.Application.ClinicalTerms.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Catalog;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 

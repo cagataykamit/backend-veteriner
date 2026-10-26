@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Catalog;

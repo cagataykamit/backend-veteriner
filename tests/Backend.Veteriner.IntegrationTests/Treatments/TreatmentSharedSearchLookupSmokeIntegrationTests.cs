@@ -15,7 +15,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
