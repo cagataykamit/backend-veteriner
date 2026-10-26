@@ -129,8 +129,8 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
-        // Örnek klinik (ADR-002): kiracıda zaten veri var ya da abonelik deneme sürecinde değil (durum çakışması).
-        if (normalized is "tenants.exampleclinicalreadyloaded" or "tenants.exampleclinictrialrequired")
+        // Örnek klinik (ADR-002): kiracıda zaten veri var, abonelik deneme sürecinde değil ya da temizlenecek örnek veri yok (durum çakışması).
+        if (normalized is "tenants.exampleclinicalreadyloaded" or "tenants.exampleclinictrialrequired" or "tenants.exampleclinicnotloaded")
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }

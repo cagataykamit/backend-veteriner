@@ -11,6 +11,7 @@ public static class AppointmentIntegrationEventTypes
     public const string Rescheduled = "appointment.rescheduled.v1";
     public const string Cancelled = "appointment.cancelled.v1";
     public const string Completed = "appointment.completed.v1";
+    public const string Deleted = "appointment.deleted.v1";
 
     public const int MaxTypeLength = 64;
 
@@ -20,7 +21,8 @@ public static class AppointmentIntegrationEventTypes
         Updated,
         Rescheduled,
         Cancelled,
-        Completed
+        Completed,
+        Deleted
     ];
 
     public static bool IsKnown(string eventType)

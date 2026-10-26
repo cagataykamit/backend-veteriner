@@ -38,8 +38,8 @@ using Backend.Veteriner.Application.Reports.Payments.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Query;
 using Backend.Veteriner.Infrastructure.Query.Dashboard;
 using Backend.Veteriner.Infrastructure.Persistence;                               // AppDbContext
-using Backend.Veteriner.Infrastructure.Persistence.Seeding;                       // ExampleClinicDataGenerator
-using Backend.Veteriner.Application.Tenants.ExampleClinic;                        // IExampleClinicLoader
+using Backend.Veteriner.Infrastructure.Persistence.Seeding;                       // ExampleClinicDataGenerator, ExampleClinicDataCleaner
+using Backend.Veteriner.Application.Tenants.ExampleClinic;                        // IExampleClinicLoader, IExampleClinicCleaner
 using Backend.Veteriner.Application.Tenants.Activation;                           // ITenantActivationRecorder, ITrialActivationMetricsReader
 using Backend.Veteriner.Infrastructure.Tenants;                                   // TenantActivationRecorder, TrialActivationMetricsReader
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;                 // EfRepository, EfReadRepository, UserRepository, RefreshTokenRepository, VerificationTokenRepository
@@ -180,6 +180,7 @@ public static class DependencyInjection
         services.AddScoped<IUserTenantRepository, UserTenantRepository>();
         services.AddScoped<IUserClinicRepository, UserClinicRepository>();
         services.AddScoped<IExampleClinicLoader, ExampleClinicDataGenerator>();
+        services.AddScoped<IExampleClinicCleaner, ExampleClinicDataCleaner>();
         services.AddScoped<ITenantActivationRecorder, TenantActivationRecorder>();
         services.AddScoped<ITrialActivationMetricsReader, TrialActivationMetricsReader>();
         services.AddScoped<IDashboardTodayAppointmentStatusCountsReader, DashboardTodayAppointmentStatusCountsReader>();

@@ -41,6 +41,9 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
 {
     public const string Marker = "ÖRNEK";
 
+    /// <summary>İşaretli alanın başı; temizlik (<see cref="ExampleClinicDataCleaner"/>) örnek kaydı bununla tanır.</summary>
+    public const string TagPrefix = Marker + " · ";
+
     private const int Seed = 20261024;
     private const int PastDays = 30;
     private const int FutureDays = 7;
@@ -741,7 +744,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         return created.Value!;
     }
 
-    private static string Tag(string text) => $"{Marker} · {text}";
+    private static string Tag(string text) => TagPrefix + text;
 
     // ---------------------------------------------------------------------------------------------
     // Yardımcı tipler

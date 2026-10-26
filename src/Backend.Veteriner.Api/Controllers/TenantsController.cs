@@ -7,6 +7,7 @@ using Backend.Veteriner.Api.Contracts;
 using Backend.Veteriner.Application.Tenants.Commands.AssignMemberClinic;
 using Backend.Veteriner.Application.Tenants.Commands.AssignMemberRole;
 using Backend.Veteriner.Application.Tenants.Commands.CancelInvite;
+using Backend.Veteriner.Application.Tenants.Commands.ClearExampleClinic;
 using Backend.Veteriner.Application.Tenants.Commands.Create;
 using Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
 using Backend.Veteriner.Application.Tenants.Commands.LoadExampleClinic;
@@ -28,6 +29,7 @@ using Backend.Veteriner.Application.Tenants.Queries.GetMemberById;
 using Backend.Veteriner.Application.Tenants.Queries.GetMembers;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionCheckout;
 using Backend.Veteriner.Application.Tenants.Queries.GetAccessState;
+using Backend.Veteriner.Application.Tenants.Queries.GetExampleClinicStatus;
 using Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionSummary;
 using Backend.Veteriner.Application.Tenants.Queries.GetPendingPlanChange;
 using Backend.Veteriner.Application.SalesPartners.Commands.ApplySubscriptionCode;
@@ -673,6 +675,44 @@ public sealed class TenantsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new LoadExampleClinicCommand(tenantId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Kiracıda örnek klinik verisi var mı ve temizlik neyi silecek (EXAMPLE_CLINIC_API_CONTRACT.md §10.2). Yetki
+    /// <c>Subscriptions.Manage</c>; JWT <c>tenant_id</c> route ile aynı olmalı. Yan etkisi yoktur.
+    /// </summary>
+    [HttpGet("{tenantId:guid}/example-clinic")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [ProducesResponseType(typeof(ExampleClinicStatusDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetExampleClinicStatus([FromRoute] Guid tenantId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetExampleClinicStatusQuery(tenantId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Örnek klinik verisini kalıcı siler (EXAMPLE_CLINIC_API_CONTRACT.md §10.3): örnek müşteri/hastalar ve onlara bağlı her
+    /// şey; kullanılmış örnek ürün pasife alınır. Yetki <c>Subscriptions.Manage</c>; JWT <c>tenant_id</c> route ile aynı olmalı.
+    /// Örnek veri yoksa 409 <c>Tenants.ExampleClinicNotLoaded</c>. Tek işlem.
+    /// </summary>
+    [HttpDelete("{tenantId:guid}/example-clinic")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [ProducesResponseType(typeof(ExampleClinicDataCountsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ClearExampleClinic([FromRoute] Guid tenantId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ClearExampleClinicCommand(tenantId), ct);
         return result.ToActionResult(this);
     }
 
