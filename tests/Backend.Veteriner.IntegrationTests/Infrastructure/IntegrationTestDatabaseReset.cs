@@ -159,6 +159,7 @@ internal static class IntegrationTestDatabaseReset
 
         // SINGLE_USER, dosyaları eksik/bozuk LocalDB kayıtlarında DB'yi yeniden açmaya çalışır ve hata üretir.
         // Önce oturumları sonlandır, ardından doğrudan DROP dene; gerekirse EMERGENCY moduna al.
+        // Yalnız kullanıcı oturumları: sistem oturumu (checkpoint vb.) KILL edilemez, "Only user processes can be killed" verir (CI).
         await using (var killCommand = connection.CreateCommand())
         {
             killCommand.CommandText = $@"
@@ -168,7 +169,7 @@ BEGIN
     DECLARE @kill nvarchar(max) = N'';
     SELECT @kill = @kill + N'KILL ' + CAST(session_id AS nvarchar(10)) + N';'
     FROM sys.dm_exec_sessions
-    WHERE database_id = @dbId AND session_id <> @@SPID;
+    WHERE database_id = @dbId AND session_id <> @@SPID AND is_user_process = 1;
     IF LEN(@kill) > 0 EXEC(@kill);
 END";
             killCommand.Parameters.AddWithValue("@db", databaseName);
