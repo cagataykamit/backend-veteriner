@@ -152,10 +152,11 @@ public sealed class CreateStockMovementCommandHandler
             new ProductStockForUpdateSpec(tenantId, request.ClinicId, request.ProductId),
             ct);
 
-        // Yeni stok satırı, hareketten sonra yazılır: hareketin benzersiz kuralları (requestId, kaynak) önce eler
-        // ve satır kalıcılaşmadan işlem sonlanır. Mevcut satırdaki değişiklik hareketle aynı SaveChanges'te gider.
-        // Yeni parti hareketin navigasyonudur: hareketle aynı SaveChanges'te yazılır (hareket elenirse parti de yazılmaz).
+        // Hareket tek başına önce yazılır: benzersiz kuralları (requestId, kaynak) kaybedeni ilk yazımında eler ve işlemde
+        // kaybedenin hiçbir değişikliği kalmaz. Yeni stok/parti satırı ve mevcut satırlardaki değişiklik ancak sonra yazılır.
+        // Başarısız SaveChanges'in kısmi yazımını geri alacak savepoint'e güvenilmez (EF, MARS açık bağlantıda savepoint açmaz).
         ProductStock? newStock = null;
+        Action? changeExistingRows = null; // mevcut stok/parti satırına uygulanacak değişiklik
         StockMovement movement;
         StockBatch? batch = null; // etkilenen parti; null = partisiz (eski/devir) bakiye
 
@@ -194,7 +195,7 @@ public sealed class CreateStockMovementCommandHandler
                 if (stock is null)
                     newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
                 else
-                    stock.IncreaseQuantity(request.Quantity);
+                    changeExistingRows = () => stock.IncreaseQuantity(request.Quantity);
 
                 movement = CreateMovementEntity(
                     tenantId,
@@ -232,8 +233,12 @@ public sealed class CreateStockMovementCommandHandler
                     return insufficient;
 
                 batch = consumption.Value;
-                batch?.Decrease(request.Quantity);
-                stock.DecreaseQuantity(request.Quantity);
+                var consumedBatch = batch;
+                changeExistingRows = () =>
+                {
+                    consumedBatch?.Decrease(request.Quantity);
+                    stock.DecreaseQuantity(request.Quantity);
+                };
                 movement = CreateMovementEntity(
                     tenantId,
                     request,
@@ -273,8 +278,13 @@ public sealed class CreateStockMovementCommandHandler
 
                 if (batch is not null)
                 {
-                    batch.SetRemaining(targetQty);
-                    stock!.SetAbsoluteQuantity(stock.QuantityOnHand + delta);
+                    var countedBatch = batch;
+                    var countedStock = stock!;
+                    changeExistingRows = () =>
+                    {
+                        countedBatch.SetRemaining(targetQty);
+                        countedStock.SetAbsoluteQuantity(countedStock.QuantityOnHand + delta);
+                    };
                 }
                 else
                 {
@@ -290,7 +300,7 @@ public sealed class CreateStockMovementCommandHandler
                     if (stock is null)
                         newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, targetQty, 0);
                     else
-                        stock.SetAbsoluteQuantity(targetQty);
+                        changeExistingRows = () => stock.SetAbsoluteQuantity(targetQty);
                 }
 
                 movement = CreateMovementEntity(
@@ -309,20 +319,10 @@ public sealed class CreateStockMovementCommandHandler
                     "Desteklenmeyen hareket tipi.");
         }
 
-        // Mevcut parti hareketle aynı kayıt işleminde güncellenir (FK satırı var). Yeni parti hareketten sonra yazılır:
-        // aksi hâlde parti INSERT'ü, requestId yarışını kaybeden hareketin INSERT'ünden önce çalışır ve sahipsiz kalır.
-        var batchIsNew = request.MovementType is StockMovementType.In or StockMovementType.Initial;
-        if (batch is not null && !batchIsNew)
-            movement.LinkBatch(batch);
-
         // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); işlem sınırı TransactionBehavior'dadır.
         try
         {
             await _stockMovementsWrite.AddAsync(movement, ct);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return ConcurrencyConflict();
         }
         catch (DbUpdateException)
         {
@@ -363,11 +363,13 @@ public sealed class CreateStockMovementCommandHandler
             }
         }
 
-        if (batch is not null && batchIsNew)
-        {
+        if (batch is not null && request.MovementType is StockMovementType.In or StockMovementType.Initial)
             await _batchesWrite.AddAsync(batch, ct);
-            movement.LinkBatch(batch);
-        }
+
+        // Mevcut satır değişikliği son SaveChanges'e kalır: eşzamanlı değiştiyse (rowVersion) başarısız sonuç işlemi geri alır.
+        changeExistingRows?.Invoke();
+        if (batch is not null)
+            movement.LinkBatch(batch); // bakiye, değişiklikten sonraki parti kalanıdır
 
         try
         {
