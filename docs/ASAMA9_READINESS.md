@@ -62,7 +62,7 @@
 | Outbox sağlık: dead-letter varsa Unhealthy, bekleyen > 500 ise Degraded (eşik statik alan, yapılandırılamaz). Projeksiyon gecikme eşikleri yapılandırılabilir (Production'da Unhealthy 60 sn). | `OutboxHealthCheck.cs:9,17-26`; `appsettings.Production.json` `*ProjectionHealth` |
 | OpenTelemetry iz + metrik, OTLP/gRPC; uç nokta `OTEL_EXPORTER_OTLP_ENDPOINT`, yoksa `http://localhost:4317`. Üretimde toplayıcı yoksa veri gitmez; gösterge paneli/uyarı kuralı depoda yok. Yalnız tasarım dokümanı: `cqrs-11c-monitoring-alerts.md`. | `WebApplicationBuilderExtensions.cs:68,202-250`; `docs/cqrs/cqrs-11c-monitoring-alerts.md` |
 | Hata izleme aracı (Sentry/App Insights/Seq vb.): **yok**. | csproj ve kod taraması boş |
-| Yavaş SQL günlüğü: `EF.SlowSql`, eşik 200 ms (config); `SlowConnectionOpenMs 1000`, `MediatRSlowMs 400`, `HttpRequestWarningMs 750`. | `SlowQueryLoggingInterceptor.cs:95-103`; `appsettings.json` `PerformanceDiagnostics` |
+| Yavaş SQL günlüğü: `EF.SlowSql`, eşik 200 ms (config); `SlowConnectionOpenMs 1000`, `MediatorSlowMs 400`, `HttpRequestWarningMs 750`. | `SlowQueryLoggingInterceptor.cs:95-103`; `appsettings.json` `PerformanceDiagnostics` |
 | Outbox yönetim ucu (sayfa 200 sınırı, silme/yeniden dene). | `OutboxAdminController.cs:22,199` |
 | Hata yanıtları ProblemDetails + traceId/correlationId. | `WebApplicationExtensions.cs:~95-115` |
 

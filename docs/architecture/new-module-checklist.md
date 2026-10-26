@@ -49,7 +49,7 @@ Yeni bir **bounded context** foundation üzerine eklenirken aşağıdaki adımla
 ## 6. Controller (API)
 
 - [ ] Route ve API versiyonu mevcut convention ile uyumlu.
-- [ ] MediatR `Send`; Result → HTTP mapping.
+- [ ] Mediator `Send`; Result → HTTP mapping.
 - [ ] Swagger açıklamaları / response type’lar (mümkün olduğunca eksiksiz).
 
 ---

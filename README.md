@@ -13,7 +13,7 @@
 | **Auth / Users** | Giriş, yenileme, oturum yönetimi, kullanıcı yaşam döngüsü (platform seviyesi) |
 | **JWT / refresh / sessions** | Erişim ve yenileme token’ları; oturum listeleme / iptal |
 | **Permission tabanlı authorization** | İzin kataloğu, policy handler, operasyon claim’leri |
-| **Result + CQRS + MediatR** | `Result` tabanlı uygulama yanıtları; command/query pipeline (validation, audit, logging vb.) |
+| **Result + CQRS + Mediator** | `Result` tabanlı uygulama yanıtları; command/query pipeline (validation, audit, logging vb.) |
 | **Audit / correlation / outbox** | İstek korelasyonu, denetim izi yazımı, transactional outbox altyapısı |
 | **Persistence** | EF Core, `AppDbContext`, konfigürasyonlar, repository desenleri, migration tabanı |
 | **Seeding** | İzin ve temel platform verisi için seed akışları |
@@ -33,7 +33,7 @@
 ## Mimari yaklaşım
 
 - **Katmanlı yapı:** `Backend.Veteriner.Api` → `Application` → `Domain` ← `Infrastructure`
-- **Uygulama katmanı:** MediatR ile command/query; FluentValidation; ortak pipeline davranışları
+- **Uygulama katmanı:** Mediator (martinothamar, kaynak üretici; işleyiciler `ValueTask` döner) ile command/query; FluentValidation; ortak pipeline davranışları (kayıt ve sıra: `Api/Configuration/MediatorConfiguration.cs`, ADR-038)
 - **Domain:** Agregatlar, domain event arabirimleri, `Result` / hata modeli (ürün domain’i burada minimal tutulur)
 - **Altyapı:** EF Core, outbox, e-posta gönderimi, JWT, önbellek invalidation vb.
 

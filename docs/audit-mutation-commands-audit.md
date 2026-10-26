@@ -236,7 +236,7 @@ Naming tutarlı: `Entity.Action` veya `Domain.Action`.
 ```csharp
 // Backend.Veteriner.Application/Contact/Commands/SendContactMessage/SendContactMessageCommand.cs
 using Backend.Veteriner.Application.Common.Abstractions;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Contact.Commands.SendContactMessage;
 
