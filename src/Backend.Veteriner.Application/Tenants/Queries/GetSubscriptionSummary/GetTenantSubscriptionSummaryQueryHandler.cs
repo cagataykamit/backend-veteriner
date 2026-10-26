@@ -156,7 +156,8 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
             period.BillingCycleAnchorUtc,
             period.PeriodEndUtc,
             pendingDto,
-            available);
+            available,
+            sub.BillingPeriod.ToString());
 
         _logger.LogInformation(
             "Tenant subscription summary generated. TenantId={TenantId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",

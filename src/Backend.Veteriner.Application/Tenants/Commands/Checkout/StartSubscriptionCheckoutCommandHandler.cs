@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using MediatR;
@@ -97,9 +98,22 @@ public sealed class StartSubscriptionCheckoutCommandHandler
 
         var isExpiredReadOnly = effective == TenantSubscriptionStatus.ReadOnly;
         var decision = SubscriptionPlanChangeDecider.Decide(sub.PlanCode, targetPlanCode);
+
+        // Dönem (BILL-001): verilmezse ücretli abonelikte mevcut dönem, hiç ödeme yoksa aylık. Etkin ücretli dönemde
+        // aylıktan yıllığa hemen geçilir (kalan günler düşülür); yıllıktan aylığa yalnız dönem bitince (yenilemede).
+        var requestedPeriod = request.BillingPeriod ?? (sub.ActivatedAtUtc is null ? BillingPeriodKind.Monthly : sub.BillingPeriod);
+        var inPaidPeriod = !isExpiredReadOnly && sub.Status == TenantSubscriptionStatus.Active;
+        var switchesToYearly = inPaidPeriod && sub.BillingPeriod == BillingPeriodKind.Monthly && requestedPeriod == BillingPeriodKind.Yearly;
+        if (inPaidPeriod && sub.BillingPeriod == BillingPeriodKind.Yearly && requestedPeriod == BillingPeriodKind.Monthly)
+        {
+            return Result<SubscriptionCheckoutSessionDto>.Failure(
+                "Subscriptions.PeriodChangeAtPeriodEnd",
+                "Yıllık dönemden aylığa dönem bitince geçilir.");
+        }
+
         if (!isExpiredReadOnly)
         {
-            if (decision == SubscriptionPlanChangeDecision.Same)
+            if (decision == SubscriptionPlanChangeDecision.Same && !switchesToYearly)
             {
                 return Result<SubscriptionCheckoutSessionDto>.Failure(
                     "Subscriptions.SamePlanAlreadyActive",
@@ -132,12 +146,20 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             return await ApplyTrialPlanChangeAsync(request.TenantId, sub, targetPlanCode, now, ct);
         }
 
+        if (requestedPeriod == BillingPeriodKind.Yearly
+            && BillingCheckoutProviderResolution.Resolve(_billingOptions.Value) is { IsSuccess: true, Value: BillingProvider.Stripe })
+        {
+            return Result<SubscriptionCheckoutSessionDto>.Failure(
+                "Billing.YearlyNotSupportedByProvider",
+                "Yıllık ödeme bu ödeme sağlayıcısında desteklenmiyor.");
+        }
+
         string? chargeCurrency = null;
         long? proratedChargeMinor = null;
         decimal? prorationRatio = null;
         var prices = _billingOptions.Value;
         // Süresi dolmuş deneme/ücretli dönemde (effective ReadOnly) açık bir dönem kalmadığı için plan yönü ne olursa olsun
-        // hedef planın tam fiyatı çekilir (BILL-003); oranlama yalnız etkin ücretli dönem içindeki yükseltmede.
+        // hedef planın seçilen dönem fiyatı tam çekilir (BILL-003, BILL-001); oranlama yalnız etkin ücretli dönem içinde.
         if (isExpiredReadOnly)
         {
             if (!TryGetPlanPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
@@ -148,8 +170,30 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             }
 
             chargeCurrency = ResolvePlanPriceCurrency(prices);
-            proratedChargeMinor = Math.Max(1, targetPriceMinor);
+            proratedChargeMinor = Math.Max(1, SubscriptionPricing.PeriodPriceMinor(targetPriceMinor, requestedPeriod));
             prorationRatio = 1.0m;
+        }
+        else if (switchesToYearly)
+        {
+            if (!TryGetPlanPriceMinor(prices, sub.PlanCode, out var currentPriceMinor)
+                || !TryGetPlanPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
+            {
+                return Result<SubscriptionCheckoutSessionDto>.Failure(
+                    "Billing.PlanPriceNotConfigured",
+                    "Dönem değişimi için plan fiyatları (minor unit) yapılandırılmalı.");
+            }
+
+            var window = TenantSubscriptionPeriodCalculator.ResolveCurrentWindow(sub, now);
+            var periodSwitch = SubscriptionProrationCalculator.CalculatePeriodSwitch(
+                now,
+                window.PeriodStartUtc,
+                window.PeriodEndUtc,
+                SubscriptionPricing.PeriodPriceMinor(currentPriceMinor, sub.BillingPeriod),
+                SubscriptionPricing.PeriodPriceMinor(targetPriceMinor, requestedPeriod));
+
+            chargeCurrency = ResolvePlanPriceCurrency(prices);
+            proratedChargeMinor = Math.Max(1, periodSwitch.ProratedChargeMinor);
+            prorationRatio = periodSwitch.ProrationRatio;
         }
         else if (decision == SubscriptionPlanChangeDecision.Upgrade)
         {
@@ -161,13 +205,14 @@ public sealed class StartSubscriptionCheckoutCommandHandler
                     "Proration için plan fiyatları (minor unit) yapılandırılmalı.");
             }
 
+            // Yükseltme mevcut dönem içinde, dönem türünün fiyatıyla oranlanır (yıllıkta yıllık fark × kalan oran).
             var period = TenantSubscriptionPeriodCalculator.ResolveCurrentWindow(sub, now);
             var proration = SubscriptionProrationCalculator.Calculate(
                 now,
                 period.PeriodStartUtc,
                 period.PeriodEndUtc,
-                currentPriceMinor,
-                targetPriceMinor);
+                SubscriptionPricing.PeriodPriceMinor(currentPriceMinor, sub.BillingPeriod),
+                SubscriptionPricing.PeriodPriceMinor(targetPriceMinor, sub.BillingPeriod));
 
             if (proration.PriceDiffMinor <= 0)
             {
@@ -187,7 +232,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         long? discountMinor = null;
         if (proratedChargeMinor is > 0)
         {
-            var price = await _partnerDiscounts.PriceAsync(request.TenantId, proratedChargeMinor.Value, now, ct);
+            var price = await _partnerDiscounts.PriceAsync(request.TenantId, proratedChargeMinor.Value, requestedPeriod, now, ct);
             proratedChargeMinor = price.NetAmountMinor;
             discountMinor = price.CodeDiscountMinor > 0 ? price.CodeDiscountMinor : null;
         }
@@ -210,6 +255,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
 
         if (existingOpen is not null
             && existingOpen.TargetPlanCode == targetPlanCode
+            && existingOpen.BillingPeriod == requestedPeriod
             && existingOpen.IsOpen(now))
         {
             return Result<SubscriptionCheckoutSessionDto>.Success(
@@ -248,7 +294,8 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             targetPlanCode,
             providerKind,
             now,
-            expiresAt);
+            expiresAt,
+            requestedPeriod);
         if (grossChargeMinor is > 0)
             session.RecordPricing(grossChargeMinor.Value, discountMinor ?? 0);
 
@@ -354,7 +401,8 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             proratedChargeMinor,
             prorationRatio,
             TrialPlanChangeApplied: false,
-            DiscountAmountMinor: discountAmountMinor);
+            DiscountAmountMinor: discountAmountMinor,
+            BillingPeriod: session.BillingPeriod.ToString());
     }
 
     private static string ResolvePlanPriceCurrency(BillingOptions options)
