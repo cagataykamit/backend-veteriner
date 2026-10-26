@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Outbox;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentOutboxClaimRepositoryIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
 {
     private static readonly TimeSpan DefaultLease = TimeSpan.FromSeconds(60);
 

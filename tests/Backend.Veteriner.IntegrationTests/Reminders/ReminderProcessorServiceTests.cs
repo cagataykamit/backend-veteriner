@@ -26,9 +26,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
     // Test başına açılan izole LocalDB veritabanları; test bitince (başarılı/başarısız) silinir, .mdf/.ldf kalmaz.
     private readonly List<string> _connectionStrings = new();
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         foreach (var connectionString in _connectionStrings)
             await IntegrationTestDatabaseReset.EnsureDroppedAsync(connectionString);

@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Backend.Veteriner.Api.Contracts;
 using Backend.Veteriner.Api.Controllers;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
@@ -21,7 +23,7 @@ using Backend.Veteriner.Application.Treatments.Contracts.Dtos;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Backend.Veteriner.Api.Swagger;
@@ -85,25 +87,48 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             Description = "JWT token'ınızı 'Bearer ' önekiyle girin."
         });
 
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "Bearer"
-                    }
-                },
-                Array.Empty<string>()
-            }
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
         });
+    }
+
+    // Sözleşme filtrelerinin ortak yardımcıları. Referans ($ref) şemalar paylaşılan bileşeni temsil ettiği için
+    // değiştirilmez; yalnızca satır içi (OpenApiSchema) şemalar düzenlenir.
+    private static void Describe(IOpenApiSchema schema, string propertyName, string description)
+    {
+        if (schema.Properties?.TryGetValue(propertyName, out var p) == true && p is OpenApiSchema property)
+            property.Description = description;
+    }
+
+    private static void MarkRequired(IOpenApiSchema schema, params string[] names)
+    {
+        if (schema is not OpenApiSchema target || target.Properties is null)
+            return;
+
+        target.Required ??= new HashSet<string>(StringComparer.Ordinal);
+        foreach (var name in names)
+        {
+            if (target.Properties.ContainsKey(name))
+                target.Required.Add(name);
+        }
+    }
+
+    private static void SetNullable(IOpenApiSchema schema, string propertyName, bool isNullable)
+    {
+        if (schema.Properties?.TryGetValue(propertyName, out var p) != true || p is not OpenApiSchema property)
+            return;
+
+        // OpenAPI.NET 2.x: nullable, tür bayraklarındaki Null ile ifade edilir (3.0 çıktısında "nullable": true).
+        if (isNullable)
+            property.Type |= JsonSchemaType.Null;
+        else if (property.Type is { } type)
+            property.Type = type & ~JsonSchemaType.Null;
     }
 
     private sealed class PaymentsContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(CreatePaymentCommand))
             {
@@ -169,42 +194,12 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 Describe(schema, "petId", "Hayvan yoksa null.");
             }
         }
-
-        private static void Describe(OpenApiSchema schema, string propertyName, string description)
-        {
-            if (schema.Properties.TryGetValue(propertyName, out var p))
-            {
-                p.Description = description;
-            }
-        }
-
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                {
-                    schema.Required.Add(name);
-                }
-            }
-        }
-
-        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
-        {
-            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
-            {
-                return;
-            }
-
-            propertySchema.Nullable = isNullable;
-        }
     }
 
     /// <summary>Randevu yanıtlarında <c>type</c> ile <c>status</c> anlamını Swagger’da netleştirir.</summary>
     private sealed class AppointmentsContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(CreateAppointmentCommand))
             {
@@ -245,44 +240,24 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             }
         }
 
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                {
-                    schema.Required.Add(name);
-                }
-            }
-        }
-
-        private static void Describe(OpenApiSchema schema, string propertyName, string description)
-        {
-            if (schema.Properties.TryGetValue(propertyName, out var p))
-            {
-                p.Description = description;
-            }
-        }
-
-        private static void DescribeStatus(OpenApiSchema schema)
+        private static void DescribeStatus(IOpenApiSchema schema)
         {
             Describe(schema, "status",
                 "Randevu durumu (JSON’da sayı): 0=Scheduled, 1=Completed, 2=Cancelled.");
         }
 
-        private static void DescribeAppointmentType(OpenApiSchema schema)
+        private static void DescribeAppointmentType(IOpenApiSchema schema)
         {
             Describe(schema, "appointmentType",
                 "Randevu / ziyaret türü (JSON’da sayı): 0=Examination, 1=Vaccination, 2=Checkup, 3=Surgery, 4=Grooming, 5=Consultation, 6=Other.");
         }
 
-        private static void DescribeAppointmentTypeOnCreateUpdate(OpenApiSchema schema)
+        private static void DescribeAppointmentTypeOnCreateUpdate(IOpenApiSchema schema)
         {
             DescribeAppointmentType(schema);
         }
 
-        private static void DescribeStatusOnWrite(OpenApiSchema schema)
+        private static void DescribeStatusOnWrite(IOpenApiSchema schema)
         {
             Describe(schema, "status",
                 "Randevu durumu (JSON sayı): 0=Scheduled, 1=Completed, 2=Cancelled. Scheduled dışındaki değerlerde çakışma kontrolü yapılmaz.");
@@ -291,7 +266,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
 
     private sealed class ExaminationsContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(CreateExaminationBody))
             {
@@ -385,36 +360,11 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 Describe(schema, "visitReason", "Başvuru nedeni.");
             }
         }
-
-        private static void Describe(OpenApiSchema schema, string propertyName, string description)
-        {
-            if (schema.Properties.TryGetValue(propertyName, out var p))
-            {
-                p.Description = description;
-            }
-        }
-
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                    schema.Required.Add(name);
-            }
-        }
-
-        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
-        {
-            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
-                return;
-            propertySchema.Nullable = isNullable;
-        }
     }
 
     private sealed class TreatmentsContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(CreateTreatmentCommand))
             {
@@ -455,28 +405,11 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 SetNullable(schema, "followUpDateUtc", true);
             }
         }
-
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                    schema.Required.Add(name);
-            }
-        }
-
-        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
-        {
-            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
-                return;
-            propertySchema.Nullable = isNullable;
-        }
     }
 
     private sealed class PrescriptionsContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(CreatePrescriptionCommand))
             {
@@ -521,28 +454,11 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 SetNullable(schema, "followUpDateUtc", true);
             }
         }
-
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                    schema.Required.Add(name);
-            }
-        }
-
-        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
-        {
-            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
-                return;
-            propertySchema.Nullable = isNullable;
-        }
     }
 
     private sealed class LabResultsContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(CreateLabResultCommand))
             {
@@ -596,28 +512,11 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 SetNullable(schema, "examinationId", true);
             }
         }
-
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                    schema.Required.Add(name);
-            }
-        }
-
-        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
-        {
-            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
-                return;
-            propertySchema.Nullable = isNullable;
-        }
     }
 
     private sealed class HospitalizationsContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(CreateHospitalizationCommand))
             {
@@ -680,28 +579,11 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 SetNullable(schema, "location", true);
             }
         }
-
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                    schema.Required.Add(name);
-            }
-        }
-
-        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
-        {
-            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
-                return;
-            propertySchema.Nullable = isNullable;
-        }
     }
 
     private sealed class PetsContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(PetHistorySummaryDto))
             {
@@ -761,28 +643,11 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 MarkRequired(schema, "id", "paidAtUtc", "clinicId", "clinicName", "amount", "currency", "method");
             }
         }
-
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                    schema.Required.Add(name);
-            }
-        }
-
-        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
-        {
-            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
-                return;
-            propertySchema.Nullable = isNullable;
-        }
     }
 
     private sealed class ClientsContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(ClientRecentSummaryDto))
             {
@@ -826,28 +691,11 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 MarkRequired(schema, "id", "examinedAtUtc", "petId", "petName", "visitReason");
             }
         }
-
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                    schema.Required.Add(name);
-            }
-        }
-
-        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
-        {
-            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
-                return;
-            propertySchema.Nullable = isNullable;
-        }
     }
 
     private sealed class DashboardContractSchemaFilter : ISchemaFilter
     {
-        public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
         {
             if (context.Type == typeof(DashboardFinanceSummaryDto))
             {
@@ -916,31 +764,6 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 MarkRequired(schema, "id", "clientId", "name", "species");
             }
         }
-
-        private static void Describe(OpenApiSchema schema, string propertyName, string description)
-        {
-            if (schema.Properties.TryGetValue(propertyName, out var p))
-            {
-                p.Description = description;
-            }
-        }
-
-        private static void MarkRequired(OpenApiSchema schema, params string[] names)
-        {
-            schema.Required ??= new HashSet<string>(StringComparer.Ordinal);
-            foreach (var name in names)
-            {
-                if (schema.Properties.ContainsKey(name))
-                    schema.Required.Add(name);
-            }
-        }
-
-        private static void SetNullable(OpenApiSchema schema, string propertyName, bool isNullable)
-        {
-            if (!schema.Properties.TryGetValue(propertyName, out var propertySchema))
-                return;
-            propertySchema.Nullable = isNullable;
-        }
     }
 
     /// <summary>
@@ -968,7 +791,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
 
             static void SetDesc(OpenApiOperation op, string name, string description)
             {
-                var p = op.Parameters!.FirstOrDefault(x =>
+                var p = op.Parameters!.OfType<OpenApiParameter>().FirstOrDefault(x =>
                     string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
                 if (p is null)
                     return;
@@ -1006,13 +829,15 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 return;
             }
 
+            operation.Responses ??= new OpenApiResponses();
+
             if (string.Equals(action, "Logout", StringComparison.OrdinalIgnoreCase))
             {
                 var schema = context.SchemaGenerator.GenerateSchema(typeof(AuthLogoutBodyDto), context.SchemaRepository);
                 operation.RequestBody = new OpenApiRequestBody
                 {
                     Required = false,
-                    Content =
+                    Content = new Dictionary<string, OpenApiMediaType>
                     {
                         ["application/json"] = new OpenApiMediaType { Schema = schema }
                     }
@@ -1021,7 +846,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 operation.Responses["200"] = new OpenApiResponse
                 {
                     Description = "OK",
-                    Content =
+                    Content = new Dictionary<string, OpenApiMediaType>
                     {
                         ["application/json"] = new OpenApiMediaType
                         {
@@ -1033,7 +858,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 operation.Responses["401"] = new OpenApiResponse
                 {
                     Description = "Unauthorized",
-                    Content =
+                    Content = new Dictionary<string, OpenApiMediaType>
                     {
                         ["application/json"] = new OpenApiMediaType
                         {
@@ -1052,7 +877,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 operation.Responses["200"] = new OpenApiResponse
                 {
                     Description = "OK",
-                    Content =
+                    Content = new Dictionary<string, OpenApiMediaType>
                     {
                         ["application/json"] = new OpenApiMediaType
                         {
@@ -1064,7 +889,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
                 operation.Responses["401"] = new OpenApiResponse
                 {
                     Description = "Unauthorized",
-                    Content =
+                    Content = new Dictionary<string, OpenApiMediaType>
                     {
                         ["application/json"] = new OpenApiMediaType
                         {
@@ -1107,7 +932,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
             if (operation.Parameters == null)
                 return;
 
-            foreach (var parameter in operation.Parameters)
+            foreach (var parameter in operation.Parameters.OfType<OpenApiParameter>())
             {
                 var description = apiDescription.ParameterDescriptions
                     .FirstOrDefault(p => p.Name == parameter.Name);
@@ -1116,12 +941,10 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
 
                 parameter.Description ??= description.ModelMetadata?.Description;
 
-                if (parameter.Schema.Default is null && description.DefaultValue is not null)
+                if (parameter.Schema is OpenApiSchema schema && schema.Default is null && description.DefaultValue is not null)
                 {
                     // default değerleri swagger'a yansıtma
-                    parameter.Schema.Default = OpenApiAnyFactory.CreateFromJson(
-                        System.Text.Json.JsonSerializer.Serialize(description.DefaultValue)
-                    );
+                    schema.Default = JsonNode.Parse(JsonSerializer.Serialize(description.DefaultValue));
                 }
 
                 parameter.Required |= description.IsRequired;
