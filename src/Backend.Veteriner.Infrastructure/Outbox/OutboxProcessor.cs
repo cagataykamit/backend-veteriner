@@ -2,7 +2,6 @@ using System.Text.Json;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Outbox;
-using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -10,21 +9,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
-using Mediator;
 
 namespace Backend.Veteriner.Infrastructure.Outbox;
 
 /// <summary>
-/// Outbox tablosundaki mesajlar� periyodik olarak i�ler.
-/// 
-/// Desteklenen mesaj tipleri:
-/// - Email outbox mesajlar�
-/// - Domain event outbox mesajlar�
-/// 
-/// Kurumsal davran��:
-/// - Retry / exponential backoff / jitter
-/// - Dead-letter deste�i
-/// - Email ve domain event ak��lar�n� tek i�lemcide toplama
+/// Outbox tablosundaki mesajları periyodik olarak işler.
+///
+/// Desteklenen mesaj tipleri: e-posta outbox mesajları. Projeksiyon entegrasyon olayları (appointment, client, pet,
+/// payment) bu işlemciye girmez; her birinin kendi claim tabanlı işlemcisi vardır. Domain event yayını park edilmiştir
+/// (foundation-rules §9); tanınmayan tip dead-letter'a düşer.
+///
+/// Kurumsal davranış: retry / exponential backoff / jitter, dead-letter desteği.
 /// </summary>
 public sealed class OutboxProcessor : BackgroundService
 {
@@ -108,7 +103,7 @@ public sealed class OutboxProcessor : BackgroundService
             }
             catch (OperationCanceledException)
             {
-                // Stop s�ras�nda iptal normal durum
+                // Stop sırasında iptal normal durum
             }
             catch (Exception ex)
             {
@@ -119,7 +114,6 @@ public sealed class OutboxProcessor : BackgroundService
 
     private static async Task ProcessMessageAsync(OutboxMessage msg, IServiceProvider sp, CancellationToken ct)
     {
-        // 1) Klasik uygulama outbox mesajlar�
         switch (msg.Type)
         {
             case OutboxMessageTypes.Email:
@@ -132,25 +126,9 @@ public sealed class OutboxProcessor : BackgroundService
                     await smtp.SendAsync(payload.To, payload.Subject, payload.Body, ct, payload.IsHtml);
                     return;
                 }
+
+            default:
+                throw new NotSupportedException($"Unknown outbox type: {msg.Type}");
         }
-
-        // 2) Domain event outbox mesajlar�
-        var eventRegistry = sp.GetRequiredService<DomainEventTypeRegistry>();
-        var mediator = sp.GetRequiredService<IMediator>();
-
-        var eventType = eventRegistry.Resolve(msg.Type);
-        if (eventType is not null)
-        {
-            var domainEvent = JsonSerializer.Deserialize(msg.Payload, eventType, JsonOptions) as IDomainEvent;
-
-            if (domainEvent is null)
-                throw new InvalidOperationException($"Domain event deserialize edilemedi. Type={msg.Type}");
-
-            await mediator.Publish(domainEvent, ct);
-            return;
-        }
-
-        // 3) Desteklenmeyen tip
-        throw new NotSupportedException($"Unknown outbox type: {msg.Type}");
     }
 }

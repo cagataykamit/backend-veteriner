@@ -1,5 +1,7 @@
 # Auth Domain Event / Outbox Genişletme Analizi
 
+> **Tarihsel belge (2026-10-27 notu):** Burada anlatılan `DomainEventOutboxInterceptor`, `DomainEventTypeRegistry`, `UserCreatedDomainEvent` ve handler'ı hiç devreye alınmadı ve ölü kod olarak kaldırıldı; güncel durum `architecture/foundation-rules.md` §9. Öneriler ilk gerçek domain event ihtiyacında yeniden değerlendirilir.
+
 **Tarih:** 2025-03-11  
 **Kapsam:** Auth closure sonrası – domain event adayları, üretim yeri, outbox uyumu, yol haritası
 

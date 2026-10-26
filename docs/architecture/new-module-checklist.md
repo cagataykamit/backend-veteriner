@@ -86,10 +86,10 @@ Yeni bir **bounded context** foundation üzerine eklenirken aşağıdaki adımla
 
 ## 11. Domain event (ileride)
 
-> Foundation’da **`DomainEventOutboxInterceptor` şu an park edilmiştir.** İlk domain event use-case’inde aşağılar eklenmelidir:
+> Domain event → outbox köprüsü **park edilmiştir; kodda yoktur** (foundation-rules §9). İlk domain event use-case’inde aşağılar eklenmelidir:
 
 - [ ] Event tipi ve serileştirme sözleşmesi.
-- [ ] `DomainEventTypeRegistry` (veya eşdeğer) ile tip çözümü.
+- [ ] SaveChanges interceptor’ı (aggregate'ten outbox'a) ve tip kaydı ile tip çözümü.
 - [ ] Outbox mesaj tipi ve worker işleme.
 - [ ] Entegrasyon testi: publish → outbox → işlendi doğrulaması.
 

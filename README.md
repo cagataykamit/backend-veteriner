@@ -76,7 +76,7 @@ Operasyonel adımlar için: [`docs/architecture/new-module-checklist.md`](docs/a
 
 ## Park edilen konular
 
-- **`DomainEventOutboxInterceptor`:** Şu an bilinçli olarak etkinleştirilmemiştir. İlk **gerçek domain event** use-case’inde (serileştirme, tip kaydı, outbox sözleşmesi ile birlikte) ele alınacaktır. Detay: [`docs/architecture/foundation-rules.md`](docs/architecture/foundation-rules.md) içindeki ilgili bölüm.
+- **Domain event → outbox köprüsü:** Kodda yoktur (ölü kalan interceptor 2026-10-27'de kaldırıldı); Domain'de yalnız `IDomainEvent` işaretleyicisi durur. İlk **gerçek domain event** use-case’inde (serileştirme, tip kaydı, outbox sözleşmesi ile birlikte) ele alınacaktır. Detay: [`docs/architecture/foundation-rules.md`](docs/architecture/foundation-rules.md) içindeki ilgili bölüm.
 
 ## Güvenlik notu
 

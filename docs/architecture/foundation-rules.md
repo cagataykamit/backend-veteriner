@@ -100,13 +100,13 @@ Bu dördü **platform tutarlılığı** için foundation seviyesinde korunur; ü
 
 ## 9. Domain event outbox — neden şu an park edildi?
 
-**`DomainEventOutboxInterceptor`** (veya eşdeğer otomatik domain event → outbox köprüsü) şu an **bilinçli olarak devre dışı / kullanılmıyor** olarak ele alınır.
+Otomatik domain event → outbox köprüsü **bilinçli olarak yok**. Domain'de yalnız işaretleyici kaldı: `IDomainEvent` (dış pakete bağımlı değil, Mediator bildirimi türetmez), `DomainEvent` temel kaydı ve `AggregateRoot.AddDomainEvent`. Kayıtlı ama DbContext'e hiç bağlanmamış `DomainEventOutboxInterceptor`, `DomainEventTypeRegistry`, `OutboxProcessor`'daki domain event dalı ve tek üretici `UserCreatedDomainEvent` 2026-10-27'de ölü kod olarak kaldırıldı; `Mediator.Abstractions` paketi Domain'den düştü.
 
 **Gerekçe (özet):**
 
 1. **İlk use-case öncesi** tip kaydı, serileştirme sözleşmesi (`$type`, assembly adı, versioning) ve worker tarafı tüketimi netleştirilmelidir.
 2. Foundation’da henüz **zorunlu, üretim kritik** bir domain event yayını yoksa interceptor’ı açmak yanlış pozitif outbox mesajları veya kırılgan deserialize yolları doğurabilir.
-3. Etkinleştirme; **ilk gerçek domain event** ihtiyacıyla birlikte test edilerek yapılmalıdır (`DomainEventTypeRegistry`, outbox payload, idempotency).
+3. Etkinleştirme; **ilk gerçek domain event** ihtiyacıyla birlikte test edilerek yapılmalıdır (tip kaydı, outbox payload, idempotency). Mediator bildirimi gerekirse `IDomainEvent`'i Application tarafında sarmalayın; Domain pakete bağlanmaz.
 
 Park kaldırıldığında bu bölüm güncellenmeli ve checklist’e “domain event + outbox” adımları eklenmelidir.
 

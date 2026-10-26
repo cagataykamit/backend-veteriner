@@ -150,8 +150,6 @@ public static class DependencyInjection
         services.AddScoped<OutboxSaveChangesInterceptor>();
         services.AddScoped<SlowQueryLoggingInterceptor>();
         services.AddScoped<DbConnectionSlowOpenInterceptor>();
-        services.AddScoped<DomainEventOutboxInterceptor>();
-        services.AddSingleton<DomainEventTypeRegistry>();
 
         // ===== DbContext (command) =====
         services.AddDbContext<AppDbContext>((sp, opt) =>

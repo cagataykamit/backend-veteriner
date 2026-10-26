@@ -1,5 +1,4 @@
 using Backend.Veteriner.Application.Common.Behaviors;
-using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Api.Configuration;
 
@@ -15,8 +14,8 @@ public static class MediatorConfiguration
             // İşleyiciler ve ara katmanlar DbContext gibi kapsamlı bağımlılık taşır (kütüphane varsayılanı Singleton).
             options.ServiceLifetime = ServiceLifetime.Scoped;
 
-            // Domain: IDomainEvent bildirimleri; Application: komut, sorgu ve işleyiciler.
-            options.Assemblies = [typeof(IDomainEvent), typeof(Application.DependencyInjection)];
+            // Application: komut, sorgu ve işleyiciler. Domain Mediator'a bağımlı değildir (domain event yayını park; foundation-rules §9).
+            options.Assemblies = [typeof(Application.DependencyInjection)];
 
             // Ara katman sırası dıştan içe (ilk eleman en dışta çalışır):
             // 1) UnhandledException: iç katmanlardaki istisnaları loglar ve aynen iletir.

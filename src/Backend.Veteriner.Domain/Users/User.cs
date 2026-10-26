@@ -1,5 +1,4 @@
 using Backend.Veteriner.Domain.Shared;
-using Backend.Veteriner.Domain.Users.Events;
 
 namespace Backend.Veteriner.Domain.Users;
 
@@ -48,8 +47,6 @@ public class User : AggregateRoot
         // Kurumsal standart: olu�turma an?n? domain'de sabitle
         CreatedAtUtc = DateTime.UtcNow;
         UpdatedAtUtc = null;
-
-        AddDomainEvent(new UserCreatedDomainEvent(Id, Email));
     }
 
     /// <summary>Gorunen adi ayarlar; bos/bosluk adi temizler. Uzunluk siniri asilirsa Result.Failure.</summary>
