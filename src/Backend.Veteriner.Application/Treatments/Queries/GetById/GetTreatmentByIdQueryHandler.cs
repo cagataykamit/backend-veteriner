@@ -8,7 +8,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Treatments.Queries.GetById;
 
@@ -44,7 +44,7 @@ public sealed class GetTreatmentByIdQueryHandler
         _clients = clients;
     }
 
-    public async Task<Result<TreatmentDetailDto>> Handle(GetTreatmentByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<TreatmentDetailDto>> Handle(GetTreatmentByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

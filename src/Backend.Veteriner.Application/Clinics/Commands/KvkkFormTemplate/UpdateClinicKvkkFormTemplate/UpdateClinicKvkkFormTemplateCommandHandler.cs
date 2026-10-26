@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Clinics.Commands.KvkkFormTemplate.UpdateClinicKvkkFormTemplate;
@@ -42,7 +42,7 @@ public sealed class UpdateClinicKvkkFormTemplateCommandHandler
         _templates = templates;
     }
 
-    public async Task<Result<ClinicKvkkFormTemplateDto>> Handle(
+    public async ValueTask<Result<ClinicKvkkFormTemplateDto>> Handle(
         UpdateClinicKvkkFormTemplateCommand request,
         CancellationToken ct)
     {

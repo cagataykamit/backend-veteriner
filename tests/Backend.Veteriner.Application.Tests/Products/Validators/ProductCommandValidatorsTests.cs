@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Products.Commands.Create;
 using Backend.Veteriner.Application.Products.Commands.Create.Validators;
 using Backend.Veteriner.Application.Products.Commands.Update;
 using Backend.Veteriner.Application.Products.Commands.Update.Validators;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Products.Validators;
 

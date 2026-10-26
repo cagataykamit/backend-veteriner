@@ -1,6 +1,6 @@
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
 

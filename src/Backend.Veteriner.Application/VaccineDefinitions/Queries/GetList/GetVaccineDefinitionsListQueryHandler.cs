@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.VaccineDefinitions.Contracts.Dtos;
 using Backend.Veteriner.Application.VaccineDefinitions.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.VaccineDefinitions.Queries.GetList;
 
@@ -23,7 +23,7 @@ public sealed class GetVaccineDefinitionsListQueryHandler
         _definitions = definitions;
     }
 
-    public async Task<Result<PagedResult<VaccineDefinitionDto>>> Handle(
+    public async ValueTask<Result<PagedResult<VaccineDefinitionDto>>> Handle(
         GetVaccineDefinitionsListQuery request,
         CancellationToken ct)
     {

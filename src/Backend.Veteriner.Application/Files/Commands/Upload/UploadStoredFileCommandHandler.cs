@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Files.Contracts.Dtos;
 using Backend.Veteriner.Application.Files.Specs;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -51,7 +51,7 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
 
     private DateTime Now => _timeProvider.GetUtcNow().UtcDateTime;
 
-    public async Task<Result<StoredFileDto>> Handle(UploadStoredFileCommand request, CancellationToken ct)
+    public async ValueTask<Result<StoredFileDto>> Handle(UploadStoredFileCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Fail("Tenants.ContextMissing", "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");

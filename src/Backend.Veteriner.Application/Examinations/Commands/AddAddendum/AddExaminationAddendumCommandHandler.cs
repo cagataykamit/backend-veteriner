@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Examinations.Commands.AddAddendum;
 
@@ -45,7 +45,7 @@ public sealed class AddExaminationAddendumCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ExaminationAddendumDto>> Handle(AddExaminationAddendumCommand request, CancellationToken ct)
+    public async ValueTask<Result<ExaminationAddendumDto>> Handle(AddExaminationAddendumCommand request, CancellationToken ct)
     {
         if (_clientContext.UserId is not { } userId)
         {

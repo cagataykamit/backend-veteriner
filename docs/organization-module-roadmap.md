@@ -320,7 +320,7 @@ Not: Mevcut projede IRepository\<T\>, IReadRepository\<T\> (Ardalis) var; Auth t
 
 | Katman | Klasör | Dosya | Amaç | Bağımlılık |
 |--------|--------|-------|------|------------|
-| Backend.Veteriner.Api | Controllers | PositionsController.cs | [Route("api/v{version}/positions")]; GET (list), GET {id}, POST (create); Authorize(Policy = Organization.Positions.Read/Write) | MediatR, ResultExtensions, PermissionCatalog |
+| Backend.Veteriner.Api | Controllers | PositionsController.cs | [Route("api/v{version}/positions")]; GET (list), GET {id}, POST (create); Authorize(Policy = Organization.Positions.Read/Write) | Mediator, ResultExtensions, PermissionCatalog |
 | Backend.Veteriner.Api | Controllers | OrganizationUnitsController.cs | [Route("api/v{version}/organization-units")]; GET, GET {id}, POST | Aynı |
 | Backend.Veteriner.Api | Controllers | EmployeesController.cs | [Route("api/v{version}/employees")]; GET, GET {id}, POST | Aynı |
 

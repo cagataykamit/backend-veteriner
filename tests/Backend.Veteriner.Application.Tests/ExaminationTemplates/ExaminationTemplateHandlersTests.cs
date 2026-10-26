@@ -19,8 +19,8 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
-using MediatR;
+using AwesomeAssertions;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 

@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.ExaminationTemplates.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.ExaminationTemplates.Queries.GetList;
 
@@ -28,7 +28,7 @@ public sealed class GetExaminationTemplatesListQueryHandler
         _products = products;
     }
 
-    public async Task<Result<PagedResult<ExaminationTemplateDto>>> Handle(
+    public async ValueTask<Result<PagedResult<ExaminationTemplateDto>>> Handle(
         GetExaminationTemplatesListQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)

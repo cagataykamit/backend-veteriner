@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Queries.GetById;
 
@@ -52,7 +52,7 @@ public sealed class GetHospitalizationByIdQueryHandler
         _wards = wards;
     }
 
-    public async Task<Result<HospitalizationDetailDto>> Handle(GetHospitalizationByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<HospitalizationDetailDto>> Handle(GetHospitalizationByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

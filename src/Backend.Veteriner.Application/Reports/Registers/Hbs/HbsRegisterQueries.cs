@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Registers.Hbs;
 
@@ -29,8 +29,8 @@ public sealed class GetHbsPrescriptionRegisterQueryHandler
         _reader = reader;
     }
 
-    public Task<Result<RegisterReadResult<HbsPrescriptionRegisterItemDto>>> Handle(GetHbsPrescriptionRegisterQuery request, CancellationToken ct)
-        => _runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct);
+    public ValueTask<Result<RegisterReadResult<HbsPrescriptionRegisterItemDto>>> Handle(GetHbsPrescriptionRegisterQuery request, CancellationToken ct)
+        => new(_runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct));
 }
 
 public sealed class ExportHbsPrescriptionRegisterQueryHandler
@@ -45,8 +45,8 @@ public sealed class ExportHbsPrescriptionRegisterQueryHandler
         _reader = reader;
     }
 
-    public Task<Result<RegisterExportResult>> Handle(ExportHbsPrescriptionRegisterQuery request, CancellationToken ct)
-        => _runner.ExportAsync(_reader, request.Query, request.Format, HbsPrescriptionRegisterColumns.Export, ct);
+    public ValueTask<Result<RegisterExportResult>> Handle(ExportHbsPrescriptionRegisterQuery request, CancellationToken ct)
+        => new(_runner.ExportAsync(_reader, request.Query, request.Format, HbsPrescriptionRegisterColumns.Export, ct));
 }
 
 public sealed class GetHbsVaccinationRegisterQueryHandler
@@ -61,8 +61,8 @@ public sealed class GetHbsVaccinationRegisterQueryHandler
         _reader = reader;
     }
 
-    public Task<Result<RegisterReadResult<HbsVaccinationRegisterItemDto>>> Handle(GetHbsVaccinationRegisterQuery request, CancellationToken ct)
-        => _runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct);
+    public ValueTask<Result<RegisterReadResult<HbsVaccinationRegisterItemDto>>> Handle(GetHbsVaccinationRegisterQuery request, CancellationToken ct)
+        => new(_runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct));
 }
 
 public sealed class ExportHbsVaccinationRegisterQueryHandler
@@ -77,6 +77,6 @@ public sealed class ExportHbsVaccinationRegisterQueryHandler
         _reader = reader;
     }
 
-    public Task<Result<RegisterExportResult>> Handle(ExportHbsVaccinationRegisterQuery request, CancellationToken ct)
-        => _runner.ExportAsync(_reader, request.Query, request.Format, HbsVaccinationRegisterColumns.Export, ct);
+    public ValueTask<Result<RegisterExportResult>> Handle(ExportHbsVaccinationRegisterQuery request, CancellationToken ct)
+        => new(_runner.ExportAsync(_reader, request.Query, request.Format, HbsVaccinationRegisterColumns.Export, ct));
 }

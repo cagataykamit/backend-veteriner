@@ -3,14 +3,14 @@ using Backend.Veteriner.Application.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Outbox;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentOutboxClaimRepositoryIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
 {
     private static readonly TimeSpan DefaultLease = TimeSpan.FromSeconds(60);
 

@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Dashboard.ReadModels;
 using Backend.Veteriner.Application.Dashboard.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Appointments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -108,7 +108,7 @@ public sealed class DashboardQueryHandlerFeatureFlagTests
         _dashboardReader.Setup(r => r.GetAsync(It.IsAny<DashboardAppointmentReadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateSummaryHandler(true).Handle(new GetDashboardSummaryQuery(), CancellationToken.None);
+        var act = async () => await CreateSummaryHandler(true).Handle(new GetDashboardSummaryQuery(), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         _todayCounts.Verify(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyCollection<Guid>?>(), It.IsAny<CancellationToken>()), Times.Never);

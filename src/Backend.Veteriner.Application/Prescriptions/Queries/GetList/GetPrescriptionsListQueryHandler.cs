@@ -12,7 +12,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Prescriptions.Queries.GetList;
@@ -49,7 +49,7 @@ public sealed class GetPrescriptionsListQueryHandler
         _queryReadModelsOptions = queryReadModelsOptions.Value;
     }
 
-    public async Task<Result<PagedResult<PrescriptionListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<PrescriptionListItemDto>>> Handle(
         GetPrescriptionsListQuery request,
         CancellationToken ct)
     {

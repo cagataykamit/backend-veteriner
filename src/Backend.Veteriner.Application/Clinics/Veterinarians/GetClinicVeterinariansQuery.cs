@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Veterinarians;
 
@@ -26,7 +26,7 @@ public sealed class GetClinicVeterinariansQueryHandler
         _veterinarians = veterinarians;
     }
 
-    public async Task<Result<IReadOnlyList<ClinicVeterinarianDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<ClinicVeterinarianDto>>> Handle(
         GetClinicVeterinariansQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)

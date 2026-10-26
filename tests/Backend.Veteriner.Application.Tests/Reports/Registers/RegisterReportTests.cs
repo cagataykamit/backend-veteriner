@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.Reports.Registers.Prescriptions;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Pets;
 using ClosedXML.Excel;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Reports.Registers;

@@ -1,7 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Domain.Appointments;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Appointments;
 

@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.StockMovements.Contracts.Dtos;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.StockMovements.Queries.GetList;
 

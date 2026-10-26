@@ -7,7 +7,7 @@
 
 ## 1. Genel değerlendirme
 
-- **Mevcut outbox altyapısı aggregate-odaklı ve tutarlı.** Sadece `AggregateRoot` türeyen ve EF change tracker’da olan entity’lerin `DomainEvents` listesi SaveChanges sırasında `DomainEventOutboxInterceptor` ile outbox’a yazılıyor. OutboxProcessor bu kayıtları deserialize edip MediatR ile publish ediyor; retry/dead-letter mevcut.
+- **Mevcut outbox altyapısı aggregate-odaklı ve tutarlı.** Sadece `AggregateRoot` türeyen ve EF change tracker’da olan entity’lerin `DomainEvents` listesi SaveChanges sırasında `DomainEventOutboxInterceptor` ile outbox’a yazılıyor. OutboxProcessor bu kayıtları deserialize edip Mediator ile publish ediyor; retry/dead-letter mevcut.
 - **Kritik nokta:** Projede **hiçbir domain entity şu an `AggregateRoot`’tan türemiyor.** `User`, `Permission`, `UserOperationClaim`, `RefreshToken` hepsi sade entity. Bu yüzden **`UserCreatedDomainEvent` tanımlı olsa da hiçbir yerde raise edilmiyor** ve outbox’a hiç düşmüyor. Handler da sadece log atıyor; event akışı fiilen kapalı.
 - **Öneri stratejisi:** Gerçekten değer üreten **tek yüksek öncelikli** event: **UserCreated** (onboarding, email verification, welcome flow). Bunun için User’ı aggregate yapıp event’i aggregate içinde üretmek yeterli. Diğer auth mutasyonları (session revoke, permission CRUD, user claim assign/remove, password reset, email verification) için **audit + mevcut handler reaksiyonları (cache invalidation, mail)** çoğu senaryoda yeterli; gereksiz event üretiminden kaçınılmalı. İleride somut tüketici (dış sistem, read model, analytics) çıkarsa event eklenebilir.
 
@@ -71,7 +71,7 @@
 - **Sonuç:** Bunlar için “domain event” aggregate içinde raise edilemez; event istenirse “application event” olur ve mevcut outbox pipeline’ına girmek için ek bir yazım noktası (handler’dan OutboxMessage ekleme vb.) gerekir. Bu dokümanda öneri: **eklemeyin**; audit + handler reaksiyonu yeterli.
 
 ### User ve UserCreated
-- Kullanıcı oluşturma, **User** aggregate’inin yaşam döngüsünde “doğdu” anına karşılık gelir. Event’in aggregate içinde üretilmesi DDD açısından doğru: **User** aggregate root yapılır, constructor’da (veya `Create` factory’de) `AddDomainEvent(new UserCreatedDomainEvent(Id, Email))` çağrılır. SaveChanges’ta interceptor event’i toplar ve outbox’a yazar; processor sonra MediatR ile publish eder. Handler’da welcome mail / email verification tetiklenebilir.
+- Kullanıcı oluşturma, **User** aggregate’inin yaşam döngüsünde “doğdu” anına karşılık gelir. Event’in aggregate içinde üretilmesi DDD açısından doğru: **User** aggregate root yapılır, constructor’da (veya `Create` factory’de) `AddDomainEvent(new UserCreatedDomainEvent(Id, Email))` çağrılır. SaveChanges’ta interceptor event’i toplar ve outbox’a yazar; processor sonra Mediator ile publish eder. Handler’da welcome mail / email verification tetiklenebilir.
 
 ### Password reset / Email verification
 - Bunlar “kullanıcı davranışı” veya “sistem işlemi”; genelde ayrı aggregate değil, handler + mail + audit ile çözülüyor. Event’e dönüştürmek için ya (a) bir aggregate (örn. User) üzerinde “password reset requested” gibi metot + event tanımlanır (modeli şişirir), ya (b) application event olarak handler’dan yazılır. Öneri: **şimdilik event eklenmesin**; audit yeterli.

@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Registers.Vaccines;
 
@@ -22,8 +22,8 @@ public sealed class GetVaccineRegisterQueryHandler
         _reader = reader;
     }
 
-    public Task<Result<RegisterReadResult<VaccineRegisterItemDto>>> Handle(GetVaccineRegisterQuery request, CancellationToken ct)
-        => _runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct);
+    public ValueTask<Result<RegisterReadResult<VaccineRegisterItemDto>>> Handle(GetVaccineRegisterQuery request, CancellationToken ct)
+        => new(_runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct));
 }
 
 public sealed class ExportVaccineRegisterQueryHandler : IRequestHandler<ExportVaccineRegisterQuery, Result<RegisterExportResult>>
@@ -37,6 +37,6 @@ public sealed class ExportVaccineRegisterQueryHandler : IRequestHandler<ExportVa
         _reader = reader;
     }
 
-    public Task<Result<RegisterExportResult>> Handle(ExportVaccineRegisterQuery request, CancellationToken ct)
-        => _runner.ExportAsync(_reader, request.Query, request.Format, VaccineRegisterColumns.Export, ct);
+    public ValueTask<Result<RegisterExportResult>> Handle(ExportVaccineRegisterQuery request, CancellationToken ct)
+        => new(_runner.ExportAsync(_reader, request.Query, request.Format, VaccineRegisterColumns.Export, ct));
 }

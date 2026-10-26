@@ -4,7 +4,7 @@ using System.Text.Json;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Common.Behaviors;
@@ -14,7 +14,7 @@ namespace Backend.Veteriner.Application.Common.Behaviors;
 /// yazıcı (ayrı DbContext kapsamı) hata verirse hata loglanır, handler'ın yanıtı veya özgün istisnası aynen iletilir.
 /// </summary>
 public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : notnull
+    where TRequest : notnull, IMessage
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -50,17 +50,17 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         _logger = logger;
     }
 
-    public async Task<TResponse> Handle(
+    public async ValueTask<TResponse> Handle(
         TRequest request,
-        RequestHandlerDelegate<TResponse> next,
+        MessageHandlerDelegate<TRequest, TResponse> next,
         CancellationToken ct)
     {
         if (request is not IAuditableRequest auditable)
-            return await next();
+            return await next(request, ct);
 
         try
         {
-            var response = await next();
+            var response = await next(request, ct);
 
             var (success, failureReason) = ResultOutcome.Of(response);
 

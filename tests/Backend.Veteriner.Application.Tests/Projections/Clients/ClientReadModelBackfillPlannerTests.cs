@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Projections.Clients;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Projections.Clients;
 

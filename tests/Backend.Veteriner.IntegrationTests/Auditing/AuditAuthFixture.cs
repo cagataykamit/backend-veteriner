@@ -13,7 +13,7 @@ public sealed class AuditAuthFixture : IAsyncLifetime
     public CustomWebApplicationFactory Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         Factory = new CustomWebApplicationFactory();
         Client = Factory.CreateClient();
@@ -28,10 +28,10 @@ public sealed class AuditAuthFixture : IAsyncLifetime
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         Client.Dispose();
         Factory.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }

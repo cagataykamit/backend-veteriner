@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Commands.Logout;
 
@@ -12,7 +12,7 @@ public sealed class LogoutCommandHandler : IRequestHandler<LogoutCommand, Unit>
         _refreshRepo = refreshRepo;
     }
 
-    public async Task<Unit> Handle(LogoutCommand request, CancellationToken ct)
+    public async ValueTask<Unit> Handle(LogoutCommand request, CancellationToken ct)
     {
         // 1?? Refresh token bo�sa hi�bir �ey yapma
         if (string.IsNullOrWhiteSpace(request.RefreshToken))

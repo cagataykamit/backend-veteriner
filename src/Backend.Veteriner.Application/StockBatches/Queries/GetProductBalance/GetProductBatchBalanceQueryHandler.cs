@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.StockBatches.Contracts.Dtos;
 using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.StockBatches.Queries.GetProductBalance;
 
@@ -40,7 +40,7 @@ public sealed class GetProductBatchBalanceQueryHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ProductBatchBalanceDto>> Handle(GetProductBatchBalanceQuery request, CancellationToken ct)
+    public async ValueTask<Result<ProductBatchBalanceDto>> Handle(GetProductBatchBalanceQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

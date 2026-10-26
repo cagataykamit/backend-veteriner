@@ -15,7 +15,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
 using FluentValidation;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
 
@@ -62,7 +62,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ImportOwnerUnitResult>> Handle(ApplyImportOwnerUnitCommand request, CancellationToken ct)
+    public async ValueTask<Result<ImportOwnerUnitResult>> Handle(ApplyImportOwnerUnitCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ImportOwnerUnitResult>.Failure("Tenants.ContextMissing", "Kiracı bağlamı yok.");

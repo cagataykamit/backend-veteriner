@@ -10,7 +10,7 @@ using Backend.Veteriner.Application.Auth.Queries.Permissions.GetAll;
 using Backend.Veteriner.Application.Auth.Queries.Permissions.GetById;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;

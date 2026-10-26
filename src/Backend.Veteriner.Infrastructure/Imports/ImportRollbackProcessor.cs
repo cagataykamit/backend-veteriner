@@ -9,7 +9,7 @@ using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Web;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

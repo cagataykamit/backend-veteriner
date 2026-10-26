@@ -7,7 +7,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Appointments.Queries.ExportAppointmentReport;
 
@@ -43,7 +43,7 @@ public sealed class ExportAppointmentsReportXlsxQueryHandler
         _trialLimitPolicy = trialLimitPolicy;
     }
 
-    public async Task<Result<AppointmentsXlsxExportResult>> Handle(
+    public async ValueTask<Result<AppointmentsXlsxExportResult>> Handle(
         ExportAppointmentsReportXlsxQuery request,
         CancellationToken ct)
     {

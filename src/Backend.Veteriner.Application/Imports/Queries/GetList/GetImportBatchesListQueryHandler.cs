@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Imports.Contracts.Dtos;
 using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Imports.Queries.GetList;
 
@@ -29,7 +29,7 @@ public sealed class GetImportBatchesListQueryHandler
         _batches = batches;
     }
 
-    public async Task<Result<PagedResult<ImportBatchDto>>> Handle(GetImportBatchesListQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<ImportBatchDto>>> Handle(GetImportBatchesListQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

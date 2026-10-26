@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Outbox;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Common.Outbox;
 

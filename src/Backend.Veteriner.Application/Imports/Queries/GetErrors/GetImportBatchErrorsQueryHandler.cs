@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Imports.Queries.GetErrors;
 
@@ -33,7 +33,7 @@ public sealed class GetImportBatchErrorsQueryHandler : IRequestHandler<GetImport
         _rows = rows;
     }
 
-    public async Task<Result<ImportTemplateFileDto>> Handle(GetImportBatchErrorsQuery request, CancellationToken ct)
+    public async ValueTask<Result<ImportTemplateFileDto>> Handle(GetImportBatchErrorsQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

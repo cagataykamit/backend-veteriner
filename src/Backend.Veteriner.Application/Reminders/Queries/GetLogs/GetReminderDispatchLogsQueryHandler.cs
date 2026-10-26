@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Reminders.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reminders.Queries.GetLogs;
 
@@ -36,7 +36,7 @@ public sealed class GetReminderDispatchLogsQueryHandler
         _logRead = logRead;
     }
 
-    public async Task<Result<PagedResult<ReminderDispatchLogItemDto>>> Handle(GetReminderDispatchLogsQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<ReminderDispatchLogItemDto>>> Handle(GetReminderDispatchLogsQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

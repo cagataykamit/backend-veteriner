@@ -13,14 +13,14 @@ using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Appointments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Appointments;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentCommandOutboxIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentCommandOutboxIntegrationTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 

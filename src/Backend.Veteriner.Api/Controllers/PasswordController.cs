@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Auth.PasswordReset.Commands.Request;
 using Backend.Veteriner.Application.Auth.PasswordReset.Commands.Confirm;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

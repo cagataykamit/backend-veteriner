@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Queries.ExportCollections;
 
@@ -45,7 +45,7 @@ public sealed class ExportSalesPartnerCollectionsQueryHandler
         _tenants = tenants;
     }
 
-    public async Task<Result<SalesPartnerCollectionsExportDto>> Handle(ExportSalesPartnerCollectionsQuery request, CancellationToken ct)
+    public async ValueTask<Result<SalesPartnerCollectionsExportDto>> Handle(ExportSalesPartnerCollectionsQuery request, CancellationToken ct)
     {
         if (request.SalesPartnerId is { } id && !await _partners.AnyAsync(new SalesPartnerByIdSpec(id), ct))
             return Result<SalesPartnerCollectionsExportDto>.Failure(SalesPartnerErrors.PartnerNotFound);

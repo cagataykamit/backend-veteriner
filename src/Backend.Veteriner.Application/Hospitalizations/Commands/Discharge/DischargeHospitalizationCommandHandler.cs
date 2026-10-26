@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Commands.Discharge;
@@ -36,7 +36,7 @@ public sealed class DischargeHospitalizationCommandHandler
         _hospitalizationsWrite = hospitalizationsWrite;
     }
 
-    public async Task<Result<HospitalizationWriteResultDto>> Handle(DischargeHospitalizationCommand request, CancellationToken ct)
+    public async ValueTask<Result<HospitalizationWriteResultDto>> Handle(DischargeHospitalizationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

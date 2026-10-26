@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetMemberById;
 
@@ -46,7 +46,7 @@ public sealed class GetTenantMemberByIdQueryHandler
         _userClinics = userClinics;
     }
 
-    public async Task<Result<TenantMemberDetailDto>> Handle(GetTenantMemberByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<TenantMemberDetailDto>> Handle(GetTenantMemberByIdQuery request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Tenants.InviteCreate))
         {

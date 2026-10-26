@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Registers.Prescriptions;
 
@@ -33,15 +33,15 @@ public sealed class GetPrescriptionRegisterQueryHandler
         _reader = reader;
     }
 
-    public Task<Result<RegisterReadResult<PrescriptionRegisterEntryDto>>> Handle(
+    public ValueTask<Result<RegisterReadResult<PrescriptionRegisterEntryDto>>> Handle(
         GetPrescriptionRegisterQuery request,
         CancellationToken ct)
-        => _runner.ReadPageAsync(
+        => new(_runner.ReadPageAsync(
             _reader,
             new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false),
             request.Page,
             request.PageSize,
-            ct);
+            ct));
 }
 
 public sealed class ExportPrescriptionRegisterQueryHandler
@@ -56,7 +56,7 @@ public sealed class ExportPrescriptionRegisterQueryHandler
         _reader = reader;
     }
 
-    public async Task<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterQuery request, CancellationToken ct)
+    public async ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterQuery request, CancellationToken ct)
     {
         var loaded = await _runner.LoadForExportAsync(
             _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), ct);
@@ -83,7 +83,7 @@ public sealed class ExportPrescriptionRegisterXlsxQueryHandler
         _reader = reader;
     }
 
-    public async Task<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterXlsxQuery request, CancellationToken ct)
+    public async ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterXlsxQuery request, CancellationToken ct)
     {
         var loaded = await _runner.LoadForExportAsync(
             _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), ct);

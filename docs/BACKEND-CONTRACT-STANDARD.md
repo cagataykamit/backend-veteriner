@@ -1097,7 +1097,7 @@ Controller, tenant çözülemezse `TryGetResolvedTenant` ile **işleme girmeden*
 | **`Clients.DuplicateClient`** | **`409`** | Aynı kiracıda **(1)** normalize **ad + e-posta** (e-posta dolu) veya **(2)** normalize **ad + telefon** (telefon dolu); ad `Trim` + küçük harf ile karşılaştırılır. **Yalnızca** aynı e-posta, **yalnızca** aynı telefon veya **e-posta+telefon ama farklı ad** tek başına engel değildir (create/update; güncellemede kendi `id` hariç) |
 | `Clients.RouteIdMismatch` | `400` | `PUT` route id ≠ body id |
 
-FluentValidation (validator’lar) → `400` `ValidationProblemDetails` (MediatR pipeline).
+FluentValidation (validator’lar) → `400` `ValidationProblemDetails` (Mediator pipeline).
 
 ### Özet endpoint’ler (değişmedi)
 
@@ -1503,7 +1503,7 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 
 ### 23.2 Merkezi enforcement noktası
 
-- **Uygulama katmanı MediatR pipeline** içinde, tenant context çözümlenen tüm `*Command` (mutation) istekleri için merkezi write-guard çalışır.
+- **Uygulama katmanı Mediator pipeline** içinde, tenant context çözümlenen tüm `*Command` (mutation) istekleri için merkezi write-guard çalışır.
 - **Kapsam:** create/update/delete/discharge gibi tüm mutation command’lar; davet akışları (`POST …/invites`, `accept`, `signup-and-accept`) dahil.
 - **İstisnalar:** `Backend.Veteriner.Application.Auth.*` altındaki command’lar (login/refresh/select-clinic vb.) enforcement dışıdır.
 

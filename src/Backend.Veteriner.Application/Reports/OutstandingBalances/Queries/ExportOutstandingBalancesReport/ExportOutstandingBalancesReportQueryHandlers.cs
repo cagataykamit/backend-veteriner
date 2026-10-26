@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.ExportOutstandingBalancesReport;
 
@@ -29,7 +29,7 @@ public sealed class ExportOutstandingBalancesReportQueryHandler
         _trialLimitPolicy = trialLimitPolicy;
     }
 
-    public async Task<Result<OutstandingBalancesCsvExportResult>> Handle(
+    public async ValueTask<Result<OutstandingBalancesCsvExportResult>> Handle(
         ExportOutstandingBalancesReportQuery request,
         CancellationToken ct)
     {
@@ -69,7 +69,7 @@ public sealed class ExportOutstandingBalancesReportXlsxQueryHandler
         _trialLimitPolicy = trialLimitPolicy;
     }
 
-    public async Task<Result<OutstandingBalancesXlsxExportResult>> Handle(
+    public async ValueTask<Result<OutstandingBalancesXlsxExportResult>> Handle(
         ExportOutstandingBalancesReportXlsxQuery request,
         CancellationToken ct)
     {

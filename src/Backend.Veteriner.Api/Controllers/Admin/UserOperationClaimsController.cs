@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Auth.Commands.UserOperationClaims.Remove;
 using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Auth.Queries.UserOperationClaims.GetByUserId;
 using Backend.Veteriner.Application.Auth.Queries.UserOperationClaims.GetDetails;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

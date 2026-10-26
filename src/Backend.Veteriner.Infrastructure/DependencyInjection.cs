@@ -11,9 +11,9 @@ using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Visits;
 using Backend.Veteriner.Application.Auth.Contracts;                              // IPermissionReader
 using Backend.Veteriner.Application.Common.Abstractions;                        // IPasswordHasher, IJwtTokenService, ITokenHashService, IClientContext, IUser..., IRefreshTokenRepository, IVerificationTokenRepository, IEmailSender, IEmailSenderImmediate, IAppUrlProvider
-using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Outbox;                               // IOutboxBuffer
+using Backend.Veteriner.Application.Outbox;                                      // IOutboxAdminRepository
 using Backend.Veteriner.Application.Common.Auditing;                            // IAuditLogWriter, IAuditContext
 using Backend.Veteriner.Infrastructure.Caching;                                  // PermissionReader
 using Backend.Veteriner.Infrastructure.Mailing;                                   // MailKitEmailSender, TransactionalEmailSender, SmtpOptions
@@ -63,6 +63,7 @@ using Backend.Veteriner.Application.Reports.Registers.VaccineInfo;
 using Backend.Veteriner.Application.Reports.Registers.Vaccines;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaimPermissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaims;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.UserOperationClaims;
 using Backend.Veteriner.Infrastructure.Reminders;
@@ -77,7 +78,6 @@ using Backend.Veteriner.Infrastructure.Web;                                     
 using Backend.Veteriner.Infrastructure.Auditing;                                  // AuditLogWriter
 using Backend.Veteriner.Infrastructure.Billing;
 using Backend.Veteriner.Application.Common.Billing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -176,6 +176,7 @@ public static class DependencyInjection
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IOperationClaimPermissionRepository, OperationClaimPermissionRepository>();
         services.AddScoped<IOperationClaimReadRepository, OperationClaimReadRepository>();
+        services.AddScoped<IOutboxAdminRepository, OutboxAdminRepository>();
         services.AddScoped<IUserOperationClaimRepository, UserOperationClaimRepository>();
         services.AddScoped<IUserTenantRepository, UserTenantRepository>();
         services.AddScoped<IUserClinicRepository, UserClinicRepository>();
@@ -412,9 +413,6 @@ public static class DependencyInjection
 
         /// ===== Unit of Work =====
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-
-        // TransactionBehavior, MediatR pipeline'ında çalışır; her request için transaction başlatır ve commit/rollback yapar.
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
 
         return services;

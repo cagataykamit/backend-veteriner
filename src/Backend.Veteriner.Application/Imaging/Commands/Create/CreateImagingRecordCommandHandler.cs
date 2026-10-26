@@ -8,7 +8,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Imaging.Commands.Create;
 
@@ -50,7 +50,7 @@ public sealed class CreateImagingRecordCommandHandler : IRequestHandler<CreateIm
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<Guid>> Handle(CreateImagingRecordCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateImagingRecordCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

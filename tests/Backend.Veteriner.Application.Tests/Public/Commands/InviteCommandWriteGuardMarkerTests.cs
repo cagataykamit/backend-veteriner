@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Public.Commands.AcceptInvite;
 using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Public.Commands;
 

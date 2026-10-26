@@ -1,7 +1,7 @@
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Vaccinations;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Hbs;
 

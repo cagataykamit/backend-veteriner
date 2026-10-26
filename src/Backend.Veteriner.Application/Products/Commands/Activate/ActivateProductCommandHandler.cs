@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Products.Commands.Activate;
 
@@ -19,7 +19,7 @@ public sealed class ActivateProductCommandHandler : IRequestHandler<ActivateProd
         _products = products;
     }
 
-    public async Task<Result> Handle(ActivateProductCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(ActivateProductCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result.Failure("Tenants.ContextMissing", "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");

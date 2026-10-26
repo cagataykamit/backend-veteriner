@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Organization.Contracts.Dtos;
 using Backend.Veteriner.Application.Organization.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Organization.Queries.GetBillingProfile;
 
@@ -25,7 +25,7 @@ public sealed class GetOrganizationBillingProfileQueryHandler
         _profilesRead = profilesRead;
     }
 
-    public async Task<Result<OrganizationBillingProfileDto>> Handle(
+    public async ValueTask<Result<OrganizationBillingProfileDto>> Handle(
         GetOrganizationBillingProfileQuery request,
         CancellationToken ct)
     {

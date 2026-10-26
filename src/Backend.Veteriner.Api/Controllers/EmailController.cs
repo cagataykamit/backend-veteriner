@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.EmailVerification.Commands.Confirm;
 using Backend.Veteriner.Application.EmailVerification.Commands.Request;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

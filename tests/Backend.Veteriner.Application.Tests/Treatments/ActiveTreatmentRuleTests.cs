@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Treatments;
 using Backend.Veteriner.Application.Treatments.Specs;
 using Backend.Veteriner.Domain.Treatments;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Treatments;
 

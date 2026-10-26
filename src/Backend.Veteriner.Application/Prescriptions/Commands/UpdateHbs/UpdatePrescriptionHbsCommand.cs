@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Prescriptions.Commands.UpdateHbs;
 
@@ -59,7 +59,7 @@ public sealed class UpdatePrescriptionHbsCommandHandler : IRequestHandler<Update
         _names = names;
     }
 
-    public async Task<Result<HbsEntryDto>> Handle(UpdatePrescriptionHbsCommand request, CancellationToken ct)
+    public async ValueTask<Result<HbsEntryDto>> Handle(UpdatePrescriptionHbsCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

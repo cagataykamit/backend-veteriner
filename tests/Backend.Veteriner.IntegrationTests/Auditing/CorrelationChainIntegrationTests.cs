@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

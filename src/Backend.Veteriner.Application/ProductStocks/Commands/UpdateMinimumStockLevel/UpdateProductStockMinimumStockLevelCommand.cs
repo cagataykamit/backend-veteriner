@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.ProductStocks.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.ProductStocks.Commands.UpdateMinimumStockLevel;
 

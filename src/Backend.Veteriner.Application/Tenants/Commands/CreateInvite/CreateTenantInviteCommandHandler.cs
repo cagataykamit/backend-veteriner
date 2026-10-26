@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
 
@@ -56,7 +56,7 @@ public sealed class CreateTenantInviteCommandHandler
         _uow = uow;
     }
 
-    public async Task<Result<CreateTenantInviteResultDto>> Handle(CreateTenantInviteCommand request, CancellationToken ct)
+    public async ValueTask<Result<CreateTenantInviteResultDto>> Handle(CreateTenantInviteCommand request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Tenants.InviteCreate))
         {

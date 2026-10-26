@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Examinations.Queries.GetAddenda;
 
@@ -35,7 +35,7 @@ public sealed class GetExaminationAddendaQueryHandler
         _userNames = userNames;
     }
 
-    public async Task<Result<IReadOnlyList<ExaminationAddendumDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<ExaminationAddendumDto>>> Handle(
         GetExaminationAddendaQuery request,
         CancellationToken ct)
     {

@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.CareInstructions.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.CareInstructions.Queries.GetList;
 

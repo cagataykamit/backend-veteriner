@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.ProductCategories.Commands.Update;
 
@@ -22,7 +22,7 @@ public sealed class UpdateProductCategoryCommandHandler : IRequestHandler<Update
         _categoriesWrite = categoriesWrite;
     }
 
-    public async Task<Result> Handle(UpdateProductCategoryCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(UpdateProductCategoryCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result.Failure(

@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.DailyTransactions.Queries;
 
@@ -66,8 +66,8 @@ public sealed class GetCashSummaryReportQueryHandler : IRequestHandler<GetCashSu
         ICashEventsReader reader)
         => _loader = new CashSummaryLoader(tenantContext, clinicContext, scopeResolver, reader);
 
-    public Task<Result<CashSummaryReportDto>> Handle(GetCashSummaryReportQuery request, CancellationToken ct)
-        => _loader.LoadAsync(request.From, request.To, request.ClinicId, ct);
+    public ValueTask<Result<CashSummaryReportDto>> Handle(GetCashSummaryReportQuery request, CancellationToken ct)
+        => new(_loader.LoadAsync(request.From, request.To, request.ClinicId, ct));
 }
 
 public sealed class ExportCashSummaryReportQueryHandler : IRequestHandler<ExportCashSummaryReportQuery, Result<RegisterExportResult>>
@@ -81,7 +81,7 @@ public sealed class ExportCashSummaryReportQueryHandler : IRequestHandler<Export
         ICashEventsReader reader)
         => _loader = new CashSummaryLoader(tenantContext, clinicContext, scopeResolver, reader);
 
-    public async Task<Result<RegisterExportResult>> Handle(ExportCashSummaryReportQuery request, CancellationToken ct)
+    public async ValueTask<Result<RegisterExportResult>> Handle(ExportCashSummaryReportQuery request, CancellationToken ct)
     {
         var report = await _loader.LoadAsync(request.From, request.To, request.ClinicId, ct);
         if (!report.IsSuccess)

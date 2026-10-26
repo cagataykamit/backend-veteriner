@@ -14,7 +14,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Charges.Commands.Create;
@@ -62,7 +62,7 @@ public sealed class CreateChargeCommandHandler : IRequestHandler<CreateChargeCom
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ChargeCreateResultDto>> Handle(CreateChargeCommand request, CancellationToken ct)
+    public async ValueTask<Result<ChargeCreateResultDto>> Handle(CreateChargeCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

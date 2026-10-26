@@ -15,7 +15,7 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Administrations.Commands.Void;
@@ -75,7 +75,7 @@ public sealed class VoidAdministrationCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<AdministrationDto>> Handle(VoidAdministrationCommand request, CancellationToken ct)
+    public async ValueTask<Result<AdministrationDto>> Handle(VoidAdministrationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

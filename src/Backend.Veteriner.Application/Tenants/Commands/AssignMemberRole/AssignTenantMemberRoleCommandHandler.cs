@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.AssignMemberRole;
 
@@ -50,7 +50,7 @@ public sealed class AssignTenantMemberRoleCommandHandler
         _uow = uow;
     }
 
-    public async Task<Result<AssignTenantMemberRoleResultDto>> Handle(AssignTenantMemberRoleCommand request, CancellationToken ct)
+    public async ValueTask<Result<AssignTenantMemberRoleResultDto>> Handle(AssignTenantMemberRoleCommand request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Tenants.InviteCreate))
         {

@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.OwnerPortal.Commands.CreateClientPortalInvit
 using Backend.Veteriner.Application.OwnerPortal.Commands.RevokeClientPortalInvite;
 using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetClientPortalAccess;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;

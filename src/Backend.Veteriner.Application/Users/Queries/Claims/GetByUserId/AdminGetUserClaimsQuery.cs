@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Users.Contracts.Dtos;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Users.Queries.Claims.GetByUserId;
 

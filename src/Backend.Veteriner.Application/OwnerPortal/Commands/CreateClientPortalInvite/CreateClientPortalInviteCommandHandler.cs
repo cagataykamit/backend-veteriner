@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Commands.CreateClientPortalInvite;
@@ -53,7 +53,7 @@ public sealed class CreateClientPortalInviteCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ClientPortalInviteDto>> Handle(CreateClientPortalInviteCommand request, CancellationToken ct)
+    public async ValueTask<Result<ClientPortalInviteDto>> Handle(CreateClientPortalInviteCommand request, CancellationToken ct)
     {
         var scopeResult = await _staffAccess.ResolveClientAsync(request.ClientId, ct);
         if (!scopeResult.IsSuccess)

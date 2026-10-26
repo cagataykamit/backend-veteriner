@@ -1,6 +1,6 @@
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Hospitalizations;
 

@@ -12,7 +12,7 @@ using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clients.Queries.GetBalance;
 
@@ -50,7 +50,7 @@ public sealed class GetClientBalanceQueryHandler
         _visits = visits;
     }
 
-    public async Task<Result<ClientBalanceDto>> Handle(GetClientBalanceQuery request, CancellationToken ct)
+    public async ValueTask<Result<ClientBalanceDto>> Handle(GetClientBalanceQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

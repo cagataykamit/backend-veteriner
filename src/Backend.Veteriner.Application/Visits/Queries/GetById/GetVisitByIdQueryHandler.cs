@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Visits.Queries.GetById;
 
@@ -32,7 +32,7 @@ public sealed class GetVisitByIdQueryHandler : IRequestHandler<GetVisitByIdQuery
         _veterinarians = veterinarians;
     }
 
-    public async Task<Result<VisitDto>> Handle(GetVisitByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<VisitDto>> Handle(GetVisitByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

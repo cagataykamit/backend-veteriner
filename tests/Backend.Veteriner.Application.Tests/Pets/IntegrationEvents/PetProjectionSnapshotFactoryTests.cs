@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Pets.IntegrationEvents;
 

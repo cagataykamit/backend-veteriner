@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalClinic;
 
@@ -31,7 +31,7 @@ public sealed class GetPortalClinicQueryHandler : IRequestHandler<GetPortalClini
         _workingHours = workingHours;
     }
 
-    public async Task<Result<PortalClinicDto>> Handle(GetPortalClinicQuery request, CancellationToken ct)
+    public async ValueTask<Result<PortalClinicDto>> Handle(GetPortalClinicQuery request, CancellationToken ct)
     {
         var scopeResult = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scopeResult.IsSuccess)

@@ -14,7 +14,7 @@ using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -132,7 +132,7 @@ public sealed class AppointmentQueryHandlerFeatureFlagTests
             .ThrowsAsync(new InvalidOperationException("query db unavailable"));
 
         var handler = CreateListHandler(true);
-        var act = () => handler.Handle(new GetAppointmentsListQuery(new PageRequest()), CancellationToken.None);
+        var act = async () => await handler.Handle(new GetAppointmentsListQuery(new PageRequest()), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         _appointments.Verify(r => r.CountAsync(It.IsAny<AppointmentsFilteredCountSpec>(), It.IsAny<CancellationToken>()), Times.Never);

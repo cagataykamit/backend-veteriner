@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Infrastructure.Outbox;
 

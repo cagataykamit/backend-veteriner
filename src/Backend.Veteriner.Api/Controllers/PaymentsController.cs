@@ -12,7 +12,7 @@ using Backend.Veteriner.Application.Payments.Queries.GetAllocations;
 using Backend.Veteriner.Application.Payments.Queries.GetById;
 using Backend.Veteriner.Application.Payments.Queries.GetList;
 using Backend.Veteriner.Domain.Payments;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

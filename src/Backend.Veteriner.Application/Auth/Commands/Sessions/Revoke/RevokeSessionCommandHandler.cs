@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Commands.Sessions.Revoke;
 
@@ -11,7 +11,7 @@ public sealed class RevokeSessionCommandHandler : IRequestHandler<RevokeSessionC
     public RevokeSessionCommandHandler(IRefreshTokenRepository repo)
         => _repo = repo;
 
-    public async Task<Result> Handle(RevokeSessionCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(RevokeSessionCommand request, CancellationToken ct)
     {
         var token = await _repo.GetByIdAsync(request.RefreshTokenId, ct)
                     ?? null;

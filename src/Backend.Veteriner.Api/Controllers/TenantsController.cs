@@ -35,10 +35,11 @@ using Backend.Veteriner.Application.Tenants.Queries.GetPendingPlanChange;
 using Backend.Veteriner.Application.SalesPartners.Commands.ApplySubscriptionCode;
 using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.SalesPartners.Queries.GetSubscriptionDiscount;
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using System.Collections.Generic;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -576,10 +577,26 @@ public sealed class TenantsController : ControllerBase
                 .ToActionResult(this);
         }
 
+        BillingPeriodKind? billingPeriod = null;
+        if (!string.IsNullOrWhiteSpace(body.BillingPeriod))
+        {
+            if (!Enum.TryParse<BillingPeriodKind>(body.BillingPeriod.Trim(), ignoreCase: true, out var parsed)
+                || !Enum.IsDefined(parsed)
+                || int.TryParse(body.BillingPeriod, out _))
+            {
+                return Result<SubscriptionCheckoutSessionDto>.Failure(
+                        "Subscriptions.Checkout.Validation.BillingPeriodInvalid",
+                        "billingPeriod Monthly ya da Yearly olmalı.")
+                    .ToActionResult(this);
+            }
+
+            billingPeriod = parsed;
+        }
+
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new StartSubscriptionCheckoutCommand(tenantId, body.TargetPlanCode), ct);
+        var result = await _mediator.Send(new StartSubscriptionCheckoutCommand(tenantId, body.TargetPlanCode, billingPeriod), ct);
         return result.ToActionResult(this);
     }
 

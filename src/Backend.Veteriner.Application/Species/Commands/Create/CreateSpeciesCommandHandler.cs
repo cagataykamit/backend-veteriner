@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SpeciesReference.Commands.Create;
 
@@ -29,7 +29,7 @@ public sealed class CreateSpeciesCommandHandler : IRequestHandler<CreateSpeciesC
         _catalogCache = catalogCache;
     }
 
-    public async Task<Result<Guid>> Handle(CreateSpeciesCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateSpeciesCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

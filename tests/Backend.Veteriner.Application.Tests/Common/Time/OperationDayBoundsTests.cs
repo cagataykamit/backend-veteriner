@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Time;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Common.Time;
 

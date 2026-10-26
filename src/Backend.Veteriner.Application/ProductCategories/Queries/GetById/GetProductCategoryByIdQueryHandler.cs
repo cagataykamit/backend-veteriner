@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.ProductCategories.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.ProductCategories.Queries.GetById;
 
@@ -21,7 +21,7 @@ public sealed class GetProductCategoryByIdQueryHandler
         _categories = categories;
     }
 
-    public async Task<Result<ProductCategoryDto>> Handle(GetProductCategoryByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<ProductCategoryDto>> Handle(GetProductCategoryByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ProductCategoryDto>.Failure(

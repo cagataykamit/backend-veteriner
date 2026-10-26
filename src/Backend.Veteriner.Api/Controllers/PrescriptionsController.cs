@@ -13,7 +13,7 @@ using Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 using Backend.Veteriner.Application.Prescriptions.Queries.GetById;
 using Backend.Veteriner.Application.Prescriptions.Queries.GetList;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

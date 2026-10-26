@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Imports;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Imports;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Imports;
 

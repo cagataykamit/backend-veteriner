@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.ExaminationTemplates.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ExaminationTemplates.Commands.Update;
@@ -31,7 +31,7 @@ public sealed class UpdateExaminationTemplateCommandHandler
         _products = products;
     }
 
-    public async Task<Result<ExaminationTemplateDto>> Handle(UpdateExaminationTemplateCommand request, CancellationToken ct)
+    public async ValueTask<Result<ExaminationTemplateDto>> Handle(UpdateExaminationTemplateCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ExaminationTemplateDto>.Failure(ExaminationTemplateErrors.TenantContextMissing);

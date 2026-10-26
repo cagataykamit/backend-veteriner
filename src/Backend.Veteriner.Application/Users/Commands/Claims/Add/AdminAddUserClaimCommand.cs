@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Users.Commands.Claims.Add;
 

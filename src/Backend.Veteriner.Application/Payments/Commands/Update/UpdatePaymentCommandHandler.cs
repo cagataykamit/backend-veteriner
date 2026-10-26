@@ -18,7 +18,7 @@ using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Payments.Commands.Update;
@@ -69,7 +69,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         _eventOutbox = eventOutbox;
     }
 
-    public async Task<Result> Handle(UpdatePaymentCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(UpdatePaymentCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Clinics.WorkingHours;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkingHours;
 
@@ -34,7 +34,7 @@ public sealed class GetClinicWorkingHoursQueryHandler
         _hoursRead = hoursRead;
     }
 
-    public async Task<Result<IReadOnlyList<ClinicWorkingHourDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<ClinicWorkingHourDto>>> Handle(
         GetClinicWorkingHoursQuery request,
         CancellationToken ct)
     {

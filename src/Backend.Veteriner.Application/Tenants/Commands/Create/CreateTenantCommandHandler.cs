@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.Create;
 
@@ -23,7 +23,7 @@ public sealed class CreateTenantCommandHandler : IRequestHandler<CreateTenantCom
         _subscriptionsWrite = subscriptionsWrite;
     }
 
-    public async Task<Result<Guid>> Handle(CreateTenantCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateTenantCommand request, CancellationToken ct)
     {
         var nameKey = request.Name.Trim().ToLowerInvariant();
         var duplicate = await _tenantsRead.FirstOrDefaultAsync(new TenantByNameCaseInsensitiveSpec(nameKey), ct);

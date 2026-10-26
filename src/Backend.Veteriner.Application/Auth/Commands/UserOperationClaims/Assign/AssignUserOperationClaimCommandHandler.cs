@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Commands.UserOperationClaims.Assign;
 
@@ -26,7 +26,7 @@ public sealed class AssignUserOperationClaimCommandHandler
         _uow = uow;
     }
 
-    public async Task<Result<Guid>> Handle(AssignUserOperationClaimCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(AssignUserOperationClaimCommand request, CancellationToken ct)
     {
         var user = await _users.FirstOrDefaultAsync(new UserByIdWithRolesSpec(request.UserId), ct);
         if (user is null)

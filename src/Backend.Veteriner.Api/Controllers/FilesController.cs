@@ -1,6 +1,6 @@
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Application.Files.Queries.GetSignedContent;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

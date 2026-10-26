@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Infrastructure.Persistence;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using System;
@@ -17,7 +17,7 @@ namespace Backend.Veteriner.Application.Common.Behaviors;
 /// - Validation başarısızsa transaction hiç başlamaz.
 /// </summary>
 public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : notnull
+    where TRequest : notnull, IMessage
 {
     private readonly AppDbContext _db;
     private readonly ILogger<TransactionBehavior<TRequest, TResponse>> _logger;
@@ -30,18 +30,18 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
         _logger = logger;
     }
 
-    public async Task<TResponse> Handle(
+    public async ValueTask<TResponse> Handle(
         TRequest request,
-        RequestHandlerDelegate<TResponse> next,
+        MessageHandlerDelegate<TRequest, TResponse> next,
         CancellationToken ct)
     {
         // Sadece transactional command'lerde transaction aç
         if (request is not ITransactionalRequest)
-            return await next();
+            return await next(request, ct);
 
         // Zaten açık transaction varsa nested transaction açma
         if (_db.Database.CurrentTransaction is not null)
-            return await next();
+            return await next(request, ct);
 
         var requestName = typeof(TRequest).Name;
 
@@ -51,7 +51,7 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
         {
             _logger.LogInformation("TRANSACTION START {RequestName}", requestName);
 
-            var response = await next();
+            var response = await next(request, ct);
 
             // Başarısız Result dönen orkestrasyonlarda (yarım kayıt riski) iş kuralı hatası da geri alır.
             if (request is ITransactionalRollbackOnFailureRequest && !ResultOutcome.Of(response).Success)

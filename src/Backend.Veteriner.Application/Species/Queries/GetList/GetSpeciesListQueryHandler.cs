@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.SpeciesReference.Contracts.Dtos;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SpeciesReference.Queries.GetList;
 
@@ -20,7 +20,7 @@ public sealed class GetSpeciesListQueryHandler
         _catalogCache = catalogCache;
     }
 
-    public async Task<Result<PagedResult<SpeciesListItemDto>>> Handle(GetSpeciesListQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<SpeciesListItemDto>>> Handle(GetSpeciesListQuery request, CancellationToken ct)
     {
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);

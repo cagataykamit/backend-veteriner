@@ -10,7 +10,7 @@ using Backend.Veteriner.Application.Products.Commands.Create;
 using Backend.Veteriner.Application.Sales.Commands.Create;
 using Backend.Veteriner.Application.Vaccinations.Commands.Create;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Common;
 

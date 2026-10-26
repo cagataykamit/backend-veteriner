@@ -13,7 +13,7 @@ namespace Backend.IntegrationTests.Infrastructure;
 /// verilmezse süreç kimliğinden türetilen <c>p&lt;pid&gt;</c>. Taban adlar <see cref="IntegrationTestDatabaseGuard"/>
 /// allowlist'ine uyar; ekli ad dev veritabanı adlarıyla (<c>VetinityCommandDb</c>, <c>VetinityQueryDb</c>) hiç çakışmaz.
 ///
-/// Temizlik (<see cref="CleanUp"/>, koşu sonunda <see cref="IntegrationTestFramework"/> çağırır): bu koşunun
+/// Temizlik (<see cref="CleanUp"/>, koşu sonunda <see cref="IntegrationTestDatabaseCleanupFixture"/> çağırır): bu koşunun
 /// veritabanları (ve .mdf/.ldf dosyaları) DROP edilir; ayrıca sahibi artık çalışmayan <c>p&lt;pid&gt;</c> artıkları
 /// süpürülür. Açık kimlikli (<c>INTEGRATION_TEST_RUN_ID</c>) koşular yalnız kendi kimliğini temizler,
 /// başkasının veritabanına dokunmaz.

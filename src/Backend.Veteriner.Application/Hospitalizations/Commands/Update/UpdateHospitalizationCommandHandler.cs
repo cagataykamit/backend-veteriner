@@ -18,7 +18,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Commands.Update;
@@ -67,7 +67,7 @@ public sealed class UpdateHospitalizationCommandHandler
         _wards = wards;
     }
 
-    public async Task<Result<HospitalizationWriteResultDto>> Handle(UpdateHospitalizationCommand request, CancellationToken ct)
+    public async ValueTask<Result<HospitalizationWriteResultDto>> Handle(UpdateHospitalizationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

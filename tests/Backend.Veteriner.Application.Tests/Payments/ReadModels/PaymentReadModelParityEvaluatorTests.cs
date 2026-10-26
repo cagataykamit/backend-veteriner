@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Payments.ReadModels;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Payments.ReadModels;
 

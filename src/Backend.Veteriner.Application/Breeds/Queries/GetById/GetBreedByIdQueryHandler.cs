@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.BreedsReference.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.BreedsReference.Queries.GetById;
 
@@ -13,7 +13,7 @@ public sealed class GetBreedByIdQueryHandler : IRequestHandler<GetBreedByIdQuery
 
     public GetBreedByIdQueryHandler(IReadRepository<Breed> breeds) => _breeds = breeds;
 
-    public async Task<Result<BreedDetailDto>> Handle(GetBreedByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<BreedDetailDto>> Handle(GetBreedByIdQuery request, CancellationToken ct)
     {
         var entity = await _breeds.FirstOrDefaultAsync(new BreedByIdWithSpeciesSpec(request.Id), ct);
         if (entity is null)

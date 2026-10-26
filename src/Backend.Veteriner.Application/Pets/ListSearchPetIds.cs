@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 
-namespace Backend.Veteriner.Application.Common;
+namespace Backend.Veteriner.Application.Pets;
 
 /// <summary>Randevu/muayene/aşı listelerinde müşteri veya hayvan metin alanları araması için eşleşen pet id kümesi.</summary>
 public static class ListSearchPetIds

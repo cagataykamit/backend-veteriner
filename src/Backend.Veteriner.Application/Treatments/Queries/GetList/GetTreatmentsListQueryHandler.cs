@@ -12,7 +12,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -58,7 +58,7 @@ public sealed class GetTreatmentsListQueryHandler
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public async Task<Result<PagedResult<TreatmentListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<TreatmentListItemDto>>> Handle(
         GetTreatmentsListQuery request,
         CancellationToken ct)
     {

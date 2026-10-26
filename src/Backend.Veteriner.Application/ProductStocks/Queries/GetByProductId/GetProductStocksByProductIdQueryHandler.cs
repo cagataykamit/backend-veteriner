@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.ProductStocks.Queries.GetByProductId;
 
@@ -45,7 +45,7 @@ public sealed class GetProductStocksByProductIdQueryHandler
         _expiredStock = expiredStock;
     }
 
-    public async Task<Result<IReadOnlyList<ProductStockDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<ProductStockDto>>> Handle(
         GetProductStocksByProductIdQuery request,
         CancellationToken ct)
     {

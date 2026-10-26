@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Catalog;

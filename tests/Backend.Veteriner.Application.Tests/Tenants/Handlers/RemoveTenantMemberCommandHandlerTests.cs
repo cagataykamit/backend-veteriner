@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Tenants.Commands.RemoveMember;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;

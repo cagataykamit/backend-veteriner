@@ -2,7 +2,7 @@ using System.Text;
 using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Domain.Imports;
 using ClosedXML.Excel;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Imports;
 

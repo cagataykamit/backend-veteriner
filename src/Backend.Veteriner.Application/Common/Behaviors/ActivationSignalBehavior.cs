@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Activation;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Common.Behaviors;
@@ -12,7 +12,7 @@ namespace Backend.Veteriner.Application.Common.Behaviors;
 /// yazmaz.
 /// </summary>
 public sealed class ActivationSignalBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : notnull
+    where TRequest : notnull, IMessage
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClientContext _client;
@@ -31,12 +31,12 @@ public sealed class ActivationSignalBehavior<TRequest, TResponse> : IPipelineBeh
         _logger = logger;
     }
 
-    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
+    public async ValueTask<TResponse> Handle(TRequest request, MessageHandlerDelegate<TRequest, TResponse> next, CancellationToken ct)
     {
         if (request is not IActivationSignalRequest signal)
-            return await next();
+            return await next(request, ct);
 
-        var response = await next();
+        var response = await next(request, ct);
 
         var tenantId = _tenantContext.TenantId;
         if (!tenantId.HasValue || tenantId.Value == Guid.Empty)

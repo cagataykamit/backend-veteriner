@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
 
@@ -46,7 +46,7 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
         _legalAcceptances = legalAcceptances;
     }
 
-    public async Task<Result<TenantInviteAcceptResultDto>> Handle(
+    public async ValueTask<Result<TenantInviteAcceptResultDto>> Handle(
         SignupAndAcceptTenantInviteCommand request,
         CancellationToken ct)
     {

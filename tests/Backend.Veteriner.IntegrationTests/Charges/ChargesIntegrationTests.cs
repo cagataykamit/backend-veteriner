@@ -17,7 +17,7 @@ using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Domain.Visits;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

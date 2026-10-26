@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Common.Diagnostics;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Domain.DemoRequests;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -37,7 +37,7 @@ public sealed class CreateDemoRequestCommandHandler : IRequestHandler<CreateDemo
         _logger = logger;
     }
 
-    public async Task<Result> Handle(CreateDemoRequestCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(CreateDemoRequestCommand request, CancellationToken ct)
     {
         if (request.IsHoneypotFilled)
         {

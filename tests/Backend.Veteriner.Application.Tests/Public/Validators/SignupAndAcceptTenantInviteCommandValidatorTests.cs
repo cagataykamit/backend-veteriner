@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
 using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite.Validators;
 using Backend.Veteriner.Application.Tests.Common.Validation;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Public.Validators;
 

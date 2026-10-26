@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Domain.SalesPartners;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.SalesPartners;
 

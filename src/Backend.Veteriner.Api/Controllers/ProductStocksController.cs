@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.ProductStocks.Commands.UpdateMinimumStockLev
 using Backend.Veteriner.Application.ProductStocks.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductStocks.Queries.GetList;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

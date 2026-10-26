@@ -12,7 +12,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Reminders;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -26,9 +26,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
     // Test başına açılan izole LocalDB veritabanları; test bitince (başarılı/başarısız) silinir, .mdf/.ldf kalmaz.
     private readonly List<string> _connectionStrings = new();
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         foreach (var connectionString in _connectionStrings)
             await IntegrationTestDatabaseReset.EnsureDroppedAsync(connectionString);

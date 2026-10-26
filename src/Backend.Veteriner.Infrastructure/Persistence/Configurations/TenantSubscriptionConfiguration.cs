@@ -20,6 +20,11 @@ public sealed class TenantSubscriptionConfiguration : IEntityTypeConfiguration<T
             .IsRequired()
             .HasConversion<int>();
 
+        // Ödenen dönem türü (BILL-001); mevcut satırlar migration'da aylık (1) doldurulur.
+        b.Property(x => x.BillingPeriod)
+            .IsRequired()
+            .HasConversion<int>();
+
         b.Property(x => x.TrialStartsAtUtc);
         b.Property(x => x.TrialEndsAtUtc);
         b.Property(x => x.ActivatedAtUtc);

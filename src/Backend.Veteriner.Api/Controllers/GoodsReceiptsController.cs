@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.GoodsReceipts.Commands.Create;
 using Backend.Veteriner.Application.GoodsReceipts.Contracts.Dtos;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

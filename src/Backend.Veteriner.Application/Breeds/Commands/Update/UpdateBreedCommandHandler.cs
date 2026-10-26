@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.BreedsReference.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.BreedsReference.Commands.Update;
 
@@ -22,7 +22,7 @@ public sealed class UpdateBreedCommandHandler : IRequestHandler<UpdateBreedComma
         _catalogCache = catalogCache;
     }
 
-    public async Task<Result> Handle(UpdateBreedCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(UpdateBreedCommand request, CancellationToken ct)
     {
         var entity = await _breedsRead.FirstOrDefaultAsync(new BreedByIdWithSpeciesSpec(request.Id), ct);
         if (entity is null)

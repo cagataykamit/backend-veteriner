@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Imports.Commands.ReleaseReminders;
@@ -44,7 +44,7 @@ public sealed class ReleaseImportRemindersCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ImportReleaseRemindersResultDto>> Handle(ReleaseImportRemindersCommand request, CancellationToken ct)
+    public async ValueTask<Result<ImportReleaseRemindersResultDto>> Handle(ReleaseImportRemindersCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

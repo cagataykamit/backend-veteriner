@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -125,7 +125,7 @@ public sealed class PaymentGetByIdQueryHandlerFeatureFlagTests
         _getByIdReader.Setup(x => x.GetByIdAsync(tenantId, paymentId, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Query DB unavailable"));
 
-        var act = () => CreateHandler(paymentsGetByIdReadEnabled: true)
+        var act = async () => await CreateHandler(paymentsGetByIdReadEnabled: true)
             .Handle(new GetPaymentByIdQuery(paymentId), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Query DB unavailable");

@@ -110,7 +110,7 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
         }
 
         var completionReference = ResolveCompletionReference(session, externalReference);
-        sub.ActivatePaidPlan(session.TargetPlanCode, utcNow);
+        sub.ActivatePaidPlan(session.TargetPlanCode, session.BillingPeriod, utcNow);
         session.MarkCompleted(utcNow, completionReference);
 
         // Satış ortağı komisyonu yalnız gerçek tahsilatta (ADR-037 madde 4): imzası doğrulanan sağlayıcı olayı. Panel finalize

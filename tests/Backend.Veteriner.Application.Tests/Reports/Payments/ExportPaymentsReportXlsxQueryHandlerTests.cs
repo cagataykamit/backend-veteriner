@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using ClosedXML.Excel;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 

@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Reports.DailyTransactions;
 using Backend.Veteriner.Application.Reports.DailyTransactions.Queries;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Domain.Payments;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

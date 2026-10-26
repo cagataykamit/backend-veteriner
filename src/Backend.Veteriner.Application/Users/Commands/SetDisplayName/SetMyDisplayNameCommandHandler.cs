@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Users.Commands.SetDisplayName;
 
@@ -15,7 +15,7 @@ public sealed class SetMyDisplayNameCommandHandler : IRequestHandler<SetMyDispla
         _client = client;
     }
 
-    public async Task<Result> Handle(SetMyDisplayNameCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(SetMyDisplayNameCommand request, CancellationToken ct)
     {
         if (_client.UserId is not { } userId)
         {

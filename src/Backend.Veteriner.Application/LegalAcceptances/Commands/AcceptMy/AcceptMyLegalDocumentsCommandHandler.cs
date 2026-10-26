@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.LegalAcceptances.Specs;
 using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.LegalAcceptances.Commands.AcceptMy;
 
@@ -29,7 +29,7 @@ public sealed class AcceptMyLegalDocumentsCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<MyLegalAcceptanceStatusDto>> Handle(AcceptMyLegalDocumentsCommand request, CancellationToken ct)
+    public async ValueTask<Result<MyLegalAcceptanceStatusDto>> Handle(AcceptMyLegalDocumentsCommand request, CancellationToken ct)
     {
         if (_client.UserId is not { } userId)
         {

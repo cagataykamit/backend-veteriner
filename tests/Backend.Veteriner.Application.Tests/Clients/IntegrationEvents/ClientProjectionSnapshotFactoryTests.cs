@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Domain.Clients;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Clients.IntegrationEvents;
 

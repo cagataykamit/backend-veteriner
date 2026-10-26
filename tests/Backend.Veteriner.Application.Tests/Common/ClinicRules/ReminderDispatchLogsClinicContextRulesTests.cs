@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Clinic;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Common.ClinicRules;
 

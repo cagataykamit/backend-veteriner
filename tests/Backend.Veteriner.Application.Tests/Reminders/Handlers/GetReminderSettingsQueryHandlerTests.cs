@@ -2,7 +2,7 @@ using Ardalis.Specification;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reminders.Queries.GetSettings;
 using Backend.Veteriner.Domain.Reminders;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Reminders.Handlers;

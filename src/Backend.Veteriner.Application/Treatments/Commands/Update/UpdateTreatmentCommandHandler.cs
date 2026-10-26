@@ -13,7 +13,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Treatments.Commands.Update;
 
@@ -51,7 +51,7 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
         _treatmentsWrite = treatmentsWrite;
     }
 
-    public async Task<Result> Handle(UpdateTreatmentCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(UpdateTreatmentCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

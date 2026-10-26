@@ -8,7 +8,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Vaccinations.Queries.GetVaccinationReport;
 
@@ -41,7 +41,7 @@ public sealed class GetVaccinationsReportQueryHandler
         _clinics = clinics;
     }
 
-    public async Task<Result<VaccinationReportResultDto>> Handle(
+    public async ValueTask<Result<VaccinationReportResultDto>> Handle(
         GetVaccinationsReportQuery request,
         CancellationToken ct)
     {

@@ -14,7 +14,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -22,7 +22,7 @@ using Microsoft.Extensions.Options;
 namespace Backend.IntegrationTests.Appointments;
 
 [Collection("appointment-query-read")]
-public sealed class AppointmentListCalendarQueryParityIntegrationTests : IClassFixture<AppointmentQueryReadModelWebApplicationFactory>
+public sealed class AppointmentListCalendarQueryParityIntegrationTests
 {
     private readonly AppointmentQueryReadModelWebApplicationFactory _factory;
 

@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Vaccinations.Commands.Update;
 
@@ -60,7 +60,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
         _administrations = administrations;
     }
 
-    public async Task<Result> Handle(UpdateVaccinationCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(UpdateVaccinationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

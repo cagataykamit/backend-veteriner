@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Queries.Permissions.GetById;
 
@@ -11,7 +11,7 @@ public sealed class GetPermissionByIdQueryHandler
     private readonly IPermissionRepository _repo;
     public GetPermissionByIdQueryHandler(IPermissionRepository repo) => _repo = repo;
 
-    public async Task<Result<PermissionDto>> Handle(GetPermissionByIdQuery q, CancellationToken ct)
+    public async ValueTask<Result<PermissionDto>> Handle(GetPermissionByIdQuery q, CancellationToken ct)
     {
         var p = await _repo.GetByIdAsync(q.Id, ct);
         if (p is null)

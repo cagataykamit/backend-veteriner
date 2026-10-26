@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using System.Text.Json.Serialization;
 
 namespace Backend.Veteriner.Application.Clients.Commands.QuickRegister;

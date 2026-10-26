@@ -4,7 +4,7 @@ using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Appointments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Commands.CancelCollection;
 
@@ -14,7 +14,7 @@ public sealed class CancelDiscountCollectionCommandHandler
 
     public CancelDiscountCollectionCommandHandler(IRepository<DiscountRedemption> redemptions) => _redemptions = redemptions;
 
-    public async Task<Result<DiscountCollectionDto>> Handle(CancelDiscountCollectionCommand request, CancellationToken ct)
+    public async ValueTask<Result<DiscountCollectionDto>> Handle(CancelDiscountCollectionCommand request, CancellationToken ct)
     {
         var redemptions = await _redemptions.ListAsync(new DiscountRedemptionsByPartnerSpec(request.SalesPartnerId, tracked: true), ct);
         var owner = redemptions.FirstOrDefault(r => r.Collections.Any(c => c.Id == request.CollectionId));

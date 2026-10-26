@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.ProductCategories.Commands.Update;
 using Backend.Veteriner.Application.ProductCategories.Queries.GetById;
 using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Domain.Products;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.ProductCategories.Handlers;

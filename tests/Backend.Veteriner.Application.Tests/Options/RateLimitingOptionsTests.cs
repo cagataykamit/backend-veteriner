@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Options;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 
 namespace Backend.Veteriner.Application.Tests.RateLimiting;

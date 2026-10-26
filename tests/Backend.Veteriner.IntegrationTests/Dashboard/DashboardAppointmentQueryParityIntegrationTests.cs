@@ -2,14 +2,14 @@ using Backend.Veteriner.Application.Dashboard.Contracts.Dtos;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Dashboard;
 
 [Collection("dashboard-query-read")]
-public sealed class DashboardAppointmentQueryParityIntegrationTests : IClassFixture<DashboardQueryReadModelWebApplicationFactory>
+public sealed class DashboardAppointmentQueryParityIntegrationTests
 {
     private readonly DashboardQueryReadModelWebApplicationFactory _factory;
 

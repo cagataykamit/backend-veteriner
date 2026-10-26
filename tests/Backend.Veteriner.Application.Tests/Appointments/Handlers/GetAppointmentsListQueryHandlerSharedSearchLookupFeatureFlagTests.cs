@@ -15,7 +15,7 @@ using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -174,7 +174,7 @@ public sealed class GetAppointmentsListQueryHandlerSharedSearchLookupFeatureFlag
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(
+        var act = async () => await CreateHandler(
                 appointmentsEnabled: false,
                 sharedSearchLookupEnabled: true)
             .Handle(

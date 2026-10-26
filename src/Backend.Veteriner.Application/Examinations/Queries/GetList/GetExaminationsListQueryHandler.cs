@@ -13,7 +13,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -56,7 +56,7 @@ public sealed class GetExaminationsListQueryHandler
         _logger = logger ?? NullLogger<GetExaminationsListQueryHandler>.Instance;
     }
 
-    public async Task<Result<PagedResult<ExaminationListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<ExaminationListItemDto>>> Handle(
         GetExaminationsListQuery request,
         CancellationToken ct)
     {

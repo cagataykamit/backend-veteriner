@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Queries.KvkkFormTemplate.GetClinicKvkkFormTemplate;
 
@@ -34,7 +34,7 @@ public sealed class GetClinicKvkkFormTemplateQueryHandler
         _templates = templates;
     }
 
-    public async Task<Result<ClinicKvkkFormTemplateDto>> Handle(
+    public async ValueTask<Result<ClinicKvkkFormTemplateDto>> Handle(
         GetClinicKvkkFormTemplateQuery request,
         CancellationToken ct)
     {

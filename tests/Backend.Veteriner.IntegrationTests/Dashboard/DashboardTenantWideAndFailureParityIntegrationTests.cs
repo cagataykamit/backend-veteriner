@@ -5,14 +5,14 @@ using Backend.Veteriner.Application.Dashboard.Queries.GetOperationalAlerts;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Dashboard;
 
 [Collection("dashboard-query-read")]
-public sealed class DashboardTenantWideParityIntegrationTests : IClassFixture<DashboardQueryReadModelWebApplicationFactory>
+public sealed class DashboardTenantWideParityIntegrationTests
 {
     private readonly DashboardQueryReadModelWebApplicationFactory _factory;
 
@@ -223,7 +223,7 @@ public sealed class DashboardTenantWideParityIntegrationTests : IClassFixture<Da
 }
 
 [Collection("dashboard-query-broken")]
-public sealed class DashboardQueryFailureParityIntegrationTests : IClassFixture<DashboardQueryReadModelBrokenQueryWebApplicationFactory>
+public sealed class DashboardQueryFailureParityIntegrationTests
 {
     private readonly DashboardQueryReadModelBrokenQueryWebApplicationFactory _factory;
 

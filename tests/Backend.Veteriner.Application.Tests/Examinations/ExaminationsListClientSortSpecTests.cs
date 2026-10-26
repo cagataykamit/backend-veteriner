@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Domain.Examinations;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Examinations;
 

@@ -18,7 +18,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Clients;
 using Backend.IntegrationTests.Projections.Pets;
 using ClosedXML.Excel;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;

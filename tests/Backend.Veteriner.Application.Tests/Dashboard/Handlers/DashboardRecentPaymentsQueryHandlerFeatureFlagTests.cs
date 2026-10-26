@@ -10,7 +10,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -183,7 +183,7 @@ public sealed class DashboardRecentPaymentsQueryHandlerFeatureFlagTests
             .Setup(r => r.GetRecentAsync(It.IsAny<DashboardRecentPaymentsReadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(dashboardRecentPaymentsReadEnabled: true)
+        var act = async () => await CreateHandler(dashboardRecentPaymentsReadEnabled: true)
             .Handle(new GetDashboardFinanceSummaryQuery(), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

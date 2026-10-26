@@ -1,6 +1,6 @@
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Payments;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Payments;
 

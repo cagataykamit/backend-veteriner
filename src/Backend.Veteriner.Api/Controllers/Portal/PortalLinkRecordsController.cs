@@ -11,7 +11,7 @@ using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalPet;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalPets;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalPetVaccinations;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

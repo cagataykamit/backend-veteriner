@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Organization.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Organization.Commands.UpdateBillingProfile;
 

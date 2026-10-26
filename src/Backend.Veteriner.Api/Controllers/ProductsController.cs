@@ -18,7 +18,7 @@ using Backend.Veteriner.Application.Products.Queries.GetById;
 using Backend.Veteriner.Application.Products.Queries.GetList;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

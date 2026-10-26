@@ -1,6 +1,6 @@
 using System.Text;
 using Backend.Veteriner.Domain.Files;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Files;
 

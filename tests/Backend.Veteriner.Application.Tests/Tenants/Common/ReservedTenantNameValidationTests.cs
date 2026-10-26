@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Tenants.Commands.Create.Validators;
 using Backend.Veteriner.Application.Tenants.Commands.UpdateSettings;
 using Backend.Veteriner.Application.Tenants.Commands.UpdateSettings.Validators;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Tenants.Common;
 

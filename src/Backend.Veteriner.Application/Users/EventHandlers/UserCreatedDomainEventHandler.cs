@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Users.Events;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Users.EventHandlers;
@@ -17,13 +17,13 @@ public sealed class UserCreatedDomainEventHandler : INotificationHandler<UserCre
         _logger = logger;
     }
 
-    public Task Handle(UserCreatedDomainEvent notification, CancellationToken cancellationToken)
+    public ValueTask Handle(UserCreatedDomainEvent notification, CancellationToken cancellationToken)
     {
         _logger.LogInformation(
             "DOMAIN EVENT UserCreated handled. UserId={UserId}, Email={Email}",
             notification.UserId,
             notification.Email);
 
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }

@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Users.Common;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Users;
 

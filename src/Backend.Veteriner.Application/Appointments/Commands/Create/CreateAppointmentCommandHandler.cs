@@ -13,7 +13,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Commands.Create;
@@ -61,7 +61,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         _eventOutbox = eventOutbox;
     }
 
-    public async Task<Result<Guid>> Handle(CreateAppointmentCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateAppointmentCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

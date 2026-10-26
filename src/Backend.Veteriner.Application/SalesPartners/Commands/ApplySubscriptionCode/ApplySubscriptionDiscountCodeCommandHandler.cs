@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.SalesPartners.Commands.ApplySubscriptionCode;
@@ -39,7 +39,7 @@ public sealed class ApplySubscriptionDiscountCodeCommandHandler
         _redemptions = redemptions;
     }
 
-    public async Task<Result<SubscriptionDiscountDto>> Handle(ApplySubscriptionDiscountCodeCommand request, CancellationToken ct)
+    public async ValueTask<Result<SubscriptionDiscountDto>> Handle(ApplySubscriptionDiscountCodeCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId || tenantId != request.TenantId)
             return Result<SubscriptionDiscountDto>.Failure(SalesPartnerErrors.AccessDenied);

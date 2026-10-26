@@ -18,7 +18,7 @@ using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Prescriptions.Handlers;

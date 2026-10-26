@@ -1,6 +1,6 @@
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Appointments.Commands.Update;
 

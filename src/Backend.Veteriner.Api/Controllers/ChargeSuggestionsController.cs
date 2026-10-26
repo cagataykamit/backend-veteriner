@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.ChargeSuggestions.Contracts.Dtos;
 using Backend.Veteriner.Application.ChargeSuggestions.Queries.GetList;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;

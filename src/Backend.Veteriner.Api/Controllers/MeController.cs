@@ -11,7 +11,7 @@ using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.LegalAcceptances.Commands.AcceptMy;
 using Backend.Veteriner.Application.LegalAcceptances.Queries.GetMyStatus;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

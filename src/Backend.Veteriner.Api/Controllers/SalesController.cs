@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Sales.Commands.Void;
 using Backend.Veteriner.Application.Sales.Contracts.Dtos;
 using Backend.Veteriner.Application.Sales.Queries.GetById;
 using Backend.Veteriner.Application.Sales.Queries.GetList;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

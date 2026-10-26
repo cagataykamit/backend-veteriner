@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Clinics.Commands.Create;
 using Backend.Veteriner.Application.Clinics.Commands.Create.Validators;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Clinics.Validators;
 

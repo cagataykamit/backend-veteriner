@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Tenants.Activation;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetTrialActivationMetrics;
 
@@ -25,7 +25,7 @@ public sealed class GetTrialActivationMetricsQueryHandler : IRequestHandler<GetT
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<TrialActivationMetricsDto>> Handle(GetTrialActivationMetricsQuery request, CancellationToken ct)
+    public async ValueTask<Result<TrialActivationMetricsDto>> Handle(GetTrialActivationMetricsQuery request, CancellationToken ct)
     {
         var toUtc = Utc(request.ToUtc ?? _timeProvider.GetUtcNow().UtcDateTime);
         var fromUtc = Utc(request.FromUtc ?? toUtc.AddDays(-DefaultPeriodDays));

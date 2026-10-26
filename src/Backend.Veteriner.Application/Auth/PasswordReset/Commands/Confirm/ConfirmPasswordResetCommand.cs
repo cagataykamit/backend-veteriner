@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.PasswordReset.Commands.Confirm;
 

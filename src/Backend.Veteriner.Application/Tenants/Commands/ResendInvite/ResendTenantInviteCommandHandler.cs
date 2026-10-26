@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.ResendInvite;
 
@@ -40,7 +40,7 @@ public sealed class ResendTenantInviteCommandHandler
         _uow = uow;
     }
 
-    public async Task<Result<ResendTenantInviteResultDto>> Handle(ResendTenantInviteCommand request, CancellationToken ct)
+    public async ValueTask<Result<ResendTenantInviteResultDto>> Handle(ResendTenantInviteCommand request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Tenants.InviteCreate))
         {

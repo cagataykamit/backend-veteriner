@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Domain.Legal;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.LegalAcceptances;
 

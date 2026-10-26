@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.RemoveMember;
 
@@ -62,7 +62,7 @@ public sealed class RemoveTenantMemberCommandHandler
         _uow = uow;
     }
 
-    public async Task<Result<RemoveTenantMemberResultDto>> Handle(RemoveTenantMemberCommand request, CancellationToken ct)
+    public async ValueTask<Result<RemoveTenantMemberResultDto>> Handle(RemoveTenantMemberCommand request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Tenants.InviteCreate))
         {

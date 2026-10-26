@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Charges.Queries.GetAllocations;
 
@@ -36,7 +36,7 @@ public sealed class GetChargeAllocationsQueryHandler
         _payments = payments;
     }
 
-    public async Task<Result<IReadOnlyList<ChargeAllocationItemDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<ChargeAllocationItemDto>>> Handle(
         GetChargeAllocationsQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)

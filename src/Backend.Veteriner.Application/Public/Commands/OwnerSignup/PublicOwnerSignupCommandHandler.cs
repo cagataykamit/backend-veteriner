@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
@@ -82,7 +82,7 @@ public sealed class PublicOwnerSignupCommandHandler
         _logger = logger ?? NullLogger<PublicOwnerSignupCommandHandler>.Instance;
     }
 
-    public async Task<Result<PublicOwnerSignupResultDto>> Handle(PublicOwnerSignupCommand request, CancellationToken ct)
+    public async ValueTask<Result<PublicOwnerSignupResultDto>> Handle(PublicOwnerSignupCommand request, CancellationToken ct)
     {
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();

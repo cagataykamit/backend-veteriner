@@ -1,6 +1,9 @@
 using System.Net;
+using System.Text.Json;
 using Backend.IntegrationTests.Auditing;
-using FluentAssertions;
+using AwesomeAssertions;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 
 namespace Backend.IntegrationTests.Security;
 
@@ -33,6 +36,26 @@ public sealed class SecurityHeadersIntegrationTests
         var response = await client.GetAsync("/swagger/v1/swagger.json");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Swagger_Should_GenerateDocument_When_Enabled()
+    {
+        await using var swaggerEnabled = _fixture.Factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) =>
+            c.AddInMemoryCollection(new Dictionary<string, string?> { ["Swagger:Enabled"] = "true" })));
+        using var client = swaggerEnabled.CreateClient();
+
+        var response = await client.GetAsync("/swagger/v1/swagger.json");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("openapi").GetString().Should().StartWith("3.");
+        root.GetProperty("paths").TryGetProperty("/api/v1/Auth/login", out _).Should().BeTrue();
+        root.GetProperty("components").GetProperty("securitySchemes").TryGetProperty("Bearer", out _).Should().BeTrue();
+        var createPayment = root.GetProperty("components").GetProperty("schemas").GetProperty("CreatePaymentCommand");
+        createPayment.GetProperty("required").EnumerateArray().Select(x => x.GetString()).Should().Contain("allocations");
+        createPayment.GetProperty("properties").GetProperty("petId").GetProperty("nullable").GetBoolean().Should().BeTrue();
     }
 
     [Fact]

@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Hospitalizations.Wards.Access;
 using Backend.Veteriner.Application.Hospitalizations.Wards.Specs;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Wards.Commands.CreateWard;
 
@@ -26,7 +26,7 @@ public sealed class CreateWardCommandHandler : IRequestHandler<CreateWardCommand
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<Guid>> Handle(CreateWardCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateWardCommand request, CancellationToken ct)
     {
         var access = await _access.EnsureWriteAccessAsync(request.ClinicId, ct);
         if (!access.IsSuccess)

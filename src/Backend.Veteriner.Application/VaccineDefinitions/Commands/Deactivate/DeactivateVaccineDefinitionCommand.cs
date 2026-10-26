@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.VaccineDefinitions.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.VaccineDefinitions.Commands.Deactivate;
 
@@ -24,7 +24,7 @@ public sealed class DeactivateVaccineDefinitionCommandHandler : IRequestHandler<
         _definitionsWrite = definitionsWrite;
     }
 
-    public async Task<Result> Handle(DeactivateVaccineDefinitionCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(DeactivateVaccineDefinitionCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

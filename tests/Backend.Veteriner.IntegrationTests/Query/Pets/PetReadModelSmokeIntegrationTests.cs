@@ -8,7 +8,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 

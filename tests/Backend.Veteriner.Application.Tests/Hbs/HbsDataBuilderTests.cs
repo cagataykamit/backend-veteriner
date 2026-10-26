@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Application.Hbs.Contracts;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Hbs;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Hbs;
 

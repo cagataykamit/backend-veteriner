@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Queries.TaxpayerSettings.GetClinicTaxpayerSettings;
 
@@ -34,7 +34,7 @@ public sealed class GetClinicTaxpayerSettingsQueryHandler
         _settings = settings;
     }
 
-    public async Task<Result<ClinicTaxpayerSettingsDto>> Handle(
+    public async ValueTask<Result<ClinicTaxpayerSettingsDto>> Handle(
         GetClinicTaxpayerSettingsQuery request,
         CancellationToken ct)
     {

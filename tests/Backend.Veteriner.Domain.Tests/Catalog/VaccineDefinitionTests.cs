@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Catalog;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Catalog;
 

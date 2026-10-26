@@ -15,7 +15,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Examinations.Commands.Create;
@@ -60,7 +60,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ExaminationWriteResultDto>> Handle(CreateExaminationCommand request, CancellationToken ct)
+    public async ValueTask<Result<ExaminationWriteResultDto>> Handle(CreateExaminationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

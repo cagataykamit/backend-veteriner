@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Users.Contracts.Dtos;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Users.Queries.GetAll;
 
@@ -18,6 +18,6 @@ public sealed class AdminGetUsersQueryHandler
     public AdminGetUsersQueryHandler(IUserReadRepository users)
         => _users = users;
 
-    public Task<PagedResult<AdminUserListItemDto>> Handle(AdminGetUsersQuery request, CancellationToken ct)
-        => _users.GetAdminPagedAsync(request.PageRequest, ct);
+    public ValueTask<PagedResult<AdminUserListItemDto>> Handle(AdminGetUsersQuery request, CancellationToken ct)
+        => new(_users.GetAdminPagedAsync(request.PageRequest, ct));
 }

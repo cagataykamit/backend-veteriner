@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clients.Queries.GetById;
 
@@ -25,7 +25,7 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
         _userNames = userNames;
     }
 
-    public async Task<Result<ClientDetailDto>> Handle(GetClientByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<ClientDetailDto>> Handle(GetClientByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Files.Contracts.Dtos;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Files.Queries.CreateAccessUrl;
@@ -25,7 +25,7 @@ public sealed class CreateStoredFileAccessUrlQueryHandler(
     /// <summary>İmzalı içerik ucunun API köküne göre yolu.</summary>
     public const string SignedContentPath = "/api/v1/files/signed";
 
-    public async Task<Result<StoredFileAccessUrlDto>> Handle(CreateStoredFileAccessUrlQuery request, CancellationToken ct)
+    public async ValueTask<Result<StoredFileAccessUrlDto>> Handle(CreateStoredFileAccessUrlQuery request, CancellationToken ct)
     {
         if (tenantContext.TenantId is not { } tenantId)
         {

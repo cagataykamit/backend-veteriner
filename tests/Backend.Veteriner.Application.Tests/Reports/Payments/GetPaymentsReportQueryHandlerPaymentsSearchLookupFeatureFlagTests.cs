@@ -15,7 +15,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -104,7 +104,7 @@ public sealed class GetPaymentsReportQueryHandlerPaymentsSearchLookupFeatureFlag
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(paymentsSearchLookupEnabled: true).Handle(
+        var act = async () => await CreateHandler(paymentsSearchLookupEnabled: true).Handle(
             CreateReportQuery(clinicId, search: "pamuk"),
             CancellationToken.None);
 

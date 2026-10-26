@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Application.Hbs.Contracts;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Prescriptions.Queries.GetHbsData;
 
@@ -43,7 +43,7 @@ public sealed class GetPrescriptionHbsDataQueryHandler : IRequestHandler<GetPres
         _sources = sources;
     }
 
-    public async Task<Result<HbsDataDto>> Handle(GetPrescriptionHbsDataQuery request, CancellationToken ct)
+    public async ValueTask<Result<HbsDataDto>> Handle(GetPrescriptionHbsDataQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

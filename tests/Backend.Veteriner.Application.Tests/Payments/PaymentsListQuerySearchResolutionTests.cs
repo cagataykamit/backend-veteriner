@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Payments;
 using Backend.Veteriner.Application.Pets.ReadModels;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Payments;

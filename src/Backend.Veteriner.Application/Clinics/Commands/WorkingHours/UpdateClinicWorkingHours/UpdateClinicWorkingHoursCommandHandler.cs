@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Commands.WorkingHours.UpdateClinicWorkingHours;
 
@@ -40,7 +40,7 @@ public sealed class UpdateClinicWorkingHoursCommandHandler
         _hoursWrite = hoursWrite;
     }
 
-    public async Task<Result<IReadOnlyList<ClinicWorkingHourDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<ClinicWorkingHourDto>>> Handle(
         UpdateClinicWorkingHoursCommand request,
         CancellationToken ct)
     {

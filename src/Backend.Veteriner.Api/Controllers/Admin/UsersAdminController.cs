@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Users.Contracts.Dtos;
 using Backend.Veteriner.Application.Users.Queries.GetAll;
 using Backend.Veteriner.Application.Users.Queries.GetById;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

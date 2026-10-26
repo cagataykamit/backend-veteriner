@@ -20,7 +20,7 @@ Bu belge **Backend.Veteriner** deposunun güncel mimari ve süreç kurallarını
 ## 2. Controller kuralları
 
 - Controller’lar **ince** kalır: doğrulama ve iş kuralı **command/query handler**’larda.
-- MediatR ile `Send`; yanıt dönüşümü projede kullanılan **Result → HTTP** yardımcıları ile yapılır.
+- Mediator ile `Send`; yanıt dönüşümü projede kullanılan **Result → HTTP** yardımcıları ile yapılır.
 - Yetkisiz uçlar `[AllowAnonymous]` ile açıkça işaretlenir; admin/platform uçları **permission policy** ile korunur.
 - API **sürümleme** ve route kuralları mevcut Api projesindeki standarda uyulur (kırıcı değişiklik yapılmadan genişletilir).
 

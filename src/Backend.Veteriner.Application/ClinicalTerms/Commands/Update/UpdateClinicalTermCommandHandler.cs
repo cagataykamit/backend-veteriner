@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ClinicalTerms.Commands.Update;
@@ -20,7 +20,7 @@ public sealed class UpdateClinicalTermCommandHandler : IRequestHandler<UpdateCli
         _terms = terms;
     }
 
-    public async Task<Result<ClinicalTermDto>> Handle(UpdateClinicalTermCommand request, CancellationToken ct)
+    public async ValueTask<Result<ClinicalTermDto>> Handle(UpdateClinicalTermCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ClinicalTermDto>.Failure(ClinicalTermErrors.TenantContextMissing);

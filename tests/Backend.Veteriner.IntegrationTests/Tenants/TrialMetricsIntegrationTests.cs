@@ -10,7 +10,7 @@ using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

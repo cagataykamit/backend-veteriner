@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Users;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Users.Commands.Create;
 
@@ -25,7 +25,7 @@ public sealed class AdminCreateUserCommandHandler : IRequestHandler<AdminCreateU
         _hasher = hasher;
     }
 
-    public async Task<Result<Guid>> Handle(AdminCreateUserCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(AdminCreateUserCommand request, CancellationToken ct)
     {
         // Aynı email var mı?
         var exists = await _usersRead.FirstOrDefaultAsync(new UserByEmailSpec(request.Email), ct);

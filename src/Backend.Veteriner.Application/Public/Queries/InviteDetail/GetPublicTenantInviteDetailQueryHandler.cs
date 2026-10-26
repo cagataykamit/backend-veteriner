@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Public.Queries.InviteDetail;
 
@@ -47,7 +47,7 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
         _seatEvaluator = seatEvaluator;
     }
 
-    public async Task<Result<PublicTenantInviteDetailDto>> Handle(
+    public async ValueTask<Result<PublicTenantInviteDetailDto>> Handle(
         GetPublicTenantInviteDetailQuery request,
         CancellationToken ct)
     {

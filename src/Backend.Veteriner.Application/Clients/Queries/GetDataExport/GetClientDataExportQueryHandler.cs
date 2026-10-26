@@ -14,7 +14,7 @@ using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clients.Queries.GetDataExport;
 
@@ -78,7 +78,7 @@ public sealed class GetClientDataExportQueryHandler
         _payments = payments;
     }
 
-    public async Task<Result<ClientDataExportDto>> Handle(GetClientDataExportQuery request, CancellationToken ct)
+    public async ValueTask<Result<ClientDataExportDto>> Handle(GetClientDataExportQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

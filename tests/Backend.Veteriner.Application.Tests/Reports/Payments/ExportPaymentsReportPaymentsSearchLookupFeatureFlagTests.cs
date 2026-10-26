@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -84,7 +84,7 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateCsvHandler(paymentsSearchLookupEnabled: true).Handle(
+        var act = async () => await CreateCsvHandler(paymentsSearchLookupEnabled: true).Handle(
             CreateExportQuery(clinicId, search: "pamuk"),
             CancellationToken.None);
 
@@ -162,7 +162,7 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateCsvHandler(
+        var act = async () => await CreateCsvHandler(
                 paymentsSearchLookupEnabled: true,
                 paymentsReportExportReadEnabled: true)
             .Handle(CreateExportQuery(clinicId, search: "pamuk"), CancellationToken.None);

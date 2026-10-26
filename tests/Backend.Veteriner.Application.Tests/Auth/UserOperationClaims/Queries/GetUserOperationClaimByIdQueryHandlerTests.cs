@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Auth.Queries.UserOperationClaims.GetById;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Auth;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Auth.UserOperationClaims.Queries;

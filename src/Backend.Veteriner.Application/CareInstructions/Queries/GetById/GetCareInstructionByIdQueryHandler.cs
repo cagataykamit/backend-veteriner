@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Domain.CareInstructions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.CareInstructions.Queries.GetById;
 
@@ -29,7 +29,7 @@ public sealed class GetCareInstructionByIdQueryHandler
         _careInstructions = careInstructions;
     }
 
-    public async Task<Result<CareInstructionDto>> Handle(GetCareInstructionByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<CareInstructionDto>> Handle(GetCareInstructionByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

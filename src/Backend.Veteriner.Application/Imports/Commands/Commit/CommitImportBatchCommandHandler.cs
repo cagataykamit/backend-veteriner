@@ -10,7 +10,7 @@ using Backend.Veteriner.Application.Vaccinations.Access;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Imports.Commands.Commit;
@@ -54,7 +54,7 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ImportCommitResultDto>> Handle(CommitImportBatchCommand request, CancellationToken ct)
+    public async ValueTask<Result<ImportCommitResultDto>> Handle(CommitImportBatchCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

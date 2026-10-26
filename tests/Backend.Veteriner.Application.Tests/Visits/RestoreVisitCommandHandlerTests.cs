@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Visits.Commands.Restore;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Visits;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 
@@ -132,7 +132,7 @@ public sealed class RestoreVisitCommandHandlerTests
         _visitsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("other"));
 
-        var act = () => CreateHandler().Handle(new RestoreVisitCommand(visit.Id, Reason), CancellationToken.None);
+        var act = async () => await CreateHandler().Handle(new RestoreVisitCommand(visit.Id, Reason), CancellationToken.None);
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }

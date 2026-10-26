@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.CareInstructions;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.CareInstructions;
 

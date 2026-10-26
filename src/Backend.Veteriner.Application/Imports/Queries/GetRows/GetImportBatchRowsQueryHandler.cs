@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Imports.Queries.GetRows;
 
@@ -36,7 +36,7 @@ public sealed class GetImportBatchRowsQueryHandler
         _rows = rows;
     }
 
-    public async Task<Result<PagedResult<ImportRowDto>>> Handle(GetImportBatchRowsQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<ImportRowDto>>> Handle(GetImportBatchRowsQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

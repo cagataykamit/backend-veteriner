@@ -12,7 +12,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Pets.Commands.Create;
 
@@ -53,7 +53,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         _eventOutbox = eventOutbox;
     }
 
-    public async Task<Result<Guid>> Handle(CreatePetCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreatePetCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

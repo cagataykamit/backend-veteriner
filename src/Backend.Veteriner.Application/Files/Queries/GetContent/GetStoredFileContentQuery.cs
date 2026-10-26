@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Files.Contracts.Dtos;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Files.Queries.GetContent;
 
@@ -13,7 +13,7 @@ public sealed record GetStoredFileContentQuery(StoredFileOwnerType OwnerType, Gu
 public sealed class GetStoredFileContentQueryHandler(ITenantContext tenantContext, StoredFileContentReader reader)
     : IRequestHandler<GetStoredFileContentQuery, Result<StoredFileContent>>
 {
-    public async Task<Result<StoredFileContent>> Handle(GetStoredFileContentQuery request, CancellationToken ct)
+    public async ValueTask<Result<StoredFileContent>> Handle(GetStoredFileContentQuery request, CancellationToken ct)
     {
         if (tenantContext.TenantId is not { } tenantId)
         {

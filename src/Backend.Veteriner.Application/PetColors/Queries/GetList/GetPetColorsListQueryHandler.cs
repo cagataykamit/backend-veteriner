@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.PetColors.Contracts.Dtos;
 using Backend.Veteriner.Application.PetColors.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.PetColors.Queries.GetList;
 
@@ -14,7 +14,7 @@ public sealed class GetPetColorsListQueryHandler
 
     public GetPetColorsListQueryHandler(IReadRepository<PetColor> colors) => _colors = colors;
 
-    public async Task<Result<IReadOnlyList<PetColorListItemDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<PetColorListItemDto>>> Handle(
         GetPetColorsListQuery request,
         CancellationToken ct)
     {

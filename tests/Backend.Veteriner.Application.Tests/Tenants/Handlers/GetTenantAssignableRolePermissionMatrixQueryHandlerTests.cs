@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Queries.GetAssignableRolePermissionMatrix;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;

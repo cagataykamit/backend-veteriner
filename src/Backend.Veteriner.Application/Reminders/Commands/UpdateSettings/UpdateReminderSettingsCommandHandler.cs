@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Reminders.Contracts.Dtos;
 using Backend.Veteriner.Application.Reminders.Specs;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reminders.Commands.UpdateSettings;
 
@@ -24,7 +24,7 @@ public sealed class UpdateReminderSettingsCommandHandler
         _settingsWrite = settingsWrite;
     }
 
-    public async Task<Result<ReminderSettingsDto>> Handle(UpdateReminderSettingsCommand request, CancellationToken ct)
+    public async ValueTask<Result<ReminderSettingsDto>> Handle(UpdateReminderSettingsCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

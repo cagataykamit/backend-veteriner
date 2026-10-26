@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Vaccinations;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -133,7 +133,7 @@ public sealed class GetPetOpenItemsQueryHandlerTests
         return c;
     }
 
-    private Task<Domain.Shared.Result<PetOpenItemsDto>> Run(GetPetOpenItemsQueryHandler handler)
+    private ValueTask<Domain.Shared.Result<PetOpenItemsDto>> Run(GetPetOpenItemsQueryHandler handler)
         => handler.Handle(new GetPetOpenItemsQuery(_pet.Id), CancellationToken.None);
 
     [Fact]

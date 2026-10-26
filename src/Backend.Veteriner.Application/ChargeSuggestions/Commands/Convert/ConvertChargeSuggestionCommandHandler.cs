@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ChargeSuggestions.Commands.Convert;
@@ -73,7 +73,7 @@ public sealed class ConvertChargeSuggestionCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ChargeCreateResultDto>> Handle(ConvertChargeSuggestionCommand request, CancellationToken ct)
+    public async ValueTask<Result<ChargeCreateResultDto>> Handle(ConvertChargeSuggestionCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

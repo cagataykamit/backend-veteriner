@@ -16,7 +16,7 @@ using Backend.Veteriner.Application.Pets.Queries.GetTimeline;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using System.Text.Json.Serialization;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

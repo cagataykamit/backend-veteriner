@@ -1,6 +1,6 @@
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Vaccinations;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Imports;
 

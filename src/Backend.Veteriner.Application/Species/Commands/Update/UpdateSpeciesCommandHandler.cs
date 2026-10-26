@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SpeciesReference.Commands.Update;
 
@@ -22,7 +22,7 @@ public sealed class UpdateSpeciesCommandHandler : IRequestHandler<UpdateSpeciesC
         _catalogCache = catalogCache;
     }
 
-    public async Task<Result> Handle(UpdateSpeciesCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(UpdateSpeciesCommand request, CancellationToken ct)
     {
         var entity = await _speciesRead.FirstOrDefaultAsync(new SpeciesByIdSpec(request.Id), ct);
         if (entity is null)

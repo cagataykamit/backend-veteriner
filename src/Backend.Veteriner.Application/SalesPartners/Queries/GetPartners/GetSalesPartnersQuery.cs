@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Queries.GetPartners;
 
@@ -25,7 +25,7 @@ public sealed class GetSalesPartnersQueryHandler : IRequestHandler<GetSalesPartn
         _redemptions = redemptions;
     }
 
-    public async Task<IReadOnlyList<SalesPartnerDto>> Handle(GetSalesPartnersQuery request, CancellationToken ct)
+    public async ValueTask<IReadOnlyList<SalesPartnerDto>> Handle(GetSalesPartnersQuery request, CancellationToken ct)
     {
         var partners = await _partners.ListAsync(new SalesPartnersOrderedSpec(), ct);
         var codes = await _codes.ListAsync(new DiscountCodesByPartnerSpec(null), ct);

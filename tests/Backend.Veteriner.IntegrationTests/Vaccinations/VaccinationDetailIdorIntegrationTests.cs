@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Vaccinations;

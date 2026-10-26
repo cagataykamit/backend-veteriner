@@ -13,7 +13,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.LabResults.Commands.Create;
 
@@ -54,7 +54,7 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
         _labResultsWrite = labResultsWrite;
     }
 
-    public async Task<Result<Guid>> Handle(CreateLabResultCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateLabResultCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

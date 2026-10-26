@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Infrastructure.Outbox;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Backend.IntegrationTests.Outbox;

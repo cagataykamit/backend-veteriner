@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Auth.Queries.Me;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Auth.Queries;

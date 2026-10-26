@@ -5,7 +5,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,7 +13,6 @@ namespace Backend.IntegrationTests.Outbox;
 
 [Collection("pet-projection-claim")]
 public sealed class PetOutboxClaimRepositoryIntegrationTests
-    : IClassFixture<PetProjectionClaimEnabledWebApplicationFactory>
 {
     private static readonly TimeSpan DefaultLease = TimeSpan.FromSeconds(60);
 

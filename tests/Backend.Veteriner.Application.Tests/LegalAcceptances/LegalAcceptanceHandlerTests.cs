@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.LegalAcceptances.Commands.AcceptMy;
 using Backend.Veteriner.Application.LegalAcceptances.Queries.GetMyStatus;
 using Backend.Veteriner.Application.LegalAcceptances.Specs;
 using Backend.Veteriner.Domain.Legal;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.LegalAcceptances;

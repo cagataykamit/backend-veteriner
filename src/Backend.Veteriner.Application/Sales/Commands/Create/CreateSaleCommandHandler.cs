@@ -18,7 +18,7 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Sales;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Sales.Commands.Create;
@@ -72,7 +72,7 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         _assembler = assembler;
     }
 
-    public async Task<Result<SaleCreateResultDto>> Handle(CreateSaleCommand request, CancellationToken ct)
+    public async ValueTask<Result<SaleCreateResultDto>> Handle(CreateSaleCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

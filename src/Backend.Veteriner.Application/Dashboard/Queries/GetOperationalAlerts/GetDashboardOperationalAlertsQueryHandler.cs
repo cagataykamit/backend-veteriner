@@ -13,7 +13,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -50,7 +50,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
         _todayAppointmentCounts = todayAppointmentCounts;
     }
 
-    public async Task<Result<DashboardOperationalAlertsDto>> Handle(GetDashboardOperationalAlertsQuery request, CancellationToken ct)
+    public async ValueTask<Result<DashboardOperationalAlertsDto>> Handle(GetDashboardOperationalAlertsQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

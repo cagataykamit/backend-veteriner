@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
@@ -49,7 +49,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         _logger = logger ?? NullLogger<RefreshCommandHandler>.Instance;
     }
 
-    public async Task<Result<LoginResultDto>> Handle(RefreshCommand request, CancellationToken ct)
+    public async ValueTask<Result<LoginResultDto>> Handle(RefreshCommand request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken))
         {

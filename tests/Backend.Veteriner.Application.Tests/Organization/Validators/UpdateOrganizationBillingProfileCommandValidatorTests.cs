@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Organization;
 using Backend.Veteriner.Application.Organization.Commands.UpdateBillingProfile;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Organization.Validators;
 

@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 
@@ -268,7 +268,7 @@ public sealed class CreateStockMovementSafetyTests
             .Setup(r => r.AddAsync(It.IsAny<StockMovement>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("Başka hata.", innerException: null));
 
-        var act = () => CreateHandler().Handle(Cmd(StockMovementType.In, 1), CancellationToken.None);
+        var act = async () => await CreateHandler().Handle(Cmd(StockMovementType.In, 1), CancellationToken.None);
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }

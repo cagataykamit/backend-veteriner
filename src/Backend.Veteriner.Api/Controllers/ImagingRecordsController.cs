@@ -16,7 +16,7 @@ using Backend.Veteriner.Application.Imaging.Queries.GetList;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

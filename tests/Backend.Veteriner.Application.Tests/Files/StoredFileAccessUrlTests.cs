@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Files.Queries.CreateAccessUrl;
 using Backend.Veteriner.Application.Files.Queries.GetSignedContent;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -50,12 +50,12 @@ public sealed class StoredFileAccessUrlTests
     private StoredFileContentReader Reader()
         => new([_owner.Object], _files.Object, _storage.Object, NullLogger<StoredFileContentReader>.Instance);
 
-    private Task<Result<Backend.Veteriner.Application.Files.Contracts.Dtos.StoredFileAccessUrlDto>> CreateUrl(Guid? fileId = null)
+    private ValueTask<Result<Backend.Veteriner.Application.Files.Contracts.Dtos.StoredFileAccessUrlDto>> CreateUrl(Guid? fileId = null)
         => new CreateStoredFileAccessUrlQueryHandler(
                 _tenant.Object, Reader(), _signer, Options.Create(new FileStorageOptions()), _time)
             .Handle(new CreateStoredFileAccessUrlQuery(StoredFileOwnerType.ImagingRecord, _ownerId, fileId ?? _file.Id), CancellationToken.None);
 
-    private Task<Result<Backend.Veteriner.Application.Files.Contracts.Dtos.StoredFileContent>> Open(long expires, string? signature)
+    private ValueTask<Result<Backend.Veteriner.Application.Files.Contracts.Dtos.StoredFileContent>> Open(long expires, string? signature)
         => new GetSignedStoredFileContentQueryHandler(Reader(), _signer, _time)
             .Handle(new GetSignedStoredFileContentQuery(_file.Id, expires, signature), CancellationToken.None);
 

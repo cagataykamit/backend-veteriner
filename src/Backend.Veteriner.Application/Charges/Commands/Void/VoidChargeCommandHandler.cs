@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Common.Finance;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Charges.Commands.Void;
@@ -38,7 +38,7 @@ public sealed class VoidChargeCommandHandler : IRequestHandler<VoidChargeCommand
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result> Handle(VoidChargeCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(VoidChargeCommand request, CancellationToken ct)
     {
         var actor = await FinanceCorrectionActor.ResolveAsync(_tenantContext, _clientContext, _tenants, ct);
         if (!actor.IsSuccess)

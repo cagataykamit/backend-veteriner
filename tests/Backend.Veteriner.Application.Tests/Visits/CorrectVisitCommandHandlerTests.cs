@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Visits.Commands.Correct;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Visits;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 

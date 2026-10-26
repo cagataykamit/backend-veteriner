@@ -10,7 +10,7 @@ using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.StockMovements.Commands.Reverse;
@@ -56,7 +56,7 @@ public sealed class ReverseStockMovementCommandHandler
         _uow = uow;
     }
 
-    public async Task<Result<StockMovementCreateResult>> Handle(ReverseStockMovementCommand request, CancellationToken ct)
+    public async ValueTask<Result<StockMovementCreateResult>> Handle(ReverseStockMovementCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Fail("Tenants.ContextMissing", "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");

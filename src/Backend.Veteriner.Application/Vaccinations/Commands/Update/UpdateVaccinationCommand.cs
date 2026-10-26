@@ -1,6 +1,6 @@
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Vaccinations.Commands.Update;
 

@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalPetVaccinations;
 
@@ -41,7 +41,7 @@ public sealed class GetPortalPetVaccinationsQueryHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PortalPetVaccinationsDto>> Handle(GetPortalPetVaccinationsQuery request, CancellationToken ct)
+    public async ValueTask<Result<PortalPetVaccinationsDto>> Handle(GetPortalPetVaccinationsQuery request, CancellationToken ct)
     {
         var scopeResult = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scopeResult.IsSuccess)

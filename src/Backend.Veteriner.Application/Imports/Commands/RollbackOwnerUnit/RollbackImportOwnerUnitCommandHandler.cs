@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Imports.Commands.RollbackOwnerUnit;
 
@@ -58,7 +58,7 @@ public sealed class RollbackImportOwnerUnitCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ImportRollbackUnitResult>> Handle(RollbackImportOwnerUnitCommand request, CancellationToken ct)
+    public async ValueTask<Result<ImportRollbackUnitResult>> Handle(RollbackImportOwnerUnitCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ImportRollbackUnitResult>.Failure("Tenants.ContextMissing", "Kiracı bağlamı yok.");

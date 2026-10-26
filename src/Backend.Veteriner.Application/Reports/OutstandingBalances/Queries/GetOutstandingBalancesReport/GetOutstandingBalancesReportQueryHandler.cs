@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Contracts.Dtos;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.GetOutstandingBalancesReport;
 
@@ -27,7 +27,7 @@ public sealed class GetOutstandingBalancesReportQueryHandler
         _reader = reader;
     }
 
-    public async Task<Result<OutstandingBalancesReportResultDto>> Handle(
+    public async ValueTask<Result<OutstandingBalancesReportResultDto>> Handle(
         GetOutstandingBalancesReportQuery request,
         CancellationToken ct)
     {

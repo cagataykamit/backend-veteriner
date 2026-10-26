@@ -22,7 +22,7 @@ using Backend.Veteriner.Application.Imports.Queries.GetTemplate;
 using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;

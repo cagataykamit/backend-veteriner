@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.OwnerPortal.Sessions;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Commands.PortalPasswordSignIn;
 
@@ -44,7 +44,7 @@ public sealed class PortalPasswordSignInCommandHandler : IRequestHandler<PortalP
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PortalAuthTokensDto>> Handle(PortalPasswordSignInCommand request, CancellationToken ct)
+    public async ValueTask<Result<PortalAuthTokensDto>> Handle(PortalPasswordSignInCommand request, CancellationToken ct)
     {
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var email = OwnerAccount.NormalizeEmail(request.Email);

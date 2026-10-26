@@ -1,7 +1,7 @@
 using System.Text;
 using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Domain.Imports;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Imports;
 

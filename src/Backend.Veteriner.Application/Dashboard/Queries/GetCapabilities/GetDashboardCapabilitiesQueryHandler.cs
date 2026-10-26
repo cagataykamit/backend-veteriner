@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Dashboard.Queries.GetCapabilities;
 
@@ -32,7 +32,7 @@ public sealed class GetDashboardCapabilitiesQueryHandler
         _subscriptions = subscriptions;
     }
 
-    public async Task<Result<DashboardCapabilitiesDto>> Handle(GetDashboardCapabilitiesQuery request, CancellationToken ct)
+    public async ValueTask<Result<DashboardCapabilitiesDto>> Handle(GetDashboardCapabilitiesQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Commands.ChangePassword;
 
@@ -20,7 +20,7 @@ public sealed class ChangePasswordCommandHandler : IRequestHandler<ChangePasswor
         _client = client;
     }
 
-    public async Task<Result> Handle(ChangePasswordCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(ChangePasswordCommand request, CancellationToken ct)
     {
         var userId = _client.UserId;
         if (userId is null)

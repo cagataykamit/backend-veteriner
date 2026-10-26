@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Projections.Payments;
 using Backend.Veteriner.Infrastructure.Projections.Payments;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

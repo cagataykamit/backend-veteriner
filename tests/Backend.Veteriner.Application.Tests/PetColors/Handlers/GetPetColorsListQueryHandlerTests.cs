@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.PetColors.Queries.GetList;
 using Backend.Veteriner.Application.PetColors.Specs;
 using Backend.Veteriner.Domain.Catalog;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.PetColors.Handlers;

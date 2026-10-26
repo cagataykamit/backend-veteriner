@@ -12,7 +12,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.LabResults.Queries.GetList;
@@ -49,7 +49,7 @@ public sealed class GetLabResultsListQueryHandler
         _queryReadModelsOptions = queryReadModelsOptions.Value;
     }
 
-    public async Task<Result<PagedResult<LabResultListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<LabResultListItemDto>>> Handle(
         GetLabResultsListQuery request,
         CancellationToken ct)
     {

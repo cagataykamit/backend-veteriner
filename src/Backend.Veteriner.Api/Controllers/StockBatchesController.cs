@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.StockBatches.Contracts.Dtos;
 using Backend.Veteriner.Application.StockBatches.Queries.GetById;
 using Backend.Veteriner.Application.StockBatches.Queries.GetList;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

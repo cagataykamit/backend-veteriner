@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Visits.Commands.Transition;
 

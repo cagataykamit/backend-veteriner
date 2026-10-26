@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.ProductCategories.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductCategories.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ProductCategories.Commands.Create;
@@ -25,7 +25,7 @@ public sealed class CreateProductCategoryCommandHandler
         _categoriesWrite = categoriesWrite;
     }
 
-    public async Task<Result<ProductCategoryDto>> Handle(CreateProductCategoryCommand request, CancellationToken ct)
+    public async ValueTask<Result<ProductCategoryDto>> Handle(CreateProductCategoryCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ProductCategoryDto>.Failure(

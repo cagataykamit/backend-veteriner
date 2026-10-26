@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Tenants.Billing;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 

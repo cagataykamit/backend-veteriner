@@ -17,7 +17,7 @@ using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -42,17 +42,16 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
         var (email, password, assignedClinicId, unassignedClinicId) =
             await IntegrationTestAuthHelper.SeedClinicAdminUserAsync(_factory.Services, hasher);
 
-        await SeedTodayAppointmentAsync(_factory.Services, assignedClinicId, AppointmentStatus.Scheduled);
-        await SeedTodayAppointmentAsync(_factory.Services, unassignedClinicId, AppointmentStatus.Scheduled);
-
         var login = await IntegrationTestAuthHelper.LoginAsync(http, _factory.Services, email, password);
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
 
-        var response = await http.GetAsync("/api/v1/dashboard/summary");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        // Atanan klinik paylaşılan seed kliniği; başka testlerin bugüne eklediği randevular sayıya girmesin diye fark ölçülür.
+        var before = await GetCountAsync(http, "/api/v1/dashboard/summary", "todayAppointmentsCount");
 
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        json.GetProperty("todayAppointmentsCount").GetInt32().Should().Be(1);
+        await SeedTodayAppointmentAsync(_factory.Services, assignedClinicId, AppointmentStatus.Scheduled);
+        await SeedTodayAppointmentAsync(_factory.Services, unassignedClinicId, AppointmentStatus.Scheduled);
+
+        (await GetCountAsync(http, "/api/v1/dashboard/summary", "todayAppointmentsCount")).Should().Be(before + 1);
     }
 
     [Fact]
@@ -64,17 +63,24 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
         var (email, password, assignedClinicId, unassignedClinicId) =
             await IntegrationTestAuthHelper.SeedClinicAdminUserAsync(_factory.Services, hasher);
 
-        await SeedTodayAppointmentAsync(_factory.Services, assignedClinicId, AppointmentStatus.Cancelled);
-        await SeedTodayAppointmentAsync(_factory.Services, unassignedClinicId, AppointmentStatus.Cancelled);
-
         var login = await IntegrationTestAuthHelper.LoginAsync(http, _factory.Services, email, password);
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
 
-        var response = await http.GetAsync("/api/v1/dashboard/operational-alerts");
+        var before = await GetCountAsync(http, "/api/v1/dashboard/operational-alerts", "todayCancelledAppointmentsCount");
+
+        await SeedTodayAppointmentAsync(_factory.Services, assignedClinicId, AppointmentStatus.Cancelled);
+        await SeedTodayAppointmentAsync(_factory.Services, unassignedClinicId, AppointmentStatus.Cancelled);
+
+        (await GetCountAsync(http, "/api/v1/dashboard/operational-alerts", "todayCancelledAppointmentsCount")).Should().Be(before + 1);
+    }
+
+    private static async Task<int> GetCountAsync(HttpClient http, string url, string property)
+    {
+        var response = await http.GetAsync(url);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        json.GetProperty("todayCancelledAppointmentsCount").GetInt32().Should().Be(1);
+        return json.GetProperty(property).GetInt32();
     }
 
     [Fact]

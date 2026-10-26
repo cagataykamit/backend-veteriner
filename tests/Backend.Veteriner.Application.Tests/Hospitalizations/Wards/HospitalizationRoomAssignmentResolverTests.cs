@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Hospitalizations.Wards;
 using Backend.Veteriner.Application.Hospitalizations.Wards.Specs;
 using Backend.Veteriner.Domain.Hospitalizations;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Hospitalizations.Wards;

@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.StockBatches.Contracts.Dtos;
 using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.StockBatches.Queries.GetList;
 
@@ -38,7 +38,7 @@ public sealed class GetStockBatchesListQueryHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PagedResult<StockBatchDto>>> Handle(GetStockBatchesListQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<StockBatchDto>>> Handle(GetStockBatchesListQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -1,4 +1,4 @@
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.LegalAcceptances.Queries.GetCurrentVersions;
 
@@ -12,10 +12,10 @@ public sealed record GetCurrentLegalDocumentVersionsQuery(bool OwnerPortal = fal
 public sealed class GetCurrentLegalDocumentVersionsQueryHandler
     : IRequestHandler<GetCurrentLegalDocumentVersionsQuery, IReadOnlyList<LegalDocumentVersionDto>>
 {
-    public Task<IReadOnlyList<LegalDocumentVersionDto>> Handle(
+    public ValueTask<IReadOnlyList<LegalDocumentVersionDto>> Handle(
         GetCurrentLegalDocumentVersionsQuery request,
         CancellationToken ct) =>
-        Task.FromResult(LegalDocumentCatalog.ToDtos(request.OwnerPortal
+        ValueTask.FromResult(LegalDocumentCatalog.ToDtos(request.OwnerPortal
             ? LegalDocumentCatalog.RequiredForOwnerAccount
             : LegalDocumentCatalog.StaffDocuments));
 }

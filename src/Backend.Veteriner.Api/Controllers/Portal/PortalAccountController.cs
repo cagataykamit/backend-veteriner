@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalClinicDisclosure;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalLegalStatus;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalMe;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Auth.Commands.LogoutAll;
 using Backend.Veteriner.Application.Auth.Commands.Refresh;
 using Backend.Veteriner.Application.Auth.Commands.SelectClinic;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Pets.Commands.SetStatus;
@@ -31,7 +31,7 @@ public sealed class SetPetStatusCommandHandler : IRequestHandler<SetPetStatusCom
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PetStatusDto>> Handle(SetPetStatusCommand request, CancellationToken ct)
+    public async ValueTask<Result<PetStatusDto>> Handle(SetPetStatusCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Dashboard.Queries.GetCapabilities;
 using Backend.Veteriner.Application.Dashboard.Queries.GetFinanceSummary;
 using Backend.Veteriner.Application.Dashboard.Queries.GetOperationalAlerts;
 using Backend.Veteriner.Application.Dashboard.Queries.GetSummary;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

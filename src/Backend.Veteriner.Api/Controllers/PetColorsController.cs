@@ -2,7 +2,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.PetColors.Contracts.Dtos;
 using Backend.Veteriner.Application.PetColors.Queries.GetList;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

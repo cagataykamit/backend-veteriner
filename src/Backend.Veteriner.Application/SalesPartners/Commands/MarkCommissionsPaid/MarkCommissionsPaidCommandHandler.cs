@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Commands.MarkCommissionsPaid;
 
@@ -14,7 +14,7 @@ public sealed class MarkCommissionsPaidCommandHandler
 
     public MarkCommissionsPaidCommandHandler(IRepository<DiscountRedemption> redemptions) => _redemptions = redemptions;
 
-    public async Task<Result<MarkCommissionsPaidResultDto>> Handle(MarkCommissionsPaidCommand request, CancellationToken ct)
+    public async ValueTask<Result<MarkCommissionsPaidResultDto>> Handle(MarkCommissionsPaidCommand request, CancellationToken ct)
     {
         var redemptions = await _redemptions.ListAsync(new DiscountRedemptionsByPartnerSpec(request.SalesPartnerId, tracked: true), ct);
         var owners = redemptions

@@ -12,7 +12,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -61,7 +61,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         _logger = logger ?? NullLogger<GetDashboardFinanceSummaryQueryHandler>.Instance;
     }
 
-    public async Task<Result<DashboardFinanceSummaryDto>> Handle(
+    public async ValueTask<Result<DashboardFinanceSummaryDto>> Handle(
         GetDashboardFinanceSummaryQuery request,
         CancellationToken ct)
     {

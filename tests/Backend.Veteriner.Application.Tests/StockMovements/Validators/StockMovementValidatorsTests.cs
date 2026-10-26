@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.StockMovements.Queries.GetList;
 using Backend.Veteriner.Application.StockMovements.Queries.GetByProductId.Validators;
 using Backend.Veteriner.Application.StockMovements.Queries.GetList.Validators;
 using Backend.Veteriner.Domain.Products;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.StockMovements.Validators;
 

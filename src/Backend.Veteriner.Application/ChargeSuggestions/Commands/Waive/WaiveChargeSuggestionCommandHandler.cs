@@ -8,7 +8,7 @@ using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ChargeSuggestions.Commands.Waive;
@@ -48,7 +48,7 @@ public sealed class WaiveChargeSuggestionCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ChargeSuggestionDto>> Handle(WaiveChargeSuggestionCommand request, CancellationToken ct)
+    public async ValueTask<Result<ChargeSuggestionDto>> Handle(WaiveChargeSuggestionCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

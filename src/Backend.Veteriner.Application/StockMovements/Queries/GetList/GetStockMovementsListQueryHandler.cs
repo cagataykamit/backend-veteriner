@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.StockMovements.Queries.GetList;
 
@@ -35,7 +35,7 @@ public sealed class GetStockMovementsListQueryHandler
         _clinics = clinics;
     }
 
-    public async Task<Result<PagedResult<StockMovementDto>>> Handle(
+    public async ValueTask<Result<PagedResult<StockMovementDto>>> Handle(
         GetStockMovementsListQuery request,
         CancellationToken ct)
     {

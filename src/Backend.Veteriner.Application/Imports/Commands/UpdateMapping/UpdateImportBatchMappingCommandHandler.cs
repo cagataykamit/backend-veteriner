@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Imports.Commands.UpdateMapping;
@@ -44,7 +44,7 @@ public sealed class UpdateImportBatchMappingCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ImportBatchDto>> Handle(UpdateImportBatchMappingCommand request, CancellationToken ct)
+    public async ValueTask<Result<ImportBatchDto>> Handle(UpdateImportBatchMappingCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

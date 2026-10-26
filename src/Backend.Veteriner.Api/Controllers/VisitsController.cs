@@ -11,7 +11,7 @@ using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Queries.GetById;
 using Backend.Veteriner.Application.Visits.Queries.GetToday;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Administrations;
-using MediatR;
+using Mediator;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Clinics.Access;
@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Vaccinations.Handlers;

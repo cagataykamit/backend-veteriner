@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Organization.Commands.UpdateBillingProfile;
 using Backend.Veteriner.Application.Organization.Queries.GetBillingProfile;
 using Backend.Veteriner.Domain.Tenants;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Organization.Handlers;

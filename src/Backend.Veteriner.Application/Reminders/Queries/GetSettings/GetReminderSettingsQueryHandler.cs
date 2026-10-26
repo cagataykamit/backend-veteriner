@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Reminders.Contracts.Dtos;
 using Backend.Veteriner.Application.Reminders.Specs;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reminders.Queries.GetSettings;
 
@@ -21,7 +21,7 @@ public sealed class GetReminderSettingsQueryHandler
         _settingsRead = settingsRead;
     }
 
-    public async Task<Result<ReminderSettingsDto>> Handle(GetReminderSettingsQuery request, CancellationToken ct)
+    public async ValueTask<Result<ReminderSettingsDto>> Handle(GetReminderSettingsQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

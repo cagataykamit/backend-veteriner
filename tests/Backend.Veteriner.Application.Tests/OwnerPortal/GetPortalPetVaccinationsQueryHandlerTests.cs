@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.OwnerPortal;
@@ -74,7 +74,7 @@ public sealed class GetPortalPetVaccinationsQueryHandlerTests
         return id;
     }
 
-    private Task<Result<PortalPetVaccinationsDto>> SendAsync(DateTime utcNow)
+    private ValueTask<Result<PortalPetVaccinationsDto>> SendAsync(DateTime utcNow)
         => Handler(utcNow).Handle(new GetPortalPetVaccinationsQuery(_account.Id, _link.Id, _pet?.Id ?? Guid.NewGuid()), CancellationToken.None);
 
     [Fact]

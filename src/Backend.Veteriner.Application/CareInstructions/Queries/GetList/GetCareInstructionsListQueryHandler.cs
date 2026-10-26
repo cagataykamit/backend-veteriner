@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.CareInstructions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.CareInstructions.Queries.GetList;
 
@@ -30,7 +30,7 @@ public sealed class GetCareInstructionsListQueryHandler
         _careInstructions = careInstructions;
     }
 
-    public async Task<Result<PagedResult<CareInstructionDto>>> Handle(
+    public async ValueTask<Result<PagedResult<CareInstructionDto>>> Handle(
         GetCareInstructionsListQuery request,
         CancellationToken ct)
     {

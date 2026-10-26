@@ -9,7 +9,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.LabResults.Queries.GetById;
 
@@ -45,7 +45,7 @@ public sealed class GetLabResultByIdQueryHandler
         _clients = clients;
     }
 
-    public async Task<Result<LabResultDetailDto>> Handle(GetLabResultByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<LabResultDetailDto>> Handle(GetLabResultByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

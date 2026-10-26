@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -123,7 +123,7 @@ public sealed class PetQueryHandlerFeatureFlagTests
             .ThrowsAsync(new InvalidOperationException("query db unavailable"));
 
         var handler = CreateListHandler(true);
-        var act = () => handler.Handle(new GetPetsListQuery(new PageRequest()), CancellationToken.None);
+        var act = async () => await handler.Handle(new GetPetsListQuery(new PageRequest()), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         _pets.Verify(r => r.CountAsync(It.IsAny<PetsByTenantCountSpec>(), It.IsAny<CancellationToken>()), Times.Never);

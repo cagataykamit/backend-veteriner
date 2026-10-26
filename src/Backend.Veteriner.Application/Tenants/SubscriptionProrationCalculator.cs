@@ -34,6 +34,23 @@ public static class SubscriptionProrationCalculator
         return new SubscriptionProrationResult(ratio, diff, charge);
     }
 
+    /// <summary>
+    /// Dönem türü değişimi (aylıktan yıllığa, BILL-001): yeni dönem hemen başlar; mevcut dönemin kullanılmamış kısmı
+    /// (<paramref name="currentPeriodPriceMinor"/> × kalan oran) yeni dönem fiyatından düşülür. Oran, mevcut dönemden kalan paydır.
+    /// </summary>
+    public static SubscriptionProrationResult CalculatePeriodSwitch(
+        DateTime utcNow,
+        DateTime currentPeriodStartUtc,
+        DateTime currentPeriodEndUtc,
+        long currentPeriodPriceMinor,
+        long newPeriodPriceMinor)
+    {
+        var unused = Calculate(utcNow, currentPeriodStartUtc, currentPeriodEndUtc, 0, currentPeriodPriceMinor);
+        var charge = newPeriodPriceMinor - unused.ProratedChargeMinor;
+
+        return new SubscriptionProrationResult(unused.ProrationRatio, newPeriodPriceMinor - currentPeriodPriceMinor, charge);
+    }
+
     private static DateTime EnsureUtc(DateTime value)
         => value.Kind switch
         {

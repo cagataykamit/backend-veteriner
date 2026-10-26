@@ -1,14 +1,15 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Contracts.Outbox;
 using Backend.Veteriner.Application.Common.Models;
-using Backend.Veteriner.Infrastructure.Persistence;
-using Backend.Veteriner.Infrastructure.Persistence.Entities;
+using Backend.Veteriner.Application.Outbox;
+using Backend.Veteriner.Application.Outbox.Commands.Delete;
+using Backend.Veteriner.Application.Outbox.Commands.RetryAllDeadLetters;
+using Backend.Veteriner.Application.Outbox.Commands.RetryDeadLetter;
+using Backend.Veteriner.Application.Outbox.Queries.GetDeadLettersPaged;
+using Backend.Veteriner.Application.Outbox.Queries.GetPendingPaged;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Api.Controllers;
 
@@ -19,90 +20,19 @@ namespace Backend.Veteriner.Api.Controllers;
 [Produces("application/json")]
 public sealed class OutboxAdminController : ControllerBase
 {
-    private const int MaxPageSize = 200;
+    private readonly IMediator _mediator;
 
-    private readonly AppDbContext _db;
-    private readonly ILogger<OutboxAdminController> _logger;
-
-    public OutboxAdminController(AppDbContext db, ILogger<OutboxAdminController> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    public OutboxAdminController(IMediator mediator) => _mediator = mediator;
 
     // GET /api/v1/admin/outbox/pending?page=1&pageSize=50&sort=createdAtUtc&order=desc&search=...
     [HttpGet("pending")]
     public async Task<ActionResult<PagedResult<OutboxItemDto>>> GetPending([FromQuery] PageRequest req, CancellationToken ct)
-    {
-        var (page, pageSize) = Normalize(req);
-
-        IQueryable<OutboxMessage> q = _db.OutboxMessages
-            .Where(x => x.ProcessedAtUtc == null && x.DeadLetterAtUtc == null);
-
-        if (!string.IsNullOrWhiteSpace(req.Search))
-        {
-            var s = req.Search.Trim();
-            q = q.Where(x => x.Type.Contains(s));
-        }
-
-        q = ApplySort(q, req.Sort, req.Order);
-
-        var total = await q.CountAsync(ct);
-
-        var items = await q
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(x => new OutboxItemDto
-            {
-                Id = x.Id,
-                Type = x.Type,
-                CreatedAtUtc = x.CreatedAtUtc,
-                RetryCount = x.RetryCount,
-                NextAttemptAtUtc = x.NextAttemptAtUtc,
-                LastError = x.LastError,
-                DeadLetterAtUtc = x.DeadLetterAtUtc
-            })
-            .ToListAsync(ct);
-
-        return Ok(PagedResult<OutboxItemDto>.Create(items, total, page, pageSize));
-    }
+        => Ok(await _mediator.Send(new GetOutboxPendingPagedQuery(req), ct));
 
     // GET /api/v1/admin/outbox/dead?page=1&pageSize=50&sort=deadLetterAtUtc&order=desc&search=...
     [HttpGet("dead")]
     public async Task<ActionResult<PagedResult<OutboxItemDto>>> GetDead([FromQuery] PageRequest req, CancellationToken ct)
-    {
-        var (page, pageSize) = Normalize(req);
-
-        IQueryable<OutboxMessage> q = _db.OutboxMessages
-            .Where(x => x.DeadLetterAtUtc != null && x.ProcessedAtUtc == null);
-
-        if (!string.IsNullOrWhiteSpace(req.Search))
-        {
-            var s = req.Search.Trim();
-            q = q.Where(x => x.Type.Contains(s));
-        }
-
-        q = ApplySort(q, req.Sort, req.Order);
-
-        var total = await q.CountAsync(ct);
-
-        var items = await q
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(x => new OutboxItemDto
-            {
-                Id = x.Id,
-                Type = x.Type,
-                CreatedAtUtc = x.CreatedAtUtc,
-                RetryCount = x.RetryCount,
-                NextAttemptAtUtc = x.NextAttemptAtUtc,
-                LastError = x.LastError,
-                DeadLetterAtUtc = x.DeadLetterAtUtc
-            })
-            .ToListAsync(ct);
-
-        return Ok(PagedResult<OutboxItemDto>.Create(items, total, page, pageSize));
-    }
+        => Ok(await _mediator.Send(new GetOutboxDeadLettersPagedQuery(req), ct));
 
     // POST /api/v1/admin/outbox/retry/{id}
     [Authorize(Policy = PermissionCatalog.Outbox.Write)]
@@ -112,44 +42,19 @@ public sealed class OutboxAdminController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Retry(Guid id, CancellationToken ct)
     {
-        var actorUserId = GetActorUserIdOrNull();
+        var result = await _mediator.Send(new RetryOutboxDeadLetterCommand(id), ct);
+        if (result.IsSuccess) return Ok(new { ok = true });
 
-        _logger.LogInformation(
-            "AUDIT Outbox.Write RetryDeadLetter actorUserId={ActorUserId} outboxId={OutboxId}",
-            actorUserId, id);
-
-        var msg = await _db.OutboxMessages.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (msg is null)
+        // Bu uçlar ResultExtensions şeklini kullanmaz; mevcut yanıtlar (NotFound(), "Invalid operation" 400) korunur.
+        if (result.Error.Code == OutboxErrors.NotDeadLetter.Code)
         {
-            _logger.LogInformation(
-                "AUDIT Outbox.Write RetryDeadLetter NOT_FOUND actorUserId={ActorUserId} outboxId={OutboxId}",
-                actorUserId, id);
-            return NotFound();
-        }
-
-        if (msg.DeadLetterAtUtc is null)
-        {
-            _logger.LogInformation(
-                "AUDIT Outbox.Write RetryDeadLetter INVALID_OPERATION actorUserId={ActorUserId} outboxId={OutboxId} reason=not_dead_letter",
-                actorUserId, id);
-
             return Problem(
                 title: "Invalid operation",
-                detail: "Mesaj dead-letter değil.",
+                detail: result.Error.Message,
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        msg.DeadLetterAtUtc = null;
-        msg.NextAttemptAtUtc = DateTime.UtcNow;
-        msg.LastError = null;
-
-        await _db.SaveChangesAsync(ct);
-
-        _logger.LogInformation(
-            "AUDIT Outbox.Write RetryDeadLetter SUCCESS actorUserId={ActorUserId} outboxId={OutboxId}",
-            actorUserId, id);
-
-        return Ok(new { ok = true });
+        return NotFound();
     }
 
     // POST /api/v1/admin/outbox/retry-dead-all
@@ -157,41 +62,8 @@ public sealed class OutboxAdminController : ControllerBase
     [HttpPost("retry-dead-all")]
     public async Task<IActionResult> RetryAllDead(CancellationToken ct)
     {
-        var actorUserId = GetActorUserIdOrNull();
-
-        _logger.LogInformation(
-            "AUDIT Outbox.Write RetryAllDeadLetter actorUserId={ActorUserId}",
-            actorUserId);
-
-        var list = await _db.OutboxMessages
-            .Where(x => x.DeadLetterAtUtc != null && x.ProcessedAtUtc == null)
-            .ToListAsync(ct);
-
-        if (list.Count == 0)
-        {
-            _logger.LogInformation(
-                "AUDIT Outbox.Write RetryAllDeadLetter SUCCESS actorUserId={ActorUserId} count=0",
-                actorUserId);
-
-            return Ok(new { count = 0 });
-        }
-
-        var now = DateTime.UtcNow;
-
-        foreach (var m in list)
-        {
-            m.DeadLetterAtUtc = null;
-            m.NextAttemptAtUtc = now;
-            m.LastError = null;
-        }
-
-        await _db.SaveChangesAsync(ct);
-
-        _logger.LogInformation(
-            "AUDIT Outbox.Write RetryAllDeadLetter SUCCESS actorUserId={ActorUserId} count={Count}",
-            actorUserId, list.Count);
-
-        return Ok(new { count = list.Count });
+        var count = await _mediator.Send(new RetryAllOutboxDeadLettersCommand(), ct);
+        return Ok(new { count });
     }
 
     // DELETE /api/v1/admin/outbox/{id}
@@ -201,60 +73,7 @@ public sealed class OutboxAdminController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var actorUserId = GetActorUserIdOrNull();
-
-        _logger.LogInformation(
-            "AUDIT Outbox.Write DeleteOutboxMessage actorUserId={ActorUserId} outboxId={OutboxId}",
-            actorUserId, id);
-
-        var msg = await _db.OutboxMessages.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (msg is null)
-        {
-            _logger.LogInformation(
-                "AUDIT Outbox.Write DeleteOutboxMessage NOT_FOUND actorUserId={ActorUserId} outboxId={OutboxId}",
-                actorUserId, id);
-
-            return NotFound();
-        }
-
-        _db.OutboxMessages.Remove(msg);
-        await _db.SaveChangesAsync(ct);
-
-        _logger.LogInformation(
-            "AUDIT Outbox.Write DeleteOutboxMessage SUCCESS actorUserId={ActorUserId} outboxId={OutboxId}",
-            actorUserId, id);
-
-        return NoContent();
-    }
-
-    private static (int page, int pageSize) Normalize(PageRequest req)
-    {
-        var page = Math.Max(1, req.Page);
-        var pageSize = Math.Clamp(req.PageSize, 1, MaxPageSize);
-        return (page, pageSize);
-    }
-
-    private static IQueryable<OutboxMessage> ApplySort(IQueryable<OutboxMessage> q, string? sort, string? order)
-    {
-        var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
-
-        return (sort?.Trim().ToLowerInvariant()) switch
-        {
-            "createdatutc" => desc ? q.OrderByDescending(x => x.CreatedAtUtc) : q.OrderBy(x => x.CreatedAtUtc),
-            "retrycount" => desc ? q.OrderByDescending(x => x.RetryCount) : q.OrderBy(x => x.RetryCount),
-            "type" => desc ? q.OrderByDescending(x => x.Type) : q.OrderBy(x => x.Type),
-            "deadletteratutc" => desc ? q.OrderByDescending(x => x.DeadLetterAtUtc) : q.OrderBy(x => x.DeadLetterAtUtc),
-            _ => q.OrderByDescending(x => x.CreatedAtUtc)
-        };
-    }
-
-    private Guid? GetActorUserIdOrNull()
-    {
-        var sub =
-            User.FindFirstValue(JwtRegisteredClaimNames.Sub) ??
-            User.FindFirstValue("sub") ??
-            User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(sub, out var userId) ? userId : null;
+        var result = await _mediator.Send(new DeleteOutboxMessageCommand(id), ct);
+        return result.IsSuccess ? NoContent() : NotFound();
     }
 }

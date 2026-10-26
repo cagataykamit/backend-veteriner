@@ -7,7 +7,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Vaccinations.Queries.ExportVaccinationReport;
 
@@ -43,7 +43,7 @@ public sealed class ExportVaccinationsReportXlsxQueryHandler
         _trialLimitPolicy = trialLimitPolicy;
     }
 
-    public async Task<Result<VaccinationsXlsxExportResult>> Handle(
+    public async ValueTask<Result<VaccinationsXlsxExportResult>> Handle(
         ExportVaccinationsReportXlsxQuery request,
         CancellationToken ct)
     {

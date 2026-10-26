@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Projections.Clients;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.Projections.Clients;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Query.Clients;

@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Hospitalizations;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.Hospitalizations;
 

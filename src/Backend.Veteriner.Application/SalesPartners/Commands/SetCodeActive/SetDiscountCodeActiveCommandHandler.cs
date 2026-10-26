@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Commands.SetCodeActive;
 
@@ -18,7 +18,7 @@ public sealed class SetDiscountCodeActiveCommandHandler : IRequestHandler<SetDis
         _redemptions = redemptions;
     }
 
-    public async Task<Result<DiscountCodeDto>> Handle(SetDiscountCodeActiveCommand request, CancellationToken ct)
+    public async ValueTask<Result<DiscountCodeDto>> Handle(SetDiscountCodeActiveCommand request, CancellationToken ct)
     {
         var code = await _codes.FirstOrDefaultAsync(new DiscountCodeByIdSpec(request.SalesPartnerId, request.CodeId), ct);
         if (code is null)

@@ -17,7 +17,7 @@ using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Prescriptions.Commands.Update;
 
@@ -61,7 +61,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         _prescriptionsWrite = prescriptionsWrite;
     }
 
-    public async Task<Result> Handle(UpdatePrescriptionCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(UpdatePrescriptionCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

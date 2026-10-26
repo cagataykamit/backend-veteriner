@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Imports.Commit;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Backend.Veteriner.Application.Tests.Imports;

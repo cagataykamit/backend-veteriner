@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Public.Commands.AcceptInvite;
 
@@ -30,7 +30,7 @@ public sealed class AcceptTenantInviteCommandHandler
         _acceptance = acceptance;
     }
 
-    public async Task<Result<TenantInviteAcceptResultDto>> Handle(AcceptTenantInviteCommand request, CancellationToken ct)
+    public async ValueTask<Result<TenantInviteAcceptResultDto>> Handle(AcceptTenantInviteCommand request, CancellationToken ct)
     {
         string hash;
         try

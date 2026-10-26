@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Tenants;
@@ -13,6 +14,10 @@ public sealed class TenantSubscription : AggregateRoot
     public DateTime? TrialStartsAtUtc { get; private set; }
     public DateTime? TrialEndsAtUtc { get; private set; }
     public DateTime? ActivatedAtUtc { get; private set; }
+
+    /// <summary>Ücretli dönem türü (BILL-001); dönem <see cref="ActivatedAtUtc"/> ile başlar, <see cref="PaidPeriodEndUtc"/> ile biter.</summary>
+    public BillingPeriodKind BillingPeriod { get; private set; } = BillingPeriodKind.Monthly;
+
     public DateTime? CancelledAtUtc { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
@@ -67,24 +72,34 @@ public sealed class TenantSubscription : AggregateRoot
         UpdatedAtUtc = now;
     }
 
+    /// <summary>Ücretli dönemin bitişi; hiç ödeme alınmadıysa <c>null</c>.</summary>
+    public DateTime? PaidPeriodEndUtc
+        => ActivatedAtUtc is { } start ? BillingPeriods.EndOf(start, BillingPeriod) : null;
+
+    /// <summary>Mevcut dönem türünü koruyarak planı etkinleştirir (yükseltme, planlı düşürme).</summary>
     public void ActivatePaidPlan(SubscriptionPlanCode targetPlanCode, DateTime utcNow)
+        => ActivatePaidPlan(targetPlanCode, BillingPeriod, utcNow);
+
+    public void ActivatePaidPlan(SubscriptionPlanCode targetPlanCode, BillingPeriodKind period, DateTime utcNow)
     {
         var now = NormalizeUtc(utcNow);
         var anchor = ActivatedAtUtc;
-        var currentPeriodExpired = anchor.HasValue && anchor.Value.AddMonths(1) <= now;
+        var currentPeriodExpired = PaidPeriodEndUtc is { } end && end <= now;
+        var periodChanged = period != BillingPeriod;
 
-        if (Status == TenantSubscriptionStatus.Active && PlanCode == targetPlanCode && !currentPeriodExpired)
+        if (Status == TenantSubscriptionStatus.Active && PlanCode == targetPlanCode && !periodChanged && !currentPeriodExpired)
         {
             UpdatedAtUtc = now;
             return;
         }
 
         // Billing cycle anchor korunur: süresi dolmamış aktif abonelikte plan geçişi (upgrade) anchor'ı
-        // reset etmez. Ancak önceki ödeme dönemi süresi dolmuşsa (renewal), anchor yeni ödeme zamanına
-        // taşınır; aksi halde ödeme tamamlansa bile abonelik hemen tekrar ReadOnly'e düşerdi.
+        // reset etmez. Önceki dönem dolmuşsa (renewal) ya da dönem türü değiştiyse (aylıktan yıllığa;
+        // kalan günler tahsilattan düşülmüştür) yeni dönem ödeme anında başlar.
         PlanCode = targetPlanCode;
+        BillingPeriod = period;
         Status = TenantSubscriptionStatus.Active;
-        ActivatedAtUtc = currentPeriodExpired || anchor is null ? now : anchor.Value;
+        ActivatedAtUtc = currentPeriodExpired || periodChanged || anchor is null ? now : anchor.Value;
         CancelledAtUtc = null;
         UpdatedAtUtc = now;
     }

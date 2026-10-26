@@ -24,5 +24,6 @@ public sealed record SubscriptionCheckoutSessionDto(
     long? ProratedChargeMinor,
     decimal? ProrationRatio,
     bool TrialPlanChangeApplied,
-    long? DiscountAmountMinor = null);
+    long? DiscountAmountMinor = null,
+    string BillingPeriod = "Monthly");
 

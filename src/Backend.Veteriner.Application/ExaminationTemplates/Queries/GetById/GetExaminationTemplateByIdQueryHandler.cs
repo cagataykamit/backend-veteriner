@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.ExaminationTemplates.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.ExaminationTemplates.Queries.GetById;
 
@@ -25,7 +25,7 @@ public sealed class GetExaminationTemplateByIdQueryHandler
         _products = products;
     }
 
-    public async Task<Result<ExaminationTemplateDto>> Handle(GetExaminationTemplateByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<ExaminationTemplateDto>> Handle(GetExaminationTemplateByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ExaminationTemplateDto>.Failure(ExaminationTemplateErrors.TenantContextMissing);

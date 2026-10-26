@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Examinations.Queries.GetById;
 
@@ -49,7 +49,7 @@ public sealed class GetExaminationByIdQueryHandler
         _userNames = userNames;
     }
 
-    public async Task<Result<ExaminationDetailDto>> Handle(GetExaminationByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<ExaminationDetailDto>> Handle(GetExaminationByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

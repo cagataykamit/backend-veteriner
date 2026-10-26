@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Queries.Sessions;
 
@@ -15,7 +15,7 @@ public sealed class ListSessionsQueryHandler : IRequestHandler<ListSessionsQuery
         _client = client;
     }
 
-    public async Task<Result<IReadOnlyList<SessionDto>>> Handle(ListSessionsQuery request, CancellationToken ct)
+    public async ValueTask<Result<IReadOnlyList<SessionDto>>> Handle(ListSessionsQuery request, CancellationToken ct)
     {
         var userId = _client.UserId;
         if (userId is null)

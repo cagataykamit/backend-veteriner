@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Tenants.Queries.GetMembers;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;

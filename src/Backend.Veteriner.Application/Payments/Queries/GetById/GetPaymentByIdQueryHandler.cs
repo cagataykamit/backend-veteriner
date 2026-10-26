@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -60,7 +60,7 @@ public sealed class GetPaymentByIdQueryHandler
         _petCountReader = petCountReader;
     }
 
-    public async Task<Result<PaymentDetailDto>> Handle(GetPaymentByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<PaymentDetailDto>> Handle(GetPaymentByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

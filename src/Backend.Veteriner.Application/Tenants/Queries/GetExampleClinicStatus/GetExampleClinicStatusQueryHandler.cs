@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.ExampleClinic;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetExampleClinicStatus;
 
@@ -28,7 +28,7 @@ public sealed class GetExampleClinicStatusQueryHandler
         _cleaner = cleaner;
     }
 
-    public async Task<Result<ExampleClinicStatusDto>> Handle(GetExampleClinicStatusQuery request, CancellationToken ct)
+    public async ValueTask<Result<ExampleClinicStatusDto>> Handle(GetExampleClinicStatusQuery request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Subscriptions.Manage))
         {

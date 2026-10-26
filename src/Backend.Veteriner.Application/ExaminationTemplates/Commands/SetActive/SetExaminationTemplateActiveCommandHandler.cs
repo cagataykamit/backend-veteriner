@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.ExaminationTemplates.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ExaminationTemplates.Commands.SetActive;
@@ -18,7 +18,7 @@ public sealed class SetExaminationTemplateActiveCommandHandler : IRequestHandler
         _templates = templates;
     }
 
-    public async Task<Result> Handle(SetExaminationTemplateActiveCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(SetExaminationTemplateActiveCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result.Failure(ExaminationTemplateErrors.TenantContextMissing);

@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Auth.Queries.UserOperationClaims.GetDetails;
 using Backend.Veteriner.Application.Common.Abstractions;
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Auth.UserOperationClaims.Queries;

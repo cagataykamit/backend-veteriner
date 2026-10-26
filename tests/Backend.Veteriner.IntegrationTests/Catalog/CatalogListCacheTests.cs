@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.BreedsReference.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.SpeciesReference.Contracts.Dtos;
 using Backend.Veteriner.Infrastructure.Caching;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace Backend.Veteriner.IntegrationTests.Catalog;

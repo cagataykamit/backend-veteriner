@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -229,7 +229,7 @@ public sealed class PaymentsReportReadRoutingTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("lookup down"));
 
-        var act = () => CreateHandler(paymentsReportReadEnabled: true)
+        var act = async () => await CreateHandler(paymentsReportReadEnabled: true)
             .Handle(Query(clinicId: cid, search: "pamuk"), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -379,7 +379,7 @@ public sealed class PaymentsReportReadRoutingTests
             .Setup(r => r.GetReportAsync(It.IsAny<PaymentsReportReadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(paymentsReportReadEnabled: true)
+        var act = async () => await CreateHandler(paymentsReportReadEnabled: true)
             .Handle(Query(clinicId: cid), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

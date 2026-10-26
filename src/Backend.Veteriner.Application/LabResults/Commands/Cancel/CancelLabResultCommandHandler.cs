@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.LabResults.Commands.Cancel;
@@ -44,7 +44,7 @@ public sealed class CancelLabResultCommandHandler
         _fileCloser = fileCloser;
     }
 
-    public async Task<Result<LabResultWriteResultDto>> Handle(CancelLabResultCommand request, CancellationToken ct)
+    public async ValueTask<Result<LabResultWriteResultDto>> Handle(CancelLabResultCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

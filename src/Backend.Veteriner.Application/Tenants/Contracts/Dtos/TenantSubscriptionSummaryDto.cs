@@ -18,7 +18,8 @@ public sealed record TenantSubscriptionSummaryDto(
     DateTime BillingCycleAnchorUtc,
     DateTime NextBillingAtUtc,
     PendingSubscriptionPlanChangeDto? PendingPlanChange,
-    IReadOnlyList<SubscriptionPlanOptionDto> AvailablePlans);
+    IReadOnlyList<SubscriptionPlanOptionDto> AvailablePlans,
+    string BillingPeriod = "Monthly");
 
 public sealed record SubscriptionPlanOptionDto(string Code, string Name, string? Description, int MaxUsers);
 
