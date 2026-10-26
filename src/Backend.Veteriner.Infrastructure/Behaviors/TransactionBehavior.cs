@@ -71,7 +71,8 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
         }
         catch
         {
-            await tx.RollbackAsync(ct);
+            // İstek iptal edilmiş olabilir; geri alma iptal edilmiş token ile kesilmesin, özgün istisna maskelenmesin.
+            await tx.RollbackAsync(CancellationToken.None);
 
             _logger.LogWarning("TRANSACTION ROLLBACK {RequestName}", requestName);
 
