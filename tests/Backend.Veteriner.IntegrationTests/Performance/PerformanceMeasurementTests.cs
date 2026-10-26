@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
@@ -15,14 +16,14 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit.Abstractions;
 
 namespace Backend.IntegrationTests.Performance;
 
 /// <summary>Yalnız <c>VETINITY_PERF=1</c> iken çalışır; normal test koşularında atlanır.</summary>
 public sealed class PerfFactAttribute : FactAttribute
 {
-    public PerfFactAttribute()
+    public PerfFactAttribute([CallerFilePath] string? sourceFilePath = null, [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (Environment.GetEnvironmentVariable("VETINITY_PERF") != "1")
             Skip = "Performans ölçümü: VETINITY_PERF=1 ile çalıştırın (docs/PERFORMANCE_FINDINGS.md).";

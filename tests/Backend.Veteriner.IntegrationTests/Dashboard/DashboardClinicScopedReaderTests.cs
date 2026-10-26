@@ -23,7 +23,7 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     /// Test başına izole, run-specific LocalDB oluşturur ve migrate eder.
     /// DB açılmadan ÖNCE guard çalışır; migrate aşamasında hata olursa DB hemen drop edilir.
     /// </summary>
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var commandDbName = IntegrationTestDatabaseNames.WithRunId($"{CommandDatabasePrefix}{Guid.NewGuid():N}");
         var connectionString =
@@ -59,7 +59,7 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     /// Önce DbContext (ve connection) dispose edilir, ardından DB güvenli force-drop ile silinir;
     /// böylece C:\Users\&lt;user&gt; altında kalıcı .mdf/.ldf dosyası kalmaz.
     /// </summary>
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_db is not null)
             await _db.DisposeAsync();

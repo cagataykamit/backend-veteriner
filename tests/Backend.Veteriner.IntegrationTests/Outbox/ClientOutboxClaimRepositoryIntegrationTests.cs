@@ -13,7 +13,6 @@ namespace Backend.IntegrationTests.Outbox;
 
 [Collection("client-projection-claim")]
 public sealed class ClientOutboxClaimRepositoryIntegrationTests
-    : IClassFixture<ClientProjectionClaimEnabledWebApplicationFactory>
 {
     private static readonly TimeSpan DefaultLease = TimeSpan.FromSeconds(60);
 

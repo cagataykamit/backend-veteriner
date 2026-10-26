@@ -22,7 +22,7 @@ using Microsoft.Extensions.Options;
 namespace Backend.IntegrationTests.Appointments;
 
 [Collection("appointment-query-read")]
-public sealed class AppointmentListCalendarQueryParityIntegrationTests : IClassFixture<AppointmentQueryReadModelWebApplicationFactory>
+public sealed class AppointmentListCalendarQueryParityIntegrationTests
 {
     private readonly AppointmentQueryReadModelWebApplicationFactory _factory;
 

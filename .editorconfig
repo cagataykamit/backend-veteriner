@@ -19,3 +19,8 @@ indent_size = 4
 # Saat kaynagi kurali (BannedSymbols.txt, Domain + Application): mevcut 180+ kullanim kademeli temizlenecek; o yuzden
 # oneri seviyesinde (IDE gosterir, derleme uyarisi vermez). Temizlik bitince warning/error yapilir.
 dotnet_diagnostic.RS0030.severity = suggestion
+
+[tests/**/*.cs]
+# xUnit v3 analizoru (xUnit1051): CancellationToken alan cagrilara TestContext.Current.CancellationToken onerir.
+# Mevcut ~3000 cagri noktasi icin toplu degisiklik yapilmadi; yeni testlerde tercih edilir.
+dotnet_diagnostic.xUnit1051.severity = suggestion

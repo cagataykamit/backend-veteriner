@@ -18,7 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Appointments;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentMutationSequenceIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentMutationSequenceIntegrationTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 

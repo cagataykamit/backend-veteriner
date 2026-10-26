@@ -13,7 +13,6 @@ namespace Backend.IntegrationTests.Outbox;
 
 [Collection("pet-projection-claim")]
 public sealed class PetOutboxClaimRepositoryIntegrationTests
-    : IClassFixture<PetProjectionClaimEnabledWebApplicationFactory>
 {
     private static readonly TimeSpan DefaultLease = TimeSpan.FromSeconds(60);
 

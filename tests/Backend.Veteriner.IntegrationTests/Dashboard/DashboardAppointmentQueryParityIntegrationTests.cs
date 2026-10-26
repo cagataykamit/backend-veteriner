@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Dashboard;
 
 [Collection("dashboard-query-read")]
-public sealed class DashboardAppointmentQueryParityIntegrationTests : IClassFixture<DashboardQueryReadModelWebApplicationFactory>
+public sealed class DashboardAppointmentQueryParityIntegrationTests
 {
     private readonly DashboardQueryReadModelWebApplicationFactory _factory;
 

@@ -20,7 +20,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Appointments;
 
 [Collection("appointment-projection")]
-public sealed class AppointmentCommandOutboxIntegrationTests : IClassFixture<AppointmentProjectionWebApplicationFactory>
+public sealed class AppointmentCommandOutboxIntegrationTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
