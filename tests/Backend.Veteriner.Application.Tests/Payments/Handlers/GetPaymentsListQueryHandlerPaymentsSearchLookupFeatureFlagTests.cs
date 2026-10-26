@@ -96,7 +96,7 @@ public sealed class GetPaymentsListQueryHandlerPaymentsSearchLookupFeatureFlagTe
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(paymentsSearchLookupEnabled: true).Handle(
+        var act = async () => await CreateHandler(paymentsSearchLookupEnabled: true).Handle(
             new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }, Search: "pamuk"),
             CancellationToken.None);
 

@@ -205,7 +205,7 @@ public sealed class ClientInvoicingIdentityHandlerTests
             _clientId, "Ayşe Yılmaz",
             InvoicingIdentity: new ClientInvoicingIdentityDto(ClientPersonType.Corporate, null, Vkn, "VD", null, null, null, null));
 
-        await behavior.Handle(command, _ => Task.FromResult(Result.Success()), CancellationToken.None);
+        await behavior.Handle(command, (_, _) => ValueTask.FromResult(Result.Success()), CancellationToken.None);
 
         entry!.Action.Should().Be("Client.Update");
         entry.RequestPayload.Should().Contain("\"taxNumber\":\"123*****90\"").And.NotContain(Vkn);

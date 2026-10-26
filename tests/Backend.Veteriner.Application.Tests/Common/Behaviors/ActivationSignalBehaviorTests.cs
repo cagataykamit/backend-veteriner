@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Tenants.Activation;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using AwesomeAssertions;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -15,12 +16,12 @@ namespace Backend.Veteriner.Application.Tests.Common.Behaviors;
 /// </summary>
 public sealed class ActivationSignalBehaviorTests
 {
-    public sealed record SampleSignalCommand : IActivationSignalRequest
+    public sealed record SampleSignalCommand : IRequest<Result<Guid>>, IActivationSignalRequest
     {
         public ActivationSignalKind ActivationSignal => ActivationSignalKind.PetCreated;
     }
 
-    public sealed record PlainCommand;
+    public sealed record PlainCommand : IRequest<Result>;
 
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
@@ -46,7 +47,7 @@ public sealed class ActivationSignalBehaviorTests
     public async Task Handle_Should_Record_When_Command_Succeeds()
     {
         var result = await CreateBehavior().Handle(
-            new SampleSignalCommand(), _ => Task.FromResult(Result<Guid>.Success(Guid.NewGuid())), CancellationToken.None);
+            new SampleSignalCommand(), (_, _) => ValueTask.FromResult(Result<Guid>.Success(Guid.NewGuid())), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         VerifyRecorded(Times.Once());
@@ -56,7 +57,7 @@ public sealed class ActivationSignalBehaviorTests
     public async Task Handle_Should_NotRecord_When_Command_Fails()
     {
         await CreateBehavior().Handle(
-            new SampleSignalCommand(), _ => Task.FromResult(Result<Guid>.Failure("Pets.Invalid", "x")), CancellationToken.None);
+            new SampleSignalCommand(), (_, _) => ValueTask.FromResult(Result<Guid>.Failure("Pets.Invalid", "x")), CancellationToken.None);
 
         _recorder.Verify(r => r.RecordFirstActionAsync(It.IsAny<Guid>(), It.IsAny<ActivationSignalKind>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never());
     }
@@ -67,7 +68,7 @@ public sealed class ActivationSignalBehaviorTests
         _tenant.SetupGet(t => t.TenantId).Returns((Guid?)null);
 
         await CreateBehavior().Handle(
-            new SampleSignalCommand(), _ => Task.FromResult(Result<Guid>.Success(Guid.NewGuid())), CancellationToken.None);
+            new SampleSignalCommand(), (_, _) => ValueTask.FromResult(Result<Guid>.Success(Guid.NewGuid())), CancellationToken.None);
 
         _recorder.Verify(r => r.RecordFirstActionAsync(It.IsAny<Guid>(), It.IsAny<ActivationSignalKind>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never());
     }
@@ -79,7 +80,7 @@ public sealed class ActivationSignalBehaviorTests
             _tenant.Object, _client.Object, _recorder.Object,
             new Mock<ILogger<ActivationSignalBehavior<PlainCommand, Result>>>().Object);
 
-        var result = await behavior.Handle(new PlainCommand(), _ => Task.FromResult(Result.Success()), CancellationToken.None);
+        var result = await behavior.Handle(new PlainCommand(), (_, _) => ValueTask.FromResult(Result.Success()), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         _recorder.VerifyNoOtherCalls();
@@ -93,7 +94,7 @@ public sealed class ActivationSignalBehaviorTests
         var id = Guid.NewGuid();
 
         var result = await CreateBehavior().Handle(
-            new SampleSignalCommand(), _ => Task.FromResult(Result<Guid>.Success(id)), CancellationToken.None);
+            new SampleSignalCommand(), (_, _) => ValueTask.FromResult(Result<Guid>.Success(id)), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue("ölçüm hatası iş sonucunu bozmamalı");
         result.Value.Should().Be(id);

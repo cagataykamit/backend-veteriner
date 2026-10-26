@@ -126,7 +126,7 @@ public sealed class GetPetSummaryQueryHandlerTests
         return v;
     }
 
-    private Task<Domain.Shared.Result<PetSummaryDto>> Run(GetPetSummaryQueryHandler handler)
+    private ValueTask<Domain.Shared.Result<PetSummaryDto>> Run(GetPetSummaryQueryHandler handler)
         => handler.Handle(new GetPetSummaryQuery(_petId), CancellationToken.None);
 
     [Fact]
@@ -381,7 +381,7 @@ public sealed class GetPetSummaryQueryHandlerTests
                 throw new OperationCanceledException(cts.Token);
             });
 
-        var act = () => CreateHandler(hospRepo: failing).Handle(new GetPetSummaryQuery(_petId), cts.Token);
+        var act = async () => await CreateHandler(hospRepo: failing).Handle(new GetPetSummaryQuery(_petId), cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
     }

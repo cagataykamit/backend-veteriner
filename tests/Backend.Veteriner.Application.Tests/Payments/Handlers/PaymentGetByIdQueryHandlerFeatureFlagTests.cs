@@ -125,7 +125,7 @@ public sealed class PaymentGetByIdQueryHandlerFeatureFlagTests
         _getByIdReader.Setup(x => x.GetByIdAsync(tenantId, paymentId, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Query DB unavailable"));
 
-        var act = () => CreateHandler(paymentsGetByIdReadEnabled: true)
+        var act = async () => await CreateHandler(paymentsGetByIdReadEnabled: true)
             .Handle(new GetPaymentByIdQuery(paymentId), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Query DB unavailable");

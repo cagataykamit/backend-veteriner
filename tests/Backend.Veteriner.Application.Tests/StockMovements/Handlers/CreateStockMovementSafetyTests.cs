@@ -268,7 +268,7 @@ public sealed class CreateStockMovementSafetyTests
             .Setup(r => r.AddAsync(It.IsAny<StockMovement>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("Başka hata.", innerException: null));
 
-        var act = () => CreateHandler().Handle(Cmd(StockMovementType.In, 1), CancellationToken.None);
+        var act = async () => await CreateHandler().Handle(Cmd(StockMovementType.In, 1), CancellationToken.None);
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }

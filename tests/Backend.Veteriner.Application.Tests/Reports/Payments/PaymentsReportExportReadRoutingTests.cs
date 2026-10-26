@@ -260,7 +260,7 @@ public sealed class PaymentsReportExportReadRoutingTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("lookup down"));
 
-        var act = () => CreateCsvHandler(exportReadEnabled: true)
+        var act = async () => await CreateCsvHandler(exportReadEnabled: true)
             .Handle(CsvQuery(cid, search: "pamuk"), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -450,7 +450,7 @@ public sealed class PaymentsReportExportReadRoutingTests
             .Setup(r => r.GetExportAsync(It.IsAny<PaymentsReportExportReadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateCsvHandler(exportReadEnabled: true).Handle(CsvQuery(cid), CancellationToken.None);
+        var act = async () => await CreateCsvHandler(exportReadEnabled: true).Handle(CsvQuery(cid), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         VerifyCommandExportPathNeverUsed();

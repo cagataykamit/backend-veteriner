@@ -23,7 +23,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Web;
 using ClosedXML.Excel;
 using AwesomeAssertions;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

@@ -149,7 +149,7 @@ public sealed class DashboardFinanceQueryHandlerFeatureFlagTests
             .Setup(r => r.GetAsync(It.IsAny<DashboardFinanceReadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(true).Handle(new GetDashboardFinanceSummaryQuery(), CancellationToken.None);
+        var act = async () => await CreateHandler(true).Handle(new GetDashboardFinanceSummaryQuery(), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         _aggregates.Verify(

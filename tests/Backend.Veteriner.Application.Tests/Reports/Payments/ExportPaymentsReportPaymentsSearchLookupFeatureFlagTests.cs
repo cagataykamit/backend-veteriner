@@ -84,7 +84,7 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateCsvHandler(paymentsSearchLookupEnabled: true).Handle(
+        var act = async () => await CreateCsvHandler(paymentsSearchLookupEnabled: true).Handle(
             CreateExportQuery(clinicId, search: "pamuk"),
             CancellationToken.None);
 
@@ -162,7 +162,7 @@ public sealed class ExportPaymentsReportPaymentsSearchLookupFeatureFlagTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateCsvHandler(
+        var act = async () => await CreateCsvHandler(
                 paymentsSearchLookupEnabled: true,
                 paymentsReportExportReadEnabled: true)
             .Handle(CreateExportQuery(clinicId, search: "pamuk"), CancellationToken.None);

@@ -96,7 +96,7 @@ public sealed class ClientQueryHandlerFeatureFlagTests
             .ThrowsAsync(new InvalidOperationException("query db unavailable"));
 
         var handler = CreateListHandler(true);
-        var act = () => handler.Handle(new GetClientsListQuery(new PageRequest()), CancellationToken.None);
+        var act = async () => await handler.Handle(new GetClientsListQuery(new PageRequest()), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         _clients.Verify(r => r.CountAsync(It.IsAny<ClientsByTenantCountSpec>(), It.IsAny<CancellationToken>()), Times.Never);

@@ -132,7 +132,7 @@ public sealed class RestoreVisitCommandHandlerTests
         _visitsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("other"));
 
-        var act = () => CreateHandler().Handle(new RestoreVisitCommand(visit.Id, Reason), CancellationToken.None);
+        var act = async () => await CreateHandler().Handle(new RestoreVisitCommand(visit.Id, Reason), CancellationToken.None);
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }

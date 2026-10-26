@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Administrations;
-using MediatR;
+using Mediator;
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Clinics.Access;

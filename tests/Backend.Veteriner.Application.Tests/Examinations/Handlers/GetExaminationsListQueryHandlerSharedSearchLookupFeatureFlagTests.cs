@@ -131,7 +131,7 @@ public sealed class GetExaminationsListQueryHandlerSharedSearchLookupFeatureFlag
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(sharedSearchLookupEnabled: true).Handle(
+        var act = async () => await CreateHandler(sharedSearchLookupEnabled: true).Handle(
             new GetExaminationsListQuery(new PageRequest { Page = 1, PageSize = 20, Search = "pamuk" }),
             CancellationToken.None);
 

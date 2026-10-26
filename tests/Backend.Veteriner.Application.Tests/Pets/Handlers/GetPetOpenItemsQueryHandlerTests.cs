@@ -133,7 +133,7 @@ public sealed class GetPetOpenItemsQueryHandlerTests
         return c;
     }
 
-    private Task<Domain.Shared.Result<PetOpenItemsDto>> Run(GetPetOpenItemsQueryHandler handler)
+    private ValueTask<Domain.Shared.Result<PetOpenItemsDto>> Run(GetPetOpenItemsQueryHandler handler)
         => handler.Handle(new GetPetOpenItemsQuery(_pet.Id), CancellationToken.None);
 
     [Fact]

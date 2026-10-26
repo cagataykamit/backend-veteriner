@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Domain.Shared;
 using AwesomeAssertions;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -12,7 +13,7 @@ namespace Backend.Veteriner.Application.Tests.Common.Behaviors;
 public sealed class AuditBehaviorTests
 {
     // Moq'un ILogger<AuditBehavior<T,...>> proxy'si için tip erişilebilir olmalı (public).
-    public sealed record SampleAuditedCommand : IAuditableRequest
+    public sealed record SampleAuditedCommand : IRequest<Result>, IAuditableRequest
     {
         public string AuditAction => "Sample.Do";
         public string? AuditTarget => "Id=1";
@@ -43,7 +44,7 @@ public sealed class AuditBehaviorTests
         WriterThrows();
 
         var result = await CreateBehavior().Handle(
-            new SampleAuditedCommand(), _ => Task.FromResult(Result.Success()), CancellationToken.None);
+            new SampleAuditedCommand(), (_, _) => ValueTask.FromResult(Result.Success()), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue("iş yazımı commit edilmiş; denetim hatası 500'e dönüşmemeli");
         VerifyErrorLogged(Times.Once());
@@ -54,9 +55,9 @@ public sealed class AuditBehaviorTests
     {
         WriterThrows();
 
-        var act = () => CreateBehavior().Handle(
+        var act = async () => await CreateBehavior().Handle(
             new SampleAuditedCommand(),
-            _ => throw new TimeoutException("handler failed"),
+            (_, _) => throw new TimeoutException("handler failed"),
             CancellationToken.None);
 
         await act.Should().ThrowAsync<TimeoutException>("denetim yazıcısının hatası özgün istisnayı maskelememeli");
@@ -72,7 +73,7 @@ public sealed class AuditBehaviorTests
             .Returns(Task.CompletedTask);
 
         await CreateBehavior().Handle(
-            new SampleAuditedCommand(), _ => Task.FromResult(Result.Failure("X.Y", "iş kuralı")), CancellationToken.None);
+            new SampleAuditedCommand(), (_, _) => ValueTask.FromResult(Result.Failure("X.Y", "iş kuralı")), CancellationToken.None);
 
         entry.Should().NotBeNull();
         entry!.Action.Should().Be("Sample.Do");

@@ -371,7 +371,7 @@ public sealed class CreateVisitCommandHandlerTests
         _visitsWrite.Setup(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("other failure"));
 
-        var act = () => CreateHandler().Handle(
+        var act = async () => await CreateHandler().Handle(
             new CreateVisitCommand(_clinicId, _petId, null, null), CancellationToken.None);
 
         await act.Should().ThrowAsync<DbUpdateException>();

@@ -307,7 +307,7 @@ public sealed class ClientPaymentSummaryQueryHandlerFeatureFlagTests
             .Setup(r => r.GetSummaryAsync(It.IsAny<ClientPaymentSummaryReadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(clientPaymentSummaryReadEnabled: true)
+        var act = async () => await CreateHandler(clientPaymentSummaryReadEnabled: true)
             .Handle(new GetClientPaymentSummaryQuery(Guid.NewGuid()), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

@@ -44,10 +44,10 @@ public sealed class GetVisitsTodayChargeAmountsTests
             .ReturnsAsync(new OpenItemsSummaryDto(1, 2, 30m, 4, 5));
     }
 
-    private Task<Backend.Veteriner.Domain.Shared.Result<TodayDto>> RunAsync(params TodayItemDto[] items)
+    private ValueTask<Backend.Veteriner.Domain.Shared.Result<TodayDto>> RunAsync(params TodayItemDto[] items)
         => RunAsync(voided: false, items);
 
-    private Task<Backend.Veteriner.Domain.Shared.Result<TodayDto>> RunAsync(bool voided, params TodayItemDto[] items)
+    private ValueTask<Backend.Veteriner.Domain.Shared.Result<TodayDto>> RunAsync(bool voided, params TodayItemDto[] items)
     {
         _reader.Setup(r => r.GetAsync(It.IsAny<VisitTodayReadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new VisitTodayReadResult(items, []));

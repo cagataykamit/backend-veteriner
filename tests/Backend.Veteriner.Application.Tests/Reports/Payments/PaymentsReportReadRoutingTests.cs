@@ -229,7 +229,7 @@ public sealed class PaymentsReportReadRoutingTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("lookup down"));
 
-        var act = () => CreateHandler(paymentsReportReadEnabled: true)
+        var act = async () => await CreateHandler(paymentsReportReadEnabled: true)
             .Handle(Query(clinicId: cid, search: "pamuk"), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -379,7 +379,7 @@ public sealed class PaymentsReportReadRoutingTests
             .Setup(r => r.GetReportAsync(It.IsAny<PaymentsReportReadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(paymentsReportReadEnabled: true)
+        var act = async () => await CreateHandler(paymentsReportReadEnabled: true)
             .Handle(Query(clinicId: cid), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

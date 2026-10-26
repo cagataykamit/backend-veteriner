@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using AwesomeAssertions;
+using Mediator;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Common.Behaviors;
@@ -16,7 +17,7 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
     private readonly Mock<IReadRepository<TenantSubscription>> _subscriptions = new();
 
     private TenantSubscriptionWriteGuardBehavior<TRequest, Result> CreateBehavior<TRequest>()
-        where TRequest : notnull
+        where TRequest : notnull, IMessage
     {
         var evaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
         return new TenantSubscriptionWriteGuardBehavior<TRequest, Result>(_tenantContext.Object, evaluator);
@@ -44,10 +45,10 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
         var behavior = CreateBehavior<SampleMutationCommand>();
         var nextCalled = false;
 
-        var result = await behavior.Handle(new SampleMutationCommand(), _ =>
+        var result = await behavior.Handle(new SampleMutationCommand(), (_, _) =>
         {
             nextCalled = true;
-            return Task.FromResult(Result.Success());
+            return ValueTask.FromResult(Result.Success());
         }, CancellationToken.None);
 
         nextCalled.Should().BeTrue();
@@ -76,7 +77,7 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
 
         var result = await behavior.Handle(
             new SampleMutationCommand(),
-            _ => Task.FromResult(Result.Success()),
+            (_, _) => ValueTask.FromResult(Result.Success()),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -102,7 +103,7 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
         var behavior = CreateBehavior<SampleMutationCommand>();
         var result = await behavior.Handle(
             new SampleMutationCommand(),
-            _ => Task.FromResult(Result.Success()),
+            (_, _) => ValueTask.FromResult(Result.Success()),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -117,10 +118,10 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
         var behavior = CreateBehavior<SampleQuery>();
         var nextCalled = false;
 
-        var result = await behavior.Handle(new SampleQuery(), _ =>
+        var result = await behavior.Handle(new SampleQuery(), (_, _) =>
         {
             nextCalled = true;
-            return Task.FromResult(Result.Success());
+            return ValueTask.FromResult(Result.Success());
         }, CancellationToken.None);
 
         nextCalled.Should().BeTrue();
@@ -136,10 +137,10 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
         var behavior = CreateBehavior<IgnoredMutationCommand>();
         var nextCalled = false;
 
-        var result = await behavior.Handle(new IgnoredMutationCommand(), _ =>
+        var result = await behavior.Handle(new IgnoredMutationCommand(), (_, _) =>
         {
             nextCalled = true;
-            return Task.FromResult(Result.Success());
+            return ValueTask.FromResult(Result.Success());
         }, CancellationToken.None);
 
         nextCalled.Should().BeTrue();
@@ -154,10 +155,10 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
         var behavior = CreateBehavior<Backend.Veteriner.Application.Auth.TestDoubles.AuthLoginCommand>();
         var nextCalled = false;
 
-        var result = await behavior.Handle(new Backend.Veteriner.Application.Auth.TestDoubles.AuthLoginCommand(), _ =>
+        var result = await behavior.Handle(new Backend.Veteriner.Application.Auth.TestDoubles.AuthLoginCommand(), (_, _) =>
         {
             nextCalled = true;
-            return Task.FromResult(Result.Success());
+            return ValueTask.FromResult(Result.Success());
         }, CancellationToken.None);
 
         nextCalled.Should().BeTrue();
@@ -172,10 +173,10 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
         var behavior = CreateBehavior<SampleMutationCommand>();
         var nextCalled = false;
 
-        var result = await behavior.Handle(new SampleMutationCommand(), _ =>
+        var result = await behavior.Handle(new SampleMutationCommand(), (_, _) =>
         {
             nextCalled = true;
-            return Task.FromResult(Result.Success());
+            return ValueTask.FromResult(Result.Success());
         }, CancellationToken.None);
 
         nextCalled.Should().BeTrue();
@@ -183,7 +184,7 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
         _tenants.Verify(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    private sealed record SampleMutationCommand;
-    private sealed record SampleQuery;
-    private sealed record IgnoredMutationCommand : IIgnoreTenantWriteSubscriptionGuard;
+    private sealed record SampleMutationCommand : IRequest<Result>;
+    private sealed record SampleQuery : IRequest<Result>;
+    private sealed record IgnoredMutationCommand : IRequest<Result>, IIgnoreTenantWriteSubscriptionGuard;
 }

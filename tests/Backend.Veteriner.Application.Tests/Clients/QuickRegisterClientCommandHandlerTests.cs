@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Pets.Commands.Create;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using AwesomeAssertions;
-using MediatR;
+using Mediator;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Clients;

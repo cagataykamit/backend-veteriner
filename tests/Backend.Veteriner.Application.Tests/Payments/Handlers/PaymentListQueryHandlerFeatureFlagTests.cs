@@ -247,7 +247,7 @@ public sealed class PaymentListQueryHandlerFeatureFlagTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("lookup down"));
 
-        var act = () => CreateHandler(paymentsListReadEnabled: true).Handle(
+        var act = async () => await CreateHandler(paymentsListReadEnabled: true).Handle(
             new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }, Search: "pamuk"),
             CancellationToken.None);
 
@@ -342,7 +342,7 @@ public sealed class PaymentListQueryHandlerFeatureFlagTests
         _listReadModelReader.Setup(r => r.GetListAsync(It.IsAny<PaymentsListReadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(paymentsListReadEnabled: true).Handle(
+        var act = async () => await CreateHandler(paymentsListReadEnabled: true).Handle(
             new GetPaymentsListQuery(new PaymentListPagingRequest { Page = 1, PageSize = 20 }),
             CancellationToken.None);
 

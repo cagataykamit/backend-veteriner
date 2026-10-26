@@ -183,7 +183,7 @@ public sealed class DashboardRecentPaymentsQueryHandlerFeatureFlagTests
             .Setup(r => r.GetRecentAsync(It.IsAny<DashboardRecentPaymentsReadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(dashboardRecentPaymentsReadEnabled: true)
+        var act = async () => await CreateHandler(dashboardRecentPaymentsReadEnabled: true)
             .Handle(new GetDashboardFinanceSummaryQuery(), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

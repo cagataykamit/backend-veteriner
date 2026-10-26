@@ -174,7 +174,7 @@ public sealed class GetAppointmentsListQueryHandlerSharedSearchLookupFeatureFlag
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("query db down"));
 
-        var act = () => CreateHandler(
+        var act = async () => await CreateHandler(
                 appointmentsEnabled: false,
                 sharedSearchLookupEnabled: true)
             .Handle(
