@@ -1,15 +1,15 @@
 using FluentValidation;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Common.Behaviors;
 
 public sealed class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : notnull
+    where TRequest : notnull, IMessage
 {
     private readonly IEnumerable<IValidator<TRequest>> _validators;
     public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators) => _validators = validators;
 
-    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
+    public async ValueTask<TResponse> Handle(TRequest request, MessageHandlerDelegate<TRequest, TResponse> next, CancellationToken ct)
     {
         if (_validators.Any())
         {
@@ -23,6 +23,6 @@ public sealed class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<
                 throw new ValidationException(failures);
         }
 
-        return await next();
+        return await next(request, ct);
     }
 }

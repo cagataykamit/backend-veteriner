@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Common.Behaviors;
 
@@ -12,7 +12,7 @@ namespace Backend.Veteriner.Application.Common.Behaviors;
 /// </summary>
 public sealed class TenantSubscriptionWriteGuardBehavior<TRequest, TResponse>
     : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : notnull
+    where TRequest : notnull, IMessage
 {
     private readonly ITenantContext _tenantContext;
     private readonly TenantSubscriptionEffectiveWriteEvaluator _evaluator;
@@ -25,13 +25,13 @@ public sealed class TenantSubscriptionWriteGuardBehavior<TRequest, TResponse>
         _evaluator = evaluator;
     }
 
-    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
+    public async ValueTask<TResponse> Handle(TRequest request, MessageHandlerDelegate<TRequest, TResponse> next, CancellationToken ct)
     {
         if (request is IIgnoreTenantWriteSubscriptionGuard)
-            return await next();
+            return await next(request, ct);
 
         if (!ShouldEnforceForRequestType(typeof(TRequest)))
-            return await next();
+            return await next(request, ct);
 
         var tenantId = _tenantContext.TenantId;
         if (!tenantId.HasValue || tenantId.Value == Guid.Empty)
@@ -39,19 +39,19 @@ public sealed class TenantSubscriptionWriteGuardBehavior<TRequest, TResponse>
             // Tenant context çözümlenmemişse davranışı bozmayalım:
             // - Public owner signup gibi tenant oluşmadan çalışan use-case'ler etkilenmez.
             // - Tenant ile ilişkili write işlemleri zaten handler seviyesinde tenantId doğrulaması yapıyor.
-            return await next();
+            return await next(request, ct);
         }
 
         var gate = await _evaluator.EnsureWriteAllowedAsync(tenantId.Value, ct);
         if (gate.IsSuccess)
-            return await next();
+            return await next(request, ct);
 
         return Fail<TResponse>(gate.Error);
     }
 
     private static bool ShouldEnforceForRequestType(Type requestType)
     {
-        // MediatR convention: mutation = *Command, read = *Query
+        // Mediator convention: mutation = *Command, read = *Query
         if (!requestType.Name.EndsWith("Command", StringComparison.Ordinal))
             return false;
 

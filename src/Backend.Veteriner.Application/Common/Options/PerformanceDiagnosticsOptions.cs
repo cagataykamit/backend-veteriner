@@ -1,7 +1,7 @@
 namespace Backend.Veteriner.Application.Common.Options;
 
 /// <summary>
-/// Request / MediatR / SQL / outbound billing HTTP ölçümleri için eşikler.
+/// Request / Mediator / SQL / outbound billing HTTP ölçümleri için eşikler.
 /// </summary>
 public sealed class PerformanceDiagnosticsOptions
 {
@@ -13,8 +13,8 @@ public sealed class PerformanceDiagnosticsOptions
     /// <summary>HTTP pipeline tam süre; üzerinde Warning (method, path, correlation).</summary>
     public int HttpRequestWarningMs { get; set; } = 750;
 
-    /// <summary>MediatR pipeline (tek handler) toplam süre uyarısı.</summary>
-    public int MediatRSlowMs { get; set; } = 400;
+    /// <summary>Mediator pipeline (tek handler) toplam süre uyarısı.</summary>
+    public int MediatorSlowMs { get; set; } = 400;
 
     /// <summary>EF komutu yürütme süresi; üzerinde kısa SQL özeti ile Warning.</summary>
     public int SlowSqlMs { get; set; } = 200;
