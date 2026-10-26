@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Models;
@@ -65,7 +66,7 @@ public sealed class UsersAdminController : ControllerBase
 
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id },
             id
         );
     }

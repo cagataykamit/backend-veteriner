@@ -1,3 +1,4 @@
+using Asp.Versioning.ApiExplorer;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -927,7 +928,7 @@ public sealed class ConfigureSwaggerOptions : IConfigureOptions<SwaggerGenOption
         {
             var apiDescription = context.ApiDescription;
 
-            operation.Deprecated |= apiDescription.IsDeprecated();
+            operation.Deprecated |= apiDescription.IsDeprecated;
 
             if (operation.Parameters == null)
                 return;

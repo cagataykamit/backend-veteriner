@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Backend.Veteriner.Api.Common.Extensions;
@@ -74,7 +75,7 @@ public sealed class PermissionsController : ControllerBase
 
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id },
             id
         );
     }

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
@@ -89,7 +90,7 @@ public sealed class ExaminationTemplatesController : ControllerBase
 
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id = result.Value!.Id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id = result.Value!.Id },
             result.Value);
     }
 

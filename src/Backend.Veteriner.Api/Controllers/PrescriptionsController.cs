@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
@@ -55,7 +56,7 @@ public sealed class PrescriptionsController : ControllerBase
         var id = result.Value;
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id },
             id);
     }
 

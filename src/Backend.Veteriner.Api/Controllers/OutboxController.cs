@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Outbox.Commands.Requeue;
 using Backend.Veteriner.Application.Outbox.Queries.GetDeadLetters;

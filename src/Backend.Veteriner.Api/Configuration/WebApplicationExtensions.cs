@@ -3,7 +3,7 @@ using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.Common.Constants;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Asp.Versioning.ApiExplorer;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using System.Diagnostics;

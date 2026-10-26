@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
@@ -65,7 +66,7 @@ public sealed class PaymentsController : ControllerBase
 
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id = created.Id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id = created.Id },
             created.Id);
     }
 

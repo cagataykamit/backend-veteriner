@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Auth;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;

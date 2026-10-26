@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Administrations.Commands.Create;
@@ -75,7 +76,7 @@ public sealed class AdministrationsController : ControllerBase
 
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id = created.Administration.Id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id = created.Administration.Id },
             created);
     }
 

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Auth.Queries.Permissions.GetByUserId;
 using Mediator;

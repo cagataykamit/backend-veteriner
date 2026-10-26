@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
@@ -82,7 +83,7 @@ public sealed class ExaminationsController : ControllerBase
         var writeResult = result.Value!;
         return CreatedAtAction(
             nameof(GetById),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id = writeResult.Id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id = writeResult.Id },
             writeResult);
     }
 
@@ -193,7 +194,7 @@ public sealed class ExaminationsController : ControllerBase
 
         return CreatedAtAction(
             nameof(GetAddenda),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id },
             result.Value);
     }
 

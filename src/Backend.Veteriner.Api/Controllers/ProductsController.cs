@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
@@ -150,7 +151,7 @@ public sealed class ProductsController : ControllerBase
             nameof(GetById),
             new
             {
-                version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0",
+                version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0",
                 id = result.Value!.Id
             },
             result.Value);

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Application.Users.Commands.SetDisplayName;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth.Commands.ChangePassword;
