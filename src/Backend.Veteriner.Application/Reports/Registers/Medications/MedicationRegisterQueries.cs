@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Registers.Medications;
 
@@ -22,8 +22,8 @@ public sealed class GetMedicationRegisterQueryHandler
         _reader = reader;
     }
 
-    public Task<Result<RegisterReadResult<MedicationRegisterItemDto>>> Handle(GetMedicationRegisterQuery request, CancellationToken ct)
-        => _runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct);
+    public ValueTask<Result<RegisterReadResult<MedicationRegisterItemDto>>> Handle(GetMedicationRegisterQuery request, CancellationToken ct)
+        => new(_runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct));
 }
 
 public sealed class ExportMedicationRegisterQueryHandler : IRequestHandler<ExportMedicationRegisterQuery, Result<RegisterExportResult>>
@@ -37,6 +37,6 @@ public sealed class ExportMedicationRegisterQueryHandler : IRequestHandler<Expor
         _reader = reader;
     }
 
-    public Task<Result<RegisterExportResult>> Handle(ExportMedicationRegisterQuery request, CancellationToken ct)
-        => _runner.ExportAsync(_reader, request.Query, request.Format, MedicationRegisterColumns.Export, ct);
+    public ValueTask<Result<RegisterExportResult>> Handle(ExportMedicationRegisterQuery request, CancellationToken ct)
+        => new(_runner.ExportAsync(_reader, request.Query, request.Format, MedicationRegisterColumns.Export, ct));
 }

@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Payments.Commands.Create;
 

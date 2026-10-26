@@ -12,7 +12,7 @@ using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Imaging.Queries.GetById;
 
@@ -45,7 +45,7 @@ public sealed class GetImagingRecordByIdQueryHandler
         _clients = clients;
     }
 
-    public async Task<Result<ImagingRecordDetailDto>> Handle(GetImagingRecordByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<ImagingRecordDetailDto>> Handle(GetImagingRecordByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

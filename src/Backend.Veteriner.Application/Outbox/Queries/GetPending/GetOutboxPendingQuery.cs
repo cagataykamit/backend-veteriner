@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Contracts.Outbox;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Outbox.Queries.GetPending;
 
@@ -14,6 +14,6 @@ public sealed class GetOutboxPendingQueryHandler : IRequestHandler<GetOutboxPend
 
     public GetOutboxPendingQueryHandler(IOutboxAdminRepository outbox) => _outbox = outbox;
 
-    public Task<IReadOnlyList<OutboxPendingMessageDto>> Handle(GetOutboxPendingQuery request, CancellationToken ct)
-        => _outbox.ListOldestPendingAsync(Take, ct);
+    public ValueTask<IReadOnlyList<OutboxPendingMessageDto>> Handle(GetOutboxPendingQuery request, CancellationToken ct)
+        => new(_outbox.ListOldestPendingAsync(Take, ct));
 }

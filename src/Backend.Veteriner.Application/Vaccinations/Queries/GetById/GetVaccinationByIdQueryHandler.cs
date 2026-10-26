@@ -15,7 +15,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Vaccinations.Queries.GetById;
 
@@ -63,7 +63,7 @@ public sealed class GetVaccinationByIdQueryHandler
         _clients = clients;
     }
 
-    public async Task<Result<VaccinationDetailDto>> Handle(GetVaccinationByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<VaccinationDetailDto>> Handle(GetVaccinationByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

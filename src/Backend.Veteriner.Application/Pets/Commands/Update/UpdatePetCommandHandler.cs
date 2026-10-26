@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Pets.Commands.Update;
@@ -50,7 +50,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         _eventOutbox = eventOutbox;
     }
 
-    public async Task<Result> Handle(UpdatePetCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(UpdatePetCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

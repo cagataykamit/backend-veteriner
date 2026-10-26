@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Files.Contracts.Dtos;
 using Backend.Veteriner.Application.Files.Specs;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Files.Queries.GetList;
 
@@ -18,7 +18,7 @@ public sealed class GetStoredFilesQueryHandler(
     IReadRepository<StoredFile> files)
     : IRequestHandler<GetStoredFilesQuery, Result<IReadOnlyList<StoredFileDto>>>
 {
-    public async Task<Result<IReadOnlyList<StoredFileDto>>> Handle(GetStoredFilesQuery request, CancellationToken ct)
+    public async ValueTask<Result<IReadOnlyList<StoredFileDto>>> Handle(GetStoredFilesQuery request, CancellationToken ct)
     {
         if (tenantContext.TenantId is not { } tenantId)
         {

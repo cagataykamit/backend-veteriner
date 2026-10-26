@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Clients.Commands.SetKvkkConsent;
@@ -51,7 +51,7 @@ public sealed class SetClientKvkkConsentCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ClientKvkkConsentDto>> Handle(SetClientKvkkConsentCommand request, CancellationToken ct)
+    public async ValueTask<Result<ClientKvkkConsentDto>> Handle(SetClientKvkkConsentCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

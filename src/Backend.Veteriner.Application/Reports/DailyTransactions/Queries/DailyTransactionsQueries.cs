@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.DailyTransactions.Queries;
 
@@ -49,7 +49,7 @@ public sealed class GetDailyTransactionsReportQueryHandler
         _reader = reader;
     }
 
-    public async Task<Result<DailyTransactionsReportResultDto>> Handle(
+    public async ValueTask<Result<DailyTransactionsReportResultDto>> Handle(
         GetDailyTransactionsReportQuery request,
         CancellationToken ct)
     {
@@ -91,7 +91,7 @@ public sealed class ExportDailyTransactionsReportQueryHandler
         _trialLimitPolicy = trialLimitPolicy;
     }
 
-    public async Task<Result<RegisterExportResult>> Handle(ExportDailyTransactionsReportQuery request, CancellationToken ct)
+    public async ValueTask<Result<RegisterExportResult>> Handle(ExportDailyTransactionsReportQuery request, CancellationToken ct)
     {
         var filter = await DailyTransactionsReportFilter.ResolveAsync(
             _tenantContext, _clinicContext, _scopeResolver,

@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Outbox.Commands.Requeue;
 using Backend.Veteriner.Application.Outbox.Queries.GetDeadLetters;
 using Backend.Veteriner.Application.Outbox.Queries.GetPending;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

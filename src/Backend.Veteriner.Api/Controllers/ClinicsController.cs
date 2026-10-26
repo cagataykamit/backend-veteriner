@@ -31,7 +31,7 @@ using Backend.Veteriner.Application.Hospitalizations.Wards.Commands.UpdateWard;
 using Backend.Veteriner.Application.Hospitalizations.Wards.Queries.GetClinicWardsWithRooms;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

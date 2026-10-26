@@ -13,7 +13,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -64,7 +64,7 @@ public sealed class GetPaymentsReportQueryHandler
         _logger = logger ?? NullLogger<GetPaymentsReportQueryHandler>.Instance;
     }
 
-    public async Task<Result<PaymentReportResultDto>> Handle(
+    public async ValueTask<Result<PaymentReportResultDto>> Handle(
         GetPaymentsReportQuery request,
         CancellationToken ct)
     {

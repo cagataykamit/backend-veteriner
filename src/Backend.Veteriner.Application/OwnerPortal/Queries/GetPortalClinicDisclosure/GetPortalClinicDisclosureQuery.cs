@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalClinicDisclosure;
 
@@ -46,7 +46,7 @@ public sealed class GetPortalClinicDisclosureQueryHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PortalClinicDisclosureDto>> Handle(GetPortalClinicDisclosureQuery request, CancellationToken ct)
+    public async ValueTask<Result<PortalClinicDisclosureDto>> Handle(GetPortalClinicDisclosureQuery request, CancellationToken ct)
     {
         var scopeResult = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scopeResult.IsSuccess)

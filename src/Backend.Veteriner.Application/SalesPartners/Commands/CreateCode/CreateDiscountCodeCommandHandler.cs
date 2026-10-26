@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.SalesPartners.Commands.CreateCode;
@@ -22,7 +22,7 @@ public sealed class CreateDiscountCodeCommandHandler : IRequestHandler<CreateDis
         _codes = codes;
     }
 
-    public async Task<Result<DiscountCodeDto>> Handle(CreateDiscountCodeCommand request, CancellationToken ct)
+    public async ValueTask<Result<DiscountCodeDto>> Handle(CreateDiscountCodeCommand request, CancellationToken ct)
     {
         if (!await _partners.AnyAsync(new SalesPartnerByIdSpec(request.SalesPartnerId), ct))
             return Result<DiscountCodeDto>.Failure(SalesPartnerErrors.PartnerNotFound);

@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.Remove
@@ -51,7 +51,7 @@ namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.
         /// - Cache invalidation
         /// - Opsiyonel: t�m refresh token'lar�n revoke edilmesi
         /// </summary>
-        public async Task Handle(RemovePermissionFromClaimCommand cmd, CancellationToken ct)
+        public async ValueTask<Unit> Handle(RemovePermissionFromClaimCommand cmd, CancellationToken ct)
         {
             // 1) Rol�permission ili�kisini kald�r
             await _repo.RemoveAsync(cmd.OperationClaimId, cmd.PermissionId, ct);
@@ -76,6 +76,8 @@ namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.
 
                 await _refreshRepo.SaveChangesAsync(ct);
             }
+
+            return Unit.Value;
         }
     }
 }

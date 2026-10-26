@@ -1,5 +1,5 @@
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Registers.ControlledSubstances;
 
@@ -24,10 +24,10 @@ public sealed class GetControlledSubstanceRegisterQueryHandler
         _reader = reader;
     }
 
-    public Task<Result<RegisterReadResult<ControlledSubstanceRegisterItemDto>>> Handle(
+    public ValueTask<Result<RegisterReadResult<ControlledSubstanceRegisterItemDto>>> Handle(
         GetControlledSubstanceRegisterQuery request,
         CancellationToken ct)
-        => _runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct);
+        => new(_runner.ReadPageAsync(_reader, request.Query, request.Page, request.PageSize, ct));
 }
 
 public sealed class ExportControlledSubstanceRegisterQueryHandler
@@ -44,6 +44,6 @@ public sealed class ExportControlledSubstanceRegisterQueryHandler
         _reader = reader;
     }
 
-    public Task<Result<RegisterExportResult>> Handle(ExportControlledSubstanceRegisterQuery request, CancellationToken ct)
-        => _runner.ExportAsync(_reader, request.Query, request.Format, ControlledSubstanceRegisterColumns.Export, ct);
+    public ValueTask<Result<RegisterExportResult>> Handle(ExportControlledSubstanceRegisterQuery request, CancellationToken ct)
+        => new(_runner.ExportAsync(_reader, request.Query, request.Format, ControlledSubstanceRegisterColumns.Export, ct));
 }

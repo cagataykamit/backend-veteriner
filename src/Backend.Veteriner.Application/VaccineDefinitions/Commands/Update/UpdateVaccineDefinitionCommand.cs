@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Application.VaccineDefinitions.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.VaccineDefinitions.Commands.Update;
 
@@ -34,7 +34,7 @@ public sealed class UpdateVaccineDefinitionCommandHandler : IRequestHandler<Upda
         _definitionsWrite = definitionsWrite;
     }
 
-    public async Task<Result> Handle(UpdateVaccineDefinitionCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(UpdateVaccineDefinitionCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

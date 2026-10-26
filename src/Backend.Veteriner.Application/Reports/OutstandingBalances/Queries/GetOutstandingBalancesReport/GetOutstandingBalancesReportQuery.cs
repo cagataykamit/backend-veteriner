@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.OutstandingBalances.Queries.GetOutstandingBalancesReport;
 

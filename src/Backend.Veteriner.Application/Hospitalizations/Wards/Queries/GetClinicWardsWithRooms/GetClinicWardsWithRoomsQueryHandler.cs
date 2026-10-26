@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Hospitalizations.Wards.Access;
 using Backend.Veteriner.Application.Hospitalizations.Wards.Specs;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Wards.Queries.GetClinicWardsWithRooms;
 
@@ -25,7 +25,7 @@ public sealed class GetClinicWardsWithRoomsQueryHandler
         _rooms = rooms;
     }
 
-    public async Task<Result<IReadOnlyList<HospitalizationWardDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<HospitalizationWardDto>>> Handle(
         GetClinicWardsWithRoomsQuery request,
         CancellationToken ct)
     {

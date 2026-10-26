@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Contracts.Outbox;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Outbox.Queries.GetDeadLetters;
 
@@ -15,6 +15,6 @@ public sealed class GetOutboxDeadLettersQueryHandler
 
     public GetOutboxDeadLettersQueryHandler(IOutboxAdminRepository outbox) => _outbox = outbox;
 
-    public Task<IReadOnlyList<OutboxDeadLetterMessageDto>> Handle(GetOutboxDeadLettersQuery request, CancellationToken ct)
-        => _outbox.ListLatestDeadLettersAsync(Take, ct);
+    public ValueTask<IReadOnlyList<OutboxDeadLetterMessageDto>> Handle(GetOutboxDeadLettersQuery request, CancellationToken ct)
+        => new(_outbox.ListLatestDeadLettersAsync(Take, ct));
 }

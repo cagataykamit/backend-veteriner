@@ -1,12 +1,12 @@
 
 
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Domain.Shared;
 
 /// <summary>
 /// Domain event işaretleyicisi.
-/// MediatR INotification üzerinden publish edilir.
+/// Mediator INotification üzerinden publish edilir.
 /// </summary>
 public interface IDomainEvent : INotification
 {

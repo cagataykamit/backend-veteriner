@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Hospitalizations.Wards.Access;
 using Backend.Veteriner.Application.Hospitalizations.Wards.Specs;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Wards.Commands.UpdateRoom;
 
@@ -27,7 +27,7 @@ public sealed class UpdateRoomCommandHandler : IRequestHandler<UpdateRoomCommand
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<HospitalizationRoomDto>> Handle(UpdateRoomCommand request, CancellationToken ct)
+    public async ValueTask<Result<HospitalizationRoomDto>> Handle(UpdateRoomCommand request, CancellationToken ct)
     {
         var access = await _access.EnsureWriteAccessAsync(request.ClinicId, ct);
         if (!access.IsSuccess)

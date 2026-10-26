@@ -21,7 +21,7 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Administrations.Commands.Create;
@@ -93,7 +93,7 @@ public sealed class CreateAdministrationCommandHandler
         _expiredStock = expiredStock;
     }
 
-    public async Task<Result<AdministrationCreateResultDto>> Handle(
+    public async ValueTask<Result<AdministrationCreateResultDto>> Handle(
         CreateAdministrationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)

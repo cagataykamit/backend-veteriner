@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Administrations.Queries.GetList;
 
@@ -38,7 +38,7 @@ public sealed class GetAdministrationsListQueryHandler
         _batches = batches;
     }
 
-    public async Task<Result<PagedResult<AdministrationDto>>> Handle(
+    public async ValueTask<Result<PagedResult<AdministrationDto>>> Handle(
         GetAdministrationsListQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)

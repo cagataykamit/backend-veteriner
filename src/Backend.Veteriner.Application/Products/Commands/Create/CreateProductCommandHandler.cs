@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Products.Contracts.Dtos;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Products.Commands.Create;
 
@@ -27,7 +27,7 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
         _categoriesRead = categoriesRead;
     }
 
-    public async Task<Result<ProductDto>> Handle(CreateProductCommand request, CancellationToken ct)
+    public async ValueTask<Result<ProductDto>> Handle(CreateProductCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ProductDto>.Failure(

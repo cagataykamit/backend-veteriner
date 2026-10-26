@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Treatments.Contracts.Dtos;
 using Backend.Veteriner.Application.Treatments.Queries.GetById;
 using Backend.Veteriner.Application.Treatments.Queries.GetList;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

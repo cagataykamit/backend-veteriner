@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Authorization;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Commands.Permissions.Create;
 
@@ -10,7 +10,7 @@ public sealed class CreatePermissionCommandHandler : IRequestHandler<CreatePermi
     private readonly IPermissionRepository _repo;
     public CreatePermissionCommandHandler(IPermissionRepository repo) => _repo = repo;
 
-    public async Task<Result<Guid>> Handle(CreatePermissionCommand cmd, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreatePermissionCommand cmd, CancellationToken ct)
     {
         var code = cmd.Code.Trim();
 

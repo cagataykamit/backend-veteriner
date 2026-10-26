@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalPets;
 
@@ -26,7 +26,7 @@ public sealed class GetPortalPetsQueryHandler : IRequestHandler<GetPortalPetsQue
         _pets = pets;
     }
 
-    public async Task<Result<IReadOnlyList<PortalPetDto>>> Handle(GetPortalPetsQuery request, CancellationToken ct)
+    public async ValueTask<Result<IReadOnlyList<PortalPetDto>>> Handle(GetPortalPetsQuery request, CancellationToken ct)
     {
         var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)

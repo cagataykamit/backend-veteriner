@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Auth.Commands.Permissions.Delete;
@@ -37,7 +37,7 @@ namespace Backend.Veteriner.Application.Auth.Commands.Permissions.Delete;
             _opt = opt.Value;
         }
 
-        public async Task<Result> Handle(DeletePermissionCommand cmd, CancellationToken ct)
+        public async ValueTask<Result> Handle(DeletePermissionCommand cmd, CancellationToken ct)
         {
             var entity = await _repo.GetByIdAsync(cmd.Id, ct)
                          ?? null;

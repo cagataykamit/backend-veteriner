@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Examinations.Commands.Finalize;
@@ -42,7 +42,7 @@ public sealed class FinalizeExaminationCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ExaminationFinalizeResultDto>> Handle(FinalizeExaminationCommand request, CancellationToken ct)
+    public async ValueTask<Result<ExaminationFinalizeResultDto>> Handle(FinalizeExaminationCommand request, CancellationToken ct)
     {
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
         {

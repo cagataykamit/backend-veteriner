@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
@@ -56,7 +56,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         _logger = logger ?? NullLogger<SelectClinicCommandHandler>.Instance;
     }
 
-    public async Task<Result<LoginResultDto>> Handle(SelectClinicCommand request, CancellationToken ct)
+    public async ValueTask<Result<LoginResultDto>> Handle(SelectClinicCommand request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken))
         {

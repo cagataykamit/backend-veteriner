@@ -14,7 +14,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -66,7 +66,7 @@ public sealed class GetPaymentsListQueryHandler
         _petCountReader = petCountReader;
     }
 
-    public async Task<Result<PagedResult<PaymentListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<PaymentListItemDto>>> Handle(
         GetPaymentsListQuery request,
         CancellationToken ct)
     {

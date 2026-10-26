@@ -18,7 +18,7 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using System.Text.Json.Serialization;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

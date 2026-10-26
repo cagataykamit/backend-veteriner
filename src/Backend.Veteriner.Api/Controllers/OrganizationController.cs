@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Organization.Contracts.Dtos;
 using Backend.Veteriner.Application.Organization.Contracts.Requests;
 using Backend.Veteriner.Application.Organization.Queries.GetBillingProfile;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

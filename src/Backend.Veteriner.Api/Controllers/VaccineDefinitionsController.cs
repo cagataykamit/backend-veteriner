@@ -11,7 +11,7 @@ using Backend.Veteriner.Application.VaccineDefinitions.Contracts.Dtos;
 using Backend.Veteriner.Application.VaccineDefinitions.Queries.GetById;
 using Backend.Veteriner.Application.VaccineDefinitions.Queries.GetList;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

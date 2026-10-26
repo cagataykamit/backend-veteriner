@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.EmailVerification.Commands.Request;
 
@@ -31,7 +31,7 @@ public sealed class RequestEmailVerificationHandler : IRequestHandler<RequestEma
         _url = url;
     }
 
-    public async Task<Unit> Handle(RequestEmailVerificationCommand request, CancellationToken ct)
+    public async ValueTask<Unit> Handle(RequestEmailVerificationCommand request, CancellationToken ct)
     {
         // 1) Email normalize (case-insensitive search)
         var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();

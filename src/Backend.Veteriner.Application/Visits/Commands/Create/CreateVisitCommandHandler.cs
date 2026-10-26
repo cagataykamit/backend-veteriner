@@ -15,7 +15,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Visits.Commands.Create;
@@ -69,7 +69,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         _appointmentEventOutbox = appointmentEventOutbox;
     }
 
-    public async Task<Result<VisitCreateResultDto>> Handle(CreateVisitCommand request, CancellationToken ct)
+    public async ValueTask<Result<VisitCreateResultDto>> Handle(CreateVisitCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

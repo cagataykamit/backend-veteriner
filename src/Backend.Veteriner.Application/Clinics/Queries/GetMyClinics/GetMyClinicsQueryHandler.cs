@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Queries.GetMyClinics;
 
@@ -38,7 +38,7 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
         _userOperationClaims = userOperationClaims;
     }
 
-    public async Task<Result<IReadOnlyList<ClinicListItemDto>>> Handle(GetMyClinicsQuery request, CancellationToken ct)
+    public async ValueTask<Result<IReadOnlyList<ClinicListItemDto>>> Handle(GetMyClinicsQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

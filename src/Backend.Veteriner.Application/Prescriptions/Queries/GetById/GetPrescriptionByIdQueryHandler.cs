@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Prescriptions.Queries.GetById;
 
@@ -49,7 +49,7 @@ public sealed class GetPrescriptionByIdQueryHandler
         _clients = clients;
     }
 
-    public async Task<Result<PrescriptionDetailDto>> Handle(GetPrescriptionByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<PrescriptionDetailDto>> Handle(GetPrescriptionByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

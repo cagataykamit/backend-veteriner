@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Examinations.Commands.Update;
@@ -45,7 +45,7 @@ public sealed class UpdateExaminationCommandHandler
         _examinationsWrite = examinationsWrite;
     }
 
-    public async Task<Result<ExaminationWriteResultDto>> Handle(UpdateExaminationCommand request, CancellationToken ct)
+    public async ValueTask<Result<ExaminationWriteResultDto>> Handle(UpdateExaminationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

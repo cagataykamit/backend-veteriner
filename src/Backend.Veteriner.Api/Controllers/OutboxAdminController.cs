@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Outbox.Commands.RetryAllDeadLetters;
 using Backend.Veteriner.Application.Outbox.Commands.RetryDeadLetter;
 using Backend.Veteriner.Application.Outbox.Queries.GetDeadLettersPaged;
 using Backend.Veteriner.Application.Outbox.Queries.GetPendingPaged;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

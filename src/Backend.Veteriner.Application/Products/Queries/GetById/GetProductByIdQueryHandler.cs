@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Products.Contracts.Dtos;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Products.Queries.GetById;
 
@@ -24,7 +24,7 @@ public sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQ
         _categories = categories;
     }
 
-    public async Task<Result<ProductDto>> Handle(GetProductByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<ProductDto>> Handle(GetProductByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ProductDto>.Failure(

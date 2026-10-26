@@ -14,7 +14,7 @@ using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Imaging.Queries.GetList;
@@ -55,7 +55,7 @@ public sealed class GetImagingRecordsListQueryHandler
         _queryReadModelsOptions = queryReadModelsOptions.Value;
     }
 
-    public async Task<Result<PagedResult<ImagingRecordListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<ImagingRecordListItemDto>>> Handle(
         GetImagingRecordsListQuery request,
         CancellationToken ct)
     {

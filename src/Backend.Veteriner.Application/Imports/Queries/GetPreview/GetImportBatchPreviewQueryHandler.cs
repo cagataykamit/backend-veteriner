@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Imports.Queries.GetPreview;
 
@@ -44,7 +44,7 @@ public sealed class GetImportBatchPreviewQueryHandler : IRequestHandler<GetImpor
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ImportPreviewDto>> Handle(GetImportBatchPreviewQuery request, CancellationToken ct)
+    public async ValueTask<Result<ImportPreviewDto>> Handle(GetImportBatchPreviewQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

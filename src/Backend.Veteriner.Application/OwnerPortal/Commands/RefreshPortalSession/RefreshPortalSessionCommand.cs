@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.OwnerPortal.Sessions;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Commands.RefreshPortalSession;
 
@@ -40,7 +40,7 @@ public sealed class RefreshPortalSessionCommandHandler : IRequestHandler<Refresh
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PortalAuthTokensDto>> Handle(RefreshPortalSessionCommand request, CancellationToken ct)
+    public async ValueTask<Result<PortalAuthTokensDto>> Handle(RefreshPortalSessionCommand request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken))
             return Result<PortalAuthTokensDto>.Failure(OwnerPortalErrors.InvalidRefreshToken);

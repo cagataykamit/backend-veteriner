@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Imports.Queries.GetRollbackPreview;
 
@@ -49,7 +49,7 @@ public sealed class GetImportRollbackPreviewQueryHandler
         _plans = plans;
     }
 
-    public async Task<Result<ImportRollbackPreviewDto>> Handle(GetImportRollbackPreviewQuery request, CancellationToken ct)
+    public async ValueTask<Result<ImportRollbackPreviewDto>> Handle(GetImportRollbackPreviewQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

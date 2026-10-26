@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Queries.GetPartnerById;
 
@@ -26,7 +26,7 @@ public sealed class GetSalesPartnerByIdQueryHandler : IRequestHandler<GetSalesPa
         _redemptions = redemptions;
     }
 
-    public async Task<Result<SalesPartnerDetailDto>> Handle(GetSalesPartnerByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<SalesPartnerDetailDto>> Handle(GetSalesPartnerByIdQuery request, CancellationToken ct)
     {
         var partner = await _partners.FirstOrDefaultAsync(new SalesPartnerByIdSpec(request.Id), ct);
         if (partner is null)

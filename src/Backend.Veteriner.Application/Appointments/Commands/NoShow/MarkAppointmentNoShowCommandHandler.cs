@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Commands.NoShow;
@@ -46,7 +46,7 @@ public sealed class MarkAppointmentNoShowCommandHandler : IRequestHandler<MarkAp
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result> Handle(MarkAppointmentNoShowCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(MarkAppointmentNoShowCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

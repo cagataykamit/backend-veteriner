@@ -20,7 +20,7 @@ using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Payments.Commands.Create;
@@ -80,7 +80,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         _eventOutbox = eventOutbox;
     }
 
-    public async Task<Result<PaymentCreateResultDto>> Handle(CreatePaymentCommand request, CancellationToken ct)
+    public async ValueTask<Result<PaymentCreateResultDto>> Handle(CreatePaymentCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

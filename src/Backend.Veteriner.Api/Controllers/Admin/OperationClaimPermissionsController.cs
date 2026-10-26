@@ -3,7 +3,7 @@ using System.Security.Claims;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.Add;
 using Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.Remove;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;

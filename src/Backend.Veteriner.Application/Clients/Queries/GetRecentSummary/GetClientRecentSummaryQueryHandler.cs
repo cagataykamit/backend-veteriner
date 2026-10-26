@@ -8,7 +8,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clients.Queries.GetRecentSummary;
 
@@ -41,7 +41,7 @@ public sealed class GetClientRecentSummaryQueryHandler
         _examinations = examinations;
     }
 
-    public async Task<Result<ClientRecentSummaryDto>> Handle(GetClientRecentSummaryQuery request, CancellationToken ct)
+    public async ValueTask<Result<ClientRecentSummaryDto>> Handle(GetClientRecentSummaryQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

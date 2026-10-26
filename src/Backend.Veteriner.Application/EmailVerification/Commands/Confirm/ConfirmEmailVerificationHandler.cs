@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Auth;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.EmailVerification.Commands.Confirm;
 
@@ -20,7 +20,7 @@ public sealed class ConfirmEmailVerificationHandler : IRequestHandler<ConfirmEma
         _users = users;
     }
 
-    public async Task<Unit> Handle(ConfirmEmailVerificationCommand request, CancellationToken ct)
+    public async ValueTask<Unit> Handle(ConfirmEmailVerificationCommand request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Token))
             throw new UnauthorizedAccessException("Geçersiz token.");

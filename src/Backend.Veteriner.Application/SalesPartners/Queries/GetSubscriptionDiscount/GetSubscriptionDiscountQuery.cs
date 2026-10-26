@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Queries.GetSubscriptionDiscount;
 
@@ -28,7 +28,7 @@ public sealed class GetSubscriptionDiscountQueryHandler : IRequestHandler<GetSub
         _subscriptions = subscriptions;
     }
 
-    public async Task<Result<SubscriptionDiscountDto>> Handle(GetSubscriptionDiscountQuery request, CancellationToken ct)
+    public async ValueTask<Result<SubscriptionDiscountDto>> Handle(GetSubscriptionDiscountQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId || tenantId != request.TenantId)
             return Result<SubscriptionDiscountDto>.Failure(SalesPartnerErrors.AccessDenied);

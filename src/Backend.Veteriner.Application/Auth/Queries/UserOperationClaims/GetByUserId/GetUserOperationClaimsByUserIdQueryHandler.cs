@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Abstractions;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Queries.UserOperationClaims.GetByUserId;
 
@@ -12,7 +12,7 @@ public sealed class GetUserOperationClaimsByUserIdQueryHandler
     public GetUserOperationClaimsByUserIdQueryHandler(IUserOperationClaimRepository repo)
         => _repo = repo;
 
-    public async Task<IReadOnlyList<UserOperationClaimDto>> Handle(GetUserOperationClaimsByUserIdQuery request, CancellationToken ct)
+    public async ValueTask<IReadOnlyList<UserOperationClaimDto>> Handle(GetUserOperationClaimsByUserIdQuery request, CancellationToken ct)
     {
         var list = await _repo.GetByUserIdAsync(request.UserId, ct);
 

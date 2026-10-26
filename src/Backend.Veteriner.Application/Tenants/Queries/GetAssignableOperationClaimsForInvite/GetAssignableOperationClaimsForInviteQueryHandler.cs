@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetAssignableOperationClaimsForInvite;
 
@@ -25,7 +25,7 @@ public sealed class GetAssignableOperationClaimsForInviteQueryHandler
         _claims = claims;
     }
 
-    public async Task<Result<IReadOnlyList<AssignableOperationClaimForInviteDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<AssignableOperationClaimForInviteDto>>> Handle(
         GetAssignableOperationClaimsForInviteQuery request,
         CancellationToken ct)
     {

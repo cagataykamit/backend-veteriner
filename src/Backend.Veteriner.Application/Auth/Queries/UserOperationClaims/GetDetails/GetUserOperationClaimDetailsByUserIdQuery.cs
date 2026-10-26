@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Auth.Contracts.Dtos;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Queries.UserOperationClaims.GetDetails;
 

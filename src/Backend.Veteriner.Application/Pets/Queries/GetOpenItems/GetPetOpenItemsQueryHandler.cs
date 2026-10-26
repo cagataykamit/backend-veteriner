@@ -15,7 +15,7 @@ using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Pets.Queries.GetOpenItems;
@@ -75,7 +75,7 @@ public sealed class GetPetOpenItemsQueryHandler : IRequestHandler<GetPetOpenItem
         _logger = logger;
     }
 
-    public async Task<Result<PetOpenItemsDto>> Handle(GetPetOpenItemsQuery request, CancellationToken ct)
+    public async ValueTask<Result<PetOpenItemsDto>> Handle(GetPetOpenItemsQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Commands.Deactivate;
 
@@ -42,7 +42,7 @@ public sealed class DeactivateClinicCommandHandler
         _clinicsWrite = clinicsWrite;
     }
 
-    public async Task<Result<DeactivateClinicResultDto>> Handle(DeactivateClinicCommand request, CancellationToken ct)
+    public async ValueTask<Result<DeactivateClinicResultDto>> Handle(DeactivateClinicCommand request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Clinics.Update))
         {

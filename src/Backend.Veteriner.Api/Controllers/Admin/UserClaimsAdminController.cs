@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Users.Commands.Claims.Add;
 using Backend.Veteriner.Application.Users.Commands.Claims.Remove;
 using Backend.Veteriner.Application.Users.Contracts.Dtos;
 using Backend.Veteriner.Application.Users.Queries.Claims.GetByUserId;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetAccessState;
 
@@ -33,7 +33,7 @@ public sealed class GetTenantAccessStateQueryHandler
         _subscriptions = subscriptions;
     }
 
-    public async Task<Result<TenantAccessStateDto>> Handle(
+    public async ValueTask<Result<TenantAccessStateDto>> Handle(
         GetTenantAccessStateQuery request,
         CancellationToken ct)
     {

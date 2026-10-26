@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Users.Commands.Claims.Remove;
 
@@ -27,7 +27,7 @@ public sealed class AdminRemoveUserClaimCommandHandler : IRequestHandler<AdminRe
         _uow = uow;
     }
 
-    public async Task Handle(AdminRemoveUserClaimCommand request, CancellationToken ct)
+    public async ValueTask<Unit> Handle(AdminRemoveUserClaimCommand request, CancellationToken ct)
     {
         // 1) Rol ilişkisini kaldır
         await _repo.RemoveAsync(request.UserId, request.OperationClaimId, ct);
@@ -37,5 +37,6 @@ public sealed class AdminRemoveUserClaimCommandHandler : IRequestHandler<AdminRe
 
         // 3) Kullanıcının permission cache'ini düşür
         _cache.InvalidateUser(request.UserId);
+        return Unit.Value;
     }
 }

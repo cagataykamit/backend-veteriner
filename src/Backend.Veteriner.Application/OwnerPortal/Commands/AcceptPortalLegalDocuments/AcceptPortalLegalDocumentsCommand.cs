@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalLegalStatus;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Commands.AcceptPortalLegalDocuments;
 
@@ -38,7 +38,7 @@ public sealed class AcceptPortalLegalDocumentsCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PortalLegalStatusDto>> Handle(AcceptPortalLegalDocumentsCommand request, CancellationToken ct)
+    public async ValueTask<Result<PortalLegalStatusDto>> Handle(AcceptPortalLegalDocumentsCommand request, CancellationToken ct)
     {
         var account = await _access.GetActiveAccountAsync(request.OwnerAccountId, ct);
         if (!account.IsSuccess)

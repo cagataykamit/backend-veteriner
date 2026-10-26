@@ -15,7 +15,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -61,7 +61,7 @@ public sealed class GetVaccinationsListQueryHandler
         _logger = logger ?? NullLogger<GetVaccinationsListQueryHandler>.Instance;
     }
 
-    public async Task<Result<PagedResult<VaccinationListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<VaccinationListItemDto>>> Handle(
         GetVaccinationsListQuery request,
         CancellationToken ct)
     {

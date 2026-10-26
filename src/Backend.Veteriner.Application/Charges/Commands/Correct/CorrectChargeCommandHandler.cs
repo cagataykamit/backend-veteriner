@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Charges.Commands.Correct;
@@ -46,7 +46,7 @@ public sealed class CorrectChargeCommandHandler : IRequestHandler<CorrectChargeC
         _charges = charges;
     }
 
-    public async Task<Result<ChargeDto>> Handle(CorrectChargeCommand request, CancellationToken ct)
+    public async ValueTask<Result<ChargeDto>> Handle(CorrectChargeCommand request, CancellationToken ct)
     {
         var actor = await FinanceCorrectionActor.ResolveAsync(_tenantContext, _clientContext, _tenants, ct);
         if (!actor.IsSuccess)

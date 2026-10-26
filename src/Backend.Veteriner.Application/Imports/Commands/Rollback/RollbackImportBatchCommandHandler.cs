@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Imports.Commands.Rollback;
@@ -56,7 +56,7 @@ public sealed class RollbackImportBatchCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ImportRollbackResultDto>> Handle(RollbackImportBatchCommand request, CancellationToken ct)
+    public async ValueTask<Result<ImportRollbackResultDto>> Handle(RollbackImportBatchCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

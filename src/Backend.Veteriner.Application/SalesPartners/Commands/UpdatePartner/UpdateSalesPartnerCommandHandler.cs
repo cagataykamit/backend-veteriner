@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Commands.UpdatePartner;
 
@@ -28,7 +28,7 @@ public sealed class UpdateSalesPartnerCommandHandler : IRequestHandler<UpdateSal
         _redemptions = redemptions;
     }
 
-    public async Task<Result<SalesPartnerDto>> Handle(UpdateSalesPartnerCommand request, CancellationToken ct)
+    public async ValueTask<Result<SalesPartnerDto>> Handle(UpdateSalesPartnerCommand request, CancellationToken ct)
     {
         var partner = await _partners.FirstOrDefaultAsync(new SalesPartnerByIdSpec(request.Id), ct);
         if (partner is null)

@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Outbox.Commands.Delete;
@@ -30,7 +30,7 @@ public sealed class DeleteOutboxMessageCommandHandler : IRequestHandler<DeleteOu
         _logger = logger;
     }
 
-    public async Task<Result> Handle(DeleteOutboxMessageCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(DeleteOutboxMessageCommand request, CancellationToken ct)
     {
         var actorUserId = _client.UserId;
 

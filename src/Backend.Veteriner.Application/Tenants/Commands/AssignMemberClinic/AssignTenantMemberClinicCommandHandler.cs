@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.AssignMemberClinic;
 
@@ -46,7 +46,7 @@ public sealed class AssignTenantMemberClinicCommandHandler
         _uow = uow;
     }
 
-    public async Task<Result<AssignTenantMemberClinicResultDto>> Handle(
+    public async ValueTask<Result<AssignTenantMemberClinicResultDto>> Handle(
         AssignTenantMemberClinicCommand request,
         CancellationToken ct)
     {

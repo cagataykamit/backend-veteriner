@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Sales.Contracts.Dtos;
 using Backend.Veteriner.Application.Sales.Specs;
 using Backend.Veteriner.Domain.Sales;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Sales.Queries.GetList;
 
@@ -31,7 +31,7 @@ public sealed class GetSalesListQueryHandler : IRequestHandler<GetSalesListQuery
         _assembler = assembler;
     }
 
-    public async Task<Result<PagedResult<SaleDto>>> Handle(GetSalesListQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<SaleDto>>> Handle(GetSalesListQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

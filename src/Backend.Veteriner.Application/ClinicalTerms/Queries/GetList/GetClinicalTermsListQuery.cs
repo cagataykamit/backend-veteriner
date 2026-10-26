@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.ClinicalTerms.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.ClinicalTerms.Queries.GetList;
 

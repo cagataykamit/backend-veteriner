@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Outbox.Commands.RetryAllDeadLetters;
@@ -29,7 +29,7 @@ public sealed class RetryAllOutboxDeadLettersCommandHandler : IRequestHandler<Re
         _logger = logger;
     }
 
-    public async Task<int> Handle(RetryAllOutboxDeadLettersCommand request, CancellationToken ct)
+    public async ValueTask<int> Handle(RetryAllOutboxDeadLettersCommand request, CancellationToken ct)
     {
         var actorUserId = _client.UserId;
 

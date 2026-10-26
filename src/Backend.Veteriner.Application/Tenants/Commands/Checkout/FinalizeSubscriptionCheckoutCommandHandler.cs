@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.Checkout;
 
@@ -20,7 +20,7 @@ public sealed class FinalizeSubscriptionCheckoutCommandHandler
         _activation = activation;
     }
 
-    public async Task<Result<SubscriptionCheckoutSessionDto>> Handle(FinalizeSubscriptionCheckoutCommand request, CancellationToken ct)
+    public async ValueTask<Result<SubscriptionCheckoutSessionDto>> Handle(FinalizeSubscriptionCheckoutCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } resolvedTenantId || resolvedTenantId != request.TenantId)
         {

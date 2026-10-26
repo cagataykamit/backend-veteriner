@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Commands.Create;
 
@@ -27,7 +27,7 @@ public sealed class CreateClinicCommandHandler : IRequestHandler<CreateClinicCom
         _clinicsWrite = clinicsWrite;
     }
 
-    public async Task<Result<Guid>> Handle(CreateClinicCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateClinicCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

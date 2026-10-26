@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Auth;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Auth.PasswordReset.Commands.Confirm;
@@ -36,7 +36,7 @@ public sealed class ConfirmPasswordResetHandler : IRequestHandler<ConfirmPasswor
         _logger = logger;
     }
 
-    public async Task<Unit> Handle(ConfirmPasswordResetCommand request, CancellationToken ct)
+    public async ValueTask<Unit> Handle(ConfirmPasswordResetCommand request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Token))
             throw new UnauthorizedAccessException("Geçersiz token.");

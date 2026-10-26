@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetList;
 
@@ -15,7 +15,7 @@ public sealed class GetTenantsListQueryHandler
 
     public GetTenantsListQueryHandler(IReadRepository<Tenant> tenants) => _tenants = tenants;
 
-    public async Task<Result<PagedResult<TenantListItemDto>>> Handle(GetTenantsListQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<TenantListItemDto>>> Handle(GetTenantsListQuery request, CancellationToken ct)
     {
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);

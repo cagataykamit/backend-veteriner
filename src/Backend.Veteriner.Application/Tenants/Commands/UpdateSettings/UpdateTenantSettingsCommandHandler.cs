@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.UpdateSettings;
 
@@ -38,7 +38,7 @@ public sealed class UpdateTenantSettingsCommandHandler
         _tenantsWrite = tenantsWrite;
     }
 
-    public async Task<Result<TenantDetailDto>> Handle(UpdateTenantSettingsCommand request, CancellationToken ct)
+    public async ValueTask<Result<TenantDetailDto>> Handle(UpdateTenantSettingsCommand request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Tenants.InviteCreate))
         {

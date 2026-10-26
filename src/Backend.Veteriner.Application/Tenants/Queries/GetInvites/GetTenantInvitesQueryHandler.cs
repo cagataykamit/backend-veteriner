@@ -9,7 +9,7 @@ using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using System.Collections.Generic;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetInvites;
@@ -40,7 +40,7 @@ public sealed class GetTenantInvitesQueryHandler
         _userTenants = userTenants;
     }
 
-    public async Task<Result<PagedResult<TenantInviteListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<TenantInviteListItemDto>>> Handle(
         GetTenantInvitesQuery request,
         CancellationToken ct)
     {

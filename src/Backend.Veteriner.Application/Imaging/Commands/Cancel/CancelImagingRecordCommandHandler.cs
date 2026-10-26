@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Imaging.Specs;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Imaging.Commands.Cancel;
@@ -42,7 +42,7 @@ public sealed class CancelImagingRecordCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ImagingRecordWriteResultDto>> Handle(CancelImagingRecordCommand request, CancellationToken ct)
+    public async ValueTask<Result<ImagingRecordWriteResultDto>> Handle(CancelImagingRecordCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Fail("Tenants.ContextMissing", "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");

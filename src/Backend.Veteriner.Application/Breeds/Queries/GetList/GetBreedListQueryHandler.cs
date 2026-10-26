@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.BreedsReference.Queries.GetList;
 
@@ -20,7 +20,7 @@ public sealed class GetBreedListQueryHandler
         _catalogCache = catalogCache;
     }
 
-    public async Task<Result<PagedResult<BreedListItemDto>>> Handle(GetBreedListQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<BreedListItemDto>>> Handle(GetBreedListQuery request, CancellationToken ct)
     {
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);

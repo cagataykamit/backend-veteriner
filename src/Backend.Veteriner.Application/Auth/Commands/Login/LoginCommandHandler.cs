@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -64,7 +64,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         _logger = logger ?? NullLogger<LoginCommandHandler>.Instance;
     }
 
-    public async Task<Result<LoginResultDto>> Handle(LoginCommand request, CancellationToken ct)
+    public async ValueTask<Result<LoginResultDto>> Handle(LoginCommand request, CancellationToken ct)
     {
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();

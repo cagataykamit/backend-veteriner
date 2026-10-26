@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalInvitePreview;
 
@@ -33,7 +33,7 @@ public sealed class GetPortalInvitePreviewQueryHandler : IRequestHandler<GetPort
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PortalInvitePreviewDto>> Handle(GetPortalInvitePreviewQuery request, CancellationToken ct)
+    public async ValueTask<Result<PortalInvitePreviewDto>> Handle(GetPortalInvitePreviewQuery request, CancellationToken ct)
     {
         var resolved = await _inviteResolver.ResolveUsableAsync(request.Token, _timeProvider.GetUtcNow().UtcDateTime, ct);
         if (!resolved.IsSuccess)

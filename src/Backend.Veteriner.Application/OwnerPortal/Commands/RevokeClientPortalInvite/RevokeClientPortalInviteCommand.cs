@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Commands.RevokeClientPortalInvite;
 
@@ -34,7 +34,7 @@ public sealed class RevokeClientPortalInviteCommandHandler : IRequestHandler<Rev
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result> Handle(RevokeClientPortalInviteCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(RevokeClientPortalInviteCommand request, CancellationToken ct)
     {
         var scopeResult = await _staffAccess.ResolveClientAsync(request.ClientId, ct);
         if (!scopeResult.IsSuccess)

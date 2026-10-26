@@ -12,7 +12,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Pets.Queries.GetSummary;
@@ -64,7 +64,7 @@ public sealed class GetPetSummaryQueryHandler : IRequestHandler<GetPetSummaryQue
         _logger = logger;
     }
 
-    public async Task<Result<PetSummaryDto>> Handle(GetPetSummaryQuery request, CancellationToken ct)
+    public async ValueTask<Result<PetSummaryDto>> Handle(GetPetSummaryQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

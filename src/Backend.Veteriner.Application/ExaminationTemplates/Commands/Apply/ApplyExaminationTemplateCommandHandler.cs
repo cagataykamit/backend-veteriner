@@ -12,7 +12,7 @@ using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ExaminationTemplates.Commands.Apply;
@@ -69,7 +69,7 @@ public sealed class ApplyExaminationTemplateCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<ExaminationTemplateApplyResultDto>> Handle(
+    public async ValueTask<Result<ExaminationTemplateApplyResultDto>> Handle(
         ApplyExaminationTemplateCommand request, CancellationToken ct)
     {
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))

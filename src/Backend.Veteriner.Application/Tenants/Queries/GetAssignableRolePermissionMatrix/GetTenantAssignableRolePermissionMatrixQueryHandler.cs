@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetAssignableRolePermissionMatrix;
 
@@ -32,7 +32,7 @@ public sealed class GetTenantAssignableRolePermissionMatrixQueryHandler
         _claimPermissions = claimPermissions;
     }
 
-    public async Task<Result<IReadOnlyList<TenantAssignableRolePermissionMatrixRowDto>>> Handle(
+    public async ValueTask<Result<IReadOnlyList<TenantAssignableRolePermissionMatrixRowDto>>> Handle(
         GetTenantAssignableRolePermissionMatrixQuery request,
         CancellationToken ct)
     {

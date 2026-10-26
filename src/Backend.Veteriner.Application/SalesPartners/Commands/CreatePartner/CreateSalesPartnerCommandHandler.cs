@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Commands.CreatePartner;
 
@@ -19,7 +19,7 @@ public sealed class CreateSalesPartnerCommandHandler : IRequestHandler<CreateSal
         _tenants = tenants;
     }
 
-    public async Task<Result<SalesPartnerDto>> Handle(CreateSalesPartnerCommand request, CancellationToken ct)
+    public async ValueTask<Result<SalesPartnerDto>> Handle(CreateSalesPartnerCommand request, CancellationToken ct)
     {
         if (request.LinkedTenantId is { } tenantId && !await _tenants.AnyAsync(new TenantByIdSpec(tenantId), ct))
             return Result<SalesPartnerDto>.Failure(SalesPartnerErrors.TenantNotFound);

@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.LabResults.Queries.GetList;
 

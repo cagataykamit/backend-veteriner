@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.ClinicalTerms.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.ClinicalTerms.Queries.GetById;
 
@@ -18,7 +18,7 @@ public sealed class GetClinicalTermByIdQueryHandler : IRequestHandler<GetClinica
         _terms = terms;
     }
 
-    public async Task<Result<ClinicalTermDto>> Handle(GetClinicalTermByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<ClinicalTermDto>> Handle(GetClinicalTermByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ClinicalTermDto>.Failure(

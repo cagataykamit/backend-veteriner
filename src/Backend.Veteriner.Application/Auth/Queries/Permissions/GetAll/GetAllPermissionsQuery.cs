@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Models;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Queries.Permissions.GetAll;
 

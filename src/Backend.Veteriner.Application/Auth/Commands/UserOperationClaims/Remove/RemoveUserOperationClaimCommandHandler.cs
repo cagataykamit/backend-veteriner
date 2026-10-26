@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Commands.UserOperationClaims.Remove;
 
@@ -11,6 +11,9 @@ public sealed class RemoveUserOperationClaimCommandHandler
     public RemoveUserOperationClaimCommandHandler(IUserOperationClaimRepository repo)
         => _repo = repo;
 
-    public Task Handle(RemoveUserOperationClaimCommand request, CancellationToken ct)
-        => _repo.RemoveAsync(request.UserId, request.OperationClaimId, ct);
+    public async ValueTask<Unit> Handle(RemoveUserOperationClaimCommand request, CancellationToken ct)
+    {
+        await _repo.RemoveAsync(request.UserId, request.OperationClaimId, ct);
+        return Unit.Value;
+    }
 }

@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetMembers;
 
@@ -27,7 +27,7 @@ public sealed class GetTenantMembersQueryHandler
         _userTenants = userTenants;
     }
 
-    public async Task<Result<PagedResult<TenantMemberListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<TenantMemberListItemDto>>> Handle(
         GetTenantMembersQuery request,
         CancellationToken ct)
     {

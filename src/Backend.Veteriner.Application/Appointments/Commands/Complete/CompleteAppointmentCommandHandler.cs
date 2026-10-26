@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Commands.Complete;
@@ -38,7 +38,7 @@ public sealed class CompleteAppointmentCommandHandler : IRequestHandler<Complete
         _eventOutbox = eventOutbox;
     }
 
-    public async Task<Result> Handle(CompleteAppointmentCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(CompleteAppointmentCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

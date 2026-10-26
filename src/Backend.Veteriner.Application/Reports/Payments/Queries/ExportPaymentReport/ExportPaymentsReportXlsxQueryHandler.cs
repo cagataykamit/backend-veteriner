@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
@@ -60,7 +60,7 @@ public sealed class ExportPaymentsReportXlsxQueryHandler
         _trialLimitPolicy = trialLimitPolicy;
     }
 
-    public async Task<Result<PaymentsXlsxExportResult>> Handle(
+    public async ValueTask<Result<PaymentsXlsxExportResult>> Handle(
         ExportPaymentsReportXlsxQuery request,
         CancellationToken ct)
     {

@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Commands.LogoutAll;
 
@@ -12,7 +12,7 @@ public sealed class LogoutAllCommandHandler : IRequestHandler<LogoutAllCommand, 
         _refreshRepo = refreshRepo;
     }
 
-    public async Task<Unit> Handle(LogoutAllCommand request, CancellationToken ct)
+    public async ValueTask<Unit> Handle(LogoutAllCommand request, CancellationToken ct)
     {
         // 1?? Kullan�c� ID kontrol�
         if (request.UserId == Guid.Empty)

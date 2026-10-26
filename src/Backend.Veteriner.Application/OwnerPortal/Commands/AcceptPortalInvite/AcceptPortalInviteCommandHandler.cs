@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Commands.AcceptPortalInvite;
 
@@ -40,7 +40,7 @@ public sealed class AcceptPortalInviteCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PortalInviteAcceptResultDto>> Handle(AcceptPortalInviteCommand request, CancellationToken ct)
+    public async ValueTask<Result<PortalInviteAcceptResultDto>> Handle(AcceptPortalInviteCommand request, CancellationToken ct)
     {
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 

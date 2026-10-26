@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.ClinicalTerms.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.ClinicalTerms.Commands.SetActive;
@@ -18,7 +18,7 @@ public sealed class SetClinicalTermActiveCommandHandler : IRequestHandler<SetCli
         _terms = terms;
     }
 
-    public async Task<Result> Handle(SetClinicalTermActiveCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(SetClinicalTermActiveCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result.Failure(ClinicalTermErrors.TenantContextMissing);

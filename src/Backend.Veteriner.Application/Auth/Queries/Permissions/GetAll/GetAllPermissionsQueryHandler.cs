@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Queries.Permissions.GetAll;
 
@@ -13,7 +13,7 @@ public sealed class GetAllPermissionsQueryHandler
     private readonly IPermissionRepository _repo;
     public GetAllPermissionsQueryHandler(IPermissionRepository repo) => _repo = repo;
 
-    public async Task<PagedResult<PermissionDto>> Handle(GetAllPermissionsQuery q, CancellationToken ct)
+    public async ValueTask<PagedResult<PermissionDto>> Handle(GetAllPermissionsQuery q, CancellationToken ct)
     {
         var page = Math.Max(1, q.Req.Page);
         var pageSize = Math.Clamp(q.Req.PageSize, 1, MaxPageSize);

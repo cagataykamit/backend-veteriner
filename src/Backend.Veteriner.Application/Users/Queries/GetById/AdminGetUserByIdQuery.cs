@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Users.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Users.Queries.GetById;
 

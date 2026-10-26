@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.Add
@@ -32,7 +32,7 @@ namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.
             _opt = opt.Value;
         }
 
-        public async Task Handle(AddPermissionToClaimCommand cmd, CancellationToken ct)
+        public async ValueTask<Unit> Handle(AddPermissionToClaimCommand cmd, CancellationToken ct)
         {
             // ------------------------------------------------------
             // 1) Idempotent kontrol
@@ -73,6 +73,8 @@ namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.
                 // burada manuel persist edilir.
                 await _refreshRepo.SaveChangesAsync(ct);
             }
+
+            return Unit.Value;
         }
     }
 }

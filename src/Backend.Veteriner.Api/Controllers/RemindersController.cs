@@ -9,7 +9,7 @@ using Backend.Veteriner.Application.Reminders.Contracts.Requests;
 using Backend.Veteriner.Application.Reminders.Queries.GetLogs;
 using Backend.Veteriner.Application.Reminders.Queries.GetSettings;
 using Backend.Veteriner.Domain.Reminders;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

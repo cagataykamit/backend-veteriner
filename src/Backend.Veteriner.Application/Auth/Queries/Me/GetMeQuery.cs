@@ -1,4 +1,4 @@
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Queries.Me;
 

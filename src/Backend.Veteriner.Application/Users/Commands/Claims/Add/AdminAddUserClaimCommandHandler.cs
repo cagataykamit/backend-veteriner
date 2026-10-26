@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Auth;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Users.Commands.Claims.Add;
 
@@ -29,11 +29,11 @@ public sealed class AdminAddUserClaimCommandHandler : IRequestHandler<AdminAddUs
         _uow = uow;
     }
 
-    public async Task Handle(AdminAddUserClaimCommand request, CancellationToken ct)
+    public async ValueTask<Unit> Handle(AdminAddUserClaimCommand request, CancellationToken ct)
     {
         // 1) Idempotent kontrol
         var exists = await _repo.ExistsAsync(request.UserId, request.OperationClaimId, ct);
-        if (exists) return;
+        if (exists) return Unit.Value;
 
         // 2) İlişkiyi ekle
         var entity = new UserOperationClaim(request.UserId, request.OperationClaimId);
@@ -44,5 +44,6 @@ public sealed class AdminAddUserClaimCommandHandler : IRequestHandler<AdminAddUs
 
         // 4) Kullanıcının efektif permission seti değişti -> cache düş
         _cache.InvalidateUser(request.UserId);
+        return Unit.Value;
     }
 }

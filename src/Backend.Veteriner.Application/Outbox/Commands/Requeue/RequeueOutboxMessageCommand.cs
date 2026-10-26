@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Outbox.Commands.Requeue;
 
@@ -21,7 +21,7 @@ public sealed class RequeueOutboxMessageCommandHandler : IRequestHandler<Requeue
         _uow = uow;
     }
 
-    public async Task<Result> Handle(RequeueOutboxMessageCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(RequeueOutboxMessageCommand request, CancellationToken ct)
     {
         if (!await _outbox.RequeueAsync(request.Id, ct))
             return Result.Failure(OutboxErrors.NotFound);

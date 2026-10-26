@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Users.Specs;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Queries.Me;
 
@@ -10,7 +10,7 @@ public sealed class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeDto>
 
     public GetMeQueryHandler(IUserReadRepository users) => _users = users;
 
-    public async Task<MeDto> Handle(GetMeQuery request, CancellationToken ct)
+    public async ValueTask<MeDto> Handle(GetMeQuery request, CancellationToken ct)
     {
         var user = await _users.FirstOrDefaultAsync(new UserByIdWithRolesSpec(request.UserId), ct)
                    ?? throw new UnauthorizedAccessException("Kullanıcı bulunamadı.");

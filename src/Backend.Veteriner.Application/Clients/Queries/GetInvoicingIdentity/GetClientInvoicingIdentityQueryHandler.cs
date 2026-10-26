@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clients.Queries.GetInvoicingIdentity;
 
@@ -25,7 +25,7 @@ public sealed class GetClientInvoicingIdentityQueryHandler
         _clients = clients;
     }
 
-    public async Task<Result<ClientInvoicingIdentityDto>> Handle(GetClientInvoicingIdentityQuery request, CancellationToken ct)
+    public async ValueTask<Result<ClientInvoicingIdentityDto>> Handle(GetClientInvoicingIdentityQuery request, CancellationToken ct)
     {
         // Tam kimlik numarası yalnız düzenleme yetkisiyle döner (uç politikasına ek savunma).
         if (!_permissions.HasPermission(PermissionCatalog.Clients.Update))

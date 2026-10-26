@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Pets.Queries.GetTimeline;
 
@@ -46,7 +46,7 @@ public sealed class GetPetTimelineQueryHandler
         _sources = sources.ToDictionary(s => s.Kind);
     }
 
-    public async Task<Result<PetTimelineDto>> Handle(GetPetTimelineQuery request, CancellationToken ct)
+    public async ValueTask<Result<PetTimelineDto>> Handle(GetPetTimelineQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

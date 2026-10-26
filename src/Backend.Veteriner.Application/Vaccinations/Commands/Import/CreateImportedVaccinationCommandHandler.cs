@@ -8,7 +8,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Vaccinations.Commands.Import;
 
@@ -46,7 +46,7 @@ public sealed class CreateImportedVaccinationCommandHandler : IRequestHandler<Cr
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<Guid>> Handle(CreateImportedVaccinationCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateImportedVaccinationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -8,7 +8,7 @@ using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Charges.Queries.GetById;
 
@@ -37,7 +37,7 @@ public sealed class GetChargeByIdQueryHandler : IRequestHandler<GetChargeByIdQue
         _pets = pets;
     }
 
-    public async Task<Result<ChargeDto>> Handle(GetChargeByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<ChargeDto>> Handle(GetChargeByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

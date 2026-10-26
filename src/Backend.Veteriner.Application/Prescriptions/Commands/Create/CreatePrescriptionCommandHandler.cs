@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Prescriptions.Commands.Create;
 
@@ -57,7 +57,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
         _prescriptionsWrite = prescriptionsWrite;
     }
 
-    public async Task<Result<Guid>> Handle(CreatePrescriptionCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreatePrescriptionCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

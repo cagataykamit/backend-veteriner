@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Sales;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Sales.Commands.Void;
@@ -63,7 +63,7 @@ public sealed class VoidSaleCommandHandler : IRequestHandler<VoidSaleCommand, Re
         _assembler = assembler;
     }
 
-    public async Task<Result<SaleDto>> Handle(VoidSaleCommand request, CancellationToken ct)
+    public async ValueTask<Result<SaleDto>> Handle(VoidSaleCommand request, CancellationToken ct)
     {
         var actor = await FinanceCorrectionActor.ResolveAsync(_tenantContext, _clientContext, _tenants, ct);
         if (!actor.IsSuccess)

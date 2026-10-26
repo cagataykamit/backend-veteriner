@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.RemoveMemberClinic;
 
@@ -51,7 +51,7 @@ public sealed class RemoveTenantMemberClinicCommandHandler
         _uow = uow;
     }
 
-    public async Task<Result<RemoveTenantMemberClinicResultDto>> Handle(
+    public async ValueTask<Result<RemoveTenantMemberClinicResultDto>> Handle(
         RemoveTenantMemberClinicCommand request,
         CancellationToken ct)
     {

@@ -16,7 +16,7 @@ using Backend.Veteriner.Application.Examinations.Queries.GetRelatedSummary;
 using Backend.Veteriner.Application.ExaminationTemplates.Commands.Apply;
 using Backend.Veteriner.Application.ExaminationTemplates.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

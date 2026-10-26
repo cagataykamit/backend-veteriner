@@ -7,7 +7,7 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using FluentValidation;
 using FluentValidation.Results;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.GoodsReceipts.Commands.Create;
 
@@ -30,7 +30,7 @@ public sealed class CreateGoodsReceiptCommandHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<GoodsReceiptCreateResult>> Handle(CreateGoodsReceiptCommand request, CancellationToken ct)
+    public async ValueTask<Result<GoodsReceiptCreateResult>> Handle(CreateGoodsReceiptCommand request, CancellationToken ct)
     {
         var lines = request.Lines!;
         var occurredAtUtc = _timeProvider.GetUtcNow().UtcDateTime;

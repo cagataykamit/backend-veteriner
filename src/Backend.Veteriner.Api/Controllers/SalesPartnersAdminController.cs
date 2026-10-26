@@ -14,7 +14,7 @@ using Backend.Veteriner.Application.SalesPartners.Queries.ExportCollections;
 using Backend.Veteriner.Application.SalesPartners.Queries.GetPartnerById;
 using Backend.Veteriner.Application.SalesPartners.Queries.GetPartners;
 using Backend.Veteriner.Application.SalesPartners.Queries.GetRedemptions;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

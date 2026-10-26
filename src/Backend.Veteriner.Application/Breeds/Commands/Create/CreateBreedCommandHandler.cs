@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.BreedsReference.Commands.Create;
 
@@ -33,7 +33,7 @@ public sealed class CreateBreedCommandHandler : IRequestHandler<CreateBreedComma
         _catalogCache = catalogCache;
     }
 
-    public async Task<Result<Guid>> Handle(CreateBreedCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateBreedCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

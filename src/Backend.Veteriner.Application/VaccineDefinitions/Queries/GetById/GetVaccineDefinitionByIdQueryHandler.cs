@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.VaccineDefinitions.Contracts.Dtos;
 using Backend.Veteriner.Application.VaccineDefinitions.Specs;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.VaccineDefinitions.Queries.GetById;
 
@@ -21,7 +21,7 @@ public sealed class GetVaccineDefinitionByIdQueryHandler
         _definitions = definitions;
     }
 
-    public async Task<Result<VaccineDefinitionDto>> Handle(GetVaccineDefinitionByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<VaccineDefinitionDto>> Handle(GetVaccineDefinitionByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Queries.Me;
 
@@ -41,7 +41,7 @@ public sealed class GetAccountSummaryQueryHandler
         _userOperationClaims = userOperationClaims;
     }
 
-    public async Task<Result<AccountSummaryDto>> Handle(GetAccountSummaryQuery request, CancellationToken ct)
+    public async ValueTask<Result<AccountSummaryDto>> Handle(GetAccountSummaryQuery request, CancellationToken ct)
     {
         var userId = _client.UserId;
         if (userId is null)

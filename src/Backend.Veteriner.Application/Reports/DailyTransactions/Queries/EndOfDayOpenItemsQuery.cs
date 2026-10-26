@@ -3,7 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.DailyTransactions.Queries;
 
@@ -35,7 +35,7 @@ public sealed class GetEndOfDayOpenItemsQueryHandler : IRequestHandler<GetEndOfD
         _openItems = openItems;
     }
 
-    public async Task<Result<EndOfDayOpenItemsDto>> Handle(GetEndOfDayOpenItemsQuery request, CancellationToken ct)
+    public async ValueTask<Result<EndOfDayOpenItemsDto>> Handle(GetEndOfDayOpenItemsQuery request, CancellationToken ct)
     {
         var filter = await DailyTransactionsReportFilter.ResolveAsync(
             _tenantContext, _clinicContext, _scopeResolver, request.From, request.To, request.ClinicId, null, null, null, ct);

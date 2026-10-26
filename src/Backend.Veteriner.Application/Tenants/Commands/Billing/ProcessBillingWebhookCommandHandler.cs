@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -52,7 +52,7 @@ public sealed class ProcessBillingWebhookCommandHandler
         _logger = logger;
     }
 
-    public async Task<Result<BillingWebhookAckDto>> Handle(ProcessBillingWebhookCommand request, CancellationToken ct)
+    public async ValueTask<Result<BillingWebhookAckDto>> Handle(ProcessBillingWebhookCommand request, CancellationToken ct)
     {
         var verified = _signatureVerifier.Verify(request.Provider, request.RawBody, request.Headers);
         if (!verified.IsSuccess)

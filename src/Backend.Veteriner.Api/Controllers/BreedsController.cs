@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.BreedsReference.Queries.GetById;
 using Backend.Veteriner.Application.BreedsReference.Queries.GetList;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

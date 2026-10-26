@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Contracts.Outbox;
 using Backend.Veteriner.Application.Common.Models;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Outbox.Queries.GetDeadLettersPaged;
 
@@ -14,6 +14,6 @@ public sealed class GetOutboxDeadLettersPagedQueryHandler
 
     public GetOutboxDeadLettersPagedQueryHandler(IOutboxAdminRepository outbox) => _outbox = outbox;
 
-    public Task<PagedResult<OutboxItemDto>> Handle(GetOutboxDeadLettersPagedQuery request, CancellationToken ct)
-        => _outbox.GetDeadLettersPagedAsync(request.PageRequest, ct);
+    public ValueTask<PagedResult<OutboxItemDto>> Handle(GetOutboxDeadLettersPagedQuery request, CancellationToken ct)
+        => new(_outbox.GetDeadLettersPagedAsync(request.PageRequest, ct));
 }

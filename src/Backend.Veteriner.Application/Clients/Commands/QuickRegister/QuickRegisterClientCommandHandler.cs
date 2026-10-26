@@ -2,7 +2,7 @@ using Backend.Veteriner.Application.Clients.Commands.Create;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Commands.Create;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clients.Commands.QuickRegister;
 
@@ -18,7 +18,7 @@ public sealed class QuickRegisterClientCommandHandler
 
     public QuickRegisterClientCommandHandler(ISender sender) => _sender = sender;
 
-    public async Task<Result<QuickRegisterClientResultDto>> Handle(
+    public async ValueTask<Result<QuickRegisterClientResultDto>> Handle(
         QuickRegisterClientCommand request, CancellationToken ct)
     {
         var client = await _sender.Send(

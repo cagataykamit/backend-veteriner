@@ -24,7 +24,7 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Examinations.Queries.GetRelatedSummary;
 
@@ -96,7 +96,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
         _permissionChecker = permissionChecker;
     }
 
-    public async Task<Result<ExaminationRelatedSummaryDto>> Handle(
+    public async ValueTask<Result<ExaminationRelatedSummaryDto>> Handle(
         GetExaminationRelatedSummaryQuery request,
         CancellationToken ct)
     {

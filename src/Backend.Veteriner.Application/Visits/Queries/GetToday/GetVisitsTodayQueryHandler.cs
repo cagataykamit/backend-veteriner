@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Visits.Queries.GetToday;
 
@@ -55,7 +55,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<TodayDto>> Handle(GetVisitsTodayQuery request, CancellationToken ct)
+    public async ValueTask<Result<TodayDto>> Handle(GetVisitsTodayQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

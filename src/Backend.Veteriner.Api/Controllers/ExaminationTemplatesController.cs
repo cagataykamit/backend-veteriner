@@ -10,7 +10,7 @@ using Backend.Veteriner.Application.ExaminationTemplates.Contracts.Dtos;
 using Backend.Veteriner.Application.ExaminationTemplates.Queries.GetById;
 using Backend.Veteriner.Application.ExaminationTemplates.Queries.GetList;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

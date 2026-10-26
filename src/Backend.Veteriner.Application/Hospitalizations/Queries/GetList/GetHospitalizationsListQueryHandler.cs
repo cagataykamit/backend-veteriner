@@ -13,7 +13,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Queries.GetList;
@@ -56,7 +56,7 @@ public sealed class GetHospitalizationsListQueryHandler
         _wards = wards;
     }
 
-    public async Task<Result<PagedResult<HospitalizationListItemDto>>> Handle(
+    public async ValueTask<Result<PagedResult<HospitalizationListItemDto>>> Handle(
         GetHospitalizationsListQuery request,
         CancellationToken ct)
     {

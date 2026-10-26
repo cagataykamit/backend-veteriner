@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.ClinicalTerms.Queries.GetList;
 
@@ -20,7 +20,7 @@ public sealed class GetClinicalTermsListQueryHandler
         _terms = terms;
     }
 
-    public async Task<Result<PagedResult<ClinicalTermDto>>> Handle(GetClinicalTermsListQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<ClinicalTermDto>>> Handle(GetClinicalTermsListQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<PagedResult<ClinicalTermDto>>.Failure(

@@ -5,7 +5,7 @@ using Backend.Veteriner.Application.Common.Diagnostics;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -38,7 +38,7 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
         _logger = logger;
     }
 
-    public async Task<Unit> Handle(RequestPasswordResetCommand request, CancellationToken ct)
+    public async ValueTask<Unit> Handle(RequestPasswordResetCommand request, CancellationToken ct)
     {
         var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();
         _logger.LogInformation("PasswordReset: START for {Email}", LogMasking.MaskEmail(email));

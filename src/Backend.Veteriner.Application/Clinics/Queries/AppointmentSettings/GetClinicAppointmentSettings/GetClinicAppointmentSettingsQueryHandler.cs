@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Queries.AppointmentSettings.GetClinicAppointmentSettings;
 
@@ -34,7 +34,7 @@ public sealed class GetClinicAppointmentSettingsQueryHandler
         _settingsRead = settingsRead;
     }
 
-    public async Task<Result<ClinicAppointmentSettingsDto>> Handle(
+    public async ValueTask<Result<ClinicAppointmentSettingsDto>> Handle(
         GetClinicAppointmentSettingsQuery request,
         CancellationToken ct)
     {

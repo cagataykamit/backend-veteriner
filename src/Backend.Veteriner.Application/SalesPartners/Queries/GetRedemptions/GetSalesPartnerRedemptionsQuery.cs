@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.SalesPartners.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Queries.GetRedemptions;
 
@@ -28,7 +28,7 @@ public sealed class GetSalesPartnerRedemptionsQueryHandler
         _tenants = tenants;
     }
 
-    public async Task<Result<IReadOnlyList<DiscountRedemptionRowDto>>> Handle(GetSalesPartnerRedemptionsQuery request, CancellationToken ct)
+    public async ValueTask<Result<IReadOnlyList<DiscountRedemptionRowDto>>> Handle(GetSalesPartnerRedemptionsQuery request, CancellationToken ct)
     {
         if (!await _partners.AnyAsync(new SalesPartnerByIdSpec(request.SalesPartnerId), ct))
             return Result<IReadOnlyList<DiscountRedemptionRowDto>>.Failure(SalesPartnerErrors.PartnerNotFound);

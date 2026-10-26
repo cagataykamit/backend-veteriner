@@ -19,7 +19,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Vaccinations.Commands.Create;
 
@@ -74,7 +74,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         _sender = sender;
     }
 
-    public async Task<Result<VaccinationCreateResultDto>> Handle(CreateVaccinationCommand request, CancellationToken ct)
+    public async ValueTask<Result<VaccinationCreateResultDto>> Handle(CreateVaccinationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {
@@ -260,7 +260,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
             new(vaccination.Id, result.Created, result.Administration, result.Stock));
     }
 
-    private Task<Result<AdministrationCreateResultDto>> SendAdministrationAsync(
+    private ValueTask<Result<AdministrationCreateResultDto>> SendAdministrationAsync(
         CreateVaccinationCommand request, Guid clinicId, DateTime? administeredAtUtc, Guid vaccinationId, CancellationToken ct)
         => _sender.Send(
             new CreateAdministrationCommand(

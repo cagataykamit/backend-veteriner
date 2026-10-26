@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Contracts.Outbox;
 using Backend.Veteriner.Application.Common.Models;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Outbox.Queries.GetPendingPaged;
 
@@ -13,6 +13,6 @@ public sealed class GetOutboxPendingPagedQueryHandler : IRequestHandler<GetOutbo
 
     public GetOutboxPendingPagedQueryHandler(IOutboxAdminRepository outbox) => _outbox = outbox;
 
-    public Task<PagedResult<OutboxItemDto>> Handle(GetOutboxPendingPagedQuery request, CancellationToken ct)
-        => _outbox.GetPendingPagedAsync(request.PageRequest, ct);
+    public ValueTask<PagedResult<OutboxItemDto>> Handle(GetOutboxPendingPagedQuery request, CancellationToken ct)
+        => new(_outbox.GetPendingPagedAsync(request.PageRequest, ct));
 }

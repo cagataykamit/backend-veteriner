@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clients.Commands.Create;
 
@@ -32,7 +32,7 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
         _eventOutbox = eventOutbox;
     }
 
-    public async Task<Result<ClientCreatedDto>> Handle(CreateClientCommand request, CancellationToken ct)
+    public async ValueTask<Result<ClientCreatedDto>> Handle(CreateClientCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Files.Contracts.Dtos;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Files.Queries.GetSignedContent;
 
@@ -18,7 +18,7 @@ public sealed class GetSignedStoredFileContentQueryHandler(
     TimeProvider timeProvider)
     : IRequestHandler<GetSignedStoredFileContentQuery, Result<StoredFileContent>>
 {
-    public async Task<Result<StoredFileContent>> Handle(GetSignedStoredFileContentQuery request, CancellationToken ct)
+    public async ValueTask<Result<StoredFileContent>> Handle(GetSignedStoredFileContentQuery request, CancellationToken ct)
     {
         var now = timeProvider.GetUtcNow().ToUnixTimeSeconds();
         if (request.Expires < now || !signer.IsValid(request.FileId, request.Expires, request.Signature))

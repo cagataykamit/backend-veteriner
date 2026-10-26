@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Pets.Queries.GetById;
 
@@ -26,7 +26,7 @@ public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Re
         _clients = clients;
     }
 
-    public async Task<Result<PetDetailDto>> Handle(GetPetByIdQuery request, CancellationToken ct)
+    public async ValueTask<Result<PetDetailDto>> Handle(GetPetByIdQuery request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

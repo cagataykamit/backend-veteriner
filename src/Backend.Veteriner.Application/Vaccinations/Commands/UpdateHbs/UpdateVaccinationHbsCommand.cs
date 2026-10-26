@@ -10,7 +10,7 @@ using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Vaccinations.Commands.UpdateHbs;
 
@@ -60,7 +60,7 @@ public sealed class UpdateVaccinationHbsCommandHandler : IRequestHandler<UpdateV
         _names = names;
     }
 
-    public async Task<Result<HbsEntryDto>> Handle(UpdateVaccinationHbsCommand request, CancellationToken ct)
+    public async ValueTask<Result<HbsEntryDto>> Handle(UpdateVaccinationHbsCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

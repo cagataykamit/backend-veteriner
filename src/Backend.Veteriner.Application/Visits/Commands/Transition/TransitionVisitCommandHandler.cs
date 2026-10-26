@@ -6,7 +6,7 @@ using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Visits.Commands.Transition;
@@ -39,7 +39,7 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
         _veterinarians = veterinarians;
     }
 
-    public async Task<Result<VisitDto>> Handle(TransitionVisitCommand request, CancellationToken ct)
+    public async ValueTask<Result<VisitDto>> Handle(TransitionVisitCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

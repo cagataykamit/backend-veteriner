@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Auth.Commands.Sessions.RevokeMy;
 
@@ -15,7 +15,7 @@ public sealed class RevokeMySessionCommandHandler : IRequestHandler<RevokeMySess
         _client = client;
     }
 
-    public async Task<Result> Handle(RevokeMySessionCommand request, CancellationToken ct)
+    public async ValueTask<Result> Handle(RevokeMySessionCommand request, CancellationToken ct)
     {
         var userId = _client.UserId;
         if (userId is null)

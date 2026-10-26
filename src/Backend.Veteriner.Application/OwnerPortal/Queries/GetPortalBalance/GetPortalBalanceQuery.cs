@@ -8,7 +8,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalBalance;
 
@@ -38,7 +38,7 @@ public sealed class GetPortalBalanceQueryHandler : IRequestHandler<GetPortalBala
         _payments = payments;
     }
 
-    public async Task<Result<PortalBalanceDto>> Handle(GetPortalBalanceQuery request, CancellationToken ct)
+    public async ValueTask<Result<PortalBalanceDto>> Handle(GetPortalBalanceQuery request, CancellationToken ct)
     {
         var scopeResult = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scopeResult.IsSuccess)

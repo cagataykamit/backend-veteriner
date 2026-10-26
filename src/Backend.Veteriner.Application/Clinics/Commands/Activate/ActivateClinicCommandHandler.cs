@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Commands.Activate;
 
@@ -41,7 +41,7 @@ public sealed class ActivateClinicCommandHandler
         _clinicsWrite = clinicsWrite;
     }
 
-    public async Task<Result<ActivateClinicResultDto>> Handle(ActivateClinicCommand request, CancellationToken ct)
+    public async ValueTask<Result<ActivateClinicResultDto>> Handle(ActivateClinicCommand request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Clinics.Update))
         {

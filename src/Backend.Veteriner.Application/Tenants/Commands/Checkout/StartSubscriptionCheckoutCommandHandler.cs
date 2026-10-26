@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -57,7 +57,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         _logger = logger;
     }
 
-    public async Task<Result<SubscriptionCheckoutSessionDto>> Handle(StartSubscriptionCheckoutCommand request, CancellationToken ct)
+    public async ValueTask<Result<SubscriptionCheckoutSessionDto>> Handle(StartSubscriptionCheckoutCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } resolvedTenantId || resolvedTenantId != request.TenantId)
         {

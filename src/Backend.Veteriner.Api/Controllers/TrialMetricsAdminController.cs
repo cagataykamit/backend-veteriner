@@ -2,7 +2,7 @@ using Backend.Veteriner.Api.Auth;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Queries.GetTrialActivationMetrics;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

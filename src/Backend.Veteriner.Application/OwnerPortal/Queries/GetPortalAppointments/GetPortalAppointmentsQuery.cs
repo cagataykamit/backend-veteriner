@@ -7,7 +7,7 @@ using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalAppointments;
 
@@ -59,7 +59,7 @@ public sealed class GetPortalAppointmentsQueryHandler
         _timeProvider = timeProvider;
     }
 
-    public async Task<Result<PagedResult<PortalAppointmentDto>>> Handle(GetPortalAppointmentsQuery request, CancellationToken ct)
+    public async ValueTask<Result<PagedResult<PortalAppointmentDto>>> Handle(GetPortalAppointmentsQuery request, CancellationToken ct)
     {
         var scopeResult = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scopeResult.IsSuccess)

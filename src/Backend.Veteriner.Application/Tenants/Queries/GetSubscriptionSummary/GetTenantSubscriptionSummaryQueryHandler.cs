@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
@@ -40,7 +40,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         _logger = logger ?? NullLogger<GetTenantSubscriptionSummaryQueryHandler>.Instance;
     }
 
-    public async Task<Result<TenantSubscriptionSummaryDto>> Handle(
+    public async ValueTask<Result<TenantSubscriptionSummaryDto>> Handle(
         GetTenantSubscriptionSummaryQuery request,
         CancellationToken ct)
     {

@@ -8,7 +8,7 @@ using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Appointments.Queries.GetAppointmentReport;
 
@@ -44,7 +44,7 @@ public sealed class GetAppointmentsReportQueryHandler
         _statusBreakdown = statusBreakdown;
     }
 
-    public async Task<Result<AppointmentReportResultDto>> Handle(
+    public async ValueTask<Result<AppointmentReportResultDto>> Handle(
         GetAppointmentsReportQuery request,
         CancellationToken ct)
     {

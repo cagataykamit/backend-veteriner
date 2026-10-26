@@ -4,7 +4,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Commands.AppointmentSettings.UpdateClinicAppointmentSettings;
 
@@ -40,7 +40,7 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
         _settingsWrite = settingsWrite;
     }
 
-    public async Task<Result<ClinicAppointmentSettingsDto>> Handle(
+    public async ValueTask<Result<ClinicAppointmentSettingsDto>> Handle(
         UpdateClinicAppointmentSettingsCommand request,
         CancellationToken ct)
     {

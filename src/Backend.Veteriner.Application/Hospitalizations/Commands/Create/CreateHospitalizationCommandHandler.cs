@@ -16,7 +16,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Visits;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Hospitalizations.Commands.Create;
 
@@ -63,7 +63,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         _wards = wards;
     }
 
-    public async Task<Result<Guid>> Handle(CreateHospitalizationCommand request, CancellationToken ct)
+    public async ValueTask<Result<Guid>> Handle(CreateHospitalizationCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {

@@ -1,5 +1,5 @@
 using Backend.Veteriner.Application.SalesPartners.Contracts;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.SalesPartners.Queries.ValidateCode;
 
@@ -15,7 +15,7 @@ public sealed class ValidateDiscountCodeQueryHandler : IRequestHandler<ValidateD
 
     public ValidateDiscountCodeQueryHandler(DiscountCodeRedemptionService discountCodes) => _discountCodes = discountCodes;
 
-    public async Task<DiscountCodeValidationDto> Handle(ValidateDiscountCodeQuery request, CancellationToken ct)
+    public async ValueTask<DiscountCodeValidationDto> Handle(ValidateDiscountCodeQuery request, CancellationToken ct)
     {
         var code = await _discountCodes.FindRedeemableAsync(request.Code, DateTime.UtcNow, ct);
         return code is null ? DiscountCodeValidationDto.Invalid : DiscountCodeValidationDto.From(code);

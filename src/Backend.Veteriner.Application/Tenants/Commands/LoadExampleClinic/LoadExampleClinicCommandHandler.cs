@@ -11,7 +11,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.LoadExampleClinic;
 
@@ -60,7 +60,7 @@ public sealed class LoadExampleClinicCommandHandler
         _loader = loader;
     }
 
-    public async Task<Result<ExampleClinicLoadSummaryDto>> Handle(LoadExampleClinicCommand request, CancellationToken ct)
+    public async ValueTask<Result<ExampleClinicLoadSummaryDto>> Handle(LoadExampleClinicCommand request, CancellationToken ct)
     {
         if (!_permissions.HasPermission(PermissionCatalog.Subscriptions.Manage))
         {

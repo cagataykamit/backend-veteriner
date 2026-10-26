@@ -1,7 +1,7 @@
 using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Domain.Shared;
-using MediatR;
+using Mediator;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalMe;
 
@@ -14,7 +14,7 @@ public sealed class GetPortalMeQueryHandler : IRequestHandler<GetPortalMeQuery, 
 
     public GetPortalMeQueryHandler(OwnerPortalAccess access) => _access = access;
 
-    public async Task<Result<PortalMeDto>> Handle(GetPortalMeQuery request, CancellationToken ct)
+    public async ValueTask<Result<PortalMeDto>> Handle(GetPortalMeQuery request, CancellationToken ct)
     {
         var accountResult = await _access.GetActiveAccountAsync(request.OwnerAccountId, ct);
         if (!accountResult.IsSuccess)
