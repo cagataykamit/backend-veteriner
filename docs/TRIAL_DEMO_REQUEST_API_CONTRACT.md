@@ -66,7 +66,7 @@ Yinelenen talep (aynı e-posta tekrar gönderir) **reddedilmez**; her gönderim 
 
 ## 3) Bildirim e-postası
 
-- Yapılandırma: `DemoRequests:NotifyEmail` (tek adres). Değer ürün deposunda AK-6 ile kullanıcıdan bekleniyor; **boşken talep yalnız veritabanına yazılır**, e-posta kuyruğa girmez, bilgi logu yazılır (adres maskeli değil çünkü yok; talep sahibinin e-postası logda maskeli).
+- Yapılandırma: `DemoRequests:NotifyEmail` (tek adres). Kullanıcı kararı (2026-10-26, AK-6): `vetinity.app@gmail.com`, `appsettings.Production.json` şablonunda. Bu dosya yayına girmez; canlıda ortam değişkeni `DemoRequests__NotifyEmail` olarak verilir. Temel `appsettings.json` ve geliştirme/test ortamında boştur. **Boşken talep yalnız veritabanına yazılır**, e-posta kuyruğa girmez, bilgi logu yazılır (adres maskeli değil çünkü yok; talep sahibinin e-postası logda maskeli).
 - Doluysa e-posta mevcut outbox portuyla (`IEmailSender`) talep kaydıyla **aynı `SaveChanges`** içinde kuyruğa girer: ya ikisi birden yazılır ya hiçbiri.
 - Konu: `Vetinity demo talebi — {clinicName}`. Gövde düz metin: tüm alanlar (Türkçe etiketlerle), talep kimliği ve UTC zamanı. Yanıt için talep sahibinin e-postası gövdededir (port `Reply-To` desteklemez).
 - Kayıtta `NotificationQueuedAtUtc` tutulur: adres sonradan girildiğinde bildirilmemiş talepler veritabanından ayırt edilir (geri dönük gönderim ilk sürümde yok).
