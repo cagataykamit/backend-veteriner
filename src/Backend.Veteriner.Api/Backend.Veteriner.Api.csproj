@@ -29,12 +29,12 @@
 		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
 		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
 
-		<!-- OpenTelemetry instrumentation (1.15.x ailesi, OTel core ile hizalı) -->
+		<!-- OpenTelemetry instrumentation (1.20.x ailesi, OTel core ile hizalı; EF Core paketi yalnız beta yayımlanıyor) -->
 		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.1" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.20.1" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.20.1" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.20.1" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.15.1-beta.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.20.1-beta.1" />
 
 		<!-- Serilog & Swagger -->
 		<PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
