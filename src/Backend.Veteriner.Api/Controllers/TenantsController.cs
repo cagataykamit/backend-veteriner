@@ -578,26 +578,10 @@ public sealed class TenantsController : ControllerBase
                 .ToActionResult(this);
         }
 
-        BillingPeriodKind? billingPeriod = null;
-        if (!string.IsNullOrWhiteSpace(body.BillingPeriod))
-        {
-            if (!Enum.TryParse<BillingPeriodKind>(body.BillingPeriod.Trim(), ignoreCase: true, out var parsed)
-                || !Enum.IsDefined(parsed)
-                || int.TryParse(body.BillingPeriod, out _))
-            {
-                return Result<SubscriptionCheckoutSessionDto>.Failure(
-                        "Subscriptions.Checkout.Validation.BillingPeriodInvalid",
-                        "billingPeriod Monthly ya da Yearly olmalı.")
-                    .ToActionResult(this);
-            }
-
-            billingPeriod = parsed;
-        }
-
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new StartSubscriptionCheckoutCommand(tenantId, body.TargetPlanCode, billingPeriod), ct);
+        var result = await _mediator.Send(new StartSubscriptionCheckoutCommand(tenantId, body.TargetPlanCode, body.BillingPeriod), ct);
         return result.ToActionResult(this);
     }
 
