@@ -1,10 +1,10 @@
 # Backend.Veteriner
 
-**Veteriner** ürünü için ASP.NET Core backend’i. Şu aşamada depo; kimlik doğrulama, yetkilendirme, kalıcılık, gözlemlenebilirlik ve platform API **çekirdeğini** içerir. Sektörel domain (ör. klinik, hasta, randevu) ayrı modüller olarak eklenecek şekilde tasarlanmıştır.
+**Vetinity** veteriner klinik SaaS ürününün ASP.NET Core backend’i. Depo; platform çekirdeğinin (kimlik doğrulama, yetkilendirme, kalıcılık, gözlemlenebilirlik) üzerinde klinik iş modüllerini, hayvan sahibi portalı API’sini ve platform yönetim uçlarını içerir.
 
 ## Bu repo nedir?
 
-**Backend.Veteriner**, veteriner iş kurallarının üzerine inşa edileceği **çekirdek + platform** katmanıdır. Ürün bounded context’leri (klinikler, hayvanlar, randevular vb.) bu çekirdeğe eklenir; aşağıda listelenen örnek modüller şu an repoda **yoktur**.
+**Backend.Veteriner**, panel (klinik personeli), portal (hayvan sahibi) ve platform yönetimi istemcilerinin kullandığı tek API’dir. Ürün kararları ve yol haritası ayrı ürün deposunda (`vetinity-product`) tutulur; bu depo uygulamanın ve API sözleşmesinin (`docs/*_API_CONTRACT.md`) kaynağıdır.
 
 ## Ne içerir?
 
@@ -18,15 +18,16 @@
 | **Persistence** | EF Core, `AppDbContext`, konfigürasyonlar, repository desenleri, migration tabanı |
 | **Seeding** | İzin ve temel platform verisi için seed akışları |
 | **Middleware / Swagger / Health** | API sözleşmesi, sürümleme, sağlık kontrolleri, ortak middleware |
-| **Platform admin controller’ları** | Kullanıcı, izin, claim ve outbox gibi **platform** uçları |
-| **Veteriner domain iskeleti** | `Tenant`, `Clinic`, `Client`, `Pet`, `Appointment` agregatları; Application’da Create + GetById + sayfalı liste sorguları (API uçları sonraki adımda) |
+| **Platform admin controller’ları** | Kullanıcı, izin, claim, outbox, satış ortağı ve deneme metrikleri gibi **platform** uçları (`Controllers/Admin`) |
+| **Klinik iş modülleri** | Kiracı ve klinik, müşteri, hayvan, randevu, muayene ve vizite, aşı, reçete, tedavi, yatış, laboratuvar ve görüntüleme, hatırlatma, ücret/ödeme/satış, ürün ve stok, raporlar ve gün sonu, içe aktarma, dosyalar (`Controllers`) |
+| **Hayvan sahibi portalı** | Portal kimlik doğrulama, hesap ve klinik bağlantı uçları (`Controllers/Portal`, `/api/portal/v1`) |
+| **Abonelik ve faturalama** | İşletme fatura profili, abonelik ödeme akışı, sağlayıcı geri çağrı ve webhook uçları |
+| **CQRS okuma modelleri** | Ayrı query veritabanı (`QueryDbContext`), outbox üzerinden projeksiyonlar, ayarla açılan okuma yolları |
 
 ## Ne içermez?
 
-Şu an kaynak ağaçta **yok** (gelecekte ayrı modül veya ayrı proje olarak eklenebilir):
-
-- **Veteriner iş domain’i** — klinik, pet, randevu, fatura vb. (henüz implementasyon yok)
-- Eski şablondan kalan örnek modül isimleri: **Contact**, **Organization**, **Tasks** (kod veya placeholder repository kalmadı)
+- Panel ve portal arayüzü (ayrı frontend deposu) ve ürün belgeleri (`vetinity-product`).
+- Eski şablondan kalan örnek modüller (**Contact**, **Tasks**, şablonun **Organization** modülü) kaldırıldı. Bugünkü `organization` ucu işletme fatura profilidir.
 
 `docs/` altındaki bazı analiz belgeleri geçmiş şablon örneklerine (ör. Contact) referans verebilir; canlı kod için `src/` esas alınmalıdır ([`docs/README.md`](docs/README.md)).
 
@@ -34,7 +35,7 @@
 
 - **Katmanlı yapı:** `Backend.Veteriner.Api` → `Application` → `Domain` ← `Infrastructure`
 - **Uygulama katmanı:** Mediator (martinothamar, kaynak üretici; işleyiciler `ValueTask` döner) ile command/query; FluentValidation; ortak pipeline davranışları (kayıt ve sıra: `Api/Configuration/MediatorConfiguration.cs`, ADR-038)
-- **Domain:** Agregatlar, domain event arabirimleri, `Result` / hata modeli (ürün domain’i burada minimal tutulur)
+- **Domain:** Modül başına agregatlar ve iş kuralları, `IDomainEvent` işaretleyicisi, `Result` / hata modeli
 - **Altyapı:** EF Core, outbox, e-posta gönderimi, JWT, önbellek invalidation vb.
 
 Ayrıntılı kurallar için: [`docs/architecture/foundation-rules.md`](docs/architecture/foundation-rules.md).
@@ -68,9 +69,9 @@ IDOR / clinic isolation regression komutları (Quick Smoke, Full Regression, Rel
 
 ## Ürün modülü ekleme (özet)
 
-1. Veteriner domain kodunu `Application` / `Domain` / `Infrastructure` içinde **ayrı klasörler** (veya ileride ayrı derlemeler) ile ekleyin; mevcut çekirdek katman kurallarına uyun.
-2. `PermissionCatalog` ve seed’lere ürün izinlerini ekleyin; EF migration’ları ürün modeline göre üretin.
-3. API’de ürün controller’larını ekleyin; mevcut JWT ve permission policy yapısı ile hizalayın.
+1. Modül kodunu `Domain` / `Application` / `Infrastructure` içinde mevcut modüllerle aynı **klasör düzeniyle** ekleyin; çekirdek katman kurallarına uyun.
+2. `PermissionCatalog` ve seed’lere modül izinlerini ekleyin; EF migration’larını üretin.
+3. API controller’ını ekleyin; mevcut JWT, permission policy ve kiracı/klinik kapsamıyla hizalayın; sözleşmeyi `docs/` altında belgeleyin.
 
 Operasyonel adımlar için: [`docs/architecture/new-module-checklist.md`](docs/architecture/new-module-checklist.md).
 
