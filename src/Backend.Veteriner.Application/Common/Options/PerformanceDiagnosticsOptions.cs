@@ -1,7 +1,7 @@
 namespace Backend.Veteriner.Application.Common.Options;
 
 /// <summary>
-/// Request / MediatR / SQL / outbound billing HTTP ve kritik handler adım ölçümleri için eşikler.
+/// Request / MediatR / SQL / outbound billing HTTP ölçümleri için eşikler.
 /// </summary>
 public sealed class PerformanceDiagnosticsOptions
 {
@@ -26,18 +26,6 @@ public sealed class PerformanceDiagnosticsOptions
 
     /// <summary>Iyzico vb. dış çağrı süreleri.</summary>
     public int OutboundHttpWarningMs { get; set; } = 500;
-
-    /// <summary>Kritik handler toplam süre; üzerinde HandlerPerf.Critical Warning.</summary>
-    public int CriticalHandlerTotalMsWarning { get; set; } = 400;
-
-    /// <summary>Tek bir MarkStep süresi; üzerinde aynı logda en yavaş adım vurgulanır.</summary>
-    public int CriticalHandlerSlowStepMsWarning { get; set; } = 150;
-
-    /// <summary>
-    /// Development ortamında kritik handler’lar için her başarılı istekte Information + adım özeti.
-    /// Prod’da false bırakın (spam önleme).
-    /// </summary>
-    public bool AlwaysLogCriticalHandlerMetricsInDevelopment { get; set; }
 
     public int SqlPreviewMaxChars { get; set; } = 200;
 }
