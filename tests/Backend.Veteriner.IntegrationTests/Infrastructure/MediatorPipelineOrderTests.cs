@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Application.SpeciesReference.Commands.Create;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Infrastructure.Behaviors;
 using AwesomeAssertions;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;

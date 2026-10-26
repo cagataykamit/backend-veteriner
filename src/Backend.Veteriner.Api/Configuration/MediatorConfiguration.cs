@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Common.Behaviors;
+using Backend.Veteriner.Infrastructure.Behaviors;
 
 namespace Backend.Veteriner.Api.Configuration;
 
