@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Pets;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;

@@ -48,7 +48,7 @@ sonucundan satır düşmesidir** (sessiz veri eksiltme).
 
 ### İncelenen paylaşılan yardımcılar
 
-- `Common/ListSearchPetIds.cs` — Strateji A (7 klinik aggregate listesi kullanır)
+- `Pets/ListSearchPetIds.cs` — Strateji A (7 klinik aggregate listesi kullanır)
 - `Reports/Payments/PaymentsReportSearchResolution.cs` — Strateji B (rapor + export)
 - `Reports/Payments/PaymentsReportItemMapping.cs` — id-hydration (rapor)
 
