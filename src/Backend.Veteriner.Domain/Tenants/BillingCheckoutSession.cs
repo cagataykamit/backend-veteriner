@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Tenants;
@@ -8,6 +9,10 @@ public sealed class BillingCheckoutSession : AggregateRoot
     public Guid TenantId { get; private set; }
     public SubscriptionPlanCode CurrentPlanCode { get; private set; }
     public SubscriptionPlanCode TargetPlanCode { get; private set; }
+
+    /// <summary>Satın alınan dönem (BILL-001); etkinleştirme ve satış ortağı tahsilatı bu dönemle yapılır.</summary>
+    public BillingPeriodKind BillingPeriod { get; private set; } = BillingPeriodKind.Monthly;
+
     public BillingCheckoutSessionStatus Status { get; private set; }
     public BillingProvider Provider { get; private set; }
     public string? ExternalReference { get; private set; }
@@ -32,10 +37,13 @@ public sealed class BillingCheckoutSession : AggregateRoot
         SubscriptionPlanCode targetPlanCode,
         BillingProvider provider,
         DateTime utcNow,
-        DateTime? expiresAtUtc)
+        DateTime? expiresAtUtc,
+        BillingPeriodKind billingPeriod = BillingPeriodKind.Monthly)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
+        if (!Enum.IsDefined(billingPeriod))
+            throw new ArgumentOutOfRangeException(nameof(billingPeriod));
 
         var now = NormalizeUtc(utcNow);
         return new BillingCheckoutSession
@@ -44,6 +52,7 @@ public sealed class BillingCheckoutSession : AggregateRoot
             TenantId = tenantId,
             CurrentPlanCode = currentPlanCode,
             TargetPlanCode = targetPlanCode,
+            BillingPeriod = billingPeriod,
             Status = BillingCheckoutSessionStatus.Pending,
             Provider = provider,
             ExpiresAtUtc = expiresAtUtc.HasValue ? NormalizeUtc(expiresAtUtc.Value) : null,

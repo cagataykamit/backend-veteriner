@@ -45,6 +45,10 @@ public static class SubscriptionPricing
         return new SubscriptionPriceBreakdown(list, periodDiscount, codeDiscount);
     }
 
+    /// <summary>Kod indirimi öncesi dönem fiyatı: aylıkta aylık fiyat, yıllıkta <see cref="YearlyBilledMonths"/> aylık fiyat.</summary>
+    public static long PeriodPriceMinor(long monthlyPriceMinor, BillingPeriodKind period)
+        => Calculate(monthlyPriceMinor, period, redemption: null, DateTime.UnixEpoch).AmountBeforeCodeMinor;
+
     /// <summary>Plan fiyatından türemeyen tutar (ör. yükseltme farkı): dönem indirimi yok, yalnız kod indirimi.</summary>
     public static SubscriptionPriceBreakdown ForAmount(
         long amountMinor,
