@@ -513,6 +513,10 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
                 await ApplySnapshotChangeAsync(completed.Previous, completed.Current, eventId, projectedAtUtc, cancellationToken);
                 break;
 
+            case AppointmentDeletedIntegrationEvent deleted:
+                await ApplyDeletionAsync(deleted.Previous, eventId, projectedAtUtc, cancellationToken);
+                break;
+
             default:
                 throw new InvalidOperationException(
                     $"Desteklenmeyen appointment integration event payload: {integrationEvent.GetType().Name}");
@@ -536,6 +540,30 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
             RecalculatePetActivity(key.TenantId, key.ClinicId, key.PetId, eventId, projectedAtUtc);
 
         foreach (var key in GetAffectedClientKeys(previous, current))
+            RecalculateClientActivity(key.TenantId, key.ClinicId, key.ClientId, eventId, projectedAtUtc);
+    }
+
+    /// <summary>Kalıcı silme: satır kaldırılır, silinen randevunun günü ve hasta/müşteri son ziyareti yeniden hesaplanır.</summary>
+    private async Task ApplyDeletionAsync(
+        AppointmentProjectionSnapshot previous,
+        Guid eventId,
+        DateTime projectedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var existing = _queryDb.AppointmentReadModels.Find(previous.AppointmentId);
+        if (existing is not null)
+        {
+            _queryDb.AppointmentReadModels.Remove(existing);
+            await _queryDb.SaveChangesAsync(cancellationToken);
+        }
+
+        foreach (var bucket in GetAffectedDailyBuckets(null, previous))
+            RecalculateDailyStats(bucket.TenantId, bucket.ClinicId, bucket.LocalDate, eventId, projectedAtUtc);
+
+        foreach (var key in GetAffectedPetKeys(null, previous))
+            RecalculatePetActivity(key.TenantId, key.ClinicId, key.PetId, eventId, projectedAtUtc);
+
+        foreach (var key in GetAffectedClientKeys(null, previous))
             RecalculateClientActivity(key.TenantId, key.ClinicId, key.ClientId, eventId, projectedAtUtc);
     }
 
@@ -829,6 +857,7 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
             AppointmentRescheduledIntegrationEvent e => e.EventId,
             AppointmentCancelledIntegrationEvent e => e.EventId,
             AppointmentCompletedIntegrationEvent e => e.EventId,
+            AppointmentDeletedIntegrationEvent e => e.EventId,
             _ => throw new InvalidOperationException("Appointment integration event EventId çözülemedi.")
         };
 }

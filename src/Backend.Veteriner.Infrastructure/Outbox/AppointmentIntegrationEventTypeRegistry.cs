@@ -16,6 +16,7 @@ public sealed class AppointmentIntegrationEventTypeRegistry
             [AppointmentIntegrationEventTypes.Rescheduled] = typeof(AppointmentRescheduledIntegrationEvent),
             [AppointmentIntegrationEventTypes.Cancelled] = typeof(AppointmentCancelledIntegrationEvent),
             [AppointmentIntegrationEventTypes.Completed] = typeof(AppointmentCompletedIntegrationEvent),
+            [AppointmentIntegrationEventTypes.Deleted] = typeof(AppointmentDeletedIntegrationEvent),
         };
 
     public static bool TryResolvePayloadType(string eventType, out Type payloadType)
