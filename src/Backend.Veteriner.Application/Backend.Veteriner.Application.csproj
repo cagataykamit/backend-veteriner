@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Ardalis.Specification" Version="9.3.1" />
-    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="FluentValidation" Version="12.2.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.22" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.22" />
