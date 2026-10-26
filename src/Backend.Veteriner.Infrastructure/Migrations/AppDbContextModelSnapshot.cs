@@ -18,7 +18,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.9")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -2033,7 +2033,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ValidationId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.ComplexProperty<Dictionary<string, object>>("CustomerCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.CustomerCounts#ImportTableCounts", b1 =>
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "CustomerCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.CustomerCounts#ImportTableCounts", b1 =>
                         {
                             b1.IsRequired();
 
@@ -2071,7 +2071,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                                 .HasColumnType("int");
                         });
 
-                    b.ComplexProperty<Dictionary<string, object>>("PetCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.PetCounts#ImportTableCounts", b1 =>
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "PetCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.PetCounts#ImportTableCounts", b1 =>
                         {
                             b1.IsRequired();
 
@@ -2109,7 +2109,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                                 .HasColumnType("int");
                         });
 
-                    b.ComplexProperty<Dictionary<string, object>>("VaccinationCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.VaccinationCounts#ImportTableCounts", b1 =>
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "VaccinationCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.VaccinationCounts#ImportTableCounts", b1 =>
                         {
                             b1.IsRequired();
 
@@ -3815,6 +3815,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("BillingPeriod")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("CheckoutUrl")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -4132,6 +4137,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<DateTime?>("ActivatedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<int>("BillingPeriod")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.Property<DateTime?>("CancelledAtUtc")
                         .HasColumnType("datetime2");

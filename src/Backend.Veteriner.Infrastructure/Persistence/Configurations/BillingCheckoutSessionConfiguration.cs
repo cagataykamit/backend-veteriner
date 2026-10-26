@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -28,6 +29,11 @@ public sealed class BillingCheckoutSessionConfiguration : IEntityTypeConfigurati
         b.Property(x => x.Provider)
             .IsRequired()
             .HasConversion<int>();
+
+        b.Property(x => x.BillingPeriod)
+            .IsRequired()
+            .HasConversion<int>()
+            .HasDefaultValue(BillingPeriodKind.Monthly);
 
         b.Property(x => x.ExternalReference)
             .HasMaxLength(250);
