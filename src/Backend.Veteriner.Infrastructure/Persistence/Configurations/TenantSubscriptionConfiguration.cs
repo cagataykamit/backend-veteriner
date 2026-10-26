@@ -1,4 +1,3 @@
-using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -21,11 +20,10 @@ public sealed class TenantSubscriptionConfiguration : IEntityTypeConfiguration<T
             .IsRequired()
             .HasConversion<int>();
 
-        // Ödenen dönem türü (BILL-001); mevcut satırlar aylık.
+        // Ödenen dönem türü (BILL-001); mevcut satırlar migration'da aylık (1) doldurulur.
         b.Property(x => x.BillingPeriod)
             .IsRequired()
-            .HasConversion<int>()
-            .HasDefaultValue(BillingPeriodKind.Monthly);
+            .HasConversion<int>();
 
         b.Property(x => x.TrialStartsAtUtc);
         b.Property(x => x.TrialEndsAtUtc);

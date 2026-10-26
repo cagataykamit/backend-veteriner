@@ -3819,9 +3819,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("BillingPeriod")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                        .HasColumnType("int");
 
                     b.Property<string>("CheckoutUrl")
                         .HasMaxLength(1000)
@@ -4142,9 +4140,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("BillingPeriod")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("CancelledAtUtc")
                         .HasColumnType("datetime2");
