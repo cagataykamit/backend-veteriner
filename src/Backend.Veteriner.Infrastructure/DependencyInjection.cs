@@ -14,6 +14,7 @@ using Backend.Veteriner.Application.Common.Abstractions;                        
 using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Outbox;                               // IOutboxBuffer
+using Backend.Veteriner.Application.Outbox;                                      // IOutboxAdminRepository
 using Backend.Veteriner.Application.Common.Auditing;                            // IAuditLogWriter, IAuditContext
 using Backend.Veteriner.Infrastructure.Caching;                                  // PermissionReader
 using Backend.Veteriner.Infrastructure.Mailing;                                   // MailKitEmailSender, TransactionalEmailSender, SmtpOptions
@@ -63,6 +64,7 @@ using Backend.Veteriner.Application.Reports.Registers.VaccineInfo;
 using Backend.Veteriner.Application.Reports.Registers.Vaccines;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaimPermissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.OperationClaims;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.UserOperationClaims;
 using Backend.Veteriner.Infrastructure.Reminders;
@@ -176,6 +178,7 @@ public static class DependencyInjection
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IOperationClaimPermissionRepository, OperationClaimPermissionRepository>();
         services.AddScoped<IOperationClaimReadRepository, OperationClaimReadRepository>();
+        services.AddScoped<IOutboxAdminRepository, OutboxAdminRepository>();
         services.AddScoped<IUserOperationClaimRepository, UserOperationClaimRepository>();
         services.AddScoped<IUserTenantRepository, UserTenantRepository>();
         services.AddScoped<IUserClinicRepository, UserClinicRepository>();

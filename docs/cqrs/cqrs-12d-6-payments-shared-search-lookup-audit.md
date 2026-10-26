@@ -33,7 +33,7 @@ adımını Query DB read-model'e taşımadan önce risk ve geçiş tasarımını
 | `Payments/Specs/PaymentsFilteredPagedSpec.cs` | Rapor sayfa (Payment entity) |
 | `Payments/Specs/PaymentsFilteredAmountsSpec.cs` | Rapor toplam tutar |
 | `Payments/Specs/PaymentsFilteredOrderedForReportSpec.cs` | Export (sayfasız, sıralı) |
-| `Common/ListSearchPetIds.cs` | Strateji A (kıyas için — payments kullanmaz) |
+| `Pets/ListSearchPetIds.cs` | Strateji A (kıyas için — payments kullanmaz) |
 | `Common/SharedSearchPetIdsLookup.cs` | 12D-3/4/5 helper (Strateji A — payments için **yeniden kullanılamaz**) |
 
 ### Lookup altyapısı (12D-2 — hazır)

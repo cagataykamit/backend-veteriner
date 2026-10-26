@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Reports.DailyTransactions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
 
@@ -14,9 +15,13 @@ public sealed class DailyTransactionsReader : IDailyTransactionsReader, ICashEve
     private static readonly DailyTransactionKind[] CashKinds = [DailyTransactionKind.Payment, DailyTransactionKind.PaymentVoid];
 
     private readonly AppDbContext _db;
+    private readonly ILogger<DailyTransactionsReader> _logger;
 
-    public DailyTransactionsReader(AppDbContext db)
-        => _db = db;
+    public DailyTransactionsReader(AppDbContext db, ILogger<DailyTransactionsReader> logger)
+    {
+        _db = db;
+        _logger = logger;
+    }
 
     public async Task<DailyTransactionsReadResult> ReadAsync(FinanceEventFilter filter, int skip, int take, CancellationToken ct = default)
     {
@@ -52,7 +57,7 @@ public sealed class DailyTransactionsReader : IDailyTransactionsReader, ICashEve
             e.Method,
             e.IsDirectSale,
             e.IsVoided,
-            FinanceEvents.ReasonOf(e),
+            FinanceEvents.ReasonOf(e, _logger),
             e.PerformedByUserId,
             names.User(e.PerformedByUserId))).ToList();
 
