@@ -23,9 +23,11 @@ public static class ExceptionHandlingExtensions
 
     public static IApplicationBuilder UseGlobalExceptionHandler(this IApplicationBuilder app, IWebHostEnvironment env)
     {
-        app.UseExceptionHandler(errorApp =>
+        app.UseExceptionHandler(new ExceptionHandlerOptions
         {
-            errorApp.Run(async ctx =>
+            // İstemcinin bıraktığı istekte framework'ün "unhandled exception" ERR günlüğü de bastırılır; aşağıda Information yazılır.
+            SuppressDiagnosticsCallback = c => IsClientAbort(c.HttpContext, c.Exception),
+            ExceptionHandler = async ctx =>
             {
                 if (ctx.Response.HasStarted) return;
 
@@ -39,6 +41,16 @@ public static class ExceptionHandlingExtensions
                     ctx.Items.TryGetValue("CorrelationId", out var legacy) ? legacy?.ToString() :
                     ctx.Request.Headers.TryGetValue(Correlation.HeaderName, out var cid) ? cid.ToString() :
                     traceId;
+
+                var clientAborted = IsClientAbort(ctx, ex);
+
+                if (clientAborted)
+                {
+                    // Bağlantı kapalı: gövde yazmak IOException fırlatır ve olay "işlenmemiş" sayılır; yalnız durum kodu bırakılır.
+                    Log.Information("Client aborted request ({ExceptionType}). Path={Path} TraceId={TraceId} CorrelationId={CorrelationId}", ex!.GetType().Name, ctx.Request.Path.Value, traceId, correlationId);
+                    ctx.Response.StatusCode = ClientClosedRequest;
+                    return;
+                }
 
                 if (ex is not null)
                     Log.Error(ex, "Unhandled exception. TraceId={TraceId} CorrelationId={CorrelationId}", traceId, correlationId);
@@ -153,11 +165,19 @@ public static class ExceptionHandlingExtensions
                     ex: ex);
 
                 await ctx.Response.WriteAsJsonAsync(pd);
-            });
+            }
         });
 
         return app;
     }
+
+    /// <summary>
+    /// İstemci isteği bıraktı (sayfa değişimi, sekme kapandı): hata değildir. SqlClient iptali <c>OperationCanceledException</c>
+    /// yerine "işlem kullanıcı tarafından iptal edildi" <c>SqlException</c>'ı olarak da fırlatabildiği için türe değil
+    /// <see cref="HttpContext.RequestAborted"/>'a bakılır.
+    /// </summary>
+    private static bool IsClientAbort(HttpContext ctx, Exception? ex)
+        => ex is not null && ctx.RequestAborted.IsCancellationRequested;
 
     private static ProblemDetails CreateProblemDetails(
         int status,
