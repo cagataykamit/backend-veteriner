@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Backend.Veteriner.Application.Common.Csv;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
@@ -80,7 +81,7 @@ public static class ImportErrorReportWriter
     public static byte[] BuildCsv(IReadOnlyList<ImportErrorReportRow> rows)
     {
         var sb = new StringBuilder();
-        sb.Append(string.Join(';', CsvHeaders)).Append("\r\n");
+        sb.AppendCsvLine(string.Join(';', CsvHeaders));
 
         foreach (var row in rows.OrderBy(r => r.Table).ThenBy(r => r.RowNumber))
         {
@@ -94,7 +95,7 @@ public static class ImportErrorReportWriter
                 Messages(row),
                 source,
             ];
-            sb.Append(string.Join(';', cells.Select(c => CsvCell(ImportCellSafety.ForExport(c))))).Append("\r\n");
+            sb.AppendCsvLine(string.Join(';', cells.Select(c => CsvCell(ImportCellSafety.ForExport(c)))));
         }
 
         return [.. Encoding.UTF8.GetPreamble(), .. Encoding.UTF8.GetBytes(sb.ToString())];

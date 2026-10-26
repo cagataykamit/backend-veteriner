@@ -1,4 +1,5 @@
 using System.Text;
+using Backend.Veteriner.Application.Common.Csv;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Imports;
 using ClosedXML.Excel;
@@ -37,7 +38,7 @@ public static class ImportTemplateBuilder
     {
         var header = string.Join(';', ImportCanonicalSchema.Fields(table).Select(f => f.Header));
         var preamble = Encoding.UTF8.GetPreamble();
-        var body = Encoding.UTF8.GetBytes(header + "\r\n");
+        var body = Encoding.UTF8.GetBytes(header + CsvLineExtensions.LineEnding);
         return [.. preamble, .. body];
     }
 

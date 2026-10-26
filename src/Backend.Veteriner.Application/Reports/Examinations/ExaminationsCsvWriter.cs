@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Backend.Veteriner.Application.Common.Csv;
 using Backend.Veteriner.Application.Reports.Examinations.Contracts.Dtos;
 
 namespace Backend.Veteriner.Application.Reports.Examinations;
@@ -32,7 +33,7 @@ internal static class ExaminationsCsvWriter
         sb.Append(Delimiter);
         sb.Append("Değerlendirme");
         sb.Append(Delimiter);
-        sb.AppendLine("Not");
+        sb.AppendCsvLine("Not");
 
         foreach (var r in rows)
             AppendLine(sb, r);
@@ -63,7 +64,7 @@ internal static class ExaminationsCsvWriter
         AppendField(sb, r.Assessment ?? string.Empty);
         sb.Append(Delimiter);
         AppendField(sb, r.Notes ?? string.Empty);
-        sb.AppendLine();
+        sb.AppendCsvLine();
     }
 
     private static void AppendField(StringBuilder sb, string value)

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Backend.Veteriner.Application.Common.Csv;
 using Backend.Veteriner.Application.Common.Time;
 
 namespace Backend.Veteriner.Application.Reports.Registers;
@@ -18,7 +19,7 @@ internal static class RegisterCsvWriter
     {
         var sb = new StringBuilder();
         sb.Append('﻿');
-        sb.AppendLine(string.Join(Delimiter, columns.Select(c => Quote(c.CsvHeader))));
+        sb.AppendCsvLine(string.Join(Delimiter, columns.Select(c => Quote(c.CsvHeader))));
 
         foreach (var row in rows)
         {
@@ -29,7 +30,7 @@ internal static class RegisterCsvWriter
                 sb.Append(Quote(Format(columns[i], row)));
             }
 
-            sb.AppendLine();
+            sb.AppendCsvLine();
         }
 
         return Encoding.UTF8.GetBytes(sb.ToString());

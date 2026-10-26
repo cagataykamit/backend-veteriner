@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Backend.Veteriner.Application.Common.Csv;
 using Backend.Veteriner.Application.Reports.Vaccinations.Contracts.Dtos;
 
 namespace Backend.Veteriner.Application.Reports.Vaccinations;
@@ -32,7 +33,7 @@ internal static class VaccinationsCsvWriter
         sb.Append(Delimiter);
         sb.Append("Sonraki Tarih");
         sb.Append(Delimiter);
-        sb.AppendLine("Not");
+        sb.AppendCsvLine("Not");
 
         foreach (var r in rows)
             AppendLine(sb, r);
@@ -59,7 +60,7 @@ internal static class VaccinationsCsvWriter
         AppendField(sb, FormatOptionalLocal(r.NextDueAtUtc));
         sb.Append(Delimiter);
         AppendField(sb, r.Notes ?? string.Empty);
-        sb.AppendLine();
+        sb.AppendCsvLine();
     }
 
     private static string FormatOptionalLocal(DateTime? utc)

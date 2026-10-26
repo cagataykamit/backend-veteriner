@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Backend.Veteriner.Application.Common.Csv;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Contracts.Dtos;
 using Backend.Veteriner.Domain.Charges;
 
@@ -19,7 +20,7 @@ internal static class OutstandingBalancesCsvWriter
     {
         var sb = new StringBuilder();
         sb.Append('﻿');
-        sb.AppendLine(string.Join(Delimiter, OutstandingBalancesReportColumns.Headers));
+        sb.AppendCsvLine(string.Join(Delimiter, OutstandingBalancesReportColumns.Headers));
 
         foreach (var r in rows)
             AppendLine(sb, r);
@@ -40,7 +41,7 @@ internal static class OutstandingBalancesCsvWriter
         AppendField(sb, r.OpenChargeCount.ToString(CultureInfo.InvariantCulture));
         sb.Append(Delimiter);
         AppendField(sb, OutstandingBalancesReportTime.ToIstanbul(r.OldestOpenChargeAtUtc).ToString("dd.MM.yyyy", Turkish));
-        sb.AppendLine();
+        sb.AppendCsvLine();
     }
 
     private static void AppendField(StringBuilder sb, string value)

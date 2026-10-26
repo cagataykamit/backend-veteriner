@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Csv;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Imports;
 using Backend.Veteriner.Application.SalesPartners.Specs;
@@ -55,7 +56,7 @@ public sealed class ExportSalesPartnerCollectionsQueryHandler
 
         var sb = new StringBuilder();
         sb.Append('﻿');
-        sb.AppendLine(string.Join(Delimiter, Headers));
+        sb.AppendCsvLine(string.Join(Delimiter, Headers));
 
         var lines = redemptions
             .SelectMany(r => r.Collections.Select(c => (Redemption: r, Collection: c)))
@@ -108,6 +109,6 @@ public sealed class ExportSalesPartnerCollectionsQueryHandler
             sb.Append(needsQuote ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"" : value);
         }
 
-        sb.AppendLine();
+        sb.AppendCsvLine();
     }
 }

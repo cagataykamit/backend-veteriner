@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Backend.Veteriner.Application.Common.Csv;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
 
 namespace Backend.Veteriner.Application.Reports.Payments;
@@ -34,7 +35,7 @@ internal static class PaymentsCsvWriter
         sb.Append(Delimiter);
         sb.Append("Ödeme Yöntemi");
         sb.Append(Delimiter);
-        sb.AppendLine("Not");
+        sb.AppendCsvLine("Not");
 
         foreach (var r in rows)
             AppendLine(sb, r);
@@ -63,7 +64,7 @@ internal static class PaymentsCsvWriter
         AppendField(sb, PaymentMethodTurkishDisplay.ToLabel(r.Method));
         sb.Append(Delimiter);
         AppendField(sb, r.Notes ?? string.Empty);
-        sb.AppendLine();
+        sb.AppendCsvLine();
     }
 
     private static void AppendField(StringBuilder sb, string value)

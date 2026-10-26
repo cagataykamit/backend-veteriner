@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Backend.Veteriner.Application.Common.Csv;
 using Backend.Veteriner.Application.Reports.Appointments.Contracts.Dtos;
 
 namespace Backend.Veteriner.Application.Reports.Appointments;
@@ -29,7 +30,7 @@ internal static class AppointmentsCsvWriter
         sb.Append(Delimiter);
         sb.Append("Durum");
         sb.Append(Delimiter);
-        sb.AppendLine("Not");
+        sb.AppendCsvLine("Not");
 
         foreach (var r in rows)
             AppendLine(sb, r);
@@ -54,7 +55,7 @@ internal static class AppointmentsCsvWriter
         AppendField(sb, AppointmentStatusTurkishDisplay.ToLabel(r.Status));
         sb.Append(Delimiter);
         AppendField(sb, r.Notes ?? string.Empty);
-        sb.AppendLine();
+        sb.AppendCsvLine();
     }
 
     private static void AppendField(StringBuilder sb, string value)
