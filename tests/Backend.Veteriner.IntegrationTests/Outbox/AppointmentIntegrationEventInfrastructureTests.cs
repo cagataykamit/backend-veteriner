@@ -122,6 +122,7 @@ public sealed class AppointmentIntegrationEventInfrastructureTests : IClassFixtu
         yield return [AppointmentIntegrationEventTypes.Rescheduled, typeof(AppointmentRescheduledIntegrationEvent)];
         yield return [AppointmentIntegrationEventTypes.Cancelled, typeof(AppointmentCancelledIntegrationEvent)];
         yield return [AppointmentIntegrationEventTypes.Completed, typeof(AppointmentCompletedIntegrationEvent)];
+        yield return [AppointmentIntegrationEventTypes.Deleted, typeof(AppointmentDeletedIntegrationEvent)];
     }
 
     private static AppointmentProjectionSnapshot CreateSnapshot()

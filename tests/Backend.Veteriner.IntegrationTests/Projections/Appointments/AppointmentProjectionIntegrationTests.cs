@@ -468,6 +468,55 @@ public sealed class AppointmentProjectionIntegrationTests
     }
 
     [Fact]
+    public async Task DeletedEvent_Should_RemoveReadModel_And_RecomputeDailyStatsAndActivity()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
+
+        await AppointmentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
+
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var earlierAtUtc = new DateTime(2026, 6, 16, 9, 0, 0, DateTimeKind.Utc);
+        var laterAtUtc = new DateTime(2026, 6, 16, 15, 0, 0, DateTimeKind.Utc);
+        var earlier = AppointmentProjectionTestSupport.CreateSnapshot(Guid.NewGuid(), tenantId, clinicId, petId, clientId, earlierAtUtc);
+        var later = AppointmentProjectionTestSupport.CreateSnapshot(Guid.NewGuid(), tenantId, clinicId, petId, clientId, laterAtUtc);
+
+        await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, AppointmentIntegrationEventTypes.Created, new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, earlier));
+        await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, AppointmentIntegrationEventTypes.Created, new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 1L, later));
+        await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, AppointmentIntegrationEventTypes.Deleted, new AppointmentDeletedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 2L, later));
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        (await queryDb.AppointmentReadModels.AnyAsync(x => x.AppointmentId == later.AppointmentId)).Should().BeFalse();
+        var localDate = AppointmentProjectionTestSupport.LocalDateForUtc(earlierAtUtc);
+        var stats = await queryDb.ClinicDailyAppointmentStatsReadModels
+            .SingleAsync(x => x.TenantId == tenantId && x.ClinicId == clinicId && x.LocalDate == localDate);
+        stats.TotalCount.Should().Be(1);
+        (await queryDb.ClinicPetActivityReadModels.SingleAsync(x => x.TenantId == tenantId && x.PetId == petId))
+            .LastAppointmentAtUtc.Should().Be(earlierAtUtc);
+        (await queryDb.ClinicClientActivityReadModels.SingleAsync(x => x.TenantId == tenantId && x.ClientId == clientId))
+            .LastAppointmentAtUtc.Should().Be(earlierAtUtc);
+
+        // Günün son randevusu da silinince sayaç ve aktivite satırları kalkar.
+        await AppointmentProjectionTestSupport.EnqueueIntegrationEventAsync(
+            commandDb, AppointmentIntegrationEventTypes.Deleted, new AppointmentDeletedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, 2L, earlier));
+        await processor.ProcessBatchAsync(CancellationToken.None);
+
+        (await queryDb.AppointmentReadModels.AnyAsync(x => x.TenantId == tenantId)).Should().BeFalse();
+        (await queryDb.ClinicDailyAppointmentStatsReadModels.AnyAsync(x => x.TenantId == tenantId)).Should().BeFalse();
+        (await queryDb.ClinicPetActivityReadModels.AnyAsync(x => x.TenantId == tenantId)).Should().BeFalse();
+        (await queryDb.ClinicClientActivityReadModels.AnyAsync(x => x.TenantId == tenantId)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task NonAppointmentOutboxMessage_Should_NotBeConsumedByProjector()
     {
         await using var scope = _factory.Services.CreateAsyncScope();

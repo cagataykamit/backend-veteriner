@@ -173,4 +173,4 @@ Gövde yok. Başarı **200** + silinen/pasife alınan sayılar (§10.2 `counts` 
 ### 10.5 Testler
 
 - Application: `ClearExampleClinicCommandHandlerTests` (yetki, bağlam, IDOR, örnek veri yok, başarı), `GetExampleClinicStatusQueryHandlerTests`, `TransactionalCommandMarkerTests`.
-- Entegrasyon: `Tenants/ExampleClinicCleanupIntegrationTests` (yükle → durum → temizle: örnek kayıtlar sıfır, kullanıcının kendi müşterisi ve kayıtları kalır, örnek hastaya eklenen muayene/ödeme silinir, kullanılmış örnek ürün pasif; ikinci temizlik 409; IDOR 403; 401/403; okuma modelleri projeksiyon sonrası boş; temizlikten sonra yeniden yükleme).
+- Entegrasyon: `Tenants/ExampleClinicCleanupIntegrationTests` (yükle → durum → temizle: örnek kayıtlar sıfır, kullanıcının kendi müşterisi ve kayıtları kalır, örnek hastaya eklenen muayene/ödeme silinir, kullanılmış örnek ürün pasif; ücretli abonelikte çalışır; okuma modeli silme olayları outbox'ta; ikinci temizlik 409; IDOR 403; 401/403; temizlikten sonra yeniden yükleme), `Projections/Appointments/AppointmentProjectionIntegrationTests.DeletedEvent_*` (randevu satırı, günlük sayaç ve aktivite yeniden hesaplanır).
