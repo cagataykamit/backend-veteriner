@@ -126,6 +126,7 @@ public static class WebApplicationBuilderExtensions
         });
 
         builder.Services.AddApplication();
+        builder.Services.AddBackendMediator();
 
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();

@@ -11,6 +11,12 @@
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
 		<PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
+		<PackageReference Include="Mediator.Abstractions" Version="3.0.2" />
+		<!-- Kaynak üretici yalnız en dış çalıştırılabilir projede (ADR-038): IMediator uygulaması ve işleyici kayıtları burada üretilir. -->
+		<PackageReference Include="Mediator.SourceGenerator" Version="3.0.2">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.1.0" />

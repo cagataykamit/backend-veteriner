@@ -11,7 +11,6 @@ using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Visits;
 using Backend.Veteriner.Application.Auth.Contracts;                              // IPermissionReader
 using Backend.Veteriner.Application.Common.Abstractions;                        // IPasswordHasher, IJwtTokenService, ITokenHashService, IClientContext, IUser..., IRefreshTokenRepository, IVerificationTokenRepository, IEmailSender, IEmailSenderImmediate, IAppUrlProvider
-using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Outbox;                               // IOutboxBuffer
 using Backend.Veteriner.Application.Outbox;                                      // IOutboxAdminRepository
@@ -79,7 +78,6 @@ using Backend.Veteriner.Infrastructure.Web;                                     
 using Backend.Veteriner.Infrastructure.Auditing;                                  // AuditLogWriter
 using Backend.Veteriner.Infrastructure.Billing;
 using Backend.Veteriner.Application.Common.Billing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -415,9 +413,6 @@ public static class DependencyInjection
 
         /// ===== Unit of Work =====
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-
-        // TransactionBehavior, MediatR pipeline'ında çalışır; her request için transaction başlatır ve commit/rollback yapar.
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
 
         return services;
