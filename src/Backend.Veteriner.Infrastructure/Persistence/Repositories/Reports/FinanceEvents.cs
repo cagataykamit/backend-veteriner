@@ -2,6 +2,7 @@ using System.Text.Json;
 using Backend.Veteriner.Application.Reports.DailyTransactions;
 using Backend.Veteriner.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
 
@@ -76,8 +77,8 @@ internal static class FinanceEvents
         return events;
     }
 
-    /// <summary>Düzeltme gerekçesi: denetim gövdesindeki <c>reason</c> alanı.</summary>
-    public static string? ReasonOf(FinanceEvent e)
+    /// <summary>Düzeltme gerekçesi: denetim gövdesindeki <c>reason</c> alanı; gövde ayrıştırılamazsa null (Debug log).</summary>
+    public static string? ReasonOf(FinanceEvent e, ILogger logger)
     {
         if (e.Reason is not null || e.Payload is null)
             return e.Reason;
@@ -91,8 +92,12 @@ internal static class FinanceEvents
                     return property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString() : null;
             }
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            // Gövde içeriği kişisel veri taşıyabilir; yalnız olay kimliği loglanır.
+            logger.LogDebug(ex,
+                "Düzeltme denetim gövdesi ayrıştırılamadı; gerekçe boş döner. Kind={Kind} ReferenceId={ReferenceId}",
+                e.Kind, e.ReferenceId);
         }
 
         return null;
