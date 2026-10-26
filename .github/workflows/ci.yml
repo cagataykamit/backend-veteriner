@@ -17,7 +17,7 @@ permissions:
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  DOTNET_EF_VERSION: 9.0.9
+  DOTNET_EF_VERSION: 9.0.22
 
 jobs:
   build-test:
