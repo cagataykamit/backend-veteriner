@@ -89,7 +89,7 @@ Operatör sırası — **20 adım**. Detaylı komutlar için [`staging-first-dep
 |---|---|---|
 | 1 | **VPS/VM seç** | Windows Server/VPS; CPU/RAM/disk staging için yeterli; firewall planı |
 | 2 | **DNS / staging domain ayarla** | Hostname → staging VM IP; TLS için hostname hazır |
-| 3 | **Windows / IIS / .NET Hosting Bundle kur** | IIS + AspNetCoreModuleV2; ASP.NET Core **9** runtime ([`windows-iis-staging-host-checklist.md`](windows-iis-staging-host-checklist.md)) |
+| 3 | **Windows / IIS / .NET Hosting Bundle kur** | IIS + AspNetCoreModuleV2; ASP.NET Core **10** runtime ([`windows-iis-staging-host-checklist.md`](windows-iis-staging-host-checklist.md)) |
 | 4 | **SQL Server kur veya erişimi hazırla** | Aynı VM veya erişilebilir host; operatör bağlantı testi |
 | 5 | **Command + Query DB oluştur** | Örn. `VetinityCommandDb_Staging`, `VetinityQueryDb_Staging` — **farklı catalog zorunlu** |
 | 6 | **SQL login / permissions ayarla** | Migration + runtime için Command ve Query DB yetkisi |
@@ -114,7 +114,7 @@ Operatör sırası — **20 adım**. Detaylı komutlar için [`staging-first-dep
 
 - [ ] Windows Server güncel patch
 - [ ] IIS Web Server role + gerekli özellikler
-- [ ] ASP.NET Core **9** Hosting Bundle kurulu (`dotnet --list-runtimes` → `Microsoft.AspNetCore.App 9.x`)
+- [ ] ASP.NET Core **10** Hosting Bundle kurulu (`dotnet --list-runtimes` → `Microsoft.AspNetCore.App 10.x`)
 - [ ] AspNetCoreModuleV2 IIS'te mevcut
 - [ ] Staging API physical path oluşturuldu (ör. `C:\inetpub\vetinity-staging-api\current\`)
 - [ ] DbMigrator çalıştırma klasörü hazır

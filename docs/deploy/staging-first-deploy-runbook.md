@@ -67,7 +67,7 @@ Deploy öncesi operatör / platform ekibi hazırlığı:
 
 | # | Gereksinim | Not |
 |---|---|---|
-| 1 | **.NET 9 runtime** | API target: `net9.0` |
+| 1 | **.NET 10 runtime** | API target: `net10.0` |
 | 2 | **ASP.NET Core Hosting Bundle** (IIS kullanılıyorsa) | Windows IIS reverse proxy için |
 | 3 | **SQL Server erişimi** | DB oluşturma + migration çalıştırma yetkisi |
 | 4 | **DbMigrator çalıştırma** | Build edilmiş `Backend.Veteriner.DbMigrator` veya repo'dan `dotnet run` |
@@ -89,7 +89,7 @@ Deploy öncesi operatör / platform ekibi hazırlığı:
 
 1. Windows Server güncel patch seviyesi
 2. SQL Server kurulu ve çalışır durumda (aynı VM veya erişilebilir host)
-3. [.NET 9 Hosting Bundle](https://dotnet.microsoft.com/download/dotnet/9.0) kurulumu
+3. [.NET 10 Hosting Bundle](https://dotnet.microsoft.com/download/dotnet/10.0) kurulumu
 4. IIS: Application Pool — **No Managed Code**, identity uygun servis hesabı
 5. Site binding: HTTPS + staging hostname
 6. Publish output klasörü (ör. `C:\inetpub\vetinity-staging-api`) — IIS site physical path
@@ -98,7 +98,7 @@ Deploy öncesi operatör / platform ekibi hazırlığı:
 
 ### Linux (Kestrel + reverse proxy) — özet adımlar
 
-1. .NET 9 runtime kurulumu
+1. .NET 10 runtime kurulumu
 2. SQL Server erişimi (Linux'ta SQL Server container veya remote Windows SQL)
 3. systemd unit veya supervisor ile Kestrel
 4. nginx/Caddy TLS termination → `http://127.0.0.1:<port>`

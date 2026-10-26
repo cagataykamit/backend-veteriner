@@ -42,7 +42,7 @@ dotnet publish src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj -c Release
 dotnet publish src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj -c Release -p:EnvironmentName=Production -o <output>
 ```
 
-**Proje:** `src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj` — `TargetFramework: net9.0`, `Microsoft.NET.Sdk.Web`
+**Proje:** `src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj` — `TargetFramework: net10.0`, `Microsoft.NET.Sdk.Web`
 
 **Ön koşul:** `dotnet restore` (dry-run'da otomatik restore yapıldı).
 
@@ -58,7 +58,7 @@ dotnet publish src/Backend.Veteriner.Api/Backend.Veteriner.Api.csproj -c Release
 dotnet publish src/Backend.Veteriner.DbMigrator/Backend.Veteriner.DbMigrator.csproj -c Release -o artifacts/deploy-dryrun/migrator
 ```
 
-**Proje:** `src/Backend.Veteriner.DbMigrator/Backend.Veteriner.DbMigrator.csproj` — `OutputType: Exe`, `TargetFramework: net9.0`
+**Proje:** `src/Backend.Veteriner.DbMigrator/Backend.Veteriner.DbMigrator.csproj` — `OutputType: Exe`, `TargetFramework: net10.0`
 
 **Csproj config copy:** `appsettings.json`, `appsettings.Development.json`, `appsettings.LoadTest.json` (`CopyToOutputDirectory: PreserveNewest`; Development/LoadTest **`CopyToPublishDirectory: Never`** — DEPLOY-4A). **`appsettings.Staging.json` yok** — Staging'de env var zorunlu ([`staging-config-secrets-inventory.md`](staging-config-secrets-inventory.md)).
 
@@ -126,7 +126,7 @@ Exit 0; komut listesi (`migrate`, `migrate-query`, `seed`, `all`, backfill komut
 | `appsettings.json` | **Var** | Base config; connection string ve JWT key **boş** |
 | `appsettings.Staging.json` | **Var** | Staging overlay; CQRS default'ları false |
 | `Backend.Veteriner.Api.deps.json` | **Var** | Runtime dependency manifest |
-| `Backend.Veteriner.Api.runtimeconfig.json` | **Var** | .NET 9 runtime config |
+| `Backend.Veteriner.Api.runtimeconfig.json` | **Var** | .NET 10 runtime config |
 | `Backend.Veteriner.Application.dll` | **Var** | Transitive publish |
 | `Backend.Veteriner.Infrastructure.dll` | **Var** | Transitive publish |
 | NuGet runtime DLL'leri | **Var** | ~107 dosya toplam (publish output) |
@@ -179,7 +179,7 @@ dotnet Backend.Veteriner.DbMigrator.dll seed   # opsiyonel
 | Hosting model | **inprocess** (AspNetCoreModuleV2) |
 | Physical path | Publish output klasörü (`current\`) |
 | Env var | IIS app pool: `ASPNETCORE_ENVIRONMENT=Staging` + connection strings + JWT ([`staging-config-secrets-inventory.md`](staging-config-secrets-inventory.md)) |
-| .NET runtime | ASP.NET Core **9** Hosting Bundle sunucuda kurulu olmalı |
+| .NET runtime | ASP.NET Core **10** Hosting Bundle sunucuda kurulu olmalı |
 | stdout log | Default kapalı; troubleshooting için geçici açılabilir |
 
 Detaylı IIS checklist: [`windows-iis-staging-host-checklist.md`](windows-iis-staging-host-checklist.md).

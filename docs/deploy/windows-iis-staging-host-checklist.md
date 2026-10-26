@@ -56,13 +56,13 @@
 
 ## Required software
 
-Asagidaki yazilimlar staging host'ta kurulu veya erisilebilir olmalidir. **Surum numarasi uydurulmaz**; proje `net9.0` hedefler.
+Asagidaki yazilimlar staging host'ta kurulu veya erisilebilir olmalidir. **Surum numarasi uydurulmaz**; proje `net10.0` hedefler.
 
 | # | Yazilim | Not |
 |---|---|---|
 | 1 | **Windows Server** veya Windows VPS | Tek VM baslangic icin yeterli |
 | 2 | **IIS** (Web Server role) | ASP.NET Core Module icin gerekli rol ozellikleri |
-| 3 | **ASP.NET Core Hosting Bundle** | Proje **TargetFramework `net9.0`** ile uyumlu bundle — [.NET 9 download](https://dotnet.microsoft.com/download/dotnet/9.0) Hosting Bundle |
+| 3 | **ASP.NET Core Hosting Bundle** | Proje **TargetFramework `net10.0`** ile uyumlu bundle — [.NET 10 download](https://dotnet.microsoft.com/download/dotnet/10.0) Hosting Bundle |
 | 4 | **SQL Server** | Ayni VM veya erisilebilir ayri host |
 | 5 | **SSMS** veya **sqlcmd** alternatifi | DB olusturma, yetki, smoke SQL |
 | 6 | **Git** | Opsiyonel — publish genelde build machine'den artifact ile |
@@ -71,7 +71,7 @@ Asagidaki yazilimlar staging host'ta kurulu veya erisilebilir olmalidir. **Surum
 
 **Kurulum sonrasi dogrulama:**
 
-- [ ] `dotnet --list-runtimes` ciktisinda **Microsoft.AspNetCore.App 9.x** gorunur (Hosting Bundle kurulumu)
+- [ ] `dotnet --list-runtimes` ciktisinda **Microsoft.AspNetCore.App 10.x** gorunur (Hosting Bundle kurulumu)
 - [ ] IIS Manager acilir; **AspNetCoreModuleV2** modulu mevcut
 - [ ] SQL Server'a localhost veya planlanan host uzerinden baglanti test edildi
 
@@ -107,7 +107,7 @@ Asagidaki yazilimlar staging host'ta kurulu veya erisilebilir olmalidir. **Surum
 
 | Konu | Checklist |
 |---|---|
-| Surum | **.NET 9** Hosting Bundle — repo `Backend.Veteriner.Api.csproj` -> `net9.0` |
+| Surum | **.NET 10** Hosting Bundle — repo `Backend.Veteriner.Api.csproj` -> `net10.0` |
 | Kurulum | Microsoft resmi installer; kurulum sonrasi IIS yeniden baslat |
 | Dogrulama | `%ProgramFiles%\dotnet\shared\Microsoft.AspNetCore.App\9.*` mevcut |
 | Modul | `AspNetCoreModuleV2` IIS Modules listesinde |
