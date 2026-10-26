@@ -29,8 +29,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
     public async ValueTask InitializeAsync()
     {
         var commandDbName = IntegrationTestDatabaseNames.WithRunId($"{CommandDatabasePrefix}{Guid.NewGuid():N}");
-        var connectionString =
-            $"Server=(localdb)\\mssqllocaldb;Database={commandDbName};Trusted_Connection=True;MultipleActiveResultSets=true";
+        var connectionString = IntegrationTestDatabaseNames.ConnectionString(commandDbName);
 
         // Güvenlik kapısı: yalnız VetinityCommandDb_TodayCounts_ prefix'i kabul edilir.
         // Reddedilen örnekler: development command DB, legacy isimler, paylaşılan integration scope DB'leri, Development-Production suffix'leri, boş ad.

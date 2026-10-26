@@ -1267,7 +1267,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
     private async Task<AppDbContext> CreateDbContextAsync()
     {
         var commandDbName = IntegrationTestDatabaseNames.WithRunId($"{CommandDatabasePrefix}{Guid.NewGuid():N}");
-        var connectionString = $"Server=(localdb)\\mssqllocaldb;Database={commandDbName};Trusted_Connection=True;MultipleActiveResultSets=true";
+        var connectionString = IntegrationTestDatabaseNames.ConnectionString(commandDbName);
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(connectionString, allowedPrefix: CommandDatabasePrefix);
         _connectionStrings.Add(connectionString);
         var options = new DbContextOptionsBuilder<AppDbContext>()

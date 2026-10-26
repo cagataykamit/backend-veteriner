@@ -39,8 +39,9 @@ internal static class IntegrationTestDatabaseNames
     /// <summary>Verilen taban ada koşu kimliğini ekler.</summary>
     public static string WithRunId(string name) => $"{name}_{RunId}";
 
+    /// <summary>LocalDB bağlantısı. 60 sn bağlantı süresi, CI'da LocalDB örneğinin geç uyanmasından doğan geçici bağlantı hatalarına karşıdır.</summary>
     public static string ConnectionString(string databaseName)
-        => $"Server={LocalDbServer};Database={databaseName};Trusted_Connection=True;MultipleActiveResultSets=true";
+        => $"Server={LocalDbServer};Database={databaseName};Trusted_Connection=True;Connect Timeout=60;MultipleActiveResultSets=true";
 
     /// <summary>En iyi çaba: sessizce geçer, test sonucunu etkilemez.</summary>
     public static void CleanUp()
