@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Backend.Veteriner.Api.Middleware;
 
 /// <summary>
-/// JWT <c>tenant_id</c> ile sorgu <c>tenantId</c> çakışmasını engeller; çözümlenmiş kiracıyı Items'a yazar.
+/// Kiracıyı JWT <c>tenant_id</c>'den çözümleyip Items'a yazar; sorgu <c>tenantId</c> JWT'dekinden farklıysa reddeder.
 /// <see cref="Microsoft.AspNetCore.Builder.WebApplication"/> pipeline'ında Authentication sonrası çalışmalıdır.
 /// </summary>
 public sealed class TenantContextMiddleware

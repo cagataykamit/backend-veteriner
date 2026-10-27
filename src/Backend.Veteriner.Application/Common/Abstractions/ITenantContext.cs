@@ -1,7 +1,7 @@
 namespace Backend.Veteriner.Application.Common.Abstractions;
 
 /// <summary>
-/// İstek kapsamında çözümlenmiş kiracı. Öncelik: JWT <c>tenant_id</c>, yoksa sorgu <c>tenantId</c> (geçiş).
+/// İstek kapsamında çözümlenmiş kiracı: yalnız JWT <c>tenant_id</c> (sorgu <c>tenantId</c> kiracı belirlemez).
 /// </summary>
 public interface ITenantContext
 {

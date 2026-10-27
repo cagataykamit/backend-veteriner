@@ -19,15 +19,19 @@ public sealed class TenantRequestResolverTests
         r.TenantId.Should().Be(tid);
     }
 
+    /// <summary>
+    /// Güvenlik: kiracı yalnız imzalı JWT'den gelir. Sorgu <c>tenantId</c> üyelik denetimi olmadan kiracı bağlamı
+    /// olsaydı, kiracısız istek (anonim, portal token'ı) başka kiracıyı hedefleyebilirdi; ADR-040 filtresi de bu değeri kullanır.
+    /// </summary>
     [Fact]
-    public void Resolve_Should_UseQuery_When_ClaimMissing()
+    public void Resolve_Should_IgnoreQuery_When_ClaimMissing()
     {
         var tid = Guid.NewGuid();
 
         var r = TenantRequestResolver.Resolve(Array.Empty<Claim>(), tid.ToString("D"));
 
         r.TenantConflict.Should().BeFalse();
-        r.TenantId.Should().Be(tid);
+        r.TenantId.Should().BeNull();
     }
 
     [Fact]
@@ -65,7 +69,7 @@ public sealed class TenantRequestResolverTests
     }
 
     [Fact]
-    public void Resolve_Should_IgnoreInvalidClaimString()
+    public void Resolve_Should_IgnoreInvalidClaimString_And_NotFallBackToQuery()
     {
         var claims = new[] { new Claim(VeterinerClaims.TenantId, "not-a-guid") };
         var tid = Guid.NewGuid();
@@ -73,6 +77,6 @@ public sealed class TenantRequestResolverTests
         var r = TenantRequestResolver.Resolve(claims, tid.ToString("D"));
 
         r.TenantConflict.Should().BeFalse();
-        r.TenantId.Should().Be(tid);
+        r.TenantId.Should().BeNull();
     }
 }

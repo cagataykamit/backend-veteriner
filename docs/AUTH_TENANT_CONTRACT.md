@@ -34,7 +34,7 @@ Access token içinde `tenant_id` claim’i, login/refresh sırasında çözümle
 
 ## Tenant-scoped API’ler
 
-Kiracı bağlamı **`ITenantContext`** (JWT `tenant_id` ve gerektiğinde sorgu `tenantId` çözümlemesi) üzerinden gelir; create/list/get için gövde `tenantId` beklenmez (ilgili komutlar buna göre güncellenmiştir).
+Kiracı bağlamı **`ITenantContext`** üzerinden yalnız JWT `tenant_id`'den gelir. Sorgu `tenantId` kiracı belirlemez: JWT'dekinden farklıysa 403, JWT'de kiracı yoksa yok sayılır (2026-10-28 güvenlik düzeltmesi); create/list/get için gövde `tenantId` beklenmez (ilgili komutlar buna göre güncellenmiştir).
 
 ## Ürün / politika (kod dışı)
 
