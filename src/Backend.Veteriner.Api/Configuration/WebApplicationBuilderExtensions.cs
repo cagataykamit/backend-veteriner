@@ -60,7 +60,8 @@ public static class WebApplicationBuilderExtensions
             lc.ReadFrom.Configuration(ctx.Configuration)
                 .Enrich.FromLogContext()
                 .Enrich.WithExceptionDetails(new DestructuringOptionsBuilder()
-                    .WithDefaultDestructurers());
+                    .WithDefaultDestructurers()
+                    .WithDestructurers([new DbUpdateExceptionDestructurer()]));
         });
 
         return builder;
