@@ -15,19 +15,22 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
     private readonly IReadRepository<BillingCheckoutSession> _sessionsRead;
     private readonly IRepository<BillingCheckoutSession> _sessionsWrite;
     private readonly ISalesPartnerDiscountBilling _partnerDiscounts;
+    private readonly TimeProvider _timeProvider;
 
     public SubscriptionCheckoutActivationService(
         IReadRepository<TenantSubscription> subscriptionsRead,
         IRepository<TenantSubscription> subscriptionsWrite,
         IReadRepository<BillingCheckoutSession> sessionsRead,
         IRepository<BillingCheckoutSession> sessionsWrite,
-        ISalesPartnerDiscountBilling partnerDiscounts)
+        ISalesPartnerDiscountBilling partnerDiscounts,
+        TimeProvider timeProvider)
     {
         _subscriptionsRead = subscriptionsRead;
         _subscriptionsWrite = subscriptionsWrite;
         _sessionsRead = sessionsRead;
         _sessionsWrite = sessionsWrite;
         _partnerDiscounts = partnerDiscounts;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Result<SubscriptionCheckoutSessionDto>> TryActivateAsync(
@@ -56,7 +59,7 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
                 "Checkout session bu kiracıya ait değil.");
         }
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 
         if (session.Status == BillingCheckoutSessionStatus.Completed)
         {

@@ -35,6 +35,7 @@ public sealed class GetDashboardSummaryQueryHandler
     private readonly IDashboardAppointmentReadModelReader _dashboardAppointmentReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetDashboardSummaryQueryHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public GetDashboardSummaryQueryHandler(
         ITenantContext tenantContext,
@@ -47,6 +48,7 @@ public sealed class GetDashboardSummaryQueryHandler
         IDashboardClinicScopedReader clinicScopedReader,
         IDashboardAppointmentReadModelReader dashboardAppointmentReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        TimeProvider timeProvider,
         ILogger<GetDashboardSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -60,6 +62,7 @@ public sealed class GetDashboardSummaryQueryHandler
         _dashboardAppointmentReader = dashboardAppointmentReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetDashboardSummaryQueryHandler>.Instance;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<DashboardSummaryDto>> Handle(GetDashboardSummaryQuery request, CancellationToken ct)
@@ -78,7 +81,7 @@ public sealed class GetDashboardSummaryQueryHandler
         var singleClinicId = scopeResult.Value!.SingleClinicId;
         var accessibleClinicIds = scopeResult.Value.AccessibleClinicIds;
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(utcNow);
         var trendBuckets = OperationPeriodBounds.Last7DaysForUtcNow(utcNow);
 

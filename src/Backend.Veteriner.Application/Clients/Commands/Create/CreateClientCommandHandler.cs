@@ -107,7 +107,7 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
             ClientIntegrationEventTypes.Created,
             new ClientCreatedIntegrationEvent(
                 Guid.NewGuid(),
-                DateTime.UtcNow,
+                utcNow,
                 ClientProjectionSnapshotFactory.Create(client)),
             ct);
 

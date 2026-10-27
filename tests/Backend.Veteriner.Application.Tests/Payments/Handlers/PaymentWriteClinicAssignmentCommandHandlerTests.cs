@@ -80,7 +80,8 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
             _examinations.Object,
             _paymentsRead.Object,
             _paymentsWrite.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private void SetupTenantClinicClient(Guid tid, Guid cid, Guid clientId)
     {

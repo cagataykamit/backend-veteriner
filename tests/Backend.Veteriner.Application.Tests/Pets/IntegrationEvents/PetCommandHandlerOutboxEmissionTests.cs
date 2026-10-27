@@ -34,7 +34,7 @@ public sealed class PetCommandHandlerOutboxEmissionTests
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(TenantSubscription.StartTrial(Guid.NewGuid(), SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
 
-        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenantsRead.Object, _subscriptionsRead.Object);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenantsRead.Object, _subscriptionsRead.Object, TimeProvider.System);
 
         return new(
             _tenantContext.Object,
@@ -46,7 +46,8 @@ public sealed class PetCommandHandlerOutboxEmissionTests
             _petsRead.Object,
             _petsWrite.Object,
             writeEvaluator,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
     }
 
     private UpdatePetCommandHandler CreateUpdateHandler()
@@ -59,7 +60,8 @@ public sealed class PetCommandHandlerOutboxEmissionTests
             _breedsRead.Object,
             _petsRead.Object,
             _petsWrite.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private static Tenant ActiveTenant(Guid tid)
     {

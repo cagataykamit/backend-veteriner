@@ -19,7 +19,7 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
     private TenantSubscriptionWriteGuardBehavior<TRequest, Result> CreateBehavior<TRequest>()
         where TRequest : notnull, IMessage
     {
-        var evaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var evaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
         return new TenantSubscriptionWriteGuardBehavior<TRequest, Result>(_tenantContext.Object, evaluator);
     }
 

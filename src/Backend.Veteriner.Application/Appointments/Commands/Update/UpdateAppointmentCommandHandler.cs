@@ -29,6 +29,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
     private readonly IRepository<Appointment> _appointmentsWrite;
     private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
     private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateAppointmentCommandHandler(
         ITenantContext tenantContext,
@@ -41,7 +42,8 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
         IRepository<Appointment> appointmentsWrite,
         IAppointmentProjectionSnapshotFactory snapshotFactory,
-        IAppointmentIntegrationEventOutbox eventOutbox)
+        IAppointmentIntegrationEventOutbox eventOutbox,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -54,6 +56,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         _appointmentsWrite = appointmentsWrite;
         _snapshotFactory = snapshotFactory;
         _eventOutbox = eventOutbox;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(UpdateAppointmentCommand request, CancellationToken ct)
@@ -74,9 +77,10 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
             return Result.Failure(statusGuard.Error);
 
         var scheduledUtc = NormalizeToUtc(request.ScheduledAtUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (request.Status == AppointmentStatus.Scheduled)
         {
-            var window = AppointmentScheduleWindow.Validate(scheduledUtc);
+            var window = AppointmentScheduleWindow.Validate(scheduledUtc, utcNow);
             if (!window.IsSuccess)
                 return Result.Failure(window.Error);
         }
@@ -178,7 +182,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
                 AppointmentIntegrationEventTypes.Updated,
                 new AppointmentUpdatedIntegrationEvent(
                     Guid.NewGuid(),
-                    DateTime.UtcNow,
+                    utcNow,
                     appointment.MutationSequence,
                     previous,
                     current),

@@ -32,7 +32,7 @@ public sealed class CreateSpeciesCommandHandlerTests
         _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(sub);
 
-        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
         return new(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object, _catalogCache.Object);
     }
 
@@ -100,7 +100,7 @@ public sealed class CreateSpeciesCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
     {
         _tenantContext.SetupGet(x => x.TenantId).Returns((Guid?)null);
-        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
         var handler = new CreateSpeciesCommandHandler(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object, _catalogCache.Object);
 
         var result = await handler.Handle(new CreateSpeciesCommand("DOG", "Köpek", 0), CancellationToken.None);
@@ -128,7 +128,7 @@ public sealed class CreateSpeciesCommandHandlerTests
         _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(sub);
 
-        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
         var handler = new CreateSpeciesCommandHandler(_tenantContext.Object, writeEvaluator, _read.Object, _write.Object, _catalogCache.Object);
 
         var result = await handler.Handle(new CreateSpeciesCommand("DOG", "Köpek", 0), CancellationToken.None);

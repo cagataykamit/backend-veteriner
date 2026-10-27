@@ -12,11 +12,13 @@ public sealed class CreateSalesPartnerCommandHandler : IRequestHandler<CreateSal
 {
     private readonly IRepository<SalesPartner> _partners;
     private readonly IReadRepository<Tenant> _tenants;
+    private readonly TimeProvider _timeProvider;
 
-    public CreateSalesPartnerCommandHandler(IRepository<SalesPartner> partners, IReadRepository<Tenant> tenants)
+    public CreateSalesPartnerCommandHandler(IRepository<SalesPartner> partners, IReadRepository<Tenant> tenants, TimeProvider timeProvider)
     {
         _partners = partners;
         _tenants = tenants;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<SalesPartnerDto>> Handle(CreateSalesPartnerCommand request, CancellationToken ct)
@@ -24,7 +26,7 @@ public sealed class CreateSalesPartnerCommandHandler : IRequestHandler<CreateSal
         if (request.LinkedTenantId is { } tenantId && !await _tenants.AnyAsync(new TenantByIdSpec(tenantId), ct))
             return Result<SalesPartnerDto>.Failure(SalesPartnerErrors.TenantNotFound);
 
-        var partner = SalesPartner.Create(request.Name, request.Email, request.Phone, request.LinkedTenantId, DateTime.UtcNow);
+        var partner = SalesPartner.Create(request.Name, request.Email, request.Phone, request.LinkedTenantId, _timeProvider.GetUtcNow().UtcDateTime);
         await _partners.AddAsync(partner, ct);
         await _partners.SaveChangesAsync(ct);
 

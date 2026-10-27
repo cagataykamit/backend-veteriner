@@ -35,10 +35,10 @@ public sealed class OutstandingBalancesReportHandlerTests
         => new(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object);
 
     private ExportOutstandingBalancesReportQueryHandler CsvHandler()
-        => new(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object, TrialLimitPolicyStub.Paid);
+        => new(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object, TrialLimitPolicyStub.Paid, TimeProvider.System);
 
     private ExportOutstandingBalancesReportXlsxQueryHandler XlsxHandler()
-        => new(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object, TrialLimitPolicyStub.Paid);
+        => new(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object, TrialLimitPolicyStub.Paid, TimeProvider.System);
 
     private static GetOutstandingBalancesReportQuery Query(
         Guid? clinicId = null, decimal? minAmount = null, string? search = null, int page = 1, int pageSize = 50)

@@ -59,7 +59,8 @@ public sealed class UpdatePaymentCommandHandlerTests
             _examinations.Object,
             _paymentsRead.Object,
             _paymentsWrite.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private static UpdatePaymentCommand Cmd(
         Guid paymentId,

@@ -79,7 +79,8 @@ public sealed class MarkAppointmentNoShowCommandHandler : IRequestHandler<MarkAp
         var sequenceBefore = appointment.MutationSequence;
         var previous = await _snapshotFactory.CreateAsync(appointment, ct);
 
-        var domain = appointment.MarkNoShow(_timeProvider.GetUtcNow().UtcDateTime, request.Reason);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var domain = appointment.MarkNoShow(utcNow, request.Reason);
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
 
@@ -91,7 +92,7 @@ public sealed class MarkAppointmentNoShowCommandHandler : IRequestHandler<MarkAp
             AppointmentIntegrationEventTypes.Updated,
             new AppointmentUpdatedIntegrationEvent(
                 Guid.NewGuid(),
-                _timeProvider.GetUtcNow().UtcDateTime,
+                utcNow,
                 appointment.MutationSequence,
                 previous,
                 _snapshotFactory.CreateScalarsFromPrevious(appointment, previous)),

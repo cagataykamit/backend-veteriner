@@ -21,6 +21,7 @@ public sealed class GetTenantInviteByIdQueryHandler
     private readonly IReadRepository<OperationClaim> _claims;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IUserTenantRepository _userTenants;
+    private readonly TimeProvider _timeProvider;
 
     public GetTenantInviteByIdQueryHandler(
         ITenantContext tenantContext,
@@ -28,7 +29,8 @@ public sealed class GetTenantInviteByIdQueryHandler
         IReadRepository<TenantInvite> invites,
         IReadRepository<OperationClaim> claims,
         IReadRepository<Clinic> clinics,
-        IUserTenantRepository userTenants)
+        IUserTenantRepository userTenants,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
@@ -36,6 +38,7 @@ public sealed class GetTenantInviteByIdQueryHandler
         _claims = claims;
         _clinics = clinics;
         _userTenants = userTenants;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<TenantInviteDetailDto>> Handle(GetTenantInviteByIdQuery request, CancellationToken ct)
@@ -74,7 +77,7 @@ public sealed class GetTenantInviteByIdQueryHandler
         var claim = await _claims.FirstOrDefaultAsync(new OperationClaimByIdSpec(invite.OperationClaimId), ct);
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(invite.TenantId, invite.ClinicId), ct);
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var isExpired = invite.Status == TenantInviteStatus.Pending && invite.ExpiresAtUtc < utcNow;
         var canLifecycle = invite.Status == TenantInviteStatus.Pending;
 

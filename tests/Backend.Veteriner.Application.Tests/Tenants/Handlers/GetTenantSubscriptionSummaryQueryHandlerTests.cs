@@ -19,8 +19,8 @@ public sealed class GetTenantSubscriptionSummaryQueryHandlerTests
 
     private GetTenantSubscriptionSummaryQueryHandler CreateHandler()
     {
-        var eval = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
-        return new(_tenantContext.Object, _permissions.Object, _tenants.Object, _subscriptions.Object, _planChanges.Object, eval);
+        var eval = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
+        return new(_tenantContext.Object, _permissions.Object, _tenants.Object, _subscriptions.Object, _planChanges.Object, eval, TimeProvider.System);
     }
 
     [Fact]

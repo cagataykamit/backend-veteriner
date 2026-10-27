@@ -75,7 +75,8 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
             _examinationsRead.Object,
             _paymentsRead.Object,
             _paymentsWrite.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private static Tenant ActiveTenant(Guid tid)
     {

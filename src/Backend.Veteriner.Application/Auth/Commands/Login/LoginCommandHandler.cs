@@ -235,7 +235,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         var rt = new Backend.Veteriner.Domain.Users.RefreshToken(
             loginUser.Id,
             refreshHash,
-            DateTime.UtcNow.AddDays(_jwtOpt.RefreshTokenDays),
+            utcNow.AddDays(_jwtOpt.RefreshTokenDays),
             _client.IpAddress,
             _client.UserAgent,
             utcNow,

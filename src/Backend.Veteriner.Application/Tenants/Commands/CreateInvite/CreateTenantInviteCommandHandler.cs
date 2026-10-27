@@ -29,6 +29,7 @@ public sealed class CreateTenantInviteCommandHandler
     private readonly IRepository<TenantInvite> _invitesWrite;
     private readonly ITokenHashService _tokenHash;
     private readonly IUnitOfWork _uow;
+    private readonly TimeProvider _timeProvider;
 
     public CreateTenantInviteCommandHandler(
         ITenantContext tenantContext,
@@ -41,7 +42,8 @@ public sealed class CreateTenantInviteCommandHandler
         IReadRepository<TenantInvite> invitesRead,
         IRepository<TenantInvite> invitesWrite,
         ITokenHashService tokenHash,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
@@ -54,6 +56,7 @@ public sealed class CreateTenantInviteCommandHandler
         _invitesWrite = invitesWrite;
         _tokenHash = tokenHash;
         _uow = uow;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<CreateTenantInviteResultDto>> Handle(CreateTenantInviteCommand request, CancellationToken ct)
@@ -73,7 +76,7 @@ public sealed class CreateTenantInviteCommandHandler
         }
 
         var emailNorm = request.Email.Trim().ToLowerInvariant();
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 
         var seat = await _seatEvaluator.TryBuildAsync(request.TenantId, ct);
         if (!seat.IsSuccess)

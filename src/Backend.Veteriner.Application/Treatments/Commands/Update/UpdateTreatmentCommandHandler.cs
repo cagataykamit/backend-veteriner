@@ -105,7 +105,8 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
         }
 
         var treatmentUtc = TreatmentDateUtcWindow.ToUtc(request.TreatmentDateUtc);
-        var window = TreatmentDateUtcWindow.Validate(treatmentUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = TreatmentDateUtcWindow.Validate(treatmentUtc, utcNow);
         if (!window.IsSuccess)
             return window;
 
@@ -154,7 +155,6 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
         if (!locked.IsSuccess)
             return locked;
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var update = t.UpdateDetails(
             effectiveClinicId,
             request.PetId,

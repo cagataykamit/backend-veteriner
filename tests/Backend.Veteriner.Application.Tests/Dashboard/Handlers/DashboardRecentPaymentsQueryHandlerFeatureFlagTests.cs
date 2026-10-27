@@ -332,5 +332,6 @@ public sealed class DashboardRecentPaymentsQueryHandlerFeatureFlagTests
             {
                 DashboardFinanceReadEnabled = dashboardFinanceReadEnabled,
                 DashboardRecentPaymentsReadEnabled = dashboardRecentPaymentsReadEnabled
-            }));
+            }),
+            TimeProvider.System);
 }

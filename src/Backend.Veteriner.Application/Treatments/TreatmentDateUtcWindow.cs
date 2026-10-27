@@ -15,17 +15,16 @@ internal static class TreatmentDateUtcWindow
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
 
-    public static Result Validate(DateTime treatmentDateUtc)
+    public static Result Validate(DateTime treatmentDateUtc, DateTime utcNow)
     {
-        var now = DateTime.UtcNow;
-        if (treatmentDateUtc < now.AddDays(-7))
+        if (treatmentDateUtc < utcNow.AddDays(-7))
         {
             return Result.Failure(
                 "Treatments.DateTooFarInPast",
                 "Treatment date is too far in the past; at most 7 days back is allowed.");
         }
 
-        if (treatmentDateUtc > now.AddYears(2))
+        if (treatmentDateUtc > utcNow.AddYears(2))
         {
             return Result.Failure(
                 "Treatments.DateTooFarInFuture",

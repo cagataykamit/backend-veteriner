@@ -11,8 +11,13 @@ public sealed class CancelDiscountCollectionCommandHandler
     : IRequestHandler<CancelDiscountCollectionCommand, Result<DiscountCollectionDto>>
 {
     private readonly IRepository<DiscountRedemption> _redemptions;
+    private readonly TimeProvider _timeProvider;
 
-    public CancelDiscountCollectionCommandHandler(IRepository<DiscountRedemption> redemptions) => _redemptions = redemptions;
+    public CancelDiscountCollectionCommandHandler(IRepository<DiscountRedemption> redemptions, TimeProvider timeProvider)
+    {
+        _redemptions = redemptions;
+        _timeProvider = timeProvider;
+    }
 
     public async ValueTask<Result<DiscountCollectionDto>> Handle(CancelDiscountCollectionCommand request, CancellationToken ct)
     {
@@ -21,7 +26,7 @@ public sealed class CancelDiscountCollectionCommandHandler
         if (owner is null)
             return Result<DiscountCollectionDto>.Failure(DiscountRedemption.CollectionNotFound);
 
-        var cancelled = owner.CancelCollection(request.CollectionId, request.Reason, DateTime.UtcNow);
+        var cancelled = owner.CancelCollection(request.CollectionId, request.Reason, _timeProvider.GetUtcNow().UtcDateTime);
         if (!cancelled.IsSuccess)
             return Result<DiscountCollectionDto>.Failure(cancelled.Error);
 

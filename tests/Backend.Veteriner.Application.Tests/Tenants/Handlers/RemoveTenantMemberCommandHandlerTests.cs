@@ -38,7 +38,8 @@ public sealed class RemoveTenantMemberCommandHandlerTests
             _userOperationClaims.Object,
             _cache.Object,
             _audit.Object,
-            _uow.Object);
+            _uow.Object,
+            TimeProvider.System);
 
     private static OperationClaim BuildClaim(Guid id, string name)
     {

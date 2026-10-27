@@ -110,7 +110,8 @@ internal static class DashboardQueryParityTestSupport
             {
                 AppointmentsEnabled = false,
                 DashboardAppointmentsEnabled = dashboardEnabled
-            }));
+            }),
+            TimeProvider.System);
 
         return await handler.Handle(new GetDashboardSummaryQuery(), CancellationToken.None);
     }

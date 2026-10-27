@@ -15,17 +15,16 @@ internal static class AdmittedAtUtcWindow
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
 
-    public static Result Validate(DateTime admittedAtUtc)
+    public static Result Validate(DateTime admittedAtUtc, DateTime utcNow)
     {
-        var now = DateTime.UtcNow;
-        if (admittedAtUtc < now.AddDays(-7))
+        if (admittedAtUtc < utcNow.AddDays(-7))
         {
             return Result.Failure(
                 "Hospitalizations.AdmittedAtTooFarInPast",
                 "Admission time is too far in the past; at most 7 days back is allowed.");
         }
 
-        if (admittedAtUtc > now.AddYears(2))
+        if (admittedAtUtc > utcNow.AddYears(2))
         {
             return Result.Failure(
                 "Hospitalizations.AdmittedAtTooFarInFuture",

@@ -43,6 +43,7 @@ public sealed class PublicOwnerSignupCommandHandler
     private readonly IUnitOfWork _uow;
     private readonly IExampleClinicLoader _exampleClinic;
     private readonly ILogger<PublicOwnerSignupCommandHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public PublicOwnerSignupCommandHandler(
         IReadRepository<User> usersRead,
@@ -61,6 +62,7 @@ public sealed class PublicOwnerSignupCommandHandler
         IPasswordHasher hasher,
         IUnitOfWork uow,
         IExampleClinicLoader exampleClinic,
+        TimeProvider timeProvider,
         ILogger<PublicOwnerSignupCommandHandler>? logger = null)
     {
         _usersRead = usersRead;
@@ -80,6 +82,7 @@ public sealed class PublicOwnerSignupCommandHandler
         _uow = uow;
         _exampleClinic = exampleClinic;
         _logger = logger ?? NullLogger<PublicOwnerSignupCommandHandler>.Instance;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<PublicOwnerSignupResultDto>> Handle(PublicOwnerSignupCommand request, CancellationToken ct)
@@ -145,7 +148,7 @@ public sealed class PublicOwnerSignupCommandHandler
         if (!legalCheck.IsSuccess)
             return Result<PublicOwnerSignupResultDto>.Failure(legalCheck.Error);
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var user = new User(email, _hasher.Hash(request.Password), utcNow);
         MarkStep("hashAndCreateUser");
         var roleResult = user.AddRole("Admin", utcNow);

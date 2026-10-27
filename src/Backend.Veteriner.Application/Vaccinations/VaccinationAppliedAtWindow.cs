@@ -15,17 +15,16 @@ internal static class VaccinationAppliedAtWindow
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
 
-    public static Result Validate(DateTime appliedAtUtc)
+    public static Result Validate(DateTime appliedAtUtc, DateTime utcNow)
     {
-        var now = DateTime.UtcNow;
-        if (appliedAtUtc < now.AddDays(-7))
+        if (appliedAtUtc < utcNow.AddDays(-7))
         {
             return Result.Failure(
                 "Vaccinations.AppliedTooFarInPast",
                 "Uygulama zamanı çok eski; en fazla 7 gün öncesine kadar kayıt açılabilir.");
         }
 
-        if (appliedAtUtc > now.AddYears(2))
+        if (appliedAtUtc > utcNow.AddYears(2))
         {
             return Result.Failure(
                 "Vaccinations.AppliedTooFarInFuture",

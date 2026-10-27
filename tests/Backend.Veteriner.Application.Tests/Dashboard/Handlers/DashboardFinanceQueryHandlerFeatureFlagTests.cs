@@ -209,7 +209,8 @@ public sealed class DashboardFinanceQueryHandlerFeatureFlagTests
             _aggregates.Object,
             _financeReadModel.Object,
             _recentReadModel.Object,
-            Options.Create(new QueryReadModelsOptions { DashboardFinanceReadEnabled = dashboardFinanceReadEnabled }));
+            Options.Create(new QueryReadModelsOptions { DashboardFinanceReadEnabled = dashboardFinanceReadEnabled }),
+            TimeProvider.System);
 
     private void SetupEmptyRecentPayments()
     {

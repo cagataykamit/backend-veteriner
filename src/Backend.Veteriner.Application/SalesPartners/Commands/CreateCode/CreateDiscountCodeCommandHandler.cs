@@ -15,11 +15,13 @@ public sealed class CreateDiscountCodeCommandHandler : IRequestHandler<CreateDis
 
     private readonly IReadRepository<SalesPartner> _partners;
     private readonly IRepository<DiscountCode> _codes;
+    private readonly TimeProvider _timeProvider;
 
-    public CreateDiscountCodeCommandHandler(IReadRepository<SalesPartner> partners, IRepository<DiscountCode> codes)
+    public CreateDiscountCodeCommandHandler(IReadRepository<SalesPartner> partners, IRepository<DiscountCode> codes, TimeProvider timeProvider)
     {
         _partners = partners;
         _codes = codes;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<DiscountCodeDto>> Handle(CreateDiscountCodeCommand request, CancellationToken ct)
@@ -35,7 +37,7 @@ public sealed class CreateDiscountCodeCommandHandler : IRequestHandler<CreateDis
             request.ValidFromUtc,
             request.ValidUntilUtc,
             request.MaxRedemptions,
-            DateTime.UtcNow);
+            _timeProvider.GetUtcNow().UtcDateTime);
         if (!created.IsSuccess)
             return Result<DiscountCodeDto>.Failure(created.Error);
 

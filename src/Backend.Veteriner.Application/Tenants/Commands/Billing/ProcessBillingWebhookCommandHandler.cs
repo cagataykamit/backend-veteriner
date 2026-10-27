@@ -27,6 +27,7 @@ public sealed class ProcessBillingWebhookCommandHandler
     private readonly IAuditLogWriter _auditLogWriter;
     private readonly IClientContext _clientContext;
     private readonly ILogger<ProcessBillingWebhookCommandHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public ProcessBillingWebhookCommandHandler(
         IBillingWebhookSignatureVerifier signatureVerifier,
@@ -38,7 +39,8 @@ public sealed class ProcessBillingWebhookCommandHandler
         IRepository<BillingCheckoutSession> sessionsWrite,
         IAuditLogWriter auditLogWriter,
         IClientContext clientContext,
-        ILogger<ProcessBillingWebhookCommandHandler> logger)
+        ILogger<ProcessBillingWebhookCommandHandler> logger,
+        TimeProvider timeProvider)
     {
         _signatureVerifier = signatureVerifier;
         _payloadParser = payloadParser;
@@ -50,6 +52,7 @@ public sealed class ProcessBillingWebhookCommandHandler
         _auditLogWriter = auditLogWriter;
         _clientContext = clientContext;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<BillingWebhookAckDto>> Handle(ProcessBillingWebhookCommand request, CancellationToken ct)
@@ -77,7 +80,7 @@ public sealed class ProcessBillingWebhookCommandHandler
         }
 
         var ev = parsed.Value!;
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 
         _logger.LogInformation(
             "Billing webhook normalize edildi: {Provider} Kind={Kind} EventType={EventType} EventId={EventId} CheckoutSessionId={CheckoutSessionId}",

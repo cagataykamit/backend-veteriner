@@ -15,7 +15,7 @@ public sealed class GetSubscriptionCheckoutQueryHandlerTests
     private readonly Mock<IReadRepository<BillingCheckoutSession>> _sessionsRead = new();
 
     private GetSubscriptionCheckoutQueryHandler CreateHandler()
-        => new(_tenantContext.Object, _sessionsWrite.Object, _sessionsRead.Object);
+        => new(_tenantContext.Object, _sessionsWrite.Object, _sessionsRead.Object, TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantMismatch()

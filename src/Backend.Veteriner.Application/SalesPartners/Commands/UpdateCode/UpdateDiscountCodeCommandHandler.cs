@@ -11,11 +11,13 @@ public sealed class UpdateDiscountCodeCommandHandler : IRequestHandler<UpdateDis
 {
     private readonly IRepository<DiscountCode> _codes;
     private readonly IReadRepository<DiscountRedemption> _redemptions;
+    private readonly TimeProvider _timeProvider;
 
-    public UpdateDiscountCodeCommandHandler(IRepository<DiscountCode> codes, IReadRepository<DiscountRedemption> redemptions)
+    public UpdateDiscountCodeCommandHandler(IRepository<DiscountCode> codes, IReadRepository<DiscountRedemption> redemptions, TimeProvider timeProvider)
     {
         _codes = codes;
         _redemptions = redemptions;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<DiscountCodeDto>> Handle(UpdateDiscountCodeCommand request, CancellationToken ct)
@@ -30,7 +32,7 @@ public sealed class UpdateDiscountCodeCommandHandler : IRequestHandler<UpdateDis
             request.ValidFromUtc,
             request.ValidUntilUtc,
             request.MaxRedemptions,
-            DateTime.UtcNow);
+            _timeProvider.GetUtcNow().UtcDateTime);
         if (!updated.IsSuccess)
             return Result<DiscountCodeDto>.Failure(updated.Error);
 

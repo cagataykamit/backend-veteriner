@@ -195,7 +195,7 @@ public sealed class CreateAdministrationCommandHandler
 
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var administeredAtUtc = request.AdministeredAtUtc is { } at ? TreatmentDateUtcWindow.ToUtc(at) : nowUtc;
-        var window = TreatmentDateUtcWindow.Validate(administeredAtUtc);
+        var window = TreatmentDateUtcWindow.Validate(administeredAtUtc, nowUtc);
         if (!window.IsSuccess)
             return Result<AdministrationCreateResultDto>.Failure(window.Error);
 

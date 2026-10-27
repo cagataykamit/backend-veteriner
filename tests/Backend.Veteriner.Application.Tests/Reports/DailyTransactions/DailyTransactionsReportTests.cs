@@ -101,7 +101,7 @@ public sealed class DailyTransactionsReportTests
         _reader
             .Setup(r => r.ReadAsync(It.IsAny<FinanceEventFilter>(), 0, RegisterReportConstants.MaxExportRows, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DailyTransactionsReadResult(2, Totals(), [item, correction]));
-        var handler = new ExportDailyTransactionsReportQueryHandler(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object, TrialLimitPolicyStub.Paid);
+        var handler = new ExportDailyTransactionsReportQueryHandler(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object, TrialLimitPolicyStub.Paid, TimeProvider.System);
         var day = new DateOnly(2026, 10, 14);
 
         var csv = await handler.Handle(new ExportDailyTransactionsReportQuery(day, day, null, null, null, null, RegisterExportFormat.Csv), CancellationToken.None);
@@ -196,7 +196,7 @@ public sealed class DailyTransactionsReportTests
         var full = CashSummaryBuilder.Build(
             new DateOnly(2026, 10, 14), new DateOnly(2026, 10, 14),
             [Cash(false, "2026-10-14T07:00:00Z", 100m, PaymentMethod.Card, collectedBy: UserA)]);
-        var export = RegisterReportRunner.BuildFile(CashSummaryBuilder.ExportSpec, CashSummaryBuilder.ToExportRows(full), RegisterExportFormat.Csv);
+        var export = RegisterReportRunner.BuildFile(CashSummaryBuilder.ExportSpec, CashSummaryBuilder.ToExportRows(full), RegisterExportFormat.Csv, DateTime.UtcNow);
 
         export.FileDownloadName.Should().MatchRegex(@"^kasa-ozeti-\d{8}\.csv$");
         var lines = Encoding.UTF8.GetString(export.Content).TrimEnd().Split("\r\n");

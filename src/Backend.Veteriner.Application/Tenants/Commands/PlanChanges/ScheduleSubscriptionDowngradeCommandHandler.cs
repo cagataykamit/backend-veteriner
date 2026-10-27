@@ -15,19 +15,22 @@ public sealed class ScheduleSubscriptionDowngradeCommandHandler
     private readonly IReadRepository<TenantSubscription> _subscriptionsRead;
     private readonly IRepository<ScheduledSubscriptionPlanChange> _changesWrite;
     private readonly IReadRepository<ScheduledSubscriptionPlanChange> _changesRead;
+    private readonly TimeProvider _timeProvider;
 
     public ScheduleSubscriptionDowngradeCommandHandler(
         ITenantContext tenantContext,
         IClientContext clientContext,
         IReadRepository<TenantSubscription> subscriptionsRead,
         IRepository<ScheduledSubscriptionPlanChange> changesWrite,
-        IReadRepository<ScheduledSubscriptionPlanChange> changesRead)
+        IReadRepository<ScheduledSubscriptionPlanChange> changesRead,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
         _subscriptionsRead = subscriptionsRead;
         _changesWrite = changesWrite;
         _changesRead = changesRead;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<PendingSubscriptionPlanChangeDto>> Handle(ScheduleSubscriptionDowngradeCommand request, CancellationToken ct)
@@ -48,11 +51,11 @@ public sealed class ScheduleSubscriptionDowngradeCommandHandler
         if (decision != SubscriptionPlanChangeDecision.Downgrade)
             return Result<PendingSubscriptionPlanChangeDto>.Failure("Subscriptions.UpgradeRequiresCheckout", "Upgrade için checkout akışı kullanılmalıdır.");
 
-        var effectiveStatus = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, DateTime.UtcNow);
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var effectiveStatus = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, now);
         if (effectiveStatus == TenantSubscriptionStatus.Cancelled)
             return Result<PendingSubscriptionPlanChangeDto>.Failure("Subscriptions.TenantCancelled", "İptal edilmiş abonelikte plan değişikliği yapılamaz.");
 
-        var now = DateTime.UtcNow;
         var open = await _changesRead.FirstOrDefaultAsync(new OpenScheduledPlanChangeByTenantSpec(request.TenantId), ct);
         if (open is not null)
         {

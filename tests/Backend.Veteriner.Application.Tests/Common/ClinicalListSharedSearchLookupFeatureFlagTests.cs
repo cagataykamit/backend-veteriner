@@ -84,7 +84,8 @@ public sealed class ClinicalListSharedSearchLookupFeatureFlagTests
             _pets.Object,
             _clients.Object,
             _petLookupReader.Object,
-            Options.Create(new QueryReadModelsOptions { SharedSearchLookupEnabled = sharedSearchLookupEnabled }));
+            Options.Create(new QueryReadModelsOptions { SharedSearchLookupEnabled = sharedSearchLookupEnabled }),
+            TimeProvider.System);
 
         await handler.Handle(
             new GetVaccinationsListQuery(new PageRequest { Page = 1, PageSize = 20, Search = "pamuk" }),

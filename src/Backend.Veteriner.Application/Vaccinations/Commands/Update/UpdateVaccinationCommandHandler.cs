@@ -90,20 +90,21 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
             ? VaccinationDueAtWindow.ToUtc(request.DueAtUtc.Value)
             : null;
 
-        var statusDates = VaccinationStatusDateRules.Validate(request.Status, appliedUtc, dueUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var statusDates = VaccinationStatusDateRules.Validate(request.Status, appliedUtc, dueUtc, utcNow);
         if (!statusDates.IsSuccess)
             return Result.Failure(statusDates.Error);
 
         if (appliedUtc.HasValue)
         {
-            var aw = VaccinationAppliedAtWindow.Validate(appliedUtc.Value);
+            var aw = VaccinationAppliedAtWindow.Validate(appliedUtc.Value, utcNow);
             if (!aw.IsSuccess)
                 return Result.Failure(aw.Error);
         }
 
         if (dueUtc.HasValue)
         {
-            var dw = VaccinationDueAtWindow.Validate(dueUtc.Value);
+            var dw = VaccinationDueAtWindow.Validate(dueUtc.Value, utcNow);
             if (!dw.IsSuccess)
                 return Result.Failure(dw.Error);
         }
@@ -190,7 +191,6 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
                 "Uygulamaya (stok düşümü) bağlı aşı kaydında yalnız notlar ve sonraki doz tarihi değişebilir; iptal için uygulama iptal edilmelidir.");
         }
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var domain = v.UpdateDetails(
             request.PetId,
             effectiveClinicId,

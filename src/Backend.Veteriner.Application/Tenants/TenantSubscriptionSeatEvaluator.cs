@@ -16,19 +16,22 @@ public sealed class TenantSubscriptionSeatEvaluator
     private readonly IReadRepository<UserTenant> _userTenants;
     private readonly IReadRepository<TenantInvite> _invites;
     private readonly TenantSubscriptionEffectiveWriteEvaluator _writeEvaluator;
+    private readonly TimeProvider _timeProvider;
 
     public TenantSubscriptionSeatEvaluator(
         IReadRepository<Tenant> tenants,
         IReadRepository<TenantSubscription> subscriptions,
         IReadRepository<UserTenant> userTenants,
         IReadRepository<TenantInvite> invites,
-        TenantSubscriptionEffectiveWriteEvaluator writeEvaluator)
+        TenantSubscriptionEffectiveWriteEvaluator writeEvaluator,
+        TimeProvider timeProvider)
     {
         _tenants = tenants;
         _subscriptions = subscriptions;
         _userTenants = userTenants;
         _invites = invites;
         _writeEvaluator = writeEvaluator;
+        _timeProvider = timeProvider;
     }
 
     public static bool SubscriptionAllowsInvites(TenantSubscriptionStatus status)
@@ -60,7 +63,7 @@ public sealed class TenantSubscriptionSeatEvaluator
             return Result<SubscriptionSeatSnapshot>.Failure(writeAllowed.Error);
         }
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var effectiveStatus = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, utcNow);
 
         if (effectiveStatus == TenantSubscriptionStatus.ReadOnly)

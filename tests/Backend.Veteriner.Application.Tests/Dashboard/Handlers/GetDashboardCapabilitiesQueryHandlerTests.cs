@@ -22,7 +22,8 @@ public sealed class GetDashboardCapabilitiesQueryHandlerTests
             _clinic.Object,
             _permissions.Object,
             _roles.Object,
-            _subs.Object);
+            _subs.Object,
+            TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

@@ -76,19 +76,22 @@ public sealed class ExportDailyTransactionsReportQueryHandler
     private readonly IClinicReadScopeResolver _scopeResolver;
     private readonly IDailyTransactionsReader _reader;
     private readonly ITrialLimitPolicy _trialLimitPolicy;
+    private readonly TimeProvider _timeProvider;
 
     public ExportDailyTransactionsReportQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver scopeResolver,
         IDailyTransactionsReader reader,
-        ITrialLimitPolicy trialLimitPolicy)
+        ITrialLimitPolicy trialLimitPolicy,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _scopeResolver = scopeResolver;
         _reader = reader;
         _trialLimitPolicy = trialLimitPolicy;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportDailyTransactionsReportQuery request, CancellationToken ct)
@@ -106,7 +109,8 @@ public sealed class ExportDailyTransactionsReportQueryHandler
         if (!withinLimit.IsSuccess)
             return Result<RegisterExportResult>.Failure(withinLimit.Error);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         return Result<RegisterExportResult>.Success(
-            RegisterReportRunner.BuildFile(DailyTransactionsReportColumns.Export, read.Items, request.Format));
+            RegisterReportRunner.BuildFile(DailyTransactionsReportColumns.Export, read.Items, request.Format, utcNow));
     }
 }

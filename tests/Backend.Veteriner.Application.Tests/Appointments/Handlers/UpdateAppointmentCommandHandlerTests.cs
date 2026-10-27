@@ -48,7 +48,8 @@ public sealed class UpdateAppointmentCommandHandlerTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
     }
 
     // Faz 4B-7: Hafta sonuna denk gelen ileri tarihler için Pazartesi'ye kaydır.

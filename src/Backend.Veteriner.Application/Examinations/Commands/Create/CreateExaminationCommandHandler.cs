@@ -81,7 +81,8 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         }
 
         var examinedUtc = ExaminationExaminedAtWindow.ToUtc(request.ExaminedAtUtc);
-        var window = ExaminationExaminedAtWindow.Validate(examinedUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = ExaminationExaminedAtWindow.Validate(examinedUtc, utcNow);
 
         if (!window.IsSuccess)
 
@@ -206,7 +207,6 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         if (!careGate.IsSuccess)
             return Result<ExaminationWriteResultDto>.Failure(careGate.Error);
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var examination = new Examination(
             tenantId,
             clinicId,

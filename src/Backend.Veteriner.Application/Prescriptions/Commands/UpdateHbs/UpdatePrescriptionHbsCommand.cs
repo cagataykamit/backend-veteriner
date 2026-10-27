@@ -38,6 +38,7 @@ public sealed class UpdatePrescriptionHbsCommandHandler : IRequestHandler<Update
     private readonly IReadRepository<Prescription> _prescriptionsRead;
     private readonly IRepository<Prescription> _prescriptionsWrite;
     private readonly IClinicVeterinarianReader _names;
+    private readonly TimeProvider _timeProvider;
 
     public UpdatePrescriptionHbsCommandHandler(
         ITenantContext tenantContext,
@@ -47,7 +48,8 @@ public sealed class UpdatePrescriptionHbsCommandHandler : IRequestHandler<Update
         IReadRepository<Tenant> tenants,
         IReadRepository<Prescription> prescriptionsRead,
         IRepository<Prescription> prescriptionsWrite,
-        IClinicVeterinarianReader names)
+        IClinicVeterinarianReader names,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -57,6 +59,7 @@ public sealed class UpdatePrescriptionHbsCommandHandler : IRequestHandler<Update
         _prescriptionsRead = prescriptionsRead;
         _prescriptionsWrite = prescriptionsWrite;
         _names = names;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<HbsEntryDto>> Handle(UpdatePrescriptionHbsCommand request, CancellationToken ct)
@@ -85,7 +88,7 @@ public sealed class UpdatePrescriptionHbsCommandHandler : IRequestHandler<Update
         if (!access.IsSuccess)
             return Result<HbsEntryDto>.Failure(access.Error);
 
-        var applied = p.ApplyHbsEntry(request.Status, request.ReferenceNumber, request.NotRequiredReason, userId, DateTime.UtcNow);
+        var applied = p.ApplyHbsEntry(request.Status, request.ReferenceNumber, request.NotRequiredReason, userId, _timeProvider.GetUtcNow().UtcDateTime);
         if (!applied.IsSuccess)
             return Result<HbsEntryDto>.Failure(applied.Error);
 

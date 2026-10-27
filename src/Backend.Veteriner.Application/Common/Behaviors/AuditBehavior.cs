@@ -39,15 +39,18 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
     private readonly IClientContext _client;
     private readonly IAuditLogWriter _auditLogWriter;
     private readonly ILogger<AuditBehavior<TRequest, TResponse>> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public AuditBehavior(
         IClientContext client,
         IAuditLogWriter auditLogWriter,
-        ILogger<AuditBehavior<TRequest, TResponse>> logger)
+        ILogger<AuditBehavior<TRequest, TResponse>> logger,
+        TimeProvider timeProvider)
     {
         _client = client;
         _auditLogWriter = auditLogWriter;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<TResponse> Handle(
@@ -91,7 +94,7 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
             CorrelationId: _client.CorrelationId,
             RequestName: typeof(TRequest).Name,
             RequestPayload: SerializeSafely(request),
-            OccurredAtUtc: DateTime.UtcNow);
+            OccurredAtUtc: _timeProvider.GetUtcNow().UtcDateTime);
 
     /// <summary>
     /// Denetim kaydı iş işleminden sonra ayrı bağlantıda yazılır; buradaki hata istemciye 500 olarak yansımamalı

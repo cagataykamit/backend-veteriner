@@ -49,11 +49,13 @@ public sealed class ExportPrescriptionRegisterQueryHandler
 {
     private readonly RegisterReportRunner _runner;
     private readonly IRegisterReader<PrescriptionRegisterEntryDto> _reader;
+    private readonly TimeProvider _timeProvider;
 
-    public ExportPrescriptionRegisterQueryHandler(RegisterReportRunner runner, IRegisterReader<PrescriptionRegisterEntryDto> reader)
+    public ExportPrescriptionRegisterQueryHandler(RegisterReportRunner runner, IRegisterReader<PrescriptionRegisterEntryDto> reader, TimeProvider timeProvider)
     {
         _runner = runner;
         _reader = reader;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterQuery request, CancellationToken ct)
@@ -65,7 +67,7 @@ public sealed class ExportPrescriptionRegisterQueryHandler
 
         return Result<RegisterExportResult>.Success(new RegisterExportResult(
             RegisterCsvWriter.WriteUtf8Bom(PrescriptionRegisterColumns.All, loaded.Value!),
-            $"recete-defteri-{RegisterReportRunner.FileDateStamp(DateTime.UtcNow)}.csv"));
+            $"recete-defteri-{RegisterReportRunner.FileDateStamp(_timeProvider.GetUtcNow().UtcDateTime)}.csv"));
     }
 }
 
@@ -76,11 +78,13 @@ public sealed class ExportPrescriptionRegisterXlsxQueryHandler
 
     private readonly RegisterReportRunner _runner;
     private readonly IRegisterReader<PrescriptionRegisterEntryDto> _reader;
+    private readonly TimeProvider _timeProvider;
 
-    public ExportPrescriptionRegisterXlsxQueryHandler(RegisterReportRunner runner, IRegisterReader<PrescriptionRegisterEntryDto> reader)
+    public ExportPrescriptionRegisterXlsxQueryHandler(RegisterReportRunner runner, IRegisterReader<PrescriptionRegisterEntryDto> reader, TimeProvider timeProvider)
     {
         _runner = runner;
         _reader = reader;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterXlsxQuery request, CancellationToken ct)
@@ -92,6 +96,6 @@ public sealed class ExportPrescriptionRegisterXlsxQueryHandler
 
         return Result<RegisterExportResult>.Success(new RegisterExportResult(
             RegisterXlsxWriter.WriteWorkbook(SheetName, PrescriptionRegisterColumns.All, loaded.Value!),
-            $"recete-defteri-{RegisterReportRunner.FileDateStamp(DateTime.UtcNow)}.xlsx"));
+            $"recete-defteri-{RegisterReportRunner.FileDateStamp(_timeProvider.GetUtcNow().UtcDateTime)}.xlsx"));
     }
 }

@@ -13,15 +13,18 @@ public sealed class CancelPendingSubscriptionPlanChangeCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ScheduledSubscriptionPlanChange> _changesWrite;
     private readonly IReadRepository<ScheduledSubscriptionPlanChange> _changesRead;
+    private readonly TimeProvider _timeProvider;
 
     public CancelPendingSubscriptionPlanChangeCommandHandler(
         ITenantContext tenantContext,
         IRepository<ScheduledSubscriptionPlanChange> changesWrite,
-        IReadRepository<ScheduledSubscriptionPlanChange> changesRead)
+        IReadRepository<ScheduledSubscriptionPlanChange> changesRead,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _changesWrite = changesWrite;
         _changesRead = changesRead;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<PendingSubscriptionPlanChangeDto>> Handle(CancelPendingSubscriptionPlanChangeCommand request, CancellationToken ct)
@@ -33,7 +36,7 @@ public sealed class CancelPendingSubscriptionPlanChangeCommandHandler
         if (open is null)
             return Result<PendingSubscriptionPlanChangeDto>.Failure("Subscriptions.PendingPlanChangeNotFound", "Bekleyen plan değişikliği bulunamadı.");
 
-        open.Cancel(DateTime.UtcNow);
+        open.Cancel(_timeProvider.GetUtcNow().UtcDateTime);
         await _changesWrite.UpdateAsync(open, ct);
         await _changesWrite.SaveChangesAsync(ct);
         return Result<PendingSubscriptionPlanChangeDto>.Success(

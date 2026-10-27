@@ -6,10 +6,12 @@ namespace Backend.Veteriner.Application.Auth.Commands.Logout;
 public sealed class LogoutCommandHandler : IRequestHandler<LogoutCommand, Unit>
 {
     private readonly IRefreshTokenRepository _refreshRepo;
+    private readonly TimeProvider _timeProvider;
 
-    public LogoutCommandHandler(IRefreshTokenRepository refreshRepo)
+    public LogoutCommandHandler(IRefreshTokenRepository refreshRepo, TimeProvider timeProvider)
     {
         _refreshRepo = refreshRepo;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Unit> Handle(LogoutCommand request, CancellationToken ct)
@@ -24,8 +26,7 @@ public sealed class LogoutCommandHandler : IRequestHandler<LogoutCommand, Unit>
             return Unit.Value; // Token bulunamad�ysa sessiz ge� (bilgi s�zd�rma yok)
 
         // 3?? Aktif token m�?
-        var isActive = stored.RevokedAtUtc is null && stored.ExpiresAtUtc > DateTime.UtcNow;
-        if (!isActive)
+        if (!stored.IsActiveAt(_timeProvider.GetUtcNow().UtcDateTime))
             return Unit.Value;
 
         // 4?? Token�� revoke et

@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Application.Pets.Commands.Create.Validators;
 
 public sealed class CreatePetCommandValidator : AbstractValidator<CreatePetCommand>
 {
-    public CreatePetCommandValidator()
+    public CreatePetCommandValidator(TimeProvider timeProvider)
     {
         RuleFor(x => x.ClientId).NotEmpty();
         RuleFor(x => x.SpeciesId).NotEmpty();
@@ -24,7 +24,7 @@ public sealed class CreatePetCommandValidator : AbstractValidator<CreatePetComma
             .IsInEnum()
             .When(x => x.Gender.HasValue);
         RuleFor(x => x.BirthDate)
-            .Must(d => !d.HasValue || d.Value <= DateOnly.FromDateTime(DateTime.UtcNow))
+            .Must(d => !d.HasValue || d.Value <= DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime))
             .WithMessage("Doğum tarihi gelecekte olamaz.");
         RuleFor(x => x.Weight)
             .GreaterThanOrEqualTo(0).When(x => x.Weight.HasValue)

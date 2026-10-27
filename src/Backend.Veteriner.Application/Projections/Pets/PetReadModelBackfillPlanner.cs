@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Application.Projections.Pets;
 /// - Pet domain'inde <c>CreatedAtUtc</c> / <c>UpdatedAtUtc</c> yoktur; backfill bir <em>event</em> değil
 ///   bir <em>snapshot</em>'tır. Ordering anahtarı için minimum UTC sentinel kullanılır
 ///   (<see cref="BackfillBaselineOccurredAtUtc"/>). Gerçek <c>pet.created.v1</c> /
-///   <c>pet.updated.v1</c> event'leri handler'da <c>DateTime.UtcNow</c> ile gelir ve sentinel'i ezer.
+///   <c>pet.updated.v1</c> event'leri handler'da <c>TimeProvider</c> anıyla gelir ve sentinel'i ezer.
 /// - Stale guard <see cref="Backend.Veteriner.Infrastructure.Projections.Pets.PetProjectionProcessor"/>
 ///   ile aynıdır: daha eski snapshot, daha yeni bir event ile yazılmış satırı ezmez.
 /// </summary>

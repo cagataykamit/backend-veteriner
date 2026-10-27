@@ -45,7 +45,7 @@ public sealed class NoShowCommandHandlerTests
     private RevertAppointmentNoShowCommandHandler CreateRevertHandler()
         => new(
             _tenantContext.Object, _clinicContext.Object, _scopeResolver.Object,
-            _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object);
+            _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object, TimeProvider.System);
 
     private Appointment Returns(DateTime scheduledAtUtc, AppointmentStatus? status = null)
     {

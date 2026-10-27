@@ -44,7 +44,8 @@ public sealed class GetVaccinationsListQueryHandlerTests
             Options.Create(new QueryReadModelsOptions
             {
                 SharedSearchLookupEnabled = sharedSearchLookupEnabled
-            }));
+            }),
+            TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

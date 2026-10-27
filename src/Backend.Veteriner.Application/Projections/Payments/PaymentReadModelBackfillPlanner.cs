@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Application.Projections.Payments;
 /// - Payment domain'inde mutasyon timestamp'i yoktur; backfill bir <em>event</em> değil bir
 ///   <em>snapshot</em>'tır. Ordering anahtarı için minimum UTC sentinel kullanılır
 ///   (<see cref="BackfillBaselineOccurredAtUtc"/>). Gerçek <c>payment.created.v1</c> /
-///   <c>payment.updated.v1</c> event'leri handler'da <c>DateTime.UtcNow</c> ile gelir ve sentinel'i ezer.
+///   <c>payment.updated.v1</c> event'leri handler'da <c>TimeProvider</c> anıyla gelir ve sentinel'i ezer.
 /// - Stale guard <see cref="Backend.Veteriner.Infrastructure.Projections.Payments.PaymentProjectionProcessor"/>
 ///   ile aynıdır: daha eski snapshot, daha yeni bir event ile yazılmış satırı ezmez.
 /// </summary>

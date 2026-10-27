@@ -18,19 +18,22 @@ public sealed class GetTenantAccessStateQueryHandler
     private readonly IUserTenantRepository _userTenants;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<TenantSubscription> _subscriptions;
+    private readonly TimeProvider _timeProvider;
 
     public GetTenantAccessStateQueryHandler(
         ITenantContext tenantContext,
         IClientContext clientContext,
         IUserTenantRepository userTenants,
         IReadRepository<Tenant> tenants,
-        IReadRepository<TenantSubscription> subscriptions)
+        IReadRepository<TenantSubscription> subscriptions,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
         _userTenants = userTenants;
         _tenants = tenants;
         _subscriptions = subscriptions;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<TenantAccessStateDto>> Handle(
@@ -89,7 +92,7 @@ public sealed class GetTenantAccessStateQueryHandler
                 "Bu kiracı için abonelik kaydı bulunamadı.");
         }
 
-        var dto = TenantAccessStateHelper.BuildForActiveTenant(tenant.Id, sub, DateTime.UtcNow);
+        var dto = TenantAccessStateHelper.BuildForActiveTenant(tenant.Id, sub, _timeProvider.GetUtcNow().UtcDateTime);
         return Result<TenantAccessStateDto>.Success(dto);
     }
 }

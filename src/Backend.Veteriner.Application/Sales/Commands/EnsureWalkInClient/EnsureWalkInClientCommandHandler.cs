@@ -68,7 +68,7 @@ public sealed class EnsureWalkInClientCommandHandler
                 ClientIntegrationEventTypes.Created,
                 new ClientCreatedIntegrationEvent(
                     Guid.NewGuid(),
-                    DateTime.UtcNow,
+                    utcNow,
                     ClientProjectionSnapshotFactory.Create(client)),
                 ct);
 

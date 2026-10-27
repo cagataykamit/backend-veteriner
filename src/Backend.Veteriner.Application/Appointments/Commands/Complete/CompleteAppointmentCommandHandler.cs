@@ -19,6 +19,7 @@ public sealed class CompleteAppointmentCommandHandler : IRequestHandler<Complete
     private readonly IRepository<Appointment> _appointmentsWrite;
     private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
     private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
+    private readonly TimeProvider _timeProvider;
 
     public CompleteAppointmentCommandHandler(
         ITenantContext tenantContext,
@@ -27,7 +28,8 @@ public sealed class CompleteAppointmentCommandHandler : IRequestHandler<Complete
         IReadRepository<Appointment> appointmentsRead,
         IRepository<Appointment> appointmentsWrite,
         IAppointmentProjectionSnapshotFactory snapshotFactory,
-        IAppointmentIntegrationEventOutbox eventOutbox)
+        IAppointmentIntegrationEventOutbox eventOutbox,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -36,6 +38,7 @@ public sealed class CompleteAppointmentCommandHandler : IRequestHandler<Complete
         _appointmentsWrite = appointmentsWrite;
         _snapshotFactory = snapshotFactory;
         _eventOutbox = eventOutbox;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(CompleteAppointmentCommand request, CancellationToken ct)
@@ -71,7 +74,7 @@ public sealed class CompleteAppointmentCommandHandler : IRequestHandler<Complete
             AppointmentIntegrationEventTypes.Completed,
             new AppointmentCompletedIntegrationEvent(
                 Guid.NewGuid(),
-                DateTime.UtcNow,
+                _timeProvider.GetUtcNow().UtcDateTime,
                 appointment.MutationSequence,
                 previous,
                 current),

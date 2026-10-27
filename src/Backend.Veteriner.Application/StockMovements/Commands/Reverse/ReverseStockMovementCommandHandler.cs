@@ -146,7 +146,7 @@ public sealed class ReverseStockMovementCommandHandler
         var reversal = original.CreateReversal(
             request.Reason,
             request.Notes,
-            DateTime.UtcNow,
+            utcNow,
             _clientContext.UserId,
             request.RequestId,
             utcNow);

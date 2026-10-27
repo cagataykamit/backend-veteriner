@@ -310,7 +310,8 @@ file static class DashboardOperationalAlertsTestInvoker
             sp.GetRequiredService<IReadRepository<Appointment>>(),
             sp.GetRequiredService<IReadRepository<Backend.Veteriner.Domain.Vaccinations.Vaccination>>(),
             sp.GetRequiredService<IReadRepository<Backend.Veteriner.Domain.Pets.Pet>>(),
-            sp.GetRequiredService<IDashboardTodayAppointmentStatusCountsReader>());
+            sp.GetRequiredService<IDashboardTodayAppointmentStatusCountsReader>(),
+            TimeProvider.System);
 
         return await handler.Handle(new GetDashboardOperationalAlertsQuery(), CancellationToken.None);
     }

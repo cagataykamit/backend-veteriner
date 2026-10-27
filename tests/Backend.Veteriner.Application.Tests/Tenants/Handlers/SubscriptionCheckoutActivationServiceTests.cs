@@ -27,7 +27,8 @@ public sealed class SubscriptionCheckoutActivationServiceTests
             _subscriptionsWrite.Object,
             _sessionsRead.Object,
             _sessionsWrite.Object,
-            new SalesPartnerDiscountBilling(_redemptions.Object, NullLogger<SalesPartnerDiscountBilling>.Instance));
+            new SalesPartnerDiscountBilling(_redemptions.Object, NullLogger<SalesPartnerDiscountBilling>.Instance),
+            TimeProvider.System);
 
     [Fact]
     public async Task TryActivateAsync_Should_ReturnFailure_When_SessionNotFound()

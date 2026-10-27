@@ -39,6 +39,7 @@ public sealed class UpdateVaccinationHbsCommandHandler : IRequestHandler<UpdateV
     private readonly IReadRepository<Vaccination> _vaccinationsRead;
     private readonly IRepository<Vaccination> _vaccinationsWrite;
     private readonly IClinicVeterinarianReader _names;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateVaccinationHbsCommandHandler(
         ITenantContext tenantContext,
@@ -48,7 +49,8 @@ public sealed class UpdateVaccinationHbsCommandHandler : IRequestHandler<UpdateV
         IReadRepository<Tenant> tenants,
         IReadRepository<Vaccination> vaccinationsRead,
         IRepository<Vaccination> vaccinationsWrite,
-        IClinicVeterinarianReader names)
+        IClinicVeterinarianReader names,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -58,6 +60,7 @@ public sealed class UpdateVaccinationHbsCommandHandler : IRequestHandler<UpdateV
         _vaccinationsRead = vaccinationsRead;
         _vaccinationsWrite = vaccinationsWrite;
         _names = names;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<HbsEntryDto>> Handle(UpdateVaccinationHbsCommand request, CancellationToken ct)
@@ -86,7 +89,7 @@ public sealed class UpdateVaccinationHbsCommandHandler : IRequestHandler<UpdateV
         if (!access.IsSuccess)
             return Result<HbsEntryDto>.Failure(access.Error);
 
-        var applied = v.ApplyHbsEntry(request.Status, request.ReferenceNumber, request.NotRequiredReason, userId, DateTime.UtcNow);
+        var applied = v.ApplyHbsEntry(request.Status, request.ReferenceNumber, request.NotRequiredReason, userId, _timeProvider.GetUtcNow().UtcDateTime);
         if (!applied.IsSuccess)
             return Result<HbsEntryDto>.Failure(applied.Error);
 

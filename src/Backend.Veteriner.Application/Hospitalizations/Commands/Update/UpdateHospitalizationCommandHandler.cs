@@ -125,7 +125,8 @@ public sealed class UpdateHospitalizationCommandHandler
             return Fail("Hospitalizations.Validation", "RowVersion geçerli Base64 (8 bayt) olmalıdır.");
 
         var admittedUtc = AdmittedAtUtcWindow.ToUtc(request.AdmittedAtUtc);
-        var window = AdmittedAtUtcWindow.Validate(admittedUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = AdmittedAtUtcWindow.Validate(admittedUtc, utcNow);
         if (!window.IsSuccess)
             return Result<HospitalizationWriteResultDto>.Failure(window.Error);
 
@@ -210,7 +211,6 @@ public sealed class UpdateHospitalizationCommandHandler
             roomAssignment = room.Value;
         }
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var update = existing.UpdateDetails(
             effectiveClinicId,
             request.PetId,

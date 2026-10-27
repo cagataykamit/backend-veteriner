@@ -97,10 +97,11 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
             return Result<Guid>.Failure(clinicAccess.Error);
 
         DateTime? resultUtc = null;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (request.ResultDateUtc is { } resultDate)
         {
             resultUtc = ResultDateUtcWindow.ToUtc(resultDate);
-            var window = ResultDateUtcWindow.Validate(resultUtc.Value);
+            var window = ResultDateUtcWindow.Validate(resultUtc.Value, utcNow);
             if (!window.IsSuccess)
                 return Result<Guid>.Failure(window.Error);
         }
@@ -149,7 +150,6 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
         if (!resultCheck.IsSuccess)
             return Result<Guid>.Failure(resultCheck.Error);
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var entity = new LabResult(
             tenantId,
             effectiveClinicId,

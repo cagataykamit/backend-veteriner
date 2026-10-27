@@ -42,17 +42,16 @@ internal static class PaymentPaidAtWindow
         }
     }
 
-    public static Result Validate(DateTime paidAtUtc)
+    public static Result Validate(DateTime paidAtUtc, DateTime utcNow)
     {
-        var now = DateTime.UtcNow;
-        if (paidAtUtc < now.AddDays(-7))
+        if (paidAtUtc < utcNow.AddDays(-7))
         {
             return Result.Failure(
                 "Payments.PaidTooFarInPast",
                 "Ödeme zamanı çok eski; en fazla 7 gün öncesine kadar kayıt açılabilir.");
         }
 
-        if (paidAtUtc > now.AddYears(2))
+        if (paidAtUtc > utcNow.AddYears(2))
         {
             return Result.Failure(
                 "Payments.PaidTooFarInFuture",

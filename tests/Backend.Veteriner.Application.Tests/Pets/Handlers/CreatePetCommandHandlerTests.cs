@@ -35,7 +35,7 @@ public sealed class CreatePetCommandHandlerTests
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(TenantSubscription.StartTrial(Guid.NewGuid(), SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
 
-        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenantsRead.Object, _subscriptionsRead.Object);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenantsRead.Object, _subscriptionsRead.Object, TimeProvider.System);
 
         return new(
             _tenantContext.Object,
@@ -47,7 +47,8 @@ public sealed class CreatePetCommandHandlerTests
             _petsRead.Object,
             _petsWrite.Object,
             writeEvaluator,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
     }
 
     private static void AlignTenantId(Tenant tenant, Guid id)

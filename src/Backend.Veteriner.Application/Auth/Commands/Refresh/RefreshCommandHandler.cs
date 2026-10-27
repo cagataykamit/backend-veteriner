@@ -91,7 +91,8 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
                 "Refresh token bulunamadı.");
         }
 
-        if (DateTime.UtcNow >= stored.ExpiresAtUtc)
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        if (utcNow >= stored.ExpiresAtUtc)
         {
             return Result<LoginResultDto>.Failure(
                 "Auth.Unauthorized.RefreshTokenExpired",
@@ -122,7 +123,6 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
                 "Oturum kiracı bilgisi eksik; lütfen yeniden giriş yapın.");
         }
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         stored.MarkUsed(utcNow);
 
         var permissionCodes = await _permissionReader.GetPermissionsAsync(user.Id, principal: null, ct)
@@ -185,7 +185,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         var newRefresh = new Backend.Veteriner.Domain.Users.RefreshToken(
             user.Id,
             newHash,
-            DateTime.UtcNow.AddDays(_opt.RefreshTokenDays),
+            utcNow.AddDays(_opt.RefreshTokenDays),
             null,
             null,
             utcNow,

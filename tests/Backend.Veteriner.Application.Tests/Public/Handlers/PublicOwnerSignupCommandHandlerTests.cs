@@ -60,6 +60,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             _hasher.Object,
             _uow.Object,
             _exampleClinic.Object,
+            TimeProvider.System,
             _logger.Object);
 
     [Fact]

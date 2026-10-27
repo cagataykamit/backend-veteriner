@@ -12,15 +12,18 @@ public sealed class CreateTenantCommandHandler : IRequestHandler<CreateTenantCom
     private readonly IReadRepository<Tenant> _tenantsRead;
     private readonly IRepository<Tenant> _tenantsWrite;
     private readonly IRepository<TenantSubscription> _subscriptionsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public CreateTenantCommandHandler(
         IReadRepository<Tenant> tenantsRead,
         IRepository<Tenant> tenantsWrite,
-        IRepository<TenantSubscription> subscriptionsWrite)
+        IRepository<TenantSubscription> subscriptionsWrite,
+        TimeProvider timeProvider)
     {
         _tenantsRead = tenantsRead;
         _tenantsWrite = tenantsWrite;
         _subscriptionsWrite = subscriptionsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreateTenantCommand request, CancellationToken ct)
@@ -32,7 +35,7 @@ public sealed class CreateTenantCommandHandler : IRequestHandler<CreateTenantCom
                 "Tenants.DuplicateName",
                 "Aynı ada sahip bir kiracı zaten var (büyük/küçük harf ayrımı yapılmaz).");
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var tenant = new Tenant(request.Name, utcNow);
         await _tenantsWrite.AddAsync(tenant, ct);
 

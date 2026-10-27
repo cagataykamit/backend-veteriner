@@ -87,7 +87,8 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
             return Result<Guid>.Failure(clinicAccess.Error);
 
         var treatmentUtc = TreatmentDateUtcWindow.ToUtc(request.TreatmentDateUtc);
-        var window = TreatmentDateUtcWindow.Validate(treatmentUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = TreatmentDateUtcWindow.Validate(treatmentUtc, utcNow);
         if (!window.IsSuccess)
             return Result<Guid>.Failure(window.Error);
 
@@ -136,7 +137,6 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
         if (!locked.IsSuccess)
             return Result<Guid>.Failure(locked.Error);
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var treatment = new Treatment(
             tenantId,
             effectiveClinicId,

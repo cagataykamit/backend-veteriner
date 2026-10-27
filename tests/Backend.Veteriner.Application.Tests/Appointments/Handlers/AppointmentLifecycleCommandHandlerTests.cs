@@ -37,10 +37,10 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     }
 
     private CancelAppointmentCommandHandler CreateCancelHandler()
-        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _read.Object, _write.Object, _snapshotFactory.Object, _eventOutbox.Object);
+        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _read.Object, _write.Object, _snapshotFactory.Object, _eventOutbox.Object, TimeProvider.System);
 
     private CompleteAppointmentCommandHandler CreateCompleteHandler()
-        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _read.Object, _write.Object, _snapshotFactory.Object, _eventOutbox.Object);
+        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _read.Object, _write.Object, _snapshotFactory.Object, _eventOutbox.Object, TimeProvider.System);
 
     private RescheduleAppointmentCommandHandler CreateRescheduleHandler()
         => new(
@@ -52,7 +52,8 @@ public sealed class AppointmentLifecycleCommandHandlerTests
             _clinicWorkingHoursRead.Object,
             _write.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     // Faz 4B-7: Hafta sonuna denk gelen ileri tarihler için Pazartesi'ye kaydır.
     // Default working-hours fallback'inde Pazar kapalı ve Cumartesi sınırlı; testler haftanın gününe bağımlı kalmasın.

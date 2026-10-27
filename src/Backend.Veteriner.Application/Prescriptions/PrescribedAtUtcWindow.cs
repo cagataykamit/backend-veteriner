@@ -15,17 +15,16 @@ internal static class PrescribedAtUtcWindow
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
 
-    public static Result Validate(DateTime prescribedAtUtc)
+    public static Result Validate(DateTime prescribedAtUtc, DateTime utcNow)
     {
-        var now = DateTime.UtcNow;
-        if (prescribedAtUtc < now.AddDays(-7))
+        if (prescribedAtUtc < utcNow.AddDays(-7))
         {
             return Result.Failure(
                 "Prescriptions.DateTooFarInPast",
                 "Prescription date is too far in the past; at most 7 days back is allowed.");
         }
 
-        if (prescribedAtUtc > now.AddYears(2))
+        if (prescribedAtUtc > utcNow.AddYears(2))
         {
             return Result.Failure(
                 "Prescriptions.DateTooFarInFuture",

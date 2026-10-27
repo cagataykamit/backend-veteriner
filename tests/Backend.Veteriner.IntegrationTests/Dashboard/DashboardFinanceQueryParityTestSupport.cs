@@ -71,7 +71,8 @@ internal static class DashboardFinanceQueryParityTestSupport
             sp.GetRequiredService<IDashboardFinancePaymentAggregatesReader>(),
             sp.GetRequiredService<IDashboardFinanceReadModelReader>(),
             sp.GetRequiredService<IDashboardRecentPaymentsReadModelReader>(),
-            Options.Create(new QueryReadModelsOptions { DashboardFinanceReadEnabled = dashboardFinanceReadEnabled }));
+            Options.Create(new QueryReadModelsOptions { DashboardFinanceReadEnabled = dashboardFinanceReadEnabled }),
+            TimeProvider.System);
 
         return await handler.Handle(new GetDashboardFinanceSummaryQuery(), CancellationToken.None);
     }

@@ -115,10 +115,11 @@ public sealed class UpdateLabResultCommandHandler
             return Fail("LabResults.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
 
         DateTime? resultUtc = null;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (request.ResultDateUtc is { } resultDate)
         {
             resultUtc = ResultDateUtcWindow.ToUtc(resultDate);
-            var window = ResultDateUtcWindow.Validate(resultUtc.Value);
+            var window = ResultDateUtcWindow.Validate(resultUtc.Value, utcNow);
             if (!window.IsSuccess)
                 return Result<LabResultWriteResultDto>.Failure(window.Error);
         }
@@ -174,7 +175,6 @@ public sealed class UpdateLabResultCommandHandler
         if (!visit.IsSuccess)
             return Result<LabResultWriteResultDto>.Failure(visit.Error);
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var update = existing.UpdateDetails(
             effectiveClinicId,
             request.PetId,

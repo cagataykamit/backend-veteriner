@@ -382,7 +382,8 @@ public static class DevSampleDataSeeder
                 new EfReadRepository<ClinicWorkingHour>(db),
                 new EfRepository<Appointment>(db),
                 new AppointmentProjectionSnapshotFactory(db),
-                new AppointmentIntegrationEventOutbox(outboxBuffer));
+                new AppointmentIntegrationEventOutbox(outboxBuffer),
+                TimeProvider.System);
 
             CreateCharge = new CreateChargeCommandHandler(
                 tenantContext,

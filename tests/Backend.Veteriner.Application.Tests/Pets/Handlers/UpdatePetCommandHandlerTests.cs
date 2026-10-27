@@ -36,7 +36,8 @@ public sealed class UpdatePetCommandHandlerTests
             _breedsRead.Object,
             _petsRead.Object,
             _petsWrite.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private static void AlignTenantId(Tenant tenant, Guid id)
         => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);

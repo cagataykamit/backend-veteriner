@@ -120,20 +120,21 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
             ? VaccinationDueAtWindow.ToUtc(request.DueAtUtc.Value)
             : null;
 
-        var statusDates = VaccinationStatusDateRules.Validate(request.Status, appliedUtc, dueUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var statusDates = VaccinationStatusDateRules.Validate(request.Status, appliedUtc, dueUtc, utcNow);
         if (!statusDates.IsSuccess)
             return Result<VaccinationCreateResultDto>.Failure(statusDates.Error);
 
         if (appliedUtc.HasValue)
         {
-            var aw = VaccinationAppliedAtWindow.Validate(appliedUtc.Value);
+            var aw = VaccinationAppliedAtWindow.Validate(appliedUtc.Value, utcNow);
             if (!aw.IsSuccess)
                 return Result<VaccinationCreateResultDto>.Failure(aw.Error);
         }
 
         if (dueUtc.HasValue)
         {
-            var dw = VaccinationDueAtWindow.Validate(dueUtc.Value);
+            var dw = VaccinationDueAtWindow.Validate(dueUtc.Value, utcNow);
             if (!dw.IsSuccess)
                 return Result<VaccinationCreateResultDto>.Failure(dw.Error);
         }
@@ -197,7 +198,6 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         if (!locked.IsSuccess)
             return Result<VaccinationCreateResultDto>.Failure(locked.Error);
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var vaccination = new Vaccination(
             tenantId,
             request.PetId,

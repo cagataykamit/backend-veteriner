@@ -16,17 +16,20 @@ public sealed class RegisterReportRunner
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _scopeResolver;
     private readonly ITrialLimitPolicy _trialLimitPolicy;
+    private readonly TimeProvider _timeProvider;
 
     public RegisterReportRunner(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver scopeResolver,
-        ITrialLimitPolicy trialLimitPolicy)
+        ITrialLimitPolicy trialLimitPolicy,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _scopeResolver = scopeResolver;
         _trialLimitPolicy = trialLimitPolicy;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Result<RegisterReadResult<TRow>>> ReadPageAsync<TRow>(
@@ -79,13 +82,14 @@ public sealed class RegisterReportRunner
         if (!loaded.IsSuccess)
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
-        return Result<RegisterExportResult>.Success(BuildFile(spec, loaded.Value!, format));
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        return Result<RegisterExportResult>.Success(BuildFile(spec, loaded.Value!, format, utcNow));
     }
 
     /// <summary>Hazır satırlardan seçilen biçimde dosya üretir (dosya adı: önek + İstanbul tarihi).</summary>
-    public static RegisterExportResult BuildFile<TRow>(RegisterExportSpec<TRow> spec, IReadOnlyList<TRow> rows, RegisterExportFormat format)
+    public static RegisterExportResult BuildFile<TRow>(RegisterExportSpec<TRow> spec, IReadOnlyList<TRow> rows, RegisterExportFormat format, DateTime utcNow)
     {
-        var stamp = FileDateStamp(DateTime.UtcNow);
+        var stamp = FileDateStamp(utcNow);
         return format == RegisterExportFormat.Csv
             ? new RegisterExportResult(RegisterCsvWriter.WriteUtf8Bom(spec.Columns, rows), $"{spec.FileBaseName}-{stamp}.csv")
             : new RegisterExportResult(RegisterXlsxWriter.WriteWorkbook(spec.SheetName, spec.Columns, rows), $"{spec.FileBaseName}-{stamp}.xlsx");

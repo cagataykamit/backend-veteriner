@@ -17,17 +17,20 @@ public sealed class AcceptTenantInviteCommandHandler
     private readonly IRepository<TenantInvite> _invites;
     private readonly IUserReadRepository _usersRead;
     private readonly TenantInviteAcceptanceService _acceptance;
+    private readonly TimeProvider _timeProvider;
 
     public AcceptTenantInviteCommandHandler(
         ITokenHashService tokenHash,
         IRepository<TenantInvite> invites,
         IUserReadRepository usersRead,
-        TenantInviteAcceptanceService acceptance)
+        TenantInviteAcceptanceService acceptance,
+        TimeProvider timeProvider)
     {
         _tokenHash = tokenHash;
         _invites = invites;
         _usersRead = usersRead;
         _acceptance = acceptance;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<TenantInviteAcceptResultDto>> Handle(AcceptTenantInviteCommand request, CancellationToken ct)
@@ -59,7 +62,7 @@ public sealed class AcceptTenantInviteCommandHandler
                 "Bu davet artık geçerli değil.");
         }
 
-        if (DateTime.UtcNow >= invite.ExpiresAtUtc)
+        if (_timeProvider.GetUtcNow().UtcDateTime >= invite.ExpiresAtUtc)
         {
             return Result<TenantInviteAcceptResultDto>.Failure(
                 "Invites.Expired",

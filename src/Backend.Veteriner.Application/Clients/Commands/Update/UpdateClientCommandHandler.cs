@@ -117,7 +117,7 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
                 ClientIntegrationEventTypes.Updated,
                 new ClientUpdatedIntegrationEvent(
                     Guid.NewGuid(),
-                    DateTime.UtcNow,
+                    utcNow,
                     ClientProjectionSnapshotFactory.Create(client)),
                 ct);
 

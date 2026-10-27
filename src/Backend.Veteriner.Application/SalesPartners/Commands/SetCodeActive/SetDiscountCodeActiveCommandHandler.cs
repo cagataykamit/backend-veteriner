@@ -11,11 +11,13 @@ public sealed class SetDiscountCodeActiveCommandHandler : IRequestHandler<SetDis
 {
     private readonly IRepository<DiscountCode> _codes;
     private readonly IReadRepository<DiscountRedemption> _redemptions;
+    private readonly TimeProvider _timeProvider;
 
-    public SetDiscountCodeActiveCommandHandler(IRepository<DiscountCode> codes, IReadRepository<DiscountRedemption> redemptions)
+    public SetDiscountCodeActiveCommandHandler(IRepository<DiscountCode> codes, IReadRepository<DiscountRedemption> redemptions, TimeProvider timeProvider)
     {
         _codes = codes;
         _redemptions = redemptions;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<DiscountCodeDto>> Handle(SetDiscountCodeActiveCommand request, CancellationToken ct)
@@ -24,7 +26,7 @@ public sealed class SetDiscountCodeActiveCommandHandler : IRequestHandler<SetDis
         if (code is null)
             return Result<DiscountCodeDto>.Failure(SalesPartnerErrors.CodeNotFound);
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         if (request.IsActive)
             code.Activate(now);
         else

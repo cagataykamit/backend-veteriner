@@ -61,7 +61,7 @@ public sealed class RequestEmailVerificationHandler : IRequestHandler<RequestEma
         if (existing is not null)
         {
             // Son 2 dakika i�inde olu�turulmu�sa yeni mail yollama (cooldown)
-            if (existing.CreatedAtUtc > DateTime.UtcNow - ResendCooldown)
+            if (existing.CreatedAtUtc > utcNow - ResendCooldown)
             {
                 return Unit.Value;
             }
@@ -78,7 +78,7 @@ public sealed class RequestEmailVerificationHandler : IRequestHandler<RequestEma
             user.Id,
             tokenHash,
             VerificationPurpose.EmailVerify,
-            DateTime.UtcNow.AddHours(24),
+            utcNow.AddHours(24),
             utcNow); // 24 saat ge�erli
 
         await _repo.AddAsync(vt, ct);

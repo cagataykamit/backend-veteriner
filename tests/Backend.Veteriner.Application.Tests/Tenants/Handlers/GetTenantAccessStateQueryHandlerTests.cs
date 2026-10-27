@@ -21,7 +21,8 @@ public sealed class GetTenantAccessStateQueryHandlerTests
             _client.Object,
             _userTenants.Object,
             _tenants.Object,
-            _subscriptions.Object);
+            _subscriptions.Object,
+            TimeProvider.System);
 
     private static void SetTenantId(Tenant t, Guid id)
         => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(t, id);

@@ -14,7 +14,7 @@ public sealed class CreateTenantCommandHandlerTests
     private readonly Mock<IRepository<Tenant>> _write = new();
     private readonly Mock<IRepository<TenantSubscription>> _subs = new();
 
-    private CreateTenantCommandHandler CreateHandler() => new(_read.Object, _write.Object, _subs.Object);
+    private CreateTenantCommandHandler CreateHandler() => new(_read.Object, _write.Object, _subs.Object, TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_DuplicateName_CaseInsensitive()

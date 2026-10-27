@@ -80,7 +80,8 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
                 "Bu davet artık geçerli değil.");
         }
 
-        if (DateTime.UtcNow >= invite.ExpiresAtUtc)
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        if (utcNow >= invite.ExpiresAtUtc)
         {
             return Result<TenantInviteAcceptResultDto>.Failure(
                 "Invites.Expired",
@@ -102,7 +103,6 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
         if (!legalCheck.IsSuccess)
             return Result<TenantInviteAcceptResultDto>.Failure(legalCheck.Error);
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var user = new User(invite.Email, _hasher.Hash(request.Password), utcNow);
         await _usersWrite.AddAsync(user, ct);
 
@@ -111,7 +111,7 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
             return accepted;
 
         await _legalAcceptances.AddRangeAsync(
-            LegalDocumentCatalog.CreateAcceptances(user.Id, invite.TenantId, requiredLegalDocuments, DateTime.UtcNow), ct);
+            LegalDocumentCatalog.CreateAcceptances(user.Id, invite.TenantId, requiredLegalDocuments, utcNow), ct);
         await _legalAcceptances.SaveChangesAsync(ct);
 
         return accepted;

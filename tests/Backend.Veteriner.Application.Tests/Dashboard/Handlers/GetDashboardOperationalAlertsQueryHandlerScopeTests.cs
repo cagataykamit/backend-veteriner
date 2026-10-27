@@ -30,7 +30,8 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerScopeTests
             _appointments.Object,
             _vaccinations.Object,
             _pets.Object,
-            _todayCounts.Object);
+            _todayCounts.Object,
+            TimeProvider.System);
 
     private void SetupZeroCounts()
     {

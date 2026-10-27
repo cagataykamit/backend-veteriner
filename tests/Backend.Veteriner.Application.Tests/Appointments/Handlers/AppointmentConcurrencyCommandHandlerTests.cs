@@ -60,7 +60,8 @@ public sealed class AppointmentConcurrencyCommandHandlerTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(
             new RescheduleAppointmentCommand(appt.Id, SlotAlignedUtcPlusDays(3)),

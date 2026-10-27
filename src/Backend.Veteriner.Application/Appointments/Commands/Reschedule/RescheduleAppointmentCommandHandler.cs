@@ -25,6 +25,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
     private readonly IRepository<Appointment> _appointmentsWrite;
     private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
     private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
+    private readonly TimeProvider _timeProvider;
 
     public RescheduleAppointmentCommandHandler(
         ITenantContext tenantContext,
@@ -35,7 +36,8 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
         IRepository<Appointment> appointmentsWrite,
         IAppointmentProjectionSnapshotFactory snapshotFactory,
-        IAppointmentIntegrationEventOutbox eventOutbox)
+        IAppointmentIntegrationEventOutbox eventOutbox,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -46,6 +48,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         _appointmentsWrite = appointmentsWrite;
         _snapshotFactory = snapshotFactory;
         _eventOutbox = eventOutbox;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(RescheduleAppointmentCommand request, CancellationToken ct)
@@ -79,7 +82,8 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
                 "Yalnızca planlanmış randevu yeniden zamanlanabilir.");
         }
 
-        var window = AppointmentScheduleWindow.Validate(scheduledUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = AppointmentScheduleWindow.Validate(scheduledUtc, utcNow);
         if (!window.IsSuccess)
             return Result.Failure(window.Error);
 
@@ -145,7 +149,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
             AppointmentIntegrationEventTypes.Rescheduled,
             new AppointmentRescheduledIntegrationEvent(
                 Guid.NewGuid(),
-                DateTime.UtcNow,
+                utcNow,
                 appointment.MutationSequence,
                 previous,
                 current),

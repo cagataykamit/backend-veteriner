@@ -41,7 +41,8 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
             Options.Create(billing),
             _resolver.Object,
             new SalesPartnerDiscountBilling(_redemptions.Object, NullLogger<SalesPartnerDiscountBilling>.Instance),
-            NullLogger<StartSubscriptionCheckoutCommandHandler>.Instance);
+            NullLogger<StartSubscriptionCheckoutCommandHandler>.Instance,
+            TimeProvider.System);
 
     private static BillingOptions CreateBillingOptions()
         => new()

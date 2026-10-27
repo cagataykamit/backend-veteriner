@@ -93,7 +93,8 @@ public sealed class ClientFilteredListHandlerTests
         var handler = new GetVaccinationsListQueryHandler(
             _tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, vaccinations.Object,
             new Mock<IReadRepository<Administration>>().Object, _pets.Object, _clients.Object, _petLookupReader.Object,
-            Options.Create(new QueryReadModelsOptions()));
+            Options.Create(new QueryReadModelsOptions()),
+            TimeProvider.System);
 
         var result = await handler.Handle(new GetVaccinationsListQuery(Page, ClientId: Guid.NewGuid()), CancellationToken.None);
 

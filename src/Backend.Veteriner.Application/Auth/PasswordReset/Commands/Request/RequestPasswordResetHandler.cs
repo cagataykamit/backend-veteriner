@@ -61,7 +61,7 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (active is not null)
         {
-            var age = DateTime.UtcNow - active.CreatedAtUtc;
+            var age = utcNow - active.CreatedAtUtc;
             if (age < Cooldown)
             {
                 _logger.LogInformation("PasswordReset: active token exists within cooldown ({AgeSeconds}s). Skipping email.", (int)age.TotalSeconds);
@@ -71,8 +71,6 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
             // Cooldown a��ld�ysa mevcut aktifi ge�ersiz k�l (kullan�lm�� i�aretle)
             // Domain entity'nizde MarkUsed() varsa onu �a��r�n:
             active.MarkUsed(utcNow);
-            // Yoksa:
-            // active.UsedAtUtc = DateTime.UtcNow;
         }
 
         // 3) Yeni token olu�tur (1 saat ge�erli)
@@ -89,7 +87,7 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
             user.Id,
             tokenHash,
             VerificationPurpose.PasswordReset,
-            DateTime.UtcNow.AddHours(1),
+            utcNow.AddHours(1),
             utcNow);
 
         await _repo.AddAsync(vt, ct);

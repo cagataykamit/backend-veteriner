@@ -17,19 +17,22 @@ public sealed class GetDashboardCapabilitiesQueryHandler
     private readonly ICurrentUserPermissionChecker _permissionChecker;
     private readonly ICurrentUserRoleAccessor _roleAccessor;
     private readonly IReadRepository<TenantSubscription> _subscriptions;
+    private readonly TimeProvider _timeProvider;
 
     public GetDashboardCapabilitiesQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         ICurrentUserPermissionChecker permissionChecker,
         ICurrentUserRoleAccessor roleAccessor,
-        IReadRepository<TenantSubscription> subscriptions)
+        IReadRepository<TenantSubscription> subscriptions,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _permissionChecker = permissionChecker;
         _roleAccessor = roleAccessor;
         _subscriptions = subscriptions;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<DashboardCapabilitiesDto>> Handle(GetDashboardCapabilitiesQuery request, CancellationToken ct)
@@ -55,7 +58,7 @@ public sealed class GetDashboardCapabilitiesQueryHandler
         var sub = await _subscriptions.FirstOrDefaultAsync(new TenantSubscriptionByTenantIdSpec(tenantId), ct);
         if (sub is not null)
         {
-            var effectiveStatus = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, DateTime.UtcNow);
+            var effectiveStatus = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, _timeProvider.GetUtcNow().UtcDateTime);
             isTenantReadOnly = effectiveStatus == TenantSubscriptionStatus.ReadOnly;
         }
 

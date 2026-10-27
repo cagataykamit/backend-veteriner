@@ -22,6 +22,7 @@ public sealed class ApplySubscriptionDiscountCodeCommandHandler
     private readonly IReadRepository<TenantSubscription> _subscriptions;
     private readonly DiscountCodeRedemptionService _discountCodes;
     private readonly IRepository<DiscountRedemption> _redemptions;
+    private readonly TimeProvider _timeProvider;
 
     public ApplySubscriptionDiscountCodeCommandHandler(
         ITenantContext tenantContext,
@@ -29,7 +30,8 @@ public sealed class ApplySubscriptionDiscountCodeCommandHandler
         IUserReadRepository users,
         IReadRepository<TenantSubscription> subscriptions,
         DiscountCodeRedemptionService discountCodes,
-        IRepository<DiscountRedemption> redemptions)
+        IRepository<DiscountRedemption> redemptions,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
@@ -37,6 +39,7 @@ public sealed class ApplySubscriptionDiscountCodeCommandHandler
         _subscriptions = subscriptions;
         _discountCodes = discountCodes;
         _redemptions = redemptions;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<SubscriptionDiscountDto>> Handle(ApplySubscriptionDiscountCodeCommand request, CancellationToken ct)
@@ -54,7 +57,7 @@ public sealed class ApplySubscriptionDiscountCodeCommandHandler
         if (_clientContext.UserId is { } userId)
             email = (await _users.FirstOrDefaultAsync(new UserByIdWithRolesSpec(userId), ct))?.Email;
 
-        var redeemed = await _discountCodes.RedeemAsync(tenantId, email, request.Code, DateTime.UtcNow, ct);
+        var redeemed = await _discountCodes.RedeemAsync(tenantId, email, request.Code, _timeProvider.GetUtcNow().UtcDateTime, ct);
         if (!redeemed.IsSuccess)
             return Result<SubscriptionDiscountDto>.Failure(redeemed.Error);
 

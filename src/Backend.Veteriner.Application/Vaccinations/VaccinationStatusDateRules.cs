@@ -13,17 +13,14 @@ internal static class VaccinationStatusDateRules
     ///   <item><b>Cancelled</b>: AppliedAtUtc olmamalı; DueAtUtc opsiyonel.</item>
     /// </list>
     /// </summary>
-    public static Result Validate(VaccinationStatus status, DateTime? appliedAtUtc, DateTime? dueAtUtc)
-        => Validate(status, appliedAtUtc, dueAtUtc, DateTime.UtcNow);
-
-    /// <param name="referenceUtc">Testler için sabit “şimdi” (UTC).</param>
-    internal static Result Validate(
+    /// <param name="utcNow">Karşılaştırılan “şimdi” (UTC); handler TimeProvider'dan verir.</param>
+    public static Result Validate(
         VaccinationStatus status,
         DateTime? appliedAtUtc,
         DateTime? dueAtUtc,
-        DateTime referenceUtc)
+        DateTime utcNow)
     {
-        referenceUtc = NormalizeUtc(referenceUtc);
+        var referenceUtc = NormalizeUtc(utcNow);
 
         switch (status)
         {

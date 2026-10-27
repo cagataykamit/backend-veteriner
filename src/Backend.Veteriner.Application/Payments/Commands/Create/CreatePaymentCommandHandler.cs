@@ -108,7 +108,8 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         }
 
         var paidUtc = PaymentPaidAtWindow.ToUtc(request.PaidAtUtc);
-        var window = PaymentPaidAtWindow.Validate(paidUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = PaymentPaidAtWindow.Validate(paidUtc, utcNow);
         if (!window.IsSuccess)
             return Result<PaymentCreateResultDto>.Failure(window.Error);
 
@@ -293,7 +294,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         }
 
         // 2) Tahsis kuralları domain'de; hata dönerse işlem geri alınır (ITransactionalRollbackOnFailureRequest) ve ödeme kalmaz.
-        var allocated = payment.AllocateFully(lines, userId, _timeProvider.GetUtcNow().UtcDateTime);
+        var allocated = payment.AllocateFully(lines, userId, utcNow);
         if (!allocated.IsSuccess)
             return Result<PaymentCreateResultDto>.Failure(allocated.Error);
 
@@ -304,7 +305,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
                 PaymentIntegrationEventTypes.Created,
                 new PaymentCreatedIntegrationEvent(
                     Guid.NewGuid(),
-                    _timeProvider.GetUtcNow().UtcDateTime,
+                    utcNow,
                     PaymentProjectionSnapshotFactory.Create(payment, client.FullName, clinic.Name, petName)),
                 ct);
 

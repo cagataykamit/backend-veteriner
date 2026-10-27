@@ -62,11 +62,11 @@ public sealed class HbsEntryHandlerTests
 
     private UpdatePrescriptionHbsCommandHandler PrescriptionHandler()
         => new(_tenantContext.Object, _clinicContext.Object, _clientContext.Object, _scope.Object, _tenants.Object,
-            _prescriptionsRead.Object, _prescriptionsWrite.Object, _names.Object);
+            _prescriptionsRead.Object, _prescriptionsWrite.Object, _names.Object, TimeProvider.System);
 
     private UpdateVaccinationHbsCommandHandler VaccinationHandler()
         => new(_tenantContext.Object, _clinicContext.Object, _clientContext.Object, _scope.Object, _tenants.Object,
-            _vaccinationsRead.Object, _vaccinationsWrite.Object, _names.Object);
+            _vaccinationsRead.Object, _vaccinationsWrite.Object, _names.Object, TimeProvider.System);
 
     [Fact]
     public async Task Prescription_Patch_Should_Save_Number_And_Return_Marker_Name()

@@ -28,7 +28,8 @@ public sealed class GetTenantInviteByIdQueryHandlerTests
             _invites.Object,
             _claims.Object,
             _clinics.Object,
-            _userTenants.Object);
+            _userTenants.Object,
+            TimeProvider.System);
 
     private static TenantInvite BuildAcceptedInvite(Guid tid, Guid cid, Guid claimId, Guid userId)
     {

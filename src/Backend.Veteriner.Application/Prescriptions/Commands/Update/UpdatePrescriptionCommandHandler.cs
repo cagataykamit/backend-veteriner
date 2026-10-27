@@ -115,7 +115,8 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         }
 
         var prescribedUtc = PrescribedAtUtcWindow.ToUtc(request.PrescribedAtUtc);
-        var window = PrescribedAtUtcWindow.Validate(prescribedUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = PrescribedAtUtcWindow.Validate(prescribedUtc, utcNow);
         if (!window.IsSuccess)
             return window;
 
@@ -211,7 +212,6 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
             itemDrafts = resolved.Value!;
         }
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var update = p.UpdateDetails(
             effectiveClinicId,
             request.PetId,

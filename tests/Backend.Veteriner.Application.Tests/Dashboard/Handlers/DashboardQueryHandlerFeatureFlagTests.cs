@@ -149,7 +149,8 @@ public sealed class DashboardQueryHandlerFeatureFlagTests
             _pets.Object,
             _clinicScoped.Object,
             _dashboardReader.Object,
-            Options.Create(new QueryReadModelsOptions { DashboardAppointmentsEnabled = dashboardEnabled }));
+            Options.Create(new QueryReadModelsOptions { DashboardAppointmentsEnabled = dashboardEnabled }),
+            TimeProvider.System);
 
     private static DashboardAppointmentReadResult EmptyReadResult()
         => new(

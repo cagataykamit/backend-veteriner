@@ -23,7 +23,7 @@ public sealed class AuditBehaviorTests
     private readonly Mock<ILogger<AuditBehavior<SampleAuditedCommand, Result>>> _logger = new();
 
     private AuditBehavior<SampleAuditedCommand, Result> CreateBehavior()
-        => new(new Mock<IClientContext>().Object, _writer.Object, _logger.Object);
+        => new(new Mock<IClientContext>().Object, _writer.Object, _logger.Object, TimeProvider.System);
 
     private void WriterThrows()
         => _writer.Setup(w => w.WriteAsync(It.IsAny<AuditLogEntry>(), It.IsAny<CancellationToken>()))

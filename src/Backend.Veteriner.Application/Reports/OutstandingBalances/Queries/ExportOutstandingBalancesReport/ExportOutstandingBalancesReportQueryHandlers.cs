@@ -14,19 +14,22 @@ public sealed class ExportOutstandingBalancesReportQueryHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IOutstandingBalancesReportReader _reader;
     private readonly ITrialLimitPolicy _trialLimitPolicy;
+    private readonly TimeProvider _timeProvider;
 
     public ExportOutstandingBalancesReportQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IOutstandingBalancesReportReader reader,
-        ITrialLimitPolicy trialLimitPolicy)
+        ITrialLimitPolicy trialLimitPolicy,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _reader = reader;
         _trialLimitPolicy = trialLimitPolicy;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<OutstandingBalancesCsvExportResult>> Handle(
@@ -40,7 +43,7 @@ public sealed class ExportOutstandingBalancesReportQueryHandler
             return Result<OutstandingBalancesCsvExportResult>.Failure(loaded.Error);
 
         var bytes = OutstandingBalancesCsvWriter.WriteUtf8Bom(loaded.Value!);
-        var fileName = $"borc-raporu-{OutstandingBalancesReportExportPipeline.FileDateStamp(DateTime.UtcNow)}.csv";
+        var fileName = $"borc-raporu-{OutstandingBalancesReportExportPipeline.FileDateStamp(_timeProvider.GetUtcNow().UtcDateTime)}.csv";
 
         return Result<OutstandingBalancesCsvExportResult>.Success(new OutstandingBalancesCsvExportResult(bytes, fileName));
     }
@@ -54,19 +57,22 @@ public sealed class ExportOutstandingBalancesReportXlsxQueryHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IOutstandingBalancesReportReader _reader;
     private readonly ITrialLimitPolicy _trialLimitPolicy;
+    private readonly TimeProvider _timeProvider;
 
     public ExportOutstandingBalancesReportXlsxQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IOutstandingBalancesReportReader reader,
-        ITrialLimitPolicy trialLimitPolicy)
+        ITrialLimitPolicy trialLimitPolicy,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _reader = reader;
         _trialLimitPolicy = trialLimitPolicy;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<OutstandingBalancesXlsxExportResult>> Handle(
@@ -80,7 +86,7 @@ public sealed class ExportOutstandingBalancesReportXlsxQueryHandler
             return Result<OutstandingBalancesXlsxExportResult>.Failure(loaded.Error);
 
         var bytes = OutstandingBalancesXlsxWriter.WriteWorkbook(loaded.Value!);
-        var fileName = $"borc-raporu-{OutstandingBalancesReportExportPipeline.FileDateStamp(DateTime.UtcNow)}.xlsx";
+        var fileName = $"borc-raporu-{OutstandingBalancesReportExportPipeline.FileDateStamp(_timeProvider.GetUtcNow().UtcDateTime)}.xlsx";
 
         return Result<OutstandingBalancesXlsxExportResult>.Success(new OutstandingBalancesXlsxExportResult(bytes, fileName));
     }

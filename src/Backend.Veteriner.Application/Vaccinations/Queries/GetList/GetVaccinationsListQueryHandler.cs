@@ -36,6 +36,7 @@ public sealed class GetVaccinationsListQueryHandler
     private readonly IPetReadModelLookupReader _petLookupReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetVaccinationsListQueryHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public GetVaccinationsListQueryHandler(
         ITenantContext tenantContext,
@@ -47,6 +48,7 @@ public sealed class GetVaccinationsListQueryHandler
         IReadRepository<Client> clients,
         IPetReadModelLookupReader petLookupReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        TimeProvider timeProvider,
         ILogger<GetVaccinationsListQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -59,6 +61,7 @@ public sealed class GetVaccinationsListQueryHandler
         _petLookupReader = petLookupReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetVaccinationsListQueryHandler>.Instance;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<PagedResult<VaccinationListItemDto>>> Handle(
@@ -74,7 +77,7 @@ public sealed class GetVaccinationsListQueryHandler
 
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
-        var listAsOfUtc = DateTime.UtcNow;
+        var listAsOfUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var totalSw = Stopwatch.StartNew();
         var stepSw = Stopwatch.StartNew();
         var querySteps = 0;

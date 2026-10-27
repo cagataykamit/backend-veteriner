@@ -103,7 +103,8 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
             return Result<Guid>.Failure(clinicAccess.Error);
 
         var admittedUtc = AdmittedAtUtcWindow.ToUtc(request.AdmittedAtUtc);
-        var window = AdmittedAtUtcWindow.Validate(admittedUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = AdmittedAtUtcWindow.Validate(admittedUtc, utcNow);
         if (!window.IsSuccess)
             return Result<Guid>.Failure(window.Error);
 
@@ -181,7 +182,6 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         }
 
         Hospitalization entity;
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         try
         {
             entity = new Hospitalization(

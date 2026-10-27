@@ -35,7 +35,8 @@ public sealed class ProcessBillingWebhookCommandHandlerTests
             _sessionsWrite.Object,
             _auditWriter.Object,
             _clientContext.Object,
-            NullLogger<ProcessBillingWebhookCommandHandler>.Instance);
+            NullLogger<ProcessBillingWebhookCommandHandler>.Instance,
+            TimeProvider.System);
 
     private static ProcessBillingWebhookCommand CreateCommand(BillingProvider provider = BillingProvider.Stripe)
         => new(provider, "{\"any\":\"payload\"}", new Dictionary<string, string>());

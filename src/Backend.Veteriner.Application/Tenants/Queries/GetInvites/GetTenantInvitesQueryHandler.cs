@@ -23,6 +23,7 @@ public sealed class GetTenantInvitesQueryHandler
     private readonly IReadRepository<OperationClaim> _claims;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IUserTenantRepository _userTenants;
+    private readonly TimeProvider _timeProvider;
 
     public GetTenantInvitesQueryHandler(
         ITenantContext tenantContext,
@@ -30,7 +31,8 @@ public sealed class GetTenantInvitesQueryHandler
         IReadRepository<TenantInvite> invites,
         IReadRepository<OperationClaim> claims,
         IReadRepository<Clinic> clinics,
-        IUserTenantRepository userTenants)
+        IUserTenantRepository userTenants,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
@@ -38,6 +40,7 @@ public sealed class GetTenantInvitesQueryHandler
         _claims = claims;
         _clinics = clinics;
         _userTenants = userTenants;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<PagedResult<TenantInviteListItemDto>>> Handle(
@@ -74,7 +77,7 @@ public sealed class GetTenantInvitesQueryHandler
         var rows = await _invites.ListAsync(
             new TenantInvitesPagedSpec(request.TenantId, searchLower, request.Status, page, pageSize), ct);
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var claimIds = rows.Select(r => r.OperationClaimId).Distinct().ToArray();
         var clinicIds = rows.Select(r => r.ClinicId).Distinct().ToArray();
 

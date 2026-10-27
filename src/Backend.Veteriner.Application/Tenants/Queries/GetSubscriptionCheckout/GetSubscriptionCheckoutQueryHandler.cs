@@ -13,15 +13,18 @@ public sealed class GetSubscriptionCheckoutQueryHandler
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<BillingCheckoutSession> _sessionsWrite;
     private readonly IReadRepository<BillingCheckoutSession> _sessionsRead;
+    private readonly TimeProvider _timeProvider;
 
     public GetSubscriptionCheckoutQueryHandler(
         ITenantContext tenantContext,
         IRepository<BillingCheckoutSession> sessionsWrite,
-        IReadRepository<BillingCheckoutSession> sessionsRead)
+        IReadRepository<BillingCheckoutSession> sessionsRead,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _sessionsWrite = sessionsWrite;
         _sessionsRead = sessionsRead;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<SubscriptionCheckoutSessionDto>> Handle(GetSubscriptionCheckoutQuery request, CancellationToken ct)
@@ -38,7 +41,7 @@ public sealed class GetSubscriptionCheckoutQueryHandler
         if (session is null)
             return Result<SubscriptionCheckoutSessionDto>.Failure("Subscriptions.CheckoutSessionNotFound", "Checkout session bulunamadı.");
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (session.Status is BillingCheckoutSessionStatus.Pending or BillingCheckoutSessionStatus.RedirectReady
             && session.ExpiresAtUtc.HasValue
             && session.ExpiresAtUtc.Value <= utcNow)

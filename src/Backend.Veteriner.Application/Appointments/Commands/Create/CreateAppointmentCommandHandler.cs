@@ -32,6 +32,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
     private readonly IRepository<Appointment> _appointmentsWrite;
     private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
     private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
+    private readonly TimeProvider _timeProvider;
 
     public CreateAppointmentCommandHandler(
         ITenantContext tenantContext,
@@ -45,7 +46,8 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         IReadRepository<ClinicWorkingHour> clinicWorkingHoursRead,
         IRepository<Appointment> appointmentsWrite,
         IAppointmentProjectionSnapshotFactory snapshotFactory,
-        IAppointmentIntegrationEventOutbox eventOutbox)
+        IAppointmentIntegrationEventOutbox eventOutbox,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -59,6 +61,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         _appointmentsWrite = appointmentsWrite;
         _snapshotFactory = snapshotFactory;
         _eventOutbox = eventOutbox;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreateAppointmentCommand request, CancellationToken ct)
@@ -92,9 +95,10 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
                 "Tenants.TenantInactive",
                 "Pasif kiracı için randevu oluşturulamaz.");
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (effectiveStatus == AppointmentStatus.Scheduled)
         {
-            var window = AppointmentScheduleWindow.Validate(scheduledUtc);
+            var window = AppointmentScheduleWindow.Validate(scheduledUtc, utcNow);
             if (!window.IsSuccess)
                 return Result<Guid>.Failure(window.Error);
         }
@@ -199,7 +203,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         var current = await _snapshotFactory.CreateAsync(appointment, ct);
         await _eventOutbox.EnqueueAsync(
             AppointmentIntegrationEventTypes.Created,
-            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), DateTime.UtcNow, sequence, current),
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), utcNow, sequence, current),
             ct);
 
         try

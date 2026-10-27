@@ -36,13 +36,13 @@ public sealed class TenantInviteManagementHandlersTests
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private GetTenantInviteByIdQueryHandler CreateDetailHandler()
-        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _claimsRead.Object, _clinicsRead.Object, _userTenants.Object);
+        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _claimsRead.Object, _clinicsRead.Object, _userTenants.Object, TimeProvider.System);
 
     private CancelTenantInviteCommandHandler CreateCancelHandler()
         => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _uow.Object);
 
     private ResendTenantInviteCommandHandler CreateResendHandler()
-        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _tokenHash.Object, _uow.Object);
+        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _tokenHash.Object, _uow.Object, TimeProvider.System);
 
     private static TenantInvite BuildPending(Guid tenantId, Guid clinicId, Guid claimId, DateTime? expiresAtUtc = null, Guid? id = null)
     {

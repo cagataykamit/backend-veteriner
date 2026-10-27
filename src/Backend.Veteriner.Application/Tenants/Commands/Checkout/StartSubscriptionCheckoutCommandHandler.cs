@@ -28,6 +28,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
     private readonly IBillingCheckoutProviderResolver _checkoutProviderResolver;
     private readonly ISalesPartnerDiscountBilling _partnerDiscounts;
     private readonly ILogger<StartSubscriptionCheckoutCommandHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public StartSubscriptionCheckoutCommandHandler(
         ITenantContext tenantContext,
@@ -41,7 +42,8 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         IOptions<BillingOptions> billingOptions,
         IBillingCheckoutProviderResolver checkoutProviderResolver,
         ISalesPartnerDiscountBilling partnerDiscounts,
-        ILogger<StartSubscriptionCheckoutCommandHandler> logger)
+        ILogger<StartSubscriptionCheckoutCommandHandler> logger,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
@@ -55,6 +57,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         _checkoutProviderResolver = checkoutProviderResolver;
         _partnerDiscounts = partnerDiscounts;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<SubscriptionCheckoutSessionDto>> Handle(StartSubscriptionCheckoutCommand request, CancellationToken ct)
@@ -94,7 +97,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
                 "Bu kiracı için abonelik kaydı bulunamadı.");
         }
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var effective = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, now);
         if (effective == TenantSubscriptionStatus.Cancelled)
         {
@@ -138,7 +141,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         var openPlanChange = await _planChangesRead.FirstOrDefaultAsync(new OpenScheduledPlanChangeByTenantSpec(request.TenantId), ct);
         if (openPlanChange is not null)
         {
-            openPlanChange.Cancel(DateTime.UtcNow);
+            openPlanChange.Cancel(now);
             await _planChangesWrite.UpdateAsync(openPlanChange, ct);
             await _planChangesWrite.SaveChangesAsync(ct);
         }
@@ -322,7 +325,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         chargeCurrency = prepared.ChargeCurrencyCode ?? chargeCurrency;
         proratedChargeMinor = prepared.ChargeAmountMinor ?? proratedChargeMinor;
         prorationRatio = prepared.ProrationRatio ?? prorationRatio;
-        var afterPrepare = DateTime.UtcNow;
+        var afterPrepare = _timeProvider.GetUtcNow().UtcDateTime;
         if (!string.IsNullOrWhiteSpace(prepared.CheckoutUrl))
         {
             session.SetRedirectReady(prepared.CheckoutUrl, prepared.ExternalReference, afterPrepare);

@@ -18,17 +18,16 @@ internal static class VaccinationDueAtWindow
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
 
-    public static Result Validate(DateTime dueAtUtc)
+    public static Result Validate(DateTime dueAtUtc, DateTime utcNow)
     {
-        var now = DateTime.UtcNow;
-        if (dueAtUtc < now.AddYears(-10))
+        if (dueAtUtc < utcNow.AddYears(-10))
         {
             return Result.Failure(
                 "Vaccinations.DueTooFarInPast",
                 "Plan tarihi 10 yıldan daha eski olamaz.");
         }
 
-        return ValidateFutureLimit(dueAtUtc, now);
+        return ValidateFutureLimit(dueAtUtc, utcNow);
     }
 
     /// <summary>

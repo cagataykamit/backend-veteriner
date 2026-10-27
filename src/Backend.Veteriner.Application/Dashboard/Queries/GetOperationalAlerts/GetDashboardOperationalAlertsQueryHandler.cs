@@ -31,6 +31,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
     private readonly IReadRepository<Vaccination> _vaccinations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IDashboardTodayAppointmentStatusCountsReader _todayAppointmentCounts;
+    private readonly TimeProvider _timeProvider;
 
     public GetDashboardOperationalAlertsQueryHandler(
         ITenantContext tenantContext,
@@ -39,7 +40,8 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
         IReadRepository<Appointment> appointments,
         IReadRepository<Vaccination> vaccinations,
         IReadRepository<Pet> pets,
-        IDashboardTodayAppointmentStatusCountsReader todayAppointmentCounts)
+        IDashboardTodayAppointmentStatusCountsReader todayAppointmentCounts,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -48,6 +50,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
         _vaccinations = vaccinations;
         _pets = pets;
         _todayAppointmentCounts = todayAppointmentCounts;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<DashboardOperationalAlertsDto>> Handle(GetDashboardOperationalAlertsQuery request, CancellationToken ct)
@@ -72,7 +75,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
                 new DashboardOperationalAlertsDto(0, 0, 0, 0, 0));
         }
 
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var next24HoursUtcExclusive = nowUtc.AddHours(24);
         var (dayStartUtc, dayEndUtc) = OperationDayBounds.ForUtcNow(nowUtc);
         // Aşı gecikmiş/yaklaşan tanımı gün bazlıdır (ADR-028); randevu sayaçları saat bazlı kalır.

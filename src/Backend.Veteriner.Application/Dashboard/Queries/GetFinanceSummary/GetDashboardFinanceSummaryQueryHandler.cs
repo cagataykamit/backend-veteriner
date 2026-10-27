@@ -34,6 +34,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
     private readonly IDashboardRecentPaymentsReadModelReader _recentPaymentsReadModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetDashboardFinanceSummaryQueryHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public GetDashboardFinanceSummaryQueryHandler(
         ITenantContext tenantContext,
@@ -46,6 +47,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         IDashboardFinanceReadModelReader financeReadModelReader,
         IDashboardRecentPaymentsReadModelReader recentPaymentsReadModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        TimeProvider timeProvider,
         ILogger<GetDashboardFinanceSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -59,6 +61,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         _recentPaymentsReadModelReader = recentPaymentsReadModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetDashboardFinanceSummaryQueryHandler>.Instance;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<DashboardFinanceSummaryDto>> Handle(
@@ -79,7 +82,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandler
         var singleClinicId = scopeResult.Value!.SingleClinicId;
         var accessibleClinicIds = scopeResult.Value.AccessibleClinicIds;
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var (dayStart, dayEnd) = OperationDayBounds.ForUtcNow(utcNow);
         var (weekStart, weekEnd) = OperationPeriodBounds.WeekForUtcNow(utcNow);
         var (monthStart, monthEnd) = OperationPeriodBounds.MonthForUtcNow(utcNow);

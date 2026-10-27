@@ -73,13 +73,18 @@ public sealed class GetCashSummaryReportQueryHandler : IRequestHandler<GetCashSu
 public sealed class ExportCashSummaryReportQueryHandler : IRequestHandler<ExportCashSummaryReportQuery, Result<RegisterExportResult>>
 {
     private readonly CashSummaryLoader _loader;
+    private readonly TimeProvider _timeProvider;
 
     public ExportCashSummaryReportQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver scopeResolver,
-        ICashEventsReader reader)
-        => _loader = new CashSummaryLoader(tenantContext, clinicContext, scopeResolver, reader);
+        ICashEventsReader reader,
+        TimeProvider timeProvider)
+    {
+        _loader = new CashSummaryLoader(tenantContext, clinicContext, scopeResolver, reader);
+        _timeProvider = timeProvider;
+    }
 
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportCashSummaryReportQuery request, CancellationToken ct)
     {
@@ -87,7 +92,8 @@ public sealed class ExportCashSummaryReportQueryHandler : IRequestHandler<Export
         if (!report.IsSuccess)
             return Result<RegisterExportResult>.Failure(report.Error);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         return Result<RegisterExportResult>.Success(RegisterReportRunner.BuildFile(
-            CashSummaryBuilder.ExportSpec, CashSummaryBuilder.ToExportRows(report.Value!), request.Format));
+            CashSummaryBuilder.ExportSpec, CashSummaryBuilder.ToExportRows(report.Value!), request.Format, utcNow));
     }
 }

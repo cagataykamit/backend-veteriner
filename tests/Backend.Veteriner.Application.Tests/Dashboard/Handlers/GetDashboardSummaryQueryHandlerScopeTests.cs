@@ -43,7 +43,8 @@ public sealed class GetDashboardSummaryQueryHandlerScopeTests
             Options.Create(new QueryReadModelsOptions
             {
                 DashboardAppointmentsEnabled = dashboardAppointmentsEnabled
-            }));
+            }),
+            TimeProvider.System);
 
     private void SetupEmptyCommandPath()
     {

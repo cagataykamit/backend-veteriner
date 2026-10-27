@@ -33,7 +33,7 @@ public sealed class CreateBreedCommandHandlerTests
         _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(sub);
 
-        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
         return new(_tenantContext.Object, writeEvaluator, _speciesRead.Object, _breedsRead.Object, _breedsWrite.Object, _catalogCache.Object);
     }
 
@@ -103,7 +103,7 @@ public sealed class CreateBreedCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
     {
         _tenantContext.SetupGet(x => x.TenantId).Returns((Guid?)null);
-        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
         var handler = new CreateBreedCommandHandler(
             _tenantContext.Object,
             writeEvaluator,
@@ -137,7 +137,7 @@ public sealed class CreateBreedCommandHandlerTests
         _subscriptions.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.Tenants.Specs.TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(sub);
 
-        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object);
+        var writeEvaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
         var handler = new CreateBreedCommandHandler(
             _tenantContext.Object,
             writeEvaluator,

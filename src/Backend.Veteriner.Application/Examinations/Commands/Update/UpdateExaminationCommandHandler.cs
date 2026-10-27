@@ -124,7 +124,8 @@ public sealed class UpdateExaminationCommandHandler
         }
 
         var examinedUtc = ExaminationExaminedAtWindow.ToUtc(request.ExaminedAtUtc);
-        var window = ExaminationExaminedAtWindow.Validate(examinedUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = ExaminationExaminedAtWindow.Validate(examinedUtc, utcNow);
         if (!window.IsSuccess)
             return Result<ExaminationWriteResultDto>.Failure(window.Error);
 
@@ -136,7 +137,6 @@ public sealed class UpdateExaminationCommandHandler
         if (pet is null)
             return Result<ExaminationWriteResultDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var domain = e.UpdateClinicalContent(new ExaminationClinicalUpdate(
             examinedUtc,
             request.VisitReason,

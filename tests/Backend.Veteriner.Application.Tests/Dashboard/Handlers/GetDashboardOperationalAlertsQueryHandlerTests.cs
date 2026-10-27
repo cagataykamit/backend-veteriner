@@ -30,7 +30,8 @@ public sealed class GetDashboardOperationalAlertsQueryHandlerTests
             _appointments.Object,
             _vaccinations.Object,
             _pets.Object,
-            _todayCounts.Object);
+            _todayCounts.Object,
+            TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()

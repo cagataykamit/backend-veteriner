@@ -15,17 +15,16 @@ internal static class ExaminationExaminedAtWindow
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
 
-    public static Result Validate(DateTime examinedAtUtc)
+    public static Result Validate(DateTime examinedAtUtc, DateTime utcNow)
     {
-        var now = DateTime.UtcNow;
-        if (examinedAtUtc < now.AddDays(-7))
+        if (examinedAtUtc < utcNow.AddDays(-7))
         {
             return Result.Failure(
                 "Examinations.ExaminedTooFarInPast",
                 "Muayene zamanı çok eski; en fazla 7 gün öncesine kadar kayıt açılabilir.");
         }
 
-        if (examinedAtUtc > now.AddYears(2))
+        if (examinedAtUtc > utcNow.AddYears(2))
         {
             return Result.Failure(
                 "Examinations.ExaminedTooFarInFuture",

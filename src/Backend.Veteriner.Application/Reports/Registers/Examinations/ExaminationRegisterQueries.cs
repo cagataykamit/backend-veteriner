@@ -52,11 +52,13 @@ public sealed class ExportExaminationRegisterQueryHandler
 {
     private readonly RegisterReportRunner _runner;
     private readonly IRegisterReader<ExaminationRegisterItemDto> _reader;
+    private readonly TimeProvider _timeProvider;
 
-    public ExportExaminationRegisterQueryHandler(RegisterReportRunner runner, IRegisterReader<ExaminationRegisterItemDto> reader)
+    public ExportExaminationRegisterQueryHandler(RegisterReportRunner runner, IRegisterReader<ExaminationRegisterItemDto> reader, TimeProvider timeProvider)
     {
         _runner = runner;
         _reader = reader;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportExaminationRegisterQuery request, CancellationToken ct)
@@ -68,7 +70,7 @@ public sealed class ExportExaminationRegisterQueryHandler
 
         return Result<RegisterExportResult>.Success(new RegisterExportResult(
             RegisterCsvWriter.WriteUtf8Bom(ExaminationRegisterColumns.All, loaded.Value!),
-            $"muayene-defteri-{RegisterReportRunner.FileDateStamp(DateTime.UtcNow)}.csv"));
+            $"muayene-defteri-{RegisterReportRunner.FileDateStamp(_timeProvider.GetUtcNow().UtcDateTime)}.csv"));
     }
 }
 
@@ -79,11 +81,13 @@ public sealed class ExportExaminationRegisterXlsxQueryHandler
 
     private readonly RegisterReportRunner _runner;
     private readonly IRegisterReader<ExaminationRegisterItemDto> _reader;
+    private readonly TimeProvider _timeProvider;
 
-    public ExportExaminationRegisterXlsxQueryHandler(RegisterReportRunner runner, IRegisterReader<ExaminationRegisterItemDto> reader)
+    public ExportExaminationRegisterXlsxQueryHandler(RegisterReportRunner runner, IRegisterReader<ExaminationRegisterItemDto> reader, TimeProvider timeProvider)
     {
         _runner = runner;
         _reader = reader;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportExaminationRegisterXlsxQuery request, CancellationToken ct)
@@ -95,6 +99,6 @@ public sealed class ExportExaminationRegisterXlsxQueryHandler
 
         return Result<RegisterExportResult>.Success(new RegisterExportResult(
             RegisterXlsxWriter.WriteWorkbook(SheetName, ExaminationRegisterColumns.All, loaded.Value!),
-            $"muayene-defteri-{RegisterReportRunner.FileDateStamp(DateTime.UtcNow)}.xlsx"));
+            $"muayene-defteri-{RegisterReportRunner.FileDateStamp(_timeProvider.GetUtcNow().UtcDateTime)}.xlsx"));
     }
 }

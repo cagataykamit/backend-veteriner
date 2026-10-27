@@ -78,7 +78,8 @@ public sealed class AppointmentMutationSequenceTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(
             new CreateAppointmentCommand(cid, pid, when, AppointmentType.Vaccination, null, "note"),
@@ -119,7 +120,8 @@ public sealed class AppointmentMutationSequenceTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(new RescheduleAppointmentCommand(appt.Id, SlotAlignedUtcPlusDays(3)), CancellationToken.None);
 
@@ -155,7 +157,8 @@ public sealed class AppointmentMutationSequenceTests
             _appointmentsRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(new CancelAppointmentCommand(appt.Id, null), CancellationToken.None);
 
@@ -189,7 +192,8 @@ public sealed class AppointmentMutationSequenceTests
             _appointmentsRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(new CompleteAppointmentCommand(appt.Id), CancellationToken.None);
 
@@ -227,7 +231,8 @@ public sealed class AppointmentMutationSequenceTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(
             new UpdateAppointmentCommand(appt.Id, cid, pid, appt.ScheduledAtUtc, AppointmentType.Examination, AppointmentStatus.Completed, null),

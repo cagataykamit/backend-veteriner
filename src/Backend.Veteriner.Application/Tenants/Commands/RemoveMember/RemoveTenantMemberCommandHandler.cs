@@ -35,6 +35,7 @@ public sealed class RemoveTenantMemberCommandHandler
     private readonly IPermissionCacheInvalidator _cacheInvalidator;
     private readonly IAuditLogWriter _auditLogWriter;
     private readonly IUnitOfWork _uow;
+    private readonly TimeProvider _timeProvider;
 
     public RemoveTenantMemberCommandHandler(
         ITenantContext tenantContext,
@@ -47,7 +48,8 @@ public sealed class RemoveTenantMemberCommandHandler
         IUserOperationClaimRepository userOperationClaims,
         IPermissionCacheInvalidator cacheInvalidator,
         IAuditLogWriter auditLogWriter,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
@@ -60,6 +62,7 @@ public sealed class RemoveTenantMemberCommandHandler
         _cacheInvalidator = cacheInvalidator;
         _auditLogWriter = auditLogWriter;
         _uow = uow;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<RemoveTenantMemberResultDto>> Handle(RemoveTenantMemberCommand request, CancellationToken ct)
@@ -168,7 +171,7 @@ public sealed class RemoveTenantMemberCommandHandler
                 CorrelationId: _clientContext.CorrelationId,
                 RequestName: nameof(RemoveTenantMemberCommand),
                 RequestPayload: auditPayload,
-                OccurredAtUtc: DateTime.UtcNow),
+                OccurredAtUtc: _timeProvider.GetUtcNow().UtcDateTime),
             ct);
 
         _cacheInvalidator.InvalidateUser(request.MemberId);

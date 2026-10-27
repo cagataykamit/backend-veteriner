@@ -21,6 +21,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
     private readonly IReadRepository<ScheduledSubscriptionPlanChange> _planChanges;
     private readonly TenantSubscriptionEffectiveWriteEvaluator _effectiveWriteEvaluator;
     private readonly ILogger<GetTenantSubscriptionSummaryQueryHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public GetTenantSubscriptionSummaryQueryHandler(
         ITenantContext tenantContext,
@@ -29,6 +30,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         IReadRepository<TenantSubscription> subscriptions,
         IReadRepository<ScheduledSubscriptionPlanChange> planChanges,
         TenantSubscriptionEffectiveWriteEvaluator effectiveWriteEvaluator,
+        TimeProvider timeProvider,
         ILogger<GetTenantSubscriptionSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -38,6 +40,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         _planChanges = planChanges;
         _effectiveWriteEvaluator = effectiveWriteEvaluator;
         _logger = logger ?? NullLogger<GetTenantSubscriptionSummaryQueryHandler>.Instance;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<TenantSubscriptionSummaryDto>> Handle(
@@ -101,7 +104,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
                 "Bu kiracı için abonelik kaydı bulunamadı.");
         }
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var effectiveStatus = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, utcNow);
         int? daysRemaining = null;
         if (sub.Status == TenantSubscriptionStatus.Trialing && sub.TrialEndsAtUtc is { } trialEnd)

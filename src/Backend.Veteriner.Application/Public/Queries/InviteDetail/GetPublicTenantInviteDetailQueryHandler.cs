@@ -26,6 +26,7 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
     private readonly IUserTenantRepository _userTenantRepo;
     private readonly TenantSubscriptionSeatEvaluator _seatEvaluator;
     private readonly IReadRepository<OperationClaim> _operationClaims;
+    private readonly TimeProvider _timeProvider;
 
     public GetPublicTenantInviteDetailQueryHandler(
         ITokenHashService tokenHash,
@@ -35,7 +36,8 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
         IReadRepository<User> usersRead,
         IUserTenantRepository userTenantRepo,
         TenantSubscriptionSeatEvaluator seatEvaluator,
-        IReadRepository<OperationClaim> operationClaims)
+        IReadRepository<OperationClaim> operationClaims,
+        TimeProvider timeProvider)
     {
         _operationClaims = operationClaims;
         _tokenHash = tokenHash;
@@ -45,6 +47,7 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
         _usersRead = usersRead;
         _userTenantRepo = userTenantRepo;
         _seatEvaluator = seatEvaluator;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<PublicTenantInviteDetailDto>> Handle(
@@ -82,7 +85,7 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
         var clinic = await _clinics.FirstOrDefaultAsync(
             new ClinicByIdSpec(invite.TenantId, invite.ClinicId), ct);
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var timeExpired = utcNow >= invite.ExpiresAtUtc;
         var isPending = invite.Status == TenantInviteStatus.Pending;
         var isExpired = timeExpired || !isPending;

@@ -34,7 +34,7 @@ public sealed class RegisterReportTests
             .ReturnsAsync(new RegisterReadResult<ExaminationRegisterItemDto>(0, []));
     }
 
-    private RegisterReportRunner Runner() => new(_tenant.Object, _clinic.Object, _scope.Object, TrialLimitPolicyStub.Paid);
+    private RegisterReportRunner Runner() => new(_tenant.Object, _clinic.Object, _scope.Object, TrialLimitPolicyStub.Paid, TimeProvider.System);
 
     private static RegisterQuery Query(DateOnly? from = null, DateOnly? to = null, Guid? clinicId = null, bool includeVoided = false)
         => new(from ?? Day, to ?? Day, clinicId, includeVoided);
@@ -253,8 +253,8 @@ public sealed class RegisterReportTests
     [Fact]
     public async Task Empty_Result_Should_Produce_Header_Only_Files()
     {
-        var handler = new ExportExaminationRegisterQueryHandler(Runner(), _reader.Object);
-        var xlsxHandler = new ExportExaminationRegisterXlsxQueryHandler(Runner(), _reader.Object);
+        var handler = new ExportExaminationRegisterQueryHandler(Runner(), _reader.Object, TimeProvider.System);
+        var xlsxHandler = new ExportExaminationRegisterXlsxQueryHandler(Runner(), _reader.Object, TimeProvider.System);
 
         var csv = await handler.Handle(new ExportExaminationRegisterQuery(Day, Day, null, false), CancellationToken.None);
         var xlsx = await xlsxHandler.Handle(new ExportExaminationRegisterXlsxQuery(Day, Day, null, false), CancellationToken.None);

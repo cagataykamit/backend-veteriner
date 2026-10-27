@@ -12,12 +12,17 @@ public sealed record ValidateDiscountCodeQuery(string? Code) : IRequest<Discount
 public sealed class ValidateDiscountCodeQueryHandler : IRequestHandler<ValidateDiscountCodeQuery, DiscountCodeValidationDto>
 {
     private readonly DiscountCodeRedemptionService _discountCodes;
+    private readonly TimeProvider _timeProvider;
 
-    public ValidateDiscountCodeQueryHandler(DiscountCodeRedemptionService discountCodes) => _discountCodes = discountCodes;
+    public ValidateDiscountCodeQueryHandler(DiscountCodeRedemptionService discountCodes, TimeProvider timeProvider)
+    {
+        _discountCodes = discountCodes;
+        _timeProvider = timeProvider;
+    }
 
     public async ValueTask<DiscountCodeValidationDto> Handle(ValidateDiscountCodeQuery request, CancellationToken ct)
     {
-        var code = await _discountCodes.FindRedeemableAsync(request.Code, DateTime.UtcNow, ct);
+        var code = await _discountCodes.FindRedeemableAsync(request.Code, _timeProvider.GetUtcNow().UtcDateTime, ct);
         return code is null ? DiscountCodeValidationDto.Invalid : DiscountCodeValidationDto.From(code);
     }
 }

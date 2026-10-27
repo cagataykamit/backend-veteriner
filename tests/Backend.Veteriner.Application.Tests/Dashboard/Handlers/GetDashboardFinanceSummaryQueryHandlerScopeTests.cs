@@ -46,7 +46,8 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerScopeTests
             {
                 DashboardFinanceReadEnabled = dashboardFinanceReadEnabled,
                 DashboardRecentPaymentsReadEnabled = dashboardRecentPaymentsReadEnabled
-            }));
+            }),
+            TimeProvider.System);
 
     private void SetupEmptyCommandPath()
     {

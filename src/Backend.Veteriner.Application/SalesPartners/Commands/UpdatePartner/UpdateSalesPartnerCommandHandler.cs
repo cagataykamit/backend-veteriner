@@ -15,17 +15,20 @@ public sealed class UpdateSalesPartnerCommandHandler : IRequestHandler<UpdateSal
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<DiscountCode> _codes;
     private readonly IReadRepository<DiscountRedemption> _redemptions;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateSalesPartnerCommandHandler(
         IRepository<SalesPartner> partners,
         IReadRepository<Tenant> tenants,
         IReadRepository<DiscountCode> codes,
-        IReadRepository<DiscountRedemption> redemptions)
+        IReadRepository<DiscountRedemption> redemptions,
+        TimeProvider timeProvider)
     {
         _partners = partners;
         _tenants = tenants;
         _codes = codes;
         _redemptions = redemptions;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<SalesPartnerDto>> Handle(UpdateSalesPartnerCommand request, CancellationToken ct)
@@ -37,7 +40,7 @@ public sealed class UpdateSalesPartnerCommandHandler : IRequestHandler<UpdateSal
         if (request.LinkedTenantId is { } tenantId && !await _tenants.AnyAsync(new TenantByIdSpec(tenantId), ct))
             return Result<SalesPartnerDto>.Failure(SalesPartnerErrors.TenantNotFound);
 
-        partner.Update(request.Name, request.Email, request.Phone, request.LinkedTenantId, request.IsActive, DateTime.UtcNow);
+        partner.Update(request.Name, request.Email, request.Phone, request.LinkedTenantId, request.IsActive, _timeProvider.GetUtcNow().UtcDateTime);
         await _partners.SaveChangesAsync(ct);
 
         var codeCount = await _codes.CountAsync(new DiscountCodesByPartnerSpec(partner.Id), ct);

@@ -9,8 +9,8 @@ namespace Backend.Veteriner.Application.Tests.Pets.Validators;
 
 public sealed class PetCommandValidatorsTests
 {
-    private readonly CreatePetCommandValidator _createValidator = new();
-    private readonly UpdatePetCommandValidator _updateValidator = new();
+    private readonly CreatePetCommandValidator _createValidator = new(TimeProvider.System);
+    private readonly UpdatePetCommandValidator _updateValidator = new(TimeProvider.System);
 
     [Fact]
     public void Create_Should_Succeed_When_IdentityFieldsEmpty()

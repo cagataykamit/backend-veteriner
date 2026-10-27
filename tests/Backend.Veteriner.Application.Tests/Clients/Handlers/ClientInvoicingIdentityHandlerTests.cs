@@ -200,7 +200,7 @@ public sealed class ClientInvoicingIdentityHandlerTests
             .Callback<AuditLogEntry, CancellationToken>((e, _) => entry = e)
             .Returns(Task.CompletedTask);
         var behavior = new AuditBehavior<UpdateClientCommand, Result>(
-            new Mock<IClientContext>().Object, writer.Object, NullLogger<AuditBehavior<UpdateClientCommand, Result>>.Instance);
+            new Mock<IClientContext>().Object, writer.Object, NullLogger<AuditBehavior<UpdateClientCommand, Result>>.Instance, TimeProvider.System);
         var command = new UpdateClientCommand(
             _clientId, "Ayşe Yılmaz",
             InvoicingIdentity: new ClientInvoicingIdentityDto(ClientPersonType.Corporate, null, Vkn, "VD", null, null, null, null));

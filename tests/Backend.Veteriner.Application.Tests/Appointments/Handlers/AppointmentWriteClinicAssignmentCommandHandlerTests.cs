@@ -72,7 +72,8 @@ public sealed class AppointmentWriteClinicAssignmentCommandHandlerTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private UpdateAppointmentCommandHandler CreateUpdateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -86,7 +87,8 @@ public sealed class AppointmentWriteClinicAssignmentCommandHandlerTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private CancelAppointmentCommandHandler CreateCancelHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -96,7 +98,8 @@ public sealed class AppointmentWriteClinicAssignmentCommandHandlerTests
             _appointmentsRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private CompleteAppointmentCommandHandler CreateCompleteHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -106,7 +109,8 @@ public sealed class AppointmentWriteClinicAssignmentCommandHandlerTests
             _appointmentsRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private RescheduleAppointmentCommandHandler CreateRescheduleHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -118,7 +122,8 @@ public sealed class AppointmentWriteClinicAssignmentCommandHandlerTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private void SetupTenantAndClinic(Guid tid, Guid cid)
     {

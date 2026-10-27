@@ -44,7 +44,8 @@ public sealed class GetDashboardSummaryQueryHandlerTests
             {
                 AppointmentsEnabled = false,
                 DashboardAppointmentsEnabled = dashboardAppointmentsEnabled
-            }));
+            }),
+            TimeProvider.System);
 
     /// <summary>
     /// Handler trend projeksiyonu için `ListAsync(DashboardAppointmentScheduledAtInWindowSpec)` çağrısı yapar;

@@ -28,6 +28,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
     private readonly IRepository<Pet> _petsWrite;
     private readonly TenantSubscriptionEffectiveWriteEvaluator _writeEvaluator;
     private readonly IPetIntegrationEventOutbox _eventOutbox;
+    private readonly TimeProvider _timeProvider;
 
     public CreatePetCommandHandler(
         ITenantContext tenantContext,
@@ -39,7 +40,8 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         IReadRepository<Pet> petsRead,
         IRepository<Pet> petsWrite,
         TenantSubscriptionEffectiveWriteEvaluator writeEvaluator,
-        IPetIntegrationEventOutbox eventOutbox)
+        IPetIntegrationEventOutbox eventOutbox,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
@@ -51,6 +53,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         _petsWrite = petsWrite;
         _writeEvaluator = writeEvaluator;
         _eventOutbox = eventOutbox;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreatePetCommand request, CancellationToken ct)
@@ -112,8 +115,9 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             colorRef = color;
         }
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (request.BirthDate.HasValue
-            && request.BirthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))
+            && request.BirthDate.Value > DateOnly.FromDateTime(utcNow))
             return Result<Guid>.Failure("Pets.BirthDateInFuture", "Doğum tarihi gelecekte olamaz.");
 
         var nameKey = Pet.NormalizeNameForDuplicateCheck(request.Name);
@@ -156,7 +160,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             PetIntegrationEventTypes.Created,
             new PetCreatedIntegrationEvent(
                 Guid.NewGuid(),
-                DateTime.UtcNow,
+                utcNow,
                 PetProjectionSnapshotFactory.Create(pet, client, species, breedRef, colorRef)),
             ct);
 

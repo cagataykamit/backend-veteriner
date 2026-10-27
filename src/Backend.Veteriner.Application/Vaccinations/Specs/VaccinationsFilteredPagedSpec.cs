@@ -45,7 +45,7 @@ public sealed class VaccinationsFilteredPagedSpec : Specification<Vaccination>
             Query.Where(v => v.ExaminationId == examinationId.Value);
 
         if (onlyOverdue)
-            Query.Where(VaccinationDueRule.IsOverdue(VaccinationDueRule.OverdueBeforeUtc(listAsOfUtc ?? DateTime.UtcNow)));
+            Query.Where(VaccinationDueRule.IsOverdue(VaccinationDueRule.OverdueBeforeUtc(listAsOfUtc ?? throw new ArgumentNullException(nameof(listAsOfUtc), "Gecikmiş filtresi liste anı (listAsOfUtc) ister."))));
         else if (status.HasValue)
         {
             Query.Where(v => v.Status == status.Value);

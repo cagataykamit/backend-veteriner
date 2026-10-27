@@ -13,13 +13,16 @@ public sealed class TenantSubscriptionEffectiveWriteEvaluator
 {
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<TenantSubscription> _subscriptions;
+    private readonly TimeProvider _timeProvider;
 
     public TenantSubscriptionEffectiveWriteEvaluator(
         IReadRepository<Tenant> tenants,
-        IReadRepository<TenantSubscription> subscriptions)
+        IReadRepository<TenantSubscription> subscriptions,
+        TimeProvider timeProvider)
     {
         _tenants = tenants;
         _subscriptions = subscriptions;
+        _timeProvider = timeProvider;
     }
 
     public static TenantSubscriptionStatus GetEffectiveStatus(TenantSubscription sub, DateTime utcNow)
@@ -67,7 +70,7 @@ public sealed class TenantSubscriptionEffectiveWriteEvaluator
                 "Bu kiracı için abonelik kaydı bulunamadı.");
         }
 
-        var effectiveStatus = GetEffectiveStatus(sub, DateTime.UtcNow);
+        var effectiveStatus = GetEffectiveStatus(sub, _timeProvider.GetUtcNow().UtcDateTime);
         if (effectiveStatus == TenantSubscriptionStatus.ReadOnly)
         {
             return Result.Failure(

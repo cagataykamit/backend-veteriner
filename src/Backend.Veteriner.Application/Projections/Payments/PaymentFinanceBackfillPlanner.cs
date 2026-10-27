@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Application.Projections.Payments;
 ///
 /// Payment domain'inde mutasyon timestamp yok → minimum UTC sentinel kullanılır
 /// (<see cref="BackfillBaselineOccurredAtUtc"/>). Gerçek integration event'leri handler'da
-/// <c>DateTime.UtcNow</c> ile gelir ve sentinel'i ezer.
+/// <c>TimeProvider</c> anıyla gelir ve sentinel'i ezer.
 /// </summary>
 public static class PaymentFinanceBackfillPlanner
 {

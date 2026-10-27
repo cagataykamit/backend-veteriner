@@ -5,7 +5,7 @@ namespace Backend.Veteriner.Application.Pets.Commands.Update.Validators;
 
 public sealed class UpdatePetCommandValidator : AbstractValidator<UpdatePetCommand>
 {
-    public UpdatePetCommandValidator()
+    public UpdatePetCommandValidator(TimeProvider timeProvider)
     {
         RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.ClientId).NotEmpty();
@@ -24,7 +24,7 @@ public sealed class UpdatePetCommandValidator : AbstractValidator<UpdatePetComma
             .IsInEnum()
             .When(x => x.Gender.HasValue);
         RuleFor(x => x.BirthDate)
-            .Must(d => !d.HasValue || d.Value <= DateOnly.FromDateTime(DateTime.UtcNow))
+            .Must(d => !d.HasValue || d.Value <= DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime))
             .WithMessage("Dogum tarihi gelecekte olamaz.");
         RuleFor(x => x.Weight)
             .GreaterThanOrEqualTo(0).When(x => x.Weight.HasValue)

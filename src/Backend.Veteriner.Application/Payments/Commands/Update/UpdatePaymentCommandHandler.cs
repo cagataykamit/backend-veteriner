@@ -38,6 +38,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
     private readonly IReadRepository<Payment> _paymentsRead;
     private readonly IRepository<Payment> _paymentsWrite;
     private readonly IPaymentIntegrationEventOutbox _eventOutbox;
+    private readonly TimeProvider _timeProvider;
 
     public UpdatePaymentCommandHandler(
         ITenantContext tenantContext,
@@ -52,7 +53,8 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         IReadRepository<Examination> examinations,
         IReadRepository<Payment> paymentsRead,
         IRepository<Payment> paymentsWrite,
-        IPaymentIntegrationEventOutbox eventOutbox)
+        IPaymentIntegrationEventOutbox eventOutbox,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -67,6 +69,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         _paymentsRead = paymentsRead;
         _paymentsWrite = paymentsWrite;
         _eventOutbox = eventOutbox;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(UpdatePaymentCommand request, CancellationToken ct)
@@ -97,7 +100,8 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         }
 
         var paidUtc = PaymentPaidAtWindow.ToUtc(request.PaidAtUtc);
-        var window = PaymentPaidAtWindow.Validate(paidUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = PaymentPaidAtWindow.Validate(paidUtc, utcNow);
         if (!window.IsSuccess)
             return Result.Failure(window.Error);
 
@@ -268,7 +272,7 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
                 PaymentIntegrationEventTypes.Updated,
                 new PaymentUpdatedIntegrationEvent(
                     Guid.NewGuid(),
-                    DateTime.UtcNow,
+                    utcNow,
                     PaymentProjectionSnapshotFactory.Create(payment, client.FullName, clinic.Name, petName)),
                 ct);
 

@@ -23,6 +23,7 @@ public sealed class ResendTenantInviteCommandHandler
     private readonly IRepository<TenantInvite> _invitesWrite;
     private readonly ITokenHashService _tokenHash;
     private readonly IUnitOfWork _uow;
+    private readonly TimeProvider _timeProvider;
 
     public ResendTenantInviteCommandHandler(
         ITenantContext tenantContext,
@@ -30,7 +31,8 @@ public sealed class ResendTenantInviteCommandHandler
         IReadRepository<TenantInvite> invitesRead,
         IRepository<TenantInvite> invitesWrite,
         ITokenHashService tokenHash,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
@@ -38,6 +40,7 @@ public sealed class ResendTenantInviteCommandHandler
         _invitesWrite = invitesWrite;
         _tokenHash = tokenHash;
         _uow = uow;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ResendTenantInviteResultDto>> Handle(ResendTenantInviteCommand request, CancellationToken ct)
@@ -80,7 +83,7 @@ public sealed class ResendTenantInviteCommandHandler
                 "Yalnızca bekleyen davet yeniden gönderilebilir; kabul edilmiş veya iptal edilmiş davet yeniden üretilemez.");
         }
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var expires = request.ExpiresAtUtc is { } ex
             ? (ex.Kind == DateTimeKind.Utc ? ex : ex.ToUniversalTime())
             : utcNow.AddDays(InviteDefaults.DefaultExpiryDays);

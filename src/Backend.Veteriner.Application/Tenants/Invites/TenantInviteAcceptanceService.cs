@@ -20,6 +20,7 @@ public sealed class TenantInviteAcceptanceService
     private readonly IUserOperationClaimRepository _userOperationClaims;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IUnitOfWork _uow;
+    private readonly TimeProvider _timeProvider;
 
     public TenantInviteAcceptanceService(
         TenantSubscriptionSeatEvaluator seatEvaluator,
@@ -29,7 +30,8 @@ public sealed class TenantInviteAcceptanceService
         IRepository<UserClinic> userClinicsWrite,
         IUserOperationClaimRepository userOperationClaims,
         IReadRepository<Clinic> clinics,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        TimeProvider timeProvider)
     {
         _seatEvaluator = seatEvaluator;
         _userTenantRepo = userTenantRepo;
@@ -39,6 +41,7 @@ public sealed class TenantInviteAcceptanceService
         _userOperationClaims = userOperationClaims;
         _clinics = clinics;
         _uow = uow;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Result<TenantInviteAcceptResultDto>> AcceptAsync(
@@ -90,7 +93,7 @@ public sealed class TenantInviteAcceptanceService
                 "Davetteki klinik bulunamadı, pasif veya bu kiracıya ait değil.");
         }
 
-        var utcNow = DateTime.UtcNow;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         await _userTenantsWrite.AddAsync(new UserTenant(user.Id, invite.TenantId, utcNow), ct);
         if (!await _userClinicRepo.ExistsAsync(user.Id, invite.ClinicId, ct))
             await _userClinicsWrite.AddAsync(new UserClinic(user.Id, invite.ClinicId, utcNow), ct);

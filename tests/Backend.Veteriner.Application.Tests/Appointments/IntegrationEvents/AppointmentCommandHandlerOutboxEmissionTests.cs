@@ -312,7 +312,8 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private UpdateAppointmentCommandHandler CreateUpdateHandler()
         => new(
@@ -326,7 +327,8 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private RescheduleAppointmentCommandHandler CreateRescheduleHandler()
         => new(
@@ -338,13 +340,14 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
             _clinicWorkingHoursRead.Object,
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            TimeProvider.System);
 
     private CancelAppointmentCommandHandler CreateCancelHandler()
-        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object);
+        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object, TimeProvider.System);
 
     private CompleteAppointmentCommandHandler CreateCompleteHandler()
-        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object);
+        => new(_tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _appointmentsRead.Object, _appointmentsWrite.Object, _snapshotFactory.Object, _eventOutbox.Object, TimeProvider.System);
 
     private void SetupCreateSuccess(Guid tid, Guid cid, Guid pid, DateTime when)
     {

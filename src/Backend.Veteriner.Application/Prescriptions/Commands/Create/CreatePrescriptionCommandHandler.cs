@@ -97,7 +97,8 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             return Result<Guid>.Failure(clinicAccess.Error);
 
         var prescribedUtc = PrescribedAtUtcWindow.ToUtc(request.PrescribedAtUtc);
-        var window = PrescribedAtUtcWindow.Validate(prescribedUtc);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var window = PrescribedAtUtcWindow.Validate(prescribedUtc, utcNow);
         if (!window.IsSuccess)
             return Result<Guid>.Failure(window.Error);
 
@@ -193,7 +194,6 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             itemDrafts = resolved.Value!;
         }
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var prescription = new Prescription(
             tenantId,
             effectiveClinicId,

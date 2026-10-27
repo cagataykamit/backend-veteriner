@@ -29,7 +29,8 @@ public sealed class GetTenantInvitesQueryHandlerTests
             _invites.Object,
             _claims.Object,
             _clinics.Object,
-            _userTenants.Object);
+            _userTenants.Object,
+            TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_PermissionDenied()
