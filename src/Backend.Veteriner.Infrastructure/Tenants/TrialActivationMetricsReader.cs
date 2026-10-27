@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Activation;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -8,11 +9,18 @@ namespace Backend.Veteriner.Infrastructure.Tenants;
 public sealed class TrialActivationMetricsReader : ITrialActivationMetricsReader
 {
     private readonly AppDbContext _db;
+    private readonly ITenantScope _tenantScope;
 
-    public TrialActivationMetricsReader(AppDbContext db) => _db = db;
+    public TrialActivationMetricsReader(AppDbContext db, ITenantScope tenantScope)
+    {
+        _db = db;
+        _tenantScope = tenantScope;
+    }
 
     public async Task<IReadOnlyList<TrialCohortRow>> ListCohortAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct)
     {
+        // Platform yönetimi metriği: tüm kiracıların deneme kohortu (ADR-040, kiracılar arası).
+        using var system = _tenantScope.AsSystem();
         var rows = await (
             from s in _db.TenantSubscriptions.AsNoTracking()
             where s.TrialStartsAtUtc != null && s.TrialStartsAtUtc >= fromUtc && s.TrialStartsAtUtc < toUtc

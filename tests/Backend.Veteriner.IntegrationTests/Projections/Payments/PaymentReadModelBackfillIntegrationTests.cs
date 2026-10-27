@@ -59,7 +59,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
 
         await RunBackfillAsync(tenantId);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var rm = await PaymentProjectionTestSupport.FindReadModelAsync(queryDb, paymentId);
 
@@ -97,7 +97,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
         second.UpdatedCount.Should().Be(1);
         second.ParityInSync.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.PaymentReadModels.CountAsync(x => x.TenantId == tenantId)).Should().Be(1);
     }
@@ -113,7 +113,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
             currency: "TRY", method: PaymentMethod.Cash, paidAtUtc: paidAt, notes: null);
 
         // Pre-existing stale read-model row (backfill sentinel ordering → Update beklenir).
-        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        await using (var seedScope = _factory.Services.CreateSystemScope())
         {
             var queryDb = seedScope.ServiceProvider.GetRequiredService<QueryDbContext>();
             queryDb.PaymentReadModels.Add(new PaymentReadModel
@@ -139,7 +139,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
         var result = await RunBackfillAsync(tenantId);
         result.UpdatedCount.Should().BeGreaterThanOrEqualTo(1);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var verifyDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var rm = await PaymentProjectionTestSupport.FindReadModelAsync(verifyDb, paymentId);
         rm!.ClientName.Should().Be("Grace Hopper");
@@ -161,7 +161,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
         var result = await RunBackfillAsync(tenantId);
         result.ParityInSync.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var rm = await PaymentProjectionTestSupport.FindReadModelAsync(queryDb, paymentId);
         rm!.PetId.Should().BeNull();
@@ -188,7 +188,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
         result.CommandPaymentCount.Should().Be(2);
         result.QueryReadModelCount.Should().Be(2);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.PaymentReadModels.CountAsync(x => x.TenantId == tenantA)).Should().Be(2);
         (await queryDb.PaymentReadModels.CountAsync(x => x.TenantId == tenantB)).Should().Be(0);
@@ -205,7 +205,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
             currency: "TRY", method: PaymentMethod.Cash, paidAtUtc: paidAt, notes: null);
 
         // Daha yeni gerçek projection event'i (UtcNow) ile yazılmış satır — backfill ezmemeli.
-        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        await using (var seedScope = _factory.Services.CreateSystemScope())
         {
             var queryDb = seedScope.ServiceProvider.GetRequiredService<QueryDbContext>();
             queryDb.PaymentReadModels.Add(new PaymentReadModel
@@ -231,7 +231,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
         var result = await RunBackfillAsync(tenantId);
         result.SkippedStaleCount.Should().BeGreaterThanOrEqualTo(1);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var verifyDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var rm = await PaymentProjectionTestSupport.FindReadModelAsync(verifyDb, paymentId);
         rm!.Amount.Should().Be(999m, "backfill daha yeni event satırını ezmemeli");
@@ -240,7 +240,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
 
     private async Task ResetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
@@ -257,14 +257,14 @@ public sealed class PaymentReadModelBackfillIntegrationTests
 
     private async Task<(Guid TenantId, Guid ClinicA, Guid ClinicB)> SeedTenantWithTwoClinicsAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await PaymentFinanceTestSupport.SeedTenantWithTwoClinicsAsync(commandDb);
     }
 
     private async Task SeedPaymentAsync(Guid tenantId, Guid clinicId, decimal amount, DateTime paidAtUtc)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await PaymentFinanceTestSupport.SeedPaymentAsync(commandDb, tenantId, clinicId, amount, paidAtUtc);
     }
@@ -280,7 +280,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
         DateTime paidAtUtc,
         string? notes)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var client = new Client(tenantId, clientName, DateTime.UtcNow);
@@ -308,7 +308,7 @@ public sealed class PaymentReadModelBackfillIntegrationTests
 
     private async Task<PaymentReadModelBackfillResult> RunBackfillAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var backfill = scope.ServiceProvider.GetRequiredService<IPaymentReadModelBackfillService>();
         return await backfill.BackfillAsync(tenantId, batchSize: 100, CancellationToken.None);
     }

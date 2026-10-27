@@ -72,7 +72,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
         full.GetProperty("nationalId").GetString().Should().Be(Tckn);
         full.GetProperty("billingAddressLine").GetString().Should().Be("Moda Cad. 1");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var createLog = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "Client.Create" && a.ActorUserId == ctx.UserId)
@@ -167,7 +167,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
         after.GetProperty("nationalId").ValueKind.Should().Be(JsonValueKind.Null);
         after.GetProperty("billingProvince").ValueKind.Should().Be(JsonValueKind.Null);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var payloads = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "Client.Update" && a.TargetId == $"ClientId={clientId}")
@@ -208,7 +208,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
         (await reader.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.OK);
         (await reader.PutAsJsonAsync(url, body)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var log = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "Clinic.TaxpayerSettings.Update" && a.TargetId == $"ClinicId={ctx.ClinicId}" && a.Success)
@@ -281,7 +281,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -344,7 +344,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<Guid> FirstSpeciesIdAsync()
         {
-            await using var scope = factory.Services.CreateAsyncScope();
+            await using var scope = factory.Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             return await db.Species.Where(s => s.IsActive).OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         }

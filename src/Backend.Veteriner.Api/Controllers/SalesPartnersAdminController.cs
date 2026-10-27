@@ -29,6 +29,7 @@ namespace Backend.Veteriner.Api.Controllers;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/admin/sales-partners")]
 [Authorize(Policy = AuthorizationPolicyNames.PlatformAdmin)]
+[PlatformTenantScope]
 [Produces("application/json")]
 public sealed class SalesPartnersAdminController : ControllerBase
 {

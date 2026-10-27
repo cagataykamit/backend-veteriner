@@ -20,6 +20,7 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
 {
     private readonly ITokenHashService _tokenHash;
     private readonly IReadRepository<TenantInvite> _invites;
+    private readonly ITenantScope _tenantScope;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<User> _usersRead;
@@ -31,6 +32,7 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
     public GetPublicTenantInviteDetailQueryHandler(
         ITokenHashService tokenHash,
         IReadRepository<TenantInvite> invites,
+        ITenantScope tenantScope,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<User> usersRead,
@@ -42,6 +44,7 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
         _operationClaims = operationClaims;
         _tokenHash = tokenHash;
         _invites = invites;
+        _tenantScope = tenantScope;
         _tenants = tenants;
         _clinics = clinics;
         _usersRead = usersRead;
@@ -73,13 +76,18 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
                 "Davet token geçersiz.");
         }
 
-        var invite = await _invites.FirstOrDefaultAsync(new TenantInviteByTokenHashSpec(hash), ct);
+        // Davet bağlantısı anonimdir: token araması kiracılar arasıdır, sonrası davetin kiracısının kapsamında (ADR-040).
+        TenantInvite? invite;
+        using (_tenantScope.AsSystem())
+            invite = await _invites.FirstOrDefaultAsync(new TenantInviteByTokenHashSpec(hash), ct);
         if (invite is null)
         {
             return Result<PublicTenantInviteDetailDto>.Failure(
                 "Invites.NotFound",
                 "Davet bulunamadı.");
         }
+
+        using var tenantScope = _tenantScope.UseTenant(invite.TenantId);
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(invite.TenantId), ct);
         var clinic = await _clinics.FirstOrDefaultAsync(

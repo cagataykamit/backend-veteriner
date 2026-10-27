@@ -22,7 +22,7 @@ public sealed class AppointmentProjectionDedupIntegrationTests
     [Fact]
     public async Task ProcessBatch_WhenDedupRowExists_Should_NotApplyReadModel()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -56,7 +56,7 @@ public sealed class AppointmentProjectionDedupIntegrationTests
     [Fact]
     public async Task ProcessBatch_WhenDedupDuplicate_Should_NotProduceRetryOrDeadLetter()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -87,7 +87,7 @@ public sealed class AppointmentProjectionDedupIntegrationTests
     [Fact]
     public async Task ProcessBatch_WhenDedupInsertSucceeds_Should_ApplyReadModel()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -114,7 +114,7 @@ public sealed class AppointmentProjectionDedupIntegrationTests
     [Fact]
     public async Task ProcessBatch_DuplicateEventTwice_Should_NotDoubleDailyStats()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -150,7 +150,7 @@ public sealed class AppointmentProjectionDedupIntegrationTests
     [Fact]
     public async Task ClaimingDisabled_Should_KeepLegacyFifoPath()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();

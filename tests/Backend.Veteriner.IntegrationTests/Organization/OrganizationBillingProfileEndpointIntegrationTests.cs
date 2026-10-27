@@ -88,7 +88,7 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
         updated.GetProperty("companyName").GetString().Should().Be("YağmurVet");
         updated.GetProperty("taxNumber").GetString().Should().Be("1234567890");
 
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.TenantBillingProfiles.SingleAsync(x => x.TenantId == tenantId);
@@ -198,7 +198,7 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
 
     private async Task<(Guid TenantId, string Token)> SeedTenantWithBillingProfileAsync(string companyName, string taxNumber)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -223,7 +223,7 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
 
     private async Task<(Guid TenantId, string Token)> SeedTenantWithoutBillingProfileAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -245,7 +245,7 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
     private async Task<(Guid TenantId, Guid UserId, string AccessToken)> SeedTenantAndIssueTokenAsync(
         IReadOnlyCollection<string> permissions)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 

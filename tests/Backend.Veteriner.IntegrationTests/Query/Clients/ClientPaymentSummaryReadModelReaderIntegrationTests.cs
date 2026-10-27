@@ -22,7 +22,7 @@ public sealed class ClientPaymentSummaryReadModelReaderIntegrationTests
     [Fact]
     public async Task GetSummary_Should_ReturnOnlyRowsForRequestedTenantAndClient()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientPaymentSummaryReadModelReader>();
 
@@ -47,7 +47,7 @@ public sealed class ClientPaymentSummaryReadModelReaderIntegrationTests
     [Fact]
     public async Task GetSummary_WithClinicFilter_Should_ReturnOnlyThatClinic()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientPaymentSummaryReadModelReader>();
 
@@ -72,7 +72,7 @@ public sealed class ClientPaymentSummaryReadModelReaderIntegrationTests
     [Fact]
     public async Task GetSummary_Should_ComputeCurrencyTotalsAndLastPaymentDate()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientPaymentSummaryReadModelReader>();
 
@@ -105,7 +105,7 @@ public sealed class ClientPaymentSummaryReadModelReaderIntegrationTests
     [Fact]
     public async Task GetSummary_Should_OrderRecentByPaidAtUtcDescThenPaymentIdDesc_AndRespectTake()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientPaymentSummaryReadModelReader>();
 
@@ -134,7 +134,7 @@ public sealed class ClientPaymentSummaryReadModelReaderIntegrationTests
     [Fact]
     public async Task GetSummary_Should_MapDenormalizedClinicNameAndPetName()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientPaymentSummaryReadModelReader>();
 
@@ -161,7 +161,7 @@ public sealed class ClientPaymentSummaryReadModelReaderIntegrationTests
     [Fact]
     public async Task GetSummary_WhenEmpty_Should_ReturnZeroCountEmptyTotalsNullLastEmptyRecent()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientPaymentSummaryReadModelReader>();
 
@@ -178,7 +178,7 @@ public sealed class ClientPaymentSummaryReadModelReaderIntegrationTests
     [Fact]
     public async Task GetSummary_Should_HandleNullablePetWithoutError()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientPaymentSummaryReadModelReader>();
 

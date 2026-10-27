@@ -35,7 +35,7 @@ public sealed class AppointmentMutationSequenceIntegrationTests
         var (clinicId, petId) = await SeedPetAsync();
         var appointmentId = await CreateAppointmentViaApiAsync(clinicId, petId, SlotAlignedUtcPlusDays(2));
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var appointment = await commandDb.Appointments.AsNoTracking().SingleAsync(a => a.Id == appointmentId);
@@ -67,7 +67,7 @@ public sealed class AppointmentMutationSequenceIntegrationTests
         (await client.PostAsJsonAsync($"/api/v1/appointments/{appointmentId}/cancel", new { Reason = "seq test" }))
             .EnsureSuccessStatusCode();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var appointment = await commandDb.Appointments.AsNoTracking().SingleAsync(a => a.Id == appointmentId);
@@ -93,8 +93,8 @@ public sealed class AppointmentMutationSequenceIntegrationTests
         var winnerTime = SlotAlignedUtcPlusDays(5);
         var loserTime = SlotAlignedUtcPlusDays(6);
 
-        await using var scope1 = _factory.Services.CreateAsyncScope();
-        await using var scope2 = _factory.Services.CreateAsyncScope();
+        await using var scope1 = _factory.Services.CreateSystemScope();
+        await using var scope2 = _factory.Services.CreateSystemScope();
 
         var db1 = scope1.ServiceProvider.GetRequiredService<AppDbContext>();
         var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -126,7 +126,7 @@ public sealed class AppointmentMutationSequenceIntegrationTests
         var act = () => db2.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateConcurrencyException>();
 
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var commandDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var appointment = await commandDb.Appointments.AsNoTracking().SingleAsync(a => a.Id == appointmentId);
@@ -146,7 +146,7 @@ public sealed class AppointmentMutationSequenceIntegrationTests
     {
         await ResetDatabasesAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var legacy = new OutboxMessage
@@ -172,7 +172,7 @@ public sealed class AppointmentMutationSequenceIntegrationTests
     {
         await ResetDatabasesAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var buffer = scope.ServiceProvider.GetRequiredService<OutboxBuffer>();
 
@@ -189,7 +189,7 @@ public sealed class AppointmentMutationSequenceIntegrationTests
     {
         await ResetDatabasesAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var (clinicId, petId) = await SeedPetAsync();
         var tenantId = await commandDb.Clinics.Where(c => c.Id == clinicId).Select(c => c.TenantId).SingleAsync();
@@ -217,7 +217,7 @@ public sealed class AppointmentMutationSequenceIntegrationTests
     {
         await ResetDatabasesAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var appointmentId = Guid.NewGuid();
@@ -268,7 +268,7 @@ public sealed class AppointmentMutationSequenceIntegrationTests
 
     private async Task ResetDatabasesAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
@@ -278,7 +278,7 @@ public sealed class AppointmentMutationSequenceIntegrationTests
 
     private async Task<(Guid ClinicId, Guid PetId)> SeedPetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var clinic = await db.Clinics.SingleAsync(c =>

@@ -42,7 +42,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
     [Fact]
     public async Task QueryDbContext_Migration_Should_Create_ReadModelTables_Only()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(
@@ -98,7 +98,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
     [Fact]
     public async Task ProcessedProjectionEvents_Should_Enforce_CompositePrimaryKey()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(
@@ -145,7 +145,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
     [Fact]
     public async Task ClinicDailyAppointmentStats_Should_Persist_DateOnly_As_SqlDate()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(
@@ -194,7 +194,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
     [Fact]
     public async Task ClinicDailyPaymentStats_Should_Persist_DecimalAmount_And_DateOnly()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(
@@ -245,7 +245,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
     [Fact]
     public async Task PetReadModel_Should_Persist_NullableFields_And_BirthDate_As_SqlDate()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(
@@ -306,7 +306,7 @@ public sealed class QueryDbMigrationIntegrationTests : IClassFixture<CustomWebAp
     [Fact]
     public void CommandAndQueryIntegrationDatabaseNames_Should_MatchExpectedCatalogs()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var appDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 

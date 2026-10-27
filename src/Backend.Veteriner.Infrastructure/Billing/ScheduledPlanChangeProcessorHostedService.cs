@@ -34,6 +34,7 @@ public sealed class ScheduledPlanChangeProcessorHostedService : BackgroundServic
             try
             {
                 using var scope = _sp.CreateScope();
+                var tenantScope = scope.ServiceProvider.GetRequiredService<ITenantScope>();
                 var changesRead = scope.ServiceProvider.GetRequiredService<IReadRepository<ScheduledSubscriptionPlanChange>>();
                 var changesWrite = scope.ServiceProvider.GetRequiredService<IRepository<ScheduledSubscriptionPlanChange>>();
                 var subsRead = scope.ServiceProvider.GetRequiredService<IReadRepository<TenantSubscription>>();
@@ -41,22 +42,25 @@ public sealed class ScheduledPlanChangeProcessorHostedService : BackgroundServic
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
                 var now = DateTime.UtcNow;
-                var due = await changesRead.ListAsync(new DueScheduledPlanChangesSpec(now, Math.Max(1, _opt.BatchSize)), stoppingToken);
-                if (due.Count == 0)
-                    continue;
 
-                var hasChanges = false;
+                // Vadesi gelen değişiklikleri bulmak kiracılar arasıdır (ADR-040); her değişiklik kendi kiracısının
+                // kapsamında uygulanır ve kaydedilir.
+                IReadOnlyList<ScheduledSubscriptionPlanChange> due;
+                using (tenantScope.AsSystem())
+                    due = await changesRead.ListAsync(new DueScheduledPlanChangesSpec(now, Math.Max(1, _opt.BatchSize)), stoppingToken);
+
                 foreach (var item in due)
                 {
                     if (item.Status != SubscriptionPlanChangeStatus.Scheduled || item.EffectiveAtUtc > now)
                         continue;
 
+                    using var tenant = tenantScope.UseTenant(item.TenantId);
                     var sub = await subsRead.FirstOrDefaultAsync(new TenantSubscriptionByTenantIdSpec(item.TenantId), stoppingToken);
                     if (sub is null)
                     {
                         item.Cancel(now);
                         await changesWrite.UpdateAsync(item, stoppingToken);
-                        hasChanges = true;
+                        await uow.SaveChangesAsync(stoppingToken);
                         continue;
                     }
 
@@ -66,11 +70,8 @@ public sealed class ScheduledPlanChangeProcessorHostedService : BackgroundServic
 
                     await subsWrite.UpdateAsync(sub, stoppingToken);
                     await changesWrite.UpdateAsync(item, stoppingToken);
-                    hasChanges = true;
-                }
-
-                if (hasChanges)
                     await uow.SaveChangesAsync(stoppingToken);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

@@ -44,7 +44,7 @@ public sealed class DataSeederTenantSubscriptionTests
     [Fact]
     public async Task SeedAsync_Should_Create_Active_Premium_Subscription_For_Default_Tenant()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -71,7 +71,7 @@ public sealed class DataSeederTenantSubscriptionTests
     [Fact]
     public async Task SeedAsync_Twice_Should_Not_Duplicate_TenantSubscription()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();

@@ -172,7 +172,7 @@ public sealed class AppointmentListCalendarIdorIntegrationTests : IClassFixture<
     {
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
 
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);

@@ -300,7 +300,7 @@ public sealed class OutboxEndpointsIntegrationTests : IClassFixture<CustomWebApp
         string? lastError = null,
         string? error = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var message = new OutboxMessage
@@ -324,14 +324,14 @@ public sealed class OutboxEndpointsIntegrationTests : IClassFixture<CustomWebApp
 
     private async Task<OutboxMessage?> LoadAsync(Guid id)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.OutboxMessages.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
     }
 
     private async Task<bool> IsAuditedAsync(string action, Guid outboxMessageId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.AuditLogs.AsNoTracking()
             .AnyAsync(a => a.Action == action && a.TargetId == $"OutboxMessageId={outboxMessageId}" && a.Success);
@@ -339,7 +339,7 @@ public sealed class OutboxEndpointsIntegrationTests : IClassFixture<CustomWebApp
 
     private async Task CleanupAsync(string marker)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.OutboxMessages.Where(x => x.Type.StartsWith(marker)).ExecuteDeleteAsync();
     }

@@ -28,9 +28,12 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Domain.Vaccinations;
+using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
+using Backend.Veteriner.Infrastructure.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Reflection;
 
 namespace Backend.Veteriner.Infrastructure.Persistence;
 
@@ -42,7 +45,15 @@ namespace Backend.Veteriner.Infrastructure.Persistence;
 /// </summary>
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    private readonly TenantContext _tenantContext;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, TenantContext tenantContext) : base(options)
+        => _tenantContext = tenantContext;
+
+    // Kiracı filtresi (ADR-040): EF bu iki değeri her sorguda DbContext örneğinden parametre olarak okur.
+    // Kiracı yoksa CurrentTenantId null'dır ve kiracılı sorgu satır döndürmez (kapalı varsayılan).
+    private Guid? CurrentTenantId => _tenantContext.TenantId;
+    private bool TenantFilterDisabled => _tenantContext.IsSystem;
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -258,6 +269,28 @@ public class AppDbContext : DbContext
             typeof(AppDbContext).Assembly,
             type => type.Namespace is null || !type.Namespace.Contains(".Persistence.Query.", StringComparison.Ordinal));
 
+        ApplyTenantFilters(b);
+
         base.OnModelCreating(b);
     }
+
+    /// <summary>
+    /// <see cref="ITenantOwned"/> uygulayan her kök varlığa adlı kiracı filtresi (ADR-040). Filtre yalnız
+    /// <c>ITenantScope.AsSystem</c> ile kalkar; <c>IgnoreQueryFilters</c> onu kaldırmaz (<see cref="QueryFilterNames"/>).
+    /// </summary>
+    private void ApplyTenantFilters(ModelBuilder b)
+    {
+        var apply = typeof(AppDbContext).GetMethod(nameof(ApplyTenantFilter), BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var tenantOwned = b.Model.GetEntityTypes()
+            .Where(t => t.BaseType is null && !t.IsOwned() && typeof(ITenantOwned).IsAssignableFrom(t.ClrType))
+            .Select(t => t.ClrType)
+            .ToList();
+        foreach (var clrType in tenantOwned)
+            apply.MakeGenericMethod(clrType).Invoke(this, [b]);
+    }
+
+    private void ApplyTenantFilter<TEntity>(ModelBuilder b) where TEntity : class, ITenantOwned
+        => b.Entity<TEntity>().HasQueryFilter(
+            QueryFilterNames.Tenant,
+            e => TenantFilterDisabled || e.TenantId == CurrentTenantId);
 }

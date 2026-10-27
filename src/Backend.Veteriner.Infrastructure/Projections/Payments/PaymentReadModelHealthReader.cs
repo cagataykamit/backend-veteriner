@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Projections.Payments;
 using Backend.Veteriner.Infrastructure.Persistence;
@@ -13,21 +14,26 @@ namespace Backend.Veteriner.Infrastructure.Projections.Payments;
 public sealed class PaymentReadModelHealthReader : IPaymentReadModelHealthReader
 {
     private readonly AppDbContext _commandDb;
+    private readonly ITenantScope _tenantScope;
     private readonly QueryDbContext _queryDb;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
 
     public PaymentReadModelHealthReader(
         AppDbContext commandDb,
+        ITenantScope tenantScope,
         QueryDbContext queryDb,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions)
     {
         _commandDb = commandDb;
+        _tenantScope = tenantScope;
         _queryDb = queryDb;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
     }
 
     public async Task<PaymentReadModelHealthSignal> GetSignalAsync(CancellationToken cancellationToken = default)
     {
+        // Komut ve okuma tarafı sayımı tüm kiracılar üzerindendir (sağlık sinyali, ADR-040).
+        using var system = _tenantScope.AsSystem();
         var commandPaymentCount = await _commandDb.Payments.AsNoTracking().LongCountAsync(cancellationToken);
         var readModelCount = await _queryDb.PaymentReadModels.AsNoTracking().LongCountAsync(cancellationToken);
 

@@ -64,7 +64,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
         await SeedAppointmentAsync(tenantId, clinicId, petId, SlotAlignedUtcPlusDays(2), AppointmentStatus.Scheduled);
         await RebuildAsync();
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             await queryDb.AppointmentReadModels.ExecuteDeleteAsync();
@@ -228,7 +228,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
         await SeedAppointmentAsync(tenantId, clinicId, petId, when, AppointmentStatus.Scheduled);
         await SeedAppointmentAsync(tenantId, clinicId, petId, when, AppointmentStatus.Completed);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var ids = await db.Appointments.Where(a => a.ScheduledAtUtc == when).Select(a => a.Id).ToListAsync();
@@ -285,7 +285,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
 
     private async Task<Guid> SeedOtherClientPetAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var client = new Client(tenantId, "Parity Other Client", DateTime.UtcNow, "905551110098");
@@ -310,7 +310,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
 
     private async Task ResetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await commandDb.Appointments.ExecuteDeleteAsync();
@@ -319,7 +319,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
 
     private async Task RebuildAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var rebuild = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionRebuildService>();
         await rebuild.RebuildAsync(500, CancellationToken.None);
     }
@@ -334,7 +334,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
         bool nullEmail = false,
         string petName = "ParityPet")
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var clinic = await db.Clinics.SingleAsync(c =>
@@ -385,7 +385,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
         AppointmentStatus status,
         string? notes = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.Appointments.Add(new Appointment(
             tenantId,
@@ -403,7 +403,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
         GetAppointmentsListQuery query,
         bool appointmentsEnabled)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var sp = scope.ServiceProvider;
         var (tenantId, clinicId) = await ResolveDefaultScopeAsync(sp);
         var adminUserId = await ResolveDefaultAdminUserIdAsync(sp);
@@ -430,7 +430,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
         GetAppointmentsCalendarQuery query,
         bool appointmentsEnabled)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var sp = scope.ServiceProvider;
         var (tenantId, clinicId) = await ResolveDefaultScopeAsync(sp);
         var adminUserId = await ResolveDefaultAdminUserIdAsync(sp);
@@ -453,7 +453,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
 
     private static async Task<(Guid TenantId, Guid ClinicId)> ResolveDefaultScopeAsync(IServiceProvider sp)
     {
-        await using var scope = sp.CreateAsyncScope();
+        await using var scope = sp.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = await db.Tenants.Where(t => t.Name == DataSeeder.DefaultTenantName).Select(t => t.Id).SingleAsync();
         var clinicId = await db.Clinics
@@ -465,7 +465,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
 
     private static async Task<Guid> ResolveDefaultAdminUserIdAsync(IServiceProvider sp)
     {
-        await using var scope = sp.CreateAsyncScope();
+        await using var scope = sp.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Users
             .Where(u => u.Email == AdminClaimSeeder.PlatformAdminUserEmail)

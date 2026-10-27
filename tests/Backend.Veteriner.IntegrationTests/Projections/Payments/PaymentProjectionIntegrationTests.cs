@@ -24,7 +24,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task CreatedEvent_Should_CreateContribution_And_UpdateDailyStats()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -72,7 +72,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task VoidedEvent_Should_RemoveContributionAndReadModel_And_RecomputeDailyTotal()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -117,7 +117,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task VoidedEvent_ForLastPayment_Should_RemoveDailyStatsRow()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -150,7 +150,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task UpdatedEvent_AmountChange_Should_RecomputeDailyTotal()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -191,7 +191,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task UpdatedEvent_DateChange_Should_MoveBetweenDailyBuckets()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -236,7 +236,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task UpdatedEvent_ClinicChange_Should_RecomputeBothClinicBuckets()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -280,7 +280,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task DuplicateEvent_Should_BeIdempotent()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -318,7 +318,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task StaleEvent_Should_NotOverwriteNewerContributionAndDailyStats()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -366,7 +366,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task UnknownPaymentEventType_Should_NotBeClaimed_And_RemainUntouched()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -390,7 +390,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task InvalidJson_Should_Retry_And_NotMarkOutboxProcessed()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -416,7 +416,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task TenantIsolation_Should_KeepDailyStatsSeparate()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -458,7 +458,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task CreatedEvent_Should_UpsertPaymentReadModel_WithMappedFields()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -518,7 +518,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task UpdatedEvent_Should_OverwritePaymentReadModel()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -569,7 +569,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task DuplicateEvent_Should_NotDuplicatePaymentReadModel()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -600,7 +600,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task NullablePet_Should_ProjectNullPetFields()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -631,7 +631,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task LegacyPayload_MissingEnrichedFields_Should_NotThrow_And_FallbackEmptyClientName()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -693,7 +693,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task StaleEvent_Should_NotOverwritePaymentReadModel()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -736,7 +736,7 @@ public sealed class PaymentProjectionIntegrationTests
     [Fact]
     public async Task NonPaymentOutboxMessage_Should_NotBeConsumedByPaymentProcessor()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();

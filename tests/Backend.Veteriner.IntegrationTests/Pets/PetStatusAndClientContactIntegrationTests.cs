@@ -195,7 +195,7 @@ public sealed class PetStatusAndClientContactIntegrationTests : IClassFixture<Cu
         Guid clientId;
         Guid speciesId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);

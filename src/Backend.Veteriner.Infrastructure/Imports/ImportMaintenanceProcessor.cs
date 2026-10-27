@@ -67,16 +67,16 @@ public sealed class ImportMaintenanceProcessor
         var batchSize = Math.Max(1, _options.BatchSize);
 
         var expired = 0;
-        foreach (var id in await DueIdsAsync(new ImportBatchesDueExpirySpec(Now, batchSize), ct))
+        foreach (var (id, tenantId) in await DueBatchesAsync(new ImportBatchesDueExpirySpec(Now, batchSize), ct))
         {
-            if (await ExpireAsync(id, ct))
+            if (await ExpireAsync(id, tenantId, ct))
                 expired++;
         }
 
         var purged = 0;
-        foreach (var id in await DueIdsAsync(new ImportBatchesDuePayloadPurgeSpec(Now, batchSize), ct))
+        foreach (var (id, tenantId) in await DueBatchesAsync(new ImportBatchesDuePayloadPurgeSpec(Now, batchSize), ct))
         {
-            if (await PurgeAsync(id, ct))
+            if (await PurgeAsync(id, tenantId, ct))
                 purged++;
         }
 
@@ -85,17 +85,21 @@ public sealed class ImportMaintenanceProcessor
         return new ImportMaintenanceResult(expired, purged);
     }
 
-    private async Task<List<Guid>> DueIdsAsync(Ardalis.Specification.ISpecification<ImportBatch> spec, CancellationToken ct)
+    /// <summary>Bakım taraması kiracılar arasıdır (ADR-040); her parti kendi kiracısının kapsamında işlenir.</summary>
+    private async Task<List<(Guid Id, Guid TenantId)>> DueBatchesAsync(Ardalis.Specification.ISpecification<ImportBatch> spec, CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        await using var scope = _scopes.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.ImportBatches.WithSpecification(spec, TenantSafeSpecificationEvaluator.Instance).Select(b => b.Id).ToListAsync(ct);
+        var due = await db.ImportBatches.WithSpecification(spec, TenantSafeSpecificationEvaluator.Instance)
+            .Select(b => new { b.Id, b.TenantId })
+            .ToListAsync(ct);
+        return due.Select(b => (b.Id, b.TenantId)).ToList();
     }
 
     /// <summary>Süresi dolan taslak: durum ve satır silme tek işlemde (taslak silme ile aynı sonuç).</summary>
-    private async Task<bool> ExpireAsync(Guid batchId, CancellationToken ct)
+    private async Task<bool> ExpireAsync(Guid batchId, Guid tenantId, CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        await using var scope = _scopes.CreateTenantScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId, ct);
@@ -127,7 +131,7 @@ public sealed class ImportMaintenanceProcessor
     /// Satırlar parça parça boşaltılır, en sonda parti işaretlenir: yarıda kesilirse sonraki tur kaldığı yerden sürer
     /// (boşaltılmış satır yeniden seçilmez).
     /// </summary>
-    private async Task<bool> PurgeAsync(Guid batchId, CancellationToken ct)
+    private async Task<bool> PurgeAsync(Guid batchId, Guid tenantId, CancellationToken ct)
     {
         var purgedRows = 0;
         while (true)
@@ -148,7 +152,7 @@ public sealed class ImportMaintenanceProcessor
             purgedRows += rows.Count;
         }
 
-        await using var scope = _scopes.CreateAsyncScope();
+        await using var scope = _scopes.CreateTenantScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId, ct);
         if (batch is null || !batch.PurgePayload(Now).IsSuccess)

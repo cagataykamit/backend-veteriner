@@ -326,7 +326,7 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
 
     private async Task ResetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
@@ -337,7 +337,7 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
 
     private async Task<(Guid TenantId, Guid ClinicId)> SeedTenantAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var (tenantId, clinicId, _) = await PaymentFinanceTestSupport.SeedTenantWithTwoClinicsAsync(commandDb);
         return (tenantId, clinicId);
@@ -363,7 +363,7 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
         DateTime paidAtUtc,
         string? notes)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var client = new Client(tenantId, clientName, DateTime.UtcNow);
@@ -391,21 +391,21 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
 
     private async Task<PaymentReadModelBackfillResult> RunBackfillAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var backfill = scope.ServiceProvider.GetRequiredService<IPaymentReadModelBackfillService>();
         return await backfill.BackfillAsync(tenantId, batchSize: 100, CancellationToken.None);
     }
 
     private async Task<PaymentReadModelParityResult> GetParityAsync(Guid tenantId, Guid clinicId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var parity = scope.ServiceProvider.GetRequiredService<IPaymentReadModelParityReader>();
         return await parity.GetClinicParityAsync(tenantId, clinicId, cancellationToken: CancellationToken.None);
     }
 
     private async Task<PaymentReadModelHealthSignal> GetReadModelSignalAsync(bool paymentsListReadEnabled)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentReadModelHealthReader>();
         var real = await reader.GetSignalAsync(CancellationToken.None);
         // Gerçek Command/Query sayımları korunur; yalnızca flag boyutu acceptance senaryosuna göre projekte edilir.
@@ -414,14 +414,14 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
 
     private async Task AssertReadModelEmptyAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.PaymentReadModels.CountAsync(x => x.TenantId == tenantId)).Should().Be(0);
     }
 
     private async Task DeleteReadModelsAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await queryDb.PaymentReadModels.Where(x => x.TenantId == tenantId).ExecuteDeleteAsync();
     }
@@ -432,7 +432,7 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
         bool paymentsListReadEnabled,
         string? search = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var sp = scope.ServiceProvider;
         var handler = new GetPaymentsListQueryHandler(
             new FixedTenantContext(tenantId),
@@ -463,7 +463,7 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
         bool paymentsListReadEnabled,
         string? search = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var sp = scope.ServiceProvider;
         var (_, _, clinicB) = await GetTwoClinicIdsAsync(tenantId);
         var accessibleClinicIds = new[] { clinicId, clinicB };
@@ -493,7 +493,7 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
 
     private async Task<(Guid TenantId, Guid ClinicA, Guid ClinicB)> GetTwoClinicIdsAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinics = await commandDb.Clinics
             .Where(c => c.TenantId == tenantId)

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Projections.Clients;
 using Backend.Veteriner.Domain.Clients;
@@ -38,17 +39,20 @@ public sealed class ClientReadModelBackfillService : IClientReadModelBackfillSer
     public static readonly Guid BackfillEventId = Guid.Empty;
 
     private readonly AppDbContext _commandDb;
+    private readonly ITenantScope _tenantScope;
     private readonly QueryDbContext _queryDb;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ClientReadModelBackfillService> _logger;
 
     public ClientReadModelBackfillService(
         AppDbContext commandDb,
+        ITenantScope tenantScope,
         QueryDbContext queryDb,
         TimeProvider timeProvider,
         ILogger<ClientReadModelBackfillService> logger)
     {
         _commandDb = commandDb;
+        _tenantScope = tenantScope;
         _queryDb = queryDb;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -59,6 +63,8 @@ public sealed class ClientReadModelBackfillService : IClientReadModelBackfillSer
         int batchSize = DefaultBatchSize,
         CancellationToken cancellationToken = default)
     {
+        // Kiracı verilirse yalnız onun kapsamı; verilmezse tüm kiracılar (platform bakım işi, ADR-040).
+        using var tenantScope = tenantId is { } scopedTenantId ? _tenantScope.UseTenant(scopedTenantId) : _tenantScope.AsSystem();
         var started = _timeProvider.GetUtcNow().UtcDateTime;
         batchSize = Math.Max(1, batchSize);
 

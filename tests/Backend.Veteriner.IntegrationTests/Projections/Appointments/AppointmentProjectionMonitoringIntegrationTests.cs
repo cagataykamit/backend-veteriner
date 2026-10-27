@@ -24,7 +24,7 @@ public sealed class AppointmentProjectionMonitoringIntegrationTests
     [Fact]
     public async Task ProcessBatch_Should_Succeed_And_RecordMetrics_WithoutChangingOutcome()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();

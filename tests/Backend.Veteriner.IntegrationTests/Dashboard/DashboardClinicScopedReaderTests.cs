@@ -38,7 +38,7 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
             .UseSqlServer(connectionString)
             .Options;
 
-        var db = new AppDbContext(options);
+        var db = IntegrationTestDbContexts.CreateSystem(options);
         try
         {
             await db.Database.MigrateAsync();

@@ -96,7 +96,7 @@ public sealed class TreatmentWriteClinicAssignmentIdorIntegrationTests : IClassF
             _factory.Services,
             unassignedClinicId);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var exam = await db.Examinations.AsNoTracking().SingleAsync(e => e.Id == seed.ExaminationId);
@@ -250,7 +250,7 @@ public sealed class TreatmentWriteClinicAssignmentIdorIntegrationTests : IClassF
 
     private async Task<(Guid ClinicId, Guid PetId, string Title)> GetTreatmentSnapshotAsync(Guid treatmentId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Treatments.AsNoTracking().SingleAsync(t => t.Id == treatmentId);
         return (row.ClinicId, row.PetId, row.Title);

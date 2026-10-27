@@ -37,7 +37,7 @@ public sealed class AppointmentSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOff_Should_FindAppointment_ByClientNameSearch_EvenWhenQueryDbEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -59,7 +59,7 @@ public sealed class AppointmentSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_NotFallback_WhenReadModelEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -81,7 +81,7 @@ public sealed class AppointmentSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_FindAppointment_ByClientNameSearch_WhenReadModelPopulated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -104,7 +104,7 @@ public sealed class AppointmentSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_ReturnOnlyRowsForRequestedTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -253,7 +253,7 @@ public sealed class AppointmentSharedSearchLookupSmokeIntegrationTests
 
     private static async Task<Guid> ResolveDefaultAdminUserIdAsync(IServiceProvider sp)
     {
-        await using var scope = sp.CreateAsyncScope();
+        await using var scope = sp.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Users
             .Where(u => u.Email == AdminClaimSeeder.PlatformAdminUserEmail)

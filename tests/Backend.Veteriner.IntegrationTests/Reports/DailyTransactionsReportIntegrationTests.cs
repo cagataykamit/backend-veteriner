@@ -346,7 +346,7 @@ public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<Cust
         Guid userId;
         Guid productId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = new Tenant($"Dtr-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
@@ -416,7 +416,7 @@ public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<Cust
         public async Task<HttpClient> NewHttpForAnotherUserAsync(string[] permissions)
         {
             string email;
-            await using (var scope = _services.CreateAsyncScope())
+            await using (var scope = _services.CreateSystemScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 (_, email) = await SeedUserAsync(db, _hasher, TenantId, ClinicId);
@@ -482,7 +482,7 @@ public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<Cust
 
         public async Task<Guid> SeedClientAsync(string name)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var phone = $"90555{Interlocked.Increment(ref _phoneSeed):D7}";
             var client = new Client(TenantId, name, DateTime.UtcNow, phone);
@@ -493,7 +493,7 @@ public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<Cust
 
         public async Task<Guid> SeedPetAsync(Guid clientId)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
             var pet = new Pet(TenantId, clientId, $"DPet-{Guid.NewGuid():N}"[..12], speciesId);
@@ -504,7 +504,7 @@ public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<Cust
 
         public async Task<Guid> SeedVisitAsync(Guid petId)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var visit = new Visit(TenantId, ClinicId, petId, null, null, UserId, DateTime.UtcNow);
             db.Visits.Add(visit);
@@ -514,7 +514,7 @@ public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<Cust
 
         public async Task<Guid> SeedChargeAsync(Guid clientId, decimal amount, DateTime createdAtUtc, Guid? visitId = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var charge = Charge.Create(
                     TenantId, ClinicId, clientId, null, visitId, null,

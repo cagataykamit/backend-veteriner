@@ -7,11 +7,21 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Repositories;
 public sealed class UserTenantRepository : IUserTenantRepository
 {
     private readonly AppDbContext _db;
+    private readonly ITenantScope _tenantScope;
 
-    public UserTenantRepository(AppDbContext db) => _db = db;
+    public UserTenantRepository(AppDbContext db, ITenantScope tenantScope)
+    {
+        _db = db;
+        _tenantScope = tenantScope;
+    }
 
+    /// <summary>
+    /// Kullanıcının üyelikleri kimlik sorgusudur ve kiracılar arasıdır (ADR-040): girişte JWT kiracısı yoktur, tek
+    /// kiracı kuralı başka kiracıdaki üyeliği de görmelidir. Yalnız kiracı kimliği döner.
+    /// </summary>
     public async Task<IReadOnlyList<Guid>> GetTenantIdsByUserIdAsync(Guid userId, CancellationToken ct)
     {
+        using var system = _tenantScope.AsSystem();
         return await _db.UserTenants
             .AsNoTracking()
             .Where(x => x.UserId == userId)
@@ -45,8 +55,10 @@ public sealed class UserTenantRepository : IUserTenantRepository
         return rows.Count == 0 ? new HashSet<Guid>() : rows.ToHashSet();
     }
 
+    /// <inheritdoc cref="GetTenantIdsByUserIdAsync"/>
     public async Task<Guid?> GetExistingTenantIdForUserAsync(Guid userId, CancellationToken ct)
     {
+        using var system = _tenantScope.AsSystem();
         return await _db.UserTenants
             .AsNoTracking()
             .Where(x => x.UserId == userId)

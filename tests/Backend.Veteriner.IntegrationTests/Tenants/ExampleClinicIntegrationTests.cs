@@ -111,7 +111,7 @@ public sealed class ExampleClinicIntegrationTests : IClassFixture<CustomWebAppli
     {
         var (response, email) = await SignupAsync(startWithExampleClinic: false);
         var tenantId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("tenantId").GetGuid();
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var subscription = await db.TenantSubscriptions.SingleAsync(s => s.TenantId == tenantId);
@@ -143,7 +143,7 @@ public sealed class ExampleClinicIntegrationTests : IClassFixture<CustomWebAppli
 
     private async Task AssertDatabaseMatchesSummaryAsync(Guid tenantId, Guid clinicId, JsonElement summary)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         (await db.Clients.CountAsync(x => x.TenantId == tenantId)).Should().Be(summary.GetProperty("clients").GetInt32());
@@ -240,7 +240,7 @@ public sealed class ExampleClinicIntegrationTests : IClassFixture<CustomWebAppli
 
     private async Task<int> CountClientsAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Clients.CountAsync(c => c.TenantId == tenantId);
     }

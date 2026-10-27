@@ -39,7 +39,7 @@ public sealed class InviteSignupTransactionIntegrationTests : IClassFixture<Cust
         var rawToken = $"tx-invite-{Guid.NewGuid():N}";
         var email = $"tx-invitee-{Guid.NewGuid():N}@example.com";
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tokenHash = scope.ServiceProvider.GetRequiredService<ITokenHashService>();
@@ -66,7 +66,7 @@ public sealed class InviteSignupTransactionIntegrationTests : IClassFixture<Cust
         response.IsSuccessStatusCode.Should().BeFalse();
         (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Invites.ClinicInvalid");
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var normalized = email.ToLowerInvariant();

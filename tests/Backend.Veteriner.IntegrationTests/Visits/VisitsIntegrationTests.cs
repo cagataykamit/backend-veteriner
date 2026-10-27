@@ -71,7 +71,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         second.Result!.Created.Should().BeFalse();
         second.Result.Visit.Id.Should().Be(first.Result.Visit.Id);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Visits.CountAsync(v => v.PetId == ctx.PetId)).Should().Be(1);
         (await db.Appointments.CountAsync(a => a.PetId == ctx.PetId)).Should().Be(0, "randevusuz geliş sahte randevu üretmez");
@@ -94,7 +94,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         results.Count(r => r.Response.StatusCode == HttpStatusCode.Created).Should().Be(1);
         results.Select(r => r.Result!.Visit.Id).Distinct().Should().HaveCount(1);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Visits.CountAsync(v => v.PetId == ctx.PetId)).Should().Be(1);
     }
@@ -115,7 +115,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         second.Response.StatusCode.Should().Be(HttpStatusCode.OK);
         second.Result!.Visit.Id.Should().Be(first.Result.Visit.Id);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Appointments.AsNoTracking().SingleAsync(a => a.Id == appointmentId))
             .Status.Should().Be(AppointmentStatus.Scheduled, "geliş randevuyu değiştirmez");
@@ -145,7 +145,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         var ctx = await SeedAsync();
         var appointmentId = await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(30));
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.Visits.Add(ctx.NewVisit(appointmentId: appointmentId));
         await db.SaveChangesAsync();
@@ -171,7 +171,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
     public async Task Database_Should_Allow_New_Visit_After_Completed_Or_Voided_Visit()
     {
         var ctx = await SeedAsync();
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var completed = ctx.NewVisit();
@@ -229,7 +229,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             .Select(_ => Task.Run(() => ctx.PostRawAsync($"/api/v1/visits/{visitId}/start"))));
 
         responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK);
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Visits.AsNoTracking().SingleAsync(v => v.Id == visitId)).CareStatus.Should().Be(VisitCareStatus.InProgress);
     }
@@ -269,7 +269,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         var transitionVoided = await ctx.PostRawAsync($"/api/v1/visits/{visitId}/start");
         transitionVoided.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var log = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "Visit.Correct" && a.TargetId == $"VisitId={visitId}" && a.Success)
@@ -290,7 +290,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Visits.Validation");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.AuditLogs.AsNoTracking()
             .AnyAsync(a => a.Action == "Visit.Correct" && a.TargetId == $"VisitId={visitId}" && !a.Success))
@@ -367,7 +367,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         today.Items.Should().ContainSingle(i => i.VisitId == visitId && !i.IsVoided);
         (await ctx.GetTodayAsync(voided: true)).Items.Should().BeEmpty();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var log = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "Visit.Restore" && a.TargetId == $"VisitId={visitId}" && a.Success)
@@ -392,7 +392,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         (await IntegrationTestProblemDetails.ReadCodeAsync(noReason)).Should().Be("Visits.Validation");
         (await ctx.Http.GetFromJsonAsync<VisitDto>($"/api/v1/visits/{visitId}"))!.IsVoided.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.AuditLogs.AsNoTracking()
             .AnyAsync(a => a.Action == "Visit.Restore" && a.TargetId == $"VisitId={visitId}" && !a.Success))
@@ -438,7 +438,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
     {
         var ctx = await SeedAsync();
         var appointmentId = await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(30));
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var voidedActive = ctx.NewVisit();
@@ -477,7 +477,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         var ctx = await SeedAsync();
         Guid otherTenantVisitId;
         Guid unassignedClinicVisitId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
@@ -598,7 +598,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         var ctx = await SeedAsync();
         Guid otherTenantVisitId;
         Guid unassignedClinicVisitId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
@@ -680,7 +680,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(30), pets[3]);
         await ctx.SeedActiveHospitalizationAsync(pets[1]);
         Guid carriedOver;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var petId = await ctx.SeedPetAsync();
@@ -783,7 +783,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         });
 
         create.StatusCode.Should().Be(HttpStatusCode.Created);
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Appointments.AsNoTracking().SingleAsync(a => a.Id == appointmentId))
             .Status.Should().Be(AppointmentStatus.Completed);
@@ -912,7 +912,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
     public async Task Today_Should_Carry_Over_Open_Visits_From_Previous_Day_Only_For_Today()
     {
         var ctx = await SeedAsync();
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Visits.Add(ctx.NewVisit(arrivedAtUtc: DateTime.UtcNow.AddDays(-1)));
@@ -967,7 +967,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
     public async Task Today_Voided_View_Should_Not_Include_Previous_Days_And_Should_Respect_Clinic_Assignment()
     {
         var ctx = await SeedAsync();
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var old = ctx.NewVisit(arrivedAtUtc: DateTime.UtcNow.AddDays(-3));
@@ -1003,7 +1003,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         var ctx = await SeedAsync();
         var otherClinic = await ctx.SeedForeignAssignedClinicAsync();
         Guid foreignVisitId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenantId = await db.Clinics.Where(c => c.Id == otherClinic).Select(c => c.TenantId).SingleAsync();
@@ -1101,7 +1101,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Visits.Validation");
         }
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Visits.CountAsync(v => v.PetId == ctx.PetId)).Should().Be(0);
     }
@@ -1113,7 +1113,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
         (await ctx.Http.PutAsJsonAsync("/api/v1/me/display-name", new { displayName = "  Dr. Ayse  " }))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.Users.AsNoTracking().SingleAsync(u => u.Id == ctx.UserId)).DisplayName.Should().Be("Dr. Ayse");
@@ -1124,7 +1124,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
         (await ctx.Http.PutAsJsonAsync("/api/v1/me/display-name", new { displayName = "" }))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
-        await using var scope2 = _factory.Services.CreateAsyncScope();
+        await using var scope2 = _factory.Services.CreateSystemScope();
         var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db2.Users.AsNoTracking().SingleAsync(u => u.Id == ctx.UserId)).DisplayName.Should().BeNull();
     }
@@ -1171,7 +1171,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         var ctx = await SeedAsync();
         var otherClinic = await ctx.SeedForeignAssignedClinicAsync();
         Guid foreignVisitId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var petId = await IntegrationTestAuthHelper.SeedPetInClinicAsync(_factory.Services, otherClinic);
@@ -1222,7 +1222,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -1330,7 +1330,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
         public async Task<Guid> SeedPetAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = new Client(TenantId, $"VClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110077");
             db.Clients.Add(client);
@@ -1344,7 +1344,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
         public async Task<Guid> SeedAppointmentAsync(TimeSpan fromNow, Guid? petId = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var appointment = new Appointment(
                 TenantId, ClinicId, petId ?? PetId, DateTime.UtcNow.Add(fromNow), 30,
@@ -1356,7 +1356,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
         public async Task UpdateAppointmentAsync(Guid appointmentId, Func<Appointment, Backend.Veteriner.Domain.Shared.Result> change)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var appointment = await db.Appointments.SingleAsync(a => a.Id == appointmentId);
             change(appointment).IsSuccess.Should().BeTrue();
@@ -1365,7 +1365,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
         public async Task SeedPaymentAsync(Guid? appointmentId, Guid petId, Guid? examinationId = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clientId = await db.Pets.Where(p => p.Id == petId).Select(p => p.ClientId).SingleAsync();
             db.Payments.Add(new Payment(
@@ -1376,7 +1376,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
         public async Task SeedActiveHospitalizationAsync(Guid petId)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Hospitalizations.Add(new Hospitalization(
                 TenantId, ClinicId, petId, null, DateTime.UtcNow.AddHours(-3),
@@ -1392,7 +1392,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         /// <summary>Verilen operasyon claim'li kullanıcı; isteğe bağlı olarak test kliniğine atanır.</summary>
         public async Task<SeededUser> SeedClinicUserAsync(string claimName, string? displayName, bool assignToClinic = true)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
@@ -1415,7 +1415,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         /// <summary>Kullanıcıya atanmamış, aynı kiracıda ikinci klinik.</summary>
         public async Task<Guid> SeedForeignAssignedClinicAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = new Clinic(TenantId, $"Other-{Guid.NewGuid():N}"[..14], "Bursa");
             db.Clinics.Add(clinic);

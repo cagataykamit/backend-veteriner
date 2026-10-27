@@ -124,7 +124,7 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
         codeRow.GetProperty("isActive").GetBoolean().Should().BeFalse();
         detail.GetProperty("partner").GetProperty("codeCount").GetInt32().Should().Be(1);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var actions = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action.StartsWith("DiscountCode.") && a.Success && a.TargetId != null
@@ -149,7 +149,7 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
         var selfSignup = await SignupAsync(code, email: "RAPOR-ORTAK@example.com");
         selfSignup.Response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await IntegrationTestProblemDetails.ReadCodeAsync(selfSignup.Response)).Should().Be("DiscountCodes.Invalid");
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.Users.AnyAsync(u => u.Email == invalidSignup.Email || u.Email == selfSignup.Email)).Should().BeFalse();
@@ -218,7 +218,7 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
         var csvText = await csv.Content.ReadAsStringAsync();
         csvText.Should().Contain("Rapor Ortak").And.Contain(code).And.Contain("899,10").And.Contain("179,82").And.Contain("geri alınacak");
 
-        await using var auditScope = _factory.Services.CreateAsyncScope();
+        await using var auditScope = _factory.Services.CreateSystemScope();
         var auditDb = auditScope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await auditDb.AuditLogs.AsNoTracking()
             .CountAsync(a => a.Action == "DiscountCommission.MarkPaid" && a.TargetId == $"SalesPartnerId={partnerId}" && a.Success))
@@ -276,7 +276,7 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
         var tenantId = (await signup.Response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("tenantId").GetGuid();
 
         Guid sessionId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var session = BillingCheckoutSession.CreatePending(
@@ -297,7 +297,7 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
         if (expectedCode is not null)
             (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be(expectedCode);
 
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var sub = await verifyDb.TenantSubscriptions.SingleAsync(s => s.TenantId == tenantId);
         if (provider == BillingProvider.Manual)
@@ -312,7 +312,7 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
 
     private async Task<HttpClient> ClientAsync(bool platformAdmin)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var user = await db.Users.SingleAsync(u => u.Email == AdminEmail);
@@ -379,7 +379,7 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
     private async Task<Guid> SimulateCollectionAsync(Guid tenantId, long grossMinor, long discountMinor, BillingActivationSource source)
     {
         Guid sessionId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var session = BillingCheckoutSession.CreatePending(
@@ -392,7 +392,7 @@ public sealed class SalesPartnerIntegrationTests : IClassFixture<CustomWebApplic
             sessionId = session.Id;
         }
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var activation = scope.ServiceProvider.GetRequiredService<ISubscriptionCheckoutActivationService>();
             var result = await activation.TryActivateAsync(sessionId, null, null, "pay-sim", source, CancellationToken.None);

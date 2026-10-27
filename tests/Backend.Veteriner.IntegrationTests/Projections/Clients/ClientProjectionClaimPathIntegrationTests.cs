@@ -26,7 +26,7 @@ public sealed class ClientProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimingEnabled_Should_MarkProcessedWithClaimToken()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -56,7 +56,7 @@ public sealed class ClientProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_DuplicateEvent_Should_KeepReadModelIdempotent()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -85,7 +85,7 @@ public sealed class ClientProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_StaleEvent_Should_NotOverwriteNewerReadModelData()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -121,7 +121,7 @@ public sealed class ClientProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_StaleMarkProcessedFalse_Should_NotCountAsBatchFailure()
     {
-        await using var scope = _instrumentedFactory.Services.CreateAsyncScope();
+        await using var scope = _instrumentedFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -151,7 +151,7 @@ public sealed class ClientProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_ApplyException_Should_MarkRetryWithClaimToken()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();

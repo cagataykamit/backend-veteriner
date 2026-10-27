@@ -30,8 +30,8 @@ public sealed class ClientOutboxClaimRepositoryIntegrationTests
         const string workerA = "worker-a:1:aaaa";
         const string workerB = "worker-b:2:bbbb";
 
-        await using var scopeA = _factory.Services.CreateAsyncScope();
-        await using var scopeB = _factory.Services.CreateAsyncScope();
+        await using var scopeA = _factory.Services.CreateSystemScope();
+        await using var scopeB = _factory.Services.CreateSystemScope();
         var repoA = scopeA.ServiceProvider.GetRequiredService<IClientOutboxClaimRepository>();
         var repoB = scopeB.ServiceProvider.GetRequiredService<IClientOutboxClaimRepository>();
 
@@ -62,7 +62,7 @@ public sealed class ClientOutboxClaimRepositoryIntegrationTests
         claimed.ClaimedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
         claimed.LeaseExpiresAtUtc.Should().BeAfter(claimed.ClaimedAtUtc);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.OutboxMessages.AsNoTracking().SingleAsync(m => m.Id == message.Id);
 
@@ -86,14 +86,14 @@ public sealed class ClientOutboxClaimRepositoryIntegrationTests
 
     private async Task ResetOutboxAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await ClientProjectionTestSupport.ClearOutboxAsync(db);
     }
 
     private async Task<OutboxMessage> SeedMessageAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clientId = Guid.NewGuid();
@@ -115,7 +115,7 @@ public sealed class ClientOutboxClaimRepositoryIntegrationTests
 
     private async Task<ClaimedIntegrationOutboxMessage?> ClaimSingleOrDefaultAsync(string workerId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var repo = scope.ServiceProvider.GetRequiredService<IClientOutboxClaimRepository>();
         var batch = await repo.ClaimNextBatchAsync(workerId, batchSize: 1, DefaultLease, CancellationToken.None);
         return batch.SingleOrDefault();

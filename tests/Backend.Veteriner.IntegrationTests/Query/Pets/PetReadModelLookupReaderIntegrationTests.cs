@@ -21,7 +21,7 @@ public sealed class PetReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task ResolvePetIdsByTextSearch_Should_ReturnEmpty_When_PatternNull()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelLookupReader>();
 
@@ -45,7 +45,7 @@ public sealed class PetReadModelLookupReaderIntegrationTests
         string term,
         string expectedPetName)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelLookupReader>();
 
@@ -70,7 +70,7 @@ public sealed class PetReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task ResolvePetIdsByPetTextFields_Should_NotMatchClientName()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelLookupReader>();
 
@@ -94,7 +94,7 @@ public sealed class PetReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task ResolvePetIdsByClientIds_Should_ReturnAllOwnedPets()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelLookupReader>();
 
@@ -117,7 +117,7 @@ public sealed class PetReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task ResolvePetIdsByTextSearch_Should_ReturnOnlyRowsForRequestedTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelLookupReader>();
 
@@ -140,7 +140,7 @@ public sealed class PetReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task ResolvePetIdsByTextSearch_Should_EscapeLikeWildcards()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelLookupReader>();
 
@@ -161,7 +161,7 @@ public sealed class PetReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task GetDisplayByIds_Should_ReturnEmpty_When_NoIds()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelLookupReader>();
 
         var result = await reader.GetDisplayByIdsAsync(
@@ -173,7 +173,7 @@ public sealed class PetReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task GetDisplayByIds_Should_ReturnOnlyTenantScopedRows()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelLookupReader>();
 
@@ -198,7 +198,7 @@ public sealed class PetReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task GetDisplayByIds_Should_OrderByNormalizedNameThenId()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelLookupReader>();
 

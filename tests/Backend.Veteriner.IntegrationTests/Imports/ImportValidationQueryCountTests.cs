@@ -186,7 +186,7 @@ public sealed class ImportValidationQueryCountTests
 
     private static async Task<Env> SeedAsync(WebApplicationFactory<global::Program> factory)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
+        await using var scope = factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

@@ -24,6 +24,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
     private readonly IPermissionReader _permissionReader;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
+    private readonly ITenantScope _tenantScope;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly ILogger<RefreshCommandHandler> _logger;
     private readonly TimeProvider _timeProvider;
@@ -36,6 +37,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         IPermissionReader permissionReader,
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
+        ITenantScope tenantScope,
         IReadRepository<Clinic> clinics,
         TimeProvider timeProvider,
         ILogger<RefreshCommandHandler>? logger = null)
@@ -47,6 +49,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         _permissionReader = permissionReader;
         _tenants = tenants;
         _userTenants = userTenants;
+        _tenantScope = tenantScope;
         _clinics = clinics;
         _logger = logger ?? NullLogger<RefreshCommandHandler>.Instance;
         _timeProvider = timeProvider;
@@ -122,6 +125,9 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
                 "Auth.RefreshSessionRequiresReLogin",
                 "Oturum kiracı bilgisi eksik; lütfen yeniden giriş yapın.");
         }
+
+        // Yenileme ucunda JWT kiracısı yoktur; kiracı oturum kaydından gelir (ADR-040).
+        using var tenantScope = _tenantScope.UseTenant(sessionTenantId);
 
         stored.MarkUsed(utcNow);
 

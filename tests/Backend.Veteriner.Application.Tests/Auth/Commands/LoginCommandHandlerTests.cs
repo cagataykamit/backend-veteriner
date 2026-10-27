@@ -50,6 +50,7 @@ public sealed class LoginCommandHandlerTests
             _permissionReader.Object,
             _tenants.Object,
             _userTenants.Object,
+            Mock.Of<ITenantScope>(),
             opt,
             TimeProvider.System);
     }

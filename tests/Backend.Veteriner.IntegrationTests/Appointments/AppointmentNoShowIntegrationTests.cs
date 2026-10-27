@@ -90,7 +90,7 @@ public sealed class AppointmentNoShowIntegrationTests : IClassFixture<CustomWebA
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         (await ctx.GetStatusAsync(id)).Should().Be(AppointmentStatus.NoShow);
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var events = await db.OutboxMessages.AsNoTracking()
             .CountAsync(m => m.Type == AppointmentIntegrationEventTypes.Updated && m.Payload.Contains(id.ToString()));
@@ -170,7 +170,7 @@ public sealed class AppointmentNoShowIntegrationTests : IClassFixture<CustomWebA
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await ctx.GetStatusAsync(id)).Should().Be(AppointmentStatus.Scheduled);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.AuditLogs.AsNoTracking().AnyAsync(a =>
             a.Action == "Appointment.NoShowRevert" && a.TargetId == $"AppointmentId={id}" && a.Success)).Should().BeTrue();
@@ -326,7 +326,7 @@ public sealed class AppointmentNoShowIntegrationTests : IClassFixture<CustomWebA
         var ctx = await SeedAsync();
         Guid otherTenantAppointment;
         Guid unassignedClinicAppointment;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
@@ -373,7 +373,7 @@ public sealed class AppointmentNoShowIntegrationTests : IClassFixture<CustomWebA
         Guid tenantId;
         Guid clinicId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -428,14 +428,14 @@ public sealed class AppointmentNoShowIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<AppointmentStatus> GetStatusAsync(Guid appointmentId)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             return await db.Appointments.AsNoTracking().Where(a => a.Id == appointmentId).Select(a => a.Status).SingleAsync();
         }
 
         public async Task SetScheduledAtAsync(Guid appointmentId, DateTime scheduledAtUtc)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var appointment = await db.Appointments.SingleAsync(a => a.Id == appointmentId);
             typeof(Appointment).GetProperty(nameof(Appointment.ScheduledAtUtc))!.SetValue(appointment, scheduledAtUtc);
@@ -445,7 +445,7 @@ public sealed class AppointmentNoShowIntegrationTests : IClassFixture<CustomWebA
         /// <summary>Doğrudan veritabanına randevu yazar (zaman/slot doğrulaması atlanır; geçmiş saat mümkün), her biri için ayrı hayvan.</summary>
         public async Task<Guid> SeedAppointmentAsync(TimeSpan fromNow, AppointmentStatus? status = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var petId = await SeedPetAsync();
             var appointment = new Appointment(
@@ -457,7 +457,7 @@ public sealed class AppointmentNoShowIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<Guid> SeedPetAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = new Client(TenantId, $"NClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110079");
             db.Clients.Add(client);

@@ -598,7 +598,7 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
 
     private async Task<decimal> GetStockAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ProductStocks.AsNoTracking()
             .Where(s => s.ClinicId == ctx.ClinicId && s.ProductId == ctx.ProductId)
@@ -608,14 +608,14 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
 
     private async Task<int> AdministrationCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Administrations.AsNoTracking().CountAsync(a => a.ProductId == ctx.ProductId);
     }
 
     private async Task<int> OutMovementCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.StockMovements.AsNoTracking()
             .CountAsync(m => m.ProductId == ctx.ProductId && m.MovementType == StockMovementType.Out);
@@ -623,7 +623,7 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
 
     private async Task<List<StockMovement>> MovementsForAsync(Guid administrationId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.StockMovements.AsNoTracking()
             .Where(m => m.ReferenceId == administrationId)
@@ -633,7 +633,7 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
 
     private async Task DeactivateProductAsync(Guid productId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var product = await db.Products.SingleAsync(p => p.Id == productId);
         product.Deactivate(DateTime.UtcNow);
@@ -642,7 +642,7 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
 
     private async Task FinalizeExaminationAsync(Guid examinationId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var exam = await db.Examinations.SingleAsync(e => e.Id == examinationId);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
@@ -651,7 +651,7 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
 
     private async Task<Guid> SeedPetAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var client = new Client(tenantId, $"AdmClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110088");
         db.Clients.Add(client);
@@ -665,7 +665,7 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
 
     private async Task<HttpClient> SeedUserClientAsync(SeedCtx ctx, string[] permissions, bool includeClinicClaim = true)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -684,7 +684,7 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
         bool withExamination = false,
         bool withTreatment = false)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

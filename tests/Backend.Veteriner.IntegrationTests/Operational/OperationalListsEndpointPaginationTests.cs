@@ -269,7 +269,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedClientsScenarioAsync(int clientCount)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -300,7 +300,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedTreatmentsScenarioAsync(int count)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -347,7 +347,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedPrescriptionsScenarioAsync(int count)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -387,7 +387,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedHospitalizationsScenarioAsync(int count)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -427,7 +427,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedLabResultsScenarioAsync(int count)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -468,7 +468,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedPaymentsScenarioAsync(int count)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -508,7 +508,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedPetsScenarioAsync(int petCount)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -542,7 +542,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedAppointmentsScenarioAsync(int count)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
@@ -618,7 +618,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedExaminationsScenarioAsync(int count)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -657,7 +657,7 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
 
     private async Task<TenantTokenCtx> SeedVaccinationsScenarioAsync(int count)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 

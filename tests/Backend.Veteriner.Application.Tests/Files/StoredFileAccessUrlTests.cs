@@ -56,7 +56,7 @@ public sealed class StoredFileAccessUrlTests
             .Handle(new CreateStoredFileAccessUrlQuery(StoredFileOwnerType.ImagingRecord, _ownerId, fileId ?? _file.Id), CancellationToken.None);
 
     private ValueTask<Result<Backend.Veteriner.Application.Files.Contracts.Dtos.StoredFileContent>> Open(long expires, string? signature)
-        => new GetSignedStoredFileContentQueryHandler(Reader(), _signer, _time)
+        => new GetSignedStoredFileContentQueryHandler(Reader(), _signer, Mock.Of<ITenantScope>(), _time)
             .Handle(new GetSignedStoredFileContentQuery(_file.Id, expires, signature), CancellationToken.None);
 
     [Fact]

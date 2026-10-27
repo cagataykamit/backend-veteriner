@@ -52,7 +52,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
         response.EnsureSuccessStatusCode();
         var appointmentId = await response.Content.ReadFromJsonAsync<Guid>();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var appointment = await commandDb.Appointments.AsNoTracking().SingleAsync(a => a.Id == appointmentId);
@@ -92,7 +92,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
         });
         response.EnsureSuccessStatusCode();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var outbox = await commandDb.OutboxMessages.AsNoTracking()
             .SingleAsync(m => m.Type == AppointmentIntegrationEventTypes.Updated);
@@ -114,7 +114,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
         var appointmentId = await SeedScheduledAppointmentAsync(clinicId, petId);
 
         DateTime originalScheduledAtUtc;
-        await using (var readScope = _factory.Services.CreateAsyncScope())
+        await using (var readScope = _factory.Services.CreateSystemScope())
         {
             var readDb = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
             originalScheduledAtUtc = await readDb.Appointments.AsNoTracking()
@@ -136,7 +136,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
         });
         response.EnsureSuccessStatusCode();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var outboxMessages = await commandDb.OutboxMessages.AsNoTracking()
             .Where(m => m.Type == AppointmentIntegrationEventTypes.Rescheduled && m.CreatedAtUtc >= testStartedAtUtc)
@@ -177,7 +177,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
         });
         response.EnsureSuccessStatusCode();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var outbox = await commandDb.OutboxMessages.AsNoTracking()
             .SingleAsync(m => m.Type == AppointmentIntegrationEventTypes.Cancelled);
@@ -202,7 +202,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
         var response = await client.PostAsync($"/api/v1/appointments/{appointmentId}/complete", null);
         response.EnsureSuccessStatusCode();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var outbox = await commandDb.OutboxMessages.AsNoTracking()
             .SingleAsync(m => m.Type == AppointmentIntegrationEventTypes.Completed);
@@ -216,7 +216,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
     {
         await ResetDatabasesAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var buffer = scope.ServiceProvider.GetRequiredService<OutboxBuffer>();
 
@@ -287,7 +287,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
         response.EnsureSuccessStatusCode();
         var appointmentId = await response.Content.ReadFromJsonAsync<Guid>();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -308,7 +308,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
 
     private async Task ResetDatabasesAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
@@ -318,7 +318,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
 
     private async Task<(Guid ClinicId, Guid PetId)> SeedPetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var clinic = await db.Clinics.SingleAsync(c =>
@@ -335,7 +335,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
 
     private async Task<Guid> SeedScheduledAppointmentAsync(Guid clinicId, Guid petId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = await db.Clinics.Where(c => c.Id == clinicId).Select(c => c.TenantId).SingleAsync();
         var appointment = new Appointment(

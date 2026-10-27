@@ -62,7 +62,7 @@ public sealed class AccountSummaryEndpointIntegrationTests : IClassFixture<Custo
 
     private async Task<string> GetTenantNameAsync(Guid tenantId)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Tenants
             .Where(t => t.Id == tenantId)

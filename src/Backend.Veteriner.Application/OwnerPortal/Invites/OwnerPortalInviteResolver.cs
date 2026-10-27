@@ -19,11 +19,14 @@ public sealed record ResolvedOwnerPortalInvite(OwnerPortalInvite Invite, Client 
 /// müşteri hâlâ bu kiracıda, e-postası davet e-postasıyla aynı (K3: e-posta değişince eski davet kapanır) ve hâlâ davet
 /// kuralına uyuyor (<see cref="OwnerPortalInvitePolicy"/>), kiracı ve klinik aktif olmalı. Aksi her durumda aynı yanıt:
 /// <c>Portal.Invites.NotFound</c>.
+/// Davet bağlantısı anonimdir; kiracı davetten çözülür (ADR-040). Token araması kiracılar arasıdır, sonraki sorgular
+/// davetin kiracısının kapsamında çalışır.
 /// </summary>
 public sealed class OwnerPortalInviteResolver
 {
     private readonly ITokenHashService _hash;
     private readonly IReadRepository<OwnerPortalInvite> _invites;
+    private readonly ITenantScope _tenantScope;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Tenant> _tenants;
@@ -31,12 +34,14 @@ public sealed class OwnerPortalInviteResolver
     public OwnerPortalInviteResolver(
         ITokenHashService hash,
         IReadRepository<OwnerPortalInvite> invites,
+        ITenantScope tenantScope,
         IReadRepository<Client> clients,
         IReadRepository<Clinic> clinics,
         IReadRepository<Tenant> tenants)
     {
         _hash = hash;
         _invites = invites;
+        _tenantScope = tenantScope;
         _clients = clients;
         _clinics = clinics;
         _tenants = tenants;
@@ -47,9 +52,14 @@ public sealed class OwnerPortalInviteResolver
         if (string.IsNullOrWhiteSpace(rawToken))
             return NotFound();
 
-        var invite = await _invites.FirstOrDefaultAsync(new OwnerPortalInviteByTokenHashSpec(_hash.ComputeSha256(rawToken.Trim())), ct);
+        OwnerPortalInvite? invite;
+        using (_tenantScope.AsSystem())
+            invite = await _invites.FirstOrDefaultAsync(new OwnerPortalInviteByTokenHashSpec(_hash.ComputeSha256(rawToken.Trim())), ct);
         if (invite is null || !invite.IsUsable(utcNow))
             return NotFound();
+
+        // İsteğin geri kalanı (önizleme ya da kabulün yazımları) davetin kiracısına bağlanır; kapsam istekle biter.
+        _ = _tenantScope.UseTenant(invite.TenantId);
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(invite.TenantId), ct);
         if (tenant is not { IsActive: true })

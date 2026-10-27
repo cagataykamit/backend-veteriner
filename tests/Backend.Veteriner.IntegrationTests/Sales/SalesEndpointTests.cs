@@ -654,7 +654,7 @@ public sealed class SalesEndpointTests : IClassFixture<CustomWebApplicationFacto
 
     private async Task<T> WithDbAsync<T>(Func<AppDbContext, Task<T>> action)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         return await action(scope.ServiceProvider.GetRequiredService<AppDbContext>());
     }
 
@@ -695,7 +695,7 @@ public sealed class SalesEndpointTests : IClassFixture<CustomWebApplicationFacto
 
     private async Task DeactivateProductAsync(Guid productId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var product = await db.Products.SingleAsync(p => p.Id == productId);
         product.Deactivate(DateTime.UtcNow);
@@ -705,7 +705,7 @@ public sealed class SalesEndpointTests : IClassFixture<CustomWebApplicationFacto
     /// <summary>Partiyi doğrudan yazar ve ürün stok satırını partilerin toplamına eşitler.</summary>
     private async Task<Guid> SeedBatchAsync(SeedCtx ctx, decimal quantity, string lot, DateOnly expiry)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var product = await db.Products.SingleAsync(p => p.Id == ctx.ProductId);
         var batch = StockBatch.Create(
@@ -724,7 +724,7 @@ public sealed class SalesEndpointTests : IClassFixture<CustomWebApplicationFacto
 
     private async Task<HttpClient> SeedUserClientAsync(SeedCtx ctx, string[] permissions, bool includeClinicClaim = true)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -739,7 +739,7 @@ public sealed class SalesEndpointTests : IClassFixture<CustomWebApplicationFacto
     /// <param name="stock">Ürün 1 stoğu (null = stok satırı yok; partiler <see cref="SeedBatchAsync"/> ile eklenir). Ürün 2 hep 17 adet.</param>
     private async Task<SeedCtx> SeedAsync(decimal? stock, decimal minimum = 0m, string[]? permissions = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

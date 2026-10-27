@@ -13,15 +13,18 @@ public sealed class DiscountCodeRedemptionService
 {
     private readonly IReadRepository<DiscountCode> _codes;
     private readonly IReadRepository<SalesPartner> _partners;
+    private readonly ITenantScope _tenantScope;
     private readonly IReadRepository<DiscountRedemption> _redemptions;
 
     public DiscountCodeRedemptionService(
         IReadRepository<DiscountCode> codes,
         IReadRepository<SalesPartner> partners,
+        ITenantScope tenantScope,
         IReadRepository<DiscountRedemption> redemptions)
     {
         _codes = codes;
         _partners = partners;
+        _tenantScope = tenantScope;
         _redemptions = redemptions;
     }
 
@@ -33,7 +36,7 @@ public sealed class DiscountCodeRedemptionService
             return null;
 
         var (code, partner) = found.Value;
-        var count = await _redemptions.CountAsync(new DiscountRedemptionsByCodeSpec(code.Id), ct);
+        var count = await CountRedemptionsAsync(code.Id, ct);
         return code.IsRedeemable(partner.IsActive, count, utcNow) ? code : null;
     }
 
@@ -56,8 +59,17 @@ public sealed class DiscountCodeRedemptionService
             return Result<DiscountRedemption>.Failure(DiscountRedemption.InvalidCode);
 
         var (code, partner) = found.Value;
-        var count = await _redemptions.CountAsync(new DiscountRedemptionsByCodeSpec(code.Id), ct);
+        var count = await CountRedemptionsAsync(code.Id, ct);
         return DiscountRedemption.Redeem(tenantId, redeemerEmail, code, partner, count, utcNow);
+    }
+
+    /// <summary>
+    /// Kodun kullanım limiti tüm kiracılardaki kullanımlarla sayılır (ADR-040, kiracılar arası); yalnız sayı döner.
+    /// </summary>
+    private async Task<int> CountRedemptionsAsync(Guid codeId, CancellationToken ct)
+    {
+        using var system = _tenantScope.AsSystem();
+        return await _redemptions.CountAsync(new DiscountRedemptionsByCodeSpec(codeId), ct);
     }
 
     private async Task<(DiscountCode Code, SalesPartner Partner)?> FindAsync(string? rawCode, CancellationToken ct)

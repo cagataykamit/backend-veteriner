@@ -34,6 +34,7 @@ public sealed class SelectClinicCommandHandlerTests
             _permissionReader.Object,
             _tenants.Object,
             _userTenants.Object,
+            Mock.Of<ITenantScope>(),
             _userClinics.Object,
             _clinicsRead.Object,
             _userOperationClaims.Object,

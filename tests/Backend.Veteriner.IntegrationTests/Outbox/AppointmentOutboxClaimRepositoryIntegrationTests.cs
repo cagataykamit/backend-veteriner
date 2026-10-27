@@ -29,8 +29,8 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
         var workerA = "worker-a:1:aaaa";
         var workerB = "worker-b:2:bbbb";
 
-        await using var scopeA = _factory.Services.CreateAsyncScope();
-        await using var scopeB = _factory.Services.CreateAsyncScope();
+        await using var scopeA = _factory.Services.CreateSystemScope();
+        await using var scopeB = _factory.Services.CreateSystemScope();
         var repoA = scopeA.ServiceProvider.GetRequiredService<IAppointmentOutboxClaimRepository>();
         var repoB = scopeB.ServiceProvider.GetRequiredService<IAppointmentOutboxClaimRepository>();
 
@@ -62,7 +62,7 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
         claimed.ClaimedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
         claimed.LeaseExpiresAtUtc.Should().BeAfter(claimed.ClaimedAtUtc);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.OutboxMessages.AsNoTracking().SingleAsync(m => m.Id == message.Id);
 
@@ -92,7 +92,7 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
         var appointmentId = Guid.NewGuid();
         var message = await SeedMessageAsync(appointmentId, sequence: 1);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.OutboxMessages.SingleAsync(m => m.Id == message.Id);
@@ -133,7 +133,7 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
         var result = await MarkProcessedAsync(message.Id, claimed.ClaimToken, claimed.ClaimedBy);
         result.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.OutboxMessages.AsNoTracking().SingleAsync(m => m.Id == message.Id);
 
@@ -262,7 +262,7 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
         await ResetOutboxAsync();
         var appointmentId = Guid.NewGuid();
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.OutboxMessages.Add(new OutboxMessage
@@ -328,7 +328,7 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
     [Fact]
     public async Task WorkerIdentity_Should_BeStableWithinProcessAndWithinMaxLength()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var identity = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionWorkerIdentity>();
 
         identity.WorkerId.Should().NotBeNullOrWhiteSpace();
@@ -341,7 +341,7 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
 
     private async Task ResetOutboxAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.OutboxMessages.ExecuteDeleteAsync();
     }
@@ -353,7 +353,7 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
         DateTime? nextAttemptAtUtc = null,
         DateTime? deadLetterAtUtc = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var message = new OutboxMessage
@@ -388,14 +388,14 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
 
     private async Task<IReadOnlyList<ClaimedAppointmentOutboxMessage>> ClaimBatchAsync(string workerId, int batchSize)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var repo = scope.ServiceProvider.GetRequiredService<IAppointmentOutboxClaimRepository>();
         return await repo.ClaimNextBatchAsync(workerId, batchSize, DefaultLease, CancellationToken.None);
     }
 
     private async Task<bool> MarkProcessedAsync(Guid messageId, Guid claimToken, string workerId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var repo = scope.ServiceProvider.GetRequiredService<IAppointmentOutboxClaimRepository>();
         return await repo.MarkProcessedAsync(messageId, claimToken, workerId, CancellationToken.None);
     }
@@ -408,7 +408,7 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
         DateTime nextAttemptAtUtc,
         string error)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var repo = scope.ServiceProvider.GetRequiredService<IAppointmentOutboxClaimRepository>();
         return await repo.MarkRetryAsync(
             messageId,
@@ -422,7 +422,7 @@ public sealed class AppointmentOutboxClaimRepositoryIntegrationTests
 
     private async Task<bool> MarkDeadLetterAsync(Guid messageId, Guid claimToken, string workerId, string error)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var repo = scope.ServiceProvider.GetRequiredService<IAppointmentOutboxClaimRepository>();
         return await repo.MarkDeadLetterAsync(messageId, claimToken, workerId, error, CancellationToken.None);
     }

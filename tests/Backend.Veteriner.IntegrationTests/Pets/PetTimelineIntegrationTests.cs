@@ -254,7 +254,7 @@ public sealed class PetTimelineIntegrationTests : IClassFixture<CustomWebApplica
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -308,7 +308,7 @@ public sealed class PetTimelineIntegrationTests : IClassFixture<CustomWebApplica
 
         private async Task SaveAsync(Func<AppDbContext, object> add)
         {
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Add(add(db));
             await db.SaveChangesAsync();
@@ -316,7 +316,7 @@ public sealed class PetTimelineIntegrationTests : IClassFixture<CustomWebApplica
 
         public async Task<Guid> SeedPetAsync()
         {
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = new Client(tenantId, $"TClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110088");
             db.Clients.Add(client);
@@ -330,7 +330,7 @@ public sealed class PetTimelineIntegrationTests : IClassFixture<CustomWebApplica
 
         public async Task<Guid> AddOtherClinicAsync()
         {
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = new Clinic(tenantId, $"TlO-{Guid.NewGuid():N}"[..14], "Ankara");
             db.Clinics.Add(clinic);
@@ -369,7 +369,7 @@ public sealed class PetTimelineIntegrationTests : IClassFixture<CustomWebApplica
 
         public async Task AddVaccinationAsync(VaccinationStatus status, DateTime? appliedAtUtc, DateTime? dueAtUtc)
         {
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var definitionId = await db.VaccineDefinitions.Select(v => v.Id).FirstAsync();
             db.Add(new Vaccination(tenantId, PetId, clinicId, null, definitionId, "Karma", status, appliedAtUtc, dueAtUtc, null, DateTime.UtcNow));

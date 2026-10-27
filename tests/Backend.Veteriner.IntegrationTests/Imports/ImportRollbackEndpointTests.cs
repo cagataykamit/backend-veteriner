@@ -61,7 +61,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
 
         // M1 önizlemeden sonra elle eklendi: uygulamada eşleşir (Matched) ve geri almada asla silinmez.
         Guid manualId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var manual = new Client(ctx.TenantId, ctx.CustomerName, DateTime.UtcNow, "905321234567", email: null, address: null);
@@ -99,7 +99,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         after.GetProperty("processed").GetInt32().Should().Be(6);
         after.GetProperty("rolledBackAtUtc").ValueKind.Should().Be(JsonValueKind.String);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.Clients.Where(c => c.TenantId == ctx.TenantId).Select(c => c.Id).ToListAsync())
@@ -159,7 +159,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
 
         // Pamuk (H1) için geliş açıldı; M2 müşterisi sonradan düzenlendi.
         Guid visitId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var visit = new Visit(ctx.TenantId, ctx.ClinicId, targets[(ImportTable.Pets, 2)], null, null, Guid.NewGuid(), DateTime.UtcNow);
@@ -203,7 +203,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         (await StatusAsync(id)).Should().Be(ImportBatchStatus.PartiallyRolledBack);
         (await CountsInTenantAsync(ctx.TenantId)).Should().Be((2, 1, 0), "M1, M2 ve geliş açılmış Pamuk kalır; aşılar ve Kehribar silinir");
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var kept = await db.ImportBatchRows.AsNoTracking()
@@ -217,7 +217,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
 
         // Yeniden deneme (yeni requestId): engel sürdükçe Fail yine reddedilir; geliş kalkınca kalanlar silinir.
         (await PostRollbackAsync(client, id, Guid.NewGuid(), "Tekrar")).StatusCode.Should().Be(HttpStatusCode.Conflict);
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.Visits.Where(v => v.Id == visitId).ExecuteDeleteAsync();
@@ -245,7 +245,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         (await PostRollbackAsync(client, id, Guid.NewGuid(), "Yanlış parti")).StatusCode.Should().Be(HttpStatusCode.Accepted);
 
         // İstekten sonra, iş başlamadan geliş açıldı.
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Visits.Add(new Visit(ctx.TenantId, ctx.ClinicId, targets[(ImportTable.Pets, 3)], null, null, Guid.NewGuid(), DateTime.UtcNow));
@@ -256,7 +256,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
 
         (await StatusAsync(id)).Should().Be(ImportBatchStatus.RollbackFailed);
         (await CountsInTenantAsync(ctx.TenantId)).Should().Be((2, 2, 3), "Fail politikasında hiçbir şey silinmez");
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var audit = await db.AuditLogs.AsNoTracking()
@@ -309,7 +309,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         await RunRollbackWorkerAsync();
         (await StatusAsync(id)).Should().Be(ImportBatchStatus.RolledBack);
         (await PostRollbackAsync(client, id, requestId, "Eşzamanlı")).StatusCode.Should().Be(HttpStatusCode.OK);
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.AuditLogs.CountAsync(a => a.TargetId == $"ImportBatchId={id}" && a.Action == "ImportBatch.RollbackCompleted"))
@@ -382,7 +382,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         var late = await SendUnitAsync(ctx.TenantId, id, crashed, plan.Units[1]);
         late.Error.Code.Should().Be(ImportOwnerUnitErrors.LeaseLostCode);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var m1 = (await TargetsAsync(id))[(ImportTable.Customers, 2)].ToString();
         (await db.OutboxMessages.AsNoTracking().Where(m => m.Type == ClientIntegrationEventTypes.Deleted).Select(m => m.Payload).ToListAsync())
@@ -440,7 +440,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         var result = await MaintenanceAsync(now.AddDays(7).AddMinutes(5));
         result.ExpiredBatches.Should().BeGreaterThanOrEqualTo(1);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id);
         batch.Status.Should().Be(ImportBatchStatus.Expired);
@@ -460,7 +460,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         var committedAt = DateTime.UtcNow;
 
         await MaintenanceAsync(committedAt.AddDays(29));
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).PayloadPurgedAtUtc.Should().BeNull("30 gün dolmadı");
@@ -469,7 +469,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
 
         await MaintenanceAsync(committedAt.AddDays(30).AddMinutes(5));
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).PayloadPurgedAtUtc.Should().NotBeNull();
@@ -556,7 +556,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
 
     private async Task<ImportRollbackPlan> PlanAsync(Guid tenantId, Guid id)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         using var tenant = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
         return (await scope.ServiceProvider.GetRequiredService<ImportRollbackPlanLoader>().LoadAsync(tenantId, id, null, CancellationToken.None)).Plan;
     }
@@ -564,7 +564,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
     private async Task<Backend.Veteriner.Domain.Shared.Result<ImportRollbackUnitResult>> SendUnitAsync(
         Guid tenantId, Guid batchId, string worker, ImportRollbackUnit unit)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         using var tenant = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
         try
         {
@@ -579,7 +579,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
 
     private async Task MutateBatchAsync(Guid id, Action<ImportBatch> mutate)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.SingleAsync(b => b.Id == id);
         mutate(batch);
@@ -589,7 +589,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
     /// <summary>(tablo, satır no) → oluşturulan kaydın kimliği.</summary>
     private async Task<Dictionary<(ImportTable, int), Guid>> TargetsAsync(Guid id)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatchRows.AsNoTracking()
             .Where(r => r.BatchId == id && r.TargetEntityId != null
@@ -600,7 +600,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
 
     private async Task<(int Clients, int Pets, int Vaccinations)> CountsInTenantAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return (
             await db.Clients.CountAsync(c => c.TenantId == tenantId),
@@ -728,14 +728,14 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
 
     private async Task<ImportBatchStatus> StatusAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatches.AsNoTracking().Where(b => b.Id == batchId).Select(b => b.Status).SingleAsync();
     }
 
     private async Task<string> TokenAsync(SeedCtx ctx, string[] permissions)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -745,7 +745,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
     /// <summary>Kiracı + klinik + teste özgü tür ve aşı tanımı + tam yetkili kullanıcı.</summary>
     private async Task<SeedCtx> SeedAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

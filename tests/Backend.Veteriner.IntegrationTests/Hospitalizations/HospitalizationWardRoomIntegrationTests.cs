@@ -82,7 +82,7 @@ public sealed class HospitalizationWardRoomIntegrationTests : IClassFixture<Cust
     private async Task<Guid> SeedRoomInForeignTenantAsync()
     {
         var foreignClinicId = await IntegrationTestAuthHelper.SeedClinicInForeignTenantAsync(_factory.Services);
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinic = await db.Clinics.SingleAsync(c => c.Id == foreignClinicId);
         var ward = HospitalizationWard.Create(clinic.TenantId, clinic.Id, "Yabancı bölüm", 0, DateTime.UtcNow);
@@ -280,7 +280,7 @@ public sealed class HospitalizationWardRoomIntegrationTests : IClassFixture<Cust
         otherClinic.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await IntegrationTestProblemDetails.ReadCodeAsync(otherClinic)).Should().Be("Hospitalizations.RoomNotFound");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Hospitalizations.AnyAsync(h => h.PetId == petId)).Should().BeFalse("hata durumunda kayıt yazılmamalı");
     }

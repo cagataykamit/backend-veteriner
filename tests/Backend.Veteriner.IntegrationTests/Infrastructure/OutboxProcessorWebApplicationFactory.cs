@@ -47,7 +47,7 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
             IntegrationTestDbContextOverride.UseDedicatedDatabase(services, OutboxProcessorCommandConnection);
             IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(services, OutboxProcessorQueryConnection);
 
-            using var scope = services.BuildServiceProvider().CreateScope();
+            using var scope = services.BuildServiceProvider().CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

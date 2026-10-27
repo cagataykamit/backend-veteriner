@@ -405,7 +405,7 @@ public sealed class ImportPerformanceTests
     private static async Task<TenantCtx> SeedTenantAsync(IServiceProvider services, ImportPilotFileGenerator gen)
     {
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(services);
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(db.Database.GetConnectionString());
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
@@ -447,7 +447,7 @@ public sealed class ImportPerformanceTests
 
     private static async Task<ImportCommitPlan> PlanAsync(IServiceProvider services, Guid id)
     {
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.ImportBatchRows.AsNoTracking().Where(r => r.BatchId == id)
             .Select(r => new ImportCommitRowInfo(r.Id, r.Table, r.RowNumber, r.ValidationStatus, r.ApplyStatus, r.NormalizedJson))
@@ -457,7 +457,7 @@ public sealed class ImportPerformanceTests
 
     private static async Task<(int Clients, int Pets, int Vaccinations)> TenantCountsAsync(IServiceProvider services, Guid tenantId)
     {
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return (await db.Clients.CountAsync(c => c.TenantId == tenantId),
             await db.Pets.CountAsync(p => p.TenantId == tenantId),
@@ -466,7 +466,7 @@ public sealed class ImportPerformanceTests
 
     private static async Task<int> ImportedDueInWindowAsync(IServiceProvider services, Guid batchId)
     {
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var now = DateTime.UtcNow;
         return await db.Vaccinations.CountAsync(v => v.ImportBatchId == batchId && v.Status == VaccinationStatus.Applied
@@ -475,7 +475,7 @@ public sealed class ImportPerformanceTests
 
     private static async Task<int> RunRemindersAsync(IServiceProvider services)
     {
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         await scope.ServiceProvider.GetRequiredService<ReminderProcessorService>().ProcessOnceAsync(CancellationToken.None);
         return 0;
     }
@@ -484,7 +484,7 @@ public sealed class ImportPerformanceTests
 
     private static async Task<Dispatches> DispatchesAsync(IServiceProvider services, Guid tenantId, Guid batchId)
     {
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var imported = db.Vaccinations.Where(v => v.ImportBatchId == batchId).Select(v => v.Id);
         var logs = await db.ReminderDispatchLogs.AsNoTracking()
@@ -501,7 +501,7 @@ public sealed class ImportPerformanceTests
     /// <summary>Gölge kullanım benzetimi: oluşturulan hastaların bir kısmına geliş açılır, bazı müşteriler düzenlenir.</summary>
     private static async Task<(int Visits, int EditedClients)> AddRollbackBlockersAsync(IServiceProvider services, TenantCtx ctx, Guid batchId)
     {
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var created = await db.ImportBatchRows.AsNoTracking()
             .Where(r => r.BatchId == batchId && r.ApplyStatus == ImportRowApplyStatus.Created && r.TargetEntityId != null)
@@ -525,7 +525,7 @@ public sealed class ImportPerformanceTests
 
     private static async Task<(int Total, int Remaining)> PurgedRowCountAsync(IServiceProvider services, params Guid[] batchIds)
     {
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = db.ImportBatchRows.Where(r => batchIds.Contains(r.BatchId));
         return (await rows.CountAsync(), await rows.CountAsync(r => r.SourceJson != null || r.NormalizedJson != null || r.IssuesJson != null));
@@ -1058,7 +1058,7 @@ public sealed class ImportPerformanceTests
                             .Select(e => $"{e.Name}:{e.Value.GetProperty("status").GetString()}"));
                     }
 
-                    await using var scope = factory.Services.CreateAsyncScope();
+                    await using var scope = factory.Services.CreateSystemScope();
                     var pressure = await scope.ServiceProvider.GetRequiredService<IImportBackpressureProbe>().ReadAsync(_cts.Token);
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                     var petPending = await OutboxMessageQueryFilters.PetIntegrationEventsOnly(db.OutboxMessages.AsNoTracking())

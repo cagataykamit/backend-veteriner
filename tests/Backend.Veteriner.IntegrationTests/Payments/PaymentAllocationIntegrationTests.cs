@@ -350,7 +350,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         var chargeId = await ctx.SeedChargeAsync(100m);
         var paymentId = (await ctx.PostPaymentAsync(ctx.Body(100m, chargeId))).Id;
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var overCharge = async () => await db.Database.ExecuteSqlRawAsync(
@@ -502,7 +502,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         corrected.StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await admin.Http.GetFromJsonAsync<PaymentDetailDto>($"/api/v1/payments/{adminPayment}"))!.Amount.Should().Be(90m);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var log = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "Payment.Update" && a.TargetId == $"PaymentId={adminPayment}" && a.Success)
@@ -537,7 +537,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -603,7 +603,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         public async Task<HttpClient> NewHttpForAnotherUserAsync(string[] permissions)
         {
             string email;
-            await using (var scope = _services.CreateAsyncScope())
+            await using (var scope = _services.CreateSystemScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 (_, email) = await SeedUserAsync(db, _hasher, TenantId, ClinicId);
@@ -678,7 +678,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<Guid> SeedClientAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = new Client(TenantId, $"AClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110077");
             db.Clients.Add(client);
@@ -688,7 +688,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<Guid> SeedChargeAsync(decimal amount, Guid? clientId = null, Guid? clinicId = null, Guid? petId = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var charge = Charge.Create(
                     TenantId, clinicId ?? ClinicId, clientId ?? ClientId, petId, null, null,
@@ -701,7 +701,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<(Guid Id, string Name)> SeedPetAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
             var pet = new Pet(TenantId, ClientId, $"APet-{Guid.NewGuid():N}"[..10], speciesId);
@@ -711,7 +711,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         }
 
         public async Task<Guid> SeedLegacyPaymentAsync(decimal amount)        {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var payment = new Payment(
                 TenantId, ClinicId, ClientId, null, null, null, amount, "TRY", PaymentMethod.Cash,
@@ -723,7 +723,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<Guid> SeedForeignClinicAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = new Clinic(TenantId, $"Other-{Guid.NewGuid():N}"[..14], "Bursa");
             db.Clinics.Add(clinic);
@@ -733,7 +733,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<Guid> SeedForeignTenantChargeAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
             db.Tenants.Add(tenant);
@@ -754,7 +754,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<int> CountPaymentsAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             return await db.Payments.CountAsync(p => p.TenantId == TenantId && p.ClinicId == ClinicId);
         }
@@ -762,7 +762,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         /// <summary>Sayaç değişmezi: her ödeme/ücret için Σ PaymentAllocations.Amount == AllocatedAmount.</summary>
         public async Task AssertCountersMatchAllocationsAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var byPayment = await db.PaymentAllocations.AsNoTracking()

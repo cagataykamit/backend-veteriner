@@ -97,7 +97,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
         (await reader.PatchAsJsonAsync($"/api/v1/prescriptions/{prescriptionId}/hbs", new { status = "NotEntered" }))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var update = await db.AuditLogs.AsNoTracking()
             .SingleAsync(a => a.Action == "Prescription.Hbs.Update" && a.TargetId == $"PrescriptionId={prescriptionId}" && a.Success);
@@ -192,7 +192,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
         (await ctx.Http.PatchAsJsonAsync($"/api/v1/vaccinations/{foreignVaccination}/hbs", new { status = "Entered" }))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Prescriptions.AsNoTracking().SingleAsync(p => p.Id == foreignPrescription)).HbsStatus
             .Should().Be(Backend.Veteriner.Domain.Hbs.HbsEntryStatus.NotEntered);
@@ -214,7 +214,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -267,7 +267,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
             var clientId = JsonDocument.Parse(clientBody).RootElement.GetProperty("id").GetGuid();
 
             Guid speciesId;
-            await using (var scope = factory.Services.CreateAsyncScope())
+            await using (var scope = factory.Services.CreateSystemScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 speciesId = await db.Species.Where(s => s.IsActive).OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
@@ -293,7 +293,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
 
         public async Task<Guid> SeedExaminationAsync(Guid petId)
         {
-            await using var scope = factory.Services.CreateAsyncScope();
+            await using var scope = factory.Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = await db.Clinics.SingleAsync(c => c.Id == ClinicId);
             var exam = new Examination(clinic.TenantId, ClinicId, petId, null, DateTime.UtcNow.AddHours(-2), "Kontrol", "Bulgu", null, null, DateTime.UtcNow);
@@ -304,7 +304,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
 
         public async Task FinalizeExaminationAsync(Guid examinationId)
         {
-            await using var scope = factory.Services.CreateAsyncScope();
+            await using var scope = factory.Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var exam = await db.Examinations.SingleAsync(e => e.Id == examinationId);
             exam.Finalize(UserId, DateTime.UtcNow).IsSuccess.Should().BeTrue();
@@ -313,7 +313,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
 
         public async Task<Guid> SeedVaccinationAsync(Guid petId, Guid examinationId)
         {
-            await using var scope = factory.Services.CreateAsyncScope();
+            await using var scope = factory.Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = await db.Clinics.SingleAsync(c => c.Id == ClinicId);
             var definition = await db.VaccineDefinitions.OrderBy(v => v.Code).Select(v => new { v.Id, v.Name }).FirstAsync();

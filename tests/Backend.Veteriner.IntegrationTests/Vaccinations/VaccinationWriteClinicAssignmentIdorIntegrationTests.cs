@@ -261,14 +261,14 @@ public sealed class VaccinationWriteClinicAssignmentIdorIntegrationTests : IClas
 
     private async Task<Guid> GetFirstVaccineDefinitionIdAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.VaccineDefinitions.OrderBy(v => v.Code).Select(v => v.Id).FirstAsync();
     }
 
     private async Task<(Guid ClinicId, Guid PetId, string? Notes)> GetVaccinationSnapshotAsync(Guid vaccinationId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Vaccinations.AsNoTracking().SingleAsync(v => v.Id == vaccinationId);
         return (row.ClinicId, row.PetId, row.Notes);

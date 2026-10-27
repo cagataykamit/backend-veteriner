@@ -70,7 +70,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         var token = await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(
             _factory.Services, email, permissions ?? [PermissionCatalog.OwnerPortal.Manage], clinicId);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = await db.Tenants.Where(t => t.Name == DataSeeder.DefaultTenantName).Select(t => t.Id).SingleAsync();
         return new StaffContext(token, tenantId, clinicId);
@@ -78,7 +78,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
 
     private async Task<Client> SeedClientAsync(Guid tenantId, string? email = null, Action<Client>? configure = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var client = new Client(tenantId, $"Portal Sahip {Guid.NewGuid():N}"[..20], DateTime.UtcNow, email: email ?? $"owner-{Guid.NewGuid():N}@example.com");
         configure?.Invoke(client);
@@ -149,7 +149,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         var client = await SeedClientAsync(staff.TenantId);
         var rawToken = await InviteAsync(staff, client.Id);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var invite = await db.OwnerPortalInvites.AsNoTracking().SingleAsync(i => i.ClientId == client.Id);
@@ -218,7 +218,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         (await SendAsync(HttpMethod.Post, "/api/portal/v1/auth/refresh", body: new { refreshToken = newRefresh }))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized, "tekrar kullanım tüm oturumları kapatır");
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var account = await db.OwnerAccounts.AsNoTracking().SingleAsync(a => a.Email == client.Email);
@@ -290,7 +290,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         }
 
         _secrets.TokenCount.Should().Be(tokensBefore, "davet token'ı üretilmez");
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.OwnerPortalInvites.AnyAsync(i => i.ClientId == declined.Id || i.ClientId == optedOut.Id || i.ClientId == noEmail.Id))
             .Should().BeFalse();
@@ -303,7 +303,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         var client = await SeedClientAsync(staff.TenantId);
         var rawToken = await InviteAsync(staff, client.Id);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tracked = await db.Clients.SingleAsync(c => c.Id == client.Id);
@@ -335,7 +335,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         var unknown = await SendAsync(HttpMethod.Post, "/api/portal/v1/auth/code/verify", body: new { email = $"nobody-{Guid.NewGuid():N}@example.com", oneTimeCode = "123456" });
         (await IntegrationTestProblemDetails.ReadCodeAsync(unknown)).Should().Be(InvalidCredentials);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var account = await db.OwnerAccounts.AsNoTracking().SingleAsync(a => a.Email == portal.Email);
         account.LockedUntilUtc.Should().NotBeNull();
@@ -404,7 +404,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
 
         // Başka kiracının müşterisi personel uçlarında görünmez.
         Guid foreignClientId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = new Tenant($"PortalYabanci-{Guid.NewGuid():N}"[..24], DateTime.UtcNow);

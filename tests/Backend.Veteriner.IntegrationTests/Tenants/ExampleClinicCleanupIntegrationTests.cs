@@ -55,7 +55,7 @@ public sealed class ExampleClinicCleanupIntegrationTests : IClassFixture<CustomW
         preview.GetProperty("productsDeactivated").GetInt32().Should().Be(1);
 
         int examinationsBefore, appointmentsBefore, paymentsBefore;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             examinationsBefore = await db.Examinations.CountAsync(x => x.TenantId == tenantId);
@@ -76,7 +76,7 @@ public sealed class ExampleClinicCleanupIntegrationTests : IClassFixture<CustomW
         counts.GetProperty("products").GetInt32().Should().Be(9);
         counts.GetProperty("productsDeactivated").GetInt32().Should().Be(1);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tag = ExampleClinicDataGenerator.TagPrefix;
@@ -190,7 +190,7 @@ public sealed class ExampleClinicCleanupIntegrationTests : IClassFixture<CustomW
     /// </summary>
     private async Task<UserRecords> SeedUserRecordsAsync(Guid tenantId, Guid clinicId, string email)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var userId = await db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync();
         var speciesId = await db.Species.Where(s => s.Code == "CAT").Select(s => s.Id).SingleAsync();
@@ -219,7 +219,7 @@ public sealed class ExampleClinicCleanupIntegrationTests : IClassFixture<CustomW
 
     private async Task ActivatePaidPlanAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var subscription = await db.TenantSubscriptions.SingleAsync(s => s.TenantId == tenantId);
         subscription.ActivatePaidPlan(SubscriptionPlanCode.Basic, DateTime.UtcNow);
@@ -231,7 +231,7 @@ public sealed class ExampleClinicCleanupIntegrationTests : IClassFixture<CustomW
 
     private async Task<int> CountClientsAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Clients.CountAsync(c => c.TenantId == tenantId);
     }

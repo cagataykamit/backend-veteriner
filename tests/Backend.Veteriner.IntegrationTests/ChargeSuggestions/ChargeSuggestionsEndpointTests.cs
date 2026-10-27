@@ -294,7 +294,7 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
 
     private async Task<SeedCtx> AddPetWithExaminationAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(ctx.TenantId, ctx.ClientId, $"CsPet2-{Guid.NewGuid():N}"[..12], speciesId);
@@ -307,7 +307,7 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
 
     private async Task<Guid> AddClientAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var client = new Client(tenantId, $"CsOther-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110078");
         db.Clients.Add(client);
@@ -357,21 +357,21 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
 
     private async Task<int> ChargeCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Charges.AsNoTracking().IgnoreQueryFilters().CountAsync(c => c.PetId == ctx.PetId);
     }
 
     private async Task<ChargeSuggestionStatus> StatusAsync(Guid suggestionId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ChargeSuggestions.AsNoTracking().Where(s => s.Id == suggestionId).Select(s => s.Status).SingleAsync();
     }
 
     private async Task<HttpClient> ClientAsync(SeedCtx ctx, string[] permissions, bool includeClinicClaim = true)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -385,7 +385,7 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
 
     private async Task<SeedCtx> SeedAsync(decimal price = Price, ProductKind kind = ProductKind.Other, decimal? stock = 20m)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = new Tenant($"cs-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);

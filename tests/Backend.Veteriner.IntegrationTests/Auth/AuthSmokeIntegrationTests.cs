@@ -97,7 +97,7 @@ public sealed class AuthSmokeIntegrationTests : IClassFixture<CustomWebApplicati
             "admin@example.com",
             "123456");
 
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinicId = db.Clinics
             .Where(c => c.TenantId == login.TenantId)

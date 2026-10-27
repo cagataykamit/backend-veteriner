@@ -21,7 +21,7 @@ public sealed class ClientReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task ResolveClientIdsByTextSearch_Should_ReturnEmpty_When_PatternNull()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelLookupReader>();
 
@@ -42,7 +42,7 @@ public sealed class ClientReadModelLookupReaderIntegrationTests
     [InlineData("905321")]
     public async Task ResolveClientIdsByTextSearch_Should_MatchAcrossNameEmailPhone(string term)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelLookupReader>();
 
@@ -64,7 +64,7 @@ public sealed class ClientReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task ResolveClientIdsByTextSearch_Should_ReturnOnlyRowsForRequestedTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelLookupReader>();
 
@@ -87,7 +87,7 @@ public sealed class ClientReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task ResolveClientIdsByTextSearch_Should_EscapeLikeWildcards()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelLookupReader>();
 
@@ -108,7 +108,7 @@ public sealed class ClientReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task GetNamesByIds_Should_ReturnEmpty_When_NoIds()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelLookupReader>();
 
         var result = await reader.GetNamesByIdsAsync(
@@ -120,7 +120,7 @@ public sealed class ClientReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task GetNamesByIds_Should_ReturnOnlyTenantScopedNames()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelLookupReader>();
 
@@ -143,7 +143,7 @@ public sealed class ClientReadModelLookupReaderIntegrationTests
     [Fact]
     public async Task GetNamesByIds_Should_OrderByNormalizedNameThenId()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelLookupReader>();
 

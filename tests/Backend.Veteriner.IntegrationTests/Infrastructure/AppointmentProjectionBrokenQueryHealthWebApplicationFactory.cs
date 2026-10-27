@@ -46,7 +46,7 @@ public sealed class AppointmentProjectionBrokenQueryReadEnabledWebApplicationFac
             IntegrationTestDbContextOverride.UseDedicatedDatabase(services, CommandConnection);
             IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(services, InvalidQueryConnection);
 
-            using var scope = services.BuildServiceProvider().CreateScope();
+            using var scope = services.BuildServiceProvider().CreateSystemScope();
             var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             IntegrationTestDatabaseGuard.EnsureSafeDatabase(
                 commandDb.Database.GetConnectionString(),
@@ -119,7 +119,7 @@ public sealed class AppointmentProjectionBrokenQueryReadDisabledWebApplicationFa
             IntegrationTestDbContextOverride.UseDedicatedDatabase(services, CommandConnection);
             IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(services, InvalidQueryConnection);
 
-            using var scope = services.BuildServiceProvider().CreateScope();
+            using var scope = services.BuildServiceProvider().CreateSystemScope();
             var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             IntegrationTestDatabaseReset.EnsureDroppedAsync(CommandConnection).GetAwaiter().GetResult();
             commandDb.Database.EnsureCreated();

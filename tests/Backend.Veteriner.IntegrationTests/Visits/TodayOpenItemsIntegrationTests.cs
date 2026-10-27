@@ -258,7 +258,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -360,7 +360,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedPetAsync()
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = new Client(TenantId, $"OClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110088");
             db.Clients.Add(client);
@@ -374,7 +374,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedOtherClinicAsync()
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = new Clinic(TenantId, $"Other-{Guid.NewGuid():N}"[..14], "Bursa");
             db.Clinics.Add(clinic);
@@ -384,7 +384,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task SeedPlannedAppointmentAsync()
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Appointments.Add(new Backend.Veteriner.Domain.Appointments.Appointment(
                 TenantId, ClinicId, PetId, DateTime.UtcNow.AddMinutes(30), 30,
@@ -397,7 +397,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
         public async Task<Guid> SeedVisitAsync(
             Guid petId, DateTime arrivedAtUtc, VisitCareStatus status, Guid? clinicId = null, bool voided = false)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var visit = new Visit(TenantId, clinicId ?? ClinicId, petId, null, null, UserId, arrivedAtUtc);
             if (status != VisitCareStatus.Waiting)
@@ -417,7 +417,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task SeedExaminationRowAsync(Guid visitId, Guid petId, Guid? clinicId = null)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var examination = new Backend.Veteriner.Domain.Examinations.Examination(
                 TenantId, clinicId ?? ClinicId, petId, null, DateTime.UtcNow.AddMinutes(-5), "Kontrol", null, null, null, DateTime.UtcNow, visitId: visitId);
@@ -427,7 +427,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedChargeAsync(Guid? visitId, Guid? examinationId, decimal amount, Guid? petId = null)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var pet = petId ?? PetId;
             var clientId = await db.Pets.Where(p => p.Id == pet).Select(p => p.ClientId).SingleAsync();
@@ -441,7 +441,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task AllocateAsync(Guid chargeId, decimal amount)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var charge = await db.Charges.SingleAsync(c => c.Id == chargeId);
             charge.ApplyAllocation(amount).IsSuccess.Should().BeTrue();
@@ -450,7 +450,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task SeedTreatmentAsync(Guid examinationId)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Treatments.Add(new Treatment(
                 TenantId, ClinicId, PetId, examinationId, DateTime.UtcNow.AddMinutes(-3), "Tedavi", "Aciklama", null, null, DateTime.UtcNow));
@@ -459,7 +459,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task SeedHospitalizationAsync(Guid? visitId, Guid? examinationId)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var hospitalization = new Hospitalization(
                 TenantId, ClinicId, PetId, examinationId, DateTime.UtcNow.AddHours(-3), DateTime.UtcNow.AddDays(1), "Gozlem", null, DateTime.UtcNow, visitId);
@@ -469,7 +469,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedAdministrationAsync(Guid examinationId, Guid? vaccinationId, bool voided)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var created = Administration.Create(
                 TenantId, ClinicId, PetId, examinationId, null, Guid.NewGuid(), 1m, DateTime.UtcNow.AddMinutes(-2),
@@ -486,7 +486,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedVaccinationAsync(Guid examinationId, VaccinationStatus status)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var definitionId = await db.VaccineDefinitions.Select(v => v.Id).FirstAsync();
             var vaccination = new Vaccination(
@@ -500,7 +500,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedLabAsync(Guid? visitId, Guid? examinationId, bool resulted, Guid? clinicId = null)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var lab = new LabResult(
                 TenantId, clinicId ?? ClinicId, PetId, examinationId, visitId, UserId,
@@ -512,7 +512,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task CancelLabAsync(Guid labId)
         {
-            await using var scope = Services.CreateAsyncScope();
+            await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var lab = await db.LabResults.SingleAsync(l => l.Id == labId);
             lab.Cancel(UserId, "Test iptal gerekcesi", DateTime.UtcNow).IsSuccess.Should().BeTrue();

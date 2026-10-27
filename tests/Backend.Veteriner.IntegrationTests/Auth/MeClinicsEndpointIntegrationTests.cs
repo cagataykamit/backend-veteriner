@@ -74,7 +74,7 @@ public sealed class MeClinicsEndpointIntegrationTests : IClassFixture<CustomWebA
 
     private async Task<Guid> GetDefaultSeedClinicIdAsync(Guid tenantId)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Clinics
             .Where(c => c.TenantId == tenantId && c.Name == DataSeeder.DefaultSeedClinicName)

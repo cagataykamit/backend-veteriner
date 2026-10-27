@@ -283,7 +283,7 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
 
     private async Task<decimal> GetStockAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ProductStocks.AsNoTracking()
             .Where(s => s.ClinicId == ctx.ClinicId && s.ProductId == ctx.ProductId)
@@ -293,21 +293,21 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
 
     private async Task<int> AdministrationCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Administrations.AsNoTracking().CountAsync(a => a.ProductId == ctx.ProductId);
     }
 
     private async Task<int> VaccinationCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Vaccinations.AsNoTracking().CountAsync(v => v.PetId == ctx.PetId);
     }
 
     private async Task<SeedCtx> SeedAsync(decimal stock, decimal minimum = 0m, string[]? permissions = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

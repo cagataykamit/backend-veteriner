@@ -96,7 +96,7 @@ public sealed class PrescriptionWriteClinicAssignmentIdorIntegrationTests : ICla
             _factory.Services,
             unassignedClinicId);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var treatment = await db.Treatments.AsNoTracking().SingleAsync(t => t.Id == treatmentId);
@@ -253,7 +253,7 @@ public sealed class PrescriptionWriteClinicAssignmentIdorIntegrationTests : ICla
 
     private async Task<(Guid ClinicId, Guid PetId, string Title)> GetPrescriptionSnapshotAsync(Guid prescriptionId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Prescriptions.AsNoTracking().SingleAsync(p => p.Id == prescriptionId);
         return (row.ClinicId, row.PetId, row.Title);

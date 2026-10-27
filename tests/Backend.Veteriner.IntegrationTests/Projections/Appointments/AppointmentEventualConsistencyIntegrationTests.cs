@@ -52,7 +52,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         var detail = (await detailResponse.Content.ReadFromJsonAsync<AppointmentDetailDto>())!;
         detail.Id.Should().Be(appointmentId);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.AppointmentReadModels.CountAsync(x => x.AppointmentId == appointmentId)).Should().Be(0);
 
@@ -77,7 +77,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         await EventualConsistencyTestSupport.EventuallyAsync(
             async () =>
             {
-                await using var scope = _factory.Services.CreateAsyncScope();
+                await using var scope = _factory.Services.CreateSystemScope();
                 var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
                 return await queryDb.AppointmentReadModels.AnyAsync(x => x.AppointmentId == appointmentId);
             },
@@ -117,7 +117,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         await EventualConsistencyTestSupport.EventuallyAsync(
             async () =>
             {
-                await using var scope = _factory.Services.CreateAsyncScope();
+                await using var scope = _factory.Services.CreateSystemScope();
                 var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
                 var row = await queryDb.AppointmentReadModels.AsNoTracking()
                     .SingleOrDefaultAsync(x => x.AppointmentId == appointmentId);
@@ -149,7 +149,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         await EventualConsistencyTestSupport.EventuallyAsync(
             async () =>
             {
-                await using var scope = _factory.Services.CreateAsyncScope();
+                await using var scope = _factory.Services.CreateSystemScope();
                 var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
                 var row = await queryDb.AppointmentReadModels.AsNoTracking()
                     .SingleAsync(x => x.AppointmentId == appointmentId);
@@ -176,7 +176,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         await EventualConsistencyTestSupport.EventuallyAsync(
             async () =>
             {
-                await using var scope = _factory.Services.CreateAsyncScope();
+                await using var scope = _factory.Services.CreateSystemScope();
                 var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
                 var row = await queryDb.AppointmentReadModels.AsNoTracking()
                     .SingleAsync(x => x.AppointmentId == appointmentId);
@@ -195,7 +195,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         var client = await CreateAuthenticatedClientAsync();
         var appointmentId = await CreateAppointmentViaApiAsync(client, clinicId, petId, SlotAlignedUtcPlusDays(2));
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var statusReader = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionStatusReader>();
@@ -222,7 +222,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         var client = await CreateAuthenticatedClientAsync();
         var appointmentId = await CreateAppointmentViaApiAsync(client, clinicId, petId, SlotAlignedUtcPlusDays(2));
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var outbox = await commandDb.OutboxMessages
             .Where(m => m.Type == AppointmentIntegrationEventTypes.Created)
@@ -266,7 +266,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         var client = await CreateAuthenticatedClientAsync();
         var appointmentId = await CreateAppointmentViaApiAsync(client, clinicId, petId, SlotAlignedUtcPlusDays(2));
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -285,7 +285,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
     [Fact]
     public async Task RestartIdempotency_Should_NotDoubleApply_WhenProcessedEventExistsButOutboxOpen()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -362,7 +362,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         var legacyWhen = SlotAlignedUtcPlusDays(1);
         var legacyId = await SeedAppointmentDirectAsync(clinicId, petId, legacyWhen);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var rebuild = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionRebuildService>();
         (await rebuild.RebuildAsync(500, CancellationToken.None)).CommandAppointmentCount.Should().BeGreaterThan(0);
 
@@ -374,7 +374,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         await EventualConsistencyTestSupport.EventuallyAsync(
             async () =>
             {
-                await using var inner = _factory.Services.CreateAsyncScope();
+                await using var inner = _factory.Services.CreateSystemScope();
                 var queryDb = inner.ServiceProvider.GetRequiredService<QueryDbContext>();
                 var count = await queryDb.AppointmentReadModels.CountAsync(x =>
                     x.AppointmentId == legacyId || x.AppointmentId == newId);
@@ -387,7 +387,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
 
     private async Task ResetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
@@ -397,7 +397,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
 
     private async Task ProcessAllPendingAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
         for (var i = 0; i < 10; i++)
         {
@@ -430,7 +430,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
 
     private async Task<(Guid ClinicId, Guid PetId)> SeedPetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var clinic = await db.Clinics.SingleAsync(c =>
@@ -447,7 +447,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
 
     private async Task<Guid> SeedAppointmentDirectAsync(Guid clinicId, Guid petId, DateTime when)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = await db.Clinics.Where(c => c.Id == clinicId).Select(c => c.TenantId).SingleAsync();
         var appointment = new Appointment(tenantId, clinicId, petId, when, 30, AppointmentType.Consultation, AppointmentStatus.Scheduled);
@@ -460,7 +460,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         GetAppointmentsListQuery query,
         bool appointmentsEnabled)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var sp = scope.ServiceProvider;
         var db = sp.GetRequiredService<AppDbContext>();
         var tenantId = await db.Tenants.Where(t => t.Name == DataSeeder.DefaultTenantName).Select(t => t.Id).SingleAsync();

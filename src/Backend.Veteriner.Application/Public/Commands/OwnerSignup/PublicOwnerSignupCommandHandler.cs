@@ -30,6 +30,7 @@ public sealed class PublicOwnerSignupCommandHandler
     private readonly IUserRepository _usersWrite;
     private readonly IReadRepository<Tenant> _tenantsRead;
     private readonly IRepository<Tenant> _tenantsWrite;
+    private readonly ITenantScope _tenantScope;
     private readonly IRepository<Clinic> _clinicsWrite;
     private readonly IRepository<UserTenant> _userTenantsWrite;
     private readonly IRepository<UserClinic> _userClinicsWrite;
@@ -50,6 +51,7 @@ public sealed class PublicOwnerSignupCommandHandler
         IUserRepository usersWrite,
         IReadRepository<Tenant> tenantsRead,
         IRepository<Tenant> tenantsWrite,
+        ITenantScope tenantScope,
         IRepository<Clinic> clinicsWrite,
         IRepository<UserTenant> userTenantsWrite,
         IRepository<UserClinic> userClinicsWrite,
@@ -69,6 +71,7 @@ public sealed class PublicOwnerSignupCommandHandler
         _usersWrite = usersWrite;
         _tenantsRead = tenantsRead;
         _tenantsWrite = tenantsWrite;
+        _tenantScope = tenantScope;
         _clinicsWrite = clinicsWrite;
         _userTenantsWrite = userTenantsWrite;
         _userClinicsWrite = userClinicsWrite;
@@ -156,6 +159,9 @@ public sealed class PublicOwnerSignupCommandHandler
             return Result<PublicOwnerSignupResultDto>.Failure(roleResult.Error);
 
         var tenant = new Tenant(tenantName, utcNow);
+
+        // Kayıt anonimdir; yeni kiracının kayıtları onun kapsamında yazılır (ADR-040).
+        using var tenantScope = _tenantScope.UseTenant(tenant.Id);
         var clinic = new Clinic(tenant.Id, clinicName, clinicCity);
 
         var subscription = TenantSubscription.StartTrial(

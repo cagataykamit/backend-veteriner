@@ -37,7 +37,7 @@ public sealed class ExaminationSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOff_Should_FindExamination_ByClientNameSearch_EvenWhenQueryDbEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -59,7 +59,7 @@ public sealed class ExaminationSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_FindExamination_ByClientNameSearch_WhenReadModelPopulated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -82,7 +82,7 @@ public sealed class ExaminationSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_NotFallback_WhenReadModelEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -103,7 +103,7 @@ public sealed class ExaminationSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_FindExamination_ByPetNameSearch_WhenReadModelPopulated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 

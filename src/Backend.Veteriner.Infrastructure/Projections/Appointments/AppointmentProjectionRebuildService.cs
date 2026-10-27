@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Domain.Appointments;
@@ -16,17 +17,20 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
     private static readonly Guid RebuildEventId = Guid.Empty;
 
     private readonly AppDbContext _commandDb;
+    private readonly ITenantScope _tenantScope;
     private readonly QueryDbContext _queryDb;
     private readonly ILogger<AppointmentProjectionRebuildService> _logger;
     private readonly AppointmentProjectionMetrics _metrics;
 
     public AppointmentProjectionRebuildService(
         AppDbContext commandDb,
+        ITenantScope tenantScope,
         QueryDbContext queryDb,
         ILogger<AppointmentProjectionRebuildService> logger,
         AppointmentProjectionMetrics metrics)
     {
         _commandDb = commandDb;
+        _tenantScope = tenantScope;
         _queryDb = queryDb;
         _logger = logger;
         _metrics = metrics;
@@ -36,6 +40,8 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
         int batchSize,
         CancellationToken cancellationToken = default)
     {
+        // Okuma modelini tüm kiracılar için yeniden kurar (platform bakım işi, ADR-040).
+        using var system = _tenantScope.AsSystem();
         var started = DateTime.UtcNow;
         batchSize = Math.Max(1, batchSize);
 

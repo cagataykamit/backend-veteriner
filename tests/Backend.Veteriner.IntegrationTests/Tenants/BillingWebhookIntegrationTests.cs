@@ -75,7 +75,7 @@ public sealed class BillingWebhookIntegrationTests : IClassFixture<CustomWebAppl
         ack.GetProperty("duplicate").GetBoolean().Should().BeFalse();
         ack.GetProperty("providerEventId").GetString().Should().Be(eventId);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var sub = await db.TenantSubscriptions.AsNoTracking().SingleAsync(s => s.TenantId == tenantId);
@@ -95,7 +95,7 @@ public sealed class BillingWebhookIntegrationTests : IClassFixture<CustomWebAppl
         ack2.GetProperty("duplicate").GetBoolean().Should().BeTrue();
         ack2.GetProperty("processed").GetBoolean().Should().BeFalse();
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.BillingWebhookReceipts.AsNoTracking().CountAsync(r => r.ProviderEventId == eventId))
@@ -115,7 +115,7 @@ public sealed class BillingWebhookIntegrationTests : IClassFixture<CustomWebAppl
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("processed").GetBoolean().Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.BillingWebhookReceipts.AsNoTracking().SingleAsync(r => r.ProviderEventId == eventId)).ProcessedAtUtc.Should().NotBeNull();
         (await db.TenantSubscriptions.AsNoTracking().SingleAsync(s => s.TenantId == tenantId)).Status
@@ -133,7 +133,7 @@ public sealed class BillingWebhookIntegrationTests : IClassFixture<CustomWebAppl
         response.IsSuccessStatusCode.Should().BeFalse();
         (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Billing.WebhookCheckoutSessionMissing");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var receipt = await db.BillingWebhookReceipts.AsNoTracking().SingleOrDefaultAsync(r => r.ProviderEventId == eventId);
         // Receipt alındı ama işlenmedi: sağlayıcının yeniden teslimi tekrar işlenebilir (duplicate sayılmaz).
@@ -186,7 +186,7 @@ public sealed class BillingWebhookIntegrationTests : IClassFixture<CustomWebAppl
 
     private async Task<bool> ReceiptExistsAsync(string eventId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.BillingWebhookReceipts.AsNoTracking().AnyAsync(r => r.ProviderEventId == eventId);
     }
@@ -212,7 +212,7 @@ public sealed class BillingWebhookIntegrationTests : IClassFixture<CustomWebAppl
 
     private async Task<Guid> SeedOpenCheckoutSessionAsync(Guid tenantId, BillingProvider provider)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var session = BillingCheckoutSession.CreatePending(
             tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Pro, provider, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));

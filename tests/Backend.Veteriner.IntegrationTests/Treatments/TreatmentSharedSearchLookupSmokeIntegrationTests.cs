@@ -36,7 +36,7 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOff_Should_FindTreatment_ByClientNameSearch_EvenWhenQueryDbEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -57,7 +57,7 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_NotFallback_WhenReadModelEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -80,7 +80,7 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_FindTreatment_ByClientNameSearch_WhenReadModelPopulated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -102,7 +102,7 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_ReturnOnlyRowsForRequestedTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -127,7 +127,7 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task ActiveOnly_Should_Return_Only_Today_Or_Later_FollowUps_Nearest_First()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         // Tohum tedavisinin takip tarihi yok: aktif sayılmaz (ADR-025 madde 2).

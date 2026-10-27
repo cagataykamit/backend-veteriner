@@ -36,7 +36,7 @@ internal static class IntegrationTestAuthHelper
 {
     public static async Task EnsureRolePermissionBindingsAsync(IServiceProvider services)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await RolePermissionBindingSeeder.SeedAsync(db);
     }
@@ -51,7 +51,7 @@ internal static class IntegrationTestAuthHelper
         var refreshToken = json.GetProperty("refreshToken").GetString()!;
         var tenantId = json.GetProperty("resolvedTenantId").GetGuid();
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var userId = await db.Users
             .Where(u => u.Email == email)
@@ -71,7 +71,7 @@ internal static class IntegrationTestAuthHelper
         IReadOnlyCollection<string> permissions,
         Guid? clinicId = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -262,7 +262,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -293,7 +293,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -328,7 +328,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -366,7 +366,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -399,7 +399,7 @@ internal static class IntegrationTestAuthHelper
         Guid clinicId,
         TimeSpan? scheduledOffsetFromUtcNow = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -436,7 +436,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -476,7 +476,7 @@ internal static class IntegrationTestAuthHelper
     /// <summary>Belirtilen klinik için tenant-owned pet oluşturur.</summary>
     public static async Task<Guid> SeedPetInClinicAsync(IServiceProvider services, Guid clinicId)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -501,7 +501,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -537,7 +537,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -575,7 +575,7 @@ internal static class IntegrationTestAuthHelper
         bool includeRelatedTreatment = false,
         TimeSpan? examinedOffsetFromUtcNow = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -636,7 +636,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -672,7 +672,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -709,7 +709,7 @@ internal static class IntegrationTestAuthHelper
         Guid clinicId,
         TimeSpan? treatmentOffsetFromUtcNow = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -749,7 +749,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -785,7 +785,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -822,7 +822,7 @@ internal static class IntegrationTestAuthHelper
         Guid clinicId,
         TimeSpan? prescribedOffsetFromUtcNow = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -863,7 +863,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -899,7 +899,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -936,7 +936,7 @@ internal static class IntegrationTestAuthHelper
         Guid clinicId,
         TimeSpan? appliedOffsetFromUtcNow = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -982,7 +982,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -1018,7 +1018,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -1058,7 +1058,7 @@ internal static class IntegrationTestAuthHelper
         Guid clinicId,
         TimeSpan? admittedOffsetFromUtcNow = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -1097,7 +1097,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -1133,7 +1133,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -1170,7 +1170,7 @@ internal static class IntegrationTestAuthHelper
         Guid clinicId,
         TimeSpan? resultOffsetFromUtcNow = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -1212,7 +1212,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -1252,7 +1252,7 @@ internal static class IntegrationTestAuthHelper
     {
         await EnsureRolePermissionBindingsAsync(services);
 
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -1285,7 +1285,7 @@ internal static class IntegrationTestAuthHelper
         Guid clinicId,
         TimeSpan? paidOffsetFromUtcNow = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -1320,7 +1320,7 @@ internal static class IntegrationTestAuthHelper
         IServiceProvider services,
         IPasswordHasher hasher)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -1342,7 +1342,7 @@ internal static class IntegrationTestAuthHelper
     /// </summary>
     public static async Task<Guid> SeedClinicInForeignTenantAsync(IServiceProvider services)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var foreignTenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
@@ -1783,7 +1783,7 @@ internal static class IntegrationTestAuthHelper
         IJwtTokenService jwt,
         IReadOnlyCollection<string> permissions)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = new Tenant($"RO-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);

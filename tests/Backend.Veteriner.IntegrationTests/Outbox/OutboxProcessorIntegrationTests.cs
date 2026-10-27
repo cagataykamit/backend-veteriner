@@ -30,7 +30,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
     {
         var subjectMarker = $"proc-{Guid.NewGuid():N}";
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var outbox = scope.ServiceProvider.GetRequiredService<IOutbox>();
             await outbox.EnqueueEmailAsync(new EmailOutboxPayload
@@ -42,7 +42,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         }
 
         OutboxMessage? row = null;
-        await using (var pollScope = _factory.Services.CreateAsyncScope())
+        await using (var pollScope = _factory.Services.CreateSystemScope())
         {
             var db = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
             for (var i = 0; i < 60; i++)
@@ -64,7 +64,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         row.Error.Should().BeNull();
         row.DeadLetterAtUtc.Should().BeNull();
 
-        await using (var cleanup = _factory.Services.CreateAsyncScope())
+        await using (var cleanup = _factory.Services.CreateSystemScope())
         {
             var db = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
             var tracked = await db.OutboxMessages.FirstAsync(x => x.Id == row.Id);
@@ -78,7 +78,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
     {
         Guid messageId;
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var snapshot = new AppointmentProjectionSnapshot(
@@ -115,7 +115,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         }
 
         OutboxMessage? row = null;
-        await using (var pollScope = _factory.Services.CreateAsyncScope())
+        await using (var pollScope = _factory.Services.CreateSystemScope())
         {
             var db = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
             for (var i = 0; i < 30; i++)
@@ -132,7 +132,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         row.DeadLetterAtUtc.Should().BeNull();
         row.RetryCount.Should().Be(0);
 
-        await using (var cleanup = _factory.Services.CreateAsyncScope())
+        await using (var cleanup = _factory.Services.CreateSystemScope())
         {
             var db = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
             var tracked = await db.OutboxMessages.FirstAsync(x => x.Id == messageId);
@@ -146,7 +146,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
     {
         Guid messageId;
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var snapshot = new PetProjectionSnapshot(
@@ -186,7 +186,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         }
 
         OutboxMessage? row = null;
-        await using (var pollScope = _factory.Services.CreateAsyncScope())
+        await using (var pollScope = _factory.Services.CreateSystemScope())
         {
             var db = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
             for (var i = 0; i < 30; i++)
@@ -203,7 +203,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         row.DeadLetterAtUtc.Should().BeNull();
         row.RetryCount.Should().Be(0);
 
-        await using (var cleanup = _factory.Services.CreateAsyncScope())
+        await using (var cleanup = _factory.Services.CreateSystemScope())
         {
             var db = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
             var tracked = await db.OutboxMessages.FirstAsync(x => x.Id == messageId);
@@ -218,7 +218,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         const string unknownType = "appointment.unknown.v1";
         Guid messageId;
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var message = new OutboxMessage
@@ -233,7 +233,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         }
 
         OutboxMessage? row = null;
-        await using (var pollScope = _factory.Services.CreateAsyncScope())
+        await using (var pollScope = _factory.Services.CreateSystemScope())
         {
             var db = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
             for (var i = 0; i < 30; i++)
@@ -250,7 +250,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         row.ProcessedAtUtc.Should().BeNull();
         row.LastError.Should().NotBeNullOrWhiteSpace();
 
-        await using (var cleanup = _factory.Services.CreateAsyncScope())
+        await using (var cleanup = _factory.Services.CreateSystemScope())
         {
             var db = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
             var tracked = await db.OutboxMessages.FirstAsync(x => x.Id == messageId);
@@ -265,7 +265,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         var subjectMarker = $"starve-{Guid.NewGuid():N}";
         Guid emailMessageId;
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var baseTime = DateTime.UtcNow.AddHours(-2);
@@ -292,7 +292,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         }
 
         OutboxMessage? emailRow = null;
-        await using (var pollScope = _factory.Services.CreateAsyncScope())
+        await using (var pollScope = _factory.Services.CreateSystemScope())
         {
             var db = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
             for (var i = 0; i < 60; i++)
@@ -307,7 +307,7 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         emailRow.Should().NotBeNull();
         emailRow!.ProcessedAtUtc.Should().NotBeNull("email mesaji appointment mesajlarinin arkasinda kalsa da islenmeli");
 
-        await using (var cleanup = _factory.Services.CreateAsyncScope())
+        await using (var cleanup = _factory.Services.CreateSystemScope())
         {
             var db = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
             var appointmentRows = (await db.OutboxMessages.AsNoTracking().Select(m => m).ToListAsync())

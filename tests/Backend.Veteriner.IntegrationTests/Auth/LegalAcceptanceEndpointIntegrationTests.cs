@@ -56,7 +56,7 @@ public sealed class LegalAcceptanceEndpointIntegrationTests : IClassFixture<Cust
 
     private async Task<int> CountAcceptancesAsync(string email)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var userId = await db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync();
         return await db.LegalAcceptances.CountAsync(a => a.UserId == userId);
@@ -119,7 +119,7 @@ public sealed class LegalAcceptanceEndpointIntegrationTests : IClassFixture<Cust
         (await AcceptAsync(token, AllCurrentDocuments())).StatusCode.Should().Be(HttpStatusCode.OK);
         (await CountAcceptancesAsync(email)).Should().Be(3);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var userId = await db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync();
         (await db.AuditLogs.AsNoTracking().CountAsync(a =>
@@ -166,7 +166,7 @@ public sealed class LegalAcceptanceEndpointIntegrationTests : IClassFixture<Cust
         var rawToken = $"legal-invite-{Guid.NewGuid():N}";
         var email = $"legal-invitee-{Guid.NewGuid():N}@example.com";
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tokenHash = scope.ServiceProvider.GetRequiredService<ITokenHashService>();
@@ -229,7 +229,7 @@ public sealed class LegalAcceptanceEndpointIntegrationTests : IClassFixture<Cust
         outdated.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await IntegrationTestProblemDetails.ReadCodeAsync(outdated)).Should().Be("LegalAcceptances.VersionOutdated");
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.Users.AnyAsync(u => u.Email == email)).Should().BeFalse("doğrulama hesap oluşturulmadan önce yapılır");

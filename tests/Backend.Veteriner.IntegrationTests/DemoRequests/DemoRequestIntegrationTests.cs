@@ -124,14 +124,14 @@ public sealed class DemoRequestIntegrationTests : IClassFixture<CustomWebApplica
 
     private static async Task<DemoRequest?> FindAsync(WebApplicationFactory<Program> factory, string clinicName)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
+        await using var scope = factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.DemoRequests.AsNoTracking().SingleOrDefaultAsync(d => d.ClinicName == clinicName);
     }
 
     private static async Task<bool> EmailOutboxContainsAsync(WebApplicationFactory<Program> factory, Guid demoRequestId)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
+        await using var scope = factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var id = demoRequestId.ToString();
         return await db.OutboxMessages.AsNoTracking()

@@ -19,7 +19,7 @@ public sealed class PetReadModelParityIntegrationTests
     [Fact]
     public async Task TenantParity_Should_BeInSync_AfterAllPetEventsProjected()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPetProjectionProcessor>();
@@ -54,7 +54,7 @@ public sealed class PetReadModelParityIntegrationTests
     [Fact]
     public async Task TenantParity_Should_IsolateTenants()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPetProjectionProcessor>();
@@ -85,7 +85,7 @@ public sealed class PetReadModelParityIntegrationTests
     [Fact]
     public async Task TenantParity_Should_ReportReadModelBehind_WhenEventsNotProjected()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var parity = scope.ServiceProvider.GetRequiredService<IPetReadModelParityReader>();

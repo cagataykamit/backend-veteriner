@@ -121,7 +121,7 @@ public sealed class ChangePasswordEndpointIntegrationTests
 
     private async Task<string> SeedTenantUserAsync(string password)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.ReadModels;
@@ -28,6 +29,7 @@ public sealed class PaymentFinanceBackfillService : IPaymentFinanceBackfillServi
     public static readonly Guid BackfillEventId = Guid.Empty;
 
     private readonly AppDbContext _commandDb;
+    private readonly ITenantScope _tenantScope;
     private readonly QueryDbContext _queryDb;
     private readonly IPaymentFinanceParityReader _parityReader;
     private readonly TimeProvider _timeProvider;
@@ -35,12 +37,14 @@ public sealed class PaymentFinanceBackfillService : IPaymentFinanceBackfillServi
 
     public PaymentFinanceBackfillService(
         AppDbContext commandDb,
+        ITenantScope tenantScope,
         QueryDbContext queryDb,
         IPaymentFinanceParityReader parityReader,
         TimeProvider timeProvider,
         ILogger<PaymentFinanceBackfillService> logger)
     {
         _commandDb = commandDb;
+        _tenantScope = tenantScope;
         _queryDb = queryDb;
         _parityReader = parityReader;
         _timeProvider = timeProvider;
@@ -52,6 +56,8 @@ public sealed class PaymentFinanceBackfillService : IPaymentFinanceBackfillServi
         int batchSize = DefaultBatchSize,
         CancellationToken cancellationToken = default)
     {
+        // Kiracı verilirse yalnız onun kapsamı; verilmezse tüm kiracılar (platform bakım işi, ADR-040).
+        using var tenantScope = tenantId is { } scopedTenantId ? _tenantScope.UseTenant(scopedTenantId) : _tenantScope.AsSystem();
         var started = _timeProvider.GetUtcNow().UtcDateTime;
         batchSize = Math.Max(1, batchSize);
 

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
 using Backend.Veteriner.Application.Imports.Commit;
@@ -74,7 +73,8 @@ public sealed class ImportCommitProcessor
 
     private async Task<(Guid BatchId, Guid TenantId)?> TryClaimAsync(CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        // Kuyruk taraması kiracılar arasıdır (ADR-040); partinin işi kendi kiracısının kapsamında döner.
+        await using var scope = _scopes.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var now = Now;
 
@@ -104,7 +104,7 @@ public sealed class ImportCommitProcessor
         try
         {
             var plan = ImportCommitPlanner.Build(await LoadRowsAsync(batchId, ct));
-            if (!await SkipRowsAsync(batchId, plan.RowsToSkip, ct))
+            if (!await SkipRowsAsync(batchId, tenantId, plan.RowsToSkip, ct))
             {
                 LogLeaseLost(batchId);
                 return;
@@ -114,8 +114,8 @@ public sealed class ImportCommitProcessor
             var unitsDone = 0;
             foreach (var chunk in plan.Units.Chunk(Math.Max(1, _options.OwnersPerChunk)))
             {
-                if (!await gate.WaitAsync(batchId, ReadPressureAsync, c => RenewLeaseAsync(batchId, c), ct)
-                    || !await RenewLeaseAsync(batchId, ct))
+                if (!await gate.WaitAsync(batchId, ReadPressureAsync, c => RenewLeaseAsync(batchId, tenantId, c), ct)
+                    || !await RenewLeaseAsync(batchId, tenantId, ct))
                 {
                     LogLeaseLost(batchId);
                     return;
@@ -135,7 +135,7 @@ public sealed class ImportCommitProcessor
                     "Import commit progress. Batch={BatchId} Units={Done}/{Total}", batchId, unitsDone, plan.Units.Count);
             }
 
-            await CompleteAsync(batchId, ct);
+            await CompleteAsync(batchId, tenantId, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -147,7 +147,7 @@ public sealed class ImportCommitProcessor
             _logger.LogError(
                 "Import commit failed unexpectedly. Batch={BatchId} Exception={ExceptionType} Inner={InnerType} Stack={Stack}",
                 batchId, ex.GetType().FullName, ex.InnerException?.GetType().FullName, ex.StackTrace);
-            await FailAsync(batchId);
+            await FailAsync(batchId, tenantId);
         }
     }
 
@@ -169,11 +169,11 @@ public sealed class ImportCommitProcessor
     }
 
     /// <summary>Uygulanmayacak satırlar <c>Skipped</c> yazılır; kira aynı kayıtta yenilenir (devralındıysa false).</summary>
-    private async Task<bool> SkipRowsAsync(Guid batchId, IReadOnlyList<Guid> rowIds, CancellationToken ct)
+    private async Task<bool> SkipRowsAsync(Guid batchId, Guid tenantId, IReadOnlyList<Guid> rowIds, CancellationToken ct)
     {
         foreach (var ids in rowIds.Chunk(RowWriteChunk))
         {
-            var written = await WriteRowsAsync(batchId, ids, row =>
+            var written = await WriteRowsAsync(batchId, tenantId, ids, row =>
                 row.RecordApplyResult(ImportRowApplyStatus.Skipped, null, null, matched: false, Now), ct);
             if (!written)
                 return false;
@@ -193,8 +193,7 @@ public sealed class ImportCommitProcessor
             Result<ImportOwnerUnitResult> result;
             try
             {
-                await using var scope = _scopes.CreateAsyncScope();
-                using var tenantScope = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
+                await using var scope = _scopes.CreateTenantScope(tenantId);
                 var sender = scope.ServiceProvider.GetRequiredService<ISender>();
                 result = await sender.Send(new ApplyImportOwnerUnitCommand(batchId, WorkerId, unit.OwnerKey, unit.RowIds), ct);
             }
@@ -210,7 +209,7 @@ public sealed class ImportCommitProcessor
                 _logger.LogWarning(
                     "Import unit failed after retry. Batch={BatchId} Rows={RowCount} Exception={ExceptionType}",
                     batchId, unit.RowIds.Count, ex.InnerException?.GetType().FullName ?? ex.GetType().FullName);
-                return await MarkUnitFailedAsync(batchId, unit, new Error(ImportRules.ApplyFailed.Code, ImportRules.ApplyFailed.Message), ct);
+                return await MarkUnitFailedAsync(batchId, tenantId, unit, new Error(ImportRules.ApplyFailed.Code, ImportRules.ApplyFailed.Message), ct);
             }
 
             if (result.IsSuccess)
@@ -222,15 +221,15 @@ public sealed class ImportCommitProcessor
 
             _logger.LogInformation(
                 "Import unit failed. Batch={BatchId} Rows={RowCount} Code={Code}", batchId, unit.RowIds.Count, result.Error.Code);
-            return await MarkUnitFailedAsync(batchId, unit, result.Error, ct);
+            return await MarkUnitFailedAsync(batchId, tenantId, unit, result.Error, ct);
         }
     }
 
     /// <summary>Başarısız birim: neden satırı komutun koduyla, diğerleri <c>Imports.OwnerUnitFailed</c> ile <c>Failed</c>.</summary>
-    private async Task<bool> MarkUnitFailedAsync(Guid batchId, ImportOwnerUnitPlan unit, Error error, CancellationToken ct)
+    private async Task<bool> MarkUnitFailedAsync(Guid batchId, Guid tenantId, ImportOwnerUnitPlan unit, Error error, CancellationToken ct)
     {
         var failingRowId = ImportOwnerUnitErrors.RowIdOf(error) ?? unit.RowIds[0];
-        return await WriteRowsAsync(batchId, unit.RowIds.ToArray(), row =>
+        return await WriteRowsAsync(batchId, tenantId, unit.RowIds.ToArray(), row =>
         {
             var issue = row.Id == failingRowId
                 ? new ImportIssue(ImportIssueSeverity.Error, error.Code, null, error.Message)
@@ -243,9 +242,9 @@ public sealed class ImportCommitProcessor
     /// Bekleyen satırları yazar ve kirayı aynı <c>SaveChanges</c>'te yeniler: kira başka işçideyse hiçbir şey yazılmaz
     /// (rowversion), false döner.
     /// </summary>
-    private async Task<bool> WriteRowsAsync(Guid batchId, Guid[] rowIds, Action<ImportBatchRow> write, CancellationToken ct)
+    private async Task<bool> WriteRowsAsync(Guid batchId, Guid tenantId, Guid[] rowIds, Action<ImportBatchRow> write, CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        await using var scope = _scopes.CreateTenantScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId, ct);
@@ -272,12 +271,12 @@ public sealed class ImportCommitProcessor
         }
     }
 
-    private async Task<bool> RenewLeaseAsync(Guid batchId, CancellationToken ct)
-        => await WriteRowsAsync(batchId, [], _ => { }, ct);
+    private async Task<bool> RenewLeaseAsync(Guid batchId, Guid tenantId, CancellationToken ct)
+        => await WriteRowsAsync(batchId, tenantId, [], _ => { }, ct);
 
-    private async Task CompleteAsync(Guid batchId, CancellationToken ct)
+    private async Task CompleteAsync(Guid batchId, Guid tenantId, CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        await using var scope = _scopes.CreateTenantScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId, ct);
@@ -340,11 +339,11 @@ public sealed class ImportCommitProcessor
         await WriteAuditAsync(scope.ServiceProvider, batch, success: pending == 0, ct);
     }
 
-    private async Task FailAsync(Guid batchId)
+    private async Task FailAsync(Guid batchId, Guid tenantId)
     {
         try
         {
-            await using var scope = _scopes.CreateAsyncScope();
+            await using var scope = _scopes.CreateTenantScope(tenantId);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId);
             if (batch is null || batch.LeaseOwner != WorkerId || !batch.FailCommit(Now).IsSuccess)

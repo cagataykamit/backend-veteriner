@@ -19,7 +19,7 @@ public sealed class ClientReadModelParityIntegrationTests
     [Fact]
     public async Task TenantParity_Should_BeInSync_AfterAllClientEventsProjected()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -54,7 +54,7 @@ public sealed class ClientReadModelParityIntegrationTests
     [Fact]
     public async Task TenantParity_Should_IsolateTenants()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -87,7 +87,7 @@ public sealed class ClientReadModelParityIntegrationTests
     {
         // Backfill caveat: command satırları var ama read-model boş → parity in-sync DEĞİL.
         // (Backfill/rebuild CQRS-12B-6 konusudur; bu fazda projeksiyon yapılmaz.)
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var parity = scope.ServiceProvider.GetRequiredService<IClientReadModelParityReader>();

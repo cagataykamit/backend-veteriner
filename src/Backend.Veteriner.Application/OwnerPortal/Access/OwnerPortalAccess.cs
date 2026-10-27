@@ -18,6 +18,8 @@ public sealed record OwnerPortalActiveLink(OwnerAccountClientLink Link, string C
 /// Portal sahiplik kontrolü — tek yer (ADR-031 K6). Bağ hesabın, aktif ve kiracısı aktif olmalıdır. Aksi her durum
 /// <c>Portal.Links.NotFound</c> (404): başka hesabın, kapalı ya da başka kiracının bağı birbirinden ayırt edilmez.
 /// Dilim B okuma uçları <see cref="ResolveLinkAsync"/> ile başlar.
+/// Portal JWT'sinde kiracı yoktur; kiracı bağdan çözülür (ADR-040). Bağ araması hesaba göre kiracılar arasıdır,
+/// sonraki sorgular bağın kiracısının kapsamında çalışır.
 /// </summary>
 public sealed class OwnerPortalAccess
 {
@@ -25,6 +27,7 @@ public sealed class OwnerPortalAccess
     private readonly IReadRepository<OwnerAccountClientLink> _links;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly ITenantScope _tenantScope;
     private readonly IReadRepository<Client> _clients;
 
     public OwnerPortalAccess(
@@ -32,12 +35,14 @@ public sealed class OwnerPortalAccess
         IReadRepository<OwnerAccountClientLink> links,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
+        ITenantScope tenantScope,
         IReadRepository<Client> clients)
     {
         _accounts = accounts;
         _links = links;
         _tenants = tenants;
         _clinics = clinics;
+        _tenantScope = tenantScope;
         _clients = clients;
     }
 
@@ -56,13 +61,18 @@ public sealed class OwnerPortalAccess
         if (!account.IsSuccess)
             return Result<OwnerPortalLinkScope>.Failure(account.Error);
 
-        var link = await _links.FirstOrDefaultAsync(new OwnerAccountClientLinkByIdSpec(linkId), ct);
+        OwnerAccountClientLink? link;
+        using (_tenantScope.AsSystem())
+            link = await _links.FirstOrDefaultAsync(new OwnerAccountClientLinkByIdSpec(linkId), ct);
         if (link is null || link.OwnerAccountId != ownerAccountId || !link.IsActive)
             return LinkNotFound();
 
         var tenants = await _tenants.ListAsync(new PortalTenantsByIdsSpec([link.TenantId]), ct);
         if (tenants is not [{ IsActive: true }])
             return LinkNotFound();
+
+        // İsteğin geri kalanı bağın kiracısına bağlanır; kapsam DI kapsamıyla (istekle) biter.
+        _ = _tenantScope.UseTenant(link.TenantId);
 
         return Result<OwnerPortalLinkScope>.Success(
             new OwnerPortalLinkScope(link.Id, link.OwnerAccountId, link.TenantId, link.ClinicId, link.ClientId));
@@ -71,6 +81,8 @@ public sealed class OwnerPortalAccess
     /// <summary>Hesabın kullanabildiği aktif bağlar (aktif kiracılarda), klinik ve müşteri adıyla.</summary>
     public async Task<IReadOnlyList<OwnerPortalActiveLink>> ListActiveLinksAsync(Guid ownerAccountId, CancellationToken ct)
     {
+        // Hesabın bağları birden çok kiracıya yayılabilir; klinik ve müşteri adları yalnız bu bağların kimlikleriyle okunur.
+        using var system = _tenantScope.AsSystem();
         var links = await _links.ListAsync(new ActiveOwnerAccountClientLinksByAccountSpec(ownerAccountId), ct);
         if (links.Count == 0)
             return [];

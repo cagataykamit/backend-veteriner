@@ -14,6 +14,7 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
     private readonly IRepository<TenantSubscription> _subscriptionsWrite;
     private readonly IReadRepository<BillingCheckoutSession> _sessionsRead;
     private readonly IRepository<BillingCheckoutSession> _sessionsWrite;
+    private readonly ITenantScope _tenantScope;
     private readonly ISalesPartnerDiscountBilling _partnerDiscounts;
     private readonly TimeProvider _timeProvider;
 
@@ -22,6 +23,7 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
         IRepository<TenantSubscription> subscriptionsWrite,
         IReadRepository<BillingCheckoutSession> sessionsRead,
         IRepository<BillingCheckoutSession> sessionsWrite,
+        ITenantScope tenantScope,
         ISalesPartnerDiscountBilling partnerDiscounts,
         TimeProvider timeProvider)
     {
@@ -29,6 +31,7 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
         _subscriptionsWrite = subscriptionsWrite;
         _sessionsRead = sessionsRead;
         _sessionsWrite = sessionsWrite;
+        _tenantScope = tenantScope;
         _partnerDiscounts = partnerDiscounts;
         _timeProvider = timeProvider;
     }
@@ -41,7 +44,11 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
         BillingActivationSource source,
         CancellationToken ct = default)
     {
-        var session = await _sessionsRead.FirstOrDefaultAsync(new BillingCheckoutSessionByIdSpec(checkoutSessionId), ct);
+        // Webhook'ta kiracı yoktur (tenantIdConstraint null): oturum kimliğiyle kiracılar arası aranır ve kiracı
+        // oturumdan çözülür (ADR-040). Panel ucunda istek kiracısı ve kısıt geçerlidir.
+        BillingCheckoutSession? session;
+        using (tenantIdConstraint is null ? _tenantScope.AsSystem() : null)
+            session = await _sessionsRead.FirstOrDefaultAsync(new BillingCheckoutSessionByIdSpec(checkoutSessionId), ct);
         if (session is null)
             return Result<SubscriptionCheckoutSessionDto>.Failure("Subscriptions.CheckoutSessionNotFound", "Checkout session bulunamadı.");
 
@@ -59,6 +66,7 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
                 "Checkout session bu kiracıya ait değil.");
         }
 
+        using var tenantScope = _tenantScope.UseTenant(session.TenantId);
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 
         if (session.Status == BillingCheckoutSessionStatus.Completed)

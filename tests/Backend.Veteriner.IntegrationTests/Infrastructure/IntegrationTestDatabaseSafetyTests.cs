@@ -128,7 +128,7 @@ public sealed class IntegrationTestEffectiveCommandDatabaseTests : IClassFixture
     [Fact]
     public void EffectiveCommandDatabaseName_Should_Be_RunSpecificIntegrationTestsDatabase()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var connectionString = db.Database.GetConnectionString();

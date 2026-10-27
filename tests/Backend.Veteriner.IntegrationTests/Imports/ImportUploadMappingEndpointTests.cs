@@ -64,7 +64,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         customerColumns.Should().OnlyContain(c => c.GetProperty("mapped").ValueKind == JsonValueKind.Null);
         tables[0].GetProperty("rowCount").GetInt32().Should().Be(2);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id);
         batch.ContentHash.Should().Be(Convert.ToHexStringLower(SHA256.HashData(bytes)));
@@ -128,7 +128,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         json.GetProperty("warnings").GetArrayLength().Should().Be(0);
         var id = json.GetProperty("id").GetGuid();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var first = await db.ImportBatchRows.AsNoTracking().SingleAsync(r => r.BatchId == id && r.Table == ImportTable.Customers);
         first.SourceJson.Should().Contain("Şükrü Işık");
@@ -294,7 +294,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         (await PostAsync(ClientFor(ctx.Token), requestId, "Denetim", null, ("file", "veri.xlsx", bytes, XlsxType)))
             .StatusCode.Should().Be(HttpStatusCode.Created);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var audit = await db.AuditLogs.AsNoTracking()
             .SingleAsync(a => a.Action == "ImportBatch.Create" && a.TargetId!.Contains(requestId.ToString()));
@@ -366,7 +366,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         columns.Select(c => (c.GetProperty("source").GetString(), c.GetProperty("mapped").GetString())).Should().Equal(
             ("Müşteri", "AdSoyad"), ("GSM", "Telefon"), ("Mail", null));
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id);
         batch.Status.Should().Be(ImportBatchStatus.Mapped);
@@ -509,7 +509,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
             (await CodeAsync(rejected)).Should().Be("Imports.ValueMappingTargetInvalid");
         }
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var saved = await db.ImportBatches.AsNoTracking().Where(b => b.Id == id).Select(b => b.MappingJson).SingleAsync();
         saved.Should().Contain(catalog.SpeciesId.ToString()).And.Contain("Kuduz-2023");
@@ -531,7 +531,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         afterDiscard.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await CodeAsync(afterDiscard)).Should().Be("Imports.InvalidState");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var audit = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "ImportBatch.Mapping" && a.TargetId == $"ImportBatchId={id}")
@@ -775,28 +775,28 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
 
     private async Task<int> BatchCountAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatches.AsNoTracking().CountAsync(b => b.TenantId == tenantId);
     }
 
     private async Task<int> RowCountAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatchRows.AsNoTracking().CountAsync(r => r.BatchId == batchId);
     }
 
     private async Task<ImportBatchStatus> StatusAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatches.AsNoTracking().Where(b => b.Id == batchId).Select(b => b.Status).SingleAsync();
     }
 
     private async Task SeedBatchWithHashAsync(Guid tenantId, Guid? clinicId, string contentHash)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = ImportBatch.Create(tenantId, clinicId, Guid.NewGuid(), "Tohum", Guid.NewGuid(), DateTime.UtcNow).Value!;
         batch.AttachFile(contentHash, 1, 0, 0);
@@ -806,7 +806,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
 
     private async Task<Guid> SeedClinicAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinic = new Clinic(tenantId, $"Imp-{Guid.NewGuid():N}"[..14], "Ankara");
         db.Clinics.Add(clinic);
@@ -818,7 +818,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
 
     private async Task<CatalogIds> SeedCatalogAsync(Guid tenantId, Guid otherTenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
 
@@ -836,7 +836,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
 
     private async Task<string> TokenAsync(SeedCtx ctx, string[] permissions)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -846,7 +846,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
 
     private async Task<SeedCtx> SeedAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

@@ -22,7 +22,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_ReturnOnlyRowsForRequestedTenantAndClinic()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -47,7 +47,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_NotReturnCrossTenantRows()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -69,7 +69,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_NotReturnCrossClinicRows()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -91,7 +91,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_OrderByPaidAtUtcDescThenPaymentIdDesc_And_Paginate()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -122,7 +122,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_FilterByClientId()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -146,7 +146,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_FilterByPetId()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -170,7 +170,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_FilterByMethod()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -192,7 +192,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_FilterByPaidAtUtcRange()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -224,7 +224,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
         string? petName,
         string? notes)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -247,7 +247,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_MatchSearchByCurrency()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -270,7 +270,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_MatchSearchByClientIdLookup()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -301,7 +301,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_MatchSearchByPetIdLookup()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -331,7 +331,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_NotLeakLookupMatchesAcrossClinic()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -362,7 +362,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_ReturnEmpty_WhenSearchUnrelated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -383,7 +383,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_HandleNullablePetWithoutError()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsListReadModelReader>();
 
@@ -409,7 +409,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetById_Should_ReturnDetail_When_TenantAndPaymentIdMatch()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentGetByIdReadModelReader>();
 
@@ -432,7 +432,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetById_Should_ReturnNull_When_RowMissing()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentGetByIdReadModelReader>();
 
@@ -446,7 +446,7 @@ public sealed class PaymentReadModelReaderIntegrationTests
     [Fact]
     public async Task GetById_Should_ReturnNull_When_CrossTenantPaymentId()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentGetByIdReadModelReader>();
 

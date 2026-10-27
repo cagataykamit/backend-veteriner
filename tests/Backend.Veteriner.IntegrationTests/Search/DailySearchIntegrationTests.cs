@@ -50,7 +50,7 @@ public sealed class DailySearchIntegrationTests
     [InlineData("532 333", "Ayşe Yılmaz")]
     public async Task Clients_Should_Find_ByTurkishLetterTokenAndPhoneFormat(string search, string expectedName)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var seed = await SeedAsync(scope.ServiceProvider);
 
         var names = await ListClientNamesAsync(scope.ServiceProvider, seed.TenantId, search);
@@ -61,7 +61,7 @@ public sealed class DailySearchIntegrationTests
     [Fact]
     public async Task Clients_Should_NotLeakAcrossTenants()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var seed = await SeedAsync(scope.ServiceProvider);
         var otherTenantId = (await SeedAsync(scope.ServiceProvider)).TenantId;
 
@@ -83,7 +83,7 @@ public sealed class DailySearchIntegrationTests
     [InlineData("0532 111 11 11", "Pamuk")]
     public async Task Pets_Should_Find_ByChipTurkishLetterAndOwner(string search, string expectedPet)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var seed = await SeedAsync(scope.ServiceProvider);
 
         var names = await ListPetNamesAsync(scope.ServiceProvider, seed.TenantId, search);
@@ -101,7 +101,7 @@ public sealed class DailySearchIntegrationTests
     [InlineData("Pamuk2", false)]
     public async Task PetDuplicateSpecs_Should_Match_Turkish_And_Accent_Insensitive(string name, bool expected)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var seed = await SeedAsync(scope.ServiceProvider);
         var pets = scope.ServiceProvider.GetRequiredService<IReadRepository<Pet>>();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -122,7 +122,7 @@ public sealed class DailySearchIntegrationTests
     [Fact]
     public async Task Pets_Should_NotLeakAcrossTenants_ByChip()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var seed = await SeedAsync(scope.ServiceProvider);
         var other = await SeedAsync(scope.ServiceProvider);
 

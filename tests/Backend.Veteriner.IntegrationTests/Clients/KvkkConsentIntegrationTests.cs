@@ -292,7 +292,7 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
     public async Task Consent_Recorded_Before_Versioning_Should_Return_Unknown_Version()
     {
         var ctx = await SeedAsync(clinicScopedToken: true);
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             // ADR-032 öncesi kayıt: Kabul işaretli, sürüm alanları null (geriye dönük doldurulmaz).
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -322,7 +322,7 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
         Guid clientId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);

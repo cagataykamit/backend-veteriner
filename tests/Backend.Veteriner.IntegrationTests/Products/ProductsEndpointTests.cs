@@ -255,7 +255,7 @@ public sealed class ProductsEndpointTests : IClassFixture<CustomWebApplicationFa
 
     private async Task<(Guid TenantId, string AccessToken)> SeedTenantAndIssueTokenAsync(IReadOnlyCollection<string> permissions, bool readOnlyTenant = false)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 

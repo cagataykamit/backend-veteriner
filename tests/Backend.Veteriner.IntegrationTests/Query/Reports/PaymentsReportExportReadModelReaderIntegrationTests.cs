@@ -28,7 +28,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_IsolateByTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -49,7 +49,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_WithClinicFilter_Should_IsolateByClinic()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -74,7 +74,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_FilterByDateRange()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -96,7 +96,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_FilterByClient()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -117,7 +117,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_FilterByPet()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -138,7 +138,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_FilterByMethod()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -158,7 +158,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_OrderByPaidAtUtcDescThenPaymentIdDesc()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -183,7 +183,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_MapDenormalizedFields()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -208,7 +208,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_WhenEmpty_Should_ReturnZeroItems()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -229,7 +229,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
         string? petName,
         string? notes)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -250,7 +250,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_MatchSearchByCurrency()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -271,7 +271,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_MatchSearchByClientIdLookup()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -294,7 +294,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_MatchSearchByPetIdLookup()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -317,7 +317,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_NotLeakLookupMatchesAcrossClinic()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -341,7 +341,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_TenantWideSearch_Should_SeeAllClinicsInTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);
@@ -364,7 +364,7 @@ public sealed class PaymentsReportExportReadModelReaderIntegrationTests
     [Fact]
     public async Task GetExport_Should_ReturnEmpty_WhenSearchUnrelated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPaymentsReportExportReadModelReader>();
         await ResetAsync(queryDb);

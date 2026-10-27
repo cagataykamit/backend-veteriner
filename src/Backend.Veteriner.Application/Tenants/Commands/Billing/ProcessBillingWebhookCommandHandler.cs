@@ -24,6 +24,7 @@ public sealed class ProcessBillingWebhookCommandHandler
     private readonly IRepository<BillingWebhookReceipt> _receiptWrite;
     private readonly IReadRepository<BillingCheckoutSession> _sessionsRead;
     private readonly IRepository<BillingCheckoutSession> _sessionsWrite;
+    private readonly ITenantScope _tenantScope;
     private readonly IAuditLogWriter _auditLogWriter;
     private readonly IClientContext _clientContext;
     private readonly ILogger<ProcessBillingWebhookCommandHandler> _logger;
@@ -37,6 +38,7 @@ public sealed class ProcessBillingWebhookCommandHandler
         IRepository<BillingWebhookReceipt> receiptWrite,
         IReadRepository<BillingCheckoutSession> sessionsRead,
         IRepository<BillingCheckoutSession> sessionsWrite,
+        ITenantScope tenantScope,
         IAuditLogWriter auditLogWriter,
         IClientContext clientContext,
         ILogger<ProcessBillingWebhookCommandHandler> logger,
@@ -49,6 +51,7 @@ public sealed class ProcessBillingWebhookCommandHandler
         _receiptWrite = receiptWrite;
         _sessionsRead = sessionsRead;
         _sessionsWrite = sessionsWrite;
+        _tenantScope = tenantScope;
         _auditLogWriter = auditLogWriter;
         _clientContext = clientContext;
         _logger = logger;
@@ -232,10 +235,15 @@ public sealed class ProcessBillingWebhookCommandHandler
         if (!ev.BillingCheckoutSessionId.HasValue)
             return Result.Success();
 
-        var session = await _sessionsRead.FirstOrDefaultAsync(
-            new BillingCheckoutSessionByIdSpec(ev.BillingCheckoutSessionId.Value), ct);
+        // Webhook'ta kiracı yoktur: oturum kimliğiyle kiracılar arası aranır, yazım oturumun kiracısında (ADR-040).
+        BillingCheckoutSession? session;
+        using (_tenantScope.AsSystem())
+            session = await _sessionsRead.FirstOrDefaultAsync(
+                new BillingCheckoutSessionByIdSpec(ev.BillingCheckoutSessionId.Value), ct);
         if (session is null)
             return Result.Success();
+
+        using var tenantScope = _tenantScope.UseTenant(session.TenantId);
 
         if (session.Provider != provider)
         {

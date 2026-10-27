@@ -53,7 +53,7 @@ public sealed class PetProjectionHealthIntegrationTests
     {
         await ResetBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -76,7 +76,7 @@ public sealed class PetProjectionHealthIntegrationTests
     {
         await ResetBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -106,7 +106,7 @@ public sealed class PetProjectionHealthIntegrationTests
     {
         await ResetBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var writtenAt = DateTime.UtcNow.AddSeconds(5);
@@ -173,7 +173,7 @@ public sealed class PetProjectionHealthIntegrationTests
     {
         await ResetBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -204,7 +204,7 @@ public sealed class PetProjectionHealthIntegrationTests
     {
         await ResetBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var status = await scope.ServiceProvider
             .GetRequiredService<IPetProjectionStatusReader>()
             .GetStatusAsync(CancellationToken.None);
@@ -223,7 +223,7 @@ public sealed class PetProjectionHealthIntegrationTests
     {
         await ResetBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -241,7 +241,7 @@ public sealed class PetProjectionHealthIntegrationTests
 
     private async Task ResetBaselineAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await PetProjectionTestSupport.ClearOutboxAsync(commandDb);

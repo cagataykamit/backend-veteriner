@@ -22,7 +22,7 @@ public sealed class AppointmentProjectionStatusIntegrationTests
     [Fact]
     public async Task GetStatus_Should_CountOnlyKnownAppointmentIntegrationEventTypes()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionStatusReader>();
@@ -56,7 +56,7 @@ public sealed class AppointmentProjectionStatusIntegrationTests
     [Fact]
     public async Task GetStatus_Should_SplitPendingAndRetryWaiting()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionStatusReader>();
@@ -92,7 +92,7 @@ public sealed class AppointmentProjectionStatusIntegrationTests
     [Fact]
     public async Task GetStatus_Should_ReturnNullOldestAge_WhenNoPendingReadyMessages()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionStatusReader>();
@@ -111,7 +111,7 @@ public sealed class AppointmentProjectionStatusIntegrationTests
     [Fact]
     public async Task GetStatus_Should_Not_Count_Fresh_Event_Written_After_Snapshot_As_RetryWaiting()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionStatusReader>();

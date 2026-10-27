@@ -97,7 +97,7 @@ public sealed class LabResultWriteClinicAssignmentIdorIntegrationTests : IClassF
             _factory.Services,
             unassignedClinicId);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var petId = await db.Examinations.AsNoTracking()
@@ -122,7 +122,7 @@ public sealed class LabResultWriteClinicAssignmentIdorIntegrationTests : IClassF
             (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Clinics.AccessDenied");
         }
 
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var count = await verifyDb.LabResults.CountAsync(lr =>
             lr.ExaminationId == exam.ExaminationId);
@@ -294,7 +294,7 @@ public sealed class LabResultWriteClinicAssignmentIdorIntegrationTests : IClassF
     private async Task<(Guid ClinicId, Guid PetId, string TestName, DateTime ResultDateUtc)> GetLabResultSnapshotAsync(
         Guid labResultId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.LabResults.AsNoTracking().SingleAsync(lr => lr.Id == labResultId);
         return (row.ClinicId, row.PetId, row.TestName, row.ResultDateUtc!.Value);

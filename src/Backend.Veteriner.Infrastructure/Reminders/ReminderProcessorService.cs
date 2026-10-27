@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
@@ -16,6 +17,7 @@ namespace Backend.Veteriner.Infrastructure.Reminders;
 public sealed class ReminderProcessorService
 {
     private readonly AppDbContext _db;
+    private readonly ITenantScope _tenantScope;
     private readonly IReminderEmailOutboxEnqueuer _reminderEmailOutboxEnqueuer;
     private readonly ReminderProcessorOptions _options;
     private readonly ILogger<ReminderProcessorService> _logger;
@@ -23,12 +25,14 @@ public sealed class ReminderProcessorService
 
     public ReminderProcessorService(
         AppDbContext db,
+        ITenantScope tenantScope,
         IReminderEmailOutboxEnqueuer reminderEmailOutboxEnqueuer,
         IOptions<ReminderProcessorOptions> options,
         ILogger<ReminderProcessorService> logger,
         TimeProvider timeProvider)
     {
         _db = db;
+        _tenantScope = tenantScope;
         _reminderEmailOutboxEnqueuer = reminderEmailOutboxEnqueuer;
         _options = options.Value;
         _logger = logger;
@@ -44,26 +48,34 @@ public sealed class ReminderProcessorService
         var legacyReconcileAfterMinutes = Math.Clamp(_options.LegacyEnqueuedReconcileAfterMinutes, 5, 24 * 60);
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
 
-        var settingsRows = await _db.TenantReminderSettings
-            .AsNoTracking()
-            .Where(x => x.EmailChannelEnabled && (x.AppointmentRemindersEnabled || x.VaccinationRemindersEnabled))
-            .ToListAsync(ct);
+        // Hatırlatması açık kiracıları bulmak kiracılar arasıdır (ADR-040); her kiracının işi kendi kapsamında döner.
+        List<TenantReminderSettings> settingsRows;
+        List<Guid> activeTenantIds;
+        Dictionary<Guid, TenantSubscription> subscriptionsByTenant;
+        using (_tenantScope.AsSystem())
+        {
+            settingsRows = await _db.TenantReminderSettings
+                .AsNoTracking()
+                .Where(x => x.EmailChannelEnabled && (x.AppointmentRemindersEnabled || x.VaccinationRemindersEnabled))
+                .ToListAsync(ct);
 
-        var tenantIds = settingsRows.Select(x => x.TenantId).Distinct().ToArray();
-        var activeTenantIds = await _db.Tenants
-            .AsNoTracking()
-            .Where(t => tenantIds.Contains(t.Id) && t.IsActive)
-            .Select(t => t.Id)
-            .ToListAsync(ct);
+            var tenantIds = settingsRows.Select(x => x.TenantId).Distinct().ToArray();
+            activeTenantIds = await _db.Tenants
+                .AsNoTracking()
+                .Where(t => tenantIds.Contains(t.Id) && t.IsActive)
+                .Select(t => t.Id)
+                .ToListAsync(ct);
 
-        var subscriptions = await _db.TenantSubscriptions
-            .AsNoTracking()
-            .Where(s => activeTenantIds.Contains(s.TenantId))
-            .ToListAsync(ct);
-        var subscriptionsByTenant = subscriptions.ToDictionary(x => x.TenantId);
+            var subscriptions = await _db.TenantSubscriptions
+                .AsNoTracking()
+                .Where(s => activeTenantIds.Contains(s.TenantId))
+                .ToListAsync(ct);
+            subscriptionsByTenant = subscriptions.ToDictionary(x => x.TenantId);
+        }
 
         foreach (var settings in settingsRows)
         {
+            using var tenant = _tenantScope.UseTenant(settings.TenantId);
             if (!activeTenantIds.Contains(settings.TenantId))
                 continue;
 
@@ -100,8 +112,12 @@ public sealed class ReminderProcessorService
             }
         }
 
-        await SyncEnqueuedDispatchLogsWithOutboxStatusAsync(batchSize, nowUtc, ct);
-        await ReconcileLegacyEnqueuedLogsWithoutOutboxIdAsync(batchSize, nowUtc, legacyReconcileAfterMinutes, ct);
+        // Gönderim günlüğü uzlaştırması outbox durumuna göre tüm kiracıların günlüklerini tarar.
+        using (_tenantScope.AsSystem())
+        {
+            await SyncEnqueuedDispatchLogsWithOutboxStatusAsync(batchSize, nowUtc, ct);
+            await ReconcileLegacyEnqueuedLogsWithoutOutboxIdAsync(batchSize, nowUtc, legacyReconcileAfterMinutes, ct);
+        }
     }
 
     private async Task ProcessAppointmentRemindersAsync(

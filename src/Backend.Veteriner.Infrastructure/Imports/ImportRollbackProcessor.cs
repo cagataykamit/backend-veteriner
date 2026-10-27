@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
 using Backend.Veteriner.Application.Imports.Commands.RollbackOwnerUnit;
@@ -71,7 +70,8 @@ public sealed class ImportRollbackProcessor
 
     private async Task<(Guid BatchId, Guid TenantId, string Policy)?> TryClaimAsync(CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        // Kuyruk taraması kiracılar arasıdır (ADR-040); partinin işi kendi kiracısının kapsamında döner.
+        await using var scope = _scopes.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var now = Now;
 
@@ -107,7 +107,7 @@ public sealed class ImportRollbackProcessor
                 _logger.LogInformation(
                     "Import rollback blocked at start; nothing deleted. Batch={BatchId} Blocked={Blocked}",
                     batchId, plan.Total(ImportRollbackDecision.Keep));
-                await FailAsync(batchId, BlockedFailureCode);
+                await FailAsync(batchId, tenantId, BlockedFailureCode);
                 return;
             }
 
@@ -115,8 +115,8 @@ public sealed class ImportRollbackProcessor
             var unitsDone = 0;
             foreach (var chunk in plan.Units.Chunk(Math.Max(1, _options.OwnersPerChunk)))
             {
-                if (!await gate.WaitAsync(batchId, ReadPressureAsync, c => RenewLeaseAsync(batchId, c), ct)
-                    || !await RenewLeaseAsync(batchId, ct))
+                if (!await gate.WaitAsync(batchId, ReadPressureAsync, c => RenewLeaseAsync(batchId, tenantId, c), ct)
+                    || !await RenewLeaseAsync(batchId, tenantId, ct))
                 {
                     LogLeaseLost(batchId);
                     return;
@@ -136,7 +136,7 @@ public sealed class ImportRollbackProcessor
                     "Import rollback progress. Batch={BatchId} Units={Done}/{Total}", batchId, unitsDone, plan.Units.Count);
             }
 
-            await CompleteAsync(batchId, policy, ct);
+            await CompleteAsync(batchId, tenantId, policy, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -148,15 +148,14 @@ public sealed class ImportRollbackProcessor
             _logger.LogError(
                 "Import rollback failed unexpectedly. Batch={BatchId} Exception={ExceptionType} Inner={InnerType} Stack={Stack}",
                 batchId, ex.GetType().FullName, ex.InnerException?.GetType().FullName, ex.StackTrace);
-            await FailAsync(batchId, UnexpectedFailureCode);
+            await FailAsync(batchId, tenantId, UnexpectedFailureCode);
         }
     }
 
     /// <summary>Tüm partinin planı (önizlemeyle aynı kural); birimler ve <c>Fail</c> politikasının başlangıç denetimi.</summary>
     private async Task<ImportRollbackPlan> PlanAsync(Guid batchId, Guid tenantId, CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
-        using var tenantScope = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
+        await using var scope = _scopes.CreateTenantScope(tenantId);
         var loader = scope.ServiceProvider.GetRequiredService<ImportRollbackPlanLoader>();
         return (await loader.LoadAsync(tenantId, batchId, rowIds: null, ct)).Plan;
     }
@@ -173,8 +172,7 @@ public sealed class ImportRollbackProcessor
         Result<ImportRollbackUnitResult> result;
         try
         {
-            await using var scope = _scopes.CreateAsyncScope();
-            using var tenantScope = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
+            await using var scope = _scopes.CreateTenantScope(tenantId);
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
             result = await sender.Send(new RollbackImportOwnerUnitCommand(batchId, WorkerId, unit.RowIds, policy), ct);
         }
@@ -191,9 +189,9 @@ public sealed class ImportRollbackProcessor
         throw new InvalidOperationException($"Geri alma birimi başarısız: {result.Error.Code}");
     }
 
-    private async Task<bool> RenewLeaseAsync(Guid batchId, CancellationToken ct)
+    private async Task<bool> RenewLeaseAsync(Guid batchId, Guid tenantId, CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        await using var scope = _scopes.CreateTenantScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId, ct);
         if (batch is null || !batch.RenewRollbackLease(WorkerId, Now).IsSuccess)
@@ -210,9 +208,9 @@ public sealed class ImportRollbackProcessor
         }
     }
 
-    private async Task CompleteAsync(Guid batchId, string policy, CancellationToken ct)
+    private async Task CompleteAsync(Guid batchId, Guid tenantId, string policy, CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        await using var scope = _scopes.CreateTenantScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId, ct);
@@ -249,11 +247,11 @@ public sealed class ImportRollbackProcessor
         await WriteAuditAsync(scope.ServiceProvider, batch, policy, counts, pending == 0 ? null : UnexpectedFailureCode, ct);
     }
 
-    private async Task FailAsync(Guid batchId, string failureCode)
+    private async Task FailAsync(Guid batchId, Guid tenantId, string failureCode)
     {
         try
         {
-            await using var scope = _scopes.CreateAsyncScope();
+            await using var scope = _scopes.CreateTenantScope(tenantId);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId);
             if (batch is null || batch.LeaseOwner != WorkerId || !batch.FailRollback(Now).IsSuccess)

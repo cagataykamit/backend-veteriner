@@ -86,7 +86,7 @@ public sealed class TenantSubscriptionSummaryEndpointIntegrationTests : IClassFi
 
     private async Task<Guid> SeedTenantWithSubscriptionAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
@@ -99,7 +99,7 @@ public sealed class TenantSubscriptionSummaryEndpointIntegrationTests : IClassFi
     private async Task<(Guid TenantId, string Token)> SeedTenantAndIssueTokenAsync(
         IReadOnlyCollection<string> permissions)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 

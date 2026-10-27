@@ -53,7 +53,7 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
         list.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).Should().Equal(id);
         list.GetProperty("totalItems").GetInt32().Should().Be(1);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var audit = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "ImportBatch.Create" && a.TargetId != null && a.TargetId.Contains(requestId.ToString()))
@@ -279,14 +279,14 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<int> BatchCountAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatches.AsNoTracking().CountAsync(b => b.TenantId == tenantId);
     }
 
     private async Task<ImportBatchStatus> StatusAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatches.AsNoTracking().Where(b => b.Id == batchId).Select(b => b.Status).SingleAsync();
     }
@@ -294,7 +294,7 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
     /// <summary>Partiyi doğrudan veritabanına yazar; <paramref name="contentHash"/> B2 yüklemesini taklit eder.</summary>
     private async Task<Guid> SeedBatchAsync(Guid tenantId, Guid? clinicId, Action<ImportBatch> drive, string? contentHash = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = ImportBatch.Create(tenantId, clinicId, Guid.NewGuid(), "Tohum", Guid.NewGuid(), DateTime.UtcNow).Value!;
         drive(batch);
@@ -307,7 +307,7 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<Guid> SeedClinicAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinic = new Clinic(tenantId, $"Imp-{Guid.NewGuid():N}"[..14], "Ankara");
         db.Clinics.Add(clinic);
@@ -317,7 +317,7 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<string> TokenAsync(SeedCtx ctx, string[] permissions)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -327,7 +327,7 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<SeedCtx> SeedAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

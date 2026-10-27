@@ -66,7 +66,7 @@ public sealed class AppointmentProjectionHealthIntegrationTests
     {
         await ResetHealthBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -91,7 +91,7 @@ public sealed class AppointmentProjectionHealthIntegrationTests
     {
         await ResetHealthBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -116,7 +116,7 @@ public sealed class AppointmentProjectionHealthIntegrationTests
     {
         await ResetHealthBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -157,7 +157,7 @@ public sealed class AppointmentProjectionHealthIntegrationTests
     [Fact]
     public void Services_Should_RegisterAppointmentProjectionMetrics()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var metrics = scope.ServiceProvider.GetService<AppointmentProjectionMetrics>();
         metrics.Should().NotBeNull();
     }
@@ -167,7 +167,7 @@ public sealed class AppointmentProjectionHealthIntegrationTests
     {
         await ResetHealthBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -192,7 +192,7 @@ public sealed class AppointmentProjectionHealthIntegrationTests
     {
         await ResetHealthBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -219,7 +219,7 @@ public sealed class AppointmentProjectionHealthIntegrationTests
     {
         await ResetHealthBaselineAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
 
@@ -238,7 +238,7 @@ public sealed class AppointmentProjectionHealthIntegrationTests
 
     private async Task ResetHealthBaselineAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await AppointmentProjectionTestSupport.ResetHealthBaselineAsync(commandDb, queryDb);

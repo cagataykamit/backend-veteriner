@@ -504,7 +504,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = new Tenant($"Bre-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
@@ -575,7 +575,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedUserAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             return (await CreateUserAsync(db, _hasher, TenantId, ClinicId)).UserId;
         }
@@ -583,7 +583,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         public async Task<HttpClient> NewHttpForAnotherUserAsync(string[] permissions)
         {
             string email;
-            await using (var scope = _services.CreateAsyncScope())
+            await using (var scope = _services.CreateSystemScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 (_, email) = await CreateUserAsync(db, _hasher, TenantId, ClinicId);
@@ -628,7 +628,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedClientAsync(string name)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = new Client(TenantId, name, DateTime.UtcNow, $"90555{Interlocked.Increment(ref _phoneSeed):D7}");
             db.Clients.Add(client);
@@ -638,7 +638,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedPetAsync(Guid clientId, string name)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
             var pet = new Pet(TenantId, clientId, name, speciesId, breed: "Tekir", microchipNumber: "900111222333444");
@@ -649,7 +649,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
 
         public async Task<Guid> SeedClinicAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = new Clinic(TenantId, $"Other-{Guid.NewGuid():N}"[..14], "Bursa");
             db.Clinics.Add(clinic);
@@ -667,7 +667,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             string? presentationForm = null,
             string? packaging = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var product = new Product(
                 TenantId, name, unit, unitPrice, "TRY", DateTime.UtcNow, kind: kind, controlledClass: controlled,
@@ -689,7 +689,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             StockMovementType type = StockMovementType.In,
             Guid? clinicId = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = clinicId ?? ClinicId;
             var movement = new StockMovement(TenantId, clinic, productId, type, quantity, occurredAtUtc, DateTime.UtcNow, createdByUserId: UserId);
@@ -715,7 +715,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             string? referenceType = null,
             Guid? referenceId = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var movement = new StockMovement(
                 TenantId, ClinicId, productId, StockMovementType.Out, quantity, occurredAtUtc,
@@ -736,7 +736,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         /// <summary>Hareketin ters hareketi; partili hareketin partisine etkisi uygulanır. Ters hareketin kimliğini döner.</summary>
         public async Task<Guid> SeedReversalAsync(Guid movementId, DateTime occurredAtUtc, string reason)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var original = await db.StockMovements.SingleAsync(m => m.Id == movementId);
             var reversal = original.CreateReversal(reason, null, occurredAtUtc, UserId, null, DateTime.UtcNow);
@@ -758,7 +758,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         /// <summary>Sayım düzeltmesi: partili ise partinin kalanı <paramref name="target"/> olur (miktar = |fark|); partisizde yalnız hareket yazılır.</summary>
         public async Task<Guid> SeedAdjustmentAsync(Guid productId, Guid? batchId, decimal target, DateTime occurredAtUtc)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             StockBatch? batch = null;
             var quantity = target;
@@ -792,7 +792,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             Guid? clinicId = null,
             Guid? responsibleVeterinarian = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             Guid? examinationId = null;
             if (responsibleVeterinarian is { } vetId)

@@ -43,7 +43,7 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
     public ExaminationTemplatesEndpointTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         ExaminationTemplateSeeder.SeedAsync(db).GetAwaiter().GetResult();
     }
@@ -297,7 +297,7 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
     [Fact]
     public async Task Seeder_Should_Be_Idempotent()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var before = await db.ExaminationTemplates.CountAsync(t => t.TenantId == null);
 
@@ -341,7 +341,7 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
 
     private async Task<Examination> ExaminationAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Examinations.AsNoTracking().SingleAsync(e => e.Id == ctx.ExaminationId);
     }
@@ -351,7 +351,7 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
 
     private async Task<decimal> StockAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ProductStocks.AsNoTracking()
             .Where(s => s.ClinicId == ctx.ClinicId && s.ProductId == ctx.DrugId)
@@ -361,14 +361,14 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
 
     private async Task<List<ChargeSuggestion>> SuggestionsAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ChargeSuggestions.AsNoTracking().Where(s => s.PetId == ctx.PetId).ToListAsync();
     }
 
     private async Task<HttpClient> ClientAsync(SeedCtx ctx, string[] permissions)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -381,7 +381,7 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
 
     private async Task<SeedCtx> SeedAsync(decimal drugStock = 20m, bool finalized = false)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = new Tenant($"et-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);

@@ -31,7 +31,7 @@ public sealed class ExaminationRowVersionConcurrencyIntegrationTests : IClassFix
 
         async Task<Examination> UpdateAsync(ExaminationClinicalUpdate update)
         {
-            await using var scope = _factory.Services.CreateAsyncScope();
+            await using var scope = _factory.Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var entity = await db.Examinations.SingleAsync(x => x.Id == seed.ExaminationId);
             entity.UpdateClinicalContent(update, DateTime.UtcNow).IsSuccess.Should().BeTrue();
@@ -41,7 +41,7 @@ public sealed class ExaminationRowVersionConcurrencyIntegrationTests : IClassFix
 
         async Task<Examination> Read()
         {
-            await using var scope = _factory.Services.CreateAsyncScope();
+            await using var scope = _factory.Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             return await db.Examinations.AsNoTracking().SingleAsync(x => x.Id == seed.ExaminationId);
         }
@@ -90,7 +90,7 @@ public sealed class ExaminationRowVersionConcurrencyIntegrationTests : IClassFix
         var examinationId = seed.ExaminationId;
 
         byte[] staleRowVersion;
-        await using (var readScope = _factory.Services.CreateAsyncScope())
+        await using (var readScope = _factory.Services.CreateSystemScope())
         {
             var readDb = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
             staleRowVersion = await readDb.Examinations.AsNoTracking()
@@ -101,8 +101,8 @@ public sealed class ExaminationRowVersionConcurrencyIntegrationTests : IClassFix
 
         staleRowVersion.Should().NotBeNullOrEmpty();
 
-        await using var scope1 = _factory.Services.CreateAsyncScope();
-        await using var scope2 = _factory.Services.CreateAsyncScope();
+        await using var scope1 = _factory.Services.CreateSystemScope();
+        await using var scope2 = _factory.Services.CreateSystemScope();
 
         var db1 = scope1.ServiceProvider.GetRequiredService<AppDbContext>();
         var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -131,7 +131,7 @@ public sealed class ExaminationRowVersionConcurrencyIntegrationTests : IClassFix
         var act = () => db2.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateConcurrencyException>();
 
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var final = await verifyDb.Examinations.AsNoTracking().SingleAsync(x => x.Id == examinationId);
 

@@ -21,7 +21,7 @@ public sealed class PaymentFinanceParityIntegrationTests
     [Fact]
     public async Task TenantParity_Should_BeInSync_AfterBackfill()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var backfill = scope.ServiceProvider.GetRequiredService<IPaymentFinanceBackfillService>();
@@ -53,7 +53,7 @@ public sealed class PaymentFinanceParityIntegrationTests
     [Fact]
     public async Task TenantParity_Should_ReportContributionBehind_WhenNotBackfilledOrProjected()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var parity = scope.ServiceProvider.GetRequiredService<IPaymentFinanceParityReader>();
@@ -78,7 +78,7 @@ public sealed class PaymentFinanceParityIntegrationTests
     [Fact]
     public async Task TenantParity_Should_IsolateTenants()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var backfill = scope.ServiceProvider.GetRequiredService<IPaymentFinanceBackfillService>();

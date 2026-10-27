@@ -41,7 +41,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
             .UseSqlServer(connectionString)
             .Options;
 
-        var db = new AppDbContext(options);
+        var db = IntegrationTestDbContexts.CreateSystem(options);
         try
         {
             await db.Database.MigrateAsync();

@@ -108,21 +108,21 @@ public sealed class DashboardFinanceQueryParityIntegrationTests
 
     private async Task<(Guid TenantId, Guid ClinicA, Guid ClinicB)> SeedTenantWithTwoClinicsAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await PaymentFinanceTestSupport.SeedTenantWithTwoClinicsAsync(commandDb);
     }
 
     private async Task SeedPaymentAsync(Guid tenantId, Guid clinicId, decimal amount, DateTime paidAtUtc)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await PaymentFinanceTestSupport.SeedPaymentAsync(commandDb, tenantId, clinicId, amount, paidAtUtc);
     }
 
     private async Task RunBackfillAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var backfill = scope.ServiceProvider.GetRequiredService<IPaymentFinanceBackfillService>();
         var result = await backfill.BackfillAsync(tenantId, PaymentFinanceBackfillService.DefaultBatchSize, CancellationToken.None);
         result.Success.Should().BeTrue();

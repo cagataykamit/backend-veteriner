@@ -41,7 +41,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
             IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(
                 services, IntegrationTestDatabaseGuard.DedicatedQueryConnectionString);
 
-            using var scope = services.BuildServiceProvider().CreateScope();
+            using var scope = services.BuildServiceProvider().CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 

@@ -384,7 +384,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         IReadOnlyCollection<string> permissions,
         bool readOnlyTenant = false)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -409,7 +409,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
 
     private async Task<string> IssueTokenWithClaimsAsync(Guid userId, List<Claim> claims)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var (accessToken, _, _) = jwt.Create(userId, $"rep-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
         return accessToken;
@@ -424,7 +424,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
 
     private async Task<PaymentWindowSeed> SeedTenantWithPaymentsForTrMay12WindowAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -458,7 +458,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         bool readOnlyTenant = false,
         bool tenantWideAdmin = false)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -496,7 +496,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
     /// <summary>Tek klinik/müşteri/hayvana <paramref name="count"/> ödeme; <paramref name="paidPlan"/> ile abonelik Active, yoksa Trialing.</summary>
     private async Task<(Guid TenantId, string Token)> SeedTenantWithManyPaymentsAsync(int count, DateTime firstPaidAtUtc, bool paidPlan)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -526,7 +526,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
 
     private async Task<TwoClinicSeed> SeedTenantTwoClinicsAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
@@ -545,7 +545,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
 
     private async Task<ClinicAdminPaymentsCtx> SeedClinicAdminWithTwoClinicsAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -576,7 +576,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
 
     private async Task<AppointmentSeed> SeedTenantWithAppointmentsAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -604,7 +604,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
 
     private async Task<ExaminationSeed> SeedTenantWithExaminationAsync(string visitReasonToken)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -639,7 +639,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
 
     private async Task<VaccinationSeed> SeedTenantWithVaccinationsAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

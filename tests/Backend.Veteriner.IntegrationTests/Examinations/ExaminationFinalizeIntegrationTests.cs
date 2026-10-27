@@ -32,7 +32,7 @@ public sealed class ExaminationFinalizeIntegrationTests : IClassFixture<CustomWe
 
     private async Task<Examination> ReadAsync(Guid id)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Examinations.AsNoTracking().SingleAsync(x => x.Id == id);
     }
@@ -55,7 +55,7 @@ public sealed class ExaminationFinalizeIntegrationTests : IClassFixture<CustomWe
         var userId = Guid.NewGuid();
         var at = DateTime.UtcNow;
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var e = await db.Examinations.AsNoTracking().SingleAsync(x => x.Id == id);
@@ -82,8 +82,8 @@ public sealed class ExaminationFinalizeIntegrationTests : IClassFixture<CustomWe
         var id = await SeedExaminationAsync();
         var seed = await ReadAsync(id);
 
-        await using var scope1 = _factory.Services.CreateAsyncScope();
-        await using var scope2 = _factory.Services.CreateAsyncScope();
+        await using var scope1 = _factory.Services.CreateSystemScope();
+        await using var scope2 = _factory.Services.CreateSystemScope();
         var db1 = scope1.ServiceProvider.GetRequiredService<AppDbContext>();
         var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
 
@@ -113,7 +113,7 @@ public sealed class ExaminationFinalizeIntegrationTests : IClassFixture<CustomWe
         var userId = Guid.NewGuid();
         var finalizedAt = DateTime.UtcNow;
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var e = await db.Examinations.SingleAsync(x => x.Id == id);
@@ -123,7 +123,7 @@ public sealed class ExaminationFinalizeIntegrationTests : IClassFixture<CustomWe
 
         var finalized = await ReadAsync(id);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var e = await db.Examinations.AsNoTracking().SingleAsync(x => x.Id == id);
@@ -132,7 +132,7 @@ public sealed class ExaminationFinalizeIntegrationTests : IClassFixture<CustomWe
             await db.SaveChangesAsync();
         }
 
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await verifyDb.ExaminationAddenda.AsNoTracking()
             .Where(a => a.ExaminationId == id)

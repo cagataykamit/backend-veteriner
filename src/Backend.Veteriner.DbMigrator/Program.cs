@@ -32,6 +32,8 @@ using var host = builder.Build();
 
 using var scope = host.Services.CreateScope();
 var sp = scope.ServiceProvider;
+// Migration, seed, bakım ve yeniden kurma komutları kiracılar arasıdır (ADR-040): kiracı filtresi kapalı.
+using var systemScope = sp.GetRequiredService<ITenantScope>().AsSystem();
 var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("DbMigrator");
 var db = sp.GetRequiredService<AppDbContext>();
 var hasher = sp.GetRequiredService<IPasswordHasher>();

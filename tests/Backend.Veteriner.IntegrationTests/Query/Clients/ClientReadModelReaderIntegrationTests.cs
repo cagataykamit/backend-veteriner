@@ -21,7 +21,7 @@ public sealed class ClientReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_ReturnOnlyRowsForRequestedTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelReader>();
 
@@ -44,7 +44,7 @@ public sealed class ClientReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_ReturnEmpty_When_NoRowsForTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelReader>();
 
@@ -60,7 +60,7 @@ public sealed class ClientReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_OrderByNormalizedNameThenId_And_Paginate()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelReader>();
 
@@ -90,7 +90,7 @@ public sealed class ClientReadModelReaderIntegrationTests
     [InlineData("905321")]   // phone / normalized phone fragment
     public async Task GetList_Should_MatchSearchAcrossNameEmailPhone(string term)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IClientReadModelReader>();
 

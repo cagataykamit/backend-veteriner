@@ -383,7 +383,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         var (tenantId, token) = await SeedTenantWithTenantWideRemindersReaderAsync();
         Guid c1;
         Guid c2;
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic1 = new Clinic(tenantId, "L1", "Istanbul");
@@ -411,7 +411,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         var (tenantId, token) = await SeedTenantWithScopedRemindersReaderWithoutClinicAssignmentAsync();
         Guid c1;
         Guid c2;
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic1 = new Clinic(tenantId, "L1", "Istanbul");
@@ -444,7 +444,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
 
     private async Task<(Guid TenantId, string Token)> SeedTenantWithTenantWideRemindersReaderAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -467,7 +467,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
 
     private async Task<(Guid TenantId, string Token)> SeedTenantWithScopedRemindersReaderWithoutClinicAssignmentAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -492,7 +492,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         bool readOnlyTenant = false,
         Guid? jwtUserId = null)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -522,7 +522,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         ReminderType reminderType,
         ReminderDispatchStatus status)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var log = new ReminderDispatchLog(
             tenantId,
@@ -551,7 +551,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
 
     private async Task<ClinicAdminSeedContext> SeedClinicAdminTenantAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

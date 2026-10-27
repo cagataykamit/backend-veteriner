@@ -112,7 +112,7 @@ public sealed class ExaminationWriteClinicAssignmentIdorIntegrationTests : IClas
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Clinics.AccessDenied");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Appointments.AsNoTracking().SingleAsync(a => a.Id == appointmentId);
         row.Status.Should().Be(AppointmentStatus.Scheduled);
@@ -253,7 +253,7 @@ public sealed class ExaminationWriteClinicAssignmentIdorIntegrationTests : IClas
 
     private async Task<(Guid ClinicId, Guid PetId, string VisitReason, string RowVersion)> GetExaminationSnapshotAsync(Guid examinationId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Examinations.AsNoTracking().SingleAsync(e => e.Id == examinationId);
         return (row.ClinicId, row.PetId, row.VisitReason, Convert.ToBase64String(row.RowVersion));

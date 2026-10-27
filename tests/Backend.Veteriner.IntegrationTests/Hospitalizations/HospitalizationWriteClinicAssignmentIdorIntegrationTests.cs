@@ -141,7 +141,7 @@ public sealed class HospitalizationWriteClinicAssignmentIdorIntegrationTests : I
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Clinics.AccessDenied");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Hospitalizations.AsNoTracking().SingleAsync(h => h.Id == hospitalizationId);
         row.DischargedAtUtc.Should().BeNull();
@@ -283,7 +283,7 @@ public sealed class HospitalizationWriteClinicAssignmentIdorIntegrationTests : I
     private async Task<(Guid ClinicId, Guid PetId, string Reason, DateTime AdmittedAtUtc)> GetHospitalizationSnapshotAsync(
         Guid hospitalizationId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Hospitalizations.AsNoTracking().SingleAsync(h => h.Id == hospitalizationId);
         return (row.ClinicId, row.PetId, row.Reason, row.AdmittedAtUtc);

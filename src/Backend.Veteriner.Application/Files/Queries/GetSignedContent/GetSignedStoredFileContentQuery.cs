@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Files.Contracts.Dtos;
+using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
 
@@ -15,6 +16,7 @@ public sealed record GetSignedStoredFileContentQuery(Guid FileId, long Expires, 
 public sealed class GetSignedStoredFileContentQueryHandler(
     StoredFileContentReader reader,
     IFileAccessSigner signer,
+    ITenantScope tenantScope,
     TimeProvider timeProvider)
     : IRequestHandler<GetSignedStoredFileContentQuery, Result<StoredFileContent>>
 {
@@ -28,7 +30,10 @@ public sealed class GetSignedStoredFileContentQueryHandler(
                 "Dosya bağlantısı geçersiz veya süresi dolmuş.");
         }
 
-        var file = await reader.FindReadyByIdAsync(request.FileId, ct);
+        // İmzalı bağlantı anonimdir ve yetkiyi imza taşır: dosya kimlikle kiracılar arası bulunur (ADR-040).
+        Result<StoredFile> file;
+        using (tenantScope.AsSystem())
+            file = await reader.FindReadyByIdAsync(request.FileId, ct);
         return file.IsSuccess
             ? await reader.OpenAsync(file.Value!, ct)
             : Result<StoredFileContent>.Failure(file.Error);

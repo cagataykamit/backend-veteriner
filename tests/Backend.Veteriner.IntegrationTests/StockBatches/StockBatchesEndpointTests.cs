@@ -821,7 +821,7 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
 
     private async Task<HttpClient> SeedClientAsync(SeedCtx ctx, string[] permissions, bool includeClinicClaim = true)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -912,14 +912,14 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
 
     private async Task<decimal> RemainingAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.StockBatches.AsNoTracking().Where(b => b.Id == batchId).Select(b => b.RemainingQuantity).SingleAsync();
     }
 
     private async Task<decimal> GetStockAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ProductStocks.AsNoTracking()
             .Where(s => s.ClinicId == ctx.ClinicId && s.ProductId == ctx.ProductId)
@@ -929,14 +929,14 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
 
     private async Task<int> BatchCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.StockBatches.AsNoTracking().CountAsync(b => b.ProductId == ctx.ProductId);
     }
 
     private async Task<(decimal SumBatches, decimal Stock)> BatchSumAndStockAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var sum = await db.StockBatches.AsNoTracking()
             .Where(b => b.ProductId == ctx.ProductId).Select(b => b.RemainingQuantity).ToListAsync();
@@ -947,14 +947,14 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
 
     private async Task<int> AdministrationCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Administrations.AsNoTracking().CountAsync(a => a.ProductId == ctx.ProductId);
     }
 
     private async Task<int> OutMovementCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.StockMovements.AsNoTracking()
             .CountAsync(m => m.ProductId == ctx.ProductId && m.MovementType == StockMovementType.Out);
@@ -962,7 +962,7 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
 
     private async Task<StockMovement> OutMovementForAsync(Guid administrationId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.StockMovements.AsNoTracking()
             .SingleAsync(m => m.ReferenceId == administrationId && m.MovementType == StockMovementType.Out);
@@ -973,7 +973,7 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
         ControlledSubstanceClass controlled = ControlledSubstanceClass.None,
         decimal? legacyStock = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

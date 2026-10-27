@@ -59,7 +59,7 @@ public sealed class PerformanceMeasurementTests
         PerfSeedResult seed;
         string email;
         var seedWatch = Stopwatch.StartNew();
-        await using (var scope = factory.Services.CreateAsyncScope())
+        await using (var scope = factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             IntegrationTestDatabaseGuard.EnsureSafeDatabase(db.Database.GetConnectionString());
@@ -199,7 +199,7 @@ public sealed class PerformanceMeasurementTests
 
     private static async Task ExecuteAdminSqlAsync(IServiceProvider services, string sql)
     {
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(db.Database.GetConnectionString());
         await db.Database.ExecuteSqlRawAsync(sql);
@@ -207,7 +207,7 @@ public sealed class PerformanceMeasurementTests
 
     private static async Task<string> QueryAsTextAsync(IServiceProvider services, string sql)
     {
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         IntegrationTestDatabaseGuard.EnsureSafeDatabase(db.Database.GetConnectionString());
         await using var conn = new SqlConnection(db.Database.GetConnectionString());

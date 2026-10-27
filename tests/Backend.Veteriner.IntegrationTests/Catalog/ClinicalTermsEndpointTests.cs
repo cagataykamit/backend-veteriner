@@ -33,7 +33,7 @@ public sealed class ClinicalTermsEndpointTests : IClassFixture<CustomWebApplicat
     public ClinicalTermsEndpointTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         ClinicalTermSeeder.SeedAsync(db).GetAwaiter().GetResult();
     }
@@ -183,7 +183,7 @@ public sealed class ClinicalTermsEndpointTests : IClassFixture<CustomWebApplicat
     [Fact]
     public async Task Seeder_Should_Be_Idempotent()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var before = await db.ClinicalTerms.CountAsync(t => t.TenantId == null);
 
@@ -195,7 +195,7 @@ public sealed class ClinicalTermsEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<HttpClient> ClientAsync(IReadOnlyCollection<string> permissions)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 

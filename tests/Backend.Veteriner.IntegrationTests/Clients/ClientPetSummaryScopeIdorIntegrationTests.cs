@@ -126,7 +126,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
             await IntegrationTestAuthHelper.SeedTenantAdminUserAsync(_factory.Services, hasher);
 
         Guid defaultClinicId;
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -159,7 +159,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
         var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
         var (email, password) = await SeedClientsReaderWithoutClinicAssignmentAsync(hasher);
 
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -196,7 +196,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
 
     private static async Task ResetChildSummaryDataAsync(IServiceProvider services)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         await db.PaymentAllocations.Where(a => a.TenantId == tenant.Id).ExecuteDeleteAsync();
@@ -207,7 +207,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
 
     private static async Task<(Guid ClientId, Guid PetId)> EnsureClientWithPetAsync(IServiceProvider services)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
 
@@ -230,7 +230,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
         decimal amount,
         Guid? petId = null)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
 
@@ -256,7 +256,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
 
     private static async Task SeedAppointmentForPetAsync(IServiceProvider services, Guid clinicId, Guid petId)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
 
@@ -273,7 +273,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
 
     private static async Task SeedExaminationForPetAsync(IServiceProvider services, Guid clinicId, Guid petId)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
 
@@ -295,7 +295,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
     {
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
 
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
 

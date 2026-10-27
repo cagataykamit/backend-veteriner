@@ -86,7 +86,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         Applied(batch, "vaccinations").Should().Equal(3, 0, 2, 0);
         batch.GetProperty("committedAtUtc").ValueKind.Should().Be(JsonValueKind.String);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clients = await db.Clients.AsNoTracking().Where(c => c.TenantId == ctx.TenantId).ToListAsync();
         clients.Should().HaveCount(2, "M1 + M2; M4 M1'in mükerreri, M3 hatalı");
@@ -164,7 +164,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().Should().Be("Committed");
         await RunWorkerAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Clients.CountAsync(c => c.TenantId == ctx.TenantId)).Should().Be(2, "aynı satır iki kez yazılmaz");
         (await db.Vaccinations.CountAsync(v => v.TenantId == ctx.TenantId)).Should().Be(3);
@@ -253,7 +253,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
 
         // Önizlemeden sonra elle aynı ad + telefonla müşteri eklendi.
         Guid manualId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var manual = new Client(ctx.TenantId, ctx.CustomerName, DateTime.UtcNow, "905321234567", email: null, address: null);
@@ -264,7 +264,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
 
         await CommitAndRunAsync(client, id, validationId);
 
-        await using var check = _factory.Services.CreateAsyncScope();
+        await using var check = _factory.Services.CreateSystemScope();
         var data = check.ServiceProvider.GetRequiredService<AppDbContext>();
         (await data.Clients.CountAsync(c => c.TenantId == ctx.TenantId)).Should().Be(2, "M1 yeni oluşmadı; elle eklenen + M2");
         var m1 = await data.ImportBatchRows.AsNoTracking().SingleAsync(r => r.BatchId == id && r.Table == ImportTable.Customers && r.RowNumber == 2);
@@ -285,7 +285,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         var (id, validationId) = await UploadValidatedScenarioAsync(client, ctx);
 
         // Önizlemeden sonra çip başka bir hayvana kaydedildi.
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var owner = new Client(ctx.TenantId, $"Başka {Guid.NewGuid():N}"[..20], DateTime.UtcNow, "905449998877", email: null, address: null);
@@ -296,7 +296,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
 
         await CommitAndRunAsync(client, id, validationId);
 
-        await using var check = _factory.Services.CreateAsyncScope();
+        await using var check = _factory.Services.CreateSystemScope();
         var data = check.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await data.ImportBatchRows.AsNoTracking().Where(r => r.BatchId == id).ToListAsync();
         var h1 = rows.Single(r => r.Table == ImportTable.Pets && r.RowNumber == 2);
@@ -347,7 +347,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         (await takeover.ProcessNextAsync(CancellationToken.None)).Should().BeTrue();
 
         (await StatusAsync(id)).Should().Be(ImportBatchStatus.Committed);
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.Clients.CountAsync(c => c.TenantId == ctx.TenantId)).Should().Be(2);
@@ -374,7 +374,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         var stale = await SendUnitAsync(ctx.TenantId, id, "w-old", plan.Units[0]);
 
         stale.Error.Code.Should().Be(ImportOwnerUnitErrors.LeaseLostCode);
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Clients.CountAsync(c => c.TenantId == ctx.TenantId)).Should().Be(0);
         (await db.ImportBatchRows.CountAsync(r => r.BatchId == id && r.ApplyStatus != ImportRowApplyStatus.Pending)).Should().Be(0);
@@ -418,7 +418,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         }
 
         (await StatusAsync(id)).Should().Be(ImportBatchStatus.Committed);
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Clients.CountAsync(c => c.TenantId == ctx.TenantId)).Should().Be(3);
     }
 
@@ -465,7 +465,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         replay.StatusCode.Should().Be(HttpStatusCode.OK, "idempotent; sayı karşılaştırılmaz");
         (await replay.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("alreadyReleased").GetBoolean().Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.AuditLogs.CountAsync(a => a.TargetId == $"ImportBatchId={id}" && a.Action == "ImportBatch.ReleaseReminders"))
             .Should().BeGreaterThanOrEqualTo(1);
@@ -509,7 +509,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         (await StatusAsync(id)).Should().Be(ImportBatchStatus.Committed, "en uzun bekleme sonunda iş yine biter");
         sw.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(2), "2. ve 3. parça öncesi ≥ 1 sn beklendi");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var pressure = await scope.ServiceProvider.GetRequiredService<IImportBackpressureProbe>().ReadAsync(CancellationToken.None);
         var clientQueue = pressure.Projections.Single(p => p.Name == "client-projection");
         clientQueue.Enabled.Should().BeTrue();
@@ -564,7 +564,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
 
     private async Task<ImportCommitPlan> PlanAsync(Guid id)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.ImportBatchRows.AsNoTracking().Where(r => r.BatchId == id)
             .Select(r => new ImportCommitRowInfo(r.Id, r.Table, r.RowNumber, r.ValidationStatus, r.ApplyStatus, r.NormalizedJson))
@@ -575,7 +575,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
     private async Task<Backend.Veteriner.Domain.Shared.Result<ImportOwnerUnitResult>> SendUnitAsync(
         Guid tenantId, Guid batchId, string worker, ImportOwnerUnitPlan unit)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         using var tenant = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
         try
         {
@@ -590,7 +590,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
 
     private async Task MutateBatchAsync(Guid id, Action<ImportBatch> mutate)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.SingleAsync(b => b.Id == id);
         mutate(batch);
@@ -599,20 +599,20 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
 
     private async Task RunReminderProcessorAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         await scope.ServiceProvider.GetRequiredService<ReminderProcessorService>().ProcessOnceAsync(CancellationToken.None);
     }
 
     private async Task<List<Guid>> ImportedVaccinationIdsAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         return await scope.ServiceProvider.GetRequiredService<AppDbContext>().Vaccinations.AsNoTracking()
             .Where(v => v.ImportBatchId == batchId).Select(v => v.Id).ToListAsync();
     }
 
     private async Task<List<Guid>> DispatchSourcesAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         return await scope.ServiceProvider.GetRequiredService<AppDbContext>().ReminderDispatchLogs.AsNoTracking()
             .Where(l => l.TenantId == tenantId && l.ReminderType == ReminderType.Vaccination)
             .Select(l => l.SourceEntityId).ToListAsync();
@@ -741,14 +741,14 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
 
     private async Task<ImportBatchStatus> StatusAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatches.AsNoTracking().Where(b => b.Id == batchId).Select(b => b.Status).SingleAsync();
     }
 
     private async Task<string> TokenAsync(SeedCtx ctx, string[] permissions)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -758,7 +758,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
     /// <summary>Kiracı + klinik + teste özgü tür ve aşı tanımı + tam yetkili kullanıcı.</summary>
     private async Task<SeedCtx> SeedAsync(bool remindersEnabled = false)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

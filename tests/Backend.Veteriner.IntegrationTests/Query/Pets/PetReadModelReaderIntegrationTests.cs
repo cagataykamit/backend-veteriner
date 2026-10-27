@@ -21,7 +21,7 @@ public sealed class PetReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_ReturnOnlyRowsForRequestedTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelReader>();
 
@@ -44,7 +44,7 @@ public sealed class PetReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_ReturnEmpty_When_NoRowsForTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelReader>();
 
@@ -60,7 +60,7 @@ public sealed class PetReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_OrderByNameThenSpeciesThenId_And_Paginate()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelReader>();
 
@@ -93,7 +93,7 @@ public sealed class PetReadModelReaderIntegrationTests
     [InlineData("yılmaz", "Pamuk")]
     public async Task GetList_Should_MatchSearchAcrossPetAndClientFields(string term, string expectedPetName)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelReader>();
 
@@ -116,7 +116,7 @@ public sealed class PetReadModelReaderIntegrationTests
     [Fact]
     public async Task GetList_Should_FilterByClientIdAndSpeciesId()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IPetReadModelReader>();
 

@@ -49,7 +49,7 @@ public sealed class SpeciesEndpointPaginationTests : IClassFixture<CustomWebAppl
     private async Task<(Guid TenantId, string AccessToken)> SeedTenantAndIssueTokenAsync(
         IReadOnlyCollection<string> permissions)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 

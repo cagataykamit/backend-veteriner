@@ -29,7 +29,7 @@ public sealed class UnitOfWorkIntegrationTests : IClassFixture<CustomWebApplicat
         var species = NewSpecies();
         try
         {
-            await using var scope = _factory.Services.CreateAsyncScope();
+            await using var scope = _factory.Services.CreateSystemScope();
             var repository = scope.ServiceProvider.GetRequiredService<IRepository<Species>>();
 
             await repository.AddAsync(species);
@@ -51,7 +51,7 @@ public sealed class UnitOfWorkIntegrationTests : IClassFixture<CustomWebApplicat
         var duplicate = new Species(first.Code, "Aynı kod");
         try
         {
-            await using var scope = _factory.Services.CreateAsyncScope();
+            await using var scope = _factory.Services.CreateSystemScope();
             var repository = scope.ServiceProvider.GetRequiredService<IRepository<Species>>();
             var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
@@ -76,7 +76,7 @@ public sealed class UnitOfWorkIntegrationTests : IClassFixture<CustomWebApplicat
     [Fact]
     public async Task Guard_Should_Throw_When_Successful_Request_Leaves_Unsaved_Changes()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var guard = CreateGuard(scope.ServiceProvider);
 
@@ -95,7 +95,7 @@ public sealed class UnitOfWorkIntegrationTests : IClassFixture<CustomWebApplicat
     [Fact]
     public async Task Guard_Should_Throw_When_Outbox_Buffer_Is_Not_Flushed()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var buffer = scope.ServiceProvider.GetRequiredService<IOutboxBuffer>();
         var guard = CreateGuard(scope.ServiceProvider);
 
@@ -114,7 +114,7 @@ public sealed class UnitOfWorkIntegrationTests : IClassFixture<CustomWebApplicat
     [Fact]
     public async Task Guard_Should_Allow_Failed_Result_And_Nested_Request_With_Pending_Changes()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var outer = CreateGuard(scope.ServiceProvider);
         var inner = CreateGuard(scope.ServiceProvider);
@@ -155,13 +155,13 @@ public sealed class UnitOfWorkIntegrationTests : IClassFixture<CustomWebApplicat
 
     private async Task<bool> ExistsAsync(Guid id)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         return await scope.ServiceProvider.GetRequiredService<AppDbContext>().Species.AnyAsync(s => s.Id == id);
     }
 
     private async Task DeleteAsync(Guid id)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         await scope.ServiceProvider.GetRequiredService<AppDbContext>().Species.Where(s => s.Id == id).ExecuteDeleteAsync();
     }
 }

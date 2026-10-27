@@ -24,7 +24,7 @@ public sealed class AppointmentProjectionOrderingIntegrationTests
     [Fact]
     public async Task ProcessBatch_Should_NotProcessNewerEvent_WhenOldestEventIsWaitingForRetry()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -79,7 +79,7 @@ public sealed class AppointmentProjectionOrderingIntegrationTests
     [Fact]
     public async Task ProcessBatch_Should_StopSameBatch_WhenOldestEventFails()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -138,7 +138,7 @@ public sealed class AppointmentProjectionOrderingIntegrationTests
     [Fact]
     public async Task ProcessBatch_Should_AdvanceAfterOldestEventIsDeadLettered()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -189,7 +189,7 @@ public sealed class AppointmentProjectionOrderingIntegrationTests
     [Fact]
     public async Task ProcessBatch_Should_MarkIdempotentHeadProcessed_AndContinueToNextEvent()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -241,7 +241,7 @@ public sealed class AppointmentProjectionOrderingIntegrationTests
     [Fact]
     public async Task ProcessBatch_Should_PreserveCreatedRescheduledCancelledOrder()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -294,7 +294,7 @@ public sealed class AppointmentProjectionOrderingIntegrationTests
     [Fact]
     public async Task ProcessBatch_Should_BlockLaterEvents_WhenMiddleEventIsWaitingForRetry()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();

@@ -210,7 +210,7 @@ public sealed class ImagingRecordsIntegrationTests : IClassFixture<CustomWebAppl
         var list = await client.GetFromJsonAsync<JsonElement>($"/api/v1/imaging-records?clinicId={clinicId}&petId={petId}");
         list.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).Should().NotContain(id);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.StoredFiles.SingleAsync(f => f.Id == fileId)).Status.Should().Be(StoredFileStatus.Deleted);
     }
@@ -365,7 +365,7 @@ public sealed class ImagingRecordsIntegrationTests : IClassFixture<CustomWebAppl
         var ready = await SeedRecordWithFileAsync(clinicId);
         Guid staleId;
         string staleKey;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var storage = scope.ServiceProvider.GetRequiredService<IFileStorage>();
@@ -381,7 +381,7 @@ public sealed class ImagingRecordsIntegrationTests : IClassFixture<CustomWebAppl
         var cleaned = await _factory.Services.GetRequiredService<StoredFileMaintenanceProcessor>().RunOnceAsync(CancellationToken.None);
 
         cleaned.Should().BeGreaterThanOrEqualTo(1);
-        await using var check = _factory.Services.CreateAsyncScope();
+        await using var check = _factory.Services.CreateSystemScope();
         var checkDb = check.ServiceProvider.GetRequiredService<AppDbContext>();
         var checkStorage = check.ServiceProvider.GetRequiredService<IFileStorage>();
         (await checkDb.StoredFiles.SingleAsync(f => f.Id == staleId)).Status.Should().Be(StoredFileStatus.Deleted);
@@ -417,7 +417,7 @@ public sealed class ImagingRecordsIntegrationTests : IClassFixture<CustomWebAppl
 
     private async Task<(Guid RecordId, Guid FileId)> SeedRecordWithFileAsync(Guid clinicId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var storage = scope.ServiceProvider.GetRequiredService<IFileStorage>();
         var tenantId = (await db.Clinics.SingleAsync(c => c.Id == clinicId)).TenantId;
@@ -437,7 +437,7 @@ public sealed class ImagingRecordsIntegrationTests : IClassFixture<CustomWebAppl
 
     private async Task<Guid> SeedExaminationAsync(Guid clinicId, Guid petId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = (await db.Clinics.SingleAsync(c => c.Id == clinicId)).TenantId;
         var exam = new Examination(tenantId, clinicId, petId, appointmentId: null, DateTime.UtcNow.AddHours(-2), "Kontrol", "Bulgu", null, null, utcNow: DateTime.UtcNow);
@@ -448,7 +448,7 @@ public sealed class ImagingRecordsIntegrationTests : IClassFixture<CustomWebAppl
 
     private async Task FinalizeExaminationAsync(Guid examId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var exam = await db.Examinations.SingleAsync(e => e.Id == examId);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();

@@ -57,7 +57,7 @@ public sealed class PetProjectionClaimEnabledWebApplicationFactory : WebApplicat
             IntegrationTestDbContextOverride.UseDedicatedDatabase(services, CommandConnection);
             IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(services, QueryConnection);
 
-            using var scope = services.BuildServiceProvider().CreateScope();
+            using var scope = services.BuildServiceProvider().CreateSystemScope();
             var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

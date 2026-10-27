@@ -285,7 +285,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         IReadOnlyCollection<string> permissions,
         bool readOnlyTenant = false)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -310,7 +310,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<MinimumMutationSeedCtx> SeedTenantStockForMutationAsync(string[] permissions)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -358,7 +358,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
     private async Task<MinimumMutationSeedCtx> SeedStockUnderTenantFromJwtAsync(string token)
     {
         var tenantId = ExtractTenantIdFromJwt(token);
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = new Clinic(tenantId, $"Ro-{Guid.NewGuid():N}"[..14], "City");
@@ -395,7 +395,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         bool forceBelowMinimum,
         bool includeClinicClaimInToken = true)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -472,7 +472,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<ClinicAdminSeedResult> SeedClinicAdminTwoClinicsAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -550,7 +550,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<TwoClinicMinSeedResult> SeedTenantTwoClinicsBelowMinAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -601,7 +601,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         Guid clinicId,
         IReadOnlyCollection<string> permissions)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
         var claims = permissions

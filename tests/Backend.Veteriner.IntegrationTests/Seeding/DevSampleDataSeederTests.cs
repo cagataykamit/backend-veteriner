@@ -42,7 +42,7 @@ public sealed class DevSampleDataSeederTests
 
     private static async Task<AppDbContext> PrepareAsync(bool withTenant = true)
     {
-        var db = new AppDbContext(CreateOptions());
+        var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await IntegrationTestDatabaseReset.ResetAndMigrateAsync(db);
         await SpeciesAndBreedCatalogSeeder.SeedAsync(db);
         if (!withTenant)

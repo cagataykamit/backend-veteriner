@@ -393,7 +393,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = new Tenant($"Reg-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
@@ -457,7 +457,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         public async Task<HttpClient> NewHttpForAnotherUserAsync(string[] permissions, Guid? clinicContext = null)
         {
             string email;
-            await using (var scope = _services.CreateAsyncScope())
+            await using (var scope = _services.CreateSystemScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 (_, email) = await SeedUserAsync(db, _hasher, TenantId, ClinicId);
@@ -485,7 +485,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
 
         public async Task<Guid> SeedClientAsync(string name, string? address = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var phone = $"90555{Interlocked.Increment(ref _phoneSeed):D7}";
             var client = new Client(TenantId, name, DateTime.UtcNow, phone, address: address);
@@ -496,7 +496,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
 
         public async Task<Guid> SeedPetAsync(Guid clientId, string name, DateOnly? birthDate = null, PetGender? gender = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
             var pet = new Pet(
@@ -511,7 +511,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
             Guid petId, DateTime examinedAtUtc, string visitReason, string? assessment = null, string? plan = null,
             bool withVisit = false, bool finalize = false, Guid? clinicId = null, bool visitHasVeterinarian = true)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             Guid? visitId = null;
             if (withVisit)
@@ -534,7 +534,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
 
         public async Task SeedTreatmentAsync(Guid petId, Guid examinationId, string title, DateTime atUtc)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Treatments.Add(new Treatment(TenantId, ClinicId, petId, examinationId, atUtc, title, "Aciklama", null, null, DateTime.UtcNow));
             await db.SaveChangesAsync();
@@ -555,7 +555,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         private async Task<Guid> SeedPrescriptionCoreAsync(
             Guid petId, Guid? examinationId, DateTime atUtc, string? content, Guid? clinicId, (string Name, decimal? Quantity)[] items)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var prescription = new Prescription(
                 TenantId, clinicId ?? ClinicId, petId, examinationId, null, atUtc, "Recete", content ?? "Recete icerigi", null, null, DateTime.UtcNow);
@@ -572,7 +572,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
 
         public async Task<Guid> SeedProductAsync(string name, string unit)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var product = new Product(TenantId, name, unit, 10m, "TRY", DateTime.UtcNow);
             db.Products.Add(product);
@@ -583,7 +583,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         public async Task SeedAdministrationAsync(
             Guid petId, Guid examinationId, Guid productId, decimal quantity, bool lateAdded, bool voided)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var administration = Administration.Create(
                     TenantId, ClinicId, petId, examinationId, null, productId, quantity,
@@ -598,7 +598,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
 
         public async Task<Guid> SeedClinicAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = new Clinic(TenantId, $"Other-{Guid.NewGuid():N}"[..14], "Bursa");
             db.Clinics.Add(clinic);

@@ -39,7 +39,7 @@ public sealed class PaymentExportSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task CsvExport_FlagOff_Should_IncludePayment_ByClientNameSearch_EvenWhenQueryDbEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -63,7 +63,7 @@ public sealed class PaymentExportSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task CsvExport_FlagOn_Should_NotFallback_WhenReadModelsEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -87,7 +87,7 @@ public sealed class PaymentExportSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task XlsxExport_FlagOn_Should_IncludePayment_ByPetNameSearch_WhenPetReadModelPopulated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -112,7 +112,7 @@ public sealed class PaymentExportSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task CsvExport_FlagOn_Should_ReturnOnlyRowsForRequestedTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 

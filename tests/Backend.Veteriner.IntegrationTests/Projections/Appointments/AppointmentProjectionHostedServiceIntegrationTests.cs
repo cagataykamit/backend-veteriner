@@ -23,7 +23,7 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests
     {
         await ResetAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -48,7 +48,7 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests
         await EventualConsistencyTestSupport.EventuallyAsync(
             async () =>
             {
-                await using var pollScope = _factory.Services.CreateAsyncScope();
+                await using var pollScope = _factory.Services.CreateSystemScope();
                 var polledCommandDb = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var polledQueryDb = pollScope.ServiceProvider.GetRequiredService<QueryDbContext>();
                 var processed = await polledCommandDb.OutboxMessages
@@ -67,7 +67,7 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests
     {
         await ResetAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
 
@@ -119,7 +119,7 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests
         await EventualConsistencyTestSupport.EventuallyAsync(
             async () =>
             {
-                await using var pollScope = _factory.Services.CreateAsyncScope();
+                await using var pollScope = _factory.Services.CreateSystemScope();
                 var polledCommandDb = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var polledQueryDb = pollScope.ServiceProvider.GetRequiredService<QueryDbContext>();
                 var processed = await polledCommandDb.OutboxMessages.CountAsync(m => m.ProcessedAtUtc != null);
@@ -134,7 +134,7 @@ public sealed class AppointmentProjectionHostedServiceIntegrationTests
 
     private async Task ResetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);

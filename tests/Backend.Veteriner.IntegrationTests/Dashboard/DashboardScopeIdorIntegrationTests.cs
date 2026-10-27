@@ -92,7 +92,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
         var (email, password, extraClinicId) =
             await IntegrationTestAuthHelper.SeedTenantAdminUserAsync(_factory.Services, hasher);
 
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -122,7 +122,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
 
         var (email, password) = await SeedDashboardReaderWithoutClinicAssignmentAsync(hasher);
 
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -221,7 +221,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
         var (email, password, extraClinicId) =
             await IntegrationTestAuthHelper.SeedTenantAdminUserAsync(_factory.Services, hasher);
 
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -253,7 +253,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
 
         var (email, password) = await SeedDashboardReaderWithoutClinicAssignmentAsync(hasher);
 
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -291,7 +291,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
 
     private static async Task ResetTenantPaymentsAsync(IServiceProvider services)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         await db.PaymentAllocations.Where(a => a.TenantId == tenant.Id).ExecuteDeleteAsync();
@@ -303,7 +303,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
         Guid clinicId,
         decimal amount)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -336,7 +336,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
         Guid clinicId,
         AppointmentStatus status)
     {
-        using var scope = services.CreateScope();
+        using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
@@ -370,7 +370,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
     {
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
 
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -418,7 +418,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
     {
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);
 
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);

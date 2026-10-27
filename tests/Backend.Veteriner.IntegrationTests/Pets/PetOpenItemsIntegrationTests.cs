@@ -213,7 +213,7 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
 
         SeedIds ids;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -266,7 +266,7 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
 
         public async Task WithDbAsync(Func<AppDbContext, SeedIds, Task> action)
         {
-            await using var scope = factory.Services.CreateAsyncScope();
+            await using var scope = factory.Services.CreateSystemScope();
             await action(scope.ServiceProvider.GetRequiredService<AppDbContext>(), ids);
         }
 

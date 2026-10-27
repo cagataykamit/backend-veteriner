@@ -82,7 +82,7 @@ public sealed class YearlyBillingIntegrationTests : IClassFixture<CustomWebAppli
 
     private static async Task ActivateMonthlyAsync(WebApplicationFactory<Program> app, Guid tenantId, DateTime paidAtUtc)
     {
-        await using var scope = app.Services.CreateAsyncScope();
+        await using var scope = app.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var sub = await db.TenantSubscriptions.SingleAsync(s => s.TenantId == tenantId);
         sub.ActivatePaidPlan(sub.PlanCode, BillingPeriodKind.Monthly, paidAtUtc);

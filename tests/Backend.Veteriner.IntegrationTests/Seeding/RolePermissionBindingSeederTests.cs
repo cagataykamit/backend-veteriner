@@ -70,7 +70,7 @@ public sealed class RolePermissionBindingSeederTests
     [Fact]
     public async Task Seed_Should_Bind_ClinicsUpdate_To_Admin_And_ClinicAdmin_WithoutDuplicates()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -141,7 +141,7 @@ public sealed class RolePermissionBindingSeederTests
     [Fact]
     public async Task Seed_Should_Bind_RemindersReadAndManage_To_Admin_And_Owner()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -185,7 +185,7 @@ public sealed class RolePermissionBindingSeederTests
     [Fact]
     public async Task Seed_Should_BeIdempotent_On_RepeatedRuns()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -217,7 +217,7 @@ public sealed class RolePermissionBindingSeederTests
     [Fact]
     public async Task Seed_Should_Bind_Correction_Permissions_To_AdminLevel_Roles_And_Revoke_Veteriner_Administrations_Correct()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         await PermissionSeeder.SeedAsync(db);
@@ -267,7 +267,7 @@ public sealed class RolePermissionBindingSeederTests
     [Fact]
     public async Task Seed_Should_NotOverride_ExistingLinks_ForClinicAdmin()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -305,7 +305,7 @@ public sealed class RolePermissionBindingSeederTests
     [Fact]
     public async Task Seed_Should_Cleanup_NonWhitelisted_System_Permissions_From_Admin_Claim()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -376,7 +376,7 @@ public sealed class RolePermissionBindingSeederTests
     [Fact]
     public async Task Seed_Cleanup_Should_Only_Affect_Admin_Claim_Not_Other_Claims()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -409,7 +409,7 @@ public sealed class RolePermissionBindingSeederTests
     [Fact]
     public async Task Seed_Should_Bind_AdminUser_To_PlatformAdmin_And_Keep_TenantAdmin_Limited_To_Whitelist()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();

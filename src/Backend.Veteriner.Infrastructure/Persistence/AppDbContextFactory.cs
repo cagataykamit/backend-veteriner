@@ -1,3 +1,5 @@
+using Backend.Veteriner.Infrastructure.Web;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -10,6 +12,7 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
     {
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
         optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=VetinityCommandDb_EfDesign;Trusted_Connection=True;TrustServerCertificate=True;");
-        return new AppDbContext(optionsBuilder.Options);
+        // Tasarım zamanında HTTP isteği ve kiracı yoktur; kiracı filtresi kapalı varsayılanla kalır (migration sorgu çalıştırmaz).
+        return new AppDbContext(optionsBuilder.Options, new TenantContext(new HttpContextAccessor()));
     }
 }

@@ -43,7 +43,7 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
         response.Headers.Location.Should().NotBeNull();
         var result = (await response.Content.ReadFromJsonAsync<QuickRegisterClientResultDto>())!;
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var client = await db.Clients.AsNoTracking().SingleAsync(c => c.Id == result.ClientId);
         client.FullName.Should().Be(name);
@@ -74,7 +74,7 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var id = (await response.Content.ReadFromJsonAsync<QuickRegisterClientResultDto>())!.ClientId;
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Clients.AsNoTracking().SingleAsync(c => c.Id == id)).PhoneNormalized.Should().Be("905551112233");
     }
@@ -139,7 +139,7 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await IntegrationTestProblemDetails.ReadCodeAsync(second)).Should().Be("Clients.DuplicateClient");
         (await ClientCountAsync(name)).Should().Be(1);
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         // Kiracı kapsamlı sayım: diğer kiracıların örnek verisinde de "Karamel" adlı hayvan olabilir (ExampleClinicDataGenerator).
         var tenantId = await db.Clients.AsNoTracking().Where(c => c.FullName == name).Select(c => c.TenantId).SingleAsync();
@@ -195,7 +195,7 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
         var http = await CreateClientAsync(BothPermissions);
         var name = UniqueName();
         Guid defaultTenantId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var foreignTenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
@@ -210,7 +210,7 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
 
         response.StatusCode.Should().Be(HttpStatusCode.Created, "başka kiracıdaki aynı ad+telefon mükerrer sayılmaz");
         var id = (await response.Content.ReadFromJsonAsync<QuickRegisterClientResultDto>())!.ClientId;
-        await using var verify = _factory.Services.CreateAsyncScope();
+        await using var verify = _factory.Services.CreateSystemScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
         (await verifyDb.Clients.AsNoTracking().SingleAsync(c => c.Id == id)).TenantId.Should().Be(defaultTenantId);
     }
@@ -239,7 +239,7 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
         if (_speciesId is { } cached)
             return cached;
 
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         _speciesId = db.Species.AsNoTracking().OrderBy(s => s.DisplayOrder).Select(s => s.Id).First();
         return _speciesId.Value;
@@ -257,14 +257,14 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
 
     private async Task<int> ClientCountAsync(string fullName)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Clients.AsNoTracking().CountAsync(c => c.FullName == fullName);
     }
 
     private async Task<int> OutboxCountContainingAsync(string text)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.OutboxMessages.AsNoTracking().CountAsync(m => m.Payload.Contains(text));
     }

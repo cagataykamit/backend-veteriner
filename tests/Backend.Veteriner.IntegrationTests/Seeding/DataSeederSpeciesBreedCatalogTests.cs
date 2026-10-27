@@ -39,7 +39,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
     [Fact]
     public async Task SeedAsync_Should_Create_DefaultSpecies()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         await DataSeeder.SeedAsync(db, new StubBcryptPasswordHasher());
@@ -58,7 +58,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
     [Fact]
     public async Task SeedAsync_Should_Create_DefaultBreeds()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         await DataSeeder.SeedAsync(db, new StubBcryptPasswordHasher());
@@ -92,7 +92,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
     [Fact]
     public async Task SeedAsync_Twice_Should_Not_Duplicate_DefaultSpeciesAndBreeds()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();

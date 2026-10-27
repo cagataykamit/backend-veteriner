@@ -37,7 +37,7 @@ public sealed class PaymentListSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOff_Should_FindPayment_ByClientNameSearch_EvenWhenQueryDbEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -59,7 +59,7 @@ public sealed class PaymentListSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_NotFallback_WhenReadModelsEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -81,7 +81,7 @@ public sealed class PaymentListSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_FindPayment_ByClientNameSearch_WhenClientReadModelPopulated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -104,7 +104,7 @@ public sealed class PaymentListSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_FindPayment_ByPetNameSearch_WhenPetReadModelPopulated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -127,7 +127,7 @@ public sealed class PaymentListSearchLookupSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_ReturnOnlyRowsForRequestedTenant()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 

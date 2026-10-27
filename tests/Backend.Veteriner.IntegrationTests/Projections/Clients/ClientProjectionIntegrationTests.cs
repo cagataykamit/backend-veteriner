@@ -24,7 +24,7 @@ public sealed class ClientProjectionIntegrationTests
     [Fact]
     public async Task CreatedEvent_Should_InsertReadModel_And_MarkOutboxProcessed()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -62,7 +62,7 @@ public sealed class ClientProjectionIntegrationTests
     [Fact]
     public async Task DeletedEvent_Should_RemoveReadModelRow_And_Ignore_Stale_Or_Missing()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -103,7 +103,7 @@ public sealed class ClientProjectionIntegrationTests
     [Fact]
     public async Task UpdatedEvent_Should_UpdateExistingReadModelRow()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -140,7 +140,7 @@ public sealed class ClientProjectionIntegrationTests
     [Fact]
     public async Task DuplicateEvent_Should_BeIdempotent()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -175,7 +175,7 @@ public sealed class ClientProjectionIntegrationTests
     [Fact]
     public async Task StaleEvent_Should_NotOverwriteNewerReadModelData()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -217,7 +217,7 @@ public sealed class ClientProjectionIntegrationTests
     [Fact]
     public async Task UnknownClientEventType_Should_NotBeClaimed_And_RemainUntouched()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -242,7 +242,7 @@ public sealed class ClientProjectionIntegrationTests
     [Fact]
     public async Task InvalidJson_Should_Retry_And_NotMarkOutboxProcessed()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();
@@ -268,7 +268,7 @@ public sealed class ClientProjectionIntegrationTests
     [Fact]
     public async Task NonClientOutboxMessage_Should_NotBeConsumedByClientProcessor()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IClientProjectionProcessor>();

@@ -55,7 +55,7 @@ public sealed class AdminSeedingOrchestrationTests
     [Fact]
     public async Task ProductionOrder_FirstBoot_Should_CreatePlatformAdminUserClaimAndAllPermissionLinks()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -90,7 +90,7 @@ public sealed class AdminSeedingOrchestrationTests
     [Fact]
     public async Task WrongOrder_AdminClaimSeederBeforeDataSeeder_Should_LeavePlatformAdminClaimWithoutUserBinding()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -121,7 +121,7 @@ public sealed class AdminSeedingOrchestrationTests
     [Fact]
     public async Task SecondRun_Should_BeIdempotent_For_PlatformAdminBindings()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         var hasher = new StubBcryptPasswordHasher();
@@ -146,7 +146,7 @@ public sealed class AdminSeedingOrchestrationTests
     [Fact]
     public async Task ProductionSeed_Should_NotCreateDefaultAdminTenantOrLink_When_DefaultAdminDisabled()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
 
         await PermissionSeeder.SeedAsync(db);
@@ -161,7 +161,7 @@ public sealed class AdminSeedingOrchestrationTests
     [Fact]
     public async Task ProductionSeed_Should_NotGrantPlatformAdmin_To_PreexistingDefaultEmailUser()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
         await PermissionSeeder.SeedAsync(db);
         db.Users.Add(new Backend.Veteriner.Domain.Users.User(AdminClaimSeeder.PlatformAdminUserEmail, new StubBcryptPasswordHasher().Hash("x"), DateTime.UtcNow));
@@ -175,7 +175,7 @@ public sealed class AdminSeedingOrchestrationTests
     [Fact]
     public async Task PlatformAdminBootstrapper_Should_CreateUserLinkedToPlatformAdmin_And_RefuseDuplicateOrWeakPassword()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
         var hasher = new StubBcryptPasswordHasher();
         await PermissionSeeder.SeedAsync(db);
@@ -206,7 +206,7 @@ public sealed class AdminSeedingOrchestrationTests
     [Fact]
     public async Task PlatformAdminBootstrapper_Should_ReusePlatformTenant_For_SecondAdmin()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
         var hasher = new StubBcryptPasswordHasher();
         await PermissionSeeder.SeedAsync(db);
@@ -222,7 +222,7 @@ public sealed class AdminSeedingOrchestrationTests
     [Fact]
     public async Task PlatformAdminBootstrapper_Should_Refuse_When_PlatformNamedTenantHasClinic()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await ResetDatabaseAsync(db);
         var hasher = new StubBcryptPasswordHasher();
         await PermissionSeeder.SeedAsync(db);

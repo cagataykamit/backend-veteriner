@@ -40,7 +40,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         result.SkippedStaleCount.Should().Be(0);
         result.ParityInSync.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var rows = await queryDb.PetReadModels.AsNoTracking().Where(x => x.TenantId == tenantId).ToListAsync();
         rows.Should().HaveCount(3);
@@ -69,7 +69,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         second.QueryPetCount.Should().Be(2);
         second.ParityInSync.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.PetReadModels.CountAsync(x => x.TenantId == tenantId)).Should().Be(2);
     }
@@ -83,7 +83,7 @@ public sealed class PetReadModelBackfillIntegrationTests
 
         await RunBackfillAsync(tenantId);
 
-        await using (var mutateScope = _factory.Services.CreateAsyncScope())
+        await using (var mutateScope = _factory.Services.CreateSystemScope())
         {
             var commandDb = mutateScope.ServiceProvider.GetRequiredService<AppDbContext>();
             var pet = await commandDb.Pets
@@ -96,7 +96,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         var second = await RunBackfillAsync(tenantId);
         second.UpdatedCount.Should().Be(1);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var row = await queryDb.PetReadModels.AsNoTracking().SingleAsync(x => x.PetId == petId);
         row.Name.Should().Be("Yeni İsim");
@@ -119,7 +119,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         result.CommandPetCount.Should().Be(2);
         result.InsertedCount.Should().Be(2);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.PetReadModels.CountAsync(x => x.TenantId == tenantA)).Should().Be(2);
         (await queryDb.PetReadModels.CountAsync(x => x.TenantId == tenantB)).Should().Be(0, "tenant scope diğer tenant'ı yazmamalı");
@@ -134,7 +134,7 @@ public sealed class PetReadModelBackfillIntegrationTests
 
         await RunBackfillAsync(tenantId);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.ProcessedProjectionEvents.CountAsync()).Should().Be(0);
     }
@@ -147,7 +147,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         var petId = await SeedSingleCommandPetAsync(tenantId, "Command Side");
 
         var newerOccurredAt = DateTime.UtcNow.AddDays(1);
-        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        await using (var seedScope = _factory.Services.CreateSystemScope())
         {
             var queryDb = seedScope.ServiceProvider.GetRequiredService<QueryDbContext>();
             queryDb.PetReadModels.Add(new PetReadModel
@@ -173,7 +173,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         result.SkippedStaleCount.Should().Be(1);
         result.UpdatedCount.Should().Be(0);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var verifyDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var row = await verifyDb.PetReadModels.AsNoTracking().SingleAsync(x => x.PetId == petId);
         row.Name.Should().Be("Newer Event Name", "daha yeni event ile yazılmış satır backfill tarafından ezilmemeli");
@@ -192,7 +192,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         result.ParityInSync.Should().BeTrue();
         result.CommandPetCount.Should().Be(result.QueryPetCount);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var parity = scope.ServiceProvider.GetRequiredService<IPetReadModelParityReader>();
         (await parity.GetGlobalParityAsync()).InSync.Should().BeTrue();
     }
@@ -203,7 +203,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         await ResetQuerySideAsync();
         var tenantId = Guid.NewGuid();
 
-        await using var seedScope = _factory.Services.CreateAsyncScope();
+        await using var seedScope = _factory.Services.CreateSystemScope();
         var commandDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var speciesId = await commandDb.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var speciesName = await commandDb.Species.Where(s => s.Id == speciesId).Select(s => s.Name).FirstAsync();
@@ -221,7 +221,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         result.InsertedCount.Should().Be(1);
         result.ParityInSync.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var row = await queryDb.PetReadModels.AsNoTracking().SingleAsync(x => x.PetId == pet.Id);
         row.ClientFullName.Should().Be("Ayşe Yılmaz");
@@ -234,21 +234,21 @@ public sealed class PetReadModelBackfillIntegrationTests
 
     private async Task<PetReadModelBackfillResult> RunBackfillAsync(Guid? tenantId, int batchSize = 500)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var backfill = scope.ServiceProvider.GetRequiredService<IPetReadModelBackfillService>();
         return await backfill.BackfillAsync(tenantId, batchSize, CancellationToken.None);
     }
 
     private async Task ResetQuerySideAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await PetProjectionTestSupport.ResetQuerySideAsync(queryDb);
     }
 
     private async Task SeedCommandPetsAsync(Guid tenantId, params string[] petNames)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var speciesId = await commandDb.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var client = new Client(tenantId, "Test Owner", DateTime.UtcNow);
@@ -263,7 +263,7 @@ public sealed class PetReadModelBackfillIntegrationTests
 
     private async Task<Guid> SeedSingleCommandPetAsync(Guid tenantId, string petName)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var speciesId = await commandDb.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var client = new Client(tenantId, "Single Owner", DateTime.UtcNow);

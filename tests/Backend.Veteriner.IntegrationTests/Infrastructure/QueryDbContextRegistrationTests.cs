@@ -20,7 +20,7 @@ public sealed class QueryDbContextRegistrationTests : IClassFixture<CustomWebApp
     [Fact]
     public void Should_Resolve_AppDbContext_And_QueryDbContext()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
 
         var act = () =>
         {
@@ -34,7 +34,7 @@ public sealed class QueryDbContextRegistrationTests : IClassFixture<CustomWebApp
     [Fact]
     public void CommandAndQueryIntegrationDatabaseNames_Should_UseDifferentCatalogs()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var appDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -49,7 +49,7 @@ public sealed class QueryDbContextRegistrationTests : IClassFixture<CustomWebApp
     [Fact]
     public void QueryDbContext_Should_Not_Register_Interceptors()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var options = scope.ServiceProvider.GetRequiredService<DbContextOptions<QueryDbContext>>();
 
         var extension = options.Extensions.OfType<CoreOptionsExtension>().SingleOrDefault();

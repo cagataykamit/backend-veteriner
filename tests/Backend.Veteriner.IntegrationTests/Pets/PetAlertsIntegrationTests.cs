@@ -166,7 +166,7 @@ public sealed class PetAlertsIntegrationTests : IClassFixture<CustomWebApplicati
     {
         var ctx = await SeedAsync();
         Guid foreignPetId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
@@ -187,7 +187,7 @@ public sealed class PetAlertsIntegrationTests : IClassFixture<CustomWebApplicati
         (await ctx.PutPetAsync(foreignPetId, new { alertFlags = Array.Empty<string>() }))
             .StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.BadRequest);
 
-        await using var check = _factory.Services.CreateAsyncScope();
+        await using var check = _factory.Services.CreateSystemScope();
         var verifyDb = check.ServiceProvider.GetRequiredService<AppDbContext>();
         (await verifyDb.Pets.AsNoTracking().SingleAsync(p => p.Id == foreignPetId)).AlertFlags.Should().Be(PetAlertFlags.Allergy);
     }
@@ -204,7 +204,7 @@ public sealed class PetAlertsIntegrationTests : IClassFixture<CustomWebApplicati
         Guid clientId;
         Guid speciesId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -282,7 +282,7 @@ public sealed class PetAlertsIntegrationTests : IClassFixture<CustomWebApplicati
 
         public async Task SeedAppointmentAsync(Guid petId)
         {
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Appointments.Add(new Appointment(
                 tenantId, ClinicId, petId, DateTime.UtcNow.AddMinutes(30), 30, AppointmentType.Consultation));

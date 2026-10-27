@@ -79,7 +79,7 @@ public sealed class PrescriptionItemsIntegrationTests : IClassFixture<CustomWebA
 
     private async Task<Guid> SeedProductAsync(Guid tenantId, string name, bool active = true)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var product = new Product(tenantId, name, "Kutu", 10m, "TRY", DateTime.UtcNow);
         if (!active)
@@ -143,7 +143,7 @@ public sealed class PrescriptionItemsIntegrationTests : IClassFixture<CustomWebA
         (await ItemsAsync(c)).Should().BeEmpty();
 
         // Reçete hiçbir aşamada stok hareketi/stok satırı üretmez.
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.StockMovements.Any(m => m.ProductId == productId).Should().BeFalse();
         db.ProductStocks.Any(s => s.ProductId == productId).Should().BeFalse();

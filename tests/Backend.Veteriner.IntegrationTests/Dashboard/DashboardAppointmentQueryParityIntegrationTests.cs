@@ -88,7 +88,7 @@ public sealed class DashboardAppointmentQueryParityIntegrationTests
             _factory.Services, tenantId, clinicId, petId, DashboardQueryParityTestSupport.TodayWithinOperationalWindow(), AppointmentStatus.Scheduled);
         await DashboardQueryParityTestSupport.RebuildAsync(_factory.Services);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             await queryDb.AppointmentReadModels.ExecuteDeleteAsync();

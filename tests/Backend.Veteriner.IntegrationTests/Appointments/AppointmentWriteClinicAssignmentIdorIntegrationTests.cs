@@ -135,7 +135,7 @@ public sealed class AppointmentWriteClinicAssignmentIdorIntegrationTests : IClas
             new { ScheduledAtUtc = SlotAlignedUtcPlusDays(5) });
         rescheduleResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Appointments.AsNoTracking().SingleAsync(a => a.Id == appointmentId);
         row.Status.Should().Be(AppointmentStatus.Scheduled);
@@ -216,7 +216,7 @@ public sealed class AppointmentWriteClinicAssignmentIdorIntegrationTests : IClas
 
     private async Task<Guid> GetAppointmentPetIdAsync(Guid appointmentId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Appointments.AsNoTracking()
             .Where(a => a.Id == appointmentId)
@@ -226,7 +226,7 @@ public sealed class AppointmentWriteClinicAssignmentIdorIntegrationTests : IClas
 
     private async Task<DateTime> GetAppointmentScheduledAtAsync(Guid appointmentId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Appointments.AsNoTracking()
             .Where(a => a.Id == appointmentId)

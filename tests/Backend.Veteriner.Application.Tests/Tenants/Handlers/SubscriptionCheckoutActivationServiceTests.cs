@@ -27,6 +27,7 @@ public sealed class SubscriptionCheckoutActivationServiceTests
             _subscriptionsWrite.Object,
             _sessionsRead.Object,
             _sessionsWrite.Object,
+            Mock.Of<ITenantScope>(),
             new SalesPartnerDiscountBilling(_redemptions.Object, NullLogger<SalesPartnerDiscountBilling>.Instance),
             TimeProvider.System);
 

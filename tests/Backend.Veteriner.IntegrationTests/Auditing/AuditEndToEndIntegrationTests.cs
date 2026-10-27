@@ -22,7 +22,7 @@ public sealed class AuditEndToEndIntegrationTests
 
     private async Task<Guid> GetAdminUserIdAsync()
     {
-        using var scope = _fixture.Factory.Services.CreateScope();
+        using var scope = _fixture.Factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.Users
             .AsNoTracking()
@@ -74,7 +74,7 @@ public sealed class AuditEndToEndIntegrationTests
         var revokeResponse = await client.DeleteAsync($"/api/v1/me/sessions/{sessionId:D}");
         revokeResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        using var scope = _fixture.Factory.Services.CreateScope();
+        using var scope = _fixture.Factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var sessionIdText = sessionId.ToString("D");

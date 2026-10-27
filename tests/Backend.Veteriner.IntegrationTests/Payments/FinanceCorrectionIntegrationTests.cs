@@ -101,7 +101,7 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
         (await IntegrationTestProblemDetails.ReadCodeAsync(again)).Should().Be("Payments.AlreadyVoided");
         (await ctx.GetChargeAsync(chargeId)).OutstandingAmount.Should().Be(500m);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var logs = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "Payment.Void" && a.TargetId == $"PaymentId={paymentId}")
@@ -218,7 +218,7 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
         balance.ChargedAmount.Should().Be(700m);
         balance.OutstandingAmount.Should().Be(300m);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.AuditLogs.AsNoTracking().AnyAsync(a =>
             a.Action == "Charge.Correct" && a.TargetId == $"ChargeId={chargeId}" && a.Success
@@ -280,7 +280,7 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -371,7 +371,7 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<Guid> SeedClientAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = new Client(TenantId, $"FClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110055");
             db.Clients.Add(client);
@@ -381,7 +381,7 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<Guid> SeedChargeAsync(decimal amount)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var charge = Charge.Create(
                     TenantId, ClinicId, ClientId, null, null, null,
@@ -394,7 +394,7 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<Guid> SeedLegacyPaymentAsync(decimal amount)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var payment = new Payment(
                 TenantId, ClinicId, ClientId, null, null, null, amount, "TRY", PaymentMethod.Cash,
@@ -406,7 +406,7 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
 
         public async Task<int> CountReversedAllocationsAsync(Guid paymentId)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             return await db.PaymentAllocations.IgnoreQueryFilters()
                 .CountAsync(a => a.PaymentId == paymentId && a.ReversedAtUtc != null);
@@ -415,7 +415,7 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
         /// <summary>Sayaç değişmezi: Σ aktif PaymentAllocations.Amount == AllocatedAmount (iptal edilenin sayacı 0).</summary>
         public async Task AssertActiveAllocationsMatchCountersAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var activeByCharge = await db.PaymentAllocations.AsNoTracking()

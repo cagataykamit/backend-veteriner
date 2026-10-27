@@ -56,7 +56,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         Counts(json, "pets").Should().Equal(5, 2, 1, 2, 2, 0, 1);
         Counts(json, "vaccinations").Should().Equal(6, 4, 0, 2, 3, 0, 1);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id);
         batch.Status.Should().Be(ImportBatchStatus.Validated);
@@ -363,7 +363,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         pets[2].GetProperty("values").GetProperty("ownerKey").GetString().Should().Be($"db:{clientId}");
 
         // Mevcut kayıtlar değişmedi.
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Clients.CountAsync(c => c.TenantId == ctx.TenantId)).Should().Be(2);
         (await db.Pets.CountAsync(p => p.TenantId == ctx.TenantId)).Should().Be(2);
@@ -631,7 +631,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         // Yeniden doğrulama işçide (kira alınmış), önceki sonuçlar sıfırlanmış ve 6 satır yazılmış an.
         (await client.PostAsync($"/api/v1/imports/batches/{id}/validate", null)).StatusCode.Should().Be(HttpStatusCode.Accepted);
         await MutateBatchAsync(id, b => b.ClaimValidationLease("w-running", DateTime.UtcNow).IsSuccess.Should().BeTrue());
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var pending = await db.ImportBatchRows.Where(r => r.BatchId == id).OrderBy(r => r.RowNumber).Skip(6)
@@ -940,14 +940,14 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
     private async Task<int> RowCountAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatchRows.AsNoTracking().CountAsync(r => r.BatchId == batchId);
     }
 
     private async Task<ImportBatchStatus> StatusAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ImportBatches.AsNoTracking().Where(b => b.Id == batchId).Select(b => b.Status).SingleAsync();
     }
@@ -966,7 +966,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
     private async Task MutateBatchAsync(Guid batchId, Action<ImportBatch> mutate)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.SingleAsync(b => b.Id == batchId);
         mutate(batch);
@@ -978,7 +978,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
     private async Task PurgeAsync(Guid batchId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = await db.ImportBatches.SingleAsync(b => b.Id == batchId);
         var rows = await db.ImportBatchRows.Where(r => r.BatchId == batchId).ToListAsync();
@@ -994,7 +994,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
     private async Task<Guid> SeedValidatedBatchForClinicAsync(Guid tenantId, Guid clinicId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var batch = ImportBatch.Create(tenantId, clinicId, Guid.NewGuid(), "Gizli", Guid.NewGuid(), DateTime.UtcNow).Value!;
         batch.AttachFile(Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"), 1, 0, 0);
@@ -1008,7 +1008,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
     private async Task<Guid> SeedClinicAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinic = new Clinic(tenantId, $"Imp-{Guid.NewGuid():N}"[..14], "Ankara");
         db.Clinics.Add(clinic);
@@ -1021,7 +1021,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
     /// <summary>Teste özgü tür ve kiracı aşı tanımı (genel katalogla çakışmasın diye benzersiz adlar).</summary>
     private async Task<CatalogIds> SeedCatalogAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
 
@@ -1036,7 +1036,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
     private async Task<(Guid ClientId, Guid PetId)> SeedExistingAsync(
         Guid tenantId, CatalogIds cat, string fullName, string phone, string petName, string? chip)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var client = new Client(tenantId, fullName, DateTime.UtcNow, phone, email: null, address: null);
         db.Clients.Add(client);
@@ -1048,7 +1048,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
     private async Task SeedVaccinationAsync(SeedCtx ctx, Guid petId, Guid vaccineId, DateOnly appliedOn)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var appliedAt = OperationDayBounds.NoonUtcForLocalDate(appliedOn);
         db.Vaccinations.Add(new Vaccination(
@@ -1058,7 +1058,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
     private async Task<string> TokenAsync(SeedCtx ctx, string[] permissions)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -1068,7 +1068,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
     private async Task<SeedCtx> SeedAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

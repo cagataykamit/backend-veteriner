@@ -142,7 +142,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
 
         (await ctx.Http.GetAsync($"/api/v1/clients/{ctx.ClientId}/data-export")).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var log = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "Client.DataExport" && a.TargetId == $"ClientId={ctx.ClientId}")
@@ -161,7 +161,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
         var foreign = await ctx.Http.GetAsync($"/api/v1/clients/{foreignClientId}/data-export");
         foreign.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await IntegrationTestProblemDetails.ReadCodeAsync(foreign)).Should().Be("Clients.NotFound");
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.AuditLogs.AsNoTracking()
@@ -229,7 +229,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
 
         ExportTestContext ctx;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -274,7 +274,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
 
         public async Task<Guid> SeedPetAsync(string name, Guid? ownerId = null)
         {
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
             var pet = new Pet(tenantId, ownerId ?? ClientId, name, speciesId, notes: $"{Secret}-hasta-notu");
@@ -285,7 +285,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
 
         public async Task SeedAppointmentsAsync(Guid petId, int count)
         {
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var start = DateTime.UtcNow.AddDays(-count);
             db.Appointments.AddRange(Enumerable.Range(0, count).Select(i =>
@@ -303,7 +303,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
             var otherPetName = $"Baska-{Guid.NewGuid():N}"[..12];
             var otherPetId = await SeedPetAsync(otherPetName, otherClientId);
 
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var now = DateTime.UtcNow;
             var foreignClinic = new Clinic(tenantId, $"Oth-{Guid.NewGuid():N}"[..14], "Bursa");
@@ -358,7 +358,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
 
         public async Task<Guid> SeedForeignTenantClientAsync()
         {
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
             db.Tenants.Add(tenant);
@@ -371,7 +371,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
 
         private async Task<Guid> SeedOtherClientAsync()
         {
-            await using var scope = services.CreateAsyncScope();
+            await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = new Client(tenantId, $"Other-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110072");
             db.Clients.Add(client);

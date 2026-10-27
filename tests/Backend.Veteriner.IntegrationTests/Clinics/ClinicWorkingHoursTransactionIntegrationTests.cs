@@ -56,7 +56,7 @@ public sealed class ClinicWorkingHoursTransactionIntegrationTests : IClassFixtur
 
     private async Task<List<ClinicWorkingHour>> LoadWeekAsync(Guid clinicId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ClinicWorkingHours.AsNoTracking()
             .Where(r => r.ClinicId == clinicId)
@@ -72,7 +72,7 @@ public sealed class ClinicWorkingHoursTransactionIntegrationTests : IClassFixtur
 
         Guid clinicId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);

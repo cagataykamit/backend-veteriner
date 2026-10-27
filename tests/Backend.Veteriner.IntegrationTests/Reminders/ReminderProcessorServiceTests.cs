@@ -1258,6 +1258,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         enqueuer.Db = db;
         return new ReminderProcessorService(
             db,
+            IntegrationTestDbContexts.TenantScopeOf(db),
             enqueuer,
             Options.Create(new ReminderProcessorOptions
             {
@@ -1289,7 +1290,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlServer(connectionString)
             .Options;
-        var db = new AppDbContext(options);
+        var db = IntegrationTestDbContexts.CreateSystem(options);
         await db.Database.MigrateAsync();
         await VaccineDefinitionSeeder.SeedAsync(db, logger: null);
         return db;

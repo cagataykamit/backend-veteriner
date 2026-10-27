@@ -50,14 +50,14 @@ internal static class DashboardQueryParityTestSupport
 
     internal static async Task ResetCommandAppointmentsAsync(IServiceProvider rootServices)
     {
-        await using var scope = rootServices.CreateAsyncScope();
+        await using var scope = rootServices.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await commandDb.Appointments.ExecuteDeleteAsync();
     }
 
     internal static async Task ResetAppointmentProjectionAsync(IServiceProvider rootServices)
     {
-        await using var scope = rootServices.CreateAsyncScope();
+        await using var scope = rootServices.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await commandDb.Appointments.ExecuteDeleteAsync();
@@ -69,7 +69,7 @@ internal static class DashboardQueryParityTestSupport
 
     internal static async Task RebuildAsync(IServiceProvider rootServices)
     {
-        await using var scope = rootServices.CreateAsyncScope();
+        await using var scope = rootServices.CreateSystemScope();
         var rebuild = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionRebuildService>();
         await rebuild.RebuildAsync(500, CancellationToken.None);
     }
@@ -94,7 +94,7 @@ internal static class DashboardQueryParityTestSupport
         Guid tenantId,
         Guid? clinicId)
     {
-        await using var scope = rootServices.CreateAsyncScope();
+        await using var scope = rootServices.CreateSystemScope();
         var sp = scope.ServiceProvider;
         var handler = new GetDashboardSummaryQueryHandler(
             new FixedTenantContext(tenantId),
@@ -124,7 +124,7 @@ internal static class DashboardQueryParityTestSupport
         DateTime when,
         AppointmentStatus status)
     {
-        await using var scope = rootServices.CreateAsyncScope();
+        await using var scope = rootServices.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.Appointments.Add(new Appointment(
             tenantId,
@@ -140,7 +140,7 @@ internal static class DashboardQueryParityTestSupport
     internal static async Task<(Guid TenantId, Guid ClinicId, Guid PetId, Guid ClientId)> SeedSingleClinicScenarioAsync(
         IServiceProvider rootServices)
     {
-        await using var scope = rootServices.CreateAsyncScope();
+        await using var scope = rootServices.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var clinic = await db.Clinics.SingleAsync(c =>
@@ -169,7 +169,7 @@ internal static class DashboardQueryParityTestSupport
 
     internal static async Task<TenantWideScenario> SeedTwoClinicScenarioAsync(IServiceProvider rootServices)
     {
-        await using var scope = rootServices.CreateAsyncScope();
+        await using var scope = rootServices.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();

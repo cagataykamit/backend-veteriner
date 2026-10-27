@@ -453,7 +453,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
         ok.Response.StatusCode.Should().Be(HttpStatusCode.Created);
         bad.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var logs = await db.AuditLogs.AsNoTracking()
             .Where(a => a.Action == "Charge.Create" && a.TargetId == $"ClientId={ctx.ClientId}")
@@ -473,7 +473,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
         Guid clinicId;
         Guid userId;
         string email;
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
@@ -565,14 +565,14 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
 
         public async Task<int> CountChargesAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             return await db.Charges.CountAsync(c => c.TenantId == TenantId && c.ClinicId == ClinicId);
         }
 
         public async Task<(Guid ClientId, Guid PetId)> SeedClientAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = new Client(TenantId, $"CClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110088");
             db.Clients.Add(client);
@@ -586,7 +586,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
 
         public async Task<Guid> SeedPetAsync(Guid clientId)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
             var pet = new Pet(TenantId, clientId, $"CPet-{Guid.NewGuid():N}"[..12], speciesId);
@@ -597,7 +597,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
 
         public async Task<Guid> SeedVisitAsync(Guid petId, Guid? clinicId = null, bool voided = false)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var visit = new Visit(TenantId, clinicId ?? ClinicId, petId, null, null, UserId, DateTime.UtcNow);
             if (voided)
@@ -609,7 +609,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
 
         public async Task<Guid> SeedExaminationAsync(Guid petId, Guid? visitId, Guid? clinicId = null)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var examination = new Examination(
                 TenantId, clinicId ?? ClinicId, petId, null, DateTime.UtcNow.AddMinutes(-5),
@@ -622,7 +622,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
         /// <summary>Kullanıcıya atanmamış, aynı kiracıda ikinci klinik.</summary>
         public async Task<Guid> SeedForeignClinicAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = new Clinic(TenantId, $"Other-{Guid.NewGuid():N}"[..14], "Bursa");
             db.Clinics.Add(clinic);
@@ -632,7 +632,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
 
         public async Task<Guid> SeedChargeAsync(Guid clinicId)
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var charge = Charge.Create(
                 TenantId, clinicId, ClientId, null, null, null, "Seed ucret", 1m, 100m, UserId, DateTime.UtcNow, null)
@@ -644,7 +644,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
 
         public async Task<Guid> SeedForeignTenantClientAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
             db.Tenants.Add(tenant);
@@ -657,7 +657,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
 
         public async Task<Guid> SeedForeignTenantChargeAsync()
         {
-            await using var scope = _services.CreateAsyncScope();
+            await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
             db.Tenants.Add(tenant);

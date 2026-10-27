@@ -30,7 +30,7 @@ internal static class DashboardFinanceQueryParityTestSupport
 
     internal static async Task ResetAsync(IServiceProvider rootServices)
     {
-        await using var scope = rootServices.CreateAsyncScope();
+        await using var scope = rootServices.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await commandDb.PaymentAllocations.ExecuteDeleteAsync();
@@ -59,7 +59,7 @@ internal static class DashboardFinanceQueryParityTestSupport
         Guid tenantId,
         Guid? clinicId)
     {
-        await using var scope = rootServices.CreateAsyncScope();
+        await using var scope = rootServices.CreateSystemScope();
         var sp = scope.ServiceProvider;
         var handler = new GetDashboardFinanceSummaryQueryHandler(
             new FixedTenantContext(tenantId),

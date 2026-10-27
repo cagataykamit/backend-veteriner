@@ -29,7 +29,7 @@ public sealed class PetReadModelSmokeIntegrationTests
     [Fact]
     public async Task FlagOff_Should_ServeFromCommandDb_EvenWhenReadModelEmpty()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -50,7 +50,7 @@ public sealed class PetReadModelSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_ServeFromReadModel_AfterProjection()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<Backend.Veteriner.Application.Projections.Pets.IPetProjectionProcessor>();
@@ -78,7 +78,7 @@ public sealed class PetReadModelSmokeIntegrationTests
     [Fact]
     public async Task FlagOn_Should_ReturnEmpty_WhenReadModelNotPopulated()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 

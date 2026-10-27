@@ -33,6 +33,7 @@ public sealed class ProcessBillingWebhookCommandHandlerTests
             _receiptWrite.Object,
             _sessionsRead.Object,
             _sessionsWrite.Object,
+            Mock.Of<ITenantScope>(),
             _auditWriter.Object,
             _clientContext.Object,
             NullLogger<ProcessBillingWebhookCommandHandler>.Instance,

@@ -25,6 +25,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
     private readonly IPermissionReader _permissionReader;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
+    private readonly ITenantScope _tenantScope;
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IUserOperationClaimRepository _userOperationClaims;
@@ -39,6 +40,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         IPermissionReader permissionReader,
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
+        ITenantScope tenantScope,
         IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinics,
         IUserOperationClaimRepository userOperationClaims,
@@ -52,6 +54,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         _permissionReader = permissionReader;
         _tenants = tenants;
         _userTenants = userTenants;
+        _tenantScope = tenantScope;
         _userClinics = userClinics;
         _clinics = clinics;
         _userOperationClaims = userOperationClaims;
@@ -129,6 +132,9 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
                 "Auth.RefreshSessionRequiresReLogin",
                 "Oturum kiracı bilgisi eksik; lütfen yeniden giriş yapın.");
         }
+
+        // Yenileme ucunda JWT kiracısı yoktur; kiracı oturum kaydından gelir (ADR-040).
+        using var tenantScope = _tenantScope.UseTenant(sessionTenantId);
 
         stored.MarkUsed(utcNow);
 

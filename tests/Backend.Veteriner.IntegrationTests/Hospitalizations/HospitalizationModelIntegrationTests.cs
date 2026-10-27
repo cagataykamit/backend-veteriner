@@ -57,7 +57,7 @@ public sealed class HospitalizationModelIntegrationTests : IClassFixture<CustomW
 
     private async Task<Guid> SeedExaminationAsync(Guid clinicId, Guid petId, bool finalized, Guid? visitId = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = (await db.Clinics.SingleAsync(c => c.Id == clinicId)).TenantId;
         var exam = new Examination(tenantId, clinicId, petId, appointmentId: null, DateTime.UtcNow.AddHours(-3), "Kontrol", "Bulgu", null, null, utcNow: DateTime.UtcNow);
@@ -71,7 +71,7 @@ public sealed class HospitalizationModelIntegrationTests : IClassFixture<CustomW
 
     private async Task FinalizeExaminationAsync(Guid examinationId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var exam = await db.Examinations.SingleAsync(e => e.Id == examinationId);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
@@ -80,7 +80,7 @@ public sealed class HospitalizationModelIntegrationTests : IClassFixture<CustomW
 
     private async Task<Guid> SeedVisitAsync(Guid clinicId, Guid petId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = (await db.Clinics.SingleAsync(c => c.Id == clinicId)).TenantId;
         var visit = new Visit(tenantId, clinicId, petId, null, null, Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));

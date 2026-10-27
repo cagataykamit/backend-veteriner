@@ -64,7 +64,7 @@ public sealed partial class OwnerPortalIntegrationTests
         var portal = await InviteAndAcceptAsync(staff);
         var now = DateTime.UtcNow;
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var colorId = await db.PetColors.Select(c => (Guid?)c.Id).FirstOrDefaultAsync();
@@ -178,7 +178,7 @@ public sealed partial class OwnerPortalIntegrationTests
 
         // Klinik
         var (clinic, _) = await GetOkAsync($"/api/portal/v1/links/{link}/clinic", token);
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var dbClinic = await db.Clinics.AsNoTracking().SingleAsync(c => c.Id == f.Staff.ClinicId);
@@ -258,7 +258,7 @@ public sealed partial class OwnerPortalIntegrationTests
         paymentItems[0].EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(["paidAtUtc", "amount", "currency", "method"]);
 
         // Okuma denetim kaydı: kim/ne/hangi kayıt, içerik yok
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var account = await db.OwnerAccounts.AsNoTracking().SingleAsync(a => a.Email == f.Portal.Email);
@@ -341,7 +341,7 @@ public sealed partial class OwnerPortalIntegrationTests
         var staff = await SeedStaffAsync();
         var portal = await InviteAndAcceptAsync(staff);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var ownLink = await db.OwnerAccountClientLinks.SingleAsync(l => l.Id == portal.LinkId);

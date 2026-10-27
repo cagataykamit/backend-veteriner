@@ -32,7 +32,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task CreatedEvent_Should_ProjectReadModels_And_MarkOutboxProcessed()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -83,7 +83,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task SameEventProcessedTwice_Should_BeIdempotent()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -121,7 +121,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task CreatedEvent_WithSearchFields_Should_ProjectBreedAndEmail()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -165,7 +165,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task QueryAlreadyProcessed_CommandOutboxUnprocessed_Should_OnlyMarkOutbox()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -224,7 +224,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task RescheduleSameDay_Should_UpdateAppointment_WithoutDuplicateDailyStats()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -271,7 +271,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task RescheduleDifferentDay_Should_RecomputeBothDailyBuckets()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -318,7 +318,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task UpdateDifferentClinicPetClient_Should_RecomputeOldAndNewActivityKeys()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -378,7 +378,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task CancelledEvent_Should_UpdateStatusAndDailyCounts()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -424,7 +424,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task CompletedEvent_Should_UpdateStatusAndDailyCounts()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -470,7 +470,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task DeletedEvent_Should_RemoveReadModel_And_RecomputeDailyStatsAndActivity()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -519,7 +519,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task NonAppointmentOutboxMessage_Should_NotBeConsumedByProjector()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -545,7 +545,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task InvalidJson_Should_RollbackQueryChanges_And_NotMarkOutboxProcessed()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -577,7 +577,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task CommandAndQueryDatabases_Should_UseDifferentCatalogs()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
 
@@ -592,7 +592,7 @@ public sealed class AppointmentProjectionIntegrationTests
     [Fact]
     public async Task CommandHandlers_Should_EmitAppointmentIntegrationOutboxEvents_AfterSuccessfulMutation()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);

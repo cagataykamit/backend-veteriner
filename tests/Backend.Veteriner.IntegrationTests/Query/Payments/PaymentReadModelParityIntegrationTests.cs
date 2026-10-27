@@ -68,7 +68,7 @@ public sealed class PaymentReadModelParityIntegrationTests
         await RunBackfillAsync(tenantId);
 
         // Read-model satırını bozarak field mismatch üret.
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             var rm = await queryDb.PaymentReadModels.SingleAsync(x => x.PaymentId == paymentId);
@@ -96,7 +96,7 @@ public sealed class PaymentReadModelParityIntegrationTests
         await RunBackfillAsync(tenantId);
 
         // Read-model ClinicName'i bozarak field mismatch üret (Command DB truth = "Clinic A").
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             var rm = await queryDb.PaymentReadModels.SingleAsync(x => x.PaymentId == paymentId);
@@ -125,7 +125,7 @@ public sealed class PaymentReadModelParityIntegrationTests
         await RunBackfillAsync(tenantId);
 
         // İki kaydın PaidAtUtc değerlerini read-model'de yer değiştir → sıralama bozulur, count korunur.
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             var rm1 = await queryDb.PaymentReadModels.SingleAsync(x => x.PaymentId == p1);
@@ -144,7 +144,7 @@ public sealed class PaymentReadModelParityIntegrationTests
 
     private async Task ResetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
@@ -155,7 +155,7 @@ public sealed class PaymentReadModelParityIntegrationTests
 
     private async Task<(Guid TenantId, Guid ClinicId)> SeedTenantAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var (tenantId, clinicId, _) = await PaymentFinanceTestSupport.SeedTenantWithTwoClinicsAsync(commandDb);
         return (tenantId, clinicId);
@@ -169,7 +169,7 @@ public sealed class PaymentReadModelParityIntegrationTests
         decimal amount,
         DateTime paidAtUtc)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var client = new Client(tenantId, clientName, DateTime.UtcNow);
@@ -197,14 +197,14 @@ public sealed class PaymentReadModelParityIntegrationTests
 
     private async Task RunBackfillAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var backfill = scope.ServiceProvider.GetRequiredService<IPaymentReadModelBackfillService>();
         await backfill.BackfillAsync(tenantId, batchSize: 100, CancellationToken.None);
     }
 
     private async Task<PaymentReadModelParityResult> GetParityAsync(Guid tenantId, Guid clinicId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var parity = scope.ServiceProvider.GetRequiredService<IPaymentReadModelParityReader>();
         return await parity.GetClinicParityAsync(tenantId, clinicId, cancellationToken: CancellationToken.None);
     }

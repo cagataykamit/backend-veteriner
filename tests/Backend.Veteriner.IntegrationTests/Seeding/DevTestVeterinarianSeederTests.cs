@@ -46,7 +46,7 @@ public sealed class DevTestVeterinarianSeederTests
 
     private static async Task<(AppDbContext Db, Guid TenantId, Guid ClinicId)> PrepareAsync()
     {
-        var db = new AppDbContext(CreateOptions());
+        var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await IntegrationTestDatabaseReset.ResetAndMigrateAsync(db);
         var hasher = new StubBcryptPasswordHasher();
         await PermissionSeeder.SeedAsync(db);
@@ -105,7 +105,7 @@ public sealed class DevTestVeterinarianSeederTests
     [Fact]
     public async Task Seed_Should_Skip_Without_Creating_Anything_When_Tenant_Or_Clinic_Missing()
     {
-        await using var db = new AppDbContext(CreateOptions());
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
         await IntegrationTestDatabaseReset.ResetAndMigrateAsync(db);
         await PermissionSeeder.SeedAsync(db);
         await InviteAssignableOperationClaimsSeeder.SeedAsync(db);

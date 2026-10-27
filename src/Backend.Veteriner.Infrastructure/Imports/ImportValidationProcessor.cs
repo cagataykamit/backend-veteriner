@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
@@ -68,7 +67,8 @@ public sealed class ImportValidationProcessor
 
     private async Task<(Guid BatchId, Guid TenantId)?> TryClaimAsync(Guid? only, CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        // Kuyruk taraması kiracılar arasıdır (ADR-040); partinin işi kendi kiracısının kapsamında döner.
+        await using var scope = _scopes.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var now = Now;
 
@@ -99,8 +99,7 @@ public sealed class ImportValidationProcessor
         _logger.LogInformation("Import validation started. Batch={BatchId} Worker={Worker}", batchId, WorkerId);
         try
         {
-            await using var scope = _scopes.CreateAsyncScope();
-            using var tenantScope = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
+            await using var scope = _scopes.CreateTenantScope(tenantId);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId, ct);
@@ -145,7 +144,7 @@ public sealed class ImportValidationProcessor
             _logger.LogError(
                 "Import validation failed unexpectedly. Batch={BatchId} Exception={ExceptionType} Inner={InnerType} Stack={Stack}",
                 batchId, ex.GetType().FullName, ex.InnerException?.GetType().FullName, ex.StackTrace);
-            await FailAsync(batchId);
+            await FailAsync(batchId, tenantId);
         }
     }
 
@@ -227,11 +226,11 @@ public sealed class ImportValidationProcessor
     }
 
     /// <summary>Beklenmeyen hata: parti takılı kalmasın (yeniden doğrulanabilir). Kira başka işçideyse dokunulmaz.</summary>
-    private async Task FailAsync(Guid batchId)
+    private async Task FailAsync(Guid batchId, Guid tenantId)
     {
         try
         {
-            await using var scope = _scopes.CreateAsyncScope();
+            await using var scope = _scopes.CreateTenantScope(tenantId);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId);
             if (batch is null || batch.LeaseOwner != WorkerId || !batch.FailValidation(Now).IsSuccess)

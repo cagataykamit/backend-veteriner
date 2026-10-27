@@ -174,7 +174,7 @@ public sealed class LabResultStatusFlowIntegrationTests : IClassFixture<CustomWe
         var id = await create.Content.ReadFromJsonAsync<Guid>();
 
         // Migration ile gelen eski kayit: yorum gerekmiyor (InterpretationRequired = false).
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE [LabResults] SET [InterpretationRequired] = 0 WHERE [Id] = {id}");
@@ -208,7 +208,7 @@ public sealed class LabResultStatusFlowIntegrationTests : IClassFixture<CustomWe
 
     private async Task<Guid> SeedFinalizedExaminationAsync(Guid clinicId, Guid petId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = (await db.Clinics.SingleAsync(c => c.Id == clinicId)).TenantId;
         var exam = new Examination(tenantId, clinicId, petId, appointmentId: null, DateTime.UtcNow.AddHours(-2), "Kontrol", "Bulgu", null, null, utcNow: DateTime.UtcNow);

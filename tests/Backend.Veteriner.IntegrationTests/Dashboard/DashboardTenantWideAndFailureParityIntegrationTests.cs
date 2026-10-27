@@ -172,7 +172,7 @@ public sealed class DashboardTenantWideParityIntegrationTests
 
         await DashboardQueryParityTestSupport.RebuildAsync(_factory.Services);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var expectedClients = await db.Clients.CountAsync(c => c.TenantId == scenario.TenantId);
         var expectedPets = await db.Pets.CountAsync(p => p.TenantId == scenario.TenantId);
@@ -202,7 +202,7 @@ public sealed class DashboardTenantWideParityIntegrationTests
 
         await DashboardQueryParityTestSupport.RebuildAsync(_factory.Services);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             await queryDb.ClinicDailyAppointmentStatsReadModels
@@ -301,7 +301,7 @@ file static class DashboardOperationalAlertsTestInvoker
         Guid tenantId,
         Guid? clinicId)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
+        await using var scope = factory.Services.CreateSystemScope();
         var sp = scope.ServiceProvider;
         var handler = new GetDashboardOperationalAlertsQueryHandler(
             new FixedTenantContext(tenantId),

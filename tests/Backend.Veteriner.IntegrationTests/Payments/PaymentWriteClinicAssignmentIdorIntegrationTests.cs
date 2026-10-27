@@ -104,7 +104,7 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
             _factory.Services,
             unassignedClinicId);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var examRow = await db.Examinations.AsNoTracking()
@@ -135,7 +135,7 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
             (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Clinics.AccessDenied");
         }
 
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var count = await verifyDb.Payments.CountAsync(p =>
             p.ExaminationId == exam.ExaminationId);
@@ -315,7 +315,7 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
 
     private async Task<Guid> SeedChargeAsync(Guid tenantId, Guid clinicId, Guid clientId, decimal amount)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var charge = Charge.Create(
                 tenantId, clinicId, clientId, null, null, null, "Seed ucret", 1m, amount,
@@ -328,7 +328,7 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
 
     private async Task<(Guid ClientId, Guid TenantId)> SeedClientInClinicAsync(Guid clinicId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var clinic = await db.Clinics.AsNoTracking().SingleAsync(c => c.Id == clinicId);
         var client = new Backend.Veteriner.Domain.Clients.Client(
@@ -344,7 +344,7 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
     private async Task<(Guid ClinicId, Guid ClientId, decimal Amount, DateTime PaidAtUtc, string? Notes)> GetPaymentSnapshotAsync(
         Guid paymentId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Payments.AsNoTracking().SingleAsync(p => p.Id == paymentId);
         return (row.ClinicId, row.ClientId, row.Amount, row.PaidAtUtc, row.Notes);

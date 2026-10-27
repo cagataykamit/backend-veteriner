@@ -253,7 +253,7 @@ public sealed class GoodsReceiptsEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<HttpClient> SeedClientAsync(SeedCtx ctx, string[] permissions)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -267,7 +267,7 @@ public sealed class GoodsReceiptsEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<decimal> StockAsync(Guid productId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.ProductStocks.AsNoTracking()
             .Where(s => s.ProductId == productId).Select(s => s.QuantityOnHand).SingleOrDefaultAsync();
@@ -275,21 +275,21 @@ public sealed class GoodsReceiptsEndpointTests : IClassFixture<CustomWebApplicat
 
     private async Task<int> BatchCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.StockBatches.AsNoTracking().CountAsync(b => b.TenantId == ctx.TenantId);
     }
 
     private async Task<int> MovementCountAsync(SeedCtx ctx)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.StockMovements.AsNoTracking().CountAsync(m => m.TenantId == ctx.TenantId);
     }
 
     private async Task<SeedCtx> SeedAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

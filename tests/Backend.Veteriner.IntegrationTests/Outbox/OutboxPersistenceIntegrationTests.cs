@@ -24,7 +24,7 @@ public sealed class OutboxPersistenceIntegrationTests : IClassFixture<CustomWebA
     public async Task OutboxBuffer_OnSaveChanges_Should_PersistMessage_WithExpectedInitialState()
     {
         var typeMarker = $"ibuf-{Guid.NewGuid():N}";
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var buffer = scope.ServiceProvider.GetRequiredService<IOutboxBuffer>();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
@@ -48,7 +48,7 @@ public sealed class OutboxPersistenceIntegrationTests : IClassFixture<CustomWebA
     public async Task EfOutbox_EnqueueAsync_Should_PersistRow()
     {
         var typeMarker = $"ief-{Guid.NewGuid():N}";
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var outbox = scope.ServiceProvider.GetRequiredService<IOutbox>();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
@@ -66,7 +66,7 @@ public sealed class OutboxPersistenceIntegrationTests : IClassFixture<CustomWebA
     public async Task OutboxPending_Http_Should_ReturnBufferedMessage_AfterAuthenticatedEnqueue()
     {
         var typeMarker = $"ihttp-{Guid.NewGuid():N}";
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var buffer = scope.ServiceProvider.GetRequiredService<IOutboxBuffer>();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -91,7 +91,7 @@ public sealed class OutboxPersistenceIntegrationTests : IClassFixture<CustomWebA
             .Select(el => el.GetProperty("type").GetString())
             .Should().Contain(typeMarker, "bekleyen listesi bu testte kuyruğa alınan mesajı içermeli");
 
-        await using (var cleanup = _factory.Services.CreateAsyncScope())
+        await using (var cleanup = _factory.Services.CreateSystemScope())
         {
             var db = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.OutboxMessages.FirstOrDefaultAsync(x => x.Type == typeMarker);

@@ -152,7 +152,7 @@ public sealed class ClinicalListSortAndDateEndpointTests : IClassFixture<CustomW
 
     private async Task<SeedCtx> SeedAsync(string permission)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 

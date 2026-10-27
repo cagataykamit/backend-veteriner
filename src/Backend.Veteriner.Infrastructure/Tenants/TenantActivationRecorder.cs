@@ -23,7 +23,7 @@ public sealed class TenantActivationRecorder : ITenantActivationRecorder
 
     public async Task RecordFirstActionAsync(Guid tenantId, ActivationSignalKind kind, Guid? userId, CancellationToken ct)
     {
-        using var scope = _scopeFactory.CreateScope();
+        using var scope = _scopeFactory.CreateTenantScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var activation = await db.TenantActivations.FirstOrDefaultAsync(a => a.TenantId == tenantId, ct);

@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Domain.Appointments;
@@ -42,7 +43,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         result.ClientActivityCount.Should().Be(0);
         result.DailyStatsCount.Should().Be(0);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.AppointmentReadModels.CountAsync()).Should().Be(0);
         (await queryDb.ClinicPetActivityReadModels.CountAsync()).Should().Be(0);
@@ -63,7 +64,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         result.CommandAppointmentCount.Should().Be(seedCount);
         result.QueryAppointmentCount.Should().Be(seedCount);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var rows = await queryDb.AppointmentReadModels.AsNoTracking().ToListAsync();
         rows.Should().HaveCount(seedCount);
@@ -85,7 +86,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         await ResetCommandAppointmentsAsync();
         var context = await GetDefaultTenantContextAsync();
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = await db.Clients.SingleAsync(c => c.Id == context.ClientId);
@@ -98,7 +99,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         await SeedAppointmentAsync(context, context.PetId, SlotAlignedUtcPlusDays(2), AppointmentStatus.Scheduled);
         await RunRebuildAsync();
 
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var queryDb = verifyScope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var row = await queryDb.AppointmentReadModels.AsNoTracking().SingleAsync();
         row.PetBreed.Should().Be("RebuildBreedFreeText");
@@ -121,7 +122,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
 
         await RunRebuildAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var stats = await queryDb.ClinicDailyAppointmentStatsReadModels.AsNoTracking().ToListAsync();
         stats.Should().HaveCount(2);
@@ -139,7 +140,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         var firstId = await SeedAppointmentAsync(context, context.PetId, when, AppointmentStatus.Scheduled);
         var secondId = await SeedAppointmentAsync(context, context.PetId, when, AppointmentStatus.Completed);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await commandDb.Appointments
@@ -150,7 +151,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         var result = await RunRebuildAsync();
 
         result.PetActivityCount.Should().Be(1);
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var queryDb = verifyScope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.AppointmentReadModels.CountAsync()).Should().Be(2);
         var activity = await queryDb.ClinicPetActivityReadModels.AsNoTracking().SingleAsync();
@@ -173,7 +174,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
 
         await RunRebuildAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var activity = await queryDb.ClinicClientActivityReadModels.AsNoTracking().SingleAsync();
         activity.ClientName.Should().Contain(context.ClientName);
@@ -187,7 +188,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         var context = await GetDefaultTenantContextAsync();
         await SeedAppointmentAsync(context, context.PetId, SlotAlignedUtcPlusDays(2), AppointmentStatus.Scheduled);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             queryDb.AppointmentReadModels.Add(new AppointmentReadModel
@@ -216,7 +217,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         var result = await RunRebuildAsync();
         result.QueryAppointmentCount.Should().Be(1);
 
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await verifyDb.AppointmentReadModels.CountAsync()).Should().Be(1);
         (await verifyDb.AppointmentReadModels.AnyAsync(x => x.ClinicName == "Stale")).Should().BeFalse();
@@ -244,7 +245,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
     public async Task Rebuild_WithPendingAppointmentOutbox_Should_Reject()
     {
         await ResetCommandAppointmentsAsync();
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var context = await GetDefaultTenantContextAsync();
         var appointmentId = await SeedAppointmentAsync(context, context.PetId, SlotAlignedUtcPlusDays(2), AppointmentStatus.Scheduled);
@@ -273,7 +274,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
     public async Task Rebuild_WithDeadLetterAppointmentOutbox_Should_Reject()
     {
         await ResetCommandAppointmentsAsync();
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         commandDb.OutboxMessages.Add(new OutboxMessage
@@ -298,7 +299,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         await SeedAppointmentAsync(context, context.PetId, SlotAlignedUtcPlusDays(2), AppointmentStatus.Scheduled);
         await SeedAppointmentAsync(context, context.PetId, SlotAlignedUtcPlusDays(4), AppointmentStatus.Completed);
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
             await queryDb.AppointmentReadModels.ExecuteDeleteAsync();
@@ -325,17 +326,18 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
             await queryDb.SaveChangesAsync();
         }
 
-        await using var failScope = _factory.Services.CreateAsyncScope();
+        await using var failScope = _factory.Services.CreateSystemScope();
         var commandDb = failScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDbForFail = failScope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var logger = failScope.ServiceProvider.GetRequiredService<ILogger<AppointmentProjectionRebuildService>>();
         var metrics = failScope.ServiceProvider.GetRequiredService<AppointmentProjectionMetrics>();
-        var failing = new FailingAfterFirstBatchRebuildService(commandDb, queryDbForFail, logger, metrics);
+        var failing = new FailingAfterFirstBatchRebuildService(
+            commandDb, failScope.ServiceProvider.GetRequiredService<ITenantScope>(), queryDbForFail, logger, metrics);
 
         var act = () => failing.RebuildAsync(batchSize: 1, CancellationToken.None);
         await act.Should().ThrowAsync<InvalidOperationException>();
 
-        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        await using var verifyScope = _factory.Services.CreateSystemScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await verifyDb.AppointmentReadModels.CountAsync()).Should().Be(1);
         (await verifyDb.AppointmentReadModels.AnyAsync(x => x.ClinicName == "Preserved")).Should().BeTrue();
@@ -349,7 +351,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         var context = await GetDefaultTenantContextAsync();
         await SeedAppointmentAsync(context, context.PetId, SlotAlignedUtcPlusDays(2), AppointmentStatus.Scheduled);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var before = await commandDb.Appointments.AsNoTracking()
             .Select(a => new { a.Id, a.Status, a.ScheduledAtUtc, a.Notes })
@@ -373,7 +375,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
 
         await RunRebuildAsync();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.ProcessedProjectionEvents.CountAsync()).Should().Be(0);
     }
@@ -394,7 +396,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         const int total = 2500;
         const int batchSize = 500;
 
-        await using (var scope = _factory.Services.CreateAsyncScope())
+        await using (var scope = _factory.Services.CreateSystemScope())
         {
             var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             for (var i = 0; i < total; i++)
@@ -426,14 +428,14 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
 
     private async Task<AppointmentProjectionRebuildResult> RunRebuildAsync(int batchSize = 1000)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var rebuild = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionRebuildService>();
         return await rebuild.RebuildAsync(batchSize, CancellationToken.None);
     }
 
     private async Task ResetCommandAppointmentsAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await AppointmentProjectionTestSupport.ClearOutboxAsync(commandDb);
         await commandDb.Appointments.ExecuteDeleteAsync();
@@ -454,7 +456,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
 
     private async Task<SeedContext> GetDefaultTenantContextAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var clinic = await db.Clinics.SingleAsync(c =>
@@ -488,7 +490,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
 
     private async Task<SeedContext> SeedSecondTenantAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = new Tenant($"RebuildTenant-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
         db.Tenants.Add(tenant);
@@ -510,7 +512,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
 
     private async Task<Guid> SeedExtraPetAsync(SeedContext context, string name)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var pet = new Pet(context.TenantId, context.ClientId, name, context.SpeciesId);
         db.Pets.Add(pet);
@@ -525,7 +527,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         AppointmentStatus status,
         string? notes = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var appointment = new Appointment(
             context.TenantId,
@@ -561,10 +563,11 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
     {
         public FailingAfterFirstBatchRebuildService(
             AppDbContext commandDb,
+            ITenantScope tenantScope,
             QueryDbContext queryDb,
             ILogger<AppointmentProjectionRebuildService> logger,
             AppointmentProjectionMetrics metrics)
-            : base(commandDb, queryDb, logger, metrics)
+            : base(commandDb, tenantScope, queryDb, logger, metrics)
         {
         }
 

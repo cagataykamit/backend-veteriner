@@ -19,6 +19,7 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
 {
     private readonly ITokenHashService _tokenHash;
     private readonly IRepository<TenantInvite> _invites;
+    private readonly ITenantScope _tenantScope;
     private readonly IReadRepository<User> _usersRead;
     private readonly IUserRepository _usersWrite;
     private readonly IPasswordHasher _hasher;
@@ -30,6 +31,7 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
     public SignupAndAcceptTenantInviteCommandHandler(
         ITokenHashService tokenHash,
         IRepository<TenantInvite> invites,
+        ITenantScope tenantScope,
         IReadRepository<User> usersRead,
         IUserRepository usersWrite,
         IPasswordHasher hasher,
@@ -40,6 +42,7 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
     {
         _tokenHash = tokenHash;
         _invites = invites;
+        _tenantScope = tenantScope;
         _usersRead = usersRead;
         _usersWrite = usersWrite;
         _hasher = hasher;
@@ -65,13 +68,18 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
                 "Davet token geçersiz.");
         }
 
-        var invite = await _invites.FirstOrDefaultAsync(new TenantInviteByTokenHashSpec(hash), ct);
+        // Davet bağlantısı anonimdir: token araması kiracılar arasıdır, sonrası davetin kiracısının kapsamında (ADR-040).
+        TenantInvite? invite;
+        using (_tenantScope.AsSystem())
+            invite = await _invites.FirstOrDefaultAsync(new TenantInviteByTokenHashSpec(hash), ct);
         if (invite is null)
         {
             return Result<TenantInviteAcceptResultDto>.Failure(
                 "Invites.NotFound",
                 "Davet bulunamadı.");
         }
+
+        using var tenantScope = _tenantScope.UseTenant(invite.TenantId);
 
         if (invite.Status != TenantInviteStatus.Pending)
         {

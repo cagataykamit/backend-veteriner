@@ -123,7 +123,7 @@ public sealed class ClinicsGetByIdIdorIntegrationTests : IClassFixture<CustomWeb
         var email = $"platform-{Guid.NewGuid():N}@vetinity.test";
         const string password = "Guclu-Parola-9!";
 
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await PlatformAdminBootstrapper.CreateAsync(db, hasher, new(email, password));
@@ -134,7 +134,7 @@ public sealed class ClinicsGetByIdIdorIntegrationTests : IClassFixture<CustomWeb
         var login = await IntegrationTestAuthHelper.LoginAsync(client, _factory.Services, email, password);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
 
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var platformTenant = await db.Tenants.SingleAsync(t => t.Name == Tenant.PlatformTenantName);
@@ -148,7 +148,7 @@ public sealed class ClinicsGetByIdIdorIntegrationTests : IClassFixture<CustomWeb
 
     private async Task<Guid> GetDefaultSeedClinicIdAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         return await db.Clinics

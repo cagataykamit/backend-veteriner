@@ -527,7 +527,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
 
     private async Task<MutationSeedCtx> SeedTenantClinicProductWithPermissionsAsync(string[] permissions)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -567,7 +567,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
     private async Task<MutationSeedCtx> SeedTenantClinicProductWithExistingTenantTokenAsync(string token)
     {
         var tenantId = ExtractTenantIdFromJwt(token);
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = new Clinic(tenantId, $"Ro-{Guid.NewGuid():N}"[..14], "Z");
@@ -596,7 +596,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
 
     private async Task<ClinicAdminMutationSeedCtx> SeedClinicAdminTwoClinicsProductForMutationAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -650,7 +650,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
         IReadOnlyCollection<string> permissions,
         bool readOnlyTenant = false)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -674,7 +674,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
 
     private async Task<MovementSeedResult> SeedTenantWithMovementsAsync(int movementsPerClinic)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
@@ -741,7 +741,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
 
     private async Task<ClinicAdminMovementSeedResult> SeedClinicAdminTwoClinicsWithMovementsAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
@@ -827,7 +827,7 @@ public sealed class StockMovementsEndpointTests : IClassFixture<CustomWebApplica
 
     private async Task<DateFilterSeedResult> SeedTenantMovementVarietyAsync()
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 

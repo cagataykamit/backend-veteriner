@@ -37,7 +37,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
         result.SkippedStaleCount.Should().Be(0);
         result.ParityInSync.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var rows = await queryDb.ClientReadModels.AsNoTracking().Where(x => x.TenantId == tenantId).ToListAsync();
         rows.Should().HaveCount(3);
@@ -66,7 +66,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
         second.QueryClientCount.Should().Be(2);
         second.ParityInSync.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.ClientReadModels.CountAsync(x => x.TenantId == tenantId)).Should().Be(2);
     }
@@ -80,7 +80,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
 
         await RunBackfillAsync(tenantId);
 
-        await using (var mutateScope = _factory.Services.CreateAsyncScope())
+        await using (var mutateScope = _factory.Services.CreateSystemScope())
         {
             var commandDb = mutateScope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = await commandDb.Clients.SingleAsync(c => c.Id == clientId);
@@ -91,7 +91,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
         var second = await RunBackfillAsync(tenantId);
         second.UpdatedCount.Should().Be(1);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var row = await queryDb.ClientReadModels.AsNoTracking().SingleAsync(x => x.ClientId == clientId);
         row.FullName.Should().Be("Yeni İsim");
@@ -115,7 +115,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
         result.CommandClientCount.Should().Be(2);
         result.InsertedCount.Should().Be(2);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.ClientReadModels.CountAsync(x => x.TenantId == tenantA)).Should().Be(2);
         (await queryDb.ClientReadModels.CountAsync(x => x.TenantId == tenantB)).Should().Be(0, "tenant scope diğer tenant'ı yazmamalı");
@@ -130,7 +130,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
 
         await RunBackfillAsync(tenantId);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.ProcessedProjectionEvents.CountAsync()).Should().Be(0);
     }
@@ -144,7 +144,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
 
         // Query'de bu client için daha YENİ bir event ile yazılmış satır var (gerçek projection).
         var newerOccurredAt = DateTime.UtcNow.AddDays(1);
-        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        await using (var seedScope = _factory.Services.CreateSystemScope())
         {
             var queryDb = seedScope.ServiceProvider.GetRequiredService<QueryDbContext>();
             queryDb.ClientReadModels.Add(new ClientReadModel
@@ -168,7 +168,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
         result.SkippedStaleCount.Should().Be(1);
         result.UpdatedCount.Should().Be(0);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var verifyDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var row = await verifyDb.ClientReadModels.AsNoTracking().SingleAsync(x => x.ClientId == clientId);
         row.FullName.Should().Be("Newer Event Name", "daha yeni event ile yazılmış satır backfill tarafından ezilmemeli");
@@ -187,28 +187,28 @@ public sealed class ClientReadModelBackfillIntegrationTests
         result.ParityInSync.Should().BeTrue();
         result.CommandClientCount.Should().Be(result.QueryClientCount);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var parity = scope.ServiceProvider.GetRequiredService<IClientReadModelParityReader>();
         (await parity.GetGlobalParityAsync()).InSync.Should().BeTrue();
     }
 
     private async Task<ClientReadModelBackfillResult> RunBackfillAsync(Guid? tenantId, int batchSize = 500)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var backfill = scope.ServiceProvider.GetRequiredService<IClientReadModelBackfillService>();
         return await backfill.BackfillAsync(tenantId, batchSize, CancellationToken.None);
     }
 
     private async Task ResetQuerySideAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await ClientProjectionTestSupport.ResetQuerySideAsync(queryDb);
     }
 
     private async Task SeedCommandClientsAsync(Guid tenantId, params string[] fullNames)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var name in fullNames)
             commandDb.Clients.Add(new Client(tenantId, name, DateTime.UtcNow));
@@ -217,7 +217,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
 
     private async Task<Guid> SeedSingleCommandClientAsync(Guid tenantId, string fullName, string? email = null)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var client = new Client(tenantId, fullName, DateTime.UtcNow, phone: null, email: email);
         commandDb.Clients.Add(client);

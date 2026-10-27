@@ -29,7 +29,7 @@ public sealed class AppointmentProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimingEnabled_Should_UseClaimRepository_NotLegacyNullMetadataRows()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -67,7 +67,7 @@ public sealed class AppointmentProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_SuccessfulApply_Should_MarkProcessedWithClaimToken()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -101,7 +101,7 @@ public sealed class AppointmentProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_StaleMarkProcessedFalse_Should_NotCountAsBatchFailure()
     {
-        await using var scope = _instrumentedFactory.Services.CreateAsyncScope();
+        await using var scope = _instrumentedFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -136,7 +136,7 @@ public sealed class AppointmentProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_ApplyException_Should_MarkRetryWithClaimToken()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -168,7 +168,7 @@ public sealed class AppointmentProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_RetryThresholdExceeded_Should_MarkDeadLetterWithClaimToken()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -198,7 +198,7 @@ public sealed class AppointmentProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_StaleRetryFalse_Should_NotThrow()
     {
-        await using var scope = _instrumentedFactory.Services.CreateAsyncScope();
+        await using var scope = _instrumentedFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -228,7 +228,7 @@ public sealed class AppointmentProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_MetadataMismatch_Should_DeadLetterWithoutRetryStorm()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -261,7 +261,7 @@ public sealed class AppointmentProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_LiveLifecycle_Should_ProjectCreateRescheduleCancel()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();
@@ -320,7 +320,7 @@ public sealed class AppointmentProjectionClaimPathIntegrationTests
     [Fact]
     public async Task ClaimPath_DuplicateEvent_Should_KeepReadModelAndStatsIdempotent()
     {
-        await using var scope = _claimFactory.Services.CreateAsyncScope();
+        await using var scope = _claimFactory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IAppointmentProjectionProcessor>();

@@ -33,6 +33,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
     private readonly IPermissionReader _permissionReader;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
+    private readonly ITenantScope _tenantScope;
     private readonly SessionOptions _sessionOpt;
     private readonly ILogger<LoginCommandHandler> _logger;
     private readonly TimeProvider _timeProvider;
@@ -48,6 +49,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         IPermissionReader permissionReader,
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
+        ITenantScope tenantScope,
         IOptions<SessionOptions> sessionOpt,
         TimeProvider timeProvider,
         ILogger<LoginCommandHandler>? logger = null)
@@ -62,6 +64,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         _permissionReader = permissionReader;
         _tenants = tenants;
         _userTenants = userTenants;
+        _tenantScope = tenantScope;
         _sessionOpt = sessionOpt.Value;
         _logger = logger ?? NullLogger<LoginCommandHandler>.Instance;
         _timeProvider = timeProvider;
@@ -195,6 +198,9 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         }
 
         var tenantId = onlyTenantId;
+
+        // Girişte JWT kiracısı yoktur; kiracı üyelikten belirlenir ve sonraki sorgular onun kapsamında çalışır (ADR-040).
+        using var tenantScope = _tenantScope.UseTenant(tenantId);
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         MarkStep("tenantLookup");

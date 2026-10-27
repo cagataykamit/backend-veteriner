@@ -113,7 +113,7 @@ public sealed class TrialMetricsIntegrationTests : IClassFixture<CustomWebApplic
 
     private async Task<TenantActivation?> ActivationAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.TenantActivations.AsNoTracking().SingleOrDefaultAsync(a => a.TenantId == tenantId);
     }
@@ -128,7 +128,7 @@ public sealed class TrialMetricsIntegrationTests : IClassFixture<CustomWebApplic
 
     private async Task<HttpClient> ClientAsync(bool platformAdmin)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var user = await db.Users.SingleAsync(u => u.Email == AdminEmail);

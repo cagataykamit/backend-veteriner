@@ -40,7 +40,7 @@ public sealed class PaymentFinanceBackfillIntegrationTests
         result.CountParityInSync.Should().BeTrue();
         result.DailyBucketParityInSync.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var localDate = OperationDayBounds.ToLocalDate(paidAt);
         var stats = await PaymentProjectionTestSupport.FindDailyStatsAsync(queryDb, tenantId, clinicA, localDate, "TRY");
@@ -65,7 +65,7 @@ public sealed class PaymentFinanceBackfillIntegrationTests
         second.CountParityInSync.Should().BeTrue();
         second.DailyBucketParityInSync.Should().BeTrue();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.PaymentDailyContributionReadModels.CountAsync(x => x.TenantId == tenantId)).Should().Be(1);
         var stats = await PaymentProjectionTestSupport.FindDailyStatsAsync(
@@ -92,7 +92,7 @@ public sealed class PaymentFinanceBackfillIntegrationTests
         result.CommandPaymentCount.Should().Be(2);
         result.QueryContributionCount.Should().Be(2);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         (await queryDb.PaymentDailyContributionReadModels.CountAsync(x => x.TenantId == tenantA)).Should().Be(2);
         (await queryDb.PaymentDailyContributionReadModels.CountAsync(x => x.TenantId == tenantB)).Should().Be(0);
@@ -102,7 +102,7 @@ public sealed class PaymentFinanceBackfillIntegrationTests
     public async Task Backfill_Should_SeparateClinicDailyBuckets()
     {
         await ResetAsync();
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var (tenantId, clinicA, clinicB) = await PaymentFinanceTestSupport.SeedTenantWithTwoClinicsAsync(commandDb);
         var paidAt = new DateTime(2026, 6, 21, 14, 0, 0, DateTimeKind.Utc);
@@ -131,7 +131,7 @@ public sealed class PaymentFinanceBackfillIntegrationTests
 
         await RunBackfillAsync(tenantId);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -161,7 +161,7 @@ public sealed class PaymentFinanceBackfillIntegrationTests
         var paidAt = new DateTime(2026, 6, 23, 11, 0, 0, DateTimeKind.Utc);
         var seed = await SeedPaymentAsync(tenantId, clinicId, 100m, paidAt);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var processor = scope.ServiceProvider.GetRequiredService<IPaymentProjectionProcessor>();
@@ -183,7 +183,7 @@ public sealed class PaymentFinanceBackfillIntegrationTests
 
     private async Task ResetAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
@@ -194,7 +194,7 @@ public sealed class PaymentFinanceBackfillIntegrationTests
 
     private async Task<(Guid TenantId, Guid ClinicId)> SeedTenantAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var (tenantId, clinicId, _) = await PaymentFinanceTestSupport.SeedTenantWithTwoClinicsAsync(commandDb);
         return (tenantId, clinicId);
@@ -206,14 +206,14 @@ public sealed class PaymentFinanceBackfillIntegrationTests
         decimal amount,
         DateTime paidAtUtc)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await PaymentFinanceTestSupport.SeedPaymentAsync(commandDb, tenantId, clinicId, amount, paidAtUtc);
     }
 
     private async Task<PaymentFinanceBackfillResult> RunBackfillAsync(Guid tenantId)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var backfill = scope.ServiceProvider.GetRequiredService<IPaymentFinanceBackfillService>();
         return await backfill.BackfillAsync(tenantId, batchSize: 100, CancellationToken.None);
     }

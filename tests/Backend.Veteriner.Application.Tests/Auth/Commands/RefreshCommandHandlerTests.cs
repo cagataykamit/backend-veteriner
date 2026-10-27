@@ -38,6 +38,7 @@ public sealed class RefreshCommandHandlerTests
             _permissionReader.Object,
             _tenants.Object,
             _userTenants.Object,
+            Mock.Of<ITenantScope>(),
             _clinics.Object,
             TimeProvider.System);
     }

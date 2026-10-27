@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Files.Specs;
 using Backend.Veteriner.Domain.Files;
+using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -54,19 +55,20 @@ public sealed class StoredFileMaintenanceProcessor
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var staleAfter = TimeSpan.FromMinutes(Math.Max(1, _options.StaleUploadMinutes));
 
-        List<Guid> ids;
-        await using (var scope = _scopes.CreateAsyncScope())
+        // Bakım taraması kiracılar arasıdır (ADR-040); her dosya kendi kiracısının kapsamında temizlenir.
+        List<(Guid Id, Guid TenantId)> due;
+        await using (var scope = _scopes.CreateSystemScope())
         {
             var files = scope.ServiceProvider.GetRequiredService<IReadRepository<StoredFile>>();
             var stale = await files.ListAsync(
                 new StoredFilesStaleUploadSpec(now, staleAfter, Math.Max(1, _options.BatchSize)), ct);
-            ids = stale.Select(f => f.Id).ToList();
+            due = stale.Select(f => (f.Id, f.TenantId)).ToList();
         }
 
         var cleaned = 0;
-        foreach (var id in ids)
+        foreach (var (id, tenantId) in due)
         {
-            if (await CleanAsync(id, now, staleAfter, ct))
+            if (await CleanAsync(id, tenantId, now, staleAfter, ct))
                 cleaned++;
         }
 
@@ -75,9 +77,9 @@ public sealed class StoredFileMaintenanceProcessor
         return cleaned;
     }
 
-    private async Task<bool> CleanAsync(Guid id, DateTime now, TimeSpan staleAfter, CancellationToken ct)
+    private async Task<bool> CleanAsync(Guid id, Guid tenantId, DateTime now, TimeSpan staleAfter, CancellationToken ct)
     {
-        await using var scope = _scopes.CreateAsyncScope();
+        await using var scope = _scopes.CreateTenantScope(tenantId);
         var files = scope.ServiceProvider.GetRequiredService<IRepository<StoredFile>>();
         var storage = scope.ServiceProvider.GetRequiredService<IFileStorage>();
         try

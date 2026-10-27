@@ -22,7 +22,7 @@ public sealed class DashboardRecentPaymentsReadModelReaderIntegrationTests
     [Fact]
     public async Task GetRecent_Should_ReturnOnlyRowsForRequestedTenantAndClinic()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IDashboardRecentPaymentsReadModelReader>();
 
@@ -47,7 +47,7 @@ public sealed class DashboardRecentPaymentsReadModelReaderIntegrationTests
     [Fact]
     public async Task GetRecent_Should_NotReturnCrossTenantRows()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IDashboardRecentPaymentsReadModelReader>();
 
@@ -69,7 +69,7 @@ public sealed class DashboardRecentPaymentsReadModelReaderIntegrationTests
     [Fact]
     public async Task GetRecent_Should_NotReturnCrossClinicRows()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IDashboardRecentPaymentsReadModelReader>();
 
@@ -91,7 +91,7 @@ public sealed class DashboardRecentPaymentsReadModelReaderIntegrationTests
     [Fact]
     public async Task GetRecent_Should_OrderByPaidAtUtcDescThenPaymentIdDesc_AndRespectTake()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IDashboardRecentPaymentsReadModelReader>();
 
@@ -118,7 +118,7 @@ public sealed class DashboardRecentPaymentsReadModelReaderIntegrationTests
     [Fact]
     public async Task GetRecent_Should_MapDenormalizedClientAndPetNames()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IDashboardRecentPaymentsReadModelReader>();
 
@@ -147,7 +147,7 @@ public sealed class DashboardRecentPaymentsReadModelReaderIntegrationTests
     [Fact]
     public async Task GetRecent_Should_HandleNullablePetWithoutError()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = _factory.Services.CreateSystemScope();
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var reader = scope.ServiceProvider.GetRequiredService<IDashboardRecentPaymentsReadModelReader>();
 
