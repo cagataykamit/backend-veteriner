@@ -8,12 +8,16 @@ namespace Backend.Veteriner.Application.Tenants;
 /// <summary>
 /// Trial tarihi + saklanan status üzerinden "effective" subscription durumunu hesaplar
 /// ve write işlemlerinin izinli olup olmadığını merkezi şekilde değerlendirir.
+/// Kapsamlı (scoped) servistir: <see cref="EnsureWriteAllowedAsync"/> sonucu istek kapsamında kiracı başına bir kez
+/// hesaplanır; aynı istekte guard'dan tekrar geçen iç komutlar (satış satırları, şablon kalemleri) kiracı ve abonelik
+/// sorgusunu yinelemez.
 /// </summary>
 public sealed class TenantSubscriptionEffectiveWriteEvaluator
 {
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<TenantSubscription> _subscriptions;
     private readonly TimeProvider _timeProvider;
+    private readonly Dictionary<Guid, Result> _writeChecks = [];
 
     public TenantSubscriptionEffectiveWriteEvaluator(
         IReadRepository<Tenant> tenants,
@@ -50,6 +54,16 @@ public sealed class TenantSubscriptionEffectiveWriteEvaluator
         => effectiveStatus is TenantSubscriptionStatus.Trialing or TenantSubscriptionStatus.Active;
 
     public async Task<Result> EnsureWriteAllowedAsync(Guid tenantId, CancellationToken ct)
+    {
+        if (_writeChecks.TryGetValue(tenantId, out var cached))
+            return cached;
+
+        var result = await EvaluateWriteAllowedAsync(tenantId, ct);
+        _writeChecks[tenantId] = result;
+        return result;
+    }
+
+    private async Task<Result> EvaluateWriteAllowedAsync(Guid tenantId, CancellationToken ct)
     {
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
         if (tenant is null)

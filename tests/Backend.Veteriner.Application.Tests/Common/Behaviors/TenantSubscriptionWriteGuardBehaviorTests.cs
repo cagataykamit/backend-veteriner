@@ -184,7 +184,32 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
         _tenants.Verify(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_Should_Query_Subscription_Once_When_Nested_Commands_Share_Request_Scope()
+    {
+        // İstek kapsamında evaluator tektir: dış komut ve iç komutlar (ör. satış satırları) guard'dan geçer, sorgu bir kez çalışır.
+        var tenantId = Guid.NewGuid();
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        SetupWritableTenant(tenantId);
+        var evaluator = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
+        var outer = new TenantSubscriptionWriteGuardBehavior<SampleMutationCommand, Result>(_tenantContext.Object, evaluator);
+        var inner = new TenantSubscriptionWriteGuardBehavior<SampleInnerCommand, Result>(_tenantContext.Object, evaluator);
+
+        var results = new List<Result>
+        {
+            await outer.Handle(new SampleMutationCommand(), (_, _) => ValueTask.FromResult(Result.Success()), CancellationToken.None)
+        };
+        for (var i = 0; i < 10; i++)
+            results.Add(await inner.Handle(new SampleInnerCommand(), (_, _) => ValueTask.FromResult(Result.Success()), CancellationToken.None));
+
+        results.Should().AllSatisfy(r => r.IsSuccess.Should().BeTrue());
+        _tenants.Verify(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()), Times.Once);
+        _subscriptions.Verify(
+            x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private sealed record SampleMutationCommand : IRequest<Result>;
+    private sealed record SampleInnerCommand : IRequest<Result>;
     private sealed record SampleQuery : IRequest<Result>;
     private sealed record IgnoredMutationCommand : IRequest<Result>, IIgnoreTenantWriteSubscriptionGuard;
 }
