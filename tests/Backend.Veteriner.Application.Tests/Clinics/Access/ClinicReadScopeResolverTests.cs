@@ -293,4 +293,27 @@ public sealed class ClinicReadScopeResolverTests
         _claims.Verify(x => x.GetOperationClaimNamesByUserIdAsync(userId, ct), Times.Once);
         _clinics.Verify(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), ct), Times.Once);
     }
+
+    [Fact]
+    public async Task AssignedUser_RepeatedResolve_InSameScope_Should_Query_Claims_And_Clinics_Once()
+    {
+        // İstek kapsamında çözücü tektir: satış satırları gibi iç komutlar kapsamı tekrar çözer, rol ve atama sorgusu bir kez çalışır.
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var clinicA = BuildClinic(tenantId, Guid.NewGuid(), "A");
+        var clinicB = BuildClinic(tenantId, Guid.NewGuid(), "B");
+        SetupUser(userId);
+        SetupClaims(userId, "Veteriner");
+        SetupAccessibleClinics(userId, tenantId, clinicA, clinicB);
+        var sut = CreateSut();
+
+        for (var i = 0; i < 10; i++)
+            (await sut.ResolveAsync(tenantId, clinicA.Id, CancellationToken.None)).IsSuccess.Should().BeTrue();
+        (await sut.ResolveAsync(tenantId, null, CancellationToken.None)).Value!.AccessibleClinicIds
+            .Should().BeEquivalentTo([clinicA.Id, clinicB.Id]);
+
+        _claims.Verify(x => x.GetOperationClaimNamesByUserIdAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
+        _userClinics.Verify(
+            x => x.ListAccessibleClinicsAsync(userId, tenantId, null, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

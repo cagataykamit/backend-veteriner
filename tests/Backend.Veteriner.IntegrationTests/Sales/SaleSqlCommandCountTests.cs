@@ -19,9 +19,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Sales;
 
 /// <summary>
-/// O2: satış satır başına iç komut (stok düşümü) gönderir; her iç komut abonelik yazma guard'ından geçer. Guard sonucu istek
-/// kapsamında önbellekte olduğundan 10 satırlık satışta abonelik sorgusu bir kez çalışmalıdır. Yalnız ölçüm başlığını
-/// taşıyan isteğin EF komutları sayılır (arka plan işleri karışmaz); sayılar test çıktısına yazılır.
+/// O2: satış satır başına iç komut (stok düşümü) gönderir; her iç komut abonelik yazma guard'ından geçer ve klinik kapsamını
+/// çözer. Guard sonucu ile kullanıcının rol/klinik ataması istek kapsamında önbellekte olduğundan 10 satırlık satışta bu
+/// sorgular birer kez çalışmalıdır. Yalnız ölçüm başlığını taşıyan isteğin EF komutları sayılır (arka plan işleri karışmaz);
+/// sayılar test çıktısına yazılır. Ölçüm: önbelleksiz 168, guard önbelleğiyle 144, kapsam önbelleğiyle 120 komut.
 /// </summary>
 [Collection("products-api")]
 public sealed class SaleSqlCommandCountTests
@@ -34,7 +35,7 @@ public sealed class SaleSqlCommandCountTests
     public SaleSqlCommandCountTests(ITestOutputHelper output) => _output = output;
 
     [Fact]
-    public async Task TenLineSale_Should_Evaluate_Subscription_Guard_Once()
+    public async Task TenLineSale_Should_Evaluate_Subscription_Guard_And_Clinic_Scope_Once()
     {
         var capture = new SqlCapture();
         using var baseFactory = new CustomWebApplicationFactory();
@@ -56,11 +57,19 @@ public sealed class SaleSqlCommandCountTests
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var (total, subscriptionQueries, dump) = capture.Summarize();
-        _output.WriteLine($"10 satırlık satış: EF komutu={total}, TenantSubscriptions sorgusu={subscriptionQueries}");
+        var (total, dump) = capture.Summarize();
+        var subscriptionQueries = capture.CountContaining("[TenantSubscriptions]");
+        var claimQueries = capture.CountContaining("[UserOperationClaims]");
+        var userClinicQueries = capture.CountContaining("[UserClinics]");
+        _output.WriteLine(
+            $"10 satırlık satış: EF komutu={total}, TenantSubscriptions={subscriptionQueries}, " +
+            $"UserOperationClaims={claimQueries}, UserClinics={userClinicQueries}");
         _output.WriteLine(dump);
 
         subscriptionQueries.Should().Be(1, "guard sonucu istek kapsamında bir kez hesaplanır; iç komutlar yeniden sorgulamaz");
+        claimQueries.Should().Be(1, "rol kuralı istek kapsamında kullanıcı başına bir kez okunur");
+        userClinicQueries.Should().Be(1, "klinik ataması istek kapsamında kullanıcı/kiracı başına bir kez okunur");
+        total.Should().BeLessThanOrEqualTo(120, "satır başına iç komutlar ortak sorguları yinelememeli");
     }
 
     private static async Task<(Guid ClinicId, Guid ClientId, Guid[] ProductIds, string Token)> SeedAsync(
@@ -103,16 +112,20 @@ public sealed class SaleSqlCommandCountTests
         private readonly object _gate = new();
         private readonly List<string> _commands = [];
 
-        public (int Total, int SubscriptionQueries, string Dump) Summarize()
+        public (int Total, string Dump) Summarize()
         {
             lock (_gate)
             {
-                var subscriptions = _commands.Count(c => c.Contains("[TenantSubscriptions]", StringComparison.Ordinal));
                 var dump = string.Join(
                     "\n",
                     _commands.GroupBy(x => x).Select(g => $"  x{g.Count()} {Shorten(g.Key)}"));
-                return (_commands.Count, subscriptions, dump);
+                return (_commands.Count, dump);
             }
+        }
+
+        public int CountContaining(string table)
+        {
+            lock (_gate) return _commands.Count(c => c.Contains(table, StringComparison.Ordinal));
         }
 
         private static string Shorten(string text)

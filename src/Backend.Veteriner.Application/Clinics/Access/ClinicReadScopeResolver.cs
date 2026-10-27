@@ -6,12 +6,20 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Application.Clinics.Access;
 
 /// <inheritdoc cref="IClinicReadScopeResolver"/>
+/// <remarks>
+/// Kapsamlı (scoped) servistir: kullanıcının atanmış klinik kuralına tabi olup olmadığı (rol sorgusu) ve erişebildiği
+/// klinikler (atama sorgusu) istek kapsamında kullanıcı/kiracı başına bir kez okunur; aynı istekte iç komutlar (satış
+/// satırları, şablon kalemleri) bu sorguları yinelemez. Uzun ömürlü bir kapsamda (arka plan işi) rol veya klinik ataması
+/// kapsam boyunca değişirse değişiklik o kapsamda görülmez.
+/// </remarks>
 public sealed class ClinicReadScopeResolver : IClinicReadScopeResolver
 {
     private readonly IClientContext _clientContext;
     private readonly IClinicAssignmentAccessGuard _assignmentGuard;
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly Dictionary<Guid, bool> _assignedScopeByUser = [];
+    private readonly Dictionary<(Guid UserId, Guid TenantId), Guid[]> _accessibleClinicIds = [];
 
     public ClinicReadScopeResolver(
         IClientContext clientContext,
@@ -37,10 +45,9 @@ public sealed class ClinicReadScopeResolver : IClinicReadScopeResolver
                 "Kullanıcı bağlamı yok.");
         }
 
-        if (await _assignmentGuard.MustApplyAssignedClinicScopeAsync(userId, ct))
+        if (await MustApplyAssignedClinicScopeAsync(userId, ct))
         {
-            var accessible = await _userClinics.ListAccessibleClinicsAsync(userId, tenantId, null, ct);
-            var accessibleIds = accessible.Select(c => c.Id).ToArray();
+            var accessibleIds = await AccessibleClinicIdsAsync(userId, tenantId, ct);
 
             if (requestClinicId.HasValue)
             {
@@ -72,5 +79,28 @@ public sealed class ClinicReadScopeResolver : IClinicReadScopeResolver
         }
 
         return Result<ClinicReadScope>.Success(new ClinicReadScope(null, null));
+    }
+
+    private async Task<bool> MustApplyAssignedClinicScopeAsync(Guid userId, CancellationToken ct)
+    {
+        if (!_assignedScopeByUser.TryGetValue(userId, out var mustApply))
+        {
+            mustApply = await _assignmentGuard.MustApplyAssignedClinicScopeAsync(userId, ct);
+            _assignedScopeByUser[userId] = mustApply;
+        }
+
+        return mustApply;
+    }
+
+    private async Task<Guid[]> AccessibleClinicIdsAsync(Guid userId, Guid tenantId, CancellationToken ct)
+    {
+        if (!_accessibleClinicIds.TryGetValue((userId, tenantId), out var ids))
+        {
+            var accessible = await _userClinics.ListAccessibleClinicsAsync(userId, tenantId, null, ct);
+            ids = accessible.Select(c => c.Id).ToArray();
+            _accessibleClinicIds[(userId, tenantId)] = ids;
+        }
+
+        return ids;
     }
 }
