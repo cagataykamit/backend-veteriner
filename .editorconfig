@@ -16,9 +16,9 @@ charset = utf-8
 indent_style = space
 indent_size = 4
 
-# Saat kaynagi kurali (BannedSymbols.txt, Domain + Application): mevcut 180+ kullanim kademeli temizlenecek; o yuzden
-# oneri seviyesinde (IDE gosterir, derleme uyarisi vermez). Temizlik bitince warning/error yapilir.
-dotnet_diagnostic.RS0030.severity = suggestion
+# Saat kaynagi kurali (BannedSymbols.txt, Domain + Application): Domain saati utcNow parametresiyle alir, Application
+# TimeProvider kullanir (B4 temizligi tamam). Yeni dogrudan DateTime.UtcNow/Now/Today kullanimi derlemeyi kirar.
+dotnet_diagnostic.RS0030.severity = error
 
 [tests/**/*.cs]
 # xUnit v3 analizoru (xUnit1051): CancellationToken alan cagrilara TestContext.Current.CancellationToken onerir.
