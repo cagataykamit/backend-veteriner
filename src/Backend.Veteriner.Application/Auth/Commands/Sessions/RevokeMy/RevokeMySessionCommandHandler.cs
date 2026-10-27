@@ -8,11 +8,13 @@ public sealed class RevokeMySessionCommandHandler : IRequestHandler<RevokeMySess
 {
     private readonly IRefreshTokenRepository _repo;
     private readonly IClientContext _client;
+    private readonly TimeProvider _timeProvider;
 
-    public RevokeMySessionCommandHandler(IRefreshTokenRepository repo, IClientContext client)
+    public RevokeMySessionCommandHandler(IRefreshTokenRepository repo, IClientContext client, TimeProvider timeProvider)
     {
         _repo = repo;
         _client = client;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(RevokeMySessionCommand request, CancellationToken ct)
@@ -30,7 +32,7 @@ public sealed class RevokeMySessionCommandHandler : IRequestHandler<RevokeMySess
 
         if (token.RevokedAtUtc is null)
         {
-            await _repo.RevokeAsync(token, ct);
+            await _repo.RevokeAsync(token, _timeProvider.GetUtcNow().UtcDateTime, ct);
             await _repo.SaveChangesAsync(ct);
         }
 

@@ -44,7 +44,7 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
 
     public Task<List<RefreshToken>> GetActiveByUserAsync(Guid userId, CancellationToken ct = default)
     {
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         return _db.RefreshTokens
             .Where(rt => rt.UserId == userId && rt.RevokedAtUtc == null && rt.ExpiresAtUtc > now)
             .OrderByDescending(rt => rt.CreatedAtUtc)
@@ -63,16 +63,15 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
         => _db.RefreshTokens
             .FirstOrDefaultAsync(x => x.Id == refreshTokenId, ct);
 
-    public Task RevokeAsync(RefreshToken token, CancellationToken ct = default)
+    public Task RevokeAsync(RefreshToken token, DateTime utcNow, CancellationToken ct = default)
     {
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         token.Revoke(utcNow, "user_revoked_session");
         return Task.CompletedTask;
     }
 
     public async Task RevokeAllByUserAsync(Guid userId, CancellationToken ct = default)
     {
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         await _db.RefreshTokens
             .Where(rt => rt.UserId == userId && rt.RevokedAtUtc == null && rt.ExpiresAtUtc > now)

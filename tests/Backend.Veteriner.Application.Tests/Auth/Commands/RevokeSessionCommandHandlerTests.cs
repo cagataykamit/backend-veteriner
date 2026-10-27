@@ -3,16 +3,19 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Users;
 using AwesomeAssertions;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Auth.Commands;
 
 public sealed class RevokeSessionCommandHandlerTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 10, 27, 9, 0, 0, TimeSpan.Zero);
+
     private readonly Mock<IRefreshTokenRepository> _repo = new();
 
     private RevokeSessionCommandHandler CreateHandler()
-        => new(_repo.Object);
+        => new(_repo.Object, new FakeTimeProvider(Now));
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_SessionNotFound()
@@ -30,7 +33,7 @@ public sealed class RevokeSessionCommandHandlerTests
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Sessions.NotFound");
-        _repo.Verify(r => r.RevokeAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(r => r.RevokeAsync(It.IsAny<RefreshToken>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
         _repo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -54,7 +57,7 @@ public sealed class RevokeSessionCommandHandlerTests
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Sessions.Forbidden");
-        _repo.Verify(r => r.RevokeAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(r => r.RevokeAsync(It.IsAny<RefreshToken>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
         _repo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -76,7 +79,7 @@ public sealed class RevokeSessionCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        _repo.Verify(r => r.RevokeAsync(token, It.IsAny<CancellationToken>()), Times.Once);
+        _repo.Verify(r => r.RevokeAsync(token, Now.UtcDateTime, It.IsAny<CancellationToken>()), Times.Once);
         _repo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -99,7 +102,7 @@ public sealed class RevokeSessionCommandHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        _repo.Verify(r => r.RevokeAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(r => r.RevokeAsync(It.IsAny<RefreshToken>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
         _repo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -7,9 +7,13 @@ namespace Backend.Veteriner.Application.Auth.Commands.Sessions.Revoke;
 public sealed class RevokeSessionCommandHandler : IRequestHandler<RevokeSessionCommand, Result>
 {
     private readonly IRefreshTokenRepository _repo;
+    private readonly TimeProvider _timeProvider;
 
-    public RevokeSessionCommandHandler(IRefreshTokenRepository repo)
-        => _repo = repo;
+    public RevokeSessionCommandHandler(IRefreshTokenRepository repo, TimeProvider timeProvider)
+    {
+        _repo = repo;
+        _timeProvider = timeProvider;
+    }
 
     public async ValueTask<Result> Handle(RevokeSessionCommand request, CancellationToken ct)
     {
@@ -30,7 +34,7 @@ public sealed class RevokeSessionCommandHandler : IRequestHandler<RevokeSessionC
         // idempotent davranış: zaten revoked ise sorun etme
         if (token.RevokedAtUtc is null)
         {
-            await _repo.RevokeAsync(token, ct);
+            await _repo.RevokeAsync(token, _timeProvider.GetUtcNow().UtcDateTime, ct);
             await _repo.SaveChangesAsync(ct);
         }
 

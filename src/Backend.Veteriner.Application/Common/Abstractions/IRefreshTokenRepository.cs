@@ -17,7 +17,7 @@ public interface IRefreshTokenRepository
     // ✅ Yeni: tekil session revoke için güvenli fetch (id + user)
     Task<RefreshToken?> GetByIdAsync(Guid refreshTokenId, CancellationToken ct = default);
 
-    Task RevokeAsync(RefreshToken token, CancellationToken ct = default);
+    Task RevokeAsync(RefreshToken token, DateTime utcNow, CancellationToken ct = default);
     Task RevokeAllByUserAsync(Guid userId, CancellationToken ct = default);
 
     Task SaveChangesAsync(CancellationToken ct = default);

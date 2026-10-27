@@ -31,7 +31,7 @@ public sealed class LogoutCommandHandlerTests
 
         await CreateHandler().Handle(new LogoutCommand("raw"), CancellationToken.None);
 
-        _repo.Verify(r => r.RevokeAsync(token, It.IsAny<CancellationToken>()), Times.Once);
+        _repo.Verify(r => r.RevokeAsync(token, Now.UtcDateTime, It.IsAny<CancellationToken>()), Times.Once);
         _repo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -43,7 +43,7 @@ public sealed class LogoutCommandHandlerTests
 
         await CreateHandler().Handle(new LogoutCommand("raw"), CancellationToken.None);
 
-        _repo.Verify(r => r.RevokeAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repo.Verify(r => r.RevokeAsync(It.IsAny<RefreshToken>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
         _repo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

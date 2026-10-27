@@ -30,7 +30,7 @@ public sealed class LogoutCommandHandler : IRequestHandler<LogoutCommand, Unit>
             return Unit.Value;
 
         // 4?? Token�� revoke et
-        await _refreshRepo.RevokeAsync(stored, ct);
+        await _refreshRepo.RevokeAsync(stored, _timeProvider.GetUtcNow().UtcDateTime, ct);
 
         // 5?? De�i�iklikleri kaydet
         await _refreshRepo.SaveChangesAsync(ct);
