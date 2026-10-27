@@ -163,6 +163,7 @@ public sealed class ConvertChargeSuggestionCommandHandler
         try
         {
             await _suggestions.UpdateAsync(suggestion, ct);
+            await _suggestions.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {

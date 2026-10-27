@@ -57,6 +57,7 @@ public sealed class AcceptPortalLegalDocumentsCommandHandler
             await _acceptances.AddRangeAsync(
                 LegalDocumentCatalog.CreateOwnerAccountAcceptances(
                     request.OwnerAccountId, pending, _timeProvider.GetUtcNow().UtcDateTime), ct);
+            await _acceptances.SaveChangesAsync(ct);
         }
 
         return Result<PortalLegalStatusDto>.Success(

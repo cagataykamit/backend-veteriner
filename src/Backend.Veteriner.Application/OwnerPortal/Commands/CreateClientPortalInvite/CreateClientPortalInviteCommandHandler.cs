@@ -118,6 +118,7 @@ public sealed class CreateClientPortalInviteCommandHandler
 
         // Eski davetlerin iptali, yeni davet ve e-posta (outbox) tek kayıtta yazılır.
         await _invites.AddAsync(invite, ct);
+        await _invites.SaveChangesAsync(ct);
 
         return Result<ClientPortalInviteDto>.Success(ClientPortalInviteDto.From(invite, utcNow));
     }

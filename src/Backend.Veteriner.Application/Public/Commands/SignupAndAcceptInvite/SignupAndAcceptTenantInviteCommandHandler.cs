@@ -108,6 +108,7 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
 
         await _legalAcceptances.AddRangeAsync(
             LegalDocumentCatalog.CreateAcceptances(user.Id, invite.TenantId, requiredLegalDocuments, DateTime.UtcNow), ct);
+        await _legalAcceptances.SaveChangesAsync(ct);
 
         return accepted;
     }

@@ -49,6 +49,7 @@ public sealed class OwnerPortalCodeService
         var message = OwnerPortalEmails.Code(purpose, rawCode);
         await _email.SendAsync(account.Email, message.Subject, message.Body, ct);
         await _codes.AddAsync(code, ct);
+        await _codes.SaveChangesAsync(ct);
     }
 
     /// <summary>

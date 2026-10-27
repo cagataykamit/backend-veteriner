@@ -155,8 +155,9 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
 
         try
         {
-            // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); requestId benzersizliği stoktan önce elenir.
+            // Kayıt hemen yapılır (işlem içinde); requestId benzersizliği stoktan önce elenir.
             await _salesWrite.AddAsync(sale, ct);
+            await _salesWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateException)
         {

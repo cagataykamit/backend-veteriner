@@ -57,8 +57,9 @@ public sealed class DiscardImportBatchCommandHandler : IRequestHandler<DiscardIm
 
         try
         {
-            // Silme kaydı hemen kalıcılaştırır; izlenen parti değişikliği (Discarded) aynı SaveChanges'te, tek işlemde yazılır.
+            // Satır silme ve izlenen parti değişikliği (Discarded) tek SaveChanges'te, tek işlemde yazılır.
             await _rows.DeleteRangeAsync(new ImportBatchRowsByBatchSpec(batch.Id), ct);
+            await _rows.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {

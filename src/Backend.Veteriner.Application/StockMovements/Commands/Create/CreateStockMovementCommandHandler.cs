@@ -315,10 +315,11 @@ public sealed class CreateStockMovementCommandHandler
         if (batch is not null && !batchIsNew)
             movement.LinkBatch(batch);
 
-        // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); işlem sınırı TransactionBehavior'dadır.
+        // Hareket hemen kaydedilir (benzersiz kurallar burada eler); işlem sınırı TransactionBehavior'dadır.
         try
         {
             await _stockMovementsWrite.AddAsync(movement, ct);
+            await _stockMovementsWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -352,6 +353,7 @@ public sealed class CreateStockMovementCommandHandler
             try
             {
                 await _productStocksWrite.AddAsync(newStock, ct);
+                await _productStocksWrite.SaveChangesAsync(ct);
             }
             catch (DbUpdateException)
             {

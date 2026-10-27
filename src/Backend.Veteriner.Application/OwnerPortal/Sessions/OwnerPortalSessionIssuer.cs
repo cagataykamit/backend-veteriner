@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Application.OwnerPortal.Sessions;
 
 /// <summary>
 /// Portal oturumu üretir: access token + ayrı tablodaki refresh (ham değer yalnız yanıtta). Davet kabulü, kodla/parolayla
-/// giriş ve yenileme aynı yolu kullanır. Kayıt refresh deposuna eklemeyle kalıcılaşır; o an izlenen diğer
+/// giriş ve yenileme aynı yolu kullanır. Kayıt bu metotta yapılır (SaveChanges); o an izlenen diğer
 /// değişiklikler (hesap sayaçları, eski refresh'in döndürülmesi) aynı kayıtta yazılır.
 /// </summary>
 public sealed class OwnerPortalSessionIssuer
@@ -49,6 +49,7 @@ public sealed class OwnerPortalSessionIssuer
 
         var refresh = OwnerPortalRefreshToken.Create(account.Id, refreshHash, utcNow.AddDays(_options.RefreshTokenDays), utcNow);
         await _refreshTokens.AddAsync(refresh, ct);
+        await _refreshTokens.SaveChangesAsync(ct);
 
         return new PortalAuthTokensDto(accessToken, accessExpiresAtUtc, rawRefresh, refresh.ExpiresAtUtc);
     }

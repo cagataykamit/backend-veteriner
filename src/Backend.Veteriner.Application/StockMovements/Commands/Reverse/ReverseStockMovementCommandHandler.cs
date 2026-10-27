@@ -156,10 +156,11 @@ public sealed class ReverseStockMovementCommandHandler
         if (batch is not null)
             reversal.LinkBatch(batch);
 
-        // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir): ters hareket ve stok değişimi tek toplu yazımdır.
+        // Ters hareket ve stok değişimi tek SaveChanges'te, tek toplu yazımdır; benzersiz kurallar burada eler.
         try
         {
             await _stockMovementsWrite.AddAsync(reversal, ct);
+            await _stockMovementsWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {

@@ -187,8 +187,9 @@ public sealed class CreateChargeCommandHandler : IRequestHandler<CreateChargeCom
         var charge = created.Value!;
         try
         {
-            // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir).
+            // Kayıt hemen yapılır; requestId benzersizliği burada elenir.
             await _chargesWrite.AddAsync(charge, ct);
+            await _chargesWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateException) when (request.RequestId.HasValue)
         {

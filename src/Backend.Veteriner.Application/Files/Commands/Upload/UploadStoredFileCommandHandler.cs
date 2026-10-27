@@ -89,6 +89,7 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
         var file = new StoredFile(
             tenantId, owner.Value, request.OwnerType, request.OwnerId, request.FileName, type, userId, Now);
         await _files.AddAsync(file, ct);
+        await _files.SaveChangesAsync(ct);
 
         await using var hashing = new HashingLimitedReadStream(request.Content, maxBytes);
         try
@@ -127,6 +128,7 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
         }
 
         await _files.UpdateAsync(file, ct);
+        await _files.SaveChangesAsync(ct);
         return Result<StoredFileDto>.Success(StoredFileDto.From(file));
     }
 
@@ -150,6 +152,7 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
             await _storage.DeleteAsync(file.StorageKey, CancellationToken.None);
             file.MarkDeleted(userId, Now);
             await _files.UpdateAsync(file, CancellationToken.None);
+            await _files.SaveChangesAsync(CancellationToken.None);
         }
         catch (Exception ex)
         {

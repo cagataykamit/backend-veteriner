@@ -225,8 +225,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             request.VitalsMeasuredAtUtc,
             visit?.Id);
 
-        // Muayene başlayınca bekleyen geliş "Devam ediyor" olur. Repository AddAsync kaydı hemen kalıcılaştırdığı
-        // (SaveChanges) için geliş geçişi AddAsync öncesinde yapılır; muayene ve geliş tek SaveChanges'te atomiktir.
+        // Muayene başlayınca bekleyen geliş "Devam ediyor" olur.
         if (visit is { CareStatus: VisitCareStatus.Waiting })
         {
             var started = visit.Start(_timeProvider.GetUtcNow().UtcDateTime);
@@ -234,21 +233,9 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
                 return Result<ExaminationWriteResultDto>.Failure(started.Error);
         }
 
-        try
-        {
-            await _examinationsWrite.AddAsync(examination, ct);
-        }
-        catch (DbUpdateConcurrencyException) when (visit is not null)
-        {
-            return Result<ExaminationWriteResultDto>.Failure(
-                "Visits.ConcurrencyConflict",
-                "Geliş kaydı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
-        }
-
-        // Appointment lifecycle: muayene başarıyla eklendiyse ve akış bir randevuya
-        // bağlıysa, planlanmış randevuyu otomatik olarak tamamla. Completed/Cancelled
-        // durumları için mevcut kural korunur (no-op). Ödeme akışı bu mantığa hiçbir
-        // zaman dokunmaz (CreatePaymentCommandHandler yalnızca okur).
+        // Appointment lifecycle: akış bir randevuya bağlıysa planlanmış randevu muayeneyle birlikte
+        // otomatik tamamlanır. Completed/Cancelled durumları için mevcut kural korunur (no-op).
+        // Ödeme akışı bu mantığa hiçbir zaman dokunmaz (CreatePaymentCommandHandler yalnızca okur).
         if (appt is not null && appt.Status == AppointmentStatus.Scheduled)
         {
             var completion = appt.Complete();
@@ -258,7 +245,19 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             await _appointmentsWrite.UpdateAsync(appt, ct);
         }
 
-        await _examinationsWrite.SaveChangesAsync(ct);
+        // Muayene, geliş ve randevu tek SaveChanges'te atomiktir.
+        try
+        {
+            await _examinationsWrite.AddAsync(examination, ct);
+            await _examinationsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException) when (visit is not null)
+        {
+            return Result<ExaminationWriteResultDto>.Failure(
+                "Visits.ConcurrencyConflict",
+                "Geliş kaydı eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
+        }
+
         return Result<ExaminationWriteResultDto>.Success(
             new ExaminationWriteResultDto(examination.Id, ExaminationRowVersion.Encode(examination.RowVersion)));
     }

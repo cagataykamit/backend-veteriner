@@ -58,6 +58,7 @@ public sealed class AcceptMyLegalDocumentsCommandHandler
             var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
             await _acceptances.AddRangeAsync(
                 LegalDocumentCatalog.CreateAcceptances(userId, tenantId, pending, utcNow), ct);
+            await _acceptances.SaveChangesAsync(ct);
         }
 
         return Result<MyLegalAcceptanceStatusDto>.Success(

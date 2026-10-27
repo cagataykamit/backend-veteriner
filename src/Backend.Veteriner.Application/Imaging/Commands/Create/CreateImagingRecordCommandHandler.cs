@@ -108,6 +108,7 @@ public sealed class CreateImagingRecordCommandHandler : IRequestHandler<CreateIm
             return Result<Guid>.Failure(created.Error);
 
         await _records.AddAsync(created.Value!, ct);
+        await _records.SaveChangesAsync(ct);
         return Result<Guid>.Success(created.Value!.Id);
     }
 }
