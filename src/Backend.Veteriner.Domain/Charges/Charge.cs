@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Domain.Charges;
 /// Müşteriye yazılan ücret (borç) satırı. Tahsilattan (Payment) ayrıdır; hiçbir şeyi ödenmiş saymaz.
 /// Müşteri zorunlu, Visit ve Muayene opsiyoneldir. Tutar bu aggregate'te hesaplanır; para birimi şimdilik yalnızca TRY.
 /// </summary>
-public sealed class Charge : AggregateRoot, IClinicScoped
+public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
 {
     public const string DefaultCurrency = "TRY";
     public const int MaxDescriptionLength = 500;

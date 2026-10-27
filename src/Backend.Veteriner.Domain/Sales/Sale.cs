@@ -8,7 +8,7 @@ namespace Backend.Veteriner.Domain.Sales;
 /// mevcut stok/ücret/ödeme komutlarıyla aynı transaction'da yazılır; tutar kuralı yalnızca burada yaşar.
 /// Düzenlenmez: yanlış satış gerekçeyle iptal edilir (<see cref="Void"/>).
 /// </summary>
-public sealed class Sale : AggregateRoot
+public sealed class Sale : AggregateRoot, ITenantOwned
 {
     public const int MaxLines = 50;
     public const int MaxNotesLength = 500;

@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Domain.Hospitalizations;
 /// Yatış odası/kafesi; bir bölümün (<see cref="HospitalizationWard"/>) altındadır ve bölümle aynı kliniğe aittir.
 /// Aktif odalar arasında ad bölüm içinde benzersizdir. Oda bölümler arası taşınmaz.
 /// </summary>
-public sealed class HospitalizationRoom : IClinicScoped
+public sealed class HospitalizationRoom : IClinicScoped, ITenantOwned
 {
     public const int NameMaxLength = HospitalizationWard.NameMaxLength;
 

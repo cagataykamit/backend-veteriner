@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Domain.Administrations;
 /// (<c>Out</c> hareketi, kaynak = bu kaydın kimliği) uygulama katmanında aynı transaction'da yazılır.
 /// Düzenlenmez: yanlış kayıt gerekçeyle iptal edilir (<see cref="Void"/>).
 /// </summary>
-public sealed class Administration : AggregateRoot, IClinicScoped
+public sealed class Administration : AggregateRoot, IClinicScoped, ITenantOwned
 {
     public const decimal MaxQuantity = 100_000m;
     public const int QuantityDecimals = 3;

@@ -5,7 +5,7 @@ namespace Backend.Veteriner.Domain.Hospitalizations;
 /// <summary>
 /// In-clinic hospitalization / observation stay for a pet; optionally linked to an examination and/or a visit.
 /// </summary>
-public sealed class Hospitalization : AggregateRoot, IClinicScoped
+public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

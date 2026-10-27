@@ -8,7 +8,7 @@ namespace Backend.Veteriner.Domain.Clients;
 /// Kiracıya bağlı müşteri (hayvan sahibi).
 /// Telefon opsiyonel; doluysa <see cref="TurkishMobilePhone"/> ile 905XXXXXXXXX saklanır (Phone ve PhoneNormalized aynı).
 /// </summary>
-public sealed class Client : AggregateRoot
+public sealed class Client : AggregateRoot, ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

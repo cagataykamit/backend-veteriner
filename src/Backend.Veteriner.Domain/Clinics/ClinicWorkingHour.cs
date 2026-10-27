@@ -1,9 +1,11 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Domain.Clinics;
 
 /// <summary>
 /// Klinik haftalık çalışma saati satırı; kiracı + klinik + gün benzersizdir.
 /// </summary>
-public sealed class ClinicWorkingHour
+public sealed class ClinicWorkingHour : ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

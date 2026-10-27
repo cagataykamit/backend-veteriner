@@ -2,7 +2,7 @@ using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Tenants;
 
-public sealed class ScheduledSubscriptionPlanChange : AggregateRoot
+public sealed class ScheduledSubscriptionPlanChange : AggregateRoot, ITenantOwned
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }

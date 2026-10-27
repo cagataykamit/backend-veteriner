@@ -12,7 +12,7 @@ namespace Backend.Veteriner.Domain.SalesPartners;
 /// <item>Komisyon yalnız gerçek tahsilatta, net (KDV hariç, indirim sonrası) tutar üzerinden; iade/iptalde geri alınır.</item>
 /// </list>
 /// </summary>
-public sealed class DiscountRedemption : AggregateRoot
+public sealed class DiscountRedemption : AggregateRoot, ITenantOwned
 {
     public const int WindowMonths = 12;
 

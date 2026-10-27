@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Domain.Products;
 /// kalan miktar yalnız stok hareketleriyle değişir. Parti bilgisi olmayan (eski) bakiye parti sayılmaz:
 /// <c>ProductStock.QuantityOnHand − Σ RemainingQuantity</c> olarak türetilir.
 /// </summary>
-public sealed class StockBatch
+public sealed class StockBatch : ITenantOwned
 {
     public const int MaxLotNumberLength = 100;
     public const int MaxSupplierNameLength = 200;

@@ -1,11 +1,12 @@
 using Backend.Veteriner.Domain.Users;
+using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Tenants;
 
 /// <summary>
 /// Kullanıcının bir kiracıdaki üyeliğini temsil eder. Login/refresh sırasında yetki doğrulaması için kaynak.
 /// </summary>
-public sealed class UserTenant
+public sealed class UserTenant : ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid UserId { get; private set; }

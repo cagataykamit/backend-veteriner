@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Domain.Tenants;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace Backend.Veteriner.Domain.Tenants;
 /// ne zaman ve ne oldu. İki işaret de yalnız ilk kez yazılır; sonraki çağrılar no-op döner (kural burada, çağıranlar
 /// tekrar kontrolü yapmaz). Ölçüm verisidir; iş kuralı taşımaz.
 /// </summary>
-public sealed class TenantActivation
+public sealed class TenantActivation : ITenantOwned
 {
     public Guid TenantId { get; private set; }
     public DateTime? ExampleClinicLoadedAtUtc { get; private set; }

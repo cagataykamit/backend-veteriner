@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Domain.Payments;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace Backend.Veteriner.Domain.Payments;
 /// üretir (sayaç değişmezleri orada korunur); oluşturulduktan sonra tutarı değişmez. Ödeme iptalinde silinmez,
 /// <see cref="ReversedAtUtc"/> ile kapatılır (yalnızca <see cref="Payment.Void"/> yapar); aktif tahsis = geri alınmamış.
 /// </summary>
-public sealed class PaymentAllocation
+public sealed class PaymentAllocation : ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Domain.OwnerPortal;
 /// depoda SHA-256 özeti tutulur. <see cref="Email"/> gönderim anındaki müşteri e-postasıdır: kabulde müşteri e-postası
 /// değişmişse davet geçersizdir (handler denetler).
 /// </summary>
-public sealed class OwnerPortalInvite
+public sealed class OwnerPortalInvite : ITenantOwned
 {
     public const int TokenHashLength = 64;
 

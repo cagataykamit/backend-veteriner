@@ -5,7 +5,7 @@ namespace Backend.Veteriner.Domain.Clinics;
 /// <summary>
 /// Kiracıya bağlı veteriner kliniği.
 /// </summary>
-public sealed class Clinic : AggregateRoot
+public sealed class Clinic : AggregateRoot, ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

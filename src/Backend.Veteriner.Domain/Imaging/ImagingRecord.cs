@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Domain.Imaging;
 /// Hastaya bağlı görüntüleme kaydı (ADR-007, ASAMA6 I1): tarih, tür, açıklama, klinik not ve dosyalar
 /// (<c>StoredFile</c>, sahip <c>ImagingRecord</c>). İsteğe bağlı olarak muayeneye bağlanır. Silinmez, gerekçeyle iptal edilir.
 /// </summary>
-public sealed class ImagingRecord : AggregateRoot
+public sealed class ImagingRecord : AggregateRoot, ITenantOwned
 {
     public const int DescriptionMaxLength = 1000;
     public const int ClinicalNoteMaxLength = 4000;

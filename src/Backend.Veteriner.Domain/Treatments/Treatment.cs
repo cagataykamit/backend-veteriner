@@ -5,7 +5,7 @@ namespace Backend.Veteriner.Domain.Treatments;
 /// <summary>
 /// Clinical treatment record for a pet; optionally linked to an examination.
 /// </summary>
-public sealed class Treatment : AggregateRoot, IClinicScoped
+public sealed class Treatment : AggregateRoot, IClinicScoped, ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

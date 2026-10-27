@@ -3,7 +3,7 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Domain.Products;
 
 /// <summary>Kiracı katalog kartı (tenant-wide); stok miktarı <see cref="ProductStock"/> üzerinden klinik bazlı tutulur.</summary>
-public sealed class Product : AggregateRoot
+public sealed class Product : AggregateRoot, ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

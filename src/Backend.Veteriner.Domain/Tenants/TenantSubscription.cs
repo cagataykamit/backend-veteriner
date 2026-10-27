@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Domain.Tenants;
 /// <summary>
 /// Kiracı başına tek abonelik kaydı (1:1 TenantId). Ödeme sağlayıcısı yok; Faz 1 plan + trial omurgası.
 /// </summary>
-public sealed class TenantSubscription : AggregateRoot
+public sealed class TenantSubscription : AggregateRoot, ITenantOwned
 {
     public Guid TenantId { get; private set; }
     public SubscriptionPlanCode PlanCode { get; private set; }

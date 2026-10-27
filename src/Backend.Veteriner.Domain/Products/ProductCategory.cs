@@ -3,7 +3,7 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Domain.Products;
 
 /// <summary>Kiracıya özgü ürün kategorisi (tenant-wide; klinik taşımaz).</summary>
-public sealed class ProductCategory : AggregateRoot
+public sealed class ProductCategory : AggregateRoot, ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Domain.Files;
 /// <see cref="MarkReady"/>; yazma bitmeden kalan kayıt bakım işiyle <see cref="StoredFileStatus.Deleted"/> olur.
 /// Her dosya tek sahip kayda (<see cref="OwnerType"/> + <see cref="OwnerId"/>) bağlıdır.
 /// </summary>
-public sealed class StoredFile : AggregateRoot
+public sealed class StoredFile : AggregateRoot, ITenantOwned
 {
     public const int StorageKeyMaxLength = 200;
     public const int ContentTypeMaxLength = 50;

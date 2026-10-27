@@ -8,7 +8,7 @@ namespace Backend.Veteriner.Domain.Payments;
 /// Yeni tahsilat bir veya daha fazla ücrete tam olarak tahsis edilir (<see cref="AllocateFully"/>);
 /// eski kayıtlar <see cref="AllocatedAmount"/> = 0 ile "bağlanmamış" kalır.
 /// </summary>
-public sealed class Payment : AggregateRoot, IClinicScoped
+public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
 {
     /// <summary>Tek tahsilat tutarı üst sınırı (anlamsız değer ve SQL taşması koruması).</summary>
     public const decimal MaxAmount = 1_000_000_000m;

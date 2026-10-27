@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Domain.CareInstructions;
 /// Hasta sahibine verilecek taburcu / evde bakım talimatı. Yatışa, muayeneye ve/veya geliş (visit) kaydına
 /// opsiyonel bağlanır (ayaktan hasta için de yazılabilir); bağlar oluşturulduktan sonra değişmez, yalnız metin düzenlenir.
 /// </summary>
-public sealed class CareInstruction : AggregateRoot, IClinicScoped
+public sealed class CareInstruction : AggregateRoot, IClinicScoped, ITenantOwned
 {
     public const int MaxTextLength = 4000;
 

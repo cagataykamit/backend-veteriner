@@ -3,7 +3,7 @@ using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Tenants;
 
-public sealed class BillingCheckoutSession : AggregateRoot
+public sealed class BillingCheckoutSession : AggregateRoot, ITenantOwned
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }

@@ -1,10 +1,12 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Domain.Clinics;
 
 /// <summary>
 /// Klinik bazlı randevu varsayılan ayarları.
 /// Tenant + Clinic benzersizdir.
 /// </summary>
-public sealed class ClinicAppointmentSettings
+public sealed class ClinicAppointmentSettings : ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

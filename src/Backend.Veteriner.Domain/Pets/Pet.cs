@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Domain.Pets;
 /// Tür <see cref="SpeciesId"/> ile global <see cref="Catalog.Species"/> tablosuna bağlıdır.
 /// Irk şimdilik serbest metin (<see cref="Breed"/>); ileride opsiyonel <c>BreedId</c> eklenebilir.
 /// </summary>
-public sealed class Pet : AggregateRoot
+public sealed class Pet : AggregateRoot, ITenantOwned
 {
     public const int MaxAlertNoteLength = 200;
     public const int MaxHbsAnimalIdLength = 50;

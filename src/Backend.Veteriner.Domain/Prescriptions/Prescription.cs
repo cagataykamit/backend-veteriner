@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Domain.Prescriptions;
 /// <summary>
 /// Clinical prescription record for a pet; optionally linked to an examination and/or a treatment.
 /// </summary>
-public sealed class Prescription : AggregateRoot, IClinicScoped
+public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

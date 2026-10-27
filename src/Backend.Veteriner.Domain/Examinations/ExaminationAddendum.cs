@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Domain.Examinations;
 /// Kesinleşmiş muayeneye eklenen gerekçeli ek not. Append-only: oluşturulduktan sonra değişmez, silinmez.
 /// Yalnız <see cref="Examination.AddAddendum"/> üretir.
 /// </summary>
-public sealed class ExaminationAddendum
+public sealed class ExaminationAddendum : ITenantOwned
 {
     public const int MinReasonLength = 5;
     public const int MaxReasonLength = 500;

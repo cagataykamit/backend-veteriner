@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Domain.Clinics;
 /// Tenant + Clinic + <see cref="Kind"/> benzersizdir. Metni klinik yazar (hukuk danışmanının onayladığı metin);
 /// yer tutucular istemcide doldurulur, sunucu ham metni saklar.
 /// </summary>
-public sealed class ClinicKvkkFormTemplate
+public sealed class ClinicKvkkFormTemplate : ITenantOwned
 {
     public const int MaxTextLength = 20_000;
 

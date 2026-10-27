@@ -8,7 +8,7 @@ namespace Backend.Veteriner.Domain.OwnerPortal;
 /// (veritabanında filtreli benzersiz indeks). Klinik erişimi kapatınca bağ <see cref="OwnerAccountClientLinkStatus.Closed"/>
 /// olur ve silinmez.
 /// </summary>
-public sealed class OwnerAccountClientLink
+public sealed class OwnerAccountClientLink : ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid OwnerAccountId { get; private set; }

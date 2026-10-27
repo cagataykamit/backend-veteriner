@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Domain.Imports;
 /// iş kuyruğudur. Durum geçişlerinin tek yeri bu sınıftır; tabloda olmayan geçiş <c>Imports.InvalidState</c> döner.
 /// Satır verisi (kişisel veri) burada değil <see cref="ImportBatchRow"/> içinde tutulur.
 /// </summary>
-public sealed class ImportBatch : AggregateRoot
+public sealed class ImportBatch : AggregateRoot, ITenantOwned
 {
     public const int MaxNameLength = 100;
     public const int ContentHashLength = 64;

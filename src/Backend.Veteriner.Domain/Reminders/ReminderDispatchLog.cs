@@ -2,7 +2,7 @@ using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Reminders;
 
-public sealed class ReminderDispatchLog : AggregateRoot
+public sealed class ReminderDispatchLog : AggregateRoot, ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

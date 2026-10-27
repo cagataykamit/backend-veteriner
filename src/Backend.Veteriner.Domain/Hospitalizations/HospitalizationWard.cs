@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Domain.Hospitalizations;
 /// altındadır. Kapasite/çakışma kuralı yoktur. Aktif bölümler arasında ad klinik içinde benzersizdir; pasif bölüm yeni
 /// yatışa atanamaz, mevcut yatışlar etkilenmez.
 /// </summary>
-public sealed class HospitalizationWard : IClinicScoped
+public sealed class HospitalizationWard : IClinicScoped, ITenantOwned
 {
     public const int NameMaxLength = 100;
 

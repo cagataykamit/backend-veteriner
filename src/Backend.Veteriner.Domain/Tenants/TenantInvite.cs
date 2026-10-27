@@ -1,9 +1,11 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Domain.Tenants;
 
 /// <summary>
 /// Kiracıya kullanıcı daveti. Ham token API'de bir kez döner; depoda yalnızca hash tutulur.
 /// </summary>
-public sealed class TenantInvite
+public sealed class TenantInvite : ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

@@ -5,7 +5,7 @@ namespace Backend.Veteriner.Domain.Tenants;
 /// <summary>
 /// Kiracı firma kimliği ve fatura adresi bilgileri (e-belge entegrasyonu öncesi profil).
 /// </summary>
-public sealed class TenantBillingProfile : AggregateRoot
+public sealed class TenantBillingProfile : AggregateRoot, ITenantOwned
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }

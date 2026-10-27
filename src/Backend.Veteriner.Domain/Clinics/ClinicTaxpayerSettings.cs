@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Domain.Clinics;
 /// Tenant + Clinic benzersizdir; kayıt yoksa <see cref="TaxRatePercent.DefaultVatRate"/> geçerlidir.
 /// Entegratör sağlayıcısı ve kimlik bilgisi bu kayıtta değildir (Dilim 3).
 /// </summary>
-public sealed class ClinicTaxpayerSettings
+public sealed class ClinicTaxpayerSettings : ITenantOwned
 {
     public const int MaxTaxOfficeLength = 100;
     public const int MaxTaxpayerNameLength = 300;
