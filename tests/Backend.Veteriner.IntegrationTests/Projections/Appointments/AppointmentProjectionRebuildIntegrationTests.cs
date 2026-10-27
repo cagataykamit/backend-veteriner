@@ -384,8 +384,8 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
     [Fact]
     public void CommandAndQueryDatabases_Should_BeDistinct()
     {
-        var commandCatalog = new SqlConnectionStringBuilder(AppointmentProjectionWebApplicationFactory.CommandConnection).InitialCatalog;
-        var queryCatalog = new SqlConnectionStringBuilder(AppointmentProjectionWebApplicationFactory.QueryConnection).InitialCatalog;
+        var commandCatalog = new SqlConnectionStringBuilder(_factory.CommandConnection).InitialCatalog;
+        var queryCatalog = new SqlConnectionStringBuilder(_factory.QueryConnection).InitialCatalog;
         commandCatalog.Should().NotBe(queryCatalog);
     }
 

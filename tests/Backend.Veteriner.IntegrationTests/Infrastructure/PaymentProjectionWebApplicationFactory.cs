@@ -1,114 +1,44 @@
-using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Infrastructure.Outbox;
-using Backend.Veteriner.Infrastructure.Persistence;
-using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Projections.Clients;
 using Backend.Veteriner.Infrastructure.Projections.Payments;
 using Backend.Veteriner.Infrastructure.Projections.Pets;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Backend.IntegrationTests.Infrastructure;
 
 /// <summary>
 /// Payment finance projection testleri için ayrı command/query LocalDB veritabanları.
 /// </summary>
-public sealed class PaymentProjectionWebApplicationFactory : WebApplicationFactory<global::Program>
+public sealed class PaymentProjectionWebApplicationFactory : DedicatedDatabaseWebApplicationFactory
 {
-    public static readonly string CommandDatabaseName = IntegrationTestDatabaseNames.Command("PaymentProjectionTests");
-    public static readonly string QueryDatabaseName = IntegrationTestDatabaseNames.Query("PaymentProjectionTests");
-
-    public static readonly string CommandConnection =
-        IntegrationTestDatabaseNames.ConnectionString(CommandDatabaseName);
-
-    public static readonly string QueryConnection =
-        IntegrationTestDatabaseNames.ConnectionString(QueryDatabaseName);
-
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    public PaymentProjectionWebApplicationFactory()
+        : base("PaymentProjectionTests")
     {
-        builder.UseEnvironment("IntegrationTests");
-
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = CommandConnection,
-                ["ConnectionStrings:SqlServer"] = CommandConnection,
-                ["ConnectionStrings:QueryConnection"] = QueryConnection,
-                ["Outbox:Enabled"] = "false",
-                ["AppointmentProjection:Enabled"] = "false",
-                ["ClientProjection:Enabled"] = "false",
-                ["PetProjection:Enabled"] = "false",
-                ["PaymentProjection:Enabled"] = "false",
-                ["QueryReadModels:AppointmentsEnabled"] = "false",
-                ["QueryReadModels:DashboardAppointmentsEnabled"] = "false"
-            }.Concat(IntegrationTestAppConfiguration.RateLimitingDisabled));
-        });
-
-        builder.ConfigureServices(services =>
-        {
-            IntegrationTestDbContextOverride.UseDedicatedDatabase(services, CommandConnection);
-            IntegrationTestDbContextOverride.UseDedicatedQueryDatabase(services, QueryConnection);
-
-            using var scope = services.BuildServiceProvider().CreateSystemScope();
-            var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
-            var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-
-            IntegrationTestDatabaseGuard.EnsureSafeDatabase(
-                commandDb.Database.GetConnectionString(),
-                allowedPrefix: CommandDatabaseName);
-            IntegrationTestDatabaseGuard.EnsureSafeDatabase(
-                queryDb.Database.GetConnectionString(),
-                allowedPrefix: QueryDatabaseName);
-
-            IntegrationTestDatabaseReset.EnsureDroppedAsync(CommandConnection).GetAwaiter().GetResult();
-            commandDb.Database.EnsureCreated();
-            TestDataSeeder.Seed(commandDb, hasher);
-            PermissionSeeder.SeedAsync(commandDb).GetAwaiter().GetResult();
-            AdminClaimSeeder.SeedAsync(commandDb).GetAwaiter().GetResult();
-            InviteAssignableOperationClaimsSeeder.SeedAsync(commandDb).GetAwaiter().GetResult();
-            RolePermissionBindingSeeder.SeedAsync(commandDb).GetAwaiter().GetResult();
-
-            IntegrationTestDatabaseReset.ResetAndMigrateAsync(queryDb).GetAwaiter().GetResult();
-        });
-
-        builder.ConfigureServices(services =>
-        {
-            services.RemoveAll<IEmailSenderImmediate>();
-            services.AddScoped<IEmailSenderImmediate, NoOpEmailSenderImmediate>();
-            services.PostConfigure<OutboxOptions>(o => o.Enabled = false);
-            services.PostConfigure<AppointmentProjectionOptions>(o => o.Enabled = false);
-            services.PostConfigure<ClientProjectionOptions>(o => o.Enabled = false);
-            services.PostConfigure<PetProjectionOptions>(o => o.Enabled = false);
-            services.PostConfigure<PaymentProjectionOptions>(o =>
-            {
-                o.Enabled = false;
-                o.BatchSize = 50;
-                o.ConsumerName = "payment-finance-v1";
-            });
-        });
     }
 
-    public override async ValueTask DisposeAsync()
+    protected override IEnumerable<KeyValuePair<string, string?>> Settings => new Dictionary<string, string?>
     {
-        await base.DisposeAsync();
-        await IntegrationTestDatabaseReset.EnsureDroppedAsync(CommandConnection);
-        await IntegrationTestDatabaseReset.EnsureDroppedAsync(QueryConnection);
-    }
+        ["Outbox:Enabled"] = "false",
+        ["AppointmentProjection:Enabled"] = "false",
+        ["ClientProjection:Enabled"] = "false",
+        ["PetProjection:Enabled"] = "false",
+        ["PaymentProjection:Enabled"] = "false",
+        ["QueryReadModels:AppointmentsEnabled"] = "false",
+        ["QueryReadModels:DashboardAppointmentsEnabled"] = "false"
+    };
 
-    protected override void Dispose(bool disposing)
+    protected override void ConfigureTestServices(IServiceCollection services)
     {
-        base.Dispose(disposing);
-        if (disposing)
+        services.PostConfigure<OutboxOptions>(o => o.Enabled = false);
+        services.PostConfigure<AppointmentProjectionOptions>(o => o.Enabled = false);
+        services.PostConfigure<ClientProjectionOptions>(o => o.Enabled = false);
+        services.PostConfigure<PetProjectionOptions>(o => o.Enabled = false);
+        services.PostConfigure<PaymentProjectionOptions>(o =>
         {
-            IntegrationTestDatabaseReset.EnsureDroppedAsync(CommandConnection).GetAwaiter().GetResult();
-            IntegrationTestDatabaseReset.EnsureDroppedAsync(QueryConnection).GetAwaiter().GetResult();
-        }
+            o.Enabled = false;
+            o.BatchSize = 50;
+            o.ConsumerName = "payment-finance-v1";
+        });
     }
 }

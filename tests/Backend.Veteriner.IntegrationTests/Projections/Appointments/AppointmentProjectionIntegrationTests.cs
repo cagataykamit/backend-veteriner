@@ -584,8 +584,8 @@ public sealed class AppointmentProjectionIntegrationTests
         var commandCatalog = new SqlConnectionStringBuilder(commandDb.Database.GetConnectionString()!).InitialCatalog;
         var queryCatalog = new SqlConnectionStringBuilder(queryDb.Database.GetConnectionString()!).InitialCatalog;
 
-        commandCatalog.Should().Be(AppointmentProjectionWebApplicationFactory.CommandDatabaseName);
-        queryCatalog.Should().Be(AppointmentProjectionWebApplicationFactory.QueryDatabaseName);
+        commandCatalog.Should().Be(_factory.CommandDatabaseName);
+        queryCatalog.Should().Be(_factory.QueryDatabaseName);
         commandCatalog.Should().NotBe(queryCatalog);
     }
 
