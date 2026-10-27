@@ -19,7 +19,7 @@ public class EfRepository<T> : RepositoryBase<T>, IRepository<T> where T : class
     private readonly AppDbContext _db;
     private readonly DbSet<T> _set;
 
-    public EfRepository(AppDbContext dbContext) : base(dbContext)
+    public EfRepository(AppDbContext dbContext) : base(dbContext, TenantSafeSpecificationEvaluator.Instance)
     {
         _db = dbContext;
         _set = dbContext.Set<T>();

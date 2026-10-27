@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -88,7 +89,7 @@ public sealed class ImportMaintenanceProcessor
     {
         await using var scope = _scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.ImportBatches.WithSpecification(spec).Select(b => b.Id).ToListAsync(ct);
+        return await db.ImportBatches.WithSpecification(spec, TenantSafeSpecificationEvaluator.Instance).Select(b => b.Id).ToListAsync(ct);
     }
 
     /// <summary>Süresi dolan taslak: durum ve satır silme tek işlemde (taslak silme ile aynı sonuç).</summary>

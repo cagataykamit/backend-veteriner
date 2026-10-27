@@ -1,9 +1,9 @@
 using System.Text.Json;
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Infrastructure.Persistence;
-using Backend.Veteriner.Infrastructure.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -100,7 +100,7 @@ public sealed class ImportValidationProcessor
         try
         {
             await using var scope = _scopes.CreateAsyncScope();
-            using var tenantScope = BackgroundTenantScope.Begin(tenantId);
+            using var tenantScope = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var batch = await db.ImportBatches.SingleOrDefaultAsync(b => b.Id == batchId, ct);

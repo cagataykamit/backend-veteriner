@@ -47,7 +47,7 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.Property(x => x.VoidReason).HasMaxLength(CorrectionReason.MaxLength);
 
         // İptal edilen ödeme tüm okuma yüzeylerinden tek yerde düşer; iptal ucu ve requestId araması IgnoreQueryFilters kullanır.
-        b.HasQueryFilter(x => x.VoidedAtUtc == null);
+        b.HasQueryFilter(QueryFilterNames.Voided, x => x.VoidedAtUtc == null);
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ClinicId });

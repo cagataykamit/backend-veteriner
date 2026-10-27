@@ -22,7 +22,6 @@ using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Infrastructure.Imports;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Reminders;
-using Backend.Veteriner.Infrastructure.Web;
 using ClosedXML.Excel;
 using AwesomeAssertions;
 using Mediator;
@@ -577,7 +576,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         Guid tenantId, Guid batchId, string worker, ImportOwnerUnitPlan unit)
     {
         await using var scope = _factory.Services.CreateAsyncScope();
-        using var tenant = BackgroundTenantScope.Begin(tenantId);
+        using var tenant = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
         try
         {
             return await scope.ServiceProvider.GetRequiredService<ISender>()

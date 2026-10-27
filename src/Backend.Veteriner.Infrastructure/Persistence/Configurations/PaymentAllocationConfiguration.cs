@@ -26,7 +26,7 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
         b.Property(x => x.ReversedAtUtc);
 
         // Geri alınan (iptal edilen ödemenin) tahsisleri geçmişte kalır, aktif tahsis sorgularında görünmez.
-        b.HasQueryFilter(x => x.ReversedAtUtc == null);
+        b.HasQueryFilter(QueryFilterNames.Voided, x => x.ReversedAtUtc == null);
 
         b.HasOne<Payment>().WithMany().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Charge>().WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);

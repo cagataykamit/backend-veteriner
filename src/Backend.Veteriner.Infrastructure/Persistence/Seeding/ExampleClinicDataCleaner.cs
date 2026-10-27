@@ -310,11 +310,11 @@ public sealed class ExampleClinicDataCleaner : IExampleClinicCleaner
         public IQueryable<Prescription> Prescriptions => db.Prescriptions.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
         public IQueryable<PrescriptionItem> PrescriptionItems
             => db.Set<PrescriptionItem>().Where(x => Prescriptions.Select(p => p.Id).Contains(x.PrescriptionId));
-        public IQueryable<Charge> Charges => db.Charges.IgnoreQueryFilters()
+        public IQueryable<Charge> Charges => db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable)
             .Where(x => x.TenantId == TenantId && (ClientIds.Contains(x.ClientId) || (x.PetId != null && PetIds.Contains(x.PetId.Value))));
-        public IQueryable<Payment> Payments => db.Payments.IgnoreQueryFilters()
+        public IQueryable<Payment> Payments => db.Payments.IgnoreQueryFilters(QueryFilterNames.Ignorable)
             .Where(x => x.TenantId == TenantId && (ClientIds.Contains(x.ClientId) || (x.PetId != null && PetIds.Contains(x.PetId.Value))));
-        public IQueryable<PaymentAllocation> PaymentAllocations => db.PaymentAllocations.IgnoreQueryFilters()
+        public IQueryable<PaymentAllocation> PaymentAllocations => db.PaymentAllocations.IgnoreQueryFilters(QueryFilterNames.Ignorable)
             .Where(x => Payments.Select(p => p.Id).Contains(x.PaymentId) || Charges.Select(c => c.Id).Contains(x.ChargeId));
         public IQueryable<Sale> Sales => db.Sales.Where(x => x.TenantId == TenantId && ClientIds.Contains(x.ClientId));
         public IQueryable<SaleLine> SaleLines => db.SaleLines.Where(x => Sales.Select(s => s.Id).Contains(x.SaleId));

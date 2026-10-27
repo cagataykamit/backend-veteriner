@@ -20,7 +20,6 @@ using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
 using Backend.Veteriner.Infrastructure.Imports;
 using Backend.Veteriner.Infrastructure.Persistence;
-using Backend.Veteriner.Infrastructure.Web;
 using ClosedXML.Excel;
 using AwesomeAssertions;
 using Mediator;
@@ -558,7 +557,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
     private async Task<ImportRollbackPlan> PlanAsync(Guid tenantId, Guid id)
     {
         await using var scope = _factory.Services.CreateAsyncScope();
-        using var tenant = BackgroundTenantScope.Begin(tenantId);
+        using var tenant = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
         return (await scope.ServiceProvider.GetRequiredService<ImportRollbackPlanLoader>().LoadAsync(tenantId, id, null, CancellationToken.None)).Plan;
     }
 
@@ -566,7 +565,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         Guid tenantId, Guid batchId, string worker, ImportRollbackUnit unit)
     {
         await using var scope = _factory.Services.CreateAsyncScope();
-        using var tenant = BackgroundTenantScope.Begin(tenantId);
+        using var tenant = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
         try
         {
             return await scope.ServiceProvider.GetRequiredService<ISender>()

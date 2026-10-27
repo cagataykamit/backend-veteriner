@@ -227,7 +227,10 @@ public static class DependencyInjection
         // ===== HttpContext & App URL & Audit =====
         services.AddHttpContextAccessor();
         services.AddScoped<IClientContext, ClientContext>();
-        services.AddScoped<ITenantContext, TenantContext>();
+        // Etkin kiracı ve kiracı filtresi kapsamı aynı örnektir (ADR-040).
+        services.AddScoped<TenantContext>();
+        services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
+        services.AddScoped<ITenantScope>(sp => sp.GetRequiredService<TenantContext>());
         services.AddScoped<IClinicContext, ClinicContext>();
         services.AddScoped<ICurrentUserPermissionChecker, CurrentUserPermissionChecker>();
         services.AddScoped<ICurrentUserRoleAccessor, CurrentUserRoleAccessor>();

@@ -10,5 +10,5 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Repositories;
 /// </summary>
 public class EfReadRepository<T> : RepositoryBase<T>, IReadRepository<T> where T : class
 {
-    public EfReadRepository(AppDbContext dbContext) : base(dbContext) { }
+    public EfReadRepository(AppDbContext dbContext) : base(dbContext, TenantSafeSpecificationEvaluator.Instance) { }
 }

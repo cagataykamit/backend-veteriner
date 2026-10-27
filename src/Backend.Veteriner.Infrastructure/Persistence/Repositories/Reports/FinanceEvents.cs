@@ -119,10 +119,10 @@ internal static class FinanceEvents
     }
 
     private static IQueryable<Domain.Charges.Charge> Charges(AppDbContext db, FinanceEventFilter f)
-        => InScope(db.Charges.IgnoreQueryFilters().AsNoTracking(), f);
+        => InScope(db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable).AsNoTracking(), f);
 
     private static IQueryable<Domain.Payments.Payment> Payments(AppDbContext db, FinanceEventFilter f)
-        => InScope(db.Payments.IgnoreQueryFilters().AsNoTracking(), f);
+        => InScope(db.Payments.IgnoreQueryFilters(QueryFilterNames.Ignorable).AsNoTracking(), f);
 
     private static IQueryable<FinanceEvent> ChargeCreated(AppDbContext db, FinanceEventFilter f)
     {
@@ -211,7 +211,7 @@ internal static class FinanceEvents
     {
         var fromUtc = f.FromUtc;
         var toUtc = f.ToUtcExclusive;
-        var allocations = db.PaymentAllocations.IgnoreQueryFilters();
+        var allocations = db.PaymentAllocations.IgnoreQueryFilters(QueryFilterNames.Ignorable);
         return Payments(db, f)
             .Where(p => p.PaidAtUtc >= fromUtc && p.PaidAtUtc < toUtc)
             .Select(p => new { Payment = p, Collector = allocations.Where(a => a.PaymentId == p.Id).OrderBy(a => a.CreatedAtUtc).Select(a => (Guid?)a.CreatedByUserId).FirstOrDefault() })
@@ -240,7 +240,7 @@ internal static class FinanceEvents
     {
         var fromUtc = f.FromUtc;
         var toUtc = f.ToUtcExclusive;
-        var allocations = db.PaymentAllocations.IgnoreQueryFilters();
+        var allocations = db.PaymentAllocations.IgnoreQueryFilters(QueryFilterNames.Ignorable);
         return Payments(db, f)
             .Where(p => p.VoidedAtUtc != null && p.VoidedAtUtc >= fromUtc && p.VoidedAtUtc < toUtc)
             .Select(p => new { Payment = p, Collector = allocations.Where(a => a.PaymentId == p.Id).OrderBy(a => a.CreatedAtUtc).Select(a => (Guid?)a.CreatedByUserId).FirstOrDefault() })

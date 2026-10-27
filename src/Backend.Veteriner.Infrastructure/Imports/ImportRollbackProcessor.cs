@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
 using Backend.Veteriner.Application.Imports.Commands.RollbackOwnerUnit;
@@ -8,7 +9,6 @@ using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Infrastructure.Persistence;
-using Backend.Veteriner.Infrastructure.Web;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -156,7 +156,7 @@ public sealed class ImportRollbackProcessor
     private async Task<ImportRollbackPlan> PlanAsync(Guid batchId, Guid tenantId, CancellationToken ct)
     {
         await using var scope = _scopes.CreateAsyncScope();
-        using var tenantScope = BackgroundTenantScope.Begin(tenantId);
+        using var tenantScope = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
         var loader = scope.ServiceProvider.GetRequiredService<ImportRollbackPlanLoader>();
         return (await loader.LoadAsync(tenantId, batchId, rowIds: null, ct)).Plan;
     }
@@ -174,7 +174,7 @@ public sealed class ImportRollbackProcessor
         try
         {
             await using var scope = _scopes.CreateAsyncScope();
-            using var tenantScope = BackgroundTenantScope.Begin(tenantId);
+            using var tenantScope = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantId);
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
             result = await sender.Send(new RollbackImportOwnerUnitCommand(batchId, WorkerId, unit.RowIds, policy), ct);
         }

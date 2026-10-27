@@ -39,4 +39,13 @@
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
+  <!-- Kiracı filtresi kuralı (RS0030, ADR-040): parametresiz IgnoreQueryFilters yasak; önem derecesi .editorconfig'de. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <AdditionalFiles Include="BannedSymbols.txt" />
+  </ItemGroup>
+
 </Project>

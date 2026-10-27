@@ -51,7 +51,7 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
         b.Property(x => x.VoidReason).HasMaxLength(CorrectionReason.MaxLength);
 
         // İptal edilen ücret tüm okuma yüzeylerinden tek yerde düşer; iptal ucu ve requestId araması IgnoreQueryFilters kullanır.
-        b.HasQueryFilter(x => x.VoidedAtUtc == null);
+        b.HasQueryFilter(QueryFilterNames.Voided, x => x.VoidedAtUtc == null);
 
         b.HasIndex(x => new { x.TenantId, x.ClientId });
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.CreatedAtUtc });

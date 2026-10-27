@@ -28,17 +28,17 @@ public sealed class ImportRollbackDependencyReader : IImportRollbackDependencyRe
         (ImportRollbackReasons.HasAdministrations, (db, t, ids) => db.Administrations.Where(x => x.TenantId == t && ids.Contains(x.PetId)).Select(x => x.PetId)),
         (ImportRollbackReasons.HasCareInstructions, (db, t, ids) => db.CareInstructions.Where(x => x.TenantId == t && ids.Contains(x.PetId)).Select(x => x.PetId)),
         (ImportRollbackReasons.HasChargeSuggestions, (db, t, ids) => db.ChargeSuggestions.Where(x => x.TenantId == t && ids.Contains(x.PetId)).Select(x => x.PetId)),
-        (ImportRollbackReasons.HasCharges, (db, t, ids) => db.Charges.IgnoreQueryFilters()
+        (ImportRollbackReasons.HasCharges, (db, t, ids) => db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable)
             .Where(x => x.TenantId == t && x.PetId != null && ids.Contains(x.PetId.Value)).Select(x => x.PetId!.Value)),
-        (ImportRollbackReasons.HasPayments, (db, t, ids) => db.Payments.IgnoreQueryFilters()
+        (ImportRollbackReasons.HasPayments, (db, t, ids) => db.Payments.IgnoreQueryFilters(QueryFilterNames.Ignorable)
             .Where(x => x.TenantId == t && x.PetId != null && ids.Contains(x.PetId.Value)).Select(x => x.PetId!.Value)),
     ];
 
     /// <summary>Müşteri bağları: neden kodu → hedef müşteriye bağlı finansal kayıtların müşteri kimlikleri.</summary>
     private static readonly (string Reason, DependencySource Query)[] ClientSources =
     [
-        (ImportRollbackReasons.HasCharges, (db, t, ids) => db.Charges.IgnoreQueryFilters().Where(x => x.TenantId == t && ids.Contains(x.ClientId)).Select(x => x.ClientId)),
-        (ImportRollbackReasons.HasPayments, (db, t, ids) => db.Payments.IgnoreQueryFilters().Where(x => x.TenantId == t && ids.Contains(x.ClientId)).Select(x => x.ClientId)),
+        (ImportRollbackReasons.HasCharges, (db, t, ids) => db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable).Where(x => x.TenantId == t && ids.Contains(x.ClientId)).Select(x => x.ClientId)),
+        (ImportRollbackReasons.HasPayments, (db, t, ids) => db.Payments.IgnoreQueryFilters(QueryFilterNames.Ignorable).Where(x => x.TenantId == t && ids.Contains(x.ClientId)).Select(x => x.ClientId)),
         (ImportRollbackReasons.HasSales, (db, t, ids) => db.Sales.Where(x => x.TenantId == t && ids.Contains(x.ClientId)).Select(x => x.ClientId)),
     ];
 
