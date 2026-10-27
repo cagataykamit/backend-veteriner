@@ -366,7 +366,7 @@ public sealed class PaymentListRolloutAcceptanceIntegrationTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var client = new Client(tenantId, clientName);
+        var client = new Client(tenantId, clientName, DateTime.UtcNow);
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync();
 

@@ -87,13 +87,13 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
         PaymentAllocationTestSupport.Setup(_chargesWrite, _clientContext, tid, cid, clientId);
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         var clinic = new Clinic(tid, "K", "İstanbul");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, cid);
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(clinic);
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali"));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow));
     }
 
     private static CreatePaymentCommand CreateCmd(
@@ -257,7 +257,7 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null));
 
-        var exam = new Examination(tid, assignedCid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, assignedCid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -286,7 +286,7 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null));
 
-        var exam = new Examination(tid, unassignedCid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, unassignedCid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -373,7 +373,7 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = ExistingRow(tid, entityCid, clientId);
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -400,7 +400,7 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = ExistingRow(tid, assignedCid, clientId);
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -426,7 +426,7 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(activeCid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = ExistingRow(tid, entityCid, clientId);
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -470,7 +470,7 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Payment?)null);
 
@@ -496,7 +496,7 @@ public sealed class PaymentWriteClinicAssignmentCommandHandlerTests
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
-        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);

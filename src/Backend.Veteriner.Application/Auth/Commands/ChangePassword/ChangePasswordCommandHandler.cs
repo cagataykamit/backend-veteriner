@@ -9,15 +9,18 @@ public sealed class ChangePasswordCommandHandler : IRequestHandler<ChangePasswor
     private readonly IUserRepository _users;
     private readonly IPasswordHasher _hasher;
     private readonly IClientContext _client;
+    private readonly TimeProvider _timeProvider;
 
     public ChangePasswordCommandHandler(
         IUserRepository users,
         IPasswordHasher hasher,
-        IClientContext client)
+        IClientContext client,
+        TimeProvider timeProvider)
     {
         _users = users;
         _hasher = hasher;
         _client = client;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(ChangePasswordCommand request, CancellationToken ct)
@@ -41,7 +44,8 @@ public sealed class ChangePasswordCommandHandler : IRequestHandler<ChangePasswor
                 "Yeni şifre mevcut şifre ile aynı olamaz.");
 
         var newHash = _hasher.Hash(request.NewPassword);
-        user.UpdatePasswordHash(newHash);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        user.UpdatePasswordHash(newHash, utcNow);
 
         await _users.SaveChangesAsync(ct);
 

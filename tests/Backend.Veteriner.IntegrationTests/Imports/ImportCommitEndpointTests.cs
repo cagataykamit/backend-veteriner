@@ -257,7 +257,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var manual = new Client(ctx.TenantId, ctx.CustomerName, "905321234567", email: null, address: null);
+            var manual = new Client(ctx.TenantId, ctx.CustomerName, DateTime.UtcNow, "905321234567", email: null, address: null);
             db.Clients.Add(manual);
             await db.SaveChangesAsync();
             manualId = manual.Id;
@@ -289,7 +289,7 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var owner = new Client(ctx.TenantId, $"Başka {Guid.NewGuid():N}"[..20], "905449998877", email: null, address: null);
+            var owner = new Client(ctx.TenantId, $"Başka {Guid.NewGuid():N}"[..20], DateTime.UtcNow, "905449998877", email: null, address: null);
             db.Clients.Add(owner);
             db.Pets.Add(new Pet(ctx.TenantId, owner.Id, "Çakışan", ctx.SpeciesId, microchipNumber: Chip));
             await db.SaveChangesAsync();
@@ -765,19 +765,19 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
 
-        var tenant = new Tenant($"imc-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"imc-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Imc-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
         var species = new Species($"IMC{suffix}", $"Imc Tür {suffix}");
-        var vaccine = VaccineDefinition.CreateTenant(tenant.Id, $"IMCV{suffix}", $"Imc Aşı {suffix}");
+        var vaccine = VaccineDefinition.CreateTenant(tenant.Id, $"IMCV{suffix}", $"Imc Aşı {suffix}", DateTime.UtcNow);
         db.Species.Add(species);
         db.VaccineDefinitions.Add(vaccine);
         if (remindersEnabled)
         {
-            var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-            settings.Update(false, 24, true, 3, true);
+            var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+            settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
             db.TenantReminderSettings.Add(settings);
         }
 

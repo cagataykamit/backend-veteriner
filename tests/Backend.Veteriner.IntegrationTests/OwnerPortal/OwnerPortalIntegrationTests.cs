@@ -80,7 +80,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var client = new Client(tenantId, $"Portal Sahip {Guid.NewGuid():N}"[..20], email: email ?? $"owner-{Guid.NewGuid():N}@example.com");
+        var client = new Client(tenantId, $"Portal Sahip {Guid.NewGuid():N}"[..20], DateTime.UtcNow, email: email ?? $"owner-{Guid.NewGuid():N}@example.com");
         configure?.Invoke(client);
         db.Clients.Add(client);
         await db.SaveChangesAsync();
@@ -268,9 +268,9 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
     {
         var staff = await SeedStaffAsync();
         var declined = await SeedClientAsync(staff.TenantId, configure: c =>
-            c.RecordKvkkConsent(KvkkConsentStatus.Declined, null, new DateOnly(2026, 10, 16), Guid.NewGuid(), null, null));
+            c.RecordKvkkConsent(KvkkConsentStatus.Declined, null, new DateOnly(2026, 10, 16), Guid.NewGuid(), null, null, DateTime.UtcNow));
         var optedOut = await SeedClientAsync(staff.TenantId, configure: c => c.ApplyContactPreferences(null, remindersOptedOut: true));
-        var noEmail = await SeedClientAsync(staff.TenantId, configure: c => c.UpdateDetails(c.FullName, null, null, null));
+        var noEmail = await SeedClientAsync(staff.TenantId, configure: c => c.UpdateDetails(c.FullName, null, null, null, DateTime.UtcNow));
         var tokensBefore = _secrets.TokenCount;
 
         foreach (var (client, code) in new[]
@@ -307,7 +307,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tracked = await db.Clients.SingleAsync(c => c.Id == client.Id);
-            tracked.UpdateDetails(tracked.FullName, $"changed-{Guid.NewGuid():N}@example.com", null, null);
+            tracked.UpdateDetails(tracked.FullName, $"changed-{Guid.NewGuid():N}@example.com", null, null, DateTime.UtcNow);
             await db.SaveChangesAsync();
         }
 
@@ -407,9 +407,9 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tenant = new Tenant($"PortalYabanci-{Guid.NewGuid():N}"[..24]);
+            var tenant = new Tenant($"PortalYabanci-{Guid.NewGuid():N}"[..24], DateTime.UtcNow);
             db.Tenants.Add(tenant);
-            var foreignClient = new Client(tenant.Id, "Yabancı Sahip", email: $"foreign-{Guid.NewGuid():N}@example.com");
+            var foreignClient = new Client(tenant.Id, "Yabancı Sahip", DateTime.UtcNow, email: $"foreign-{Guid.NewGuid():N}@example.com");
             db.Clients.Add(foreignClient);
             await db.SaveChangesAsync();
             foreignClientId = foreignClient.Id;

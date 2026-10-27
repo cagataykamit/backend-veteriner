@@ -50,7 +50,8 @@ public sealed class ExportExaminationsReportQueryHandlerTests
             "Sebep",
             "Bulgu",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
         _examinations.Setup(x => x.CountAsync(It.IsAny<ExaminationsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
@@ -124,7 +125,8 @@ public sealed class ExportExaminationsReportQueryHandlerTests
             "v",
             "f",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         _examinations
             .Setup(x => x.ListAsync(It.IsAny<ExaminationsReportFilteredOrderedForExportSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Examination> { ex });
@@ -163,7 +165,7 @@ public sealed class ExportExaminationsReportQueryHandlerTests
 
         var from = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
         var to = new DateTime(2026, 10, 5, 0, 0, 0, DateTimeKind.Utc);
-        var ex = new Examination(tid, clinicId, petId, null, from.AddHours(1), "vr", "fd", null, null);
+        var ex = new Examination(tid, clinicId, petId, null, from.AddHours(1), "vr", "fd", null, null, DateTime.UtcNow);
 
         _examinations.Setup(x => x.CountAsync(It.IsAny<ExaminationsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);

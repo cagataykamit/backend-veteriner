@@ -36,7 +36,8 @@ public sealed class ReminderDispatchLog : AggregateRoot
         DateTime scheduledForUtc,
         DateTime reminderDueAtUtc,
         ReminderDispatchStatus status,
-        string dedupeKey)
+        string dedupeKey,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -58,50 +59,50 @@ public sealed class ReminderDispatchLog : AggregateRoot
         ReminderDueAtUtc = NormalizeUtc(reminderDueAtUtc);
         Status = status;
         DedupeKey = dedupeKey.Trim();
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
-    public void MarkEnqueued(Guid? outboxMessageId = null)
+    public void MarkEnqueued(DateTime utcNow, Guid? outboxMessageId = null)
     {
         Status = ReminderDispatchStatus.Enqueued;
         OutboxMessageId = outboxMessageId;
         SentAtUtc = null;
         LastError = null;
         FailedAtUtc = null;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void MarkSent(DateTime sentAtUtc)
+    public void MarkSent(DateTime sentAtUtc, DateTime utcNow)
     {
         Status = ReminderDispatchStatus.Sent;
         SentAtUtc = NormalizeUtc(sentAtUtc);
         FailedAtUtc = null;
         LastError = null;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void MarkFailed(string? error)
+    public void MarkFailed(string? error, DateTime utcNow)
     {
         Status = ReminderDispatchStatus.Failed;
         LastError = string.IsNullOrWhiteSpace(error) ? "Unknown reminder enqueue error." : error.Trim();
-        FailedAtUtc = DateTime.UtcNow;
-        UpdatedAtUtc = DateTime.UtcNow;
+        FailedAtUtc = utcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void MarkFailed(DateTime failedAtUtc, string? error)
+    public void MarkFailed(DateTime failedAtUtc, string? error, DateTime utcNow)
     {
         Status = ReminderDispatchStatus.Failed;
         FailedAtUtc = NormalizeUtc(failedAtUtc);
         LastError = string.IsNullOrWhiteSpace(error) ? "Unknown reminder send error." : error.Trim();
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void MarkSkipped(string reason)
+    public void MarkSkipped(string reason, DateTime utcNow)
     {
         Status = ReminderDispatchStatus.Skipped;
         LastError = string.IsNullOrWhiteSpace(reason) ? "Reminder skipped." : reason.Trim();
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     private static DateTime NormalizeUtc(DateTime value)

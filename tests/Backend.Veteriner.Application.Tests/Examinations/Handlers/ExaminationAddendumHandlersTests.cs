@@ -38,7 +38,7 @@ public sealed class ExaminationAddendumHandlersTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _clientContext.SetupGet(c => c.UserId).Returns(_userId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
     }
 
     private AddExaminationAddendumCommandHandler CreateAddHandler(
@@ -66,7 +66,7 @@ public sealed class ExaminationAddendumHandlersTests
 
     private Examination ReturnExamination(bool finalized)
     {
-        var e = new Examination(_tenantId, _clinicId, Guid.NewGuid(), null, Now.AddHours(-1), "Sikayet", "Bulgu", null, null);
+        var e = new Examination(_tenantId, _clinicId, Guid.NewGuid(), null, Now.AddHours(-1), "Sikayet", "Bulgu", null, null, DateTime.UtcNow);
         if (finalized)
             e.Finalize(_userId, Now.AddMinutes(-30));
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))

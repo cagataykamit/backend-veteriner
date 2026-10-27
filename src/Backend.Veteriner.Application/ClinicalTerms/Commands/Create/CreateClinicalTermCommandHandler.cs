@@ -12,11 +12,13 @@ public sealed class CreateClinicalTermCommandHandler : IRequestHandler<CreateCli
 {
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ClinicalTerm> _terms;
+    private readonly TimeProvider _timeProvider;
 
-    public CreateClinicalTermCommandHandler(ITenantContext tenantContext, IRepository<ClinicalTerm> terms)
+    public CreateClinicalTermCommandHandler(ITenantContext tenantContext, IRepository<ClinicalTerm> terms, TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _terms = terms;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ClinicalTermDto>> Handle(CreateClinicalTermCommand request, CancellationToken ct)
@@ -24,7 +26,8 @@ public sealed class CreateClinicalTermCommandHandler : IRequestHandler<CreateCli
         if (_tenantContext.TenantId is not { } tenantId)
             return Result<ClinicalTermDto>.Failure(ClinicalTermErrors.TenantContextMissing);
 
-        var term = ClinicalTerm.CreateForTenant(tenantId, request.Kind, request.Name);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var term = ClinicalTerm.CreateForTenant(tenantId, request.Kind, request.Name, utcNow);
 
         if (await _terms.AnyAsync(new ClinicalTermNameTakenSpec(tenantId, term.Kind, term.NormalizedName), ct))
             return Result<ClinicalTermDto>.Failure(ClinicalTermErrors.DuplicateName);

@@ -307,7 +307,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"DashFin-{Guid.NewGuid():N}"[..14], "905551118877");
+        var client = new Client(clinic.TenantId, $"DashFin-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551118877");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -340,7 +340,7 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"DashScope-{Guid.NewGuid():N}"[..14], "905551119988");
+        var client = new Client(clinic.TenantId, $"DashScope-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551119988");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -403,12 +403,12 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
 
         var email = $"dash-no-clinic-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password);
@@ -453,13 +453,13 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
 
         var email = $"clients-only-dash-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password);

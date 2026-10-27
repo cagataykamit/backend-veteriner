@@ -136,10 +136,10 @@ public sealed class SaleTests
     [Fact]
     public void WalkIn_Client_Should_Be_Flagged_With_Fixed_Name()
     {
-        var walkIn = Client.CreateWalkIn(TenantId);
+        var walkIn = Client.CreateWalkIn(TenantId, Now);
 
         walkIn.IsWalkIn.Should().BeTrue();
         walkIn.FullName.Should().Be(Client.WalkInFullName);
-        new Client(TenantId, "Ayse Yilmaz").IsWalkIn.Should().BeFalse();
+        new Client(TenantId, "Ayse Yilmaz", Now).IsWalkIn.Should().BeFalse();
     }
 }

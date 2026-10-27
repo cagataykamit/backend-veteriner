@@ -205,7 +205,8 @@ public sealed class GetVaccinationsListQueryHandlerTests
             VaccinationStatus.Scheduled,
             null,
             due,
-            null);
+            null,
+            DateTime.UtcNow);
 
         _vaccinations.Setup(r => r.CountAsync(It.IsAny<VaccinationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);

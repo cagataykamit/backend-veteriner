@@ -162,13 +162,13 @@ public sealed class PaymentListSearchLookupSmokeIntegrationTests
         string clientFullName,
         string petName)
     {
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Pilot Clinic", "Istanbul");
         commandDb.Tenants.Add(tenant);
         commandDb.Clinics.Add(clinic);
         await commandDb.SaveChangesAsync();
 
-        var client = new Client(tenant.Id, clientFullName, "905551110088");
+        var client = new Client(tenant.Id, clientFullName, DateTime.UtcNow, "905551110088");
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync();
 

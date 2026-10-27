@@ -10,7 +10,7 @@ public sealed class ClientProjectionSnapshotFactoryTests
     public void Create_Should_MapAllFields_FromAggregate()
     {
         var tid = Guid.NewGuid();
-        var client = new Client(tid, "  Ayşe Yılmaz  ", "05321234567", "Ayse@Example.com", "Ankara");
+        var client = new Client(tid, "  Ayşe Yılmaz  ", DateTime.UtcNow, "05321234567", "Ayse@Example.com", "Ankara");
 
         var snap = ClientProjectionSnapshotFactory.Create(client);
 
@@ -27,7 +27,7 @@ public sealed class ClientProjectionSnapshotFactoryTests
     [Fact]
     public void Create_Should_AllowNullOptionalFields()
     {
-        var client = new Client(Guid.NewGuid(), "Mehmet Demir");
+        var client = new Client(Guid.NewGuid(), "Mehmet Demir", DateTime.UtcNow);
 
         var snap = ClientProjectionSnapshotFactory.Create(client);
 
@@ -40,7 +40,7 @@ public sealed class ClientProjectionSnapshotFactoryTests
     [Fact]
     public void Create_Should_BeDeterministic_ForSameAggregate()
     {
-        var client = new Client(Guid.NewGuid(), "Ali Veli", "05321234567", "ali@example.com");
+        var client = new Client(Guid.NewGuid(), "Ali Veli", DateTime.UtcNow, "05321234567", "ali@example.com");
 
         var first = ClientProjectionSnapshotFactory.Create(client);
         var second = ClientProjectionSnapshotFactory.Create(client);

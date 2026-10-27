@@ -198,10 +198,10 @@ public sealed class QuickRegisterIntegrationTests : IClassFixture<CustomWebAppli
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var foreignTenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..20]);
+            var foreignTenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
             db.Tenants.Add(foreignTenant);
             await db.SaveChangesAsync();
-            db.Clients.Add(new Client(foreignTenant.Id, name, "0555 111 22 33"));
+            db.Clients.Add(new Client(foreignTenant.Id, name, DateTime.UtcNow, "0555 111 22 33"));
             await db.SaveChangesAsync();
             defaultTenantId = (await db.Tenants.AsNoTracking().SingleAsync(t => t.Name == DataSeeder.DefaultTenantName)).Id;
         }

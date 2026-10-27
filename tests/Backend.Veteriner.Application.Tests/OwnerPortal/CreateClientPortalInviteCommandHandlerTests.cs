@@ -19,7 +19,7 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
     private static readonly Guid UserId = Guid.NewGuid();
 
     private readonly OwnerPortalTestFixture _f = new();
-    private readonly Tenant _tenant = new("Kiracı");
+    private readonly Tenant _tenant = new("Kiracı", DateTime.UtcNow);
     private readonly Clinic _clinic;
     private readonly Client _client;
     private readonly Mock<ITenantContext> _tenantContext = new();
@@ -39,7 +39,7 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
     public CreateClientPortalInviteCommandHandlerTests()
     {
         _clinic = new Clinic(_tenant.Id, "Merkez Klinik", "İzmir");
-        _client = new Client(_tenant.Id, "Ayşe Yılmaz", email: "Ayse@Example.com");
+        _client = new Client(_tenant.Id, "Ayşe Yılmaz", DateTime.UtcNow, email: "Ayse@Example.com");
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenant.Id);
         _clientContext.SetupGet(c => c.UserId).Returns(UserId);
@@ -101,7 +101,7 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
     [Fact]
     public async Task Should_Not_Invite_Kvkk_Declined_Client()
     {
-        _client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, new DateOnly(2026, 10, 16), UserId, null, null);
+        _client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, new DateOnly(2026, 10, 16), UserId, null, null, DateTime.UtcNow);
 
         var result = await Handler().Handle(new CreateClientPortalInviteCommand(_client.Id, null), CancellationToken.None);
 

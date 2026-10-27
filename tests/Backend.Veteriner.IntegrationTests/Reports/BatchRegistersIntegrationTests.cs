@@ -507,7 +507,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tenant = new Tenant($"Bre-{Guid.NewGuid():N}"[..18]);
+            var tenant = new Tenant($"Bre-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
             var clinic = new Clinic(tenant.Id, $"Bre-{Guid.NewGuid():N}"[..14], "Izmir", address: "Klinik Adres 1");
@@ -562,13 +562,13 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         {
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             var email = $"bre-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenantId));
-            db.UserClinics.Add(new UserClinic(user.Id, clinicId));
+            db.UserTenants.Add(new UserTenant(user.Id, tenantId, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinicId, DateTime.UtcNow));
             await db.SaveChangesAsync();
             return (user.Id, email);
         }
@@ -630,7 +630,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var client = new Client(TenantId, name, $"90555{Interlocked.Increment(ref _phoneSeed):D7}");
+            var client = new Client(TenantId, name, DateTime.UtcNow, $"90555{Interlocked.Increment(ref _phoneSeed):D7}");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;
@@ -670,7 +670,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var product = new Product(
-                TenantId, name, unit, unitPrice, "TRY", kind: kind, controlledClass: controlled,
+                TenantId, name, unit, unitPrice, "TRY", DateTime.UtcNow, kind: kind, controlledClass: controlled,
                 pharmacologicalForm: pharmacologicalForm, presentationForm: presentationForm, packaging: packaging);
             db.Products.Add(product);
             await db.SaveChangesAsync();
@@ -692,7 +692,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = clinicId ?? ClinicId;
-            var movement = new StockMovement(TenantId, clinic, productId, type, quantity, occurredAtUtc, createdByUserId: UserId);
+            var movement = new StockMovement(TenantId, clinic, productId, type, quantity, occurredAtUtc, DateTime.UtcNow, createdByUserId: UserId);
             StockBatch? batch = null;
             if (details is not null)
             {
@@ -719,6 +719,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var movement = new StockMovement(
                 TenantId, ClinicId, productId, StockMovementType.Out, quantity, occurredAtUtc,
+                DateTime.UtcNow,
                 reason: reason, referenceType: referenceType, referenceId: referenceId, createdByUserId: UserId);
             if (batchId is { } id)
             {
@@ -738,7 +739,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var original = await db.StockMovements.SingleAsync(m => m.Id == movementId);
-            var reversal = original.CreateReversal(reason, null, occurredAtUtc, UserId, null);
+            var reversal = original.CreateReversal(reason, null, occurredAtUtc, UserId, null, DateTime.UtcNow);
             if (original.BatchId is { } id)
             {
                 var batch = await db.StockBatches.SingleAsync(b => b.Id == id);
@@ -770,6 +771,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
 
             var movement = new StockMovement(
                 TenantId, ClinicId, productId, StockMovementType.Adjustment, quantity, occurredAtUtc,
+                DateTime.UtcNow,
                 reason: "Sayim", createdByUserId: UserId);
             if (batch is not null)
                 movement.LinkBatch(batch);
@@ -797,7 +799,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             {
                 var visit = new Visit(TenantId, clinicId ?? ClinicId, petId, null, vetId, UserId, administeredAtUtc);
                 var examination = new Examination(
-                    TenantId, clinicId ?? ClinicId, petId, null, administeredAtUtc, "Muayene", null, null, null, visitId: visit.Id);
+                    TenantId, clinicId ?? ClinicId, petId, null, administeredAtUtc, "Muayene", null, null, null, DateTime.UtcNow, visitId: visit.Id);
                 db.Visits.Add(visit);
                 db.Examinations.Add(examination);
                 examinationId = examination.Id;

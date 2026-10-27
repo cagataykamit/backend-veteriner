@@ -35,6 +35,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
     private readonly IUserTenantRepository _userTenants;
     private readonly SessionOptions _sessionOpt;
     private readonly ILogger<LoginCommandHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public LoginCommandHandler(
         IUserReadRepository users,
@@ -48,6 +49,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
         IOptions<SessionOptions> sessionOpt,
+        TimeProvider timeProvider,
         ILogger<LoginCommandHandler>? logger = null)
     {
         _users = users;
@@ -62,6 +64,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         _userTenants = userTenants;
         _sessionOpt = sessionOpt.Value;
         _logger = logger ?? NullLogger<LoginCommandHandler>.Instance;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<LoginResultDto>> Handle(LoginCommand request, CancellationToken ct)
@@ -228,12 +231,14 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
 
         var refreshHash = _tokenHash.ComputeSha256(refreshRaw);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var rt = new Backend.Veteriner.Domain.Users.RefreshToken(
             loginUser.Id,
             refreshHash,
             DateTime.UtcNow.AddDays(_jwtOpt.RefreshTokenDays),
             _client.IpAddress,
             _client.UserAgent,
+            utcNow,
             tenantId,
             clinicId: null);
 

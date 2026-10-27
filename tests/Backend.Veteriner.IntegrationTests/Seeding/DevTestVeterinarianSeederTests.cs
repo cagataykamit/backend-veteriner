@@ -53,7 +53,7 @@ public sealed class DevTestVeterinarianSeederTests
         await DataSeeder.SeedAsync(db, hasher);
         await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
 
-        var tenant = new Tenant(DevTestVeterinarianSeeder.TenantName);
+        var tenant = new Tenant(DevTestVeterinarianSeeder.TenantName, DateTime.UtcNow);
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
         var clinic = new Clinic(tenant.Id, DevTestVeterinarianSeeder.ClinicName, "Izmir");

@@ -103,7 +103,7 @@ public sealed class GetPetOpenItemsQueryHandlerTests
     private Vaccination AddVaccination(VaccinationStatus status, DateTime? due, Guid? petId = null)
     {
         var v = new Vaccination(_tenantId, petId ?? _pet.Id, _clinicId, null, Guid.NewGuid(), "Karma", status,
-            status == VaccinationStatus.Applied ? Now.AddDays(-1) : null, due, null);
+            status == VaccinationStatus.Applied ? Now.AddDays(-1) : null, due, null, DateTime.UtcNow);
         _vaccinations.Add(v);
         return v;
     }
@@ -111,15 +111,15 @@ public sealed class GetPetOpenItemsQueryHandlerTests
     private LabResult AddLab(bool resulted, string? interpretation = null, string name = "Hemogram")
     {
         var l = new LabResult(_tenantId, _clinicId, _pet.Id, null, null, null,
-            resulted ? Now.AddDays(-1) : null, name, resulted ? "Normal" : null, interpretation, null);
+            resulted ? Now.AddDays(-1) : null, name, resulted ? "Normal" : null, interpretation, null, DateTime.UtcNow);
         _labs.Add(l);
         return l;
     }
 
     private void AddSuggestion(decimal unitPrice, string currency, decimal quantity)
     {
-        var exam = new Examination(_tenantId, _clinicId, _pet.Id, null, Now.AddHours(-1), "Kontrol", null, null, null);
-        var product = new Product(_tenantId, "Pansuman", "Adet", unitPrice, currency, kind: ProductKind.Service);
+        var exam = new Examination(_tenantId, _clinicId, _pet.Id, null, Now.AddHours(-1), "Kontrol", null, null, null, DateTime.UtcNow);
+        var product = new Product(_tenantId, "Pansuman", "Adet", unitPrice, currency, DateTime.UtcNow, kind: ProductKind.Service);
         _suggestions.Add(ChargeSuggestion.ForExaminationService(exam, product, quantity, Now).Value!);
     }
 
@@ -234,7 +234,7 @@ public sealed class GetPetOpenItemsQueryHandlerTests
         var requested = Enumerable.Range(0, 12).Select(i => AddLab(resulted: false, name: $"Test {i}")).ToList();
         var awaitingInterpretation = AddLab(resulted: true);
         AddLab(resulted: true, interpretation: "Normal sınırlarda");
-        AddLab(resulted: false).Cancel(Guid.NewGuid(), "Yanlış kayıt girildi");
+        AddLab(resulted: false).Cancel(Guid.NewGuid(), "Yanlış kayıt girildi", DateTime.UtcNow);
 
         var result = await Run(CreateHandler());
 
@@ -346,7 +346,7 @@ public sealed class GetPetOpenItemsQueryHandlerTests
     {
         var otherClinic = Guid.NewGuid();
         _vaccinations.Add(new Vaccination(_tenantId, _pet.Id, otherClinic, null, Guid.NewGuid(), "Kuduz",
-            VaccinationStatus.Scheduled, null, Now.AddDays(-1), null));
+            VaccinationStatus.Scheduled, null, Now.AddDays(-1), null, DateTime.UtcNow));
         _charges.Add(Charge.Create(_tenantId, otherClinic, _pet.ClientId, _pet.Id, null, null, "Baska", 1, 100m,
             Guid.NewGuid(), Now, null).Value!);
         AddLab(resulted: false);

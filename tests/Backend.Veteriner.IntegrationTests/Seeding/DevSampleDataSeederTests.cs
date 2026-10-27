@@ -48,14 +48,14 @@ public sealed class DevSampleDataSeederTests
         if (!withTenant)
             return db;
 
-        var tenant = new Tenant(DevSampleDataSeeder.TenantName);
+        var tenant = new Tenant(DevSampleDataSeeder.TenantName, DateTime.UtcNow);
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
         db.Clinics.Add(new Clinic(tenant.Id, DevSampleDataSeeder.ClinicName, "Izmir"));
-        var user = new User("sample-owner@example.com", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy");
+        var user = new User("sample-owner@example.com", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
         return db;
     }

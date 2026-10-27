@@ -6,10 +6,12 @@ namespace Backend.Veteriner.Domain.Tests.Clients;
 /// <summary>ADR-036 Dilim 1: müşteri fatura kimliği kuralları (<see cref="Client.ApplyInvoicingIdentity"/>).</summary>
 public sealed class ClientInvoicingIdentityTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private const string Tckn = "10000000146";
     private const string Vkn = "1234567890";
 
-    private static Client NewClient() => new(Guid.NewGuid(), "Ayşe Yılmaz");
+    private static Client NewClient() => new(Guid.NewGuid(), "Ayşe Yılmaz", Now);
 
     [Fact]
     public void Individual_With_Valid_Tckn_And_Address_Should_Be_Stored_Trimmed()
@@ -17,7 +19,7 @@ public sealed class ClientInvoicingIdentityTests
         var client = NewClient();
 
         var result = client.ApplyInvoicingIdentity(
-            ClientPersonType.Individual, $" {Tckn} ", null, " ", null, " İstanbul ", "Kadıköy", " Moda Cad. 1 ");
+            ClientPersonType.Individual, $" {Tckn} ", null, " ", null, " İstanbul ", "Kadıköy", " Moda Cad. 1 ", Now);
 
         result.IsSuccess.Should().BeTrue();
         client.PersonType.Should().Be(ClientPersonType.Individual);
@@ -35,7 +37,7 @@ public sealed class ClientInvoicingIdentityTests
         var client = NewClient();
 
         var result = client.ApplyInvoicingIdentity(
-            ClientPersonType.Corporate, null, Vkn, "Kadıköy VD", "Örnek Ltd. Şti.", null, null, null);
+            ClientPersonType.Corporate, null, Vkn, "Kadıköy VD", "Örnek Ltd. Şti.", null, null, null, Now);
 
         result.IsSuccess.Should().BeTrue();
         client.TaxNumber.Should().Be(Vkn);
@@ -50,7 +52,7 @@ public sealed class ClientInvoicingIdentityTests
         var client = NewClient();
 
         var result = client.ApplyInvoicingIdentity(
-            ClientPersonType.Corporate, null, $" {Tckn} ", "Kadıköy VD", "Ayşe Yılmaz Veteriner Kliniği", null, null, null);
+            ClientPersonType.Corporate, null, $" {Tckn} ", "Kadıköy VD", "Ayşe Yılmaz Veteriner Kliniği", null, null, null, Now);
 
         result.IsSuccess.Should().BeTrue();
         client.TaxNumber.Should().Be(Tckn);
@@ -61,9 +63,9 @@ public sealed class ClientInvoicingIdentityTests
     public void All_Fields_Optional_Including_Empty_Identity()
     {
         var client = NewClient();
-        client.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, "İzmir", null, null);
+        client.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, "İzmir", null, null, Now);
 
-        var cleared = client.ApplyInvoicingIdentity(null, null, null, null, null, null, null, null);
+        var cleared = client.ApplyInvoicingIdentity(null, null, null, null, null, null, null, null, Now);
 
         cleared.IsSuccess.Should().BeTrue();
         client.PersonType.Should().BeNull();
@@ -73,7 +75,7 @@ public sealed class ClientInvoicingIdentityTests
 
     [Fact]
     public void Address_Without_Person_Type_Should_Be_Allowed()
-        => NewClient().ApplyInvoicingIdentity(null, null, null, null, null, "Ankara", "Çankaya", null)
+        => NewClient().ApplyInvoicingIdentity(null, null, null, null, null, "Ankara", "Çankaya", null, Now)
             .IsSuccess.Should().BeTrue();
 
     [Theory]
@@ -94,7 +96,7 @@ public sealed class ClientInvoicingIdentityTests
     {
         var client = NewClient();
 
-        var result = client.ApplyInvoicingIdentity(type, tckn, vkn, office, legalName, null, null, null);
+        var result = client.ApplyInvoicingIdentity(type, tckn, vkn, office, legalName, null, null, null, Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Clients.Validation");
@@ -106,11 +108,11 @@ public sealed class ClientInvoicingIdentityTests
     [Fact]
     public void Too_Long_Field_Should_Be_Rejected()
         => NewClient().ApplyInvoicingIdentity(
-                ClientPersonType.Corporate, null, Vkn, new string('a', Client.MaxTaxOfficeLength + 1), null, null, null, null)
+                ClientPersonType.Corporate, null, Vkn, new string('a', Client.MaxTaxOfficeLength + 1), null, null, null, null, Now)
             .Error.Code.Should().Be("Clients.Validation");
 
     [Fact]
     public void Undefined_Person_Type_Should_Be_Rejected()
-        => NewClient().ApplyInvoicingIdentity((ClientPersonType)99, null, null, null, null, null, null, null)
+        => NewClient().ApplyInvoicingIdentity((ClientPersonType)99, null, null, null, null, null, null, null, Now)
             .IsSuccess.Should().BeFalse();
 }

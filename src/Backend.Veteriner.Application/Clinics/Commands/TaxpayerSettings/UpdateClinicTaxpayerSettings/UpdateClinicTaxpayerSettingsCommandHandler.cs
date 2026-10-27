@@ -19,6 +19,7 @@ public sealed class UpdateClinicTaxpayerSettingsCommandHandler
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IRepository<ClinicTaxpayerSettings> _settings;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateClinicTaxpayerSettingsCommandHandler(
         ITenantContext tenantContext,
@@ -27,7 +28,8 @@ public sealed class UpdateClinicTaxpayerSettingsCommandHandler
         IClinicAssignmentAccessGuard assignmentGuard,
         IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinics,
-        IRepository<ClinicTaxpayerSettings> settings)
+        IRepository<ClinicTaxpayerSettings> settings,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
@@ -36,6 +38,7 @@ public sealed class UpdateClinicTaxpayerSettingsCommandHandler
         _userClinics = userClinics;
         _clinics = clinics;
         _settings = settings;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ClinicTaxpayerSettingsDto>> Handle(
@@ -78,6 +81,7 @@ public sealed class UpdateClinicTaxpayerSettingsCommandHandler
         var vatRate = request.DefaultVatRate ?? TaxRatePercent.DefaultVatRate;
         var existing = await _settings.FirstOrDefaultAsync(new ClinicTaxpayerSettingsByClinicSpec(tenantId, clinic.Id), ct);
         ClinicTaxpayerSettings row;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (existing is null)
         {
             var created = ClinicTaxpayerSettings.Create(
@@ -92,7 +96,8 @@ public sealed class UpdateClinicTaxpayerSettingsCommandHandler
                 request.AddressLine,
                 vatRate,
                 request.WithholdingRate,
-                userId);
+                userId,
+                utcNow);
             if (!created.IsSuccess)
                 return Result<ClinicTaxpayerSettingsDto>.Failure(created.Error);
             row = created.Value!;
@@ -109,7 +114,8 @@ public sealed class UpdateClinicTaxpayerSettingsCommandHandler
                 request.AddressLine,
                 vatRate,
                 request.WithholdingRate,
-                userId);
+                userId,
+                utcNow);
             if (!updated.IsSuccess)
                 return Result<ClinicTaxpayerSettingsDto>.Failure(updated.Error);
             row = existing;

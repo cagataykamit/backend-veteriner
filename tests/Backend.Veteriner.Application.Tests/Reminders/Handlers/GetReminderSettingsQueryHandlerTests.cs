@@ -13,7 +13,7 @@ public sealed class GetReminderSettingsQueryHandlerTests
     private readonly Mock<IReadRepository<TenantReminderSettings>> _settingsRead = new();
 
     private GetReminderSettingsQueryHandler CreateHandler()
-        => new(_tenant.Object, _settingsRead.Object);
+        => new(_tenant.Object, _settingsRead.Object, TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_ReturnDefault_When_RecordMissing()

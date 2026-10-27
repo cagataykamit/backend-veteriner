@@ -136,9 +136,9 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"Vac-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Vac-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var client = new Client(tenant.Id, "Müşteri", "905551112200", "vac@example.com");
+        var client = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551112200", "vac@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, "PetVac", speciesId);
 
@@ -158,7 +158,8 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             VaccinationStatus.Scheduled,
             null,
             now.AddDays(-10),
-            null);
+            null,
+            DateTime.UtcNow);
 
         var future = new Vaccination(
             tenant.Id,
@@ -170,7 +171,8 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             VaccinationStatus.Scheduled,
             null,
             now.AddDays(30),
-            null);
+            null,
+            DateTime.UtcNow);
 
         var nullDue = new Vaccination(
             tenant.Id,
@@ -182,7 +184,8 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             VaccinationStatus.Scheduled,
             null,
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
         var appliedPast = new Vaccination(
             tenant.Id,
@@ -194,7 +197,8 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             VaccinationStatus.Applied,
             now.AddDays(-20),
             now.AddDays(-5),
-            null);
+            null,
+            DateTime.UtcNow);
 
         var cancelledPast = new Vaccination(
             tenant.Id,
@@ -206,7 +210,8 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             VaccinationStatus.Cancelled,
             null,
             now.AddDays(-8),
-            null);
+            null,
+            DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, overdue, future, nullDue, appliedPast, cancelledPast);
 
@@ -226,7 +231,8 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
                 VaccinationStatus.Scheduled,
                 null,
                 now.AddDays(5),
-                null);
+                null,
+                DateTime.UtcNow);
             db.AddRange(deceasedPet, deceasedScheduled);
             deceasedPetScheduledId = deceasedScheduled.Id;
         }

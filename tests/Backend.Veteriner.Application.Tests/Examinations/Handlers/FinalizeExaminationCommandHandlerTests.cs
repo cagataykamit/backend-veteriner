@@ -33,7 +33,7 @@ public sealed class FinalizeExaminationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _clientContext.SetupGet(c => c.UserId).Returns(_userId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
     }
 
     private FinalizeExaminationCommandHandler CreateHandler()
@@ -49,7 +49,7 @@ public sealed class FinalizeExaminationCommandHandlerTests
 
     private Examination ReturnDraft()
     {
-        var e = new Examination(_tenantId, _clinicId, Guid.NewGuid(), null, Now.AddHours(-1), "Sikayet", "Bulgu", null, null);
+        var e = new Examination(_tenantId, _clinicId, Guid.NewGuid(), null, Now.AddHours(-1), "Sikayet", "Bulgu", null, null, DateTime.UtcNow);
         ExaminationTestSupport.SetRowVersion(e);
         _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(e);
@@ -139,7 +139,7 @@ public sealed class FinalizeExaminationCommandHandlerTests
     [Fact]
     public async Task Handle_Should_Fail_When_Tenant_Inactive()
     {
-        var tenant = new Tenant("A");
+        var tenant = new Tenant("A", DateTime.UtcNow);
         tenant.Deactivate();
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);

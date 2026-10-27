@@ -62,7 +62,8 @@ public sealed class ClinicTaxpayerSettings
         string? addressLine,
         decimal defaultVatRate,
         decimal? withholdingRate,
-        Guid userId)
+        Guid userId,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -73,7 +74,7 @@ public sealed class ClinicTaxpayerSettings
         {
             TenantId = tenantId,
             ClinicId = clinicId,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = utcNow,
         };
         var applied = row.Apply(
             taxpayerType, taxIdentityNumber, taxOffice, taxpayerName, province, district, addressLine,
@@ -93,13 +94,14 @@ public sealed class ClinicTaxpayerSettings
         string? addressLine,
         decimal defaultVatRate,
         decimal? withholdingRate,
-        Guid userId)
+        Guid userId,
+        DateTime utcNow)
     {
         var applied = Apply(
             taxpayerType, taxIdentityNumber, taxOffice, taxpayerName, province, district, addressLine,
             defaultVatRate, withholdingRate, userId);
         if (applied.IsSuccess)
-            UpdatedAtUtc = DateTime.UtcNow;
+            UpdatedAtUtc = utcNow;
         return applied;
     }
 

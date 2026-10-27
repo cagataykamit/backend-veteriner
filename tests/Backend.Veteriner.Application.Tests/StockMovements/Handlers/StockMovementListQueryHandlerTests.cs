@@ -158,7 +158,7 @@ public sealed class StockMovementListQueryHandlerTests
         var tid = Guid.NewGuid();
         var clinicId = Guid.NewGuid();
         var occurred = DateTime.UtcNow.AddHours(-2);
-        var product = new Product(tid, "Asi", "Adet", 100m, "TRY");
+        var product = new Product(tid, "Asi", "Adet", 100m, "TRY", DateTime.UtcNow);
         typeof(Product).GetProperty(nameof(Product.Category))!.SetValue(product, null);
 
         var movement = new StockMovement(
@@ -170,7 +170,8 @@ public sealed class StockMovementListQueryHandlerTests
             occurredAtUtc: occurred,
             unitCost: 50m,
             reason: "Alim",
-            notes: "lot-a");
+            notes: "lot-a",
+            utcNow: DateTime.UtcNow);
 
         typeof(StockMovement).GetProperty(nameof(StockMovement.Product))!.SetValue(movement, product);
 

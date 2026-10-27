@@ -26,6 +26,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
     private readonly IUserTenantRepository _userTenants;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly ILogger<RefreshCommandHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public RefreshCommandHandler(
         IRefreshTokenRepository refreshRepo,
@@ -36,6 +37,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
         IReadRepository<Clinic> clinics,
+        TimeProvider timeProvider,
         ILogger<RefreshCommandHandler>? logger = null)
     {
         _refreshRepo = refreshRepo;
@@ -47,6 +49,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         _userTenants = userTenants;
         _clinics = clinics;
         _logger = logger ?? NullLogger<RefreshCommandHandler>.Instance;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<LoginResultDto>> Handle(RefreshCommand request, CancellationToken ct)
@@ -119,7 +122,8 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
                 "Oturum kiracı bilgisi eksik; lütfen yeniden giriş yapın.");
         }
 
-        stored.MarkUsed();
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        stored.MarkUsed(utcNow);
 
         var permissionCodes = await _permissionReader.GetPermissionsAsync(user.Id, principal: null, ct)
                               ?? Array.Empty<string>();
@@ -176,7 +180,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         var (access, newRefreshRaw, accessExp) = _jwt.Create(user, extraClaims);
 
         var newHash = _hash.ComputeSha256(newRefreshRaw);
-        stored.ReplaceWith(newHash);
+        stored.ReplaceWith(newHash, utcNow);
 
         var newRefresh = new Backend.Veteriner.Domain.Users.RefreshToken(
             user.Id,
@@ -184,10 +188,11 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
             DateTime.UtcNow.AddDays(_opt.RefreshTokenDays),
             null,
             null,
+            utcNow,
             sessionTenantId,
             stored.ClinicId);
 
-        user.AddRefreshToken(newRefresh);
+        user.AddRefreshToken(newRefresh, utcNow);
         await _refreshRepo.AddAsync(newRefresh, ct);
         await _refreshRepo.SaveChangesAsync(ct);
 

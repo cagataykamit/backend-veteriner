@@ -35,7 +35,8 @@ public sealed class UpdateExaminationCommandHandlerTests
             _tenants.Object,
             _clinics.Object,
             _pets.Object,
-            _examinationsWrite.Object);
+            _examinationsWrite.Object,
+            TimeProvider.System);
 
     private static UpdateExaminationCommand BuildCommand(
         Guid id,
@@ -64,7 +65,7 @@ public sealed class UpdateExaminationCommandHandlerTests
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         _examinationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Examination?)null);
@@ -82,7 +83,7 @@ public sealed class UpdateExaminationCommandHandlerTests
         var eid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var cmd = new UpdateExaminationCommand(
             eid, null, null, null, DateTime.UtcNow, "Sikayet", string.Empty, null, null, null);
@@ -103,9 +104,9 @@ public sealed class UpdateExaminationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
-        var existing = new Examination(tid, cid, pid, aid, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        var existing = new Examination(tid, cid, pid, aid, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
         ExaminationTestSupport.SetRowVersion(existing);
 
@@ -137,9 +138,9 @@ public sealed class UpdateExaminationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
-        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
         ExaminationTestSupport.SetRowVersion(existing);
         existing.Finalize(Guid.NewGuid(), DateTime.UtcNow);
@@ -169,9 +170,9 @@ public sealed class UpdateExaminationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
-        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
         ExaminationTestSupport.SetRowVersion(existing);
 
@@ -196,9 +197,9 @@ public sealed class UpdateExaminationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
-        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
         ExaminationTestSupport.SetRowVersion(existing);
 
@@ -222,10 +223,11 @@ public sealed class UpdateExaminationCommandHandlerTests
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = new Examination(
             tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Bulgu", "Degerlendirme", "Not",
+            DateTime.UtcNow,
             anamnesis: "Hikaye", plan: "Plan",
             weightKg: 4.25m, temperatureC: 38.6m, heartRateBpm: 120, respiratoryRatePerMin: 30);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
@@ -334,9 +336,9 @@ public sealed class UpdateExaminationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
-        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
         ExaminationTestSupport.SetRowVersion(existing);
 
@@ -362,9 +364,9 @@ public sealed class UpdateExaminationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
-        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
         ExaminationTestSupport.SetRowVersion(existing);
 
@@ -393,9 +395,9 @@ public sealed class UpdateExaminationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
-        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null);
+        var existing = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Old", "Old", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(existing, eid);
         ExaminationTestSupport.SetRowVersion(existing);
 

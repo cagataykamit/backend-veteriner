@@ -50,7 +50,7 @@ public sealed class CareInstructionHandlersTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(_clinicId);
         _clientContext.SetupGet(c => c.UserId).Returns(_userId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(_tenantId, "K", "İstanbul"));
         var pet = new Pet(_tenantId, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null);
@@ -75,7 +75,8 @@ public sealed class CareInstructionHandlersTests
             _hospitalizations.Object,
             _examinations.Object,
             _visits.Object,
-            _write.Object);
+            _write.Object,
+            TimeProvider.System);
 
     private CreateCareInstructionCommand Cmd(Guid? hospitalizationId = null, Guid? examinationId = null, Guid? visitId = null)
         => new(_clinicId, _petId, hospitalizationId, examinationId, visitId, "Günde iki kez su verin");
@@ -83,7 +84,7 @@ public sealed class CareInstructionHandlersTests
     private Hospitalization Stay(Guid? examinationId = null, Guid? visitId = null, Guid? petId = null, Guid? clinicId = null)
     {
         var h = new Hospitalization(
-            _tenantId, clinicId ?? _clinicId, petId ?? _petId, examinationId, DateTime.UtcNow.AddHours(-2), null, "Gözlem", null, visitId);
+            _tenantId, clinicId ?? _clinicId, petId ?? _petId, examinationId, DateTime.UtcNow.AddHours(-2), null, "Gözlem", null, DateTime.UtcNow, visitId);
         _hospitalizations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(h);
         return h;
@@ -91,7 +92,7 @@ public sealed class CareInstructionHandlersTests
 
     private Examination Exam(Guid id, Guid? visitId = null, bool finalized = false)
     {
-        var e = new Examination(_tenantId, _clinicId, _petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var e = new Examination(_tenantId, _clinicId, _petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(e, id);
         typeof(Examination).GetProperty(nameof(Examination.VisitId))!.SetValue(e, visitId);
         if (finalized)
@@ -161,7 +162,7 @@ public sealed class CareInstructionHandlersTests
     public async Task Create_Should_Be_Allowed_For_Discharged_Hospitalization()
     {
         var stay = Stay();
-        stay.Discharge(DateTime.UtcNow, null).IsSuccess.Should().BeTrue();
+        stay.Discharge(DateTime.UtcNow, null, DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         var result = await CreateHandler().Handle(Cmd(hospitalizationId: stay.Id), CancellationToken.None);
 
@@ -271,11 +272,12 @@ public sealed class CareInstructionHandlersTests
             _clientContext.Object,
             _scopeResolver.Object,
             _tenants.Object,
-            _write.Object);
+            _write.Object,
+            TimeProvider.System);
 
     private CareInstruction Existing()
     {
-        var c = new CareInstruction(_tenantId, _clinicId, _petId, null, null, null, Guid.NewGuid(), "Eski");
+        var c = new CareInstruction(_tenantId, _clinicId, _petId, null, null, null, Guid.NewGuid(), "Eski", DateTime.UtcNow);
         _write.Setup(r => r.FirstOrDefaultAsync(It.IsAny<CareInstructionForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(c);
         return c;
@@ -330,7 +332,7 @@ public sealed class CareInstructionHandlersTests
     [Fact]
     public async Task Update_Should_Return_NotFound_When_Instruction_Is_In_Another_Clinic()
     {
-        var other = new CareInstruction(_tenantId, Guid.NewGuid(), _petId, null, null, null, Guid.NewGuid(), "Eski");
+        var other = new CareInstruction(_tenantId, Guid.NewGuid(), _petId, null, null, null, Guid.NewGuid(), "Eski", DateTime.UtcNow);
         _write.Setup(r => r.FirstOrDefaultAsync(It.IsAny<CareInstructionForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(other);
 
@@ -345,7 +347,7 @@ public sealed class CareInstructionHandlersTests
     [Fact]
     public async Task GetById_Should_Hide_Instruction_Of_Unassigned_Clinic()
     {
-        var c = new CareInstruction(_tenantId, _clinicId, _petId, null, null, null, Guid.NewGuid(), "Metin");
+        var c = new CareInstruction(_tenantId, _clinicId, _petId, null, null, null, Guid.NewGuid(), "Metin", DateTime.UtcNow);
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<CareInstructionByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(c);
         var denied = ClinicReadScopeResolverMock.ForClinicAdmin([Guid.NewGuid()]);
@@ -361,7 +363,7 @@ public sealed class CareInstructionHandlersTests
     [Fact]
     public async Task GetById_Should_Return_Dto_With_RowVersion()
     {
-        var c = new CareInstruction(_tenantId, _clinicId, _petId, null, null, null, Guid.NewGuid(), "Metin");
+        var c = new CareInstruction(_tenantId, _clinicId, _petId, null, null, null, Guid.NewGuid(), "Metin", DateTime.UtcNow);
         c.SetExpectedRowVersion(Enumerable.Repeat((byte)9, 8).ToArray());
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<CareInstructionByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(c);

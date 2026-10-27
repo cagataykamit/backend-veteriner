@@ -65,7 +65,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var manual = new Client(ctx.TenantId, ctx.CustomerName, "905321234567", email: null, address: null);
+            var manual = new Client(ctx.TenantId, ctx.CustomerName, DateTime.UtcNow, "905321234567", email: null, address: null);
             db.Clients.Add(manual);
             await db.SaveChangesAsync();
             manualId = manual.Id;
@@ -167,7 +167,7 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
             db.Visits.Add(visit);
             var m2Id = targets[(ImportTable.Customers, 3)];
             var m2 = await db.Clients.SingleAsync(c => c.Id == m2Id);
-            m2.UpdateDetails(m2.FullName, "veli@example.com", null, null);
+            m2.UpdateDetails(m2.FullName, "veli@example.com", null, null, DateTime.UtcNow);
             await db.SaveChangesAsync();
             visitId = visit.Id;
         }
@@ -752,13 +752,13 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
 
-        var tenant = new Tenant($"imr-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"imr-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Imr-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
         var species = new Species($"IMR{suffix}", $"Imr Tür {suffix}");
-        var vaccine = VaccineDefinition.CreateTenant(tenant.Id, $"IMRV{suffix}", $"Imr Aşı {suffix}");
+        var vaccine = VaccineDefinition.CreateTenant(tenant.Id, $"IMRV{suffix}", $"Imr Aşı {suffix}", DateTime.UtcNow);
         db.Species.Add(species);
         db.VaccineDefinitions.Add(vaccine);
         await db.SaveChangesAsync();

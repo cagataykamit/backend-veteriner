@@ -133,7 +133,8 @@ public sealed class CreateStockMovementCommandHandler
                 "Hizmet kalemi için stok hareketi oluşturulamaz.");
         }
 
-        var occurredAtUtc = request.OccurredAtUtc ?? _timeProvider.GetUtcNow().UtcDateTime;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var occurredAtUtc = request.OccurredAtUtc ?? utcNow;
         var createdBy = _clientContext.UserId;
         var referenceId = request.ReferenceId is { } rid && rid != Guid.Empty ? rid : (Guid?)null;
         var referenceType = string.IsNullOrWhiteSpace(request.ReferenceType) ? null : request.ReferenceType.Trim();
@@ -170,12 +171,12 @@ public sealed class CreateStockMovementCommandHandler
                         "Bu ürün için bu klinikte stok satırı zaten var; Initial kullanılamaz.");
                 }
 
-                var initialBatch = CreateEntryBatch(tenantId, request, product, createdBy, Today(), _timeProvider.GetUtcNow().UtcDateTime);
+                var initialBatch = CreateEntryBatch(tenantId, request, product, createdBy, OperationDayBounds.ToLocalDate(utcNow), utcNow);
                 if (!initialBatch.IsSuccess)
                     return Result<StockMovementCreateResult>.Failure(initialBatch.Error);
 
                 batch = initialBatch.Value;
-                newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
+                newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0, utcNow);
                 movement = CreateMovementEntity(
                     tenantId,
                     request,
@@ -183,19 +184,20 @@ public sealed class CreateStockMovementCommandHandler
                     createdBy,
                     referenceId,
                     StockMovementType.Initial,
-                    request.Quantity);
+                    request.Quantity,
+                    utcNow);
                 break;
 
             case StockMovementType.In:
-                var entryBatch = CreateEntryBatch(tenantId, request, product, createdBy, Today(), _timeProvider.GetUtcNow().UtcDateTime);
+                var entryBatch = CreateEntryBatch(tenantId, request, product, createdBy, OperationDayBounds.ToLocalDate(utcNow), utcNow);
                 if (!entryBatch.IsSuccess)
                     return Result<StockMovementCreateResult>.Failure(entryBatch.Error);
 
                 batch = entryBatch.Value;
                 if (stock is null)
-                    newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0);
+                    newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, request.Quantity, 0, utcNow);
                 else
-                    changeExistingRows = () => stock.IncreaseQuantity(request.Quantity);
+                    changeExistingRows = () => stock.IncreaseQuantity(request.Quantity, utcNow);
 
                 movement = CreateMovementEntity(
                     tenantId,
@@ -204,7 +206,8 @@ public sealed class CreateStockMovementCommandHandler
                     createdBy,
                     referenceId,
                     StockMovementType.In,
-                    request.Quantity);
+                    request.Quantity,
+                    utcNow);
                 break;
 
             case StockMovementType.Out:
@@ -237,7 +240,7 @@ public sealed class CreateStockMovementCommandHandler
                 changeExistingRows = () =>
                 {
                     consumedBatch?.Decrease(request.Quantity);
-                    stock.DecreaseQuantity(request.Quantity);
+                    stock.DecreaseQuantity(request.Quantity, utcNow);
                 };
                 movement = CreateMovementEntity(
                     tenantId,
@@ -246,7 +249,8 @@ public sealed class CreateStockMovementCommandHandler
                     createdBy,
                     referenceId,
                     StockMovementType.Out,
-                    request.Quantity);
+                    request.Quantity,
+                    utcNow);
                 break;
 
             case StockMovementType.Adjustment:
@@ -283,7 +287,7 @@ public sealed class CreateStockMovementCommandHandler
                     changeExistingRows = () =>
                     {
                         countedBatch.SetRemaining(targetQty);
-                        countedStock.SetAbsoluteQuantity(countedStock.QuantityOnHand + delta);
+                        countedStock.SetAbsoluteQuantity(countedStock.QuantityOnHand + delta, utcNow);
                     };
                 }
                 else
@@ -298,9 +302,9 @@ public sealed class CreateStockMovementCommandHandler
                     }
 
                     if (stock is null)
-                        newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, targetQty, 0);
+                        newStock = new ProductStock(tenantId, request.ClinicId, request.ProductId, targetQty, 0, utcNow);
                     else
-                        changeExistingRows = () => stock.SetAbsoluteQuantity(targetQty);
+                        changeExistingRows = () => stock.SetAbsoluteQuantity(targetQty, utcNow);
                 }
 
                 movement = CreateMovementEntity(
@@ -310,7 +314,8 @@ public sealed class CreateStockMovementCommandHandler
                     createdBy,
                     referenceId,
                     StockMovementType.Adjustment,
-                    Math.Abs(delta));
+                    Math.Abs(delta),
+                    utcNow);
                 break;
 
             default:
@@ -385,8 +390,6 @@ public sealed class CreateStockMovementCommandHandler
         return Result<StockMovementCreateResult>.Success(
             new StockMovementCreateResult(movement.ToDto(product, categoryName, clinic.Name), true));
     }
-
-    private DateOnly Today() => OperationDayBounds.ToLocalDate(_timeProvider.GetUtcNow().UtcDateTime);
 
     private async Task<bool> StockRowExistsAsync(Guid tenantId, Guid clinicId, Guid productId, CancellationToken ct)
         => await _productStocksWrite.FirstOrDefaultAsync(
@@ -466,7 +469,8 @@ public sealed class CreateStockMovementCommandHandler
         Guid? createdByUserId,
         Guid? referenceId,
         StockMovementType type,
-        decimal movementQuantity)
+        decimal movementQuantity,
+        DateTime utcNow)
         => new(
             tenantId,
             request.ClinicId,
@@ -474,6 +478,7 @@ public sealed class CreateStockMovementCommandHandler
             type,
             movementQuantity,
             occurredAtUtc,
+            utcNow,
             request.UnitCost,
             request.Reason,
             request.ReferenceType,

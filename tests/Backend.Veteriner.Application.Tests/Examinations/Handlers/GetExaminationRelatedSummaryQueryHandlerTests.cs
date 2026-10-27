@@ -94,7 +94,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             "Neden",
             "Bulgu",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         if (examinationId.HasValue)
             typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(entity, examinationId.Value);
         return entity;
@@ -127,7 +128,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
             "Tedavi",
             "Açıklama",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         var clinic = new Clinic(tenantId, "Klinik", "Şehir");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, clinicId);
 
@@ -253,7 +255,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
         SetupExaminationFound(BuildExamination(tid, clinicId, petId, examId));
         SetupSuccessGraph(tid, clinicId, petId, examId);
 
-        var product = new Product(tid, "Amoksisilin", "şişe", 10m, "TRY", sku: "SKU-1");
+        var product = new Product(tid, "Amoksisilin", "şişe", 10m, "TRY", DateTime.UtcNow, sku: "SKU-1");
         var late = Administration.Create(
             tid, clinicId, petId, examId, null, product.Id, 1.5m, DateTime.UtcNow, null,
             true, "Muayene sonrası uygulandı", Guid.NewGuid(), DateTime.UtcNow, null).Value!;
@@ -345,7 +347,7 @@ public sealed class GetExaminationRelatedSummaryQueryHandlerTests
         SetupSuccessGraph(tid, clinicId, petId, examId);
         var applied = new Vaccination(
             tid, petId, clinicId, examId, Guid.NewGuid(), "Kuduz",
-            VaccinationStatus.Applied, DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddYears(1), null);
+            VaccinationStatus.Applied, DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddYears(1), null, DateTime.UtcNow);
         _vaccinations.Setup(r => r.ListAsync(It.IsAny<VaccinationsForExaminationRelatedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Vaccination> { applied });
 

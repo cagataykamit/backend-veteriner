@@ -121,7 +121,8 @@ public sealed class VoidAdministrationCommandHandler
             return Fail("Administrations.Validation", "stockOutcome StockReturned veya WrittenOff olmalıdır.");
         }
 
-        var voided = administration.Void(userId, request.Reason, stockOutcome, _timeProvider.GetUtcNow().UtcDateTime);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var voided = administration.Void(userId, request.Reason, stockOutcome, utcNow);
         if (!voided.IsSuccess)
             return Result<AdministrationDto>.Failure(voided.Error);
 
@@ -131,11 +132,11 @@ public sealed class VoidAdministrationCommandHandler
         if (!stockStep.IsSuccess)
             return Result<AdministrationDto>.Failure(stockStep.Error);
 
-        var dropped = await DropChargeSuggestionAsync(administration, userId, ct);
+        var dropped = await DropChargeSuggestionAsync(administration, userId, utcNow, ct);
         if (!dropped.IsSuccess)
             return Result<AdministrationDto>.Failure(dropped.Error);
 
-        await CancelLinkedVaccinationAsync(administration, ct);
+        await CancelLinkedVaccinationAsync(administration, utcNow, ct);
         return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
     }
 
@@ -186,12 +187,12 @@ public sealed class VoidAdministrationCommandHandler
 
     // Bekleyen "ücret bekliyor" kalemi düşer (ADR-018). Ücreti kesilmiş/ücretsiz sayılmış kalem değişmez; kesilmiş ücret yönetici düzeltmesidir.
     // Eşzamanlı ücrete çevirme kazanırsa (RowVersion) iptal geri alınır; kullanıcı yeniden dener ve kalem artık çevrilmiş olur.
-    private async Task<Result> DropChargeSuggestionAsync(Administration administration, Guid userId, CancellationToken ct)
+    private async Task<Result> DropChargeSuggestionAsync(Administration administration, Guid userId, DateTime utcNow, CancellationToken ct)
     {
         var suggestion = await _chargeSuggestions.FirstOrDefaultAsync(
             new ChargeSuggestionBySourceForUpdateSpec(administration.TenantId, ChargeSuggestion.AdministrationSource, administration.Id),
             ct);
-        if (suggestion is null || !suggestion.CancelForVoidedSource(userId, _timeProvider.GetUtcNow().UtcDateTime))
+        if (suggestion is null || !suggestion.CancelForVoidedSource(userId, utcNow))
             return Result.Success();
 
         try
@@ -210,7 +211,7 @@ public sealed class VoidAdministrationCommandHandler
     }
 
     // Bağlı aşı kaydı uygulamanın parçasıdır: uygulama iptal edilince aşı kaydı da iptal olur (kesinleşmiş muayene kilidi uygulamaz, D3).
-    private async Task CancelLinkedVaccinationAsync(Administration administration, CancellationToken ct)
+    private async Task CancelLinkedVaccinationAsync(Administration administration, DateTime utcNow, CancellationToken ct)
     {
         if (administration.VaccinationId is not { } vaccinationId)
             return;
@@ -220,7 +221,7 @@ public sealed class VoidAdministrationCommandHandler
         if (vaccination is null)
             return;
 
-        vaccination.CancelForVoidedAdministration();
+        vaccination.CancelForVoidedAdministration(utcNow);
         await _vaccinations.UpdateAsync(vaccination, ct);
         await _vaccinations.SaveChangesAsync(ct);
     }

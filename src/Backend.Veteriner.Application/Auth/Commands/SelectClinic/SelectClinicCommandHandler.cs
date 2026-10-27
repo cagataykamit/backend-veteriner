@@ -29,6 +29,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IUserOperationClaimRepository _userOperationClaims;
     private readonly ILogger<SelectClinicCommandHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public SelectClinicCommandHandler(
         IRefreshTokenRepository refreshRepo,
@@ -41,6 +42,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinics,
         IUserOperationClaimRepository userOperationClaims,
+        TimeProvider timeProvider,
         ILogger<SelectClinicCommandHandler>? logger = null)
     {
         _refreshRepo = refreshRepo;
@@ -54,6 +56,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         _clinics = clinics;
         _userOperationClaims = userOperationClaims;
         _logger = logger ?? NullLogger<SelectClinicCommandHandler>.Instance;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<LoginResultDto>> Handle(SelectClinicCommand request, CancellationToken ct)
@@ -126,7 +129,8 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
                 "Oturum kiracı bilgisi eksik; lütfen yeniden giriş yapın.");
         }
 
-        stored.MarkUsed();
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        stored.MarkUsed(utcNow);
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(sessionTenantId), ct);
         MarkStep("tenantLookup");
@@ -204,7 +208,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
         MarkStep("jwtCreate");
 
         var newHash = _hash.ComputeSha256(newRefreshRaw);
-        stored.ReplaceWith(newHash);
+        stored.ReplaceWith(newHash, utcNow);
         stored.BindClinic(request.ClinicId);
 
         var newRefresh = new Backend.Veteriner.Domain.Users.RefreshToken(
@@ -213,10 +217,11 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
             DateTime.UtcNow.AddDays(_opt.RefreshTokenDays),
             null,
             null,
+            utcNow,
             sessionTenantId,
             request.ClinicId);
 
-        user.AddRefreshToken(newRefresh);
+        user.AddRefreshToken(newRefresh, utcNow);
         await _refreshRepo.AddAsync(newRefresh, ct);
         await _refreshRepo.SaveChangesAsync(ct);
         MarkStep("saveRefreshToken");

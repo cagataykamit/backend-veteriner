@@ -323,7 +323,7 @@ public sealed class AppointmentCommandOutboxIntegrationTests
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var clinic = await db.Clinics.SingleAsync(c =>
             c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
-        var client = new Client(tenant.Id, $"OutboxClient-{Guid.NewGuid():N}"[..14], "905551110066");
+        var client = new Client(tenant.Id, $"OutboxClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110066");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();

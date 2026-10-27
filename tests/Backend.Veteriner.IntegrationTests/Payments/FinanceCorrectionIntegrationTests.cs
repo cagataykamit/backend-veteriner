@@ -290,12 +290,12 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"fin-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             tenantId = tenant.Id;
@@ -373,7 +373,7 @@ public sealed class FinanceCorrectionIntegrationTests : IClassFixture<CustomWebA
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var client = new Client(TenantId, $"FClient-{Guid.NewGuid():N}"[..14], "905551110055");
+            var client = new Client(TenantId, $"FClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110055");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;

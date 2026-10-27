@@ -15,7 +15,7 @@ public sealed class ExaminationsListVisitFilterTests
     private Examination NewExamination(Guid? visitId, Guid? clinicId = null, Guid? tenantId = null)
         => new(
             tenantId ?? _tenantId, clinicId ?? _clinicId, Guid.NewGuid(), appointmentId: null,
-            DateTime.UtcNow.AddHours(-1), "Kontrol", "Bulgu", null, null, visitId: visitId);
+            DateTime.UtcNow.AddHours(-1), "Kontrol", "Bulgu", null, null, visitId: visitId, utcNow: DateTime.UtcNow);
 
     private static GetExaminationsListQueryValidator Validator => new();
 

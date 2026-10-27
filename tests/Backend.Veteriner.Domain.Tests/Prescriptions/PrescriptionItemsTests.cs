@@ -5,8 +5,10 @@ namespace Backend.Veteriner.Domain.Tests.Prescriptions;
 
 public sealed class PrescriptionItemsTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static Prescription NewPrescription()
-        => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, DateTime.UtcNow, "Başlık", "İçerik", null, null);
+        => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, DateTime.UtcNow, "Başlık", "İçerik", null, null, Now);
 
     private static PrescriptionItemDraft Draft(
         string name = "Amoksisilin",

@@ -41,7 +41,7 @@ public sealed class ExportExaminationsReportXlsxQueryHandlerTests
 
         var from = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc);
         var to = new DateTime(2026, 11, 5, 0, 0, 0, DateTimeKind.Utc);
-        var ex = new Examination(tid, clinicId, petId, null, from.AddHours(1), "a", "b", null, "n");
+        var ex = new Examination(tid, clinicId, petId, null, from.AddHours(1), "a", "b", null, "n", DateTime.UtcNow);
 
         _examinations.Setup(x => x.CountAsync(It.IsAny<ExaminationsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);

@@ -48,7 +48,7 @@ public sealed class CreateClinicCommandHandlerTests
         var tenantId = Guid.NewGuid();
         var cmd = new CreateClinicCommand("Merkez", "İstanbul");
 
-        var tenant = new Tenant("Pasif A.Ş.");
+        var tenant = new Tenant("Pasif A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tenantId);
         tenant.Deactivate();
 
@@ -70,7 +70,7 @@ public sealed class CreateClinicCommandHandlerTests
         var tenantId = Guid.NewGuid();
         var cmd = new CreateClinicCommand("Merkez Şube", "Ankara");
 
-        var tenant = new Tenant("Aktif A.Ş.");
+        var tenant = new Tenant("Aktif A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tenantId);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
@@ -94,7 +94,7 @@ public sealed class CreateClinicCommandHandlerTests
         var tenantId = Guid.NewGuid();
         var cmd = new CreateClinicCommand("Merkez", "İstanbul");
 
-        var tenant = new Tenant("Aktif A.Ş.");
+        var tenant = new Tenant("Aktif A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tenantId);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
@@ -135,7 +135,7 @@ public sealed class CreateClinicCommandHandlerTests
             Address: "Cadde 1",
             Description: "Açıklama");
 
-        var tenant = new Tenant("Aktif A.Ş.");
+        var tenant = new Tenant("Aktif A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tenantId);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);

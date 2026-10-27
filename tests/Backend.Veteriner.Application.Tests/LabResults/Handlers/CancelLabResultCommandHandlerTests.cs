@@ -36,7 +36,7 @@ public sealed class CancelLabResultCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(_cid);
         _clientContext.SetupGet(c => c.UserId).Returns(Guid.NewGuid());
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _labResultsWrite.Setup(r => r.UpdateAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _labResultsWrite.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _files.Setup(r => r.ListAsync(It.IsAny<StoredFilesOpenByOwnerSpec>(), It.IsAny<CancellationToken>()))
@@ -51,7 +51,8 @@ public sealed class CancelLabResultCommandHandlerTests
             _scopeResolver.Object,
             _tenants.Object,
             _labResultsWrite.Object,
-            new StoredFileAccessCloser(_files.Object));
+            new StoredFileAccessCloser(_files.Object),
+            TimeProvider.System);
 
     private LabResult Setup(bool withResult)
     {
@@ -59,7 +60,7 @@ public sealed class CancelLabResultCommandHandlerTests
         var examId = Guid.NewGuid();
         var row = new LabResult(
             _tid, _cid, _petId, examId, null, null,
-            withResult ? DateTime.UtcNow : null, "Test adı", withResult ? "Sonuç" : null, null, null);
+            withResult ? DateTime.UtcNow : null, "Test adı", withResult ? "Sonuç" : null, null, null, DateTime.UtcNow);
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
         return row;
@@ -107,7 +108,7 @@ public sealed class CancelLabResultCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_AlreadyCancelled()
     {
         var row = Setup(withResult: false);
-        row.Cancel(Guid.NewGuid(), "İlk iptal gerekçesi").IsSuccess.Should().BeTrue();
+        row.Cancel(Guid.NewGuid(), "İlk iptal gerekçesi", DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         var result = await CreateHandler().Handle(
             new CancelLabResultCommand(row.Id, "İkinci iptal gerekçesi", RowVersion), CancellationToken.None);

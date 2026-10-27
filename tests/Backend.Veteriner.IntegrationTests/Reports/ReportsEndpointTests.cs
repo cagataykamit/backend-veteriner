@@ -388,7 +388,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         var now = DateTime.UtcNow;
         var subscription = readOnlyTenant
@@ -429,9 +429,9 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var client = new Client(tenant.Id, "Ali", "905551112233", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali", DateTime.UtcNow, "905551112233", "ali@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
 
@@ -463,9 +463,9 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var client = new Client(tenant.Id, "Veli", "905551112244", "veli@example.com");
+        var client = new Client(tenant.Id, "Veli", DateTime.UtcNow, "905551112244", "veli@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, "Kedi", speciesId);
         var payment = new Payment(tenant.Id, clinic.Id, client.Id, pet.Id, null, null, 20m, "TRY", PaymentMethod.Cash, paidAtUtc, null);
@@ -501,9 +501,9 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var client = new Client(tenant.Id, "Veli", "905551112244", "veli@example.com");
+        var client = new Client(tenant.Id, "Veli", DateTime.UtcNow, "905551112244", "veli@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, "Kedi", speciesId);
         db.AddRange(tenant, clinic, client, pet);
@@ -530,10 +530,10 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var ca = new Clinic(tenant.Id, "CA", "Istanbul");
         var cb = new Clinic(tenant.Id, "CB", "Ankara");
-        var user = new User($"u-{Guid.NewGuid():N}@example.com", hasher.Hash("x"));
+        var user = new User($"u-{Guid.NewGuid():N}@example.com", hasher.Hash("x"), DateTime.UtcNow);
         db.AddRange(tenant, ca, cb, user);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
@@ -550,17 +550,17 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var ca = new Clinic(tenant.Id, "CA", "Istanbul");
         var cb = new Clinic(tenant.Id, "CB", "Ankara");
-        var user = new User($"ca-{Guid.NewGuid():N}@example.com", hasher.Hash("x"));
+        var user = new User($"ca-{Guid.NewGuid():N}@example.com", hasher.Hash("x"), DateTime.UtcNow);
         db.AddRange(tenant, ca, cb, user);
         var clinicAdminClaim = await db.OperationClaims.AsNoTracking().FirstAsync(c => c.Name == "ClinicAdmin");
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, clinicAdminClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
-        db.UserClinics.Add(new UserClinic(user.Id, ca.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, ca.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         var claims = new List<Claim>
@@ -581,9 +581,9 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var client = new Client(tenant.Id, "Müşteri", "905551112255", "m@example.com");
+        var client = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551112255", "m@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, "Pet1", speciesId);
         var inWindow = new Appointment(tenant.Id, clinic.Id, pet.Id, new DateTime(2026, 11, 15, 10, 0, 0, DateTimeKind.Utc), 30,
@@ -609,9 +609,9 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var client = new Client(tenant.Id, "Müşteri", "905551112266", "e@example.com");
+        var client = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551112266", "e@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, "Pet2", speciesId);
         var exam = new Examination(
@@ -623,7 +623,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
             visitReasonToken,
             "Bulgu",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, exam);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
@@ -643,9 +644,9 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Rep-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var client = new Client(tenant.Id, "Müşteri", "905551112277", "v@example.com");
+        var client = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551112277", "v@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, "Pet3", speciesId);
 
@@ -663,7 +664,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
             VaccinationStatus.Applied,
             new DateTime(2026, 5, 12, 14, 0, 0, DateTimeKind.Utc),
             new DateTime(2027, 6, 1, 0, 0, 0, DateTimeKind.Utc),
-            null);
+            null,
+            DateTime.UtcNow);
 
         var scheduledInside = new Vaccination(
             tenant.Id,
@@ -675,7 +677,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
             VaccinationStatus.Scheduled,
             null,
             new DateTime(2026, 5, 12, 9, 0, 0, DateTimeKind.Utc),
-            null);
+            null,
+            DateTime.UtcNow);
 
         var appliedOutside = new Vaccination(
             tenant.Id,
@@ -687,7 +690,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
             VaccinationStatus.Applied,
             new DateTime(2026, 5, 13, 14, 0, 0, DateTimeKind.Utc),
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, appliedInside, scheduledInside, appliedOutside);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));

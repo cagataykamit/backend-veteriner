@@ -9,15 +9,18 @@ public sealed class ConfirmEmailVerificationHandler : IRequestHandler<ConfirmEma
     private readonly IVerificationTokenRepository _repo;
     private readonly ITokenHashService _hash;
     private readonly IUserRepository _users;
+    private readonly TimeProvider _timeProvider;
 
     public ConfirmEmailVerificationHandler(
         IVerificationTokenRepository repo,
         ITokenHashService hash,
-        IUserRepository users)
+        IUserRepository users,
+        TimeProvider timeProvider)
     {
         _repo = repo;
         _hash = hash;
         _users = users;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Unit> Handle(ConfirmEmailVerificationCommand request, CancellationToken ct)
@@ -53,10 +56,11 @@ public sealed class ConfirmEmailVerificationHandler : IRequestHandler<ConfirmEma
                    ?? throw new UnauthorizedAccessException("Kullanıcı bulunamadı.");
 
         // Domain method: e-posta do�ruland�
-        user.ConfirmEmail();
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        user.ConfirmEmail(utcNow);
 
         // Token�� kullan�lm�� i�aretle
-        vt.MarkUsed();
+        vt.MarkUsed(utcNow);
 
         // Ayn� DbContext �zerinden tek SaveChanges
         await _repo.SaveChangesAsync(ct);

@@ -25,6 +25,7 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
     private readonly TenantInviteAcceptanceService _acceptance;
     private readonly IReadRepository<OperationClaim> _operationClaims;
     private readonly IRepository<LegalAcceptance> _legalAcceptances;
+    private readonly TimeProvider _timeProvider;
 
     public SignupAndAcceptTenantInviteCommandHandler(
         ITokenHashService tokenHash,
@@ -34,7 +35,8 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
         IPasswordHasher hasher,
         TenantInviteAcceptanceService acceptance,
         IReadRepository<OperationClaim> operationClaims,
-        IRepository<LegalAcceptance> legalAcceptances)
+        IRepository<LegalAcceptance> legalAcceptances,
+        TimeProvider timeProvider)
     {
         _tokenHash = tokenHash;
         _invites = invites;
@@ -44,6 +46,7 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
         _acceptance = acceptance;
         _operationClaims = operationClaims;
         _legalAcceptances = legalAcceptances;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<TenantInviteAcceptResultDto>> Handle(
@@ -99,7 +102,8 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
         if (!legalCheck.IsSuccess)
             return Result<TenantInviteAcceptResultDto>.Failure(legalCheck.Error);
 
-        var user = new User(invite.Email, _hasher.Hash(request.Password));
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var user = new User(invite.Email, _hasher.Hash(request.Password), utcNow);
         await _usersWrite.AddAsync(user, ct);
 
         var accepted = await _acceptance.AcceptAsync(invite, user, ct);

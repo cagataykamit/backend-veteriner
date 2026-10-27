@@ -95,16 +95,16 @@ public sealed class GetPetSummaryQueryHandlerTests
 
     private Hospitalization AddHosp(DateTime admitted, bool discharged)
     {
-        var h = new Hospitalization(_tenantId, _clinicId, _petId, null, admitted, null, "Gozlem", null);
+        var h = new Hospitalization(_tenantId, _clinicId, _petId, null, admitted, null, "Gozlem", null, DateTime.UtcNow);
         if (discharged)
-            h.Discharge(admitted.AddDays(1), null);
+            h.Discharge(admitted.AddDays(1), null, DateTime.UtcNow);
         _hosp.Add(h);
         return h;
     }
 
     private Vaccination AddVaccination(VaccinationStatus status, DateTime? applied, DateTime? due, string name = "Karma")
     {
-        var v = new Vaccination(_tenantId, _petId, _clinicId, null, Guid.NewGuid(), name, status, applied, due, null);
+        var v = new Vaccination(_tenantId, _petId, _clinicId, null, Guid.NewGuid(), name, status, applied, due, null, DateTime.UtcNow);
         _vaccinations.Add(v);
         return v;
     }
@@ -112,6 +112,7 @@ public sealed class GetPetSummaryQueryHandlerTests
     private Examination AddExam(DateTime at, decimal? weight = null, DateTime? measuredAt = null, string reason = "Kontrol")
     {
         var e = new Examination(_tenantId, _clinicId, _petId, null, at, reason, null, null, null,
+            DateTime.UtcNow,
             weightKg: weight, vitalsMeasuredAtUtc: measuredAt);
         _exams.Add(e);
         return e;
@@ -390,7 +391,7 @@ public sealed class GetPetSummaryQueryHandlerTests
     public async Task Clinic_Scope_Hides_Other_Clinics_Records()
     {
         var otherClinic = Guid.NewGuid();
-        _hosp.Add(new Hospitalization(_tenantId, otherClinic, _petId, null, Now.AddDays(-1), null, "Baska klinik", null));
+        _hosp.Add(new Hospitalization(_tenantId, otherClinic, _petId, null, Now.AddDays(-1), null, "Baska klinik", null, DateTime.UtcNow));
         AddVisit(Now.AddDays(-2));
         var scope = ClinicReadScopeResolverMock.ForClinicAdmin([_clinicId]);
 

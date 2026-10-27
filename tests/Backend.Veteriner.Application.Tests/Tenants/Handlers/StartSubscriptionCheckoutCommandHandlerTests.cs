@@ -57,7 +57,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
 
     private static Tenant CreateTenant(Guid tenantId)
     {
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         return tenant;
     }
@@ -122,7 +122,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_SubscriptionCancelled()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
         typeof(TenantSubscription).GetProperty(nameof(TenantSubscription.Status))!
@@ -146,7 +146,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     public async Task Handle_Should_ReturnSuccess_When_ManualUpgrade_And_PricesConfigured()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         // Paid/active tenant: trial dönemindeki tenantlar artık proration/checkout akışına girmiyor
         // (bkz. Trial_* testleri); bu test var olan ücretli abonelikte upgrade proration davranışını korur.
@@ -193,7 +193,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     public async Task Handle_Should_ReuseOpenCheckout_When_SameTarget_And_NotExpired()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-30), 14);
         sub.ActivatePaidPlan(SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-16));
@@ -244,7 +244,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     public async Task Handle_Should_MarkExpiredAndCreateNew_When_OpenCheckoutSameTarget_ButExpired()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-30), 14);
         sub.ActivatePaidPlan(SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-16));
@@ -309,7 +309,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     public async Task Handle_Should_ApplyPlanDirectly_Without_Checkout_Or_Proration_When_TenantIsTrialing(string targetPlan)
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         var trialStart = DateTime.UtcNow.AddDays(-7);
         var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, trialStart, 14);
@@ -366,7 +366,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     public async Task Handle_Should_CancelOpenCheckoutSession_When_TrialUpgradeAppliedDirectly()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
 
@@ -402,7 +402,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TrialTenant_RequestsSamePlan_NoOp()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
 

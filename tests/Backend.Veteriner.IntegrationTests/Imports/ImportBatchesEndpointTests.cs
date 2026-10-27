@@ -332,7 +332,7 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"imp-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"imp-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Imp-{Guid.NewGuid():N}"[..14], "Istanbul");

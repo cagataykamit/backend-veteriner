@@ -50,7 +50,8 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
             _examinations.Object,
             _treatments.Object,
             _products.Object,
-            _prescriptionsWrite.Object);
+            _prescriptionsWrite.Object,
+            TimeProvider.System);
 
     private UpdatePrescriptionCommandHandler CreateUpdateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -64,13 +65,14 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
             _treatments.Object,
             _products.Object,
             _prescriptionsRead.Object,
-            _prescriptionsWrite.Object);
+            _prescriptionsWrite.Object,
+            TimeProvider.System);
 
     private void SetupTenant(Guid tid, Guid cid, Guid petId)
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         var clinic = new Clinic(tid, "K", "İstanbul");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, cid);
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -126,7 +128,8 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
             "Eski",
             "Eski içerik",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
     [Fact]
     public async Task Create_Should_Succeed_When_TenantWide_DefaultResolver()
@@ -190,7 +193,7 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
         SetupTenant(tid, assignedCid, petId);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(assignedCid);
 
-        var treatment = new Treatment(tid, assignedCid, petId, null, ValidPrescribedAt, "T", "D", null, null);
+        var treatment = new Treatment(tid, assignedCid, petId, null, ValidPrescribedAt, "T", "D", null, null, DateTime.UtcNow);
         typeof(Treatment).GetProperty(nameof(Treatment.Id))!.SetValue(treatment, treatmentId);
         _treatments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TreatmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(treatment);
@@ -217,7 +220,7 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
         SetupTenant(tid, unassignedCid, petId);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(unassignedCid);
 
-        var treatment = new Treatment(tid, unassignedCid, petId, null, ValidPrescribedAt, "T", "D", null, null);
+        var treatment = new Treatment(tid, unassignedCid, petId, null, ValidPrescribedAt, "T", "D", null, null, DateTime.UtcNow);
         typeof(Treatment).GetProperty(nameof(Treatment.Id))!.SetValue(treatment, treatmentId);
         _treatments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TreatmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(treatment);
@@ -323,7 +326,7 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var rx = ExistingPrescription(tid, entityCid, petId);
         _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -350,7 +353,7 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var rx = ExistingPrescription(tid, assignedCid, petId);
         _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -376,7 +379,7 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(activeCid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var rx = ExistingPrescription(tid, entityCid, petId);
         _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -420,7 +423,7 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Prescription?)null);
 

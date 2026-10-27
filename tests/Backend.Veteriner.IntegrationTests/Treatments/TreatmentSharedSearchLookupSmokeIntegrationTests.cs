@@ -133,7 +133,7 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
         // Tohum tedavisinin takip tarihi yok: aktif sayılmaz (ADR-025 madde 2).
         var seed = await SeedTreatmentAsync(commandDb, clientFullName: "Ayşe Yılmaz", petName: "Pamuk");
         Treatment FollowUp(DateTime followUpUtc) => new(
-            seed.TenantId, seed.ClinicId, seed.PetId, examinationId: null, DateTime.UtcNow.AddDays(-3), "Takip", "Kontrol", null, followUpUtc);
+            seed.TenantId, seed.ClinicId, seed.PetId, examinationId: null, DateTime.UtcNow.AddDays(-3), "Takip", "Kontrol", null, followUpUtc, utcNow: DateTime.UtcNow);
         var past = FollowUp(DateTime.UtcNow.AddDays(-2));
         var later = FollowUp(DateTime.UtcNow.AddDays(10));
         var sooner = FollowUp(DateTime.UtcNow.AddDays(3));
@@ -164,13 +164,13 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
         string clientFullName,
         string petName)
     {
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Pilot Clinic", "Istanbul");
         commandDb.Tenants.Add(tenant);
         commandDb.Clinics.Add(clinic);
         await commandDb.SaveChangesAsync();
 
-        var client = new Client(tenant.Id, clientFullName, "905551110088");
+        var client = new Client(tenant.Id, clientFullName, DateTime.UtcNow, "905551110088");
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync();
 
@@ -189,7 +189,8 @@ public sealed class TreatmentSharedSearchLookupSmokeIntegrationTests
             "Antibiyotik",
             "Uygulama",
             null,
-            null);
+            null,
+            utcNow: DateTime.UtcNow);
         commandDb.Treatments.Add(treatment);
         await commandDb.SaveChangesAsync();
 

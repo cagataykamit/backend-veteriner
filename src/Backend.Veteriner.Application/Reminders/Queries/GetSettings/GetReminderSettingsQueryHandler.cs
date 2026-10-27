@@ -12,13 +12,16 @@ public sealed class GetReminderSettingsQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<TenantReminderSettings> _settingsRead;
+    private readonly TimeProvider _timeProvider;
 
     public GetReminderSettingsQueryHandler(
         ITenantContext tenantContext,
-        IReadRepository<TenantReminderSettings> settingsRead)
+        IReadRepository<TenantReminderSettings> settingsRead,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _settingsRead = settingsRead;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ReminderSettingsDto>> Handle(GetReminderSettingsQuery request, CancellationToken ct)
@@ -31,9 +34,10 @@ public sealed class GetReminderSettingsQueryHandler
         }
 
         var row = await _settingsRead.FirstOrDefaultAsync(new TenantReminderSettingsByTenantSpec(tenantId), ct);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (row is null)
         {
-            var defaults = TenantReminderSettings.CreateDefault(tenantId);
+            var defaults = TenantReminderSettings.CreateDefault(tenantId, utcNow);
             return Result<ReminderSettingsDto>.Success(new ReminderSettingsDto(
                 defaults.AppointmentRemindersEnabled,
                 defaults.AppointmentReminderHoursBefore,

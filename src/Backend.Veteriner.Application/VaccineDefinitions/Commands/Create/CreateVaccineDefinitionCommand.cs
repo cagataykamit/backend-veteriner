@@ -21,17 +21,20 @@ public sealed class CreateVaccineDefinitionCommandHandler
     private readonly IReadRepository<Species> _species;
     private readonly IReadRepository<VaccineDefinition> _definitionsRead;
     private readonly IRepository<VaccineDefinition> _definitionsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public CreateVaccineDefinitionCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Species> species,
         IReadRepository<VaccineDefinition> definitionsRead,
-        IRepository<VaccineDefinition> definitionsWrite)
+        IRepository<VaccineDefinition> definitionsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _species = species;
         _definitionsRead = definitionsRead;
         _definitionsWrite = definitionsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreateVaccineDefinitionCommand request, CancellationToken ct)
@@ -57,10 +60,12 @@ public sealed class CreateVaccineDefinitionCommandHandler
         if (dup > 0)
             return Result<Guid>.Failure("VaccineDefinitions.DuplicateCode", "Bu kiracıda aynı kod zaten kullanılıyor.");
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var entity = VaccineDefinition.CreateTenant(
             tenantId,
             request.Code,
             request.Name,
+            utcNow,
             request.SpeciesId,
             request.Description,
             request.DefaultNextDueDays,

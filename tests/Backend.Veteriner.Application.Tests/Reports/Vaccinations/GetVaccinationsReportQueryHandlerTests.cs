@@ -116,7 +116,8 @@ public sealed class GetVaccinationsReportQueryHandlerTests
             VaccinationStatus.Applied,
             applied,
             from.AddDays(60),
-            null);
+            null,
+            DateTime.UtcNow);
         _vaccinations
             .Setup(x => x.ListAsync(It.IsAny<VaccinationsReportFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Vaccination> { vac });
@@ -177,7 +178,8 @@ public sealed class GetVaccinationsReportQueryHandlerTests
             VaccinationStatus.Scheduled,
             null,
             due,
-            null);
+            null,
+            DateTime.UtcNow);
         _vaccinations
             .Setup(x => x.ListAsync(It.IsAny<VaccinationsReportFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Vaccination> { vac });

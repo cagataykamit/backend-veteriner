@@ -81,9 +81,9 @@ public sealed class PrescriptionItemsIntegrationTests : IClassFixture<CustomWebA
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var product = new Product(tenantId, name, "Kutu", 10m, "TRY");
+        var product = new Product(tenantId, name, "Kutu", 10m, "TRY", DateTime.UtcNow);
         if (!active)
-            product.Deactivate();
+            product.Deactivate(DateTime.UtcNow);
         db.Products.Add(product);
         await db.SaveChangesAsync();
         return product.Id;

@@ -5,7 +5,9 @@ namespace Backend.Veteriner.Domain.Tests.Clients;
 
 public sealed class ClientContactPreferencesTests
 {
-    private static Client CreateClient() => new(Guid.NewGuid(), "Ali Veli", "905555555555", "ali@example.com");
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
+    private static Client CreateClient() => new(Guid.NewGuid(), "Ali Veli", Now, "905555555555", "ali@example.com");
 
     [Fact]
     public void New_Client_Should_Have_No_Preference_And_Accept_Reminders()

@@ -51,7 +51,8 @@ public sealed class ExportVaccinationsReportQueryHandlerTests
             VaccinationStatus.Applied,
             applied,
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
         _vaccinations.Setup(x => x.CountAsync(It.IsAny<VaccinationsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
@@ -121,7 +122,8 @@ public sealed class ExportVaccinationsReportQueryHandlerTests
             VaccinationStatus.Scheduled,
             null,
             new DateTime(2026, 8, 15, 10, 0, 0, DateTimeKind.Utc),
-            null);
+            null,
+            DateTime.UtcNow);
         _vaccinations
             .Setup(x => x.ListAsync(It.IsAny<VaccinationsReportFilteredOrderedForExportSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Vaccination> { vac });
@@ -170,7 +172,8 @@ public sealed class ExportVaccinationsReportQueryHandlerTests
             VaccinationStatus.Applied,
             from.AddHours(2),
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
         _vaccinations.Setup(x => x.CountAsync(It.IsAny<VaccinationsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);

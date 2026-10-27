@@ -56,7 +56,7 @@ public sealed class GetClientByIdQueryHandlerTests
         var cid = Guid.NewGuid();
         var created = new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc);
         var updated = new DateTime(2025, 2, 3, 4, 5, 6, DateTimeKind.Utc);
-        var entity = new Client(tid, "Ali Veli", "05321234567", "ali@example.com", "Ankara");
+        var entity = new Client(tid, "Ali Veli", DateTime.UtcNow, "05321234567", "ali@example.com", "Ankara");
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(entity, cid);
         typeof(Client).GetProperty(nameof(Client.CreatedAtUtc))!.SetValue(entity, created);
         typeof(Client).GetProperty(nameof(Client.UpdatedAtUtc))!.SetValue(entity, updated);
@@ -92,9 +92,9 @@ public sealed class GetClientByIdQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var entity = new Client(tid, "Ali Veli", "05321234567");
+        var entity = new Client(tid, "Ali Veli", DateTime.UtcNow, "05321234567");
         entity.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 15), userId,
-            4, ClinicKvkkFormTemplate.ComputeTextHash("Rıza metni"));
+            4, ClinicKvkkFormTemplate.ComputeTextHash("Rıza metni"), DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.RowVersion))!.SetValue(entity, new byte[] { 0, 0, 0, 0, 0, 0, 0, 7 });
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);

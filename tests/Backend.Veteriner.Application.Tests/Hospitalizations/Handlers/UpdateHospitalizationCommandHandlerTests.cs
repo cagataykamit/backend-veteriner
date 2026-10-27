@@ -50,7 +50,8 @@ public sealed class UpdateHospitalizationCommandHandlerTests
             _hospitalizationsRead.Object,
             _hospitalizationsWrite.Object,
             _rooms.Object,
-            _wards.Object);
+            _wards.Object,
+            TimeProvider.System);
 
     private static UpdateHospitalizationCommand Cmd(
         Guid id,
@@ -75,7 +76,7 @@ public sealed class UpdateHospitalizationCommandHandlerTests
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -91,13 +92,14 @@ public sealed class UpdateHospitalizationCommandHandlerTests
             DateTime.UtcNow.AddDays(-1),
             null,
             "Eski",
-            null);
+            null,
+            DateTime.UtcNow);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantInactive()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("A");
+        var tenant = new Tenant("A", DateTime.UtcNow);
         tenant.Deactivate();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -125,7 +127,7 @@ public sealed class UpdateHospitalizationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = OpenStay(tid, cid, petId);
         typeof(Hospitalization).GetProperty(nameof(Hospitalization.Id))!.SetValue(existing, hid);
@@ -155,7 +157,7 @@ public sealed class UpdateHospitalizationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = OpenStay(tid, cid, petId);
         typeof(Hospitalization).GetProperty(nameof(Hospitalization.Id))!.SetValue(existing, hid);
@@ -182,7 +184,7 @@ public sealed class UpdateHospitalizationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = OpenStay(tid, cid, petId);
         typeof(Hospitalization).GetProperty(nameof(Hospitalization.Id))!.SetValue(existing, hid);
@@ -210,14 +212,14 @@ public sealed class UpdateHospitalizationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _hospitalizationsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<HospitalizationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         SetupTenantClinicPet(tid, cid, petId);
         _hospitalizationsRead.Setup(r => r.AnyAsync(It.IsAny<ActiveHospitalizationForPetClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -237,7 +239,7 @@ public sealed class UpdateHospitalizationCommandHandlerTests
 
     private static Examination ExamFor(Guid tid, Guid cid, Guid petId, Guid examId, Guid? visitId = null, bool finalized = false)
     {
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         typeof(Examination).GetProperty(nameof(Examination.VisitId))!.SetValue(exam, visitId);
         if (finalized)
@@ -301,7 +303,7 @@ public sealed class UpdateHospitalizationCommandHandlerTests
         var cid = Guid.NewGuid();
         var petId = Guid.NewGuid();
         var examId = Guid.NewGuid();
-        var existing = new Hospitalization(tid, cid, petId, examId, DateTime.UtcNow.AddDays(-1), null, "Eski", null);
+        var existing = new Hospitalization(tid, cid, petId, examId, DateTime.UtcNow.AddDays(-1), null, "Eski", null, DateTime.UtcNow);
         ArrangeUpdate(existing, tid, cid, petId, ExamFor(tid, cid, petId, examId, finalized: true));
 
         var result = await CreateHandler().Handle(Cmd(existing.Id, cid, petId, examinationId: null), CancellationToken.None);
@@ -317,7 +319,7 @@ public sealed class UpdateHospitalizationCommandHandlerTests
         var cid = Guid.NewGuid();
         var petId = Guid.NewGuid();
         var examId = Guid.NewGuid();
-        var existing = new Hospitalization(tid, cid, petId, examId, DateTime.UtcNow.AddDays(-1), null, "Eski", null);
+        var existing = new Hospitalization(tid, cid, petId, examId, DateTime.UtcNow.AddDays(-1), null, "Eski", null, DateTime.UtcNow);
         ArrangeUpdate(existing, tid, cid, petId, ExamFor(tid, cid, petId, examId, finalized: true));
 
         var result = await CreateHandler().Handle(
@@ -337,7 +339,7 @@ public sealed class UpdateHospitalizationCommandHandlerTests
         var petId = Guid.NewGuid();
         var visitId = Guid.NewGuid();
         var existing = new Hospitalization(
-            tid, cid, petId, null, DateTime.UtcNow.AddDays(-1), null, "Eski", null, visitId, "Kafes 1");
+            tid, cid, petId, null, DateTime.UtcNow.AddDays(-1), null, "Eski", null, DateTime.UtcNow, visitId, "Kafes 1");
         ArrangeUpdate(existing, tid, cid, petId, visit: VisitFor(tid, cid, petId, visitId));
 
         var result = await CreateHandler().Handle(Cmd(existing.Id, cid, petId), CancellationToken.None);

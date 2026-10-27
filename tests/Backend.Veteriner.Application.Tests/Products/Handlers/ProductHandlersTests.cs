@@ -30,7 +30,8 @@ public sealed class ProductHandlersTests
             _tenantContext.Object,
             _productsRead.Object,
             _productsWrite.Object,
-            _categoriesRead.Object);
+            _categoriesRead.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(
             new CreateProductCommand(null, "Mama", "SKU-1", null, null, "Adet", 10, "TRY"),
@@ -46,13 +47,14 @@ public sealed class ProductHandlersTests
         var tenantId = Guid.NewGuid();
         _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
         _productsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductByTenantAndSkuSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Product(tenantId, "Var", "Adet", 1, "TRY", sku: "sku-1"));
+            .ReturnsAsync(new Product(tenantId, "Var", "Adet", 1, "TRY", DateTime.UtcNow, sku: "sku-1"));
 
         var handler = new CreateProductCommandHandler(
             _tenantContext.Object,
             _productsRead.Object,
             _productsWrite.Object,
-            _categoriesRead.Object);
+            _categoriesRead.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(
             new CreateProductCommand(null, "Yeni", "SKU-1", null, null, "Adet", 10, "TRY"),
@@ -73,7 +75,8 @@ public sealed class ProductHandlersTests
             _tenantContext.Object,
             _productsRead.Object,
             _productsWrite.Object,
-            _categoriesRead.Object);
+            _categoriesRead.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(
             new CreateProductCommand(Guid.NewGuid(), "Ürün", null, null, null, "Adet", 10, "TRY"),
@@ -86,8 +89,8 @@ public sealed class ProductHandlersTests
     public async Task Create_InactiveCategory_Should_Fail()
     {
         var tenantId = Guid.NewGuid();
-        var category = new ProductCategory(tenantId, "K");
-        category.Deactivate();
+        var category = new ProductCategory(tenantId, "K", DateTime.UtcNow);
+        category.Deactivate(DateTime.UtcNow);
 
         _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
         _categoriesRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductCategoryByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -97,7 +100,8 @@ public sealed class ProductHandlersTests
             _tenantContext.Object,
             _productsRead.Object,
             _productsWrite.Object,
-            _categoriesRead.Object);
+            _categoriesRead.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(
             new CreateProductCommand(category.Id, "Ürün", null, null, null, "Adet", 10, "TRY"),
@@ -110,7 +114,7 @@ public sealed class ProductHandlersTests
     public async Task Update_Should_Succeed()
     {
         var tenantId = Guid.NewGuid();
-        var product = new Product(tenantId, "Eski", "Adet", 1, "TRY", sku: "a");
+        var product = new Product(tenantId, "Eski", "Adet", 1, "TRY", DateTime.UtcNow, sku: "a");
         _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
         _productsWrite.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductByIdTrackedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(product);
@@ -121,7 +125,8 @@ public sealed class ProductHandlersTests
             _tenantContext.Object,
             _productsRead.Object,
             _productsWrite.Object,
-            _categoriesRead.Object);
+            _categoriesRead.Object,
+            TimeProvider.System);
 
         var result = await handler.Handle(
             new UpdateProductCommand(product.Id, null, "Yeni", "b", null, null, "Kutu", 20, "TRY"),
@@ -149,13 +154,13 @@ public sealed class ProductHandlersTests
     public async Task Deactivate_Then_Activate_Should_Succeed()
     {
         var tenantId = Guid.NewGuid();
-        var product = new Product(tenantId, "U", "Adet", 10, "TRY");
+        var product = new Product(tenantId, "U", "Adet", 10, "TRY", DateTime.UtcNow);
         _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
         _productsWrite.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductByIdTrackedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(product);
 
-        var deact = new DeactivateProductCommandHandler(_tenantContext.Object, _productsWrite.Object);
-        var act = new ActivateProductCommandHandler(_tenantContext.Object, _productsWrite.Object);
+        var deact = new DeactivateProductCommandHandler(_tenantContext.Object, _productsWrite.Object, TimeProvider.System);
+        var act = new ActivateProductCommandHandler(_tenantContext.Object, _productsWrite.Object, TimeProvider.System);
 
         var d = await deact.Handle(new DeactivateProductCommand(product.Id), CancellationToken.None);
         var a = await act.Handle(new ActivateProductCommand(product.Id), CancellationToken.None);

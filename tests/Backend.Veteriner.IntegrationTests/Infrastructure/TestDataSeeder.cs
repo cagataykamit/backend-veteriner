@@ -51,7 +51,7 @@ internal static class TestDataSeeder
         }
 
         var hash = hasher.Hash("123456");
-        db.Users.Add(new User(email, hash));
+        db.Users.Add(new User(email, hash, DateTime.UtcNow));
         db.SaveChanges();
     }
 
@@ -67,14 +67,14 @@ internal static class TestDataSeeder
         var tenant = db.Tenants.FirstOrDefault(t => t.Name == DataSeeder.DefaultTenantName);
         if (tenant is null)
         {
-            db.Tenants.Add(new Tenant(DataSeeder.DefaultTenantName));
+            db.Tenants.Add(new Tenant(DataSeeder.DefaultTenantName, DateTime.UtcNow));
             db.SaveChanges();
             tenant = db.Tenants.First(t => t.Name == DataSeeder.DefaultTenantName);
         }
 
         if (!db.UserTenants.Any(ut => ut.UserId == admin.Id && ut.TenantId == tenant.Id))
         {
-            db.UserTenants.Add(new UserTenant(admin.Id, tenant.Id));
+            db.UserTenants.Add(new UserTenant(admin.Id, tenant.Id, DateTime.UtcNow));
             db.SaveChanges();
         }
 
@@ -89,7 +89,7 @@ internal static class TestDataSeeder
 
         if (!db.UserClinics.Any(uc => uc.UserId == admin.Id && uc.ClinicId == seedClinic.Id))
         {
-            db.UserClinics.Add(new UserClinic(admin.Id, seedClinic.Id));
+            db.UserClinics.Add(new UserClinic(admin.Id, seedClinic.Id, DateTime.UtcNow));
             db.SaveChanges();
         }
     }

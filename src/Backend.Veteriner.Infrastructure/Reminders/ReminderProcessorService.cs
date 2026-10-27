@@ -19,17 +19,20 @@ public sealed class ReminderProcessorService
     private readonly IReminderEmailOutboxEnqueuer _reminderEmailOutboxEnqueuer;
     private readonly ReminderProcessorOptions _options;
     private readonly ILogger<ReminderProcessorService> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public ReminderProcessorService(
         AppDbContext db,
         IReminderEmailOutboxEnqueuer reminderEmailOutboxEnqueuer,
         IOptions<ReminderProcessorOptions> options,
-        ILogger<ReminderProcessorService> logger)
+        ILogger<ReminderProcessorService> logger,
+        TimeProvider timeProvider)
     {
         _db = db;
         _reminderEmailOutboxEnqueuer = reminderEmailOutboxEnqueuer;
         _options = options.Value;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     public async Task ProcessOnceAsync(CancellationToken ct)
@@ -39,7 +42,7 @@ public sealed class ReminderProcessorService
 
         var batchSize = Math.Clamp(_options.BatchSize, 1, 500);
         var legacyReconcileAfterMinutes = Math.Clamp(_options.LegacyEnqueuedReconcileAfterMinutes, 5, 24 * 60);
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
 
         var settingsRows = await _db.TenantReminderSettings
             .AsNoTracking()
@@ -97,7 +100,7 @@ public sealed class ReminderProcessorService
             }
         }
 
-        await SyncEnqueuedDispatchLogsWithOutboxStatusAsync(batchSize, ct);
+        await SyncEnqueuedDispatchLogsWithOutboxStatusAsync(batchSize, nowUtc, ct);
         await ReconcileLegacyEnqueuedLogsWithoutOutboxIdAsync(batchSize, nowUtc, legacyReconcileAfterMinutes, ct);
     }
 
@@ -201,11 +204,12 @@ public sealed class ReminderProcessorService
                 candidate.ScheduledAtUtc,
                 reminderDueAtUtc,
                 ReminderDispatchStatus.Pending,
-                dedupeKey);
+                dedupeKey,
+                nowUtc);
 
             if (string.IsNullOrWhiteSpace(recipientEmail))
             {
-                log.MarkSkipped("Recipient email is missing");
+                log.MarkSkipped("Recipient email is missing", nowUtc);
                 if (await TryInsertLogAsync(log, ct))
                     dedupeSet.Add(dedupeKey);
                 continue;
@@ -213,7 +217,7 @@ public sealed class ReminderProcessorService
 
             if (!dailyBudget.TryConsume())
             {
-                log.MarkSkipped(TrialLimits.ReminderDailyLimitSkipReason);
+                log.MarkSkipped(TrialLimits.ReminderDailyLimitSkipReason, nowUtc);
                 if (await TryInsertLogAsync(log, ct))
                     dedupeSet.Add(dedupeKey);
                 continue;
@@ -232,11 +236,11 @@ public sealed class ReminderProcessorService
                     body,
                     isHtml: false,
                     ct);
-                log.MarkEnqueued(outboxMessageId);
+                log.MarkEnqueued(nowUtc, outboxMessageId);
             }
             catch (Exception ex)
             {
-                log.MarkFailed(ex.Message);
+                log.MarkFailed(ex.Message, nowUtc);
                 _logger.LogWarning(ex, "Appointment reminder enqueue failed. Tenant={TenantId} Appointment={AppointmentId}", tenantId, candidate.AppointmentId);
             }
 
@@ -355,11 +359,12 @@ public sealed class ReminderProcessorService
                 candidate.DueAtUtc,
                 reminderDueAtUtc,
                 ReminderDispatchStatus.Pending,
-                dedupeKey);
+                dedupeKey,
+                nowUtc);
 
             if (string.IsNullOrWhiteSpace(recipientEmail))
             {
-                log.MarkSkipped("Recipient email is missing");
+                log.MarkSkipped("Recipient email is missing", nowUtc);
                 if (await TryInsertLogAsync(log, ct))
                     dedupeSet.Add(dedupeKey);
                 continue;
@@ -367,7 +372,7 @@ public sealed class ReminderProcessorService
 
             if (!dailyBudget.TryConsume())
             {
-                log.MarkSkipped(TrialLimits.ReminderDailyLimitSkipReason);
+                log.MarkSkipped(TrialLimits.ReminderDailyLimitSkipReason, nowUtc);
                 if (await TryInsertLogAsync(log, ct))
                     dedupeSet.Add(dedupeKey);
                 continue;
@@ -388,11 +393,11 @@ public sealed class ReminderProcessorService
                     body,
                     isHtml: false,
                     ct);
-                log.MarkEnqueued(outboxMessageId);
+                log.MarkEnqueued(nowUtc, outboxMessageId);
             }
             catch (Exception ex)
             {
-                log.MarkFailed(ex.Message);
+                log.MarkFailed(ex.Message, nowUtc);
                 _logger.LogWarning(ex, "Vaccination reminder enqueue failed. Tenant={TenantId} Vaccination={VaccinationId}", tenantId, candidate.VaccinationId);
             }
 
@@ -446,7 +451,7 @@ public sealed class ReminderProcessorService
         return new DailyEmailBudget(Math.Max(0, TrialLimits.ReminderEmailsPerDay - sentToday));
     }
 
-    private async Task SyncEnqueuedDispatchLogsWithOutboxStatusAsync(int batchSize, CancellationToken ct)
+    private async Task SyncEnqueuedDispatchLogsWithOutboxStatusAsync(int batchSize, DateTime nowUtc, CancellationToken ct)
     {
         var enqueuedLogs = await _db.ReminderDispatchLogs
             .Where(x => x.Status == ReminderDispatchStatus.Enqueued && x.OutboxMessageId != null)
@@ -478,7 +483,7 @@ public sealed class ReminderProcessorService
 
             if (outbox.ProcessedAtUtc.HasValue)
             {
-                log.MarkSent(outbox.ProcessedAtUtc.Value);
+                log.MarkSent(outbox.ProcessedAtUtc.Value, nowUtc);
                 hasChanges = true;
                 continue;
             }
@@ -487,7 +492,8 @@ public sealed class ReminderProcessorService
             {
                 log.MarkFailed(
                     outbox.DeadLetterAtUtc.Value,
-                    BuildOutboxFailureSummary(outbox));
+                    BuildOutboxFailureSummary(outbox),
+                    nowUtc);
                 hasChanges = true;
             }
         }
@@ -516,7 +522,7 @@ public sealed class ReminderProcessorService
 
         const string message = "Gönderim sonucu doğrulanamadı. Lütfen gerekirse yeniden hatırlatma oluşturun.";
         foreach (var log in legacyLogs)
-            log.MarkFailed(nowUtc, message);
+            log.MarkFailed(nowUtc, message, nowUtc);
 
         await _db.SaveChangesAsync(ct);
     }

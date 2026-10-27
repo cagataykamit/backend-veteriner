@@ -72,7 +72,7 @@ internal static class PerfDataGenerator
         var clinic500 = new Clinic(tenantId, "Perf-500", "Izmir");
         var clinic501 = new Clinic(tenantId, "Perf-501", "Izmir");
         db.Clinics.AddRange(clinic500, clinic501);
-        db.UserClinics.AddRange(new UserClinic(userId, clinic500.Id), new UserClinic(userId, clinic501.Id));
+        db.UserClinics.AddRange(new UserClinic(userId, clinic500.Id, DateTime.UtcNow), new UserClinic(userId, clinic501.Id, DateTime.UtcNow));
         await Flush(db);
 
         // Müşteri + hayvan
@@ -82,7 +82,7 @@ internal static class PerfDataGenerator
         for (var i = 0; i < scale.Clients; i++)
         {
             var name = $"{FirstNames[rnd.Next(FirstNames.Length)]} {LastNames[rnd.Next(LastNames.Length)]} {i:D5}";
-            var client = new Client(tenantId, name, $"90555{3_000_000 + i:D7}", i % 3 == 0 ? $"musteri{i}@example.com" : null);
+            var client = new Client(tenantId, name, DateTime.UtcNow, $"90555{3_000_000 + i:D7}", i % 3 == 0 ? $"musteri{i}@example.com" : null);
             db.Clients.Add(client);
             clientIds.Add(client.Id);
             for (var p = 0; p < scale.PetsPerClient; p++)
@@ -109,7 +109,7 @@ internal static class PerfDataGenerator
         {
             var kind = i % 10 == 0 ? ProductKind.Vaccine : i % 3 == 0 ? ProductKind.Medicine : ProductKind.Other;
             var controlled = kind == ProductKind.Medicine && i % 9 == 0 ? ControlledSubstanceClass.Narcotic : ControlledSubstanceClass.None;
-            products.Add(new Product(tenantId, $"Ürün {i:D4}", "adet", 50 + i, "TRY", sku: $"SKU{i:D5}", kind: kind, controlledClass: controlled));
+            products.Add(new Product(tenantId, $"Ürün {i:D4}", "adet", 50 + i, "TRY", DateTime.UtcNow, sku: $"SKU{i:D5}", kind: kind, controlledClass: controlled));
         }
 
         db.Products.AddRange(products);
@@ -118,7 +118,7 @@ internal static class PerfDataGenerator
         var batchesByProduct = new Dictionary<Guid, Guid>(); // ürün → bir parti kimliği (çıkış hareketleri için)
         foreach (var product in products)
         {
-            db.ProductStocks.Add(new ProductStock(tenantId, clinicId, product.Id, 500, 20));
+            db.ProductStocks.Add(new ProductStock(tenantId, clinicId, product.Id, 500, 20, DateTime.UtcNow));
             for (var b = 0; b < 4; b++)
             {
                 var batch = StockBatch.Create(
@@ -127,7 +127,7 @@ internal static class PerfDataGenerator
                     userId, DateTime.UtcNow.AddDays(-scale.Days)).Value!;
                 db.StockBatches.Add(batch);
                 var entry = new StockMovement(
-                    tenantId, clinicId, product.Id, StockMovementType.In, 125, DateTime.UtcNow.AddDays(-scale.Days - 1));
+                    tenantId, clinicId, product.Id, StockMovementType.In, 125, DateTime.UtcNow.AddDays(-scale.Days - 1), DateTime.UtcNow);
                 entry.LinkBatch(batch);
                 db.StockMovements.Add(entry);
                 movementCount++;
@@ -167,6 +167,7 @@ internal static class PerfDataGenerator
 
                 var exam = new Examination(
                     tenantId, clinicId, petId, null, arrived.AddMinutes(10), "Genel kontrol", "Bulgu metni", "Değerlendirme", null,
+                    DateTime.UtcNow,
                     weightKg: 5 + (decimal)rnd.NextDouble() * 20, visitId: visit.Id);
                 if (rnd.Next(10) < 9) exam.Finalize(userId, arrived.AddMinutes(24));
                 db.Examinations.Add(exam);
@@ -174,7 +175,7 @@ internal static class PerfDataGenerator
 
                 if (rnd.Next(100) < 30)
                 {
-                    var rx = new Prescription(tenantId, clinicId, petId, exam.Id, null, arrived.AddMinutes(20), "Reçete", "Günde 2 kez", null, null);
+                    var rx = new Prescription(tenantId, clinicId, petId, exam.Id, null, arrived.AddMinutes(20), "Reçete", "Günde 2 kez", null, null, DateTime.UtcNow);
                     var prod = products[rnd.Next(products.Count)];
                     rx.ReplaceItems([new PrescriptionItemDraft(prod.Name, prod.Id, "Yemekle birlikte", 1)]);
                     db.Prescriptions.Add(rx);
@@ -185,7 +186,7 @@ internal static class PerfDataGenerator
                 {
                     db.Vaccinations.Add(new Vaccination(
                         tenantId, petId, clinicId, null, vaccineIds[rnd.Next(vaccineIds.Count)], "Karma aşı",
-                        VaccinationStatus.Applied, arrived.AddMinutes(15), arrived.AddYears(1), null));
+                        VaccinationStatus.Applied, arrived.AddMinutes(15), arrived.AddYears(1), null, DateTime.UtcNow));
                     Bump("Vaccinations");
                 }
 
@@ -219,6 +220,7 @@ internal static class PerfDataGenerator
                     var product = products[rnd.Next(products.Count)];
                     var outMovement = new StockMovement(
                         tenantId, clinicId, product.Id, StockMovementType.Out, 1, arrived.AddMinutes(20),
+                        DateTime.UtcNow,
                         referenceType: "Visit", referenceId: visit.Id, createdByUserId: userId);
                     // İzleyici her gün temizlendiği için parti bağı gezinti özelliği olmadan, yalnız kimlikle kurulur.
                     typeof(StockMovement).GetProperty(nameof(StockMovement.BatchId))!.SetValue(outMovement, batchesByProduct[product.Id]);

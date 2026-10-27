@@ -92,10 +92,10 @@ public sealed class Client : AggregateRoot
 
     private Client() { }
 
-    public static Client CreateWalkIn(Guid tenantId)
-        => new(tenantId, WalkInFullName) { IsWalkIn = true };
+    public static Client CreateWalkIn(Guid tenantId, DateTime utcNow)
+        => new(tenantId, WalkInFullName, utcNow) { IsWalkIn = true };
 
-    public Client(Guid tenantId, string fullName, string? phone = null, string? email = null, string? address = null)
+    public Client(Guid tenantId, string fullName, DateTime utcNow, string? phone = null, string? email = null, string? address = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -103,7 +103,7 @@ public sealed class Client : AggregateRoot
             throw new ArgumentException("Ad soyad boş olamaz.", nameof(fullName));
 
         TenantId = tenantId;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
         FullName = fullName.Trim();
         Email = NormalizeEmailForStorage(email);
@@ -111,7 +111,7 @@ public sealed class Client : AggregateRoot
         Address = NormalizeAddress(address);
     }
 
-    public void UpdateDetails(string fullName, string? email, string? phone, string? address)
+    public void UpdateDetails(string fullName, string? email, string? phone, string? address, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(fullName))
             throw new ArgumentException("Ad soyad boş olamaz.", nameof(fullName));
@@ -119,7 +119,7 @@ public sealed class Client : AggregateRoot
         Email = NormalizeEmailForStorage(email);
         ApplyPhone(phone);
         Address = NormalizeAddress(address);
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     /// <summary>
@@ -152,7 +152,8 @@ public sealed class Client : AggregateRoot
         string? legalName,
         string? billingProvince,
         string? billingDistrict,
-        string? billingAddressLine)
+        string? billingAddressLine,
+        DateTime utcNow)
     {
         if (personType is { } type && !Enum.IsDefined(type))
             return InvoicingInvalid("Geçersiz kişi türü.");
@@ -195,7 +196,7 @@ public sealed class Client : AggregateRoot
         BillingProvince = province;
         BillingDistrict = district;
         BillingAddressLine = addressLine;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 
@@ -213,7 +214,8 @@ public sealed class Client : AggregateRoot
         DateOnly today,
         Guid recordedByUserId,
         int? templateVersion,
-        string? templateHash)
+        string? templateHash,
+        DateTime utcNow)
     {
         switch (status)
         {
@@ -250,7 +252,7 @@ public sealed class Client : AggregateRoot
                 return Result.Failure("Clients.Validation", "Geçersiz rıza durumu.");
         }
 
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 

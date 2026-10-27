@@ -283,7 +283,7 @@ public sealed class GetTreatmentsListQueryHandlerTests
         // 2026-10-15 21:30 UTC = İstanbul 2026-10-16 00:30; sınır 2026-10-15 21:00 UTC.
         var nowUtc = new DateTime(2026, 10, 15, 21, 30, 0, DateTimeKind.Utc);
         var dayStartUtc = new DateTime(2026, 10, 15, 21, 0, 0, DateTimeKind.Utc);
-        Treatment New(DateTime? followUp) => new(tid, clinicId, Guid.NewGuid(), null, nowUtc.AddDays(-1), "T", "D", null, followUp);
+        Treatment New(DateTime? followUp) => new(tid, clinicId, Guid.NewGuid(), null, nowUtc.AddDays(-1), "T", "D", null, followUp, DateTime.UtcNow);
         var active = New(dayStartUtc);
         Treatment[] all = [New(null), New(dayStartUtc.AddMinutes(-1)), active];
 

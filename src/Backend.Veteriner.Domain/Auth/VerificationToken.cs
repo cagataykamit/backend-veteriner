@@ -13,7 +13,7 @@ public sealed class VerificationToken
     public string TokenHash { get; private set; } = default!;
     public VerificationPurpose Purpose { get; private set; }
     public DateTime ExpiresAtUtc { get; private set; }
-    public DateTime CreatedAtUtc { get; private set; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UsedAtUtc { get; private set; }
 
     // navigation (opsiyonel)
@@ -21,18 +21,19 @@ public sealed class VerificationToken
 
     private VerificationToken() { }
 
-    public VerificationToken(Guid userId, string tokenHash, VerificationPurpose purpose, DateTime expiresAtUtc)
+    public VerificationToken(Guid userId, string tokenHash, VerificationPurpose purpose, DateTime expiresAtUtc, DateTime utcNow)
     {
         UserId = userId;
         TokenHash = tokenHash;
         Purpose = purpose;
         ExpiresAtUtc = expiresAtUtc;
+        CreatedAtUtc = utcNow;
     }
 
-    public bool IsActive => UsedAtUtc is null && DateTime.UtcNow < ExpiresAtUtc;
+    public bool IsActiveAt(DateTime utcNow) => UsedAtUtc is null && utcNow < ExpiresAtUtc;
 
-    public void MarkUsed()
+    public void MarkUsed(DateTime utcNow)
     {
-        if (UsedAtUtc is null) UsedAtUtc = DateTime.UtcNow;
+        if (UsedAtUtc is null) UsedAtUtc = utcNow;
     }
 }

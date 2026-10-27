@@ -109,13 +109,13 @@ internal static class IntegrationTestAuthHelper
         var claim = await EnsureReadClaimForPermissionAsync(db, permissionCode);
 
         var email = $"list-reader-{Guid.NewGuid():N}@example.com";
-        var user = new User(email, hasher.Hash("123456"));
+        var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenantId));
-        db.UserClinics.Add(new UserClinic(user.Id, clinicId));
+        db.UserTenants.Add(new UserTenant(user.Id, tenantId, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, clinicId, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         var claims = new List<Claim>
@@ -153,7 +153,7 @@ internal static class IntegrationTestAuthHelper
         }
 
         var email = $"scoped-{Guid.NewGuid():N}@example.com";
-        var user = new User(email, hasher.Hash("123456"));
+        var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
@@ -162,8 +162,8 @@ internal static class IntegrationTestAuthHelper
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
         }
 
-        db.UserTenants.Add(new UserTenant(user.Id, tenantId));
-        db.UserClinics.Add(new UserClinic(user.Id, clinicId));
+        db.UserTenants.Add(new UserTenant(user.Id, tenantId, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, clinicId, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         var claims = distinctCodes
@@ -205,12 +205,12 @@ internal static class IntegrationTestAuthHelper
         var claim = await EnsureRemindersReadClaimAsync(db);
 
         var email = $"rem-reader-{Guid.NewGuid():N}@example.com";
-        var user = new User(email, hasher.Hash("123456"));
+        var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenantId));
+        db.UserTenants.Add(new UserTenant(user.Id, tenantId, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         var claims = new List<Claim>
@@ -236,12 +236,12 @@ internal static class IntegrationTestAuthHelper
         var adminClaim = await db.OperationClaims.AsNoTracking().FirstAsync(c => c.Name == "Admin");
 
         var email = $"rep-admin-{Guid.NewGuid():N}@example.com";
-        var user = new User(email, hasher.Hash("123456"));
+        var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, adminClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenantId));
+        db.UserTenants.Add(new UserTenant(user.Id, tenantId, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         var claims = jwtPermissions
@@ -270,12 +270,12 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"tenant-admin-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, adminClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         var extraClinic = new Clinic(tenant.Id, $"Extra-{Guid.NewGuid():N}"[..14], "Ankara");
@@ -306,13 +306,13 @@ internal static class IntegrationTestAuthHelper
         var clinicAdminClaim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
         var email = $"clinicadmin-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, clinicAdminClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -345,13 +345,13 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"clinic-reader-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -381,13 +381,13 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"appt-reader-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -403,7 +403,7 @@ internal static class IntegrationTestAuthHelper
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"ApptClient-{Guid.NewGuid():N}"[..14], "905551110099");
+        var client = new Client(clinic.TenantId, $"ApptClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110099");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -458,7 +458,7 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"appt-writer-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
@@ -466,8 +466,8 @@ internal static class IntegrationTestAuthHelper
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, cancelClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, completeClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, rescheduleClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -480,7 +480,7 @@ internal static class IntegrationTestAuthHelper
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"ApptPetClient-{Guid.NewGuid():N}"[..14], "905551110088");
+        var client = new Client(clinic.TenantId, $"ApptPetClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110088");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -516,13 +516,13 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"exam-reader-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -555,14 +555,14 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"exam-writer-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -579,7 +579,7 @@ internal static class IntegrationTestAuthHelper
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"ExamClient-{Guid.NewGuid():N}"[..14], "905551110088");
+        var client = new Client(clinic.TenantId, $"ExamClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110088");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -598,7 +598,8 @@ internal static class IntegrationTestAuthHelper
             "Kontrol",
             "Bulgu",
             null,
-            null);
+            null,
+            utcNow: DateTime.UtcNow);
         db.Examinations.Add(examination);
         await db.SaveChangesAsync();
 
@@ -614,7 +615,8 @@ internal static class IntegrationTestAuthHelper
                 "İlgili Tedavi",
                 "Tedavi açıklaması",
                 null,
-                null);
+                null,
+                DateTime.UtcNow);
             db.Treatments.Add(treatment);
             await db.SaveChangesAsync();
             treatmentId = treatment.Id;
@@ -649,13 +651,13 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"treat-reader-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -688,14 +690,14 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"treat-writer-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -711,7 +713,7 @@ internal static class IntegrationTestAuthHelper
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"TreatClient-{Guid.NewGuid():N}"[..14], "905551110077");
+        var client = new Client(clinic.TenantId, $"TreatClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110077");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -730,7 +732,8 @@ internal static class IntegrationTestAuthHelper
             "IDOR Test Tedavi",
             "Tedavi açıklaması",
             null,
-            null);
+            null,
+            utcNow: DateTime.UtcNow);
         db.Treatments.Add(treatment);
         await db.SaveChangesAsync();
 
@@ -761,13 +764,13 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"presc-reader-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -800,14 +803,14 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"presc-writer-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -823,7 +826,7 @@ internal static class IntegrationTestAuthHelper
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"PrescClient-{Guid.NewGuid():N}"[..14], "905551110066");
+        var client = new Client(clinic.TenantId, $"PrescClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110066");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -843,7 +846,8 @@ internal static class IntegrationTestAuthHelper
             "IDOR Test Reçete",
             "Reçete içeriği",
             null,
-            null);
+            null,
+            utcNow: DateTime.UtcNow);
         db.Prescriptions.Add(prescription);
         await db.SaveChangesAsync();
 
@@ -874,13 +878,13 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"vacc-reader-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -913,14 +917,14 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"vacc-writer-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -936,7 +940,7 @@ internal static class IntegrationTestAuthHelper
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"VaccClient-{Guid.NewGuid():N}"[..14], "905551110055");
+        var client = new Client(clinic.TenantId, $"VaccClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110055");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -961,7 +965,8 @@ internal static class IntegrationTestAuthHelper
             VaccinationStatus.Applied,
             appliedAt,
             null,
-            null);
+            null,
+            utcNow: DateTime.UtcNow);
         db.Vaccinations.Add(vaccination);
         await db.SaveChangesAsync();
 
@@ -992,13 +997,13 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"hosp-reader-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -1033,15 +1038,15 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"hosp-writer-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, dischargeClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -1057,7 +1062,7 @@ internal static class IntegrationTestAuthHelper
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"HospClient-{Guid.NewGuid():N}"[..14], "905551110044");
+        var client = new Client(clinic.TenantId, $"HospClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110044");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -1075,7 +1080,8 @@ internal static class IntegrationTestAuthHelper
             admittedAt,
             plannedDischargeAtUtc: admittedAt.AddDays(2),
             reason: "IDOR Test Yatış",
-            notes: null);
+            notes: null,
+            utcNow: DateTime.UtcNow);
         db.Hospitalizations.Add(hospitalization);
         await db.SaveChangesAsync();
 
@@ -1106,13 +1112,13 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"lab-reader-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -1145,14 +1151,14 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"lab-writer-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -1168,7 +1174,7 @@ internal static class IntegrationTestAuthHelper
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"LabClient-{Guid.NewGuid():N}"[..14], "905551110033");
+        var client = new Client(clinic.TenantId, $"LabClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110033");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -1189,7 +1195,8 @@ internal static class IntegrationTestAuthHelper
             testName: "IDOR Test CBC",
             resultText: "Normal",
             interpretation: null,
-            notes: null);
+            notes: null,
+            utcNow: DateTime.UtcNow);
         db.LabResults.Add(labResult);
         await db.SaveChangesAsync();
 
@@ -1223,14 +1230,14 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"pay-writer-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, createClaim.Id));
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, updateClaim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -1260,13 +1267,13 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"pay-reader-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, assignedClinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, assignedClinic.Id, unassignedClinic.Id);
@@ -1282,7 +1289,7 @@ internal static class IntegrationTestAuthHelper
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var clinic = await db.Clinics.SingleAsync(c => c.Id == clinicId);
-        var client = new Client(clinic.TenantId, $"PayClient-{Guid.NewGuid():N}"[..14], "905551110022");
+        var client = new Client(clinic.TenantId, $"PayClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110022");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -1320,11 +1327,11 @@ internal static class IntegrationTestAuthHelper
 
         var email = $"plain-member-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password);
@@ -1338,7 +1345,7 @@ internal static class IntegrationTestAuthHelper
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var foreignTenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16]);
+        var foreignTenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         db.Tenants.Add(foreignTenant);
         await db.SaveChangesAsync();
 
@@ -1779,7 +1786,7 @@ internal static class IntegrationTestAuthHelper
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var tenant = new Tenant($"RO-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"RO-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         db.Tenants.Add(tenant);
 
         var now = DateTime.UtcNow;

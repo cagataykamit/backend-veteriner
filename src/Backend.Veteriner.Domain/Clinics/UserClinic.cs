@@ -17,7 +17,7 @@ public sealed class UserClinic
 
     private UserClinic() { }
 
-    public UserClinic(Guid userId, Guid clinicId)
+    public UserClinic(Guid userId, Guid clinicId, DateTime utcNow)
     {
         if (userId == Guid.Empty)
             throw new ArgumentException("UserId geçersiz.", nameof(userId));
@@ -26,6 +26,6 @@ public sealed class UserClinic
 
         UserId = userId;
         ClinicId = clinicId;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
     }
 }

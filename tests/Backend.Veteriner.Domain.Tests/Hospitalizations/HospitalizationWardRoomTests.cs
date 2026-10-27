@@ -14,7 +14,7 @@ public sealed class HospitalizationWardRoomTests
         => HospitalizationWard.Create(TenantId, ClinicId, name, sortOrder, Now);
 
     private static Hospitalization Stay(Guid? clinicId = null)
-        => new(TenantId, clinicId ?? ClinicId, Guid.NewGuid(), null, Now.AddHours(-3), null, "Gözlem", null, null, "Kafes 3");
+        => new(TenantId, clinicId ?? ClinicId, Guid.NewGuid(), null, Now.AddHours(-3), null, "Gözlem", null, Now, null, "Kafes 3");
 
     [Fact]
     public void Ward_Create_Should_Trim_Name_And_Start_Active()
@@ -135,7 +135,7 @@ public sealed class HospitalizationWardRoomTests
         var ward = Ward();
         var room = HospitalizationRoom.Create(ward, "Kafes 2", 1, Now);
         var stay = Stay();
-        stay.Discharge(Now, null).IsSuccess.Should().BeTrue();
+        stay.Discharge(Now, null, Now).IsSuccess.Should().BeTrue();
 
         stay.AssignRoom(room, ward).Error.Code.Should().Be("Hospitalizations.AlreadyDischarged");
         stay.ClearRoom().Error.Code.Should().Be("Hospitalizations.AlreadyDischarged");

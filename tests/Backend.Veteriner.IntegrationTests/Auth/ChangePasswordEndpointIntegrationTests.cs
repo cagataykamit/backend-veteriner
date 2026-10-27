@@ -127,10 +127,10 @@ public sealed class ChangePasswordEndpointIntegrationTests
 
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var email = $"change-password-{Guid.NewGuid():N}@example.com";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
 
         db.Users.Add(user);
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return email;

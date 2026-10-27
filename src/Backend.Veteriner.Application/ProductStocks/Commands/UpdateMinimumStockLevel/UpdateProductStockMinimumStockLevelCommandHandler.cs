@@ -21,6 +21,7 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandler
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<ProductStock> _productStocksWrite;
     private readonly ExpiredStockReader _expiredStock;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateProductStockMinimumStockLevelCommandHandler(
         ITenantContext tenantContext,
@@ -28,7 +29,8 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Clinic> clinicsRead,
         IRepository<ProductStock> productStocksWrite,
-        ExpiredStockReader expiredStock)
+        ExpiredStockReader expiredStock,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -36,6 +38,7 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandler
         _clinicsRead = clinicsRead;
         _productStocksWrite = productStocksWrite;
         _expiredStock = expiredStock;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ProductStockDto>> Handle(
@@ -80,7 +83,8 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandler
                 "Klinik bulunamadı veya kiracıya ait değil.");
         }
 
-        stock.SetMinimumStockLevel(request.MinimumStockLevel);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        stock.SetMinimumStockLevel(request.MinimumStockLevel, utcNow);
 
         try
         {

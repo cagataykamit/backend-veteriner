@@ -224,12 +224,12 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"hbs-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             clinicId = clinic.Id;
@@ -296,7 +296,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
             await using var scope = factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var clinic = await db.Clinics.SingleAsync(c => c.Id == ClinicId);
-            var exam = new Examination(clinic.TenantId, ClinicId, petId, null, DateTime.UtcNow.AddHours(-2), "Kontrol", "Bulgu", null, null);
+            var exam = new Examination(clinic.TenantId, ClinicId, petId, null, DateTime.UtcNow.AddHours(-2), "Kontrol", "Bulgu", null, null, DateTime.UtcNow);
             db.Examinations.Add(exam);
             await db.SaveChangesAsync();
             return exam.Id;
@@ -319,7 +319,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
             var definition = await db.VaccineDefinitions.OrderBy(v => v.Code).Select(v => new { v.Id, v.Name }).FirstAsync();
             var vaccination = new Vaccination(
                 clinic.TenantId, petId, ClinicId, examinationId, definition.Id, definition.Name, VaccinationStatus.Applied,
-                DateTime.UtcNow.AddHours(-1), null, null);
+                DateTime.UtcNow.AddHours(-1), null, null, DateTime.UtcNow);
             db.Vaccinations.Add(vaccination);
             await db.SaveChangesAsync();
             return vaccination.Id;

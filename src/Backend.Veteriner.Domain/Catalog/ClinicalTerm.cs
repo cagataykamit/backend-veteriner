@@ -30,7 +30,7 @@ public sealed class ClinicalTerm : AggregateRoot
 
     private ClinicalTerm() { }
 
-    private ClinicalTerm(Guid? tenantId, ClinicalTermKind kind, string name)
+    private ClinicalTerm(Guid? tenantId, ClinicalTermKind kind, string name, DateTime utcNow)
     {
         if (!Enum.IsDefined(kind))
             throw new ArgumentException("Sözlük türü geçersiz.", nameof(kind));
@@ -43,20 +43,20 @@ public sealed class ClinicalTerm : AggregateRoot
         Kind = kind;
         ApplyName(name);
         IsActive = true;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
     }
 
-    public static ClinicalTerm CreateSystem(ClinicalTermKind kind, string name) => new(null, kind, name);
+    public static ClinicalTerm CreateSystem(ClinicalTermKind kind, string name, DateTime utcNow) => new(null, kind, name, utcNow);
 
-    public static ClinicalTerm CreateForTenant(Guid tenantId, ClinicalTermKind kind, string name)
+    public static ClinicalTerm CreateForTenant(Guid tenantId, ClinicalTermKind kind, string name, DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
 
-        return new ClinicalTerm(tenantId, kind, name);
+        return new ClinicalTerm(tenantId, kind, name, utcNow);
     }
 
-    public Result Rename(string name)
+    public Result Rename(string name, DateTime utcNow)
     {
         if (IsSystem)
             return SystemReadOnly();
@@ -66,11 +66,11 @@ public sealed class ClinicalTerm : AggregateRoot
             return check;
 
         ApplyName(name);
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 
-    public Result Activate()
+    public Result Activate(DateTime utcNow)
     {
         if (IsSystem)
             return SystemReadOnly();
@@ -78,13 +78,13 @@ public sealed class ClinicalTerm : AggregateRoot
         if (!IsActive)
         {
             IsActive = true;
-            UpdatedAtUtc = DateTime.UtcNow;
+            UpdatedAtUtc = utcNow;
         }
 
         return Result.Success();
     }
 
-    public Result Deactivate()
+    public Result Deactivate(DateTime utcNow)
     {
         if (IsSystem)
             return SystemReadOnly();
@@ -92,7 +92,7 @@ public sealed class ClinicalTerm : AggregateRoot
         if (IsActive)
         {
             IsActive = false;
-            UpdatedAtUtc = DateTime.UtcNow;
+            UpdatedAtUtc = utcNow;
         }
 
         return Result.Success();

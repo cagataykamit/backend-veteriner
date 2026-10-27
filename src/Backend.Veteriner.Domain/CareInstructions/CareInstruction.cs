@@ -36,7 +36,8 @@ public sealed class CareInstruction : AggregateRoot, IClinicScoped
         Guid? examinationId,
         Guid? visitId,
         Guid createdByUserId,
-        string text)
+        string text,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId is invalid.", nameof(tenantId));
@@ -59,10 +60,10 @@ public sealed class CareInstruction : AggregateRoot, IClinicScoped
         VisitId = visitId;
         CreatedByUserId = createdByUserId;
         Text = text.Trim();
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
     }
 
-    public Result UpdateText(Guid updatedByUserId, string text)
+    public Result UpdateText(Guid updatedByUserId, string text, DateTime utcNow)
     {
         if (updatedByUserId == Guid.Empty)
             return Result.Failure("CareInstructions.Validation", "UpdatedByUserId is invalid.");
@@ -73,7 +74,7 @@ public sealed class CareInstruction : AggregateRoot, IClinicScoped
 
         Text = text.Trim();
         UpdatedByUserId = updatedByUserId;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 

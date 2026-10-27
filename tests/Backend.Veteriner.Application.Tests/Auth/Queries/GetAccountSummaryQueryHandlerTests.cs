@@ -36,7 +36,7 @@ public sealed class GetAccountSummaryQueryHandlerTests
     {
         _client.SetupGet(c => c.UserId).Returns(userId);
 
-        var user = new User(email, "hash");
+        var user = new User(email, "hash", DateTime.UtcNow);
         typeof(User).GetProperty(nameof(User.Id))!.SetValue(user, userId);
 
         _users
@@ -77,7 +77,7 @@ public sealed class GetAccountSummaryQueryHandlerTests
         ArrangeClaimNames(userId);
         _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
 
-        var tenant = new Tenant("Vetinity Klinik");
+        var tenant = new Tenant("Vetinity Klinik", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         _tenants
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -101,7 +101,7 @@ public sealed class GetAccountSummaryQueryHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
 
-        var tenant = new Tenant("Vetinity Klinik");
+        var tenant = new Tenant("Vetinity Klinik", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         _tenants
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -130,7 +130,7 @@ public sealed class GetAccountSummaryQueryHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
         _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
 
-        var tenant = new Tenant("Vetinity Klinik");
+        var tenant = new Tenant("Vetinity Klinik", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         _tenants
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))

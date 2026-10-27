@@ -38,7 +38,7 @@ public sealed class ReverseStockMovementCommandHandlerTests
 
         var clinic = new Clinic(_tenantId, "Klinik", "İstanbul");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, _clinicId);
-        _product = new Product(_tenantId, "Ürün", "Adet", 10m, "TRY", sku: "SKU-1");
+        _product = new Product(_tenantId, "Ürün", "Adet", 10m, "TRY", DateTime.UtcNow, sku: "SKU-1");
         typeof(Product).GetProperty(nameof(Product.Id))!.SetValue(_product, _productId);
 
         _clinicsRead
@@ -68,7 +68,8 @@ public sealed class ReverseStockMovementCommandHandlerTests
             _productStocksWrite.Object,
             _stockMovementsWrite.Object,
             StockBatchMocks.EmptyResolver(),
-            _uow.Object);
+            _uow.Object,
+            TimeProvider.System);
 
     private StockMovement Movement(
         StockMovementType type,
@@ -76,6 +77,7 @@ public sealed class ReverseStockMovementCommandHandlerTests
         string? referenceType = null,
         Guid? referenceId = null)
         => new(_tenantId, _clinicId, _productId, type, qty, DateTime.UtcNow,
+            DateTime.UtcNow,
             referenceType: referenceType, referenceId: referenceId);
 
     private void SetupMovementById(StockMovement? movement)
@@ -135,7 +137,7 @@ public sealed class ReverseStockMovementCommandHandlerTests
         var referenceId = Guid.NewGuid();
         var original = Movement(StockMovementType.Out, 4m, "Administration", referenceId);
         SetupMovementById(original);
-        var stock = new ProductStock(_tenantId, _clinicId, _productId, 6m, 0);
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, 6m, 0, DateTime.UtcNow);
         SetupStock(stock);
         StockMovement? added = null;
         _stockMovementsWrite
@@ -165,7 +167,7 @@ public sealed class ReverseStockMovementCommandHandlerTests
     {
         var original = Movement(type, 4m);
         SetupMovementById(original);
-        var stock = new ProductStock(_tenantId, _clinicId, _productId, 10m, 0);
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, 10m, 0, DateTime.UtcNow);
         SetupStock(stock);
 
         var result = await CreateHandler().Handle(Cmd(original.Id), CancellationToken.None);
@@ -179,7 +181,7 @@ public sealed class ReverseStockMovementCommandHandlerTests
     {
         var original = Movement(StockMovementType.In, 4m);
         SetupMovementById(original);
-        var stock = new ProductStock(_tenantId, _clinicId, _productId, 1m, 0);
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, 1m, 0, DateTime.UtcNow);
         SetupStock(stock);
 
         var result = await CreateHandler().Handle(Cmd(original.Id), CancellationToken.None);
@@ -208,8 +210,8 @@ public sealed class ReverseStockMovementCommandHandlerTests
     {
         var original = Movement(StockMovementType.Out);
         SetupMovementById(original);
-        SetupReversalOf(original.CreateReversal("x", null, DateTime.UtcNow, null, null));
-        var stock = new ProductStock(_tenantId, _clinicId, _productId, 6m, 0);
+        SetupReversalOf(original.CreateReversal("x", null, DateTime.UtcNow, null, null, DateTime.UtcNow));
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, 6m, 0, DateTime.UtcNow);
         SetupStock(stock);
 
         var result = await CreateHandler().Handle(Cmd(original.Id), CancellationToken.None);
@@ -225,9 +227,9 @@ public sealed class ReverseStockMovementCommandHandlerTests
         var requestId = Guid.NewGuid();
         var original = Movement(StockMovementType.Out);
         SetupMovementById(original);
-        var firstReversal = original.CreateReversal("x", null, DateTime.UtcNow, null, requestId);
+        var firstReversal = original.CreateReversal("x", null, DateTime.UtcNow, null, requestId, DateTime.UtcNow);
         SetupByRequestId(firstReversal);
-        var stock = new ProductStock(_tenantId, _clinicId, _productId, 6m, 0);
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, 6m, 0, DateTime.UtcNow);
         SetupStock(stock);
 
         var result = await CreateHandler().Handle(Cmd(original.Id, requestId), CancellationToken.None);
@@ -262,8 +264,8 @@ public sealed class ReverseStockMovementCommandHandlerTests
                 It.Is<ISpecification<StockMovement>>(s => s is StockMovementReversalOfSpec),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((StockMovement?)null)
-            .ReturnsAsync(original.CreateReversal("x", null, DateTime.UtcNow, null, null));
-        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 6m, 0));
+            .ReturnsAsync(original.CreateReversal("x", null, DateTime.UtcNow, null, null, DateTime.UtcNow));
+        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 6m, 0, DateTime.UtcNow));
         _stockMovementsWrite
             .Setup(r => r.AddAsync(It.IsAny<StockMovement>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("Cannot insert duplicate key.", innerException: null));
@@ -278,7 +280,7 @@ public sealed class ReverseStockMovementCommandHandlerTests
     {
         var original = Movement(StockMovementType.Out);
         SetupMovementById(original);
-        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 6m, 0));
+        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 6m, 0, DateTime.UtcNow));
         _uow
             .Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateConcurrencyException("Concurrency conflict.", innerException: null));
@@ -293,9 +295,9 @@ public sealed class ReverseStockMovementCommandHandlerTests
     {
         var original = Movement(StockMovementType.Out);
         SetupMovementById(original);
-        var stock = new ProductStock(_tenantId, _clinicId, _productId, 6m, 0);
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, 6m, 0, DateTime.UtcNow);
         SetupStock(stock);
-        _product.Deactivate();
+        _product.Deactivate(DateTime.UtcNow);
 
         var result = await CreateHandler().Handle(Cmd(original.Id), CancellationToken.None);
 

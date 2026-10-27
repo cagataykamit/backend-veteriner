@@ -25,7 +25,7 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
 
     private void SetupWritableTenant(Guid tenantId)
     {
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
 
@@ -59,7 +59,7 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
     public async Task Handle_Should_Block_When_ReadOnlyTenant_And_MutationCommand()
     {
         var tenantId = Guid.NewGuid();
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         var readOnlyByTrial = TenantSubscription.StartTrial(
             tenantId,
@@ -88,7 +88,7 @@ public sealed class TenantSubscriptionWriteGuardBehaviorTests
     public async Task Handle_Should_Block_When_CancelledTenant_And_MutationCommand()
     {
         var tenantId = Guid.NewGuid();
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         var cancelled = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
         typeof(TenantSubscription).GetProperty(nameof(TenantSubscription.Status))!

@@ -17,19 +17,22 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
     private readonly IReadRepository<Client> _clientsRead;
     private readonly IRepository<Client> _clientsWrite;
     private readonly IClientIntegrationEventOutbox _eventOutbox;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateClientCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clientsRead,
         IRepository<Client> clientsWrite,
-        IClientIntegrationEventOutbox eventOutbox)
+        IClientIntegrationEventOutbox eventOutbox,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
         _clientsRead = clientsRead;
         _clientsWrite = clientsWrite;
         _eventOutbox = eventOutbox;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(UpdateClientCommand request, CancellationToken ct)
@@ -91,18 +94,19 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
             }
         }
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var preferences = client.ApplyContactPreferences(request.PreferredContactChannel, request.RemindersOptedOut);
         if (!preferences.IsSuccess)
             return preferences;
 
         if (request.InvoicingIdentity is { } invoicing)
         {
-            var applied = invoicing.ApplyTo(client);
+            var applied = invoicing.ApplyTo(client, utcNow);
             if (!applied.IsSuccess)
                 return applied;
         }
 
-        client.UpdateDetails(request.FullName, request.Email, request.Phone, request.Address);
+        client.UpdateDetails(request.FullName, request.Email, request.Phone, request.Address, utcNow);
 
         try
         {

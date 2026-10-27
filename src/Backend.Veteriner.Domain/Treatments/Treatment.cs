@@ -31,7 +31,8 @@ public sealed class Treatment : AggregateRoot, IClinicScoped
         string title,
         string description,
         string? notes,
-        DateTime? followUpDateUtc)
+        DateTime? followUpDateUtc,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId is invalid.", nameof(tenantId));
@@ -53,7 +54,7 @@ public sealed class Treatment : AggregateRoot, IClinicScoped
         Description = description.Trim();
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         FollowUpDateUtc = followUpDateUtc.HasValue ? NormalizeUtc(followUpDateUtc.Value) : null;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
@@ -65,7 +66,8 @@ public sealed class Treatment : AggregateRoot, IClinicScoped
         string title,
         string description,
         string? notes,
-        DateTime? followUpDateUtc)
+        DateTime? followUpDateUtc,
+        DateTime utcNow)
     {
         if (clinicId == Guid.Empty)
             return Result.Failure("Treatments.Validation", "ClinicId is invalid.");
@@ -84,7 +86,7 @@ public sealed class Treatment : AggregateRoot, IClinicScoped
         Description = description.Trim();
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         FollowUpDateUtc = followUpDateUtc.HasValue ? NormalizeUtc(followUpDateUtc.Value) : null;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 

@@ -14,15 +14,18 @@ public sealed class CreateProductCategoryCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<ProductCategory> _categoriesRead;
     private readonly IRepository<ProductCategory> _categoriesWrite;
+    private readonly TimeProvider _timeProvider;
 
     public CreateProductCategoryCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<ProductCategory> categoriesRead,
-        IRepository<ProductCategory> categoriesWrite)
+        IRepository<ProductCategory> categoriesWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _categoriesRead = categoriesRead;
         _categoriesWrite = categoriesWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ProductCategoryDto>> Handle(CreateProductCategoryCommand request, CancellationToken ct)
@@ -42,7 +45,8 @@ public sealed class CreateProductCategoryCommandHandler
                 "ProductCategories.NameAlreadyExists",
                 "Bu kiracı için aynı kategori adı zaten mevcut.");
 
-        var category = new ProductCategory(tenantId, trimmedName, request.Description);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var category = new ProductCategory(tenantId, trimmedName, utcNow, request.Description);
         try
         {
             await _categoriesWrite.AddAsync(category, ct);

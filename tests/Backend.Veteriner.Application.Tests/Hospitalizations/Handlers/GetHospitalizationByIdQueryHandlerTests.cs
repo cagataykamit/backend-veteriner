@@ -66,7 +66,8 @@ public sealed class GetHospitalizationByIdQueryHandlerTests
             DateTime.UtcNow.AddDays(-1),
             DateTime.UtcNow.AddDays(2),
             "Sebep",
-            "Not");
+            "Not",
+            DateTime.UtcNow);
         if (hospitalizationId.HasValue)
             typeof(Hospitalization).GetProperty(nameof(Hospitalization.Id))!.SetValue(h, hospitalizationId.Value);
         if (dischargedAtUtc.HasValue)
@@ -92,7 +93,7 @@ public sealed class GetHospitalizationByIdQueryHandlerTests
         var pet = new Pet(tenantId, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
 
-        var client = new Client(tenantId, "Ali Veli");
+        var client = new Client(tenantId, "Ali Veli", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -324,7 +325,7 @@ public sealed class GetHospitalizationByIdQueryHandlerTests
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(pet);
 
-        var client = new Client(tid, "Müşteri");
+        var client = new Client(tid, "Müşteri", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(client);

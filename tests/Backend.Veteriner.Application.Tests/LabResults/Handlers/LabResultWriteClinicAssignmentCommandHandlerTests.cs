@@ -50,7 +50,8 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
             _pets.Object,
             _examinations.Object,
             _visits.Object,
-            _labResultsWrite.Object);
+            _labResultsWrite.Object,
+            TimeProvider.System);
 
     private UpdateLabResultCommandHandler CreateUpdateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -62,13 +63,14 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
             _pets.Object,
             _examinations.Object,
             _visits.Object,
-            _labResultsWrite.Object);
+            _labResultsWrite.Object,
+            TimeProvider.System);
 
     private void SetupTenant(Guid tid, Guid cid, Guid petId)
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         var clinic = new Clinic(tid, "K", "İstanbul");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, cid);
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -119,7 +121,8 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
             testName,
             "Eski sonuç",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
     [Fact]
     public async Task Create_Should_Succeed_When_TenantWide_DefaultResolver()
@@ -218,7 +221,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
         var scope = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assignedCid });
         SetupTenant(tid, assignedCid, petId);
 
-        var exam = new Examination(tid, assignedCid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, assignedCid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -244,7 +247,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
         var scope = ClinicReadScopeResolverMock.ForClinicAdmin(new[] { assignedCid });
         SetupTenant(tid, unassignedCid, petId);
 
-        var exam = new Examination(tid, unassignedCid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, unassignedCid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -310,7 +313,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = ExistingRow(tid, entityCid, petId);
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -337,7 +340,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = ExistingRow(tid, assignedCid, petId);
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -363,7 +366,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(activeCid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = ExistingRow(tid, entityCid, petId);
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -407,7 +410,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((LabResult?)null);
 
@@ -432,7 +435,7 @@ public sealed class LabResultWriteClinicAssignmentCommandHandlerTests
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
-        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);

@@ -202,12 +202,12 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
 
-        var profile = TenantBillingProfile.CreateEmpty(tenant.Id);
-        profile.Update(companyName, null, null, taxNumber, null, null, null, null, null, null, null, null);
+        var profile = TenantBillingProfile.CreateEmpty(tenant.Id, DateTime.UtcNow);
+        profile.Update(companyName, null, null, taxNumber, null, null, null, null, null, null, null, null, DateTime.UtcNow);
         db.TenantBillingProfiles.Add(profile);
         await db.SaveChangesAsync();
 
@@ -227,7 +227,7 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         await db.SaveChangesAsync();
@@ -249,7 +249,7 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         await db.SaveChangesAsync();

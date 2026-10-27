@@ -31,6 +31,7 @@ public static class VaccineDefinitionSeeder
             .ToArray();
 
         var added = 0;
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         foreach (var (code, name) in GlobalCatalog)
         {
             var normalized = code.Trim().ToUpperInvariant();
@@ -41,7 +42,7 @@ public static class VaccineDefinitionSeeder
                 continue;
 
             await db.VaccineDefinitions.AddAsync(
-                VaccineDefinition.CreateGlobal(code, name, description: null, defaultNextDueDays: null, speciesId: null),
+                VaccineDefinition.CreateGlobal(code, name, utcNow, description: null, defaultNextDueDays: null, speciesId: null),
                 ct);
             added++;
         }
@@ -51,7 +52,7 @@ public static class VaccineDefinitionSeeder
             .ToListAsync(ct);
 
         foreach (var row in coreRepair)
-            row.SetIsCore(true);
+            row.SetIsCore(true, utcNow);
 
         if (added > 0 || coreRepair.Count > 0)
         {

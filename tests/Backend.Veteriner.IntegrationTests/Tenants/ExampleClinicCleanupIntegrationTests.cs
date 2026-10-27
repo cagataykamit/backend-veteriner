@@ -196,7 +196,7 @@ public sealed class ExampleClinicCleanupIntegrationTests : IClassFixture<CustomW
         var speciesId = await db.Species.Where(s => s.Code == "CAT").Select(s => s.Id).SingleAsync();
         var now = DateTime.UtcNow;
 
-        var client = new Client(tenantId, "Gerçek Müşteri", phone: "05559998877", address: "Kendi adresi");
+        var client = new Client(tenantId, "Gerçek Müşteri", DateTime.UtcNow, phone: "05559998877", address: "Kendi adresi");
         var pet = new Pet(tenantId, client.Id, "Gerçek Kedi", speciesId);
         db.Clients.Add(client);
         db.Pets.Add(pet);
@@ -205,11 +205,12 @@ public sealed class ExampleClinicCleanupIntegrationTests : IClassFixture<CustomW
 
         var examplePetId = await db.Pets.Where(p => p.TenantId == tenantId && p.Notes!.StartsWith(ExampleClinicDataGenerator.TagPrefix))
             .Select(p => p.Id).FirstAsync();
-        db.Examinations.Add(new Examination(tenantId, clinicId, examplePetId, null, now, "Kullanıcının denemesi", null, null, null));
+        db.Examinations.Add(new Examination(tenantId, clinicId, examplePetId, null, now, "Kullanıcının denemesi", null, null, null, DateTime.UtcNow));
 
         var usedProductId = await db.Products.Where(p => p.TenantId == tenantId && p.Sku == "ORN-MAMA-KEDI-2KG").Select(p => p.Id).SingleAsync();
         db.StockMovements.Add(new StockMovement(
             tenantId, clinicId, usedProductId, StockMovementType.In, 3m, now,
+            DateTime.UtcNow,
             reason: "Kullanıcı girişi", referenceType: "GoodsReceipt", createdByUserId: userId));
 
         await db.SaveChangesAsync();

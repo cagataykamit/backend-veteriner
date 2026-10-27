@@ -57,7 +57,7 @@ public sealed class CreateStockMovementCommandHandlerTests
         var productId = Guid.NewGuid();
         var clinic = new Clinic(tenantId, "Klinik", "İstanbul");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, clinicId);
-        var product = new Product(tenantId, "Ürün", "Adet", 10m, "TRY", sku: "SKU-1");
+        var product = new Product(tenantId, "Ürün", "Adet", 10m, "TRY", DateTime.UtcNow, sku: "SKU-1");
         typeof(Product).GetProperty(nameof(Product.Id))!.SetValue(product, productId);
         return (tenantId, clinicId, productId, clinic, product);
     }
@@ -184,7 +184,7 @@ public sealed class CreateStockMovementCommandHandlerTests
     public async Task Handle_Should_Fail_When_Product_Inactive()
     {
         var (tenantId, clinicId, productId, clinic, product) = SeedIdsAndEntities();
-        product.Deactivate();
+        product.Deactivate(DateTime.UtcNow);
         SetupDefaultReads(tenantId, clinicId, product, clinic);
         _productStocksWrite
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
@@ -231,7 +231,7 @@ public sealed class CreateStockMovementCommandHandlerTests
     {
         var (tenantId, clinicId, productId, clinic, product) = SeedIdsAndEntities();
         SetupDefaultReads(tenantId, clinicId, product, clinic);
-        var existing = new ProductStock(tenantId, clinicId, productId, 1m, 0);
+        var existing = new ProductStock(tenantId, clinicId, productId, 1m, 0, DateTime.UtcNow);
         _productStocksWrite
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -274,7 +274,7 @@ public sealed class CreateStockMovementCommandHandlerTests
     {
         var (tenantId, clinicId, productId, clinic, product) = SeedIdsAndEntities();
         SetupDefaultReads(tenantId, clinicId, product, clinic);
-        var stock = new ProductStock(tenantId, clinicId, productId, 10m, 0);
+        var stock = new ProductStock(tenantId, clinicId, productId, 10m, 0, DateTime.UtcNow);
         _productStocksWrite
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(stock);
@@ -295,7 +295,7 @@ public sealed class CreateStockMovementCommandHandlerTests
     {
         var (tenantId, clinicId, productId, clinic, product) = SeedIdsAndEntities();
         SetupDefaultReads(tenantId, clinicId, product, clinic);
-        var stock = new ProductStock(tenantId, clinicId, productId, 10m, 0);
+        var stock = new ProductStock(tenantId, clinicId, productId, 10m, 0, DateTime.UtcNow);
         _productStocksWrite
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(stock);
@@ -331,7 +331,7 @@ public sealed class CreateStockMovementCommandHandlerTests
     {
         var (tenantId, clinicId, productId, clinic, product) = SeedIdsAndEntities();
         SetupDefaultReads(tenantId, clinicId, product, clinic);
-        var stock = new ProductStock(tenantId, clinicId, productId, 2m, 0);
+        var stock = new ProductStock(tenantId, clinicId, productId, 2m, 0, DateTime.UtcNow);
         _productStocksWrite
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(stock);
@@ -348,7 +348,7 @@ public sealed class CreateStockMovementCommandHandlerTests
     {
         var (tenantId, clinicId, productId, clinic, product) = SeedIdsAndEntities();
         SetupDefaultReads(tenantId, clinicId, product, clinic);
-        var stock = new ProductStock(tenantId, clinicId, productId, 10m, 0);
+        var stock = new ProductStock(tenantId, clinicId, productId, 10m, 0, DateTime.UtcNow);
         StockMovement? movement = null;
         _productStocksWrite
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
@@ -395,7 +395,7 @@ public sealed class CreateStockMovementCommandHandlerTests
     {
         var (tenantId, clinicId, productId, clinic, product) = SeedIdsAndEntities();
         SetupDefaultReads(tenantId, clinicId, product, clinic);
-        var stock = new ProductStock(tenantId, clinicId, productId, 5m, 0);
+        var stock = new ProductStock(tenantId, clinicId, productId, 5m, 0, DateTime.UtcNow);
         _productStocksWrite
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(stock);

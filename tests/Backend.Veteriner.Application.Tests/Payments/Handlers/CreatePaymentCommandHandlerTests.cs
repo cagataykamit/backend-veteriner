@@ -87,11 +87,11 @@ public sealed class CreatePaymentCommandHandlerTests
     {
         PaymentAllocationTestSupport.Setup(_chargesWrite, _clientContext, tid, cid, clientId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali"));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow));
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public sealed class CreatePaymentCommandHandlerTests
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Clinic?)null);
 
@@ -125,7 +125,7 @@ public sealed class CreatePaymentCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TenantInactive()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("A");
+        var tenant = new Tenant("A", DateTime.UtcNow);
         tenant.Deactivate();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -146,7 +146,7 @@ public sealed class CreatePaymentCommandHandlerTests
         var cid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -277,7 +277,8 @@ public sealed class CreatePaymentCommandHandlerTests
             "Şikayet",
             "Bulgu",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
 

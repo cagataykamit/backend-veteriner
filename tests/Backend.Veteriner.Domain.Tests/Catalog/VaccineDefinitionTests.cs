@@ -5,17 +5,19 @@ namespace Backend.Veteriner.Domain.Tests.Catalog;
 
 public sealed class VaccineDefinitionTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     [Fact]
     public void CreateTenant_defaults_IsCore_false()
     {
-        var v = VaccineDefinition.CreateTenant(Guid.NewGuid(), "CUSTOM", "Özel");
+        var v = VaccineDefinition.CreateTenant(Guid.NewGuid(), "CUSTOM", "Özel", Now);
         v.IsCore.Should().BeFalse();
     }
 
     [Fact]
     public void CreateGlobal_normalizes_code_to_uppercase()
     {
-        var v = VaccineDefinition.CreateGlobal(" rabies ", "Kuduz");
+        var v = VaccineDefinition.CreateGlobal(" rabies ", "Kuduz", Now);
         v.Code.Should().Be("RABIES");
         v.Name.Should().Be("Kuduz");
         v.TenantId.Should().BeNull();
@@ -26,15 +28,15 @@ public sealed class VaccineDefinitionTests
     [Fact]
     public void CreateTenant_rejects_empty_tenant()
     {
-        var act = () => VaccineDefinition.CreateTenant(Guid.Empty, "X", "Y");
+        var act = () => VaccineDefinition.CreateTenant(Guid.Empty, "X", "Y", Now);
         act.Should().Throw<ArgumentException>().WithParameterName("tenantId");
     }
 
     [Fact]
     public void Deactivate_sets_inactive_and_touch_updated()
     {
-        var v = VaccineDefinition.CreateGlobal("MIXED", "Karma");
-        v.Deactivate();
+        var v = VaccineDefinition.CreateGlobal("MIXED", "Karma", Now);
+        v.Deactivate(Now);
         v.IsActive.Should().BeFalse();
         v.UpdatedAtUtc.Should().NotBeNull();
     }
@@ -42,17 +44,17 @@ public sealed class VaccineDefinitionTests
     [Fact]
     public void UpdateDetails_rejects_empty_name()
     {
-        var v = VaccineDefinition.CreateGlobal("FIV", "FIV");
-        var r = v.UpdateDetails("FIV", "  ", null, null, null, isCore: false);
+        var v = VaccineDefinition.CreateGlobal("FIV", "FIV", Now);
+        var r = v.UpdateDetails("FIV", "  ", null, null, null, isCore: false, utcNow: Now);
         r.IsSuccess.Should().BeFalse();
     }
 
     [Fact]
     public void UpdateDetails_trims_name_and_sets_species()
     {
-        var v = VaccineDefinition.CreateGlobal("LYME", "Lyme");
+        var v = VaccineDefinition.CreateGlobal("LYME", "Lyme", Now);
         var speciesId = Guid.NewGuid();
-        var r = v.UpdateDetails("LYME", "  Lyme aşısı  ", "açıklama", 14, speciesId, isCore: true);
+        var r = v.UpdateDetails("LYME", "  Lyme aşısı  ", "açıklama", 14, speciesId, isCore: true, utcNow: Now);
         r.IsSuccess.Should().BeTrue();
         v.Name.Should().Be("Lyme aşısı");
         v.Description.Should().Be("açıklama");

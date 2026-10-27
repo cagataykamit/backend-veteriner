@@ -34,7 +34,7 @@ public sealed class GetMyClinicsQueryHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
         _client.SetupGet(c => c.UserId).Returns(userId);
 
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         if (!tenantActive)
             tenant.Deactivate();

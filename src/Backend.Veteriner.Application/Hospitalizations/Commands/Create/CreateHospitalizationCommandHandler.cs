@@ -34,6 +34,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
     private readonly IRepository<Hospitalization> _hospitalizationsWrite;
     private readonly IReadRepository<HospitalizationRoom> _rooms;
     private readonly IReadRepository<HospitalizationWard> _wards;
+    private readonly TimeProvider _timeProvider;
 
     public CreateHospitalizationCommandHandler(
         ITenantContext tenantContext,
@@ -47,7 +48,8 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         IReadRepository<Hospitalization> hospitalizationsRead,
         IRepository<Hospitalization> hospitalizationsWrite,
         IReadRepository<HospitalizationRoom> rooms,
-        IReadRepository<HospitalizationWard> wards)
+        IReadRepository<HospitalizationWard> wards,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -61,6 +63,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         _hospitalizationsWrite = hospitalizationsWrite;
         _rooms = rooms;
         _wards = wards;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreateHospitalizationCommand request, CancellationToken ct)
@@ -178,6 +181,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         }
 
         Hospitalization entity;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         try
         {
             entity = new Hospitalization(
@@ -189,6 +193,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
                 request.PlannedDischargeAtUtc,
                 request.Reason,
                 request.Notes,
+                utcNow,
                 visit.Value,
                 request.Location);
         }

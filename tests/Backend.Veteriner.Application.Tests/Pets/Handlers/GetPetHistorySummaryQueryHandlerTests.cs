@@ -83,7 +83,7 @@ public sealed class GetPetHistorySummaryQueryHandlerTests
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tenantId, clientId, "Pamuk", TestSpeciesIds.Cat));
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tenantId, "Ali", "05321111111"));
+            .ReturnsAsync(new Client(tenantId, "Ali", DateTime.UtcNow, "05321111111"));
         SetupEmptyHistoryRepos();
     }
 

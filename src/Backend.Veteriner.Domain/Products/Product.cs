@@ -63,6 +63,7 @@ public sealed class Product : AggregateRoot
         string unit,
         decimal unitPrice,
         string currency,
+        DateTime utcNow,
         Guid? productCategoryId = null,
         string? sku = null,
         string? barcode = null,
@@ -102,7 +103,7 @@ public sealed class Product : AggregateRoot
         PresentationForm = NormalizeOptional(presentationForm);
         Packaging = NormalizeOptional(packaging);
         IsActive = true;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
@@ -115,6 +116,7 @@ public sealed class Product : AggregateRoot
         string unit,
         decimal unitPrice,
         string currency,
+        DateTime utcNow,
         string? sku = null,
         string? barcode = null,
         string? description = null,
@@ -148,18 +150,18 @@ public sealed class Product : AggregateRoot
         PharmacologicalForm = NormalizeOptional(pharmacologicalForm);
         PresentationForm = NormalizeOptional(presentationForm);
         Packaging = NormalizeOptional(packaging);
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void Activate()
+    public void Activate(DateTime utcNow)
     {
         IsActive = true;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void Deactivate()
+    public void Deactivate(DateTime utcNow)
     {
         IsActive = false;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 }

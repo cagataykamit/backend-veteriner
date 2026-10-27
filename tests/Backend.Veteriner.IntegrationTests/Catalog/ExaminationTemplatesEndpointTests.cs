@@ -384,26 +384,26 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var tenant = new Tenant($"et-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"et-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Et-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
-        var drug = new Product(tenant.Id, $"Ilac-{Guid.NewGuid():N}"[..14], "Doz", DrugPrice, "TRY", kind: ProductKind.Medicine);
-        var service = new Product(tenant.Id, $"Hizmet-{Guid.NewGuid():N}"[..14], "Adet", ServicePrice, "TRY", kind: ProductKind.Service);
-        var vaccine = new Product(tenant.Id, $"Asi-{Guid.NewGuid():N}"[..14], "Doz", 100m, "TRY", kind: ProductKind.Vaccine);
+        var drug = new Product(tenant.Id, $"Ilac-{Guid.NewGuid():N}"[..14], "Doz", DrugPrice, "TRY", DateTime.UtcNow, kind: ProductKind.Medicine);
+        var service = new Product(tenant.Id, $"Hizmet-{Guid.NewGuid():N}"[..14], "Adet", ServicePrice, "TRY", DateTime.UtcNow, kind: ProductKind.Service);
+        var vaccine = new Product(tenant.Id, $"Asi-{Guid.NewGuid():N}"[..14], "Doz", 100m, "TRY", DateTime.UtcNow, kind: ProductKind.Vaccine);
         db.Products.AddRange(drug, service, vaccine);
-        var owner = new Client(tenant.Id, $"EtClient-{Guid.NewGuid():N}"[..14], "905551110078");
+        var owner = new Client(tenant.Id, $"EtClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110078");
         db.Clients.Add(owner);
         await db.SaveChangesAsync();
 
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, owner.Id, $"EtPet-{Guid.NewGuid():N}"[..12], speciesId);
         db.Pets.Add(pet);
-        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, drug.Id, drugStock, 0m));
+        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, drug.Id, drugStock, 0m, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
-        var exam = new Examination(tenant.Id, clinic.Id, pet.Id, appointmentId: null, DateTime.UtcNow.AddHours(-1), "Aşı", "Bulgu yok", null, null);
+        var exam = new Examination(tenant.Id, clinic.Id, pet.Id, appointmentId: null, DateTime.UtcNow.AddHours(-1), "Aşı", "Bulgu yok", null, null, utcNow: DateTime.UtcNow);
         if (finalized)
             exam.Finalize(Guid.NewGuid(), DateTime.UtcNow);
         db.Examinations.Add(exam);

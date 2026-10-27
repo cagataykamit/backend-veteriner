@@ -25,6 +25,7 @@ public sealed class CancelLabResultCommandHandler
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IRepository<LabResult> _labResultsWrite;
     private readonly StoredFileAccessCloser _fileCloser;
+    private readonly TimeProvider _timeProvider;
 
     public CancelLabResultCommandHandler(
         ITenantContext tenantContext,
@@ -33,7 +34,8 @@ public sealed class CancelLabResultCommandHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
         IRepository<LabResult> labResultsWrite,
-        StoredFileAccessCloser fileCloser)
+        StoredFileAccessCloser fileCloser,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -42,6 +44,7 @@ public sealed class CancelLabResultCommandHandler
         _tenants = tenants;
         _labResultsWrite = labResultsWrite;
         _fileCloser = fileCloser;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<LabResultWriteResultDto>> Handle(CancelLabResultCommand request, CancellationToken ct)
@@ -79,7 +82,8 @@ public sealed class CancelLabResultCommandHandler
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
             return Fail("LabResults.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
 
-        var cancelled = existing.Cancel(userId, request.Reason);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var cancelled = existing.Cancel(userId, request.Reason, utcNow);
         if (!cancelled.IsSuccess)
             return Result<LabResultWriteResultDto>.Failure(cancelled.Error);
 

@@ -38,7 +38,7 @@ public sealed class ReverseStockMovementBatchTests
 
         var clinic = new Clinic(_tenantId, "Klinik", "İstanbul");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, _clinicId);
-        _product = new Product(_tenantId, "Ürün", "Doz", 10m, "TRY", sku: "SKU-1");
+        _product = new Product(_tenantId, "Ürün", "Doz", 10m, "TRY", DateTime.UtcNow, sku: "SKU-1");
         typeof(Product).GetProperty(nameof(Product.Id))!.SetValue(_product, _productId);
 
         _clinicsRead
@@ -66,14 +66,15 @@ public sealed class ReverseStockMovementBatchTests
             _productStocksWrite.Object,
             _stockMovementsWrite.Object,
             new StockBatchResolver(StockBatchMocks.WithBatches(batches).Object),
-            _uow.Object);
+            _uow.Object,
+            TimeProvider.System);
 
     private StockBatch Batch(decimal qty)
         => StockBatchMocks.Batch(_tenantId, _clinicId, _product, qty, "L", new DateOnly(2027, 1, 1));
 
     private StockMovement Movement(StockMovementType type, decimal qty, StockBatch? batch = null)
     {
-        var m = new StockMovement(_tenantId, _clinicId, _productId, type, qty, DateTime.UtcNow);
+        var m = new StockMovement(_tenantId, _clinicId, _productId, type, qty, DateTime.UtcNow, DateTime.UtcNow);
         if (batch is not null)
             m.LinkBatch(batch);
         _stockMovementsWrite
@@ -85,7 +86,7 @@ public sealed class ReverseStockMovementBatchTests
 
     private ProductStock SetupStock(decimal qty)
     {
-        var stock = new ProductStock(_tenantId, _clinicId, _productId, qty, 0);
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, qty, 0, DateTime.UtcNow);
         _productStocksWrite
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(stock);

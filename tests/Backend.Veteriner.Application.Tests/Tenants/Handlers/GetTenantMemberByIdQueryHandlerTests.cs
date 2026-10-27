@@ -39,11 +39,11 @@ public sealed class GetTenantMemberByIdQueryHandlerTests
 
     private static UserTenant BuildMembership(Guid tenantId, Guid userId, string email, bool confirmed)
     {
-        var user = new User(email, "hash");
+        var user = new User(email, "hash", DateTime.UtcNow);
         typeof(User).GetProperty(nameof(User.Id))!.SetValue(user, userId);
-        if (confirmed) user.ConfirmEmail();
+        if (confirmed) user.ConfirmEmail(DateTime.UtcNow);
 
-        var ut = new UserTenant(userId, tenantId);
+        var ut = new UserTenant(userId, tenantId, DateTime.UtcNow);
         typeof(UserTenant).GetProperty(nameof(UserTenant.User))!.SetValue(ut, user);
         return ut;
     }

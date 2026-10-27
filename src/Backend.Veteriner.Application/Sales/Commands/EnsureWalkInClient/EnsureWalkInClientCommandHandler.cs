@@ -19,19 +19,22 @@ public sealed class EnsureWalkInClientCommandHandler
     private readonly IReadRepository<Client> _clientsRead;
     private readonly IRepository<Client> _clientsWrite;
     private readonly IClientIntegrationEventOutbox _eventOutbox;
+    private readonly TimeProvider _timeProvider;
 
     public EnsureWalkInClientCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clientsRead,
         IRepository<Client> clientsWrite,
-        IClientIntegrationEventOutbox eventOutbox)
+        IClientIntegrationEventOutbox eventOutbox,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
         _clientsRead = clientsRead;
         _clientsWrite = clientsWrite;
         _eventOutbox = eventOutbox;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<WalkInClientDto>> Handle(EnsureWalkInClientCommand request, CancellationToken ct)
@@ -54,7 +57,8 @@ public sealed class EnsureWalkInClientCommandHandler
         if (existing is not null)
             return Result<WalkInClientDto>.Success(new WalkInClientDto(existing.Id, existing.FullName, false));
 
-        var client = Client.CreateWalkIn(tenantId);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var client = Client.CreateWalkIn(tenantId, utcNow);
         try
         {
             await _clientsWrite.AddAsync(client, ct);

@@ -6,6 +6,8 @@ namespace Backend.Veteriner.Domain.Tests.Clients;
 /// <summary>ADR-019 K4: müşteri mükerrer ad anahtarı Türkçe duyarlı ve aksan duyarsızdır; yalnız karşılaştırma içindir.</summary>
 public sealed class ClientDuplicateKeyTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     [Theory]
     [InlineData("AYŞE YILMAZ", "Ayşe Yılmaz")]
     [InlineData("AYSE YILMAZ", "Ayşe Yılmaz")]
@@ -43,7 +45,7 @@ public sealed class ClientDuplicateKeyTests
     [Fact]
     public void Stored_FullName_Is_Not_Altered_By_The_Key()
     {
-        var client = new Client(Guid.NewGuid(), "  AYŞE YILMAZ ");
+        var client = new Client(Guid.NewGuid(), "  AYŞE YILMAZ ", Now);
         client.FullName.Should().Be("AYŞE YILMAZ");
     }
 }

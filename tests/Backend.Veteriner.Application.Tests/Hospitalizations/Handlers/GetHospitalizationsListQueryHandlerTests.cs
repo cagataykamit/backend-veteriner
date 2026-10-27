@@ -207,14 +207,15 @@ public sealed class GetHospitalizationsListQueryHandlerTests
             DateTime.UtcNow.AddDays(-2),
             DateTime.UtcNow.AddDays(1),
             "Gözlem",
-            null);
+            null,
+            DateTime.UtcNow);
 
         _hospitalizations.Setup(r => r.CountAsync(It.IsAny<HospitalizationsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _hospitalizations.Setup(r => r.ListAsync(It.IsAny<HospitalizationsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Hospitalization> { h });
 
-        var client = new Client(tid, "Ali Veli");
+        var client = new Client(tid, "Ali Veli", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client> { client });

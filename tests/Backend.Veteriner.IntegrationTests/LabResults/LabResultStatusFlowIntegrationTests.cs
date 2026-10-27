@@ -211,7 +211,7 @@ public sealed class LabResultStatusFlowIntegrationTests : IClassFixture<CustomWe
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = (await db.Clinics.SingleAsync(c => c.Id == clinicId)).TenantId;
-        var exam = new Examination(tenantId, clinicId, petId, appointmentId: null, DateTime.UtcNow.AddHours(-2), "Kontrol", "Bulgu", null, null);
+        var exam = new Examination(tenantId, clinicId, petId, appointmentId: null, DateTime.UtcNow.AddHours(-2), "Kontrol", "Bulgu", null, null, utcNow: DateTime.UtcNow);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         db.Examinations.Add(exam);
         await db.SaveChangesAsync();

@@ -74,7 +74,7 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
     public async Task GetAsync_When_NoAppointments_ReturnsZeros()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         db.AddRange(tenant, clinic);
         await db.SaveChangesAsync();
@@ -91,9 +91,9 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
     public async Task GetAsync_Counts_Statuses_ForDayRange_And_Clinic()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
-        var client = new Client(tenant.Id, "Ali", "905551112233", "a@x.com");
+        var client = new Client(tenant.Id, "Ali", DateTime.UtcNow, "905551112233", "a@x.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "P", speciesId);
         var inDay = new DateTime(2026, 8, 10, 14, 0, 0, DateTimeKind.Utc);
@@ -118,10 +118,10 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
     public async Task GetAsync_Excludes_OtherClinic()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinicA = new Clinic(tenant.Id, "A", "Istanbul");
         var clinicB = new Clinic(tenant.Id, "B", "Ankara");
-        var client = new Client(tenant.Id, "Veli", "905552223344", "v@x.com");
+        var client = new Client(tenant.Id, "Veli", DateTime.UtcNow, "905552223344", "v@x.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "P", speciesId);
         var inDay = new DateTime(2026, 8, 10, 10, 0, 0, DateTimeKind.Utc);
@@ -141,11 +141,11 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
     public async Task GetAsync_TenantIsolation()
     {
         var db = _db;
-        var t1 = new Tenant("T1");
-        var t2 = new Tenant("T2");
+        var t1 = new Tenant("T1", DateTime.UtcNow);
+        var t2 = new Tenant("T2", DateTime.UtcNow);
         var c1 = new Clinic(t1.Id, "C1", "Istanbul");
         var c2 = new Clinic(t2.Id, "C2", "Istanbul");
-        var client2 = new Client(t2.Id, "X", "905553334455", "x@x.com");
+        var client2 = new Client(t2.Id, "X", DateTime.UtcNow, "905553334455", "x@x.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet2 = new Pet(t2.Id, client2.Id, "P", speciesId);
         var inDay = new DateTime(2026, 8, 10, 12, 0, 0, DateTimeKind.Utc);
@@ -163,10 +163,10 @@ public sealed class DashboardTodayAppointmentStatusCountsReaderTests : IAsyncLif
     public async Task GetAsync_When_ClinicIdNull_Counts_AllClinics_ForTenant_InRange()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinicA = new Clinic(tenant.Id, "A", "Istanbul");
         var clinicB = new Clinic(tenant.Id, "B", "Ankara");
-        var client = new Client(tenant.Id, "Y", "905554445566", "y@x.com");
+        var client = new Client(tenant.Id, "Y", DateTime.UtcNow, "905554445566", "y@x.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "P", speciesId);
         var inDay = new DateTime(2026, 8, 10, 8, 0, 0, DateTimeKind.Utc);

@@ -38,6 +38,7 @@ public sealed class UpdateHospitalizationCommandHandler
     private readonly IRepository<Hospitalization> _hospitalizationsWrite;
     private readonly IReadRepository<HospitalizationRoom> _rooms;
     private readonly IReadRepository<HospitalizationWard> _wards;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateHospitalizationCommandHandler(
         ITenantContext tenantContext,
@@ -51,7 +52,8 @@ public sealed class UpdateHospitalizationCommandHandler
         IReadRepository<Hospitalization> hospitalizationsRead,
         IRepository<Hospitalization> hospitalizationsWrite,
         IReadRepository<HospitalizationRoom> rooms,
-        IReadRepository<HospitalizationWard> wards)
+        IReadRepository<HospitalizationWard> wards,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -65,6 +67,7 @@ public sealed class UpdateHospitalizationCommandHandler
         _hospitalizationsWrite = hospitalizationsWrite;
         _rooms = rooms;
         _wards = wards;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<HospitalizationWriteResultDto>> Handle(UpdateHospitalizationCommand request, CancellationToken ct)
@@ -207,6 +210,7 @@ public sealed class UpdateHospitalizationCommandHandler
             roomAssignment = room.Value;
         }
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var update = existing.UpdateDetails(
             effectiveClinicId,
             request.PetId,
@@ -216,7 +220,8 @@ public sealed class UpdateHospitalizationCommandHandler
             request.PlannedDischargeAtUtc,
             request.Reason,
             request.Notes,
-            request.Location);
+            request.Location,
+            utcNow);
 
         if (!update.IsSuccess)
             return Result<HospitalizationWriteResultDto>.Failure(update.Error);

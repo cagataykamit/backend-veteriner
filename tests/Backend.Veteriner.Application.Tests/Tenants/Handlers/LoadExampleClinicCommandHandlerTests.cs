@@ -206,7 +206,7 @@ public sealed class LoadExampleClinicCommandHandlerTests
 
     private void SetupTenant()
     {
-        var tenant = new Tenant("Örnek Kiracı");
+        var tenant = new Tenant("Örnek Kiracı", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, _tenantId);
         _tenants.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);

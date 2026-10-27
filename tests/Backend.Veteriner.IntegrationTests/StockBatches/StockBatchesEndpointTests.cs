@@ -978,16 +978,16 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"bt-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"bt-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Bt-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
         var product = new Product(
-            tenant.Id, $"bp-{Guid.NewGuid():N}"[..14], "Doz", 2m, "TRY", sku: $"BSK-{Guid.NewGuid():N}"[..14],
+            tenant.Id, $"bp-{Guid.NewGuid():N}"[..14], "Doz", 2m, "TRY", DateTime.UtcNow, sku: $"BSK-{Guid.NewGuid():N}"[..14],
             kind: kind, controlledClass: controlled);
         db.Products.Add(product);
-        var client = new Client(tenant.Id, $"BtClient-{Guid.NewGuid():N}"[..14], "905551110099");
+        var client = new Client(tenant.Id, $"BtClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110099");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -995,7 +995,7 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
         var pet = new Pet(tenant.Id, client.Id, $"BtPet-{Guid.NewGuid():N}"[..12], speciesId);
         db.Pets.Add(pet);
         if (legacyStock is { } onHand)
-            db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, onHand, 0));
+            db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, onHand, 0, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);

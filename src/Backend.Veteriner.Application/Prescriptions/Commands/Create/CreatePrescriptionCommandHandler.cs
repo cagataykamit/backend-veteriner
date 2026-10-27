@@ -32,6 +32,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
     private readonly IReadRepository<Treatment> _treatments;
     private readonly IReadRepository<Product> _products;
     private readonly IRepository<Prescription> _prescriptionsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public CreatePrescriptionCommandHandler(
         ITenantContext tenantContext,
@@ -43,7 +44,8 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
         IReadRepository<Examination> examinations,
         IReadRepository<Treatment> treatments,
         IReadRepository<Product> products,
-        IRepository<Prescription> prescriptionsWrite)
+        IRepository<Prescription> prescriptionsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -55,6 +57,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
         _treatments = treatments;
         _products = products;
         _prescriptionsWrite = prescriptionsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreatePrescriptionCommand request, CancellationToken ct)
@@ -190,6 +193,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             itemDrafts = resolved.Value!;
         }
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var prescription = new Prescription(
             tenantId,
             effectiveClinicId,
@@ -200,7 +204,8 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             request.Title,
             request.Content,
             request.Notes,
-            request.FollowUpDateUtc);
+            request.FollowUpDateUtc,
+            utcNow);
 
         if (itemDrafts is not null)
         {

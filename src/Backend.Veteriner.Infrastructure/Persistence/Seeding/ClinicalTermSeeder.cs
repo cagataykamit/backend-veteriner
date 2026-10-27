@@ -102,13 +102,14 @@ public static class ClinicalTermSeeder
         var known = existing.Select(t => (t.Kind, t.NormalizedName)).ToHashSet();
 
         var added = 0;
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         foreach (var (kind, name) in Complaints.Select(n => (ClinicalTermKind.Complaint, n))
                      .Concat(Diagnoses.Select(n => (ClinicalTermKind.Diagnosis, n))))
         {
             if (!known.Add((kind, TurkishTextKey.Normalize(name))))
                 continue;
 
-            await db.ClinicalTerms.AddAsync(ClinicalTerm.CreateSystem(kind, name), ct);
+            await db.ClinicalTerms.AddAsync(ClinicalTerm.CreateSystem(kind, name, utcNow), ct);
             added++;
         }
 

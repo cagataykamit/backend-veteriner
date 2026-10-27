@@ -330,7 +330,7 @@ public sealed class ClientPaymentSummaryQueryHandlerFeatureFlagTests
 
     private void SetupClientFound(Guid tenantId, string fullName = "Ali Veli")
     {
-        var client = new Client(tenantId, fullName, "05321234567", "ali@example.com", "Ankara");
+        var client = new Client(tenantId, fullName, DateTime.UtcNow, "05321234567", "ali@example.com", "Ankara");
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(client);
     }

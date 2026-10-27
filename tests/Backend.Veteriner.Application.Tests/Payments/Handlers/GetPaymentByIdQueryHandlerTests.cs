@@ -95,7 +95,7 @@ public sealed class GetPaymentByIdQueryHandlerTests
 
     private void SetupClientGraph(Guid tenantId, Guid clientId, string clientName = "Ali Veli")
     {
-        var client = new Client(tenantId, clientName);
+        var client = new Client(tenantId, clientName, DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(client);

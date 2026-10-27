@@ -21,17 +21,20 @@ public sealed class UpdateVaccineDefinitionCommandHandler : IRequestHandler<Upda
     private readonly IReadRepository<Species> _species;
     private readonly IReadRepository<VaccineDefinition> _definitionsRead;
     private readonly IRepository<VaccineDefinition> _definitionsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateVaccineDefinitionCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Species> species,
         IReadRepository<VaccineDefinition> definitionsRead,
-        IRepository<VaccineDefinition> definitionsWrite)
+        IRepository<VaccineDefinition> definitionsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _species = species;
         _definitionsRead = definitionsRead;
         _definitionsWrite = definitionsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(UpdateVaccineDefinitionCommand request, CancellationToken ct)
@@ -71,13 +74,15 @@ public sealed class UpdateVaccineDefinitionCommandHandler : IRequestHandler<Upda
         if (dup > 0)
             return Result.Failure("VaccineDefinitions.DuplicateCode", "Bu kiracıda aynı kod zaten kullanılıyor.");
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var updated = entity.UpdateDetails(
             request.Code,
             request.Name,
             request.Description,
             request.DefaultNextDueDays,
             request.SpeciesId,
-            isCore: false);
+            isCore: false,
+            utcNow: utcNow);
 
         if (!updated.IsSuccess)
             return Result.Failure(updated.Error);

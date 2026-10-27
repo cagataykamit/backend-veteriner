@@ -288,7 +288,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
-        var client = new Client(tenantId, "Parity Other Client", "905551110098");
+        var client = new Client(tenantId, "Parity Other Client", DateTime.UtcNow, "905551110098");
         var pet = new Pet(tenantId, client.Id, "ParityOtherPet", speciesId);
         db.AddRange(client, pet);
         await db.SaveChangesAsync();
@@ -345,14 +345,14 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
         if (client is null)
         {
             client = nullEmail
-                ? new Client(tenant.Id, "Parity Client", "905551110099")
-                : new Client(tenant.Id, "Parity Client", "905551110099", email ?? "parity.owner@vetinity.test");
+                ? new Client(tenant.Id, "Parity Client", DateTime.UtcNow, "905551110099")
+                : new Client(tenant.Id, "Parity Client", DateTime.UtcNow, "905551110099", email ?? "parity.owner@vetinity.test");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
         }
         else if (!nullEmail && email is not null)
         {
-            client.UpdateDetails(client.FullName, email, client.Phone, client.Address);
+            client.UpdateDetails(client.FullName, email, client.Phone, client.Address, DateTime.UtcNow);
             await db.SaveChangesAsync();
         }
 

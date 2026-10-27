@@ -16,7 +16,7 @@ public sealed class PrescriptionItemResolverUnitTests
 
     private Product SetupProduct()
     {
-        var product = new Product(_tenantId, "Amoksisilin", "Kutu", 10m, "TRY");
+        var product = new Product(_tenantId, "Amoksisilin", "Kutu", 10m, "TRY", DateTime.UtcNow);
         _products.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ProductByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(product);
         return product;
     }

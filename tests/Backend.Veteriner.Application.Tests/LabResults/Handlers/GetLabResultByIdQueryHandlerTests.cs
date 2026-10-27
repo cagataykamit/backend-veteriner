@@ -65,7 +65,8 @@ public sealed class GetLabResultByIdQueryHandlerTests
             "Test adı",
             "Sonuç metni",
             "Yorum",
-            "Not");
+            "Not",
+            DateTime.UtcNow);
         if (labResultId.HasValue)
             typeof(LabResult).GetProperty(nameof(LabResult.Id))!.SetValue(lr, labResultId.Value);
         return lr;
@@ -89,7 +90,7 @@ public sealed class GetLabResultByIdQueryHandlerTests
         var pet = new Pet(tenantId, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
 
-        var client = new Client(tenantId, "Ali Veli");
+        var client = new Client(tenantId, "Ali Veli", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))

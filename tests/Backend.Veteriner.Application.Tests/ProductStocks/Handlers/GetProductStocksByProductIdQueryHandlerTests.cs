@@ -53,7 +53,7 @@ public sealed class GetProductStocksByProductIdQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var product = new Product(tid, "Serum", "Adet", 3m, "TRY");
+        var product = new Product(tid, "Serum", "Adet", 3m, "TRY", DateTime.UtcNow);
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
         _products.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Product>>(), It.IsAny<CancellationToken>()))
@@ -94,8 +94,8 @@ public sealed class GetProductStocksByProductIdQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         var clinicId = Guid.NewGuid();
-        var product = new Product(tid, "Serum", "Adet", 3m, "TRY");
-        var stock = new ProductStock(tid, clinicId, product.Id, 10m, 2m);
+        var product = new Product(tid, "Serum", "Adet", 3m, "TRY", DateTime.UtcNow);
+        var stock = new ProductStock(tid, clinicId, product.Id, 10m, 2m, DateTime.UtcNow);
         typeof(ProductStock).GetProperty(nameof(ProductStock.Product))!.SetValue(stock, product);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);

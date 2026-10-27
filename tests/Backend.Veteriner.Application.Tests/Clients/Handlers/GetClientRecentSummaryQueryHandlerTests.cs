@@ -37,7 +37,7 @@ public sealed class GetClientRecentSummaryQueryHandlerTests
     private void SetupClientAndPet(Guid tenantId, Guid clientId, Guid petId)
     {
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tenantId, "Ali", "05321111111"));
+            .ReturnsAsync(new Client(tenantId, "Ali", DateTime.UtcNow, "05321111111"));
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantClientIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Pet> { new(tenantId, clientId, "Pamuk", TestSpeciesIds.Cat) });
         _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsForClientPetsRecentSpec>(), It.IsAny<CancellationToken>()))
@@ -95,7 +95,7 @@ public sealed class GetClientRecentSummaryQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali", "05321111111"));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, "05321111111"));
 
         var result = await CreateHandler(scope).Handle(new GetClientRecentSummaryQuery(clientId), CancellationToken.None);
 
@@ -137,7 +137,7 @@ public sealed class GetClientRecentSummaryQueryHandlerTests
         _tenant.SetupGet(t => t.TenantId).Returns(tid);
         _clinic.SetupGet(c => c.ClinicId).Returns((Guid?)null);
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali", "05321111111"));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, "05321111111"));
 
         var result = await CreateHandler(scope).Handle(new GetClientRecentSummaryQuery(clientId), CancellationToken.None);
 

@@ -299,7 +299,7 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(ctx.TenantId, ctx.ClientId, $"CsPet2-{Guid.NewGuid():N}"[..12], speciesId);
         db.Pets.Add(pet);
-        var exam = new Examination(ctx.TenantId, ctx.ClinicId, pet.Id, appointmentId: null, DateTime.UtcNow.AddHours(-1), "Aşı", "Bulgu yok", null, null);
+        var exam = new Examination(ctx.TenantId, ctx.ClinicId, pet.Id, appointmentId: null, DateTime.UtcNow.AddHours(-1), "Aşı", "Bulgu yok", null, null, utcNow: DateTime.UtcNow);
         db.Examinations.Add(exam);
         await db.SaveChangesAsync();
         return ctx with { PetId = pet.Id, ExaminationId = exam.Id };
@@ -309,7 +309,7 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var client = new Client(tenantId, $"CsOther-{Guid.NewGuid():N}"[..14], "905551110078");
+        var client = new Client(tenantId, $"CsOther-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110078");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
         return client.Id;
@@ -388,14 +388,14 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var tenant = new Tenant($"cs-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"cs-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Cs-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
-        var product = new Product(tenant.Id, $"cp-{Guid.NewGuid():N}"[..14], "Doz", price, "TRY", sku: $"CSK-{Guid.NewGuid():N}"[..14], kind: kind);
+        var product = new Product(tenant.Id, $"cp-{Guid.NewGuid():N}"[..14], "Doz", price, "TRY", DateTime.UtcNow, sku: $"CSK-{Guid.NewGuid():N}"[..14], kind: kind);
         db.Products.Add(product);
-        var owner = new Client(tenant.Id, $"CsClient-{Guid.NewGuid():N}"[..14], "905551110077");
+        var owner = new Client(tenant.Id, $"CsClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110077");
         db.Clients.Add(owner);
         await db.SaveChangesAsync();
 
@@ -403,10 +403,10 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
         var pet = new Pet(tenant.Id, owner.Id, $"CsPet-{Guid.NewGuid():N}"[..12], speciesId);
         db.Pets.Add(pet);
         if (stock is { } onHand)
-            db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, onHand, 0m));
+            db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, onHand, 0m, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
-        var exam = new Examination(tenant.Id, clinic.Id, pet.Id, appointmentId: null, DateTime.UtcNow.AddHours(-1), "Aşı", "Bulgu yok", null, null);
+        var exam = new Examination(tenant.Id, clinic.Id, pet.Id, appointmentId: null, DateTime.UtcNow.AddHours(-1), "Aşı", "Bulgu yok", null, null, utcNow: DateTime.UtcNow);
         db.Examinations.Add(exam);
         await db.SaveChangesAsync();
 

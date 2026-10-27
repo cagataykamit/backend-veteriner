@@ -27,7 +27,8 @@ public sealed class ClinicWorkingHour
         TimeOnly? opensAt,
         TimeOnly? closesAt,
         TimeOnly? breakStartsAt,
-        TimeOnly? breakEndsAt)
+        TimeOnly? breakEndsAt,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -48,7 +49,7 @@ public sealed class ClinicWorkingHour
             ClosesAt = isClosed ? null : closesAt,
             BreakStartsAt = isClosed ? null : breakStartsAt,
             BreakEndsAt = isClosed ? null : breakEndsAt,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = utcNow,
             UpdatedAtUtc = null,
         };
     }

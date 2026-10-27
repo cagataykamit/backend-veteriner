@@ -45,7 +45,8 @@ public sealed class UpdateLabResultCommandHandlerTests
             _pets.Object,
             _examinations.Object,
             _visits.Object,
-            _labResultsWrite.Object);
+            _labResultsWrite.Object,
+            TimeProvider.System);
 
     private static UpdateLabResultCommand Cmd(
         Guid id,
@@ -71,7 +72,7 @@ public sealed class UpdateLabResultCommandHandlerTests
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -90,7 +91,8 @@ public sealed class UpdateLabResultCommandHandlerTests
             "Eski test",
             "Eski sonuç",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
@@ -111,7 +113,7 @@ public sealed class UpdateLabResultCommandHandlerTests
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((LabResult?)null);
 
@@ -127,7 +129,7 @@ public sealed class UpdateLabResultCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TenantInactive()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("A");
+        var tenant = new Tenant("A", DateTime.UtcNow);
         tenant.Deactivate();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -155,7 +157,7 @@ public sealed class UpdateLabResultCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExistingLabResult(tid, cid, petId));
 
@@ -175,7 +177,7 @@ public sealed class UpdateLabResultCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         var row = ExistingLabResult(tid, cid, petId);
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
@@ -211,7 +213,7 @@ public sealed class UpdateLabResultCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExistingLabResult(tid, cid, petId));
         SetupTenantClinicPet(tid, cid, petId);
@@ -235,12 +237,12 @@ public sealed class UpdateLabResultCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExistingLabResult(tid, cid, petId));
         SetupTenantClinicPet(tid, cid, petId);
 
-        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -311,7 +313,7 @@ public sealed class UpdateLabResultCommandHandlerTests
             .ReturnsAsync(row);
         SetupTenantClinicPet(tid, cid, petId);
 
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -332,14 +334,14 @@ public sealed class UpdateLabResultCommandHandlerTests
         var cid = Guid.NewGuid();
         var petId = Guid.NewGuid();
         var examId = Guid.NewGuid();
-        var row = new LabResult(tid, cid, petId, examId, null, null, DateTime.UtcNow.AddDays(-2), "Test adı", "Eski sonuç", null, null);
+        var row = new LabResult(tid, cid, petId, examId, null, null, DateTime.UtcNow.AddDays(-2), "Test adı", "Eski sonuç", null, null, DateTime.UtcNow);
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
         SetupTenantClinicPet(tid, cid, petId);
 
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -360,12 +362,12 @@ public sealed class UpdateLabResultCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
         SetupTenantClinicPet(tid, cid, petId);
 
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -417,7 +419,7 @@ public sealed class UpdateLabResultCommandHandlerTests
     public async Task Handle_Should_EnterResult_On_Requested_Even_When_ExaminationFinalized()
     {
         var (tid, cid, petId, _, exam) = SetupFinalizedLinkedLab();
-        var requested = new LabResult(tid, cid, petId, exam.Id, null, null, null, "Test adı", null, null, null);
+        var requested = new LabResult(tid, cid, petId, exam.Id, null, null, null, "Test adı", null, null, null, DateTime.UtcNow);
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(requested);
 
@@ -437,7 +439,7 @@ public sealed class UpdateLabResultCommandHandlerTests
         var cid = Guid.NewGuid();
         var petId = Guid.NewGuid();
         var row = ExistingLabResult(tid, cid, petId);
-        row.Cancel(Guid.NewGuid(), "Yanlış kayıt girildi").IsSuccess.Should().BeTrue();
+        row.Cancel(Guid.NewGuid(), "Yanlış kayıt girildi", DateTime.UtcNow).IsSuccess.Should().BeTrue();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -463,7 +465,7 @@ public sealed class UpdateLabResultCommandHandlerTests
         _labResultsWrite.Setup(r => r.FirstOrDefaultAsync(It.IsAny<LabResultForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(row);
         SetupTenantClinicPet(tid, cid, petId);
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, visitId: Guid.NewGuid());
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow, visitId: Guid.NewGuid());
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);

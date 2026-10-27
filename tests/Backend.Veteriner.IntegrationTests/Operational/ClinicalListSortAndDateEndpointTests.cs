@@ -157,9 +157,9 @@ public sealed class ClinicalListSortAndDateEndpointTests : IClassFixture<CustomW
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
         var suffix = Guid.NewGuid().ToString("N")[..8];
-        var tenant = new Tenant($"Sort-{suffix}");
+        var tenant = new Tenant($"Sort-{suffix}", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var client = new Client(tenant.Id, $"Musteri {suffix}", "905551112203");
+        var client = new Client(tenant.Id, $"Musteri {suffix}", DateTime.UtcNow, "905551112203");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet1 = new Pet(tenant.Id, client.Id, $"Pet1{suffix}", speciesId);
         var pet2 = new Pet(tenant.Id, client.Id, $"Pet2{suffix}", speciesId);
@@ -176,35 +176,35 @@ public sealed class ClinicalListSortAndDateEndpointTests : IClassFixture<CustomW
 
         var exams = new[]
         {
-            new Examination(tenant.Id, clinic.Id, pet1.Id, null, older, "Kontrol", "Bulgu", null, null),
-            new Examination(tenant.Id, clinic.Id, pet2.Id, null, newer, "Kontrol", "Bulgu", null, null),
+            new Examination(tenant.Id, clinic.Id, pet1.Id, null, older, "Kontrol", "Bulgu", null, null, DateTime.UtcNow),
+            new Examination(tenant.Id, clinic.Id, pet2.Id, null, newer, "Kontrol", "Bulgu", null, null, DateTime.UtcNow),
         };
         var treatments = new[]
         {
-            new Treatment(tenant.Id, clinic.Id, pet1.Id, null, older, "Tedavi", "Açıklama", null, null),
-            new Treatment(tenant.Id, clinic.Id, pet2.Id, null, newer, "Tedavi", "Açıklama", null, null),
+            new Treatment(tenant.Id, clinic.Id, pet1.Id, null, older, "Tedavi", "Açıklama", null, null, DateTime.UtcNow),
+            new Treatment(tenant.Id, clinic.Id, pet2.Id, null, newer, "Tedavi", "Açıklama", null, null, DateTime.UtcNow),
         };
         var prescriptions = new[]
         {
-            new Prescription(tenant.Id, clinic.Id, pet1.Id, null, null, older, "Reçete", "İçerik", null, null),
-            new Prescription(tenant.Id, clinic.Id, pet2.Id, null, null, newer, "Reçete", "İçerik", null, null),
+            new Prescription(tenant.Id, clinic.Id, pet1.Id, null, null, older, "Reçete", "İçerik", null, null, DateTime.UtcNow),
+            new Prescription(tenant.Id, clinic.Id, pet2.Id, null, null, newer, "Reçete", "İçerik", null, null, DateTime.UtcNow),
         };
         var labs = new[]
         {
-            new LabResult(tenant.Id, clinic.Id, pet1.Id, null, null, null, older, "Hemogram", "Normal", null, null),
-            new LabResult(tenant.Id, clinic.Id, pet2.Id, null, null, null, newer, "Hemogram", "Normal", null, null),
+            new LabResult(tenant.Id, clinic.Id, pet1.Id, null, null, null, older, "Hemogram", "Normal", null, null, DateTime.UtcNow),
+            new LabResult(tenant.Id, clinic.Id, pet2.Id, null, null, null, newer, "Hemogram", "Normal", null, null, DateTime.UtcNow),
         };
         var hospitalizations = new[]
         {
-            new Hospitalization(tenant.Id, clinic.Id, pet1.Id, null, older, null, "Gözlem", null),
-            new Hospitalization(tenant.Id, clinic.Id, pet2.Id, null, newer, null, "Gözlem", null),
+            new Hospitalization(tenant.Id, clinic.Id, pet1.Id, null, older, null, "Gözlem", null, DateTime.UtcNow),
+            new Hospitalization(tenant.Id, clinic.Id, pet2.Id, null, newer, null, "Gözlem", null, DateTime.UtcNow),
         };
 
         // Aşı: varsayılan sıra birleşik tarih (Applied → AppliedAtUtc, değilse DueAtUtc); sort=dueAtUtc → vade.
         var rangeFrom = baseTime.AddDays(10);
         var rangeTo = baseTime.AddDays(20);
-        Vaccination Scheduled(DateTime due) => new(tenant.Id, pet1.Id, clinic.Id, null, vaccineDefinitionId, "Kuduz", VaccinationStatus.Scheduled, null, due, null);
-        Vaccination Applied(DateTime applied, DateTime? due) => new(tenant.Id, pet1.Id, clinic.Id, null, vaccineDefinitionId, "Kuduz", VaccinationStatus.Applied, applied, due, null);
+        Vaccination Scheduled(DateTime due) => new(tenant.Id, pet1.Id, clinic.Id, null, vaccineDefinitionId, "Kuduz", VaccinationStatus.Scheduled, null, due, null, DateTime.UtcNow);
+        Vaccination Applied(DateTime applied, DateTime? due) => new(tenant.Id, pet1.Id, clinic.Id, null, vaccineDefinitionId, "Kuduz", VaccinationStatus.Applied, applied, due, null, DateTime.UtcNow);
         var vaccOlder = Scheduled(older);
         var vaccNewer = Scheduled(newer);
         var scheduledAtFromEdge = Scheduled(rangeFrom);

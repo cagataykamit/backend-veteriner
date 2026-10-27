@@ -823,10 +823,10 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
 
         var species = new Species($"IMP{suffix}", $"Imp Tür {suffix}");
-        var visible = VaccineDefinition.CreateTenant(tenantId, $"IMPV{suffix}", $"Imp Aşı {suffix}");
-        var inactive = VaccineDefinition.CreateTenant(tenantId, $"IMPI{suffix}", $"Imp Pasif {suffix}");
-        inactive.Deactivate();
-        var foreign = VaccineDefinition.CreateTenant(otherTenantId, $"IMPF{suffix}", $"Imp Yabancı {suffix}");
+        var visible = VaccineDefinition.CreateTenant(tenantId, $"IMPV{suffix}", $"Imp Aşı {suffix}", DateTime.UtcNow);
+        var inactive = VaccineDefinition.CreateTenant(tenantId, $"IMPI{suffix}", $"Imp Pasif {suffix}", DateTime.UtcNow);
+        inactive.Deactivate(DateTime.UtcNow);
+        var foreign = VaccineDefinition.CreateTenant(otherTenantId, $"IMPF{suffix}", $"Imp Yabancı {suffix}", DateTime.UtcNow);
 
         db.Species.Add(species);
         db.VaccineDefinitions.AddRange(visible, inactive, foreign);
@@ -851,7 +851,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"imp-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"imp-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         // Ice aktarma mekanigi testleri ucretli kiracida kosar; deneme kiracisinda tablo basina 500 satir siniri var (TRIAL-004).
         var subscription = TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);

@@ -38,7 +38,7 @@ public sealed class CreateStockMovementSafetyTests
 
         var clinic = new Clinic(_tenantId, "Klinik", "İstanbul");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, _clinicId);
-        var product = new Product(_tenantId, "Ürün", "Adet", 10m, "TRY", sku: "SKU-1");
+        var product = new Product(_tenantId, "Ürün", "Adet", 10m, "TRY", DateTime.UtcNow, sku: "SKU-1");
         typeof(Product).GetProperty(nameof(Product.Id))!.SetValue(product, _productId);
 
         _clinicsRead
@@ -92,7 +92,7 @@ public sealed class CreateStockMovementSafetyTests
             RequestId: requestId);
 
     private StockMovement ExistingMovement(StockMovementType type, Guid? requestId = null)
-        => new(_tenantId, _clinicId, _productId, type, 3m, DateTime.UtcNow, requestId: requestId);
+        => new(_tenantId, _clinicId, _productId, type, 3m, DateTime.UtcNow, DateTime.UtcNow, requestId: requestId);
 
     private void SetupStock(ProductStock? stock)
         => _productStocksWrite
@@ -119,7 +119,7 @@ public sealed class CreateStockMovementSafetyTests
         var requestId = Guid.NewGuid();
         var existing = ExistingMovement(StockMovementType.Out, requestId);
         SetupMovementByRequestId(existing);
-        var stock = new ProductStock(_tenantId, _clinicId, _productId, 10m, 0);
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, 10m, 0, DateTime.UtcNow);
         SetupStock(stock);
 
         var result = await CreateHandler().Handle(Cmd(StockMovementType.Out, 3, requestId), CancellationToken.None);
@@ -169,7 +169,7 @@ public sealed class CreateStockMovementSafetyTests
     {
         var referenceId = Guid.NewGuid();
         SetupMovementByReference(ExistingMovement(StockMovementType.Out));
-        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 10m, 0));
+        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 10m, 0, DateTime.UtcNow));
 
         var result = await CreateHandler().Handle(
             Cmd(StockMovementType.Out, 1, referenceType: "Administration", referenceId: referenceId),
@@ -200,7 +200,7 @@ public sealed class CreateStockMovementSafetyTests
     public async Task Handle_Should_Map_UniqueViolation_On_FirstStockRow_To_ConcurrencyConflict()
     {
         // Satır yokken eşzamanlı ilk giriş: SaveChanges ProductStocks benzersiz indeksine çarpar, sonra satır görünür.
-        var winner = new ProductStock(_tenantId, _clinicId, _productId, 5m, 0);
+        var winner = new ProductStock(_tenantId, _clinicId, _productId, 5m, 0, DateTime.UtcNow);
         _productStocksWrite
             .SetupSequence(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProductStock?)null)
@@ -248,7 +248,7 @@ public sealed class CreateStockMovementSafetyTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((StockMovement?)null)
             .ReturnsAsync(ExistingMovement(StockMovementType.Out));
-        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 10m, 0));
+        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 10m, 0, DateTime.UtcNow));
         _stockMovementsWrite
             .Setup(r => r.AddAsync(It.IsAny<StockMovement>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("Cannot insert duplicate key.", innerException: null));
@@ -263,7 +263,7 @@ public sealed class CreateStockMovementSafetyTests
     [Fact]
     public async Task Handle_Should_Rethrow_Unrecognized_DbUpdateException()
     {
-        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 10m, 0));
+        SetupStock(new ProductStock(_tenantId, _clinicId, _productId, 10m, 0, DateTime.UtcNow));
         _stockMovementsWrite
             .Setup(r => r.AddAsync(It.IsAny<StockMovement>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("Başka hata.", innerException: null));

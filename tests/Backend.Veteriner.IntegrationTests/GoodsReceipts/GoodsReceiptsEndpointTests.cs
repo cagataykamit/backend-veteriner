@@ -294,15 +294,15 @@ public sealed class GoodsReceiptsEndpointTests : IClassFixture<CustomWebApplicat
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"gr-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"gr-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Gr-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
         var plain = new Product(
-            tenant.Id, $"gp-{Guid.NewGuid():N}"[..14], "Doz", 2m, "TRY", sku: $"GSK-{Guid.NewGuid():N}"[..14]);
+            tenant.Id, $"gp-{Guid.NewGuid():N}"[..14], "Doz", 2m, "TRY", DateTime.UtcNow, sku: $"GSK-{Guid.NewGuid():N}"[..14]);
         var vaccine = new Product(
-            tenant.Id, $"gv-{Guid.NewGuid():N}"[..14], "Doz", 2m, "TRY", sku: $"GSV-{Guid.NewGuid():N}"[..14],
+            tenant.Id, $"gv-{Guid.NewGuid():N}"[..14], "Doz", 2m, "TRY", DateTime.UtcNow, sku: $"GSV-{Guid.NewGuid():N}"[..14],
             kind: ProductKind.Vaccine);
         db.Products.AddRange(plain, vaccine);
         await db.SaveChangesAsync();

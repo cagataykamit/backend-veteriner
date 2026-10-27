@@ -72,7 +72,7 @@ public sealed class ExaminationFinalizeIntegrationTests : IClassFixture<CustomWe
         after.RowVersion.Should().NotEqual(before.RowVersion);
         after.VisitReason.Should().Be(before.VisitReason);
 
-        after.UpdateClinicalContent(new ExaminationClinicalUpdate(after.ExaminedAtUtc, "Degistirilmeye calisildi"))
+        after.UpdateClinicalContent(new ExaminationClinicalUpdate(after.ExaminedAtUtc, "Degistirilmeye calisildi"), DateTime.UtcNow)
             .Error.Code.Should().Be("Examinations.Finalized");
     }
 
@@ -91,7 +91,7 @@ public sealed class ExaminationFinalizeIntegrationTests : IClassFixture<CustomWe
         var updating = await db2.Examinations.AsNoTracking().SingleAsync(x => x.Id == id);
 
         finalizing.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
-        updating.UpdateClinicalContent(new ExaminationClinicalUpdate(updating.ExaminedAtUtc, "Eszamanli duzenleme"))
+        updating.UpdateClinicalContent(new ExaminationClinicalUpdate(updating.ExaminedAtUtc, "Eszamanli duzenleme"), DateTime.UtcNow)
             .IsSuccess.Should().BeTrue();
         finalizing.SetExpectedRowVersion(seed.RowVersion);
         updating.SetExpectedRowVersion(seed.RowVersion);

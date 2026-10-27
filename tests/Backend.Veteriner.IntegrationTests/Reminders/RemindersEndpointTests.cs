@@ -449,7 +449,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         await db.SaveChangesAsync();
@@ -472,7 +472,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         await db.SaveChangesAsync();
@@ -496,7 +496,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
 
         var now = DateTime.UtcNow;
@@ -535,7 +535,8 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
             DateTime.UtcNow,
             DateTime.UtcNow,
             status,
-            $"dedupe-it-{Guid.NewGuid():N}");
+            $"dedupe-it-{Guid.NewGuid():N}",
+            DateTime.UtcNow);
         db.ReminderDispatchLogs.Add(log);
         await db.SaveChangesAsync();
         return log.Id;
@@ -555,12 +556,12 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         var now = DateTime.UtcNow;
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
 
-        var user = new User($"clinic-admin-{Guid.NewGuid():N}@example.com", hasher.Hash("P@ssw0rd!"));
+        var user = new User($"clinic-admin-{Guid.NewGuid():N}@example.com", hasher.Hash("P@ssw0rd!"), DateTime.UtcNow);
         db.Users.Add(user);
 
         var clinicAdminClaim = await db.OperationClaims.AsNoTracking()
@@ -572,7 +573,7 @@ public sealed class RemindersEndpointTests : IClassFixture<CustomWebApplicationF
         db.Clinics.AddRange(clinicA, clinicB);
         await db.SaveChangesAsync();
 
-        db.UserClinics.Add(new UserClinic(user.Id, clinicA.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, clinicA.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         var claims = new List<Claim>

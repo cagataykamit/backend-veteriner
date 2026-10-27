@@ -334,6 +334,7 @@ public sealed class PaymentWriteClinicAssignmentIdorIntegrationTests : IClassFix
         var client = new Backend.Veteriner.Domain.Clients.Client(
             clinic.TenantId,
             $"PayWriteClient-{Guid.NewGuid():N}"[..14],
+            DateTime.UtcNow,
             "905551110044");
         db.Clients.Add(client);
         await db.SaveChangesAsync();

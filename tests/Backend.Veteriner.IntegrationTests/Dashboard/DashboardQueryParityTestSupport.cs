@@ -150,7 +150,7 @@ internal static class DashboardQueryParityTestSupport
             c.TenantId == tenant.Id && c.FullName == "Dashboard Parity Client");
         if (client is null)
         {
-            client = new Client(tenant.Id, "Dashboard Parity Client", "905551110088", "dash.parity@test.local");
+            client = new Client(tenant.Id, "Dashboard Parity Client", DateTime.UtcNow, "905551110088", "dash.parity@test.local");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
         }
@@ -222,7 +222,7 @@ internal static class DashboardQueryParityTestSupport
         if (client is not null)
             return client;
 
-        client = new Client(tenantId, name, phone, email);
+        client = new Client(tenantId, name, DateTime.UtcNow, phone, email);
         db.Clients.Add(client);
         await db.SaveChangesAsync();
         return client;

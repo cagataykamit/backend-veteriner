@@ -88,7 +88,7 @@ public sealed class GetClinicWorkingHoursQueryHandlerTests
         _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
         _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(BuildClinic(cid, tid));
-        var row = ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(10, 0), new TimeOnly(11, 0), null, null);
+        var row = ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(10, 0), new TimeOnly(11, 0), null, null, DateTime.UtcNow);
         _hoursRead.Setup(x => x.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ClinicWorkingHour> { row });
 

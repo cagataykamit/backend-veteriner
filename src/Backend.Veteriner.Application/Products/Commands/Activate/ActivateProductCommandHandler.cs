@@ -10,13 +10,16 @@ public sealed class ActivateProductCommandHandler : IRequestHandler<ActivateProd
 {
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<Product> _products;
+    private readonly TimeProvider _timeProvider;
 
     public ActivateProductCommandHandler(
         ITenantContext tenantContext,
-        IRepository<Product> products)
+        IRepository<Product> products,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _products = products;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(ActivateProductCommand request, CancellationToken ct)
@@ -28,9 +31,10 @@ public sealed class ActivateProductCommandHandler : IRequestHandler<ActivateProd
         if (product is null)
             return Result.Failure("Products.NotFound", "Ürün bulunamadı veya kiracıya ait değil.");
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (!product.IsActive)
         {
-            product.Activate();
+            product.Activate(utcNow);
             await _products.SaveChangesAsync(ct);
         }
 

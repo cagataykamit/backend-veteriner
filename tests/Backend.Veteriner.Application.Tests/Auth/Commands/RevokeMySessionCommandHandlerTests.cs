@@ -64,7 +64,7 @@ public sealed class RevokeMySessionCommandHandlerTests
 
         _client.SetupGet(c => c.UserId).Returns(userId);
 
-        var token = new RefreshToken(otherUserId, "hash", DateTime.UtcNow.AddDays(1), null, null);
+        var token = new RefreshToken(otherUserId, "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow);
         _repo.Setup(r => r.GetByIdAsync(cmd.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(token);
 
@@ -87,7 +87,7 @@ public sealed class RevokeMySessionCommandHandlerTests
 
         _client.SetupGet(c => c.UserId).Returns(userId);
 
-        var token = new RefreshToken(userId, "hash", DateTime.UtcNow.AddDays(1), null, null);
+        var token = new RefreshToken(userId, "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow);
         _repo.Setup(r => r.GetByIdAsync(cmd.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(token);
 
@@ -110,8 +110,8 @@ public sealed class RevokeMySessionCommandHandlerTests
 
         _client.SetupGet(c => c.UserId).Returns(userId);
 
-        var token = new RefreshToken(userId, "hash", DateTime.UtcNow.AddDays(1), null, null);
-        token.Revoke();
+        var token = new RefreshToken(userId, "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow);
+        token.Revoke(DateTime.UtcNow);
         _repo.Setup(r => r.GetByIdAsync(cmd.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(token);
 

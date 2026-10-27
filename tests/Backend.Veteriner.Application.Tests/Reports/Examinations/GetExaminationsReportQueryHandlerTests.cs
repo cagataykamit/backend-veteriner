@@ -116,7 +116,8 @@ public sealed class GetExaminationsReportQueryHandlerTests
             "Kusma",
             "Ateş",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         _examinations
             .Setup(x => x.ListAsync(It.IsAny<ExaminationsReportFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Examination> { ex });
@@ -192,7 +193,8 @@ public sealed class GetExaminationsReportQueryHandlerTests
             "A",
             "B",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         _examinations
             .Setup(x => x.ListAsync(It.IsAny<ExaminationsReportFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Examination> { ex });

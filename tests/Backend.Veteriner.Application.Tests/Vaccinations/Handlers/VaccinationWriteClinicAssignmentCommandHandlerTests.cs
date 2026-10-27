@@ -26,7 +26,7 @@ namespace Backend.Veteriner.Application.Tests.Vaccinations.Handlers;
 /// <summary>IDOR-7E: vaccination write clinic assignment enforcement unit tests.</summary>
 public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
 {
-    private static readonly VaccineDefinition TestDefinition = VaccineDefinition.CreateGlobal("TSTX", "Karma aşı");
+    private static readonly VaccineDefinition TestDefinition = VaccineDefinition.CreateGlobal("TSTX", "Karma aşı", DateTime.UtcNow);
     private static readonly DateTime ValidDueAt = DateTime.UtcNow.AddDays(7);
 
     private readonly Mock<ITenantContext> _tenantContext = new();
@@ -59,7 +59,8 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
             _vaccinationsRead.Object,
             _vaccinationsWrite.Object,
             new Mock<IReadRepository<Administration>>().Object,
-            new Mock<ISender>().Object);
+            new Mock<ISender>().Object,
+            TimeProvider.System);
 
     private UpdateVaccinationCommandHandler CreateUpdateHandler(IClinicReadScopeResolver? resolver = null)
         => new(
@@ -73,13 +74,14 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
             _definitions.Object,
             _vaccinationsRead.Object,
             _vaccinationsWrite.Object,
-            new Mock<IReadRepository<Administration>>().Object);
+            new Mock<IReadRepository<Administration>>().Object,
+            TimeProvider.System);
 
     private void SetupTenant(Guid tid, Guid cid, Guid petId)
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         var clinic = new Clinic(tid, "K", "İstanbul");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, cid);
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -124,7 +126,8 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             ValidDueAt.AddDays(-1),
-            "Eski");
+            "Eski",
+            DateTime.UtcNow);
 
     [Fact]
     public async Task Create_Should_Succeed_When_TenantWide_DefaultResolver()
@@ -282,7 +285,7 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var v = ExistingVaccination(tid, entityCid, petId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -309,7 +312,7 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var v = ExistingVaccination(tid, assignedCid, petId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -335,7 +338,7 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(activeCid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var v = ExistingVaccination(tid, entityCid, petId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -379,7 +382,7 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Vaccination?)null);
 

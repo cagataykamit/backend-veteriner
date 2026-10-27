@@ -6,15 +6,17 @@ namespace Backend.Veteriner.Domain.Tests.Hospitalizations;
 
 public sealed class HospitalizationTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid ClinicId = Guid.NewGuid();
     private static readonly Guid PetId = Guid.NewGuid();
 
     private static Hospitalization Stay(Guid? visitId = null, string? location = null)
-        => new(TenantId, ClinicId, PetId, null, DateTime.UtcNow.AddHours(-3), null, "Gözlem", "Giriş notu", visitId, location);
+        => new(TenantId, ClinicId, PetId, null, DateTime.UtcNow.AddHours(-3), null, "Gözlem", "Giriş notu", Now, visitId, location);
 
     private static Result UpdateWith(Hospitalization h, Guid? visitId = null, string? notes = "Giriş notu", string? location = null)
-        => h.UpdateDetails(ClinicId, PetId, null, visitId, h.AdmittedAtUtc, null, "Gözlem", notes, location);
+        => h.UpdateDetails(ClinicId, PetId, null, visitId, h.AdmittedAtUtc, null, "Gözlem", notes, location, Now);
 
     [Fact]
     public void Ctor_Should_Keep_Visit_And_Trim_Location()
@@ -31,7 +33,7 @@ public sealed class HospitalizationTests
     [Fact]
     public void Ctor_Without_Optional_Parts_Should_Leave_Them_Null()
     {
-        var h = new Hospitalization(TenantId, ClinicId, PetId, null, DateTime.UtcNow.AddHours(-1), null, "R", null);
+        var h = new Hospitalization(TenantId, ClinicId, PetId, null, DateTime.UtcNow.AddHours(-1), null, "R", null, Now);
 
         h.VisitId.Should().BeNull();
         h.Location.Should().BeNull();
@@ -76,7 +78,7 @@ public sealed class HospitalizationTests
     {
         var h = Stay();
 
-        h.Discharge(DateTime.UtcNow, "Taburcu notu").IsSuccess.Should().BeTrue();
+        h.Discharge(DateTime.UtcNow, "Taburcu notu", Now).IsSuccess.Should().BeTrue();
 
         h.Notes.Should().Be("Giriş notu");
         h.DischargeNote.Should().Be("Taburcu notu");
@@ -87,14 +89,14 @@ public sealed class HospitalizationTests
     public void Discharge_Should_Leave_Note_When_Null_And_Clear_When_Blank()
     {
         var h = Stay();
-        h.Discharge(DateTime.UtcNow, "Not").IsSuccess.Should().BeTrue();
+        h.Discharge(DateTime.UtcNow, "Not", Now).IsSuccess.Should().BeTrue();
         typeof(Hospitalization).GetProperty(nameof(Hospitalization.DischargedAtUtc))!.SetValue(h, null);
 
-        h.Discharge(DateTime.UtcNow, null).IsSuccess.Should().BeTrue();
+        h.Discharge(DateTime.UtcNow, null, Now).IsSuccess.Should().BeTrue();
         h.DischargeNote.Should().Be("Not");
 
         typeof(Hospitalization).GetProperty(nameof(Hospitalization.DischargedAtUtc))!.SetValue(h, null);
-        h.Discharge(DateTime.UtcNow, " ").IsSuccess.Should().BeTrue();
+        h.Discharge(DateTime.UtcNow, " ", Now).IsSuccess.Should().BeTrue();
         h.DischargeNote.Should().BeNull();
     }
 
@@ -102,7 +104,7 @@ public sealed class HospitalizationTests
     public void Discharged_Should_Not_Be_Updatable()
     {
         var h = Stay();
-        h.Discharge(DateTime.UtcNow, null).IsSuccess.Should().BeTrue();
+        h.Discharge(DateTime.UtcNow, null, Now).IsSuccess.Should().BeTrue();
 
         var result = UpdateWith(h);
 

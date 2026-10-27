@@ -14,17 +14,20 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
     private readonly IReadRepository<Product> _productsRead;
     private readonly IRepository<Product> _productsWrite;
     private readonly IReadRepository<ProductCategory> _categoriesRead;
+    private readonly TimeProvider _timeProvider;
 
     public CreateProductCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Product> productsRead,
         IRepository<Product> productsWrite,
-        IReadRepository<ProductCategory> categoriesRead)
+        IReadRepository<ProductCategory> categoriesRead,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _productsRead = productsRead;
         _productsWrite = productsWrite;
         _categoriesRead = categoriesRead;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ProductDto>> Handle(CreateProductCommand request, CancellationToken ct)
@@ -59,12 +62,14 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
                 return Result<ProductDto>.Failure("Products.SkuAlreadyExists", "Bu kiracıda aynı SKU ile başka ürün var.");
         }
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var product = new Product(
             tenantId,
             request.Name,
             request.Unit,
             request.UnitPrice,
             request.Currency,
+            utcNow,
             request.ProductCategoryId,
             request.Sku,
             request.Barcode,

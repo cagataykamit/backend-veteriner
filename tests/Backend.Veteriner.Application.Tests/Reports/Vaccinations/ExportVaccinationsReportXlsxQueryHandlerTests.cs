@@ -51,7 +51,8 @@ public sealed class ExportVaccinationsReportXlsxQueryHandlerTests
             VaccinationStatus.Applied,
             applied,
             null,
-            "not");
+            "not",
+            DateTime.UtcNow);
 
         _vaccinations.Setup(x => x.CountAsync(It.IsAny<VaccinationsReportFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);

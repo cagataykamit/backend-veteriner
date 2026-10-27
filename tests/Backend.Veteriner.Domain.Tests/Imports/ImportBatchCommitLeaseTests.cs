@@ -118,7 +118,7 @@ public sealed class ImportBatchCommitLeaseTests
         var applied = Now.AddYears(-2);
 
         var v = Vaccination.CreateImported(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), " Kuduz ", applied, applied.AddYears(1), "Seri: A1", batchId);
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), " Kuduz ", applied, applied.AddYears(1), "Seri: A1", batchId, Now);
 
         v.Status.Should().Be(VaccinationStatus.Applied);
         v.ExaminationId.Should().BeNull();
@@ -126,7 +126,7 @@ public sealed class ImportBatchCommitLeaseTests
         v.VaccineName.Should().Be("Kuduz");
         v.AppliedAtUtc.Should().Be(applied);
         FluentActions.Invoking(() => Vaccination.CreateImported(
-                Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "K", applied, null, null, Guid.Empty))
+                Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "K", applied, null, null, Guid.Empty, Now))
             .Should().Throw<ArgumentException>();
     }
 }

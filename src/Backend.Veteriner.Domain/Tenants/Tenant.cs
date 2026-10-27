@@ -20,14 +20,14 @@ public sealed class Tenant : AggregateRoot
 
     private Tenant() { }
 
-    public Tenant(string name)
+    public Tenant(string name, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Tenant adı boş olamaz.", nameof(name));
 
         Name = name.Trim();
         IsActive = true;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
     }
 
     public static bool IsReservedName(string? name)

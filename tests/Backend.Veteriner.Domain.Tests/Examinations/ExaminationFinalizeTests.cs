@@ -13,7 +13,8 @@ public sealed class ExaminationFinalizeTests
         => new(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), appointmentId: null,
             ExaminedAt, "Iştahsızlık", "Bulgu", "Değerlendirme", "Not",
-            weightKg: 4.25m);
+            weightKg: 4.25m,
+            utcNow: Now);
 
     private static Examination CreateFinalized()
     {
@@ -77,7 +78,7 @@ public sealed class ExaminationFinalizeTests
         var e = CreateFinalized();
 
         var result = e.UpdateClinicalContent(new ExaminationClinicalUpdate(
-            ExaminedAt.AddHours(1), "Yeni neden", Findings: "Yeni bulgu", WeightKg: 9m));
+            ExaminedAt.AddHours(1), "Yeni neden", Findings: "Yeni bulgu", WeightKg: 9m), Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Examinations.Finalized");
@@ -92,7 +93,7 @@ public sealed class ExaminationFinalizeTests
     {
         var e = CreateFinalized();
 
-        var result = e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "Iştahsızlık", ClearVitals: true));
+        var result = e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "Iştahsızlık", ClearVitals: true), Now);
 
         result.Error.Code.Should().Be("Examinations.Finalized");
         e.WeightKg.Should().Be(4.25m);
@@ -103,7 +104,7 @@ public sealed class ExaminationFinalizeTests
     {
         var e = CreateDraft();
 
-        e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "Yeni neden")).IsSuccess.Should().BeTrue();
+        e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "Yeni neden"), Now).IsSuccess.Should().BeTrue();
     }
 
     [Fact]

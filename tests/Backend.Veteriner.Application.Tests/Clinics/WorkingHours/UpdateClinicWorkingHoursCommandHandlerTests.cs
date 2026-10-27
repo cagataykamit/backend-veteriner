@@ -39,7 +39,8 @@ public sealed class UpdateClinicWorkingHoursCommandHandlerTests
             _userClinics.Object,
             _clinicsRead.Object,
             _hoursRead.Object,
-            _hoursWrite.Object);
+            _hoursWrite.Object,
+            TimeProvider.System);
 
     private static Clinic BuildClinic(Guid id, Guid tenantId)
     {
@@ -81,7 +82,7 @@ public sealed class UpdateClinicWorkingHoursCommandHandlerTests
         _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(BuildClinic(cid, tid));
 
-        var old = ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(8, 0), new TimeOnly(9, 0), null, null);
+        var old = ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(8, 0), new TimeOnly(9, 0), null, null, DateTime.UtcNow);
         var savedBucket = new List<ClinicWorkingHour>();
         _hoursWrite.Setup(x => x.AddAsync(It.IsAny<ClinicWorkingHour>(), It.IsAny<CancellationToken>()))
             .Callback<ClinicWorkingHour, CancellationToken>((e, _) => savedBucket.Add(e));

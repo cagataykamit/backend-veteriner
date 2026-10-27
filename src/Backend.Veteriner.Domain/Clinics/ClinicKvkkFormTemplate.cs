@@ -50,7 +50,8 @@ public sealed class ClinicKvkkFormTemplate
         Guid clinicId,
         ClinicKvkkFormKind kind,
         string? text,
-        Guid userId)
+        Guid userId,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -64,7 +65,7 @@ public sealed class ClinicKvkkFormTemplate
             TenantId = tenantId,
             ClinicId = clinicId,
             Kind = kind,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = utcNow,
         };
         var applied = row.ApplyText(text, userId);
         return applied.IsSuccess
@@ -72,11 +73,11 @@ public sealed class ClinicKvkkFormTemplate
             : Result<ClinicKvkkFormTemplate>.Failure(applied.Error);
     }
 
-    public Result UpdateText(string? text, Guid userId)
+    public Result UpdateText(string? text, Guid userId, DateTime utcNow)
     {
         var applied = ApplyText(text, userId);
         if (applied.IsSuccess)
-            UpdatedAtUtc = DateTime.UtcNow;
+            UpdatedAtUtc = utcNow;
         return applied;
     }
 

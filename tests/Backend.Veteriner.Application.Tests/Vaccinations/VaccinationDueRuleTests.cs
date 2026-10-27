@@ -20,7 +20,7 @@ public sealed class VaccinationDueRuleTests
     private readonly Guid _clinicId = Guid.NewGuid();
 
     private Vaccination Scheduled(DateTime dueUtc, Guid? petId = null)
-        => new(_tenantId, petId ?? Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Karma", VaccinationStatus.Scheduled, null, dueUtc, null);
+        => new(_tenantId, petId ?? Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Karma", VaccinationStatus.Scheduled, null, dueUtc, null, DateTime.UtcNow);
 
     [Fact]
     public void Boundaries_Should_Be_Istanbul_Days()
@@ -105,8 +105,8 @@ public sealed class VaccinationDueRuleTests
     {
         var overdueBefore = VaccinationDueRule.OverdueBeforeUtc(NowUtc);
         var (from, to) = VaccinationDueRule.UpcomingWindow(NowUtc, 7);
-        var cancelledPast = new Vaccination(_tenantId, Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Karma", VaccinationStatus.Cancelled, null, TodayStartUtc.AddDays(-2), null);
-        var cancelledSoon = new Vaccination(_tenantId, Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Karma", VaccinationStatus.Cancelled, null, TodayStartUtc.AddDays(2), null);
+        var cancelledPast = new Vaccination(_tenantId, Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Karma", VaccinationStatus.Cancelled, null, TodayStartUtc.AddDays(-2), null, DateTime.UtcNow);
+        var cancelledSoon = new Vaccination(_tenantId, Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Karma", VaccinationStatus.Cancelled, null, TodayStartUtc.AddDays(2), null, DateTime.UtcNow);
 
         new DashboardOverdueVaccinationsCountSpec(_tenantId, _clinicId, overdueBefore).Evaluate([cancelledPast]).Should().BeEmpty();
         new DashboardUpcomingVaccinationsNext7DaysCountSpec(_tenantId, _clinicId, from, to).Evaluate([cancelledSoon]).Should().BeEmpty();

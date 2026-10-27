@@ -289,7 +289,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
 
         var now = DateTime.UtcNow;
@@ -314,7 +314,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"psm-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"psm-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(
             tenant.Id,
@@ -332,11 +332,12 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
             "Adet",
             1m,
             "TRY",
+            DateTime.UtcNow,
             sku: $"SKU-{Guid.NewGuid():N}"[..14]);
         db.Products.Add(product);
         await db.SaveChangesAsync();
 
-        var stock = new ProductStock(tenant.Id, clinic.Id, product.Id, quantityOnHand: 10m, minimumStockLevel: 50m);
+        var stock = new ProductStock(tenant.Id, clinic.Id, product.Id, quantityOnHand: 10m, minimumStockLevel: 50m, utcNow: DateTime.UtcNow);
         db.ProductStocks.Add(stock);
         await db.SaveChangesAsync();
 
@@ -368,11 +369,12 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
             "Adet",
             1m,
             "TRY",
+            DateTime.UtcNow,
             sku: $"RS-{Guid.NewGuid():N}"[..14]);
         db.Products.Add(product);
         await db.SaveChangesAsync();
 
-        var stock = new ProductStock(tenantId, clinic.Id, product.Id, 10m, 50m);
+        var stock = new ProductStock(tenantId, clinic.Id, product.Id, 10m, 50m, DateTime.UtcNow);
         db.ProductStocks.Add(stock);
         await db.SaveChangesAsync();
 
@@ -397,7 +399,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"ps-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"ps-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(
             tenant.Id,
@@ -411,6 +413,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
             "Adet",
             1m,
             "TRY",
+            DateTime.UtcNow,
             sku: $"SKU-{Guid.NewGuid():N}"[..14]);
         db.Products.Add(product);
 
@@ -432,7 +435,8 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
                 clinic.Id,
                 product.Id,
                 quantityOnHand: 5,
-                minimumStockLevel: minimum));
+                minimumStockLevel: minimum,
+                utcNow: DateTime.UtcNow));
         }
 
         await db.SaveChangesAsync();
@@ -473,7 +477,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"ca-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"ca-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(
             tenant.Id,
@@ -481,9 +485,9 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
             DateTime.UtcNow,
             14));
 
-        var user = new User($"ca-{Guid.NewGuid():N}@example.com", hasher.Hash("pw-integration"));
+        var user = new User($"ca-{Guid.NewGuid():N}@example.com", hasher.Hash("pw-integration"), DateTime.UtcNow);
         db.Users.Add(user);
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
 
         var clinicAdminClaimId = await db.OperationClaims
             .Where(c => c.Name == "ClinicAdmin")
@@ -497,7 +501,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         db.Clinics.AddRange(clinicA, clinicB);
         await db.SaveChangesAsync();
 
-        db.UserClinics.Add(new UserClinic(user.Id, clinicA.Id));
+        db.UserClinics.Add(new UserClinic(user.Id, clinicA.Id, DateTime.UtcNow));
 
         var product = new Product(
             tenant.Id,
@@ -505,12 +509,13 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
             "Adet",
             2m,
             "TRY",
+            DateTime.UtcNow,
             sku: $"SKU-{Guid.NewGuid():N}"[..14]);
         db.Products.Add(product);
         await db.SaveChangesAsync();
 
-        var stockA = new ProductStock(tenant.Id, clinicA.Id, product.Id, 4m, 2m);
-        var stockB = new ProductStock(tenant.Id, clinicB.Id, product.Id, 9m, 3m);
+        var stockA = new ProductStock(tenant.Id, clinicA.Id, product.Id, 4m, 2m, DateTime.UtcNow);
+        var stockB = new ProductStock(tenant.Id, clinicB.Id, product.Id, 9m, 3m, DateTime.UtcNow);
         db.ProductStocks.AddRange(stockA, stockB);
         await db.SaveChangesAsync();
 
@@ -549,7 +554,7 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"fil-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"fil-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(
             tenant.Id,
@@ -567,12 +572,13 @@ public sealed class ProductStocksEndpointTests : IClassFixture<CustomWebApplicat
             "Adet",
             1m,
             "TRY",
+            DateTime.UtcNow,
             sku: $"SKU-{Guid.NewGuid():N}"[..14]);
         db.Products.Add(product);
         await db.SaveChangesAsync();
 
-        db.ProductStocks.Add(new ProductStock(tenant.Id, clinicLow.Id, product.Id, 1m, 50m));
-        db.ProductStocks.Add(new ProductStock(tenant.Id, clinicOk.Id, product.Id, 100m, 1m));
+        db.ProductStocks.Add(new ProductStock(tenant.Id, clinicLow.Id, product.Id, 1m, 50m, DateTime.UtcNow));
+        db.ProductStocks.Add(new ProductStock(tenant.Id, clinicOk.Id, product.Id, 100m, 1m, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);

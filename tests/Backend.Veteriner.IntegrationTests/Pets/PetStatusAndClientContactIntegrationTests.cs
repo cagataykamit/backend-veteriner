@@ -201,18 +201,18 @@ public sealed class PetStatusAndClientContactIntegrationTests : IClassFixture<Cu
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
             var clinic = new Clinic(tenant.Id, $"Status-{Guid.NewGuid():N}"[..14], "Izmir");
             db.Clinics.Add(clinic);
-            var client = new Client(tenant.Id, $"SClient-{Guid.NewGuid():N}"[..14], "905551110082");
+            var client = new Client(tenant.Id, $"SClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110082");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"status-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             clinicId = clinic.Id;

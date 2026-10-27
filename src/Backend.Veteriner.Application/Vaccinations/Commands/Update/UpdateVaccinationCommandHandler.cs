@@ -33,6 +33,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
     private readonly IReadRepository<Vaccination> _vaccinationsRead;
     private readonly IRepository<Vaccination> _vaccinationsWrite;
     private readonly IReadRepository<Administration> _administrations;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateVaccinationCommandHandler(
         ITenantContext tenantContext,
@@ -45,7 +46,8 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
         IReadRepository<VaccineDefinition> vaccineDefinitions,
         IReadRepository<Vaccination> vaccinationsRead,
         IRepository<Vaccination> vaccinationsWrite,
-        IReadRepository<Administration> administrations)
+        IReadRepository<Administration> administrations,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -58,6 +60,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
         _vaccinationsRead = vaccinationsRead;
         _vaccinationsWrite = vaccinationsWrite;
         _administrations = administrations;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(UpdateVaccinationCommand request, CancellationToken ct)
@@ -187,6 +190,7 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
                 "Uygulamaya (stok düşümü) bağlı aşı kaydında yalnız notlar ve sonraki doz tarihi değişebilir; iptal için uygulama iptal edilmelidir.");
         }
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var domain = v.UpdateDetails(
             request.PetId,
             effectiveClinicId,
@@ -196,7 +200,8 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
             request.Status,
             appliedUtc,
             dueUtc,
-            request.Notes);
+            request.Notes,
+            utcNow);
 
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);

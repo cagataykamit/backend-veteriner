@@ -5,13 +5,15 @@ namespace Backend.Veteriner.Domain.Tests.CareInstructions;
 
 public sealed class CareInstructionTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid ClinicId = Guid.NewGuid();
     private static readonly Guid PetId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
 
     private static CareInstruction Create(string text = " Günde iki kez su verin ")
-        => new(TenantId, ClinicId, PetId, null, null, null, UserId, text);
+        => new(TenantId, ClinicId, PetId, null, null, null, UserId, text, Now);
 
     [Fact]
     public void Ctor_Should_Trim_Text_And_Record_Author()
@@ -20,7 +22,7 @@ public sealed class CareInstructionTests
         var examinationId = Guid.NewGuid();
         var visitId = Guid.NewGuid();
 
-        var c = new CareInstruction(TenantId, ClinicId, PetId, hospitalizationId, examinationId, visitId, UserId, "  Dinlendirin ");
+        var c = new CareInstruction(TenantId, ClinicId, PetId, hospitalizationId, examinationId, visitId, UserId, "  Dinlendirin ", Now);
 
         c.Text.Should().Be("Dinlendirin");
         c.CreatedByUserId.Should().Be(UserId);
@@ -53,10 +55,10 @@ public sealed class CareInstructionTests
     public void UpdateText_Should_Change_Text_And_Keep_Links()
     {
         var visitId = Guid.NewGuid();
-        var c = new CareInstruction(TenantId, ClinicId, PetId, null, null, visitId, UserId, "Eski");
+        var c = new CareInstruction(TenantId, ClinicId, PetId, null, null, visitId, UserId, "Eski", Now);
         var editor = Guid.NewGuid();
 
-        var result = c.UpdateText(editor, " Yeni ");
+        var result = c.UpdateText(editor, " Yeni ", Now);
 
         result.IsSuccess.Should().BeTrue();
         c.Text.Should().Be("Yeni");
@@ -70,7 +72,7 @@ public sealed class CareInstructionTests
     {
         var c = Create("Eski");
 
-        var result = c.UpdateText(UserId, "  ");
+        var result = c.UpdateText(UserId, "  ", Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("CareInstructions.Validation");

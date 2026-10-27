@@ -17,6 +17,7 @@ public sealed class ConfirmPasswordResetHandler : IRequestHandler<ConfirmPasswor
     private readonly IRefreshTokenRepository _refreshRepo;
     private readonly ILogger<ConfirmPasswordResetHandler> _logger;
     private readonly IClientContext _client;
+    private readonly TimeProvider _timeProvider;
 
     public ConfirmPasswordResetHandler(
         IVerificationTokenRepository verRepo,
@@ -25,7 +26,8 @@ public sealed class ConfirmPasswordResetHandler : IRequestHandler<ConfirmPasswor
         IPasswordHasher hasher,
         IRefreshTokenRepository refreshRepo,
         IClientContext client,
-        ILogger<ConfirmPasswordResetHandler> logger)
+        ILogger<ConfirmPasswordResetHandler> logger,
+        TimeProvider timeProvider)
     {
         _verRepo = verRepo;
         _hash = hash;
@@ -34,6 +36,7 @@ public sealed class ConfirmPasswordResetHandler : IRequestHandler<ConfirmPasswor
         _refreshRepo = refreshRepo;
         _client = client;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Unit> Handle(ConfirmPasswordResetCommand request, CancellationToken ct)
@@ -65,10 +68,11 @@ public sealed class ConfirmPasswordResetHandler : IRequestHandler<ConfirmPasswor
 
         // ?? Yeni parolay� bcrypt ile g�ncelle
         var newHash = _hasher.Hash(request.NewPassword);
-        user.UpdatePasswordHash(newHash);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        user.UpdatePasswordHash(newHash, utcNow);
 
         // Token�� kullan�lm�� i�aretle
-        vt.MarkUsed();
+        vt.MarkUsed(utcNow);
 
         // ?? G�venlik: t�m aktif refresh token�lar� iptal et
         var reason = $"password-reset ip={_client.IpAddress ?? "n/a"} ua=\"{_client.UserAgent ?? "n/a"}\"";

@@ -22,7 +22,7 @@ public sealed class CreateSpeciesCommandHandlerTests
     private CreateSpeciesCommandHandler CreateHandler()
     {
         var tenantId = Guid.NewGuid();
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
 
@@ -114,7 +114,7 @@ public sealed class CreateSpeciesCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_SubscriptionReadOnly()
     {
         var tenantId = Guid.NewGuid();
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         var sub = TenantSubscription.StartTrial(
             tenantId,

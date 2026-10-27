@@ -16,7 +16,7 @@ public sealed class TenantReminderSettings : AggregateRoot
 
     private TenantReminderSettings() { }
 
-    public static TenantReminderSettings CreateDefault(Guid tenantId)
+    public static TenantReminderSettings CreateDefault(Guid tenantId, DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -29,7 +29,7 @@ public sealed class TenantReminderSettings : AggregateRoot
             VaccinationRemindersEnabled = false,
             VaccinationReminderDaysBefore = 3,
             EmailChannelEnabled = true,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = utcNow,
             UpdatedAtUtc = null
         };
     }
@@ -39,7 +39,8 @@ public sealed class TenantReminderSettings : AggregateRoot
         int appointmentReminderHoursBefore,
         bool vaccinationRemindersEnabled,
         int vaccinationReminderDaysBefore,
-        bool emailChannelEnabled)
+        bool emailChannelEnabled,
+        DateTime utcNow)
     {
         if (appointmentReminderHoursBefore < 1 || appointmentReminderHoursBefore > 168)
             return Result.Failure("Reminders.Settings.Validation.AppointmentReminderHoursBefore", "appointmentReminderHoursBefore 1-168 aralığında olmalıdır.");
@@ -51,7 +52,7 @@ public sealed class TenantReminderSettings : AggregateRoot
         VaccinationRemindersEnabled = vaccinationRemindersEnabled;
         VaccinationReminderDaysBefore = vaccinationReminderDaysBefore;
         EmailChannelEnabled = emailChannelEnabled;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 }

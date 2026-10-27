@@ -132,7 +132,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
 
         _clients.Setup(c => c.CountAsync(It.IsAny<DashboardClientsTotalCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(7);
-        var client = new Client(tid, "Ali Veli", "05321111111");
+        var client = new Client(tid, "Ali Veli", DateTime.UtcNow, "05321111111");
         var clientRow = new DashboardRecentClientRow(client.Id, client.FullName, client.Phone);
         _clients.Setup(c => c.ListAsync(It.IsAny<DashboardRecentClientsListSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<DashboardRecentClientRow> { clientRow });
@@ -221,7 +221,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
             .Setup(a => a.ListAsync(It.IsAny<DashboardUpcomingScheduledListSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<DashboardUpcomingAppointmentRow>());
 
-        var clinicClient = new Client(tid, "Klinik Müşterisi", "05329998877");
+        var clinicClient = new Client(tid, "Klinik Müşterisi", DateTime.UtcNow, "05329998877");
         var clinicPet = new Pet(tid, clinicClient.Id, "Minnoş", TestSpeciesIds.Cat);
 
         _clinicScoped
@@ -301,7 +301,7 @@ public sealed class GetDashboardSummaryQueryHandlerTests
     public async Task Handle_Should_NarrowRecentClients_ByClinic_When_ClinicSelected()
     {
         var (tid, cid) = SetupClinicScopedZeros();
-        var client = new Client(tid, "Klinik Veli", "05329998877");
+        var client = new Client(tid, "Klinik Veli", DateTime.UtcNow, "05329998877");
         _clinicScoped
             .Setup(r => r.ListRecentClientsAtClinicAsync(tid, cid, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<DashboardRecentClientRow>

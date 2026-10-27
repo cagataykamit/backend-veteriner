@@ -172,7 +172,7 @@ public sealed class LegalAcceptanceEndpointIntegrationTests : IClassFixture<Cust
             var tokenHash = scope.ServiceProvider.GetRequiredService<ITokenHashService>();
             var now = DateTime.UtcNow;
 
-            var tenant = new Tenant($"Davet Kiracı {Guid.NewGuid():N}"[..24]);
+            var tenant = new Tenant($"Davet Kiracı {Guid.NewGuid():N}"[..24], DateTime.UtcNow);
             var clinic = new Clinic(tenant.Id, "Davet Klinik", "İzmir");
             db.Tenants.Add(tenant);
             db.Clinics.Add(clinic);

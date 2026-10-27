@@ -49,7 +49,8 @@ public sealed class CreateHospitalizationCommandHandlerTests
             _hospitalizationsRead.Object,
             _hospitalizationsWrite.Object,
             _rooms.Object,
-            _wards.Object);
+            _wards.Object,
+            TimeProvider.System);
 
     private static CreateHospitalizationCommand Cmd(
         Guid clinicId,
@@ -72,7 +73,7 @@ public sealed class CreateHospitalizationCommandHandlerTests
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -97,7 +98,7 @@ public sealed class CreateHospitalizationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var result = await CreateHandler().Handle(Cmd(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
@@ -173,7 +174,7 @@ public sealed class CreateHospitalizationCommandHandlerTests
         _hospitalizationsRead.Setup(r => r.AnyAsync(It.IsAny<ActiveHospitalizationForPetClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -211,7 +212,7 @@ public sealed class CreateHospitalizationCommandHandlerTests
 
     private Examination ArrangeExamination(Guid tid, Guid cid, Guid petId, Guid examId, Guid? visitId = null, bool finalized = false)
     {
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         typeof(Examination).GetProperty(nameof(Examination.VisitId))!.SetValue(exam, visitId);
         if (finalized)

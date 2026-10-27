@@ -5,6 +5,8 @@ namespace Backend.Veteriner.Domain.Tests.Examinations;
 
 public sealed class ExaminationClinicalUpdateTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static readonly DateTime ExaminedAt = new(2026, 10, 8, 10, 30, 0, DateTimeKind.Utc);
     private static readonly DateTime VitalsAt = new(2026, 10, 8, 10, 45, 0, DateTimeKind.Utc);
 
@@ -14,14 +16,15 @@ public sealed class ExaminationClinicalUpdateTests
             ExaminedAt, "Iştahsızlık", "Bulgu", "Değerlendirme", "Not",
             anamnesis: "Hikaye", plan: "Plan",
             weightKg: 4.25m, temperatureC: 38.6m, heartRateBpm: 120, respiratoryRatePerMin: 30,
-            vitalsMeasuredAtUtc: VitalsAt);
+            vitalsMeasuredAtUtc: VitalsAt,
+            utcNow: Now);
 
     [Fact]
     public void Partial_update_with_only_required_fields_keeps_all_other_fields()
     {
         var e = CreateFilled();
 
-        var result = e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt.AddHours(1), "Yeni neden"));
+        var result = e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt.AddHours(1), "Yeni neden"), Now);
 
         result.IsSuccess.Should().BeTrue();
         e.VisitReason.Should().Be("Yeni neden");
@@ -44,7 +47,7 @@ public sealed class ExaminationClinicalUpdateTests
     {
         var e = CreateFilled();
 
-        e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "Iştahsızlık", Plan: "  Yeni plan  "))
+        e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "Iştahsızlık", Plan: "  Yeni plan  "), Now)
             .IsSuccess.Should().BeTrue();
 
         e.Plan.Should().Be("Yeni plan");
@@ -63,7 +66,7 @@ public sealed class ExaminationClinicalUpdateTests
 
         e.UpdateClinicalContent(new ExaminationClinicalUpdate(
                 ExaminedAt, "Iştahsızlık",
-                Findings: blank, Assessment: blank, Notes: blank, Anamnesis: blank, Plan: blank))
+                Findings: blank, Assessment: blank, Notes: blank, Anamnesis: blank, Plan: blank), Now)
             .IsSuccess.Should().BeTrue();
 
         e.Findings.Should().BeEmpty();
@@ -78,7 +81,7 @@ public sealed class ExaminationClinicalUpdateTests
     {
         var e = CreateFilled();
 
-        e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt.AddHours(2), "Iştahsızlık", WeightKg: 5m))
+        e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt.AddHours(2), "Iştahsızlık", WeightKg: 5m), Now)
             .IsSuccess.Should().BeTrue();
 
         e.WeightKg.Should().Be(5m);
@@ -93,7 +96,7 @@ public sealed class ExaminationClinicalUpdateTests
     {
         var e = CreateFilled();
 
-        e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "Iştahsızlık", ClearVitals: true))
+        e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "Iştahsızlık", ClearVitals: true), Now)
             .IsSuccess.Should().BeTrue();
 
         e.WeightKg.Should().BeNull();
@@ -112,9 +115,11 @@ public sealed class ExaminationClinicalUpdateTests
         var withTime = CreateFilled();
 
         var r1 = withValue.UpdateClinicalContent(
-            new ExaminationClinicalUpdate(ExaminedAt, "Yeni", WeightKg: 5m, ClearVitals: true));
+            new ExaminationClinicalUpdate(ExaminedAt, "Yeni", WeightKg: 5m, ClearVitals: true),
+            Now);
         var r2 = withTime.UpdateClinicalContent(
-            new ExaminationClinicalUpdate(ExaminedAt, "Yeni", VitalsMeasuredAtUtc: VitalsAt, ClearVitals: true));
+            new ExaminationClinicalUpdate(ExaminedAt, "Yeni", VitalsMeasuredAtUtc: VitalsAt, ClearVitals: true),
+            Now);
 
         r1.IsSuccess.Should().BeFalse();
         r1.Error.Code.Should().Be("Examinations.Validation");
@@ -128,10 +133,10 @@ public sealed class ExaminationClinicalUpdateTests
     public void Vitals_added_for_first_time_default_measured_time_to_examined_time()
     {
         var e = new Examination(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, ExaminedAt, "Kontrol", "", null, null);
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, ExaminedAt, "Kontrol", "", null, null, Now);
 
         var newExaminedAt = ExaminedAt.AddHours(1);
-        e.UpdateClinicalContent(new ExaminationClinicalUpdate(newExaminedAt, "Kontrol", TemperatureC: 38.5m))
+        e.UpdateClinicalContent(new ExaminationClinicalUpdate(newExaminedAt, "Kontrol", TemperatureC: 38.5m), Now)
             .IsSuccess.Should().BeTrue();
 
         e.TemperatureC.Should().Be(38.5m);
@@ -142,10 +147,11 @@ public sealed class ExaminationClinicalUpdateTests
     public void Measured_time_without_any_resulting_vital_is_rejected()
     {
         var e = new Examination(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, ExaminedAt, "Kontrol", "", null, null);
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, ExaminedAt, "Kontrol", "", null, null, Now);
 
         var result = e.UpdateClinicalContent(
-            new ExaminationClinicalUpdate(ExaminedAt, "Kontrol", VitalsMeasuredAtUtc: VitalsAt));
+            new ExaminationClinicalUpdate(ExaminedAt, "Kontrol", VitalsMeasuredAtUtc: VitalsAt),
+            Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Examinations.Validation");
@@ -159,7 +165,8 @@ public sealed class ExaminationClinicalUpdateTests
         var e = CreateFilled();
 
         var result = e.UpdateClinicalContent(
-            new ExaminationClinicalUpdate(ExaminedAt, "Iştahsızlık", HeartRateBpm: heartRate));
+            new ExaminationClinicalUpdate(ExaminedAt, "Iştahsızlık", HeartRateBpm: heartRate),
+            Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Examinations.Validation");
@@ -171,7 +178,7 @@ public sealed class ExaminationClinicalUpdateTests
     {
         var e = CreateFilled();
 
-        var result = e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "  "));
+        var result = e.UpdateClinicalContent(new ExaminationClinicalUpdate(ExaminedAt, "  "), Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Examinations.Validation");

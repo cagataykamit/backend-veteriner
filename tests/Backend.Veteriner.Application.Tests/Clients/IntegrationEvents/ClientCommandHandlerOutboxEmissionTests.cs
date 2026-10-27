@@ -20,14 +20,14 @@ public sealed class ClientCommandHandlerOutboxEmissionTests
     private readonly Mock<IClientIntegrationEventOutbox> _eventOutbox = new();
 
     private CreateClientCommandHandler CreateCreateHandler()
-        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object);
+        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object, TimeProvider.System);
 
     private UpdateClientCommandHandler CreateUpdateHandler()
-        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object);
+        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object, TimeProvider.System);
 
     private static Tenant ActiveTenant(Guid tid)
     {
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         return tenant;
     }
@@ -115,7 +115,7 @@ public sealed class ClientCommandHandlerOutboxEmissionTests
         var tid = Guid.NewGuid();
         SetupActiveTenant(tid);
 
-        var existing = new Client(tid, "Ahmet Yılmaz", phone: null, email: "a@x.com");
+        var existing = new Client(tid, "Ahmet Yılmaz", DateTime.UtcNow, phone: null, email: "a@x.com");
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndEmailSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
@@ -139,7 +139,7 @@ public sealed class ClientCommandHandlerOutboxEmissionTests
         SetupActiveTenant(tid);
         SetupNoDuplicates();
 
-        var existing = new Client(tid, "Eski Ad", "05321112233", "eski@example.com", "Eski adres");
+        var existing = new Client(tid, "Eski Ad", DateTime.UtcNow, "05321112233", "eski@example.com", "Eski adres");
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(existing, cid);
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -205,9 +205,9 @@ public sealed class ClientCommandHandlerOutboxEmissionTests
         var otherId = Guid.NewGuid();
         SetupActiveTenant(tid);
 
-        var self = new Client(tid, "Eski Ad", "05329999999", "self@example.com");
+        var self = new Client(tid, "Eski Ad", DateTime.UtcNow, "05329999999", "self@example.com");
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(self, cid);
-        var other = new Client(tid, "Ortak Ad", "05321112233", "other@example.com");
+        var other = new Client(tid, "Ortak Ad", DateTime.UtcNow, "05321112233", "other@example.com");
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(other, otherId);
 
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))

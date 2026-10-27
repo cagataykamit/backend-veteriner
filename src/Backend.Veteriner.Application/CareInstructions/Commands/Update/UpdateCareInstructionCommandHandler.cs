@@ -21,6 +21,7 @@ public sealed class UpdateCareInstructionCommandHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IRepository<CareInstruction> _careInstructionsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateCareInstructionCommandHandler(
         ITenantContext tenantContext,
@@ -28,7 +29,8 @@ public sealed class UpdateCareInstructionCommandHandler
         IClientContext clientContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
-        IRepository<CareInstruction> careInstructionsWrite)
+        IRepository<CareInstruction> careInstructionsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -36,6 +38,7 @@ public sealed class UpdateCareInstructionCommandHandler
         _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _careInstructionsWrite = careInstructionsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<CareInstructionWriteResultDto>> Handle(UpdateCareInstructionCommand request, CancellationToken ct)
@@ -72,7 +75,8 @@ public sealed class UpdateCareInstructionCommandHandler
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
             return Fail("CareInstructions.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
 
-        var update = existing.UpdateText(userId, request.Text);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var update = existing.UpdateText(userId, request.Text, utcNow);
         if (!update.IsSuccess)
             return Result<CareInstructionWriteResultDto>.Failure(update.Error);
 

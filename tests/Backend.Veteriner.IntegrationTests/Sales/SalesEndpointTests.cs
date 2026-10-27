@@ -698,7 +698,7 @@ public sealed class SalesEndpointTests : IClassFixture<CustomWebApplicationFacto
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var product = await db.Products.SingleAsync(p => p.Id == productId);
-        product.Deactivate();
+        product.Deactivate(DateTime.UtcNow);
         await db.SaveChangesAsync();
     }
 
@@ -714,9 +714,9 @@ public sealed class SalesEndpointTests : IClassFixture<CustomWebApplicationFacto
 
         var stock = await db.ProductStocks.SingleOrDefaultAsync(s => s.ClinicId == ctx.ClinicId && s.ProductId == ctx.ProductId);
         if (stock is null)
-            db.ProductStocks.Add(new ProductStock(ctx.TenantId, ctx.ClinicId, ctx.ProductId, quantity, 0));
+            db.ProductStocks.Add(new ProductStock(ctx.TenantId, ctx.ClinicId, ctx.ProductId, quantity, 0, DateTime.UtcNow));
         else
-            stock.IncreaseQuantity(quantity);
+            stock.IncreaseQuantity(quantity, DateTime.UtcNow);
 
         await db.SaveChangesAsync();
         return batch.Id;
@@ -744,27 +744,27 @@ public sealed class SalesEndpointTests : IClassFixture<CustomWebApplicationFacto
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"sale-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"sale-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Sa-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
-        var product = new Product(tenant.Id, $"sp1-{Guid.NewGuid():N}"[..14], "Adet", 10.00m, "TRY", sku: $"S1-{Guid.NewGuid():N}"[..14]);
-        var product2 = new Product(tenant.Id, $"sp2-{Guid.NewGuid():N}"[..14], "Adet", 25.50m, "TRY", sku: $"S2-{Guid.NewGuid():N}"[..14]);
-        var vaccine = new Product(tenant.Id, $"sv-{Guid.NewGuid():N}"[..14], "Doz", 100m, "TRY", sku: $"SV-{Guid.NewGuid():N}"[..14], kind: ProductKind.Vaccine);
+        var product = new Product(tenant.Id, $"sp1-{Guid.NewGuid():N}"[..14], "Adet", 10.00m, "TRY", DateTime.UtcNow, sku: $"S1-{Guid.NewGuid():N}"[..14]);
+        var product2 = new Product(tenant.Id, $"sp2-{Guid.NewGuid():N}"[..14], "Adet", 25.50m, "TRY", DateTime.UtcNow, sku: $"S2-{Guid.NewGuid():N}"[..14]);
+        var vaccine = new Product(tenant.Id, $"sv-{Guid.NewGuid():N}"[..14], "Doz", 100m, "TRY", DateTime.UtcNow, sku: $"SV-{Guid.NewGuid():N}"[..14], kind: ProductKind.Vaccine);
         var controlled = new Product(
-            tenant.Id, $"sc-{Guid.NewGuid():N}"[..14], "Adet", 50m, "TRY", sku: $"SC-{Guid.NewGuid():N}"[..14],
+            tenant.Id, $"sc-{Guid.NewGuid():N}"[..14], "Adet", 50m, "TRY", DateTime.UtcNow, sku: $"SC-{Guid.NewGuid():N}"[..14],
             controlledClass: ControlledSubstanceClass.Narcotic);
         db.Products.AddRange(product, product2, vaccine, controlled);
-        var customer = new Client(tenant.Id, $"SaleClient-{Guid.NewGuid():N}"[..14], "905551110099");
+        var customer = new Client(tenant.Id, $"SaleClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110099");
         db.Clients.Add(customer);
         await db.SaveChangesAsync();
 
         if (stock is { } onHand)
-            db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, onHand, minimum));
-        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product2.Id, 17m, 0));
-        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, vaccine.Id, 10m, 0));
-        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, controlled.Id, 10m, 0));
+            db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, onHand, minimum, DateTime.UtcNow));
+        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product2.Id, 17m, 0, DateTime.UtcNow));
+        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, vaccine.Id, 10m, 0, DateTime.UtcNow));
+        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, controlled.Id, 10m, 0, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);

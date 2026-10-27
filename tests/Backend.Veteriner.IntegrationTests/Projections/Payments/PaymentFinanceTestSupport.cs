@@ -21,7 +21,7 @@ internal static class PaymentFinanceTestSupport
         DateTime paidAtUtc,
         string currency = "TRY")
     {
-        var client = new Client(tenantId, $"Client-{Guid.NewGuid():N}"[..12], "905551110099");
+        var client = new Client(tenantId, $"Client-{Guid.NewGuid():N}"[..12], DateTime.UtcNow, "905551110099");
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync();
 
@@ -58,7 +58,7 @@ internal static class PaymentFinanceTestSupport
 
     public static async Task<(Guid TenantId, Guid ClinicA, Guid ClinicB)> SeedTenantWithTwoClinicsAsync(AppDbContext commandDb)
     {
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinicA = new Clinic(tenant.Id, "Clinic A", "Istanbul");
         var clinicB = new Clinic(tenant.Id, "Clinic B", "Ankara");
         commandDb.Tenants.Add(tenant);

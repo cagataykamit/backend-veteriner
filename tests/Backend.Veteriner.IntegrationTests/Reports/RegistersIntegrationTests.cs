@@ -396,7 +396,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tenant = new Tenant($"Reg-{Guid.NewGuid():N}"[..18]);
+            var tenant = new Tenant($"Reg-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
             var clinic = new Clinic(tenant.Id, $"Reg-{Guid.NewGuid():N}"[..14], "Izmir", address: "Klinik Adres 1");
@@ -441,15 +441,15 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         {
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             var email = $"reg-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             if (displayName is not null)
-                user.SetDisplayName(displayName).IsSuccess.Should().BeTrue();
+                user.SetDisplayName(displayName, DateTime.UtcNow).IsSuccess.Should().BeTrue();
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenantId));
-            db.UserClinics.Add(new UserClinic(user.Id, clinicId));
+            db.UserTenants.Add(new UserTenant(user.Id, tenantId, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinicId, DateTime.UtcNow));
             await db.SaveChangesAsync();
             return (user.Id, email);
         }
@@ -488,7 +488,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var phone = $"90555{Interlocked.Increment(ref _phoneSeed):D7}";
-            var client = new Client(TenantId, name, phone, address: address);
+            var client = new Client(TenantId, name, DateTime.UtcNow, phone, address: address);
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;
@@ -523,6 +523,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
 
             var examination = new Examination(
                 TenantId, clinicId ?? ClinicId, petId, null, examinedAtUtc, visitReason, null, assessment, null,
+                DateTime.UtcNow,
                 plan: plan, visitId: visitId);
             if (finalize)
                 examination.Finalize(UserId, examinedAtUtc.AddMinutes(30)).IsSuccess.Should().BeTrue();
@@ -535,7 +536,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Treatments.Add(new Treatment(TenantId, ClinicId, petId, examinationId, atUtc, title, "Aciklama", null, null));
+            db.Treatments.Add(new Treatment(TenantId, ClinicId, petId, examinationId, atUtc, title, "Aciklama", null, null, DateTime.UtcNow));
             await db.SaveChangesAsync();
         }
 
@@ -557,7 +558,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var prescription = new Prescription(
-                TenantId, clinicId ?? ClinicId, petId, examinationId, null, atUtc, "Recete", content ?? "Recete icerigi", null, null);
+                TenantId, clinicId ?? ClinicId, petId, examinationId, null, atUtc, "Recete", content ?? "Recete icerigi", null, null, DateTime.UtcNow);
             if (items.Length > 0)
             {
                 prescription.ReplaceItems(items.Select(i => new PrescriptionItemDraft(i.Name, null, null, i.Quantity)).ToList())
@@ -573,7 +574,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var product = new Product(TenantId, name, unit, 10m, "TRY");
+            var product = new Product(TenantId, name, unit, 10m, "TRY", DateTime.UtcNow);
             db.Products.Add(product);
             await db.SaveChangesAsync();
             return product.Id;

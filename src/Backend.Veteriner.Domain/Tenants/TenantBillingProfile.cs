@@ -26,7 +26,7 @@ public sealed class TenantBillingProfile : AggregateRoot
 
     private TenantBillingProfile() { }
 
-    public static TenantBillingProfile CreateEmpty(Guid tenantId)
+    public static TenantBillingProfile CreateEmpty(Guid tenantId, DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -34,7 +34,7 @@ public sealed class TenantBillingProfile : AggregateRoot
         return new TenantBillingProfile
         {
             TenantId = tenantId,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = utcNow,
             UpdatedAtUtc = null
         };
     }
@@ -51,7 +51,8 @@ public sealed class TenantBillingProfile : AggregateRoot
         string? invoiceStreet,
         string? invoiceBuildingName,
         string? invoiceBuildingNo,
-        string? invoiceDoorNo)
+        string? invoiceDoorNo,
+        DateTime utcNow)
     {
         CompanyName = NormalizeOptional(companyName);
         LegalCompanyName = NormalizeOptional(legalCompanyName);
@@ -65,7 +66,7 @@ public sealed class TenantBillingProfile : AggregateRoot
         InvoiceBuildingName = NormalizeOptional(invoiceBuildingName);
         InvoiceBuildingNo = NormalizeOptional(invoiceBuildingNo);
         InvoiceDoorNo = NormalizeOptional(invoiceDoorNo);
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     private static string? NormalizeOptional(string? value)

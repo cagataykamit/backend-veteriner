@@ -49,7 +49,7 @@ public sealed class AssignUserOperationClaimCommandHandlerTests
         var command = new AssignUserOperationClaimCommand(Guid.NewGuid(), Guid.NewGuid());
 
         _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByIdWithRolesSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User("user@example.com", "hash"));
+            .ReturnsAsync(new User("user@example.com", "hash", DateTime.UtcNow));
 
         _operationClaims.Setup(r => r.ExistsAsync(command.OperationClaimId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
@@ -73,7 +73,7 @@ public sealed class AssignUserOperationClaimCommandHandlerTests
         var command = new AssignUserOperationClaimCommand(Guid.NewGuid(), Guid.NewGuid());
 
         _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByIdWithRolesSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User("user@example.com", "hash"));
+            .ReturnsAsync(new User("user@example.com", "hash", DateTime.UtcNow));
 
         _operationClaims.Setup(r => r.ExistsAsync(command.OperationClaimId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -101,7 +101,7 @@ public sealed class AssignUserOperationClaimCommandHandlerTests
         var command = new AssignUserOperationClaimCommand(userId, claimId);
 
         _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByIdWithRolesSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User("user@example.com", "hash"));
+            .ReturnsAsync(new User("user@example.com", "hash", DateTime.UtcNow));
 
         _operationClaims.Setup(r => r.ExistsAsync(claimId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);

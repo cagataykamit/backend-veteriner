@@ -170,16 +170,16 @@ public sealed class DailySearchIntegrationTests
     private static async Task<(Guid TenantId, Guid ShuleId)> SeedAsync(IServiceProvider sp)
     {
         var db = sp.GetRequiredService<AppDbContext>();
-        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20]);
+        var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
 
-        var shule = new Client(tenant.Id, "Şule Güneş", "905321111111");
+        var shule = new Client(tenant.Id, "Şule Güneş", DateTime.UtcNow, "905321111111");
         db.Clients.AddRange(
             shule,
-            new Client(tenant.Id, "İpek Kırmızı", "905322222222"),
-            new Client(tenant.Id, "Ayşe Yılmaz", "905323333333"),
-            new Client(tenant.Id, "Çağrı Öztürk", "905324444444"));
+            new Client(tenant.Id, "İpek Kırmızı", DateTime.UtcNow, "905322222222"),
+            new Client(tenant.Id, "Ayşe Yılmaz", DateTime.UtcNow, "905323333333"),
+            new Client(tenant.Id, "Çağrı Öztürk", DateTime.UtcNow, "905324444444"));
         await db.SaveChangesAsync();
 
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();

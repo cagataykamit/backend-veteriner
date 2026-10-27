@@ -28,7 +28,7 @@ public sealed class UpdateTenantSettingsCommandHandlerTests
 
     private static Tenant BuildTenant(Guid id, string name = "Acme Vet")
     {
-        var tenant = new Tenant(name);
+        var tenant = new Tenant(name, DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);
         return tenant;
     }

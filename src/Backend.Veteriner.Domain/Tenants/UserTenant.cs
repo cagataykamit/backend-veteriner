@@ -17,7 +17,7 @@ public sealed class UserTenant
 
     private UserTenant() { }
 
-    public UserTenant(Guid userId, Guid tenantId)
+    public UserTenant(Guid userId, Guid tenantId, DateTime utcNow)
     {
         if (userId == Guid.Empty)
             throw new ArgumentException("UserId geçersiz.", nameof(userId));
@@ -26,6 +26,6 @@ public sealed class UserTenant
 
         UserId = userId;
         TenantId = tenantId;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
     }
 }

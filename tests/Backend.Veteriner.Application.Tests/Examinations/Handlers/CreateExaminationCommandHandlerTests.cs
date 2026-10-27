@@ -85,7 +85,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = Cmd(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Clinic?)null);
@@ -109,7 +109,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = Cmd(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
@@ -133,7 +133,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = Cmd(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
 
@@ -160,7 +160,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = CmdWithAppointmentOnly(aid, DateTime.UtcNow.AddHours(-1));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Appointment?)null);
@@ -183,7 +183,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = CmdWithAppointmentAndOverrides(aid, cid, null, DateTime.UtcNow.AddHours(-1));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var wrongClinicAppt = new Appointment(tid, Guid.NewGuid(), pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -210,7 +210,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = CmdWithAppointmentAndOverrides(appointmentId, requestClinicId, petId, DateTime.UtcNow.AddHours(-1));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Appointment(tid, requestClinicId, petId, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, null, null));
 
@@ -229,7 +229,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = Cmd(tid, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow.AddDays(-30));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -246,7 +246,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = Cmd(tid, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow.AddYears(3));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -266,7 +266,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = Cmd(tid, cid, pid, null, examined);
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
@@ -304,7 +304,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = CmdWithAppointmentOnly(aid, examined);
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, AppointmentStatus.Scheduled, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -342,7 +342,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = CmdWithAppointmentOnly(aid, DateTime.UtcNow.AddMinutes(-10));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, AppointmentStatus.Completed, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -369,7 +369,7 @@ public sealed class CreateExaminationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         var cmd = CmdWithAppointmentOnly(Guid.NewGuid(), DateTime.UtcNow.AddMinutes(-10));
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         var appt = new Appointment(
             tid, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddHours(-2), 30, AppointmentType.Other, AppointmentStatus.NoShow, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -393,7 +393,7 @@ public sealed class CreateExaminationCommandHandlerTests
         var cmd = CmdWithAppointmentOnly(aid, DateTime.UtcNow.AddMinutes(-10));
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var appt = new Appointment(tid, cid, pid, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Other, AppointmentStatus.Cancelled, null);
         _appointments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))

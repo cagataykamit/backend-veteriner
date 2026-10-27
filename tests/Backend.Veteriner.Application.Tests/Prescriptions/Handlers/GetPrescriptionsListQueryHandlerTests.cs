@@ -211,14 +211,15 @@ public sealed class GetPrescriptionsListQueryHandlerTests
             "Antibiyotik",
             "İçerik metni",
             null,
-            DateTime.UtcNow.AddDays(7));
+            DateTime.UtcNow.AddDays(7),
+            DateTime.UtcNow);
 
         _prescriptions.Setup(r => r.CountAsync(It.IsAny<PrescriptionsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _prescriptions.Setup(r => r.ListAsync(It.IsAny<PrescriptionsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Prescription> { pr });
 
-        var client = new Client(tid, "Ali Veli");
+        var client = new Client(tid, "Ali Veli", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client> { client });

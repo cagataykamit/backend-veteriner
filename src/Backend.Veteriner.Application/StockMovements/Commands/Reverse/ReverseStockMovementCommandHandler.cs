@@ -29,6 +29,7 @@ public sealed class ReverseStockMovementCommandHandler
     private readonly IRepository<StockMovement> _stockMovementsWrite;
     private readonly StockBatchResolver _batchResolver;
     private readonly IUnitOfWork _uow;
+    private readonly TimeProvider _timeProvider;
 
     public ReverseStockMovementCommandHandler(
         ITenantContext tenantContext,
@@ -41,7 +42,8 @@ public sealed class ReverseStockMovementCommandHandler
         IRepository<ProductStock> productStocksWrite,
         IRepository<StockMovement> stockMovementsWrite,
         StockBatchResolver batchResolver,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -54,6 +56,7 @@ public sealed class ReverseStockMovementCommandHandler
         _stockMovementsWrite = stockMovementsWrite;
         _batchResolver = batchResolver;
         _uow = uow;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<StockMovementCreateResult>> Handle(ReverseStockMovementCommand request, CancellationToken ct)
@@ -139,12 +142,14 @@ public sealed class ReverseStockMovementCommandHandler
                 return Fail("StockMovements.InsufficientStock", "Geri alma için yeterli stok yok.");
         }
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var reversal = original.CreateReversal(
             request.Reason,
             request.Notes,
             DateTime.UtcNow,
             _clientContext.UserId,
-            request.RequestId);
+            request.RequestId,
+            utcNow);
 
         // Ters hareket tek başına önce yazılır (AddAsync ve hemen ardından SaveChanges): benzersiz kurallar (requestId, tek ters hareket)
         // kaybedeni ilk yazımında eler ve işlemde kaybedenin stok/parti değişikliği kalmaz. Başarısız SaveChanges'in kısmi
@@ -177,12 +182,12 @@ public sealed class ReverseStockMovementCommandHandler
         if (original.ReversalIncreasesStock)
         {
             batch?.Increase(original.Quantity);
-            stock!.IncreaseQuantity(original.Quantity);
+            stock!.IncreaseQuantity(original.Quantity, utcNow);
         }
         else
         {
             batch?.Decrease(original.Quantity);
-            stock!.DecreaseQuantity(original.Quantity);
+            stock!.DecreaseQuantity(original.Quantity, utcNow);
         }
 
         if (batch is not null)

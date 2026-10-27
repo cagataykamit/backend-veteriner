@@ -56,7 +56,7 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
         var now = DateTime.UtcNow;
         await env.WithDbAsync(async (db, s) =>
         {
-            var vaccine = VaccineDefinition.CreateTenant(s.TenantId, $"OIV{Guid.NewGuid():N}"[..12], "Karma");
+            var vaccine = VaccineDefinition.CreateTenant(s.TenantId, $"OIV{Guid.NewGuid():N}"[..12], "Karma", DateTime.UtcNow);
             db.VaccineDefinitions.Add(vaccine);
             await db.SaveChangesAsync();
             db.Vaccinations.AddRange(
@@ -65,12 +65,12 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
                 NewScheduledVaccination(s, vaccine, now.AddDays(45)));
 
             for (var i = 0; i < 11; i++)
-                db.LabResults.Add(new LabResult(s.TenantId, s.ClinicId, s.PetId, null, null, null, null, $"Istek {i}", null, null, null));
-            db.LabResults.Add(new LabResult(s.TenantId, s.ClinicId, s.PetId, null, null, null, now.AddDays(-1), "Biyokimya", "ALT 80", null, null));
-            db.LabResults.Add(new LabResult(s.TenantId, s.ClinicId, s.PetId, null, null, null, now.AddDays(-1), "Hemogram", "Normal", "Yorumlandi", null));
+                db.LabResults.Add(new LabResult(s.TenantId, s.ClinicId, s.PetId, null, null, null, null, $"Istek {i}", null, null, null, DateTime.UtcNow));
+            db.LabResults.Add(new LabResult(s.TenantId, s.ClinicId, s.PetId, null, null, null, now.AddDays(-1), "Biyokimya", "ALT 80", null, null, DateTime.UtcNow));
+            db.LabResults.Add(new LabResult(s.TenantId, s.ClinicId, s.PetId, null, null, null, now.AddDays(-1), "Hemogram", "Normal", "Yorumlandi", null, DateTime.UtcNow));
 
-            var exam = new Examination(s.TenantId, s.ClinicId, s.PetId, null, now.AddHours(-1), "Kontrol", null, null, null);
-            var service = new Product(s.TenantId, $"Pansuman {Guid.NewGuid():N}"[..20], "Adet", 120m, "TRY", kind: ProductKind.Service);
+            var exam = new Examination(s.TenantId, s.ClinicId, s.PetId, null, now.AddHours(-1), "Kontrol", null, null, null, DateTime.UtcNow);
+            var service = new Product(s.TenantId, $"Pansuman {Guid.NewGuid():N}"[..20], "Adet", 120m, "TRY", DateTime.UtcNow, kind: ProductKind.Service);
             db.Examinations.Add(exam);
             db.Products.Add(service);
             await db.SaveChangesAsync();
@@ -147,7 +147,7 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
         var now = DateTime.UtcNow;
         await env.WithDbAsync(async (db, s) =>
         {
-            var vaccine = VaccineDefinition.CreateTenant(s.TenantId, $"OID{Guid.NewGuid():N}"[..12], "Kuduz");
+            var vaccine = VaccineDefinition.CreateTenant(s.TenantId, $"OID{Guid.NewGuid():N}"[..12], "Kuduz", DateTime.UtcNow);
             db.VaccineDefinitions.Add(vaccine);
             await db.SaveChangesAsync();
             db.Vaccinations.Add(NewScheduledVaccination(s, vaccine, now.AddDays(-5)));
@@ -204,7 +204,7 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
     }
 
     private static Vaccination NewScheduledVaccination(SeedIds s, VaccineDefinition vaccine, DateTime dueAtUtc)
-        => new(s.TenantId, s.PetId, s.ClinicId, null, vaccine.Id, vaccine.Name, VaccinationStatus.Scheduled, null, dueAtUtc, null);
+        => new(s.TenantId, s.PetId, s.ClinicId, null, vaccine.Id, vaccine.Name, VaccinationStatus.Scheduled, null, dueAtUtc, null, DateTime.UtcNow);
 
     private async Task<OpenItemsTestContext> SeedAsync(string[]? permissions = null)
     {
@@ -219,7 +219,7 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
             var clinic = new Clinic(tenant.Id, $"OpenIt-{Guid.NewGuid():N}"[..14], "Izmir");
             db.Clinics.Add(clinic);
-            var client = new Client(tenant.Id, $"OClient-{Guid.NewGuid():N}"[..14], "905551110091");
+            var client = new Client(tenant.Id, $"OClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110091");
             db.Clients.Add(client);
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
             var pet = new Pet(tenant.Id, client.Id, "AcikIsPet", speciesId);
@@ -228,12 +228,12 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"openitems-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             ids = new SeedIds(tenant.Id, clinic.Id, client.Id, pet.Id, user.Id);

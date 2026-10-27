@@ -6,12 +6,14 @@ namespace Backend.Veteriner.Domain.Tests.Catalog;
 
 public sealed class ClinicalTermTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static readonly Guid TenantId = Guid.NewGuid();
 
     [Fact]
     public void CreateForTenant_Should_Collapse_Whitespace_And_Store_Turkish_Key()
     {
-        var term = ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Diagnosis, "  KULAK   İltihabı ");
+        var term = ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Diagnosis, "  KULAK   İltihabı ", Now);
 
         term.TenantId.Should().Be(TenantId);
         term.Kind.Should().Be(ClinicalTermKind.Diagnosis);
@@ -31,7 +33,7 @@ public sealed class ClinicalTermTests
     [Fact]
     public void CreateSystem_Should_Have_No_Tenant()
     {
-        var term = ClinicalTerm.CreateSystem(ClinicalTermKind.Complaint, "Kusma");
+        var term = ClinicalTerm.CreateSystem(ClinicalTermKind.Complaint, "Kusma", Now);
 
         term.TenantId.Should().BeNull();
         term.IsSystem.Should().BeTrue();
@@ -42,16 +44,16 @@ public sealed class ClinicalTermTests
     [InlineData("   ")]
     public void Create_Should_Reject_Empty_Name(string name)
     {
-        var act = () => ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Complaint, name);
+        var act = () => ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Complaint, name, Now);
         act.Should().Throw<ArgumentException>();
     }
 
     [Fact]
     public void Create_Should_Reject_Too_Long_Name_And_Undefined_Kind()
     {
-        var tooLong = () => ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Complaint, new string('a', ClinicalTerm.MaxNameLength + 1));
-        var badKind = () => ClinicalTerm.CreateForTenant(TenantId, (ClinicalTermKind)99, "Kusma");
-        var emptyTenant = () => ClinicalTerm.CreateForTenant(Guid.Empty, ClinicalTermKind.Complaint, "Kusma");
+        var tooLong = () => ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Complaint, new string('a', ClinicalTerm.MaxNameLength + 1), Now);
+        var badKind = () => ClinicalTerm.CreateForTenant(TenantId, (ClinicalTermKind)99, "Kusma", Now);
+        var emptyTenant = () => ClinicalTerm.CreateForTenant(Guid.Empty, ClinicalTermKind.Complaint, "Kusma", Now);
 
         tooLong.Should().Throw<ArgumentException>();
         badKind.Should().Throw<ArgumentException>();
@@ -61,9 +63,9 @@ public sealed class ClinicalTermTests
     [Fact]
     public void Rename_Should_Update_Name_Key_And_Timestamp()
     {
-        var term = ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Diagnosis, "Otit");
+        var term = ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Diagnosis, "Otit", Now);
 
-        var result = term.Rename("Otitis externa");
+        var result = term.Rename("Otitis externa", Now);
 
         result.IsSuccess.Should().BeTrue();
         term.Name.Should().Be("Otitis externa");
@@ -74,9 +76,9 @@ public sealed class ClinicalTermTests
     [Fact]
     public void Rename_Should_Fail_On_Empty_Name_Without_Change()
     {
-        var term = ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Diagnosis, "Otit");
+        var term = ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Diagnosis, "Otit", Now);
 
-        var result = term.Rename("  ");
+        var result = term.Rename("  ", Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("ClinicalTerms.Validation");
@@ -86,23 +88,23 @@ public sealed class ClinicalTermTests
     [Fact]
     public void Deactivate_And_Activate_Should_Toggle_Tenant_Term()
     {
-        var term = ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Complaint, "Kusma");
+        var term = ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Complaint, "Kusma", Now);
 
-        term.Deactivate().IsSuccess.Should().BeTrue();
+        term.Deactivate(Now).IsSuccess.Should().BeTrue();
         term.IsActive.Should().BeFalse();
-        term.Deactivate().IsSuccess.Should().BeTrue();
-        term.Activate().IsSuccess.Should().BeTrue();
+        term.Deactivate(Now).IsSuccess.Should().BeTrue();
+        term.Activate(Now).IsSuccess.Should().BeTrue();
         term.IsActive.Should().BeTrue();
     }
 
     [Fact]
     public void System_Term_Should_Be_Read_Only()
     {
-        var term = ClinicalTerm.CreateSystem(ClinicalTermKind.Complaint, "Kusma");
+        var term = ClinicalTerm.CreateSystem(ClinicalTermKind.Complaint, "Kusma", Now);
 
-        term.Rename("Kusma (akut)").Error.Code.Should().Be("ClinicalTerms.SystemTermReadOnly");
-        term.Deactivate().Error.Code.Should().Be("ClinicalTerms.SystemTermReadOnly");
-        term.Activate().Error.Code.Should().Be("ClinicalTerms.SystemTermReadOnly");
+        term.Rename("Kusma (akut)", Now).Error.Code.Should().Be("ClinicalTerms.SystemTermReadOnly");
+        term.Deactivate(Now).Error.Code.Should().Be("ClinicalTerms.SystemTermReadOnly");
+        term.Activate(Now).Error.Code.Should().Be("ClinicalTerms.SystemTermReadOnly");
         term.Name.Should().Be("Kusma");
         term.IsActive.Should().BeTrue();
     }

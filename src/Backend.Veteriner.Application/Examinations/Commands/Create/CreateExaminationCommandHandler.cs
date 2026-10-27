@@ -206,6 +206,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         if (!careGate.IsSuccess)
             return Result<ExaminationWriteResultDto>.Failure(careGate.Error);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var examination = new Examination(
             tenantId,
             clinicId,
@@ -216,6 +217,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             request.Findings,
             request.Assessment,
             request.Notes,
+            utcNow,
             request.Anamnesis,
             request.Plan,
             request.WeightKg,
@@ -228,7 +230,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
         // Muayene başlayınca bekleyen geliş "Devam ediyor" olur.
         if (visit is { CareStatus: VisitCareStatus.Waiting })
         {
-            var started = visit.Start(_timeProvider.GetUtcNow().UtcDateTime);
+            var started = visit.Start(utcNow);
             if (!started.IsSuccess)
                 return Result<ExaminationWriteResultDto>.Failure(started.Error);
         }

@@ -52,7 +52,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
     {
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         await db.SaveChangesAsync();
@@ -69,11 +69,11 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
     {
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, true, 3, false);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, true, 3, false, DateTime.UtcNow);
         db.TenantReminderSettings.Add(settings);
         await db.SaveChangesAsync();
 
@@ -90,14 +90,14 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, false, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, appt, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -120,15 +120,15 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(3), null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(3), null, DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -152,7 +152,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         db.AddRange(tenant, SeedAppointmentsForTenant(db, tenant.Id, TrialLimits.ReminderEmailsPerDay + 1, now, await GetAnySpeciesIdAsync(db)));
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
         await db.SaveChangesAsync();
@@ -177,7 +177,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         db.AddRange(tenant, SeedAppointmentsForTenant(db, tenant.Id, TrialLimits.ReminderEmailsPerDay + 1, now, await GetAnySpeciesIdAsync(db)));
         var subscription = TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now.AddDays(-1), 14);
         subscription.ActivatePaidPlan(SubscriptionPlanCode.Basic, now);
@@ -195,7 +195,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
     private static TenantReminderSettings SeedAppointmentsForTenant(AppDbContext db, Guid tenantId, int count, DateTime nowUtc, Guid speciesId)
     {
         var clinic = new Clinic(tenantId, "Klinik", "Istanbul");
-        var client = new Client(tenantId, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenantId, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         db.AddRange(clinic, client);
         for (var i = 0; i < count; i++)
         {
@@ -205,8 +205,8 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             db.AddRange(pet, appt);
         }
 
-        var settings = TenantReminderSettings.CreateDefault(tenantId);
-        settings.Update(true, 24, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenantId, DateTime.UtcNow);
+        settings.Update(true, 24, false, 3, true, DateTime.UtcNow);
         return settings;
     }
 
@@ -216,9 +216,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
@@ -233,9 +233,10 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             VaccinationStatus.Applied,
             now.AddHours(-2),
             dueAt,
-            null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true);
+            null,
+            DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -261,9 +262,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
@@ -277,9 +278,10 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             VaccinationStatus.Applied,
             now.AddHours(-2),
             null,
-            null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true);
+            null,
+            DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -298,9 +300,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
@@ -314,9 +316,10 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             VaccinationStatus.Applied,
             now.AddDays(-5),
             now.AddDays(-1),
-            null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true);
+            null,
+            DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -335,9 +338,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
@@ -351,9 +354,10 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             VaccinationStatus.Cancelled,
             null,
             now.AddDays(3),
-            null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true);
+            null,
+            DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -372,9 +376,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
@@ -389,9 +393,10 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             VaccinationStatus.Applied,
             now.AddHours(-2),
             dueAt,
-            null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true);
+            null,
+            DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
         var daysBefore = 3;
         var dedupe = $"vaccination:{vaccination.Id:D}:days-before:{daysBefore}";
         var existing = new ReminderDispatchLog(
@@ -405,7 +410,8 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             dueAt,
             dueAt.AddDays(-daysBefore),
             ReminderDispatchStatus.Enqueued,
-            dedupe);
+            dedupe,
+            DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings, existing);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -424,15 +430,15 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(3), null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(3), null, DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -451,9 +457,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
@@ -469,9 +475,10 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             VaccinationStatus.Applied,
             now.AddHours(-2),
             dueAt,
-            null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, daysBefore, true);
+            null,
+            DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, daysBefore, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -492,17 +499,17 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         const int daysBefore = 1;
         var dueAt = now.AddHours(20);
-        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, dueAt, null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, daysBefore, true);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, dueAt, null, DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, daysBefore, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -523,15 +530,15 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(3), null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 1, true);
+        var vaccination = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(3), null, DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 1, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -550,9 +557,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
@@ -568,9 +575,10 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             VaccinationStatus.Scheduled,
             null,
             dueAt,
-            null);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, daysBefore, true);
+            null,
+            DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, daysBefore, true, DateTime.UtcNow);
         var dedupe = $"vaccination:{vaccination.Id:D}:days-before:{daysBefore}";
         var existing = new ReminderDispatchLog(
             tenant.Id,
@@ -583,7 +591,8 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             dueAt,
             dueAt.AddDays(-daysBefore),
             ReminderDispatchStatus.Enqueued,
-            dedupe);
+            dedupe,
+            DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, vaccination, settings, existing);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -602,15 +611,15 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         const int hoursBefore = 24;
         var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(12), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, hoursBefore, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, hoursBefore, false, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, appt, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -632,14 +641,14 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(-2), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, false, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, appt, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -658,14 +667,14 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(48), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, false, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, appt, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -684,14 +693,14 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "No Mail");
+        var client = new Client(tenant.Id, "No Mail", DateTime.UtcNow);
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, false, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, appt, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -712,14 +721,14 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, false, 3, true, DateTime.UtcNow);
         var dedupe = $"appointment:{appt.Id:D}:hours-before:24";
         var existing = new ReminderDispatchLog(
             tenant.Id,
@@ -732,7 +741,8 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             appt.ScheduledAtUtc,
             appt.ScheduledAtUtc.AddHours(-24),
             ReminderDispatchStatus.Enqueued,
-            dedupe);
+            dedupe,
+            DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, appt, settings, existing);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -751,14 +761,14 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, false, 3, true, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, appt, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now.AddDays(-40), 7));
@@ -777,9 +787,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, false, 3, true);
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, false, 3, true, DateTime.UtcNow);
 
         var outboxId = Guid.NewGuid();
         var log = new ReminderDispatchLog(
@@ -793,8 +803,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             now.AddHours(1),
             now,
             ReminderDispatchStatus.Enqueued,
-            $"dedupe:{Guid.NewGuid():N}");
-        log.MarkEnqueued(outboxId);
+            $"dedupe:{Guid.NewGuid():N}",
+            DateTime.UtcNow);
+        log.MarkEnqueued(DateTime.UtcNow, outboxId);
 
         db.AddRange(tenant, settings, log);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -822,9 +833,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, false, 3, true);
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, false, 3, true, DateTime.UtcNow);
 
         var outboxId = Guid.NewGuid();
         var log = new ReminderDispatchLog(
@@ -838,8 +849,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             now.AddHours(1),
             now,
             ReminderDispatchStatus.Enqueued,
-            $"dedupe:{Guid.NewGuid():N}");
-        log.MarkEnqueued(outboxId);
+            $"dedupe:{Guid.NewGuid():N}",
+            DateTime.UtcNow);
+        log.MarkEnqueued(DateTime.UtcNow, outboxId);
 
         db.AddRange(tenant, settings, log);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -869,9 +881,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, false, 3, true);
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, false, 3, true, DateTime.UtcNow);
 
         var outboxId = Guid.NewGuid();
         var log = new ReminderDispatchLog(
@@ -885,8 +897,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             now.AddHours(1),
             now,
             ReminderDispatchStatus.Enqueued,
-            $"dedupe:{Guid.NewGuid():N}");
-        log.MarkEnqueued(outboxId);
+            $"dedupe:{Guid.NewGuid():N}",
+            DateTime.UtcNow);
+        log.MarkEnqueued(DateTime.UtcNow, outboxId);
 
         db.AddRange(tenant, settings, log);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -914,9 +927,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, false, 3, true);
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, false, 3, true, DateTime.UtcNow);
 
         var log = new ReminderDispatchLog(
             tenant.Id,
@@ -929,7 +942,8 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             now.AddHours(1),
             now,
             ReminderDispatchStatus.Enqueued,
-            $"dedupe:{Guid.NewGuid():N}");
+            $"dedupe:{Guid.NewGuid():N}",
+            DateTime.UtcNow);
 
         db.AddRange(tenant, settings, log);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -950,9 +964,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, false, 3, true);
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, false, 3, true, DateTime.UtcNow);
 
         var log = new ReminderDispatchLog(
             tenant.Id,
@@ -965,7 +979,8 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             now.AddHours(1),
             now,
             ReminderDispatchStatus.Enqueued,
-            $"dedupe:{Guid.NewGuid():N}");
+            $"dedupe:{Guid.NewGuid():N}",
+            DateTime.UtcNow);
 
         db.AddRange(tenant, settings, log);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -989,23 +1004,23 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenantA = new Tenant("Tenant A");
-        var tenantB = new Tenant("Tenant B");
-        var settingsA = TenantReminderSettings.CreateDefault(tenantA.Id);
-        settingsA.Update(false, 24, false, 3, true);
-        var settingsB = TenantReminderSettings.CreateDefault(tenantB.Id);
-        settingsB.Update(false, 24, false, 3, true);
+        var tenantA = new Tenant("Tenant A", DateTime.UtcNow);
+        var tenantB = new Tenant("Tenant B", DateTime.UtcNow);
+        var settingsA = TenantReminderSettings.CreateDefault(tenantA.Id, DateTime.UtcNow);
+        settingsA.Update(false, 24, false, 3, true, DateTime.UtcNow);
+        var settingsB = TenantReminderSettings.CreateDefault(tenantB.Id, DateTime.UtcNow);
+        settingsB.Update(false, 24, false, 3, true, DateTime.UtcNow);
 
         var outboxA = Guid.NewGuid();
         var outboxB = Guid.NewGuid();
         var logA = new ReminderDispatchLog(
             tenantA.Id, null, ReminderType.Appointment, ReminderSourceEntityType.Appointment, Guid.NewGuid(),
-            "a@example.com", "A", now.AddHours(1), now, ReminderDispatchStatus.Enqueued, $"dedupe:{Guid.NewGuid():N}");
-        logA.MarkEnqueued(outboxA);
+            "a@example.com", "A", now.AddHours(1), now, ReminderDispatchStatus.Enqueued, $"dedupe:{Guid.NewGuid():N}", DateTime.UtcNow);
+        logA.MarkEnqueued(DateTime.UtcNow, outboxA);
         var logB = new ReminderDispatchLog(
             tenantB.Id, null, ReminderType.Appointment, ReminderSourceEntityType.Appointment, Guid.NewGuid(),
-            "b@example.com", "B", now.AddHours(1), now, ReminderDispatchStatus.Enqueued, $"dedupe:{Guid.NewGuid():N}");
-        logB.MarkEnqueued(outboxB);
+            "b@example.com", "B", now.AddHours(1), now, ReminderDispatchStatus.Enqueued, $"dedupe:{Guid.NewGuid():N}", DateTime.UtcNow);
+        logB.MarkEnqueued(DateTime.UtcNow, outboxB);
 
         db.AddRange(tenantA, tenantB, settingsA, settingsB, logA, logB);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenantA.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -1033,21 +1048,21 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
 
         var unreleased = CommittedBatch(tenant.Id, clinic.Id, now, release: false);
         var released = CommittedBatch(tenant.Id, clinic.Id, now, release: true);
         var applied = now.AddYears(-1);
-        var manual = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, applied, now.AddDays(2), null);
-        var importedHeld = Vaccination.CreateImported(tenant.Id, pet.Id, clinic.Id, rabies.Id, rabies.Name, applied, now.AddDays(2), null, unreleased.Id);
-        var importedReleased = Vaccination.CreateImported(tenant.Id, pet.Id, clinic.Id, rabies.Id, rabies.Name, applied, now.AddDays(1), null, released.Id);
+        var manual = new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, applied, now.AddDays(2), null, DateTime.UtcNow);
+        var importedHeld = Vaccination.CreateImported(tenant.Id, pet.Id, clinic.Id, rabies.Id, rabies.Name, applied, now.AddDays(2), null, unreleased.Id, DateTime.UtcNow);
+        var importedReleased = Vaccination.CreateImported(tenant.Id, pet.Id, clinic.Id, rabies.Id, rabies.Name, applied, now.AddDays(1), null, released.Id, DateTime.UtcNow);
 
         db.AddRange(tenant, clinic, client, pet, settings, unreleased, released, manual, importedHeld, importedReleased);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -1082,12 +1097,12 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
         db.AddRange(tenant, clinic, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
 
@@ -1095,10 +1110,10 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         for (var i = 0; i < 5; i++)
         {
             // İkisi e-postasız (Skipped günlüğü de tur sınırına sayılır).
-            var client = new Client(tenant.Id, $"Sahip {i}", $"90555555550{i}", i < 2 ? null : $"sahip{i}@example.com");
+            var client = new Client(tenant.Id, $"Sahip {i}", DateTime.UtcNow, $"90555555550{i}", i < 2 ? null : $"sahip{i}@example.com");
             var pet = new Pet(tenant.Id, client.Id, $"Pamuk {i}", speciesId);
             db.AddRange(client, pet,
-                new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddYears(-1), dueAt, null));
+                new Vaccination(tenant.Id, pet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddYears(-1), dueAt, null, DateTime.UtcNow));
         }
 
         await db.SaveChangesAsync();
@@ -1117,18 +1132,18 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         await using var db = await CreateDbContextAsync();
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var speciesId = await GetAnySpeciesIdAsync(db);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, false, 3, true, DateTime.UtcNow);
         db.AddRange(tenant, clinic, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
 
         var scheduledAt = now.AddHours(12);
         for (var i = 0; i < 5; i++)
         {
-            var client = new Client(tenant.Id, $"Sahip {i}", $"90555555550{i}", $"sahip{i}@example.com");
+            var client = new Client(tenant.Id, $"Sahip {i}", DateTime.UtcNow, $"90555555550{i}", $"sahip{i}@example.com");
             var pet = new Pet(tenant.Id, client.Id, $"Pamuk {i}", speciesId);
             db.AddRange(client, pet,
                 new Appointment(tenant.Id, clinic.Id, pet.Id, scheduledAt, 30, AppointmentType.Checkup, AppointmentStatus.Scheduled));
@@ -1154,31 +1169,31 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
         var today = DateOnly.FromDateTime(now);
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, true, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, true, 3, true, DateTime.UtcNow);
         db.AddRange(tenant, clinic, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
 
-        var deceasedOwner = new Client(tenant.Id, "Vefat Sahibi", "905555555501", "vefat@example.com");
+        var deceasedOwner = new Client(tenant.Id, "Vefat Sahibi", DateTime.UtcNow, "905555555501", "vefat@example.com");
         var deceasedPet = new Pet(tenant.Id, deceasedOwner.Id, "Boncuk", speciesId);
         deceasedPet.SetStatus(PetStatus.Deceased, today, today).IsSuccess.Should().BeTrue();
 
-        var optedOutOwner = new Client(tenant.Id, "İstemez Sahibi", "905555555502", "istemez@example.com");
+        var optedOutOwner = new Client(tenant.Id, "İstemez Sahibi", DateTime.UtcNow, "905555555502", "istemez@example.com");
         optedOutOwner.ApplyContactPreferences(ContactChannel.Phone, remindersOptedOut: true).IsSuccess.Should().BeTrue();
         var optedOutPet = new Pet(tenant.Id, optedOutOwner.Id, "Tarçın", speciesId);
 
-        var activeOwner = new Client(tenant.Id, "Aktif Sahibi", "905555555503", "aktif@example.com");
+        var activeOwner = new Client(tenant.Id, "Aktif Sahibi", DateTime.UtcNow, "905555555503", "aktif@example.com");
         var activePet = new Pet(tenant.Id, activeOwner.Id, "Pamuk", speciesId);
 
         db.AddRange(deceasedOwner, deceasedPet, optedOutOwner, optedOutPet, activeOwner, activePet);
         db.AddRange(
-            new Vaccination(tenant.Id, deceasedPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(1), null),
-            new Vaccination(tenant.Id, optedOutPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(1).AddMinutes(1), null),
-            new Vaccination(tenant.Id, activePet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(2), null),
+            new Vaccination(tenant.Id, deceasedPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(1), null, DateTime.UtcNow),
+            new Vaccination(tenant.Id, optedOutPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(1).AddMinutes(1), null, DateTime.UtcNow),
+            new Vaccination(tenant.Id, activePet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(2), null, DateTime.UtcNow),
             new Appointment(tenant.Id, clinic.Id, deceasedPet.Id, now.AddHours(2), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled),
             new Appointment(tenant.Id, clinic.Id, optedOutPet.Id, now.AddHours(3), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled),
             new Appointment(tenant.Id, clinic.Id, activePet.Id, now.AddHours(12), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled));
@@ -1198,14 +1213,14 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         var email = new FakeReminderEmailOutboxEnqueuer();
         var now = DateTime.UtcNow;
         var today = DateOnly.FromDateTime(now);
-        var tenant = new Tenant("Tenant A");
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
         var speciesId = await GetAnySpeciesIdAsync(db);
-        var client = new Client(tenant.Id, "Ali Veli", "905555555555", "ali@example.com");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
         var pet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         pet.SetStatus(PetStatus.Deceased, null, today).IsSuccess.Should().BeTrue();
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(true, 24, false, 3, true);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, false, 3, true, DateTime.UtcNow);
         db.AddRange(tenant, clinic, client, pet, settings,
             new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(12), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled));
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
@@ -1251,7 +1266,8 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
                 BatchSize = batchSize,
                 WindowToleranceMinutes = 10
             }),
-            NullLogger<ReminderProcessorService>.Instance);
+            NullLogger<ReminderProcessorService>.Instance,
+            TimeProvider.System);
     }
 
     private static async Task<(Guid Id, string Name)> GetRabiesVaccineDefinitionAsync(AppDbContext db)

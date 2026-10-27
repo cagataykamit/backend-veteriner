@@ -113,7 +113,7 @@ internal static class PetProjectionTestSupport
         string? breed = null,
         CancellationToken ct = default)
     {
-        var client = new Client(tenantId, clientFullName);
+        var client = new Client(tenantId, clientFullName, DateTime.UtcNow);
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync(ct);
 

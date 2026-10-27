@@ -36,6 +36,7 @@ public sealed class VoidAdministrationCommandHandlerTests
             null, false, null, Guid.NewGuid(), DateTime.UtcNow, null).Value!;
         _out = new StockMovement(
             _tenantId, _clinicId, _productId, StockMovementType.Out, 2m, DateTime.UtcNow,
+            DateTime.UtcNow,
             referenceType: "Administration", referenceId: _administration.Id);
 
         _administrations
@@ -58,11 +59,11 @@ public sealed class VoidAdministrationCommandHandlerTests
         var tenants = new Mock<IReadRepository<Tenant>>();
         tenants
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Tenant>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
-        var product = new Product(_tenantId, "Ürün", "Adet", 10m, "TRY", sku: "SKU-1");
+        var product = new Product(_tenantId, "Ürün", "Adet", 10m, "TRY", DateTime.UtcNow, sku: "SKU-1");
         if (!productActive)
-            product.Deactivate();
+            product.Deactivate(DateTime.UtcNow);
         var products = new Mock<IReadRepository<Product>>();
         products
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Product>>(), It.IsAny<CancellationToken>()))
@@ -174,7 +175,7 @@ public sealed class VoidAdministrationCommandHandlerTests
 
     private ChargeSuggestion SetupSuggestion()
     {
-        var product = new Product(_tenantId, "Ürün", "Adet", 10m, "TRY", sku: "SKU-1");
+        var product = new Product(_tenantId, "Ürün", "Adet", 10m, "TRY", DateTime.UtcNow, sku: "SKU-1");
         typeof(Product).GetProperty(nameof(Product.Id))!.SetValue(product, _productId);
         var suggestion = ChargeSuggestion.ForAdministration(_administration, product, null).Value!;
         _chargeSuggestions

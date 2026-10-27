@@ -21,7 +21,7 @@ public sealed record ClientInvoicingIdentityDto(
     string? BillingAddressLine)
 {
     /// <summary>Nesnenin tamamını müşteriye yazar; kurallar <see cref="Client.ApplyInvoicingIdentity"/> içindedir.</summary>
-    public Result ApplyTo(Client client)
+    public Result ApplyTo(Client client, DateTime utcNow)
         => client.ApplyInvoicingIdentity(
             PersonType,
             NationalId,
@@ -30,7 +30,8 @@ public sealed record ClientInvoicingIdentityDto(
             LegalName,
             BillingProvince,
             BillingDistrict,
-            BillingAddressLine);
+            BillingAddressLine,
+            utcNow);
 
     public static ClientInvoicingIdentityDto From(Client client)
         => new(

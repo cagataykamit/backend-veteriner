@@ -23,6 +23,7 @@ public sealed class UpdateClinicKvkkFormTemplateCommandHandler
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IRepository<ClinicKvkkFormTemplate> _templates;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateClinicKvkkFormTemplateCommandHandler(
         ITenantContext tenantContext,
@@ -31,7 +32,8 @@ public sealed class UpdateClinicKvkkFormTemplateCommandHandler
         IClinicAssignmentAccessGuard assignmentGuard,
         IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinics,
-        IRepository<ClinicKvkkFormTemplate> templates)
+        IRepository<ClinicKvkkFormTemplate> templates,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
@@ -40,6 +42,7 @@ public sealed class UpdateClinicKvkkFormTemplateCommandHandler
         _userClinics = userClinics;
         _clinics = clinics;
         _templates = templates;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ClinicKvkkFormTemplateDto>> Handle(
@@ -94,16 +97,17 @@ public sealed class UpdateClinicKvkkFormTemplateCommandHandler
             return Result<ClinicKvkkFormTemplateDto>.Failure(ConflictCode, ConflictMessage);
 
         ClinicKvkkFormTemplate row;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (existing is null)
         {
-            var created = ClinicKvkkFormTemplate.Create(tenantId, request.ClinicId, request.Kind, request.Text, userId);
+            var created = ClinicKvkkFormTemplate.Create(tenantId, request.ClinicId, request.Kind, request.Text, userId, utcNow);
             if (!created.IsSuccess)
                 return Result<ClinicKvkkFormTemplateDto>.Failure(created.Error);
             row = created.Value!;
         }
         else
         {
-            var updated = existing.UpdateText(request.Text, userId);
+            var updated = existing.UpdateText(request.Text, userId, utcNow);
             if (!updated.IsSuccess)
                 return Result<ClinicKvkkFormTemplateDto>.Failure(updated.Error);
             existing.SetExpectedRowVersion(expectedRowVersion!);

@@ -42,11 +42,11 @@ public sealed class ClinicalTermHandlersTests
     }
 
     private ClinicalTerm TenantTerm(string name = "Otit")
-        => Existing(ClinicalTerm.CreateForTenant(_tenantId, ClinicalTermKind.Diagnosis, name));
+        => Existing(ClinicalTerm.CreateForTenant(_tenantId, ClinicalTermKind.Diagnosis, name, DateTime.UtcNow));
 
-    private CreateClinicalTermCommandHandler CreateHandler() => new(_tenantContext.Object, _terms.Object);
-    private UpdateClinicalTermCommandHandler UpdateHandler() => new(_tenantContext.Object, _terms.Object);
-    private SetClinicalTermActiveCommandHandler SetActiveHandler() => new(_tenantContext.Object, _terms.Object);
+    private CreateClinicalTermCommandHandler CreateHandler() => new(_tenantContext.Object, _terms.Object, TimeProvider.System);
+    private UpdateClinicalTermCommandHandler UpdateHandler() => new(_tenantContext.Object, _terms.Object, TimeProvider.System);
+    private SetClinicalTermActiveCommandHandler SetActiveHandler() => new(_tenantContext.Object, _terms.Object, TimeProvider.System);
 
     private static DbUpdateException UniqueViolation()
         => new("save failed", new Exception(
@@ -151,7 +151,7 @@ public sealed class ClinicalTermHandlersTests
     [Fact]
     public async Task Update_Should_Reject_System_Term()
     {
-        var term = Existing(ClinicalTerm.CreateSystem(ClinicalTermKind.Diagnosis, "Gastroenterit"));
+        var term = Existing(ClinicalTerm.CreateSystem(ClinicalTermKind.Diagnosis, "Gastroenterit", DateTime.UtcNow));
 
         var result = await UpdateHandler().Handle(
             new UpdateClinicalTermCommand(term.Id, "Gastroenterit (akut)", ValidRowVersion), CancellationToken.None);
@@ -200,7 +200,7 @@ public sealed class ClinicalTermHandlersTests
     [Fact]
     public async Task Deactivate_Should_Reject_System_Term()
     {
-        var term = Existing(ClinicalTerm.CreateSystem(ClinicalTermKind.Complaint, "Kusma"));
+        var term = Existing(ClinicalTerm.CreateSystem(ClinicalTermKind.Complaint, "Kusma", DateTime.UtcNow));
 
         var result = await SetActiveHandler().Handle(new SetClinicalTermActiveCommand(term.Id, false), CancellationToken.None);
 

@@ -268,13 +268,13 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"open-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             tenantId = tenant.Id;
@@ -362,7 +362,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
         {
             await using var scope = Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var client = new Client(TenantId, $"OClient-{Guid.NewGuid():N}"[..14], "905551110088");
+            var client = new Client(TenantId, $"OClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110088");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
@@ -420,7 +420,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             await using var scope = Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var examination = new Backend.Veteriner.Domain.Examinations.Examination(
-                TenantId, clinicId ?? ClinicId, petId, null, DateTime.UtcNow.AddMinutes(-5), "Kontrol", null, null, null, visitId: visitId);
+                TenantId, clinicId ?? ClinicId, petId, null, DateTime.UtcNow.AddMinutes(-5), "Kontrol", null, null, null, DateTime.UtcNow, visitId: visitId);
             db.Examinations.Add(examination);
             await db.SaveChangesAsync();
         }
@@ -453,7 +453,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             await using var scope = Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Treatments.Add(new Treatment(
-                TenantId, ClinicId, PetId, examinationId, DateTime.UtcNow.AddMinutes(-3), "Tedavi", "Aciklama", null, null));
+                TenantId, ClinicId, PetId, examinationId, DateTime.UtcNow.AddMinutes(-3), "Tedavi", "Aciklama", null, null, DateTime.UtcNow));
             await db.SaveChangesAsync();
         }
 
@@ -462,7 +462,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             await using var scope = Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var hospitalization = new Hospitalization(
-                TenantId, ClinicId, PetId, examinationId, DateTime.UtcNow.AddHours(-3), DateTime.UtcNow.AddDays(1), "Gozlem", null, visitId);
+                TenantId, ClinicId, PetId, examinationId, DateTime.UtcNow.AddHours(-3), DateTime.UtcNow.AddDays(1), "Gozlem", null, DateTime.UtcNow, visitId);
             db.Hospitalizations.Add(hospitalization);
             await db.SaveChangesAsync();
         }
@@ -492,7 +492,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             var vaccination = new Vaccination(
                 TenantId, PetId, ClinicId, examinationId, definitionId, "Test asisi", status,
                 status == VaccinationStatus.Applied ? DateTime.UtcNow.AddMinutes(-2) : null,
-                status == VaccinationStatus.Scheduled ? DateTime.UtcNow.AddDays(10) : null, null);
+                status == VaccinationStatus.Scheduled ? DateTime.UtcNow.AddDays(10) : null, null, DateTime.UtcNow);
             db.Vaccinations.Add(vaccination);
             await db.SaveChangesAsync();
             return vaccination.Id;
@@ -504,7 +504,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var lab = new LabResult(
                 TenantId, clinicId ?? ClinicId, PetId, examinationId, visitId, UserId,
-                resulted ? DateTime.UtcNow.AddMinutes(-1) : null, "Hemogram", resulted ? "Normal" : null, null, null);
+                resulted ? DateTime.UtcNow.AddMinutes(-1) : null, "Hemogram", resulted ? "Normal" : null, null, null, DateTime.UtcNow);
             db.LabResults.Add(lab);
             await db.SaveChangesAsync();
             return lab.Id;
@@ -515,7 +515,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             await using var scope = Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var lab = await db.LabResults.SingleAsync(l => l.Id == labId);
-            lab.Cancel(UserId, "Test iptal gerekcesi").IsSuccess.Should().BeTrue();
+            lab.Cancel(UserId, "Test iptal gerekcesi", DateTime.UtcNow).IsSuccess.Should().BeTrue();
             await db.SaveChangesAsync();
         }
     }

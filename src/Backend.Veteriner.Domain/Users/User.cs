@@ -27,7 +27,7 @@ public class User : AggregateRoot
     /// Kullan?c?n?n olu�turulma zaman? (UTC).
     /// Admin listeleme, audit ve raporlama i�in kritik metadatad?r.
     /// </summary>
-    public DateTime CreatedAtUtc { get; private set; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; private set; }
 
     /// <summary>
     /// Kullan?c?n?n son g�ncellenme zaman? (UTC). Opsiyonel ama �nerilir.
@@ -39,38 +39,38 @@ public class User : AggregateRoot
 
     private User() { } // EF i�in
 
-    public User(string email, string passwordHash)
+    public User(string email, string passwordHash, DateTime utcNow)
     {
         Email = email ?? throw new ArgumentNullException(nameof(email));
         PasswordHash = passwordHash ?? throw new ArgumentNullException(nameof(passwordHash));
 
         // Kurumsal standart: olu�turma an?n? domain'de sabitle
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
     /// <summary>Gorunen adi ayarlar; bos/bosluk adi temizler. Uzunluk siniri asilirsa Result.Failure.</summary>
-    public Result SetDisplayName(string? displayName)
+    public Result SetDisplayName(string? displayName, DateTime utcNow)
     {
         var normalized = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
         if (normalized is { Length: > MaxDisplayNameLength })
             return Result.Failure("Users.Validation", $"Gorunen ad en fazla {MaxDisplayNameLength} karakter olabilir.");
 
         DisplayName = normalized;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 
-    public void ConfirmEmail()
+    public void ConfirmEmail(DateTime utcNow)
     {
         EmailConfirmed = true;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     /// <summary>
     /// Role ekler. Domain kural ihlallerinde exception f?rlatmaz, Result d�ner.
     /// </summary>
-    public Result AddRole(string roleName)
+    public Result AddRole(string roleName, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(roleName))
             return Result.Failure(UserErrors.RoleNameEmpty);
@@ -81,27 +81,27 @@ public class User : AggregateRoot
             return Result.Failure(UserErrors.RoleAlreadyExists);
 
         _roles.Add(new UserRole(normalized));
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
 
         return Result.Success();
     }
 
-    public void AddRefreshToken(RefreshToken token)
+    public void AddRefreshToken(RefreshToken token, DateTime utcNow)
     {
         _refreshTokens.Add(token);
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void RevokeRefreshToken(string tokenHash)
+    public void RevokeRefreshToken(string tokenHash, DateTime utcNow)
     {
         var token = _refreshTokens.FirstOrDefault(t => t.TokenHash == tokenHash);
-        token?.Revoke();
-        UpdatedAtUtc = DateTime.UtcNow;
+        token?.Revoke(utcNow);
+        UpdatedAtUtc = utcNow;
     }
 
-    public void UpdatePasswordHash(string newHash)
+    public void UpdatePasswordHash(string newHash, DateTime utcNow)
     {
         PasswordHash = newHash ?? throw new ArgumentNullException(nameof(newHash));
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 }

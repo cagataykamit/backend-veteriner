@@ -13,17 +13,20 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
     private readonly IReadRepository<Product> _productsRead;
     private readonly IRepository<Product> _productsWrite;
     private readonly IReadRepository<ProductCategory> _categoriesRead;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateProductCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Product> productsRead,
         IRepository<Product> productsWrite,
-        IReadRepository<ProductCategory> categoriesRead)
+        IReadRepository<ProductCategory> categoriesRead,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _productsRead = productsRead;
         _productsWrite = productsWrite;
         _categoriesRead = categoriesRead;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(UpdateProductCommand request, CancellationToken ct)
@@ -68,12 +71,14 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
         if (kind == ProductKind.Service && controlledClass != ControlledSubstanceClass.None)
             return Result.Failure("Products.Validation", "Hizmet kontrollü sınıfta olamaz.");
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         product.Update(
             request.ProductCategoryId,
             request.Name,
             request.Unit,
             request.UnitPrice,
             request.Currency,
+            utcNow,
             request.Sku,
             request.Barcode,
             request.Description,

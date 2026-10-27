@@ -77,18 +77,18 @@ public sealed partial class OwnerPortalIntegrationTests
         var deceased = new Pet(staff.TenantId, portal.ClientId, "Boncuk", speciesId);
         deceased.SetStatus(PetStatus.Deceased, null, DateOnly.FromDateTime(now)).IsSuccess.Should().BeTrue();
 
-        var otherClient = new Client(staff.TenantId, "Başka Sahip", email: $"other-{Guid.NewGuid():N}@example.com");
+        var otherClient = new Client(staff.TenantId, "Başka Sahip", DateTime.UtcNow, email: $"other-{Guid.NewGuid():N}@example.com");
         var otherPet = new Pet(staff.TenantId, otherClient.Id, "Yabancı", speciesId);
 
-        var foreignTenant = new Tenant($"PortalB-{Guid.NewGuid():N}"[..20]);
-        var foreignClient = new Client(foreignTenant.Id, "Yabancı Kiracı", email: $"ft-{Guid.NewGuid():N}@example.com");
+        var foreignTenant = new Tenant($"PortalB-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
+        var foreignClient = new Client(foreignTenant.Id, "Yabancı Kiracı", DateTime.UtcNow, email: $"ft-{Guid.NewGuid():N}@example.com");
         var foreignPet = new Pet(foreignTenant.Id, foreignClient.Id, "Uzak", speciesId);
         var otherClinic = new Clinic(staff.TenantId, $"Şube-{Guid.NewGuid():N}"[..12], "Ankara");
 
         db.AddRange(otherClient, otherPet, foreignTenant, foreignClient, foreignPet, otherClinic, active, deceased);
 
         Vaccination Vacc(Pet pet, VaccinationStatus status, DateTime? appliedAtUtc, DateTime? dueAtUtc, string name)
-            => new(staff.TenantId, pet.Id, staff.ClinicId, null, definitionId, name, status, appliedAtUtc, dueAtUtc, $"{Secret} aşı notu");
+            => new(staff.TenantId, pet.Id, staff.ClinicId, null, definitionId, name, status, appliedAtUtc, dueAtUtc, $"{Secret} aşı notu", DateTime.UtcNow);
 
         var overdue = Vacc(active, VaccinationStatus.Scheduled, null, now.AddDays(-3), "Karma");
         var future = Vacc(active, VaccinationStatus.Scheduled, null, now.AddDays(20), "Kuduz");
@@ -346,7 +346,7 @@ public sealed partial class OwnerPortalIntegrationTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var ownLink = await db.OwnerAccountClientLinks.SingleAsync(l => l.Id == portal.LinkId);
             // Varsayılan kiracı diğer testlerce paylaşıldığından pasifleştirilmez; bağ ayrı, pasif bir kiracıya taşınır.
-            var inactive = new Tenant($"PortalPasif-{Guid.NewGuid():N}"[..24]);
+            var inactive = new Tenant($"PortalPasif-{Guid.NewGuid():N}"[..24], DateTime.UtcNow);
             inactive.Deactivate();
             db.Tenants.Add(inactive);
             db.Entry(ownLink).Property(l => l.TenantId).CurrentValue = inactive.Id;

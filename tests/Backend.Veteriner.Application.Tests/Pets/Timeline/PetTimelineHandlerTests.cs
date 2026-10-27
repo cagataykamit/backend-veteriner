@@ -103,28 +103,28 @@ public sealed class PetTimelineHandlerTests
 
     private Examination NewExam(DateTime at, Guid? visitId = null, Guid? clinicId = null)
     {
-        var e = new Examination(_tenantId, clinicId ?? _clinicId, _petId, null, at, "Kontrol", null, null, null, visitId: visitId);
+        var e = new Examination(_tenantId, clinicId ?? _clinicId, _petId, null, at, "Kontrol", null, null, null, DateTime.UtcNow, visitId: visitId);
         _exams.Add(e);
         return e;
     }
 
     private Vaccination NewVaccination(VaccinationStatus status, DateTime? applied, DateTime? due)
     {
-        var v = new Vaccination(_tenantId, _petId, _clinicId, null, Guid.NewGuid(), "Karma", status, applied, due, null);
+        var v = new Vaccination(_tenantId, _petId, _clinicId, null, Guid.NewGuid(), "Karma", status, applied, due, null, DateTime.UtcNow);
         _vaccinations.Add(v);
         return v;
     }
 
     private Treatment NewTreatment(DateTime at, Guid? examinationId = null)
     {
-        var t = new Treatment(_tenantId, _clinicId, _petId, examinationId, at, "Serum", "Aciklama", null, null);
+        var t = new Treatment(_tenantId, _clinicId, _petId, examinationId, at, "Serum", "Aciklama", null, null, DateTime.UtcNow);
         _treatments.Add(t);
         return t;
     }
 
     private Hospitalization NewHospitalization(DateTime at)
     {
-        var h = new Hospitalization(_tenantId, _clinicId, _petId, null, at, null, "Gozlem", null);
+        var h = new Hospitalization(_tenantId, _clinicId, _petId, null, at, null, "Gozlem", null, DateTime.UtcNow);
         _hosp.Add(h);
         return h;
     }
@@ -143,7 +143,7 @@ public sealed class PetTimelineHandlerTests
 
     private Product NewProduct()
     {
-        var product = new Product(_tenantId, "Amoksisilin", "şişe", 10m, "TRY", sku: "SKU-1");
+        var product = new Product(_tenantId, "Amoksisilin", "şişe", 10m, "TRY", DateTime.UtcNow, sku: "SKU-1");
         _products.Add(product);
         return product;
     }
@@ -375,10 +375,10 @@ public sealed class PetTimelineHandlerTests
 [Fact]
     public async Task LabResult_Should_Be_Single_Row_At_RequestTime_With_Status_And_Cancelled_Hidden_By_Default()
     {
-        var requested = new LabResult(_tenantId, _clinicId, _petId, null, null, null, null, "Kan sayımı", null, null, null);
-        var resulted = new LabResult(_tenantId, _clinicId, _petId, null, Guid.NewGuid(), null, T0, "Biyokimya", "Normal", null, null);
-        var cancelled = new LabResult(_tenantId, _clinicId, _petId, null, null, null, null, "İdrar", null, null, null);
-        cancelled.Cancel(Guid.NewGuid(), "Yanlış hasta için istendi").IsSuccess.Should().BeTrue();
+        var requested = new LabResult(_tenantId, _clinicId, _petId, null, null, null, null, "Kan sayımı", null, null, null, DateTime.UtcNow);
+        var resulted = new LabResult(_tenantId, _clinicId, _petId, null, Guid.NewGuid(), null, T0, "Biyokimya", "Normal", null, null, DateTime.UtcNow);
+        var cancelled = new LabResult(_tenantId, _clinicId, _petId, null, null, null, null, "İdrar", null, null, null, DateTime.UtcNow);
+        cancelled.Cancel(Guid.NewGuid(), "Yanlış hasta için istendi", DateTime.UtcNow).IsSuccess.Should().BeTrue();
         _labs.AddRange([requested, resulted, cancelled]);
 
         var hidden = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
@@ -460,7 +460,7 @@ public sealed class PetTimelineHandlerTests
     public async Task Hospitalization_Is_One_Event_At_Admission_With_Status()
     {
         var h = NewHospitalization(T0);
-        _hosp.Single().Discharge(T0.AddDays(2), null);
+        _hosp.Single().Discharge(T0.AddDays(2), null, DateTime.UtcNow);
 
         var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
 

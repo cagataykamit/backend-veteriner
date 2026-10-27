@@ -154,7 +154,7 @@ public sealed class GetAppointmentsListQueryHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantTextSearchSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Client> { new(tid, "Ali Veli") });
+            .ReturnsAsync(new List<Client> { new(tid, "Ali Veli", DateTime.UtcNow) });
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantTextFieldsSearchSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Pet>());
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantForClientIdsSpec>(), It.IsAny<CancellationToken>()))

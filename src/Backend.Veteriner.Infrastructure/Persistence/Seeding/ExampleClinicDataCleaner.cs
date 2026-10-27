@@ -227,8 +227,9 @@ public sealed class ExampleClinicDataCleaner : IExampleClinicCleaner
 
         var ids = scope.DeactivatableProductIds;
         var products = await _db.Products.Where(p => ids.Contains(p.Id)).ToListAsync(ct);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         foreach (var product in products)
-            product.Deactivate();
+            product.Deactivate(utcNow);
 
         await _db.SaveChangesAsync(ct);
         return products.Count;

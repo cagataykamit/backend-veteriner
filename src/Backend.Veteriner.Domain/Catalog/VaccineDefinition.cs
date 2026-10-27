@@ -29,7 +29,8 @@ public sealed class VaccineDefinition : AggregateRoot
         string name,
         string? description,
         int? defaultNextDueDays,
-        bool isCore)
+        bool isCore,
+        DateTime utcNow)
     {
         TenantId = tenantId;
         SpeciesId = speciesId;
@@ -39,13 +40,14 @@ public sealed class VaccineDefinition : AggregateRoot
         DefaultNextDueDays = defaultNextDueDays;
         IsCore = isCore;
         IsActive = true;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
     public static VaccineDefinition CreateGlobal(
         string code,
         string name,
+        DateTime utcNow,
         string? description = null,
         int? defaultNextDueDays = null,
         bool isCore = true,
@@ -59,13 +61,15 @@ public sealed class VaccineDefinition : AggregateRoot
             name.Trim(),
             TrimOrNull(description),
             defaultNextDueDays,
-            isCore);
+            isCore,
+            utcNow);
     }
 
     public static VaccineDefinition CreateTenant(
         Guid tenantId,
         string code,
         string name,
+        DateTime utcNow,
         Guid? speciesId = null,
         string? description = null,
         int? defaultNextDueDays = null,
@@ -82,7 +86,8 @@ public sealed class VaccineDefinition : AggregateRoot
             name.Trim(),
             TrimOrNull(description),
             defaultNextDueDays,
-            isCore);
+            isCore,
+            utcNow);
     }
 
     public Result UpdateDetails(
@@ -91,7 +96,8 @@ public sealed class VaccineDefinition : AggregateRoot
         string? description,
         int? defaultNextDueDays,
         Guid? speciesId,
-        bool isCore)
+        bool isCore,
+        DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(code))
             return Result.Failure("VaccineDefinitions.Validation", "Aşı kodu boş olamaz.");
@@ -116,30 +122,30 @@ public sealed class VaccineDefinition : AggregateRoot
         DefaultNextDueDays = defaultNextDueDays;
         SpeciesId = speciesId;
         IsCore = isCore;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 
-    public void Activate()
+    public void Activate(DateTime utcNow)
     {
         IsActive = true;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void Deactivate()
+    public void Deactivate(DateTime utcNow)
     {
         IsActive = false;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     /// <summary>
     /// <c>IsCore</c> bayrağını günceller (ör. idempotent seed düzeltmesi). İş kuralı: global sistem
     /// kataloğu için <c>true</c>, kiracı özel tanımlar için genelde <c>false</c>.
     /// </summary>
-    public void SetIsCore(bool value)
+    public void SetIsCore(bool value, DateTime utcNow)
     {
         IsCore = value;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     private static void ValidateInputs(string code, string name, string? description, int? defaultNextDueDays)

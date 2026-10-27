@@ -35,7 +35,7 @@ public sealed class GetTenantAccessStateQueryHandlerTests
         _client.SetupGet(c => c.UserId).Returns(uid);
         _userTenants.Setup(r => r.ExistsAsync(uid, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         SetTenantId(tenant, tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
@@ -67,7 +67,7 @@ public sealed class GetTenantAccessStateQueryHandlerTests
         _client.SetupGet(c => c.UserId).Returns(uid);
         _userTenants.Setup(r => r.ExistsAsync(uid, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         SetTenantId(tenant, tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
@@ -124,7 +124,7 @@ public sealed class GetTenantAccessStateQueryHandlerTests
         _client.SetupGet(c => c.UserId).Returns(uid);
         _userTenants.Setup(r => r.ExistsAsync(uid, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         SetTenantId(tenant, tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);

@@ -11,11 +11,13 @@ public sealed class SetClinicalTermActiveCommandHandler : IRequestHandler<SetCli
 {
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ClinicalTerm> _terms;
+    private readonly TimeProvider _timeProvider;
 
-    public SetClinicalTermActiveCommandHandler(ITenantContext tenantContext, IRepository<ClinicalTerm> terms)
+    public SetClinicalTermActiveCommandHandler(ITenantContext tenantContext, IRepository<ClinicalTerm> terms, TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _terms = terms;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(SetClinicalTermActiveCommand request, CancellationToken ct)
@@ -27,7 +29,8 @@ public sealed class SetClinicalTermActiveCommandHandler : IRequestHandler<SetCli
         if (term is null)
             return Result.Failure(ClinicalTermErrors.NotFound);
 
-        var change = request.IsActive ? term.Activate() : term.Deactivate();
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var change = request.IsActive ? term.Activate(utcNow) : term.Deactivate(utcNow);
         if (!change.IsSuccess)
             return change;
 

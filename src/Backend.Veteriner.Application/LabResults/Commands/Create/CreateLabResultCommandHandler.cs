@@ -29,6 +29,7 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Visit> _visits;
     private readonly IRepository<LabResult> _labResultsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public CreateLabResultCommandHandler(
         ITenantContext tenantContext,
@@ -40,7 +41,8 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
         IReadRepository<Visit> visits,
-        IRepository<LabResult> labResultsWrite)
+        IRepository<LabResult> labResultsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -52,6 +54,7 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
         _examinations = examinations;
         _visits = visits;
         _labResultsWrite = labResultsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreateLabResultCommand request, CancellationToken ct)
@@ -146,6 +149,7 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
         if (!resultCheck.IsSuccess)
             return Result<Guid>.Failure(resultCheck.Error);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var entity = new LabResult(
             tenantId,
             effectiveClinicId,
@@ -157,7 +161,8 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
             request.TestName,
             request.ResultText,
             request.Interpretation,
-            request.Notes);
+            request.Notes,
+            utcNow);
 
         await _labResultsWrite.AddAsync(entity, ct);
         await _labResultsWrite.SaveChangesAsync(ct);

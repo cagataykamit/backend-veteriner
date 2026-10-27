@@ -88,7 +88,7 @@ public sealed class GetAppointmentByIdQueryHandlerTests
         var pet = new Pet(tenantId, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
 
-        var client = new Client(tenantId, "Ali Veli");
+        var client = new Client(tenantId, "Ali Veli", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
 
         var clinic = new Clinic(tenantId, "Klinik", "Adres");

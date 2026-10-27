@@ -55,7 +55,7 @@ public sealed class ExaminationTemplateHandlersTests
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _templates.Setup(r => r.AnyAsync(It.IsAny<ExaminationTemplateNameTakenSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
         _templates.Setup(r => r.AddAsync(It.IsAny<ExaminationTemplate>(), It.IsAny<CancellationToken>()))
@@ -75,7 +75,7 @@ public sealed class ExaminationTemplateHandlersTests
 
     private Product AddProduct(ProductKind kind, decimal price = 100m)
     {
-        var product = new Product(_tenantId, $"Urun-{_catalog.Count}", "Adet", price, "TRY", kind: kind);
+        var product = new Product(_tenantId, $"Urun-{_catalog.Count}", "Adet", price, "TRY", DateTime.UtcNow, kind: kind);
         _catalog.Add(product);
         return product;
     }
@@ -91,11 +91,11 @@ public sealed class ExaminationTemplateHandlersTests
     }
 
     private ExaminationTemplate TenantTemplate(params ExaminationTemplateLineDraft[] lines)
-        => Existing(ExaminationTemplate.CreateForTenant(_tenantId, "Kulak paketi", "Kulak kaşıntısı", "Otoskopi: ", null, lines).Value!);
+        => Existing(ExaminationTemplate.CreateForTenant(_tenantId, "Kulak paketi", "Kulak kaşıntısı", "Otoskopi: ", null, lines, DateTime.UtcNow).Value!);
 
     private Examination Draft(string visitReason = "Kontrol", string findings = "Genel durum iyi")
     {
-        var e = new Examination(_tenantId, _clinicId, Guid.NewGuid(), null, Now.AddHours(-1), visitReason, findings, null, null);
+        var e = new Examination(_tenantId, _clinicId, Guid.NewGuid(), null, Now.AddHours(-1), visitReason, findings, null, null, DateTime.UtcNow);
         ExaminationTestSupport.SetRowVersion(e);
         _examinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(e);
@@ -110,9 +110,9 @@ public sealed class ExaminationTemplateHandlersTests
                 Now, null, "Active", null, null, null, null, false, null, Guid.NewGuid(), Now, null),
             new AdministrationStockDto(10m, 0m, false, 10m, 0m)));
 
-    private CreateExaminationTemplateCommandHandler CreateHandler() => new(_tenantContext.Object, _templates.Object, _products.Object);
-    private UpdateExaminationTemplateCommandHandler UpdateHandler() => new(_tenantContext.Object, _templates.Object, _products.Object);
-    private SetExaminationTemplateActiveCommandHandler SetActiveHandler() => new(_tenantContext.Object, _templates.Object);
+    private CreateExaminationTemplateCommandHandler CreateHandler() => new(_tenantContext.Object, _templates.Object, _products.Object, TimeProvider.System);
+    private UpdateExaminationTemplateCommandHandler UpdateHandler() => new(_tenantContext.Object, _templates.Object, _products.Object, TimeProvider.System);
+    private SetExaminationTemplateActiveCommandHandler SetActiveHandler() => new(_tenantContext.Object, _templates.Object, TimeProvider.System);
 
     private ApplyExaminationTemplateCommandHandler ApplyHandler()
         => new(
@@ -226,7 +226,7 @@ public sealed class ExaminationTemplateHandlersTests
     [Fact]
     public async Task Update_And_SetActive_Should_Reject_System_Template()
     {
-        var system = Existing(ExaminationTemplate.CreateSystem("Rutin muayene", "Genel kontrol", null, null));
+        var system = Existing(ExaminationTemplate.CreateSystem("Rutin muayene", "Genel kontrol", null, null, DateTime.UtcNow));
 
         var update = await UpdateHandler().Handle(
             new UpdateExaminationTemplateCommand(system.Id, "Rutin", "Kontrol", null, null, [], TemplateRowVersionBase64),
@@ -308,7 +308,7 @@ public sealed class ExaminationTemplateHandlersTests
     public async Task Apply_Should_Reject_Inactive_Template_And_Missing_RowVersion()
     {
         var template = TenantTemplate();
-        template.Deactivate();
+        template.Deactivate(DateTime.UtcNow);
         var exam = Draft();
 
         var inactive = await ApplyHandler().Handle(ApplyCmd(exam, template), CancellationToken.None);

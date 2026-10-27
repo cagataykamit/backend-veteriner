@@ -5,8 +5,11 @@ namespace Backend.Veteriner.Domain.Tests.Products;
 
 public sealed class StockMovementReversalTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static StockMovement Movement(StockMovementType type)
         => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), type, 4m, DateTime.UtcNow,
+            Now,
             unitCost: 2m, referenceType: " Administration ", referenceId: Guid.NewGuid());
 
     [Theory]
@@ -33,7 +36,7 @@ public sealed class StockMovementReversalTests
         var requestId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
-        var reversal = original.CreateReversal("  Yanlış ürün ", "not", DateTime.UtcNow, userId, requestId);
+        var reversal = original.CreateReversal("  Yanlış ürün ", "not", DateTime.UtcNow, userId, requestId, Now);
 
         reversal.MovementType.Should().Be(StockMovementType.Reversal);
         reversal.ReversesMovementId.Should().Be(original.Id);
@@ -54,7 +57,7 @@ public sealed class StockMovementReversalTests
     [InlineData(StockMovementType.Reversal)]
     public void CreateReversal_Should_Throw_When_NotReversible(StockMovementType type)
     {
-        var act = () => Movement(type).CreateReversal("x", null, DateTime.UtcNow, null, null);
+        var act = () => Movement(type).CreateReversal("x", null, DateTime.UtcNow, null, null, Now);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -62,7 +65,7 @@ public sealed class StockMovementReversalTests
     [Fact]
     public void CreateReversal_Should_Throw_When_Reason_Blank()
     {
-        var act = () => Movement(StockMovementType.Out).CreateReversal(" ", null, DateTime.UtcNow, null, null);
+        var act = () => Movement(StockMovementType.Out).CreateReversal(" ", null, DateTime.UtcNow, null, null, Now);
 
         act.Should().Throw<ArgumentException>();
     }

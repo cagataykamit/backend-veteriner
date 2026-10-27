@@ -274,8 +274,8 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
             .Setup(r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<PaymentPaidAtAmountRow>());
 
-        var client1 = new Client(tid, "Ayşe Kaya", "05321111111");
-        var client2 = new Client(tid, "Mehmet Demir", "05322222222");
+        var client1 = new Client(tid, "Ayşe Kaya", DateTime.UtcNow, "05321111111");
+        var client2 = new Client(tid, "Mehmet Demir", DateTime.UtcNow, "05322222222");
         var pet1 = new Pet(tid, client1.Id, "Pamuk", TestSpeciesIds.Cat);
         var pet2 = new Pet(tid, client2.Id, "Karabaş", TestSpeciesIds.Dog);
 
@@ -519,7 +519,7 @@ public sealed class GetDashboardFinanceSummaryQueryHandlerTests
             .Setup(r => r.ListAsync(It.IsAny<PaymentsPaidAtAmountInWindowSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<PaymentPaidAtAmountRow>());
 
-        var client = new Client(tid, "Zeynep Ak", "05320000000");
+        var client = new Client(tid, "Zeynep Ak", DateTime.UtcNow, "05320000000");
         var recentRows = new List<DashboardFinancePaymentRow>
         {
             new(Guid.NewGuid(), DateTime.UtcNow, client.Id, Guid.NewGuid(), null, 50m, "TRY", PaymentMethod.Cash),

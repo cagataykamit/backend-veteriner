@@ -26,6 +26,7 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Examination> _examinations;
     private readonly IRepository<Treatment> _treatmentsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public CreateTreatmentCommandHandler(
         ITenantContext tenantContext,
@@ -35,7 +36,8 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
-        IRepository<Treatment> treatmentsWrite)
+        IRepository<Treatment> treatmentsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -45,6 +47,7 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
         _pets = pets;
         _examinations = examinations;
         _treatmentsWrite = treatmentsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreateTreatmentCommand request, CancellationToken ct)
@@ -133,6 +136,7 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
         if (!locked.IsSuccess)
             return Result<Guid>.Failure(locked.Error);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var treatment = new Treatment(
             tenantId,
             effectiveClinicId,
@@ -142,7 +146,8 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
             request.Title,
             request.Description,
             request.Notes,
-            request.FollowUpDateUtc);
+            request.FollowUpDateUtc,
+            utcNow);
 
         await _treatmentsWrite.AddAsync(treatment, ct);
         await _treatmentsWrite.SaveChangesAsync(ct);

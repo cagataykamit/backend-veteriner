@@ -13,15 +13,18 @@ public sealed class UpdateReminderSettingsCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<TenantReminderSettings> _settingsRead;
     private readonly IRepository<TenantReminderSettings> _settingsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateReminderSettingsCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<TenantReminderSettings> settingsRead,
-        IRepository<TenantReminderSettings> settingsWrite)
+        IRepository<TenantReminderSettings> settingsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _settingsRead = settingsRead;
         _settingsWrite = settingsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ReminderSettingsDto>> Handle(UpdateReminderSettingsCommand request, CancellationToken ct)
@@ -34,15 +37,17 @@ public sealed class UpdateReminderSettingsCommandHandler
         }
 
         var row = await _settingsRead.FirstOrDefaultAsync(new TenantReminderSettingsByTenantSpec(tenantId), ct);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (row is null)
         {
-            row = TenantReminderSettings.CreateDefault(tenantId);
+            row = TenantReminderSettings.CreateDefault(tenantId, utcNow);
             var initial = row.Update(
                 request.AppointmentRemindersEnabled,
                 request.AppointmentReminderHoursBefore,
                 request.VaccinationRemindersEnabled,
                 request.VaccinationReminderDaysBefore,
-                request.EmailChannelEnabled);
+                request.EmailChannelEnabled,
+                utcNow);
             if (!initial.IsSuccess)
                 return Result<ReminderSettingsDto>.Failure(initial.Error);
             await _settingsWrite.AddAsync(row, ct);
@@ -54,7 +59,8 @@ public sealed class UpdateReminderSettingsCommandHandler
                 request.AppointmentReminderHoursBefore,
                 request.VaccinationRemindersEnabled,
                 request.VaccinationReminderDaysBefore,
-                request.EmailChannelEnabled);
+                request.EmailChannelEnabled,
+                utcNow);
             if (!update.IsSuccess)
                 return Result<ReminderSettingsDto>.Failure(update.Error);
             await _settingsWrite.UpdateAsync(row, ct);

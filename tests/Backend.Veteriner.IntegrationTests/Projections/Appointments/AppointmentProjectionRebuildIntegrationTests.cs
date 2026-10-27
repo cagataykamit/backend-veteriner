@@ -89,7 +89,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = await db.Clients.SingleAsync(c => c.Id == context.ClientId);
-            client.UpdateDetails(client.FullName, "rebuild.search@example.com", client.Phone, client.Address);
+            client.UpdateDetails(client.FullName, "rebuild.search@example.com", client.Phone, client.Address, DateTime.UtcNow);
             var pet = await db.Pets.SingleAsync(p => p.Id == context.PetId);
             pet.UpdateDetails(pet.Name, pet.SpeciesId, "RebuildBreedFreeText", pet.BirthDate, pet.BreedId, pet.Gender, pet.ColorId, pet.Weight, pet.Notes);
             await db.SaveChangesAsync();
@@ -464,7 +464,7 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
         var client = await db.Clients.FirstOrDefaultAsync(c => c.TenantId == tenant.Id);
         if (client is null)
         {
-            client = new Client(tenant.Id, "Rebuild Default Client", "905551110088");
+            client = new Client(tenant.Id, "Rebuild Default Client", DateTime.UtcNow, "905551110088");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
         }
@@ -490,13 +490,13 @@ public sealed class AppointmentProjectionRebuildIntegrationTests
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var tenant = new Tenant($"RebuildTenant-{Guid.NewGuid():N}"[..20]);
+        var tenant = new Tenant($"RebuildTenant-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
 
         var clinic = new Clinic(tenant.Id, $"RebuildClinic-{Guid.NewGuid():N}"[..16], "Ankara");
         db.Clinics.Add(clinic);
-        var client = new Client(tenant.Id, "Rebuild Client", "905551110077");
+        var client = new Client(tenant.Id, "Rebuild Client", DateTime.UtcNow, "905551110077");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 

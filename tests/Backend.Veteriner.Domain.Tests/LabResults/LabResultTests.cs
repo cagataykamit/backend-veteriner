@@ -6,19 +6,21 @@ namespace Backend.Veteriner.Domain.Tests.LabResults;
 
 public sealed class LabResultTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid ClinicId = Guid.NewGuid();
     private static readonly Guid PetId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
 
     private static LabResult Requested()
-        => new(TenantId, ClinicId, PetId, null, null, UserId, null, " Kan sayımı ", null, null, null);
+        => new(TenantId, ClinicId, PetId, null, null, UserId, null, " Kan sayımı ", null, null, null, Now);
 
     private static LabResult Resulted(string? interpretation = null)
-        => new(TenantId, ClinicId, PetId, null, null, UserId, DateTime.UtcNow, "Kan sayımı", "Normal", interpretation, null);
+        => new(TenantId, ClinicId, PetId, null, null, UserId, DateTime.UtcNow, "Kan sayımı", "Normal", interpretation, null, Now);
 
     private static Result UpdateWith(LabResult l, DateTime? date, string? text, string? interpretation = null)
-        => l.UpdateDetails(ClinicId, PetId, null, null, date, "Kan sayımı", text, interpretation, null);
+        => l.UpdateDetails(ClinicId, PetId, null, null, date, "Kan sayımı", text, interpretation, null, Now);
 
     [Fact]
     public void Ctor_Without_Result_Should_Create_Requested_With_Server_Request_Time()
@@ -30,10 +32,10 @@ public sealed class LabResultTests
         l.ResultText.Should().BeNull();
         l.ResultDateUtc.Should().BeNull();
         l.RequestedByUserId.Should().Be(UserId);
-        l.RequestedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        l.RequestedAtUtc.Should().Be(Now);
         l.AwaitingInterpretation.Should().BeFalse();
     }
-[Fact]    public void Ctor_With_Result_Should_Request_At_Result_Date()    {        var resultDate = DateTime.UtcNow.AddDays(-5);        var l = new LabResult(TenantId, ClinicId, PetId, null, null, UserId, resultDate, "Kan sayımı", "Normal", null, null);        l.RequestedAtUtc.Should().Be(resultDate);        l.InterpretationRequired.Should().BeTrue();    }    [Fact]    public void Requested_Then_Resulted_Should_Keep_Request_Time()    {        var l = Requested();        var requestedAt = l.RequestedAtUtc;        UpdateWith(l, DateTime.UtcNow.AddDays(-2), "Normal").IsSuccess.Should().BeTrue();        l.RequestedAtUtc.Should().Be(requestedAt);    }    [Fact]    public void AwaitingInterpretation_Should_Be_False_When_Interpretation_Not_Required()    {        var l = Resulted();        typeof(LabResult).GetProperty(nameof(LabResult.InterpretationRequired))!.SetValue(l, false);        l.AwaitingInterpretation.Should().BeFalse();    }
+[Fact]    public void Ctor_With_Result_Should_Request_At_Result_Date()    {        var resultDate = DateTime.UtcNow.AddDays(-5);        var l = new LabResult(TenantId, ClinicId, PetId, null, null, UserId, resultDate, "Kan sayımı", "Normal", null, null, Now);        l.RequestedAtUtc.Should().Be(resultDate);        l.InterpretationRequired.Should().BeTrue();    }    [Fact]    public void Requested_Then_Resulted_Should_Keep_Request_Time()    {        var l = Requested();        var requestedAt = l.RequestedAtUtc;        UpdateWith(l, DateTime.UtcNow.AddDays(-2), "Normal").IsSuccess.Should().BeTrue();        l.RequestedAtUtc.Should().Be(requestedAt);    }    [Fact]    public void AwaitingInterpretation_Should_Be_False_When_Interpretation_Not_Required()    {        var l = Resulted();        typeof(LabResult).GetProperty(nameof(LabResult.InterpretationRequired))!.SetValue(l, false);        l.AwaitingInterpretation.Should().BeFalse();    }
 
     [Fact]
     public void Ctor_With_Result_Should_Create_Resulted_And_Await_Interpretation()
@@ -52,7 +54,7 @@ public sealed class LabResultTests
     {
         var act = () => new LabResult(
             TenantId, ClinicId, PetId, null, null, UserId,
-            withDate ? DateTime.UtcNow : null, "T", withText ? "metin" : null, null, null);
+            withDate ? DateTime.UtcNow : null, "T", withText ? "metin" : null, null, null, Now);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -105,7 +107,7 @@ public sealed class LabResultTests
     {
         var l = Requested();
 
-        l.Cancel(UserId, "  Yanlış hasta için istendi  ").IsSuccess.Should().BeTrue();
+        l.Cancel(UserId, "  Yanlış hasta için istendi  ", Now).IsSuccess.Should().BeTrue();
 
         l.Status.Should().Be(LabResultStatus.Cancelled);
         l.CancelReason.Should().Be("Yanlış hasta için istendi");
@@ -113,7 +115,7 @@ public sealed class LabResultTests
         l.CancelledAtUtc.Should().NotBeNull();
         l.AwaitingInterpretation.Should().BeFalse();
         UpdateWith(l, DateTime.UtcNow, "x").Error.Code.Should().Be("LabResults.AlreadyCancelled");
-        l.Cancel(UserId, "ikinci iptal gerekçesi").Error.Code.Should().Be("LabResults.AlreadyCancelled");
+        l.Cancel(UserId, "ikinci iptal gerekçesi", Now).Error.Code.Should().Be("LabResults.AlreadyCancelled");
     }
 
     [Theory]
@@ -124,7 +126,7 @@ public sealed class LabResultTests
     {
         var l = Requested();
 
-        var result = l.Cancel(UserId, reason);
+        var result = l.Cancel(UserId, reason, Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("LabResults.Validation");

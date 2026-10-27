@@ -15,15 +15,18 @@ public sealed class CreateExaminationTemplateCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ExaminationTemplate> _templates;
     private readonly IReadRepository<Product> _products;
+    private readonly TimeProvider _timeProvider;
 
     public CreateExaminationTemplateCommandHandler(
         ITenantContext tenantContext,
         IRepository<ExaminationTemplate> templates,
-        IReadRepository<Product> products)
+        IReadRepository<Product> products,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _templates = templates;
         _products = products;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ExaminationTemplateDto>> Handle(CreateExaminationTemplateCommand request, CancellationToken ct)
@@ -33,8 +36,9 @@ public sealed class CreateExaminationTemplateCommandHandler
 
         var drafts = (request.Lines ?? []).Select(l => new ExaminationTemplateLineDraft(l.ProductId, l.Quantity)).ToList();
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var created = ExaminationTemplate.CreateForTenant(
-            tenantId, request.Name, request.VisitReason, request.Findings, request.Plan, drafts);
+            tenantId, request.Name, request.VisitReason, request.Findings, request.Plan, drafts, utcNow);
         if (!created.IsSuccess)
             return Result<ExaminationTemplateDto>.Failure(created.Error);
 

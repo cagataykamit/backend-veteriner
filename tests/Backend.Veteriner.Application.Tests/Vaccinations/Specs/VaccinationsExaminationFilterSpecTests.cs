@@ -13,7 +13,7 @@ public sealed class VaccinationsExaminationFilterSpecTests
 
     private Vaccination Build(Guid tenantId, Guid? examinationId, Guid? clinicId = null)
         => new(tenantId, _petId, clinicId ?? _clinicId, examinationId, Guid.NewGuid(), "Kuduz",
-            VaccinationStatus.Applied, DateTime.UtcNow.AddHours(-1), null, null);
+            VaccinationStatus.Applied, DateTime.UtcNow.AddHours(-1), null, null, DateTime.UtcNow);
 
     [Fact]
     public void ListSpec_Should_FilterByExaminationId_Within_TenantAndClinic()

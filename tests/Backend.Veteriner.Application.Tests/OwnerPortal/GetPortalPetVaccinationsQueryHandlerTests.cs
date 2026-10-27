@@ -22,7 +22,7 @@ namespace Backend.Veteriner.Application.Tests.OwnerPortal;
 /// </summary>
 public sealed class GetPortalPetVaccinationsQueryHandlerTests
 {
-    private readonly Tenant _tenant = new("Portal Kiracı");
+    private readonly Tenant _tenant = new("Portal Kiracı", DateTime.UtcNow);
     private readonly OwnerAccount _account = OwnerAccount.Create("ayse@example.com", "Ayşe", OwnerPortalTestFixture.Now);
     private readonly Guid _clientId = Guid.NewGuid();
     private readonly OwnerAccountClientLink _link;

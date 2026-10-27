@@ -85,17 +85,17 @@ public sealed class ClinicWorkingHoursTransactionIntegrationTests : IClassFixtur
             {
                 db.ClinicWorkingHours.Add(ClinicWorkingHour.Create(
                     tenant.Id, clinic.Id, day, isClosed: false,
-                    new TimeOnly(9, 0), new TimeOnly(18, 0), null, null));
+                    new TimeOnly(9, 0), new TimeOnly(18, 0), null, null, utcNow: DateTime.UtcNow));
             }
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"wh-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             clinicId = clinic.Id;

@@ -483,13 +483,13 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"charge-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             tenantId = tenant.Id;
@@ -574,7 +574,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var client = new Client(TenantId, $"CClient-{Guid.NewGuid():N}"[..14], "905551110088");
+            var client = new Client(TenantId, $"CClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110088");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
@@ -613,7 +613,7 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var examination = new Examination(
                 TenantId, clinicId ?? ClinicId, petId, null, DateTime.UtcNow.AddMinutes(-5),
-                "Kontrol", "Bulgu yok", null, null, visitId: visitId);
+                "Kontrol", "Bulgu yok", null, null, DateTime.UtcNow, visitId: visitId);
             db.Examinations.Add(examination);
             await db.SaveChangesAsync();
             return examination.Id;
@@ -646,10 +646,10 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16]);
+            var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             await db.SaveChangesAsync();
-            var client = new Client(tenant.Id, $"FClient-{Guid.NewGuid():N}"[..14], "905551110099");
+            var client = new Client(tenant.Id, $"FClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110099");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;
@@ -659,12 +659,12 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16]);
+            var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             await db.SaveChangesAsync();
             var clinic = new Clinic(tenant.Id, $"FClinic-{Guid.NewGuid():N}"[..14], "Ankara");
             db.Clinics.Add(clinic);
-            var client = new Client(tenant.Id, $"FClient-{Guid.NewGuid():N}"[..14], "905551110098");
+            var client = new Client(tenant.Id, $"FClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110098");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             var charge = Charge.Create(

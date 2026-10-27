@@ -34,6 +34,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
     private readonly IReadRepository<Product> _products;
     private readonly IReadRepository<Prescription> _prescriptionsRead;
     private readonly IRepository<Prescription> _prescriptionsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdatePrescriptionCommandHandler(
         ITenantContext tenantContext,
@@ -46,7 +47,8 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         IReadRepository<Treatment> treatments,
         IReadRepository<Product> products,
         IReadRepository<Prescription> prescriptionsRead,
-        IRepository<Prescription> prescriptionsWrite)
+        IRepository<Prescription> prescriptionsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -59,6 +61,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         _products = products;
         _prescriptionsRead = prescriptionsRead;
         _prescriptionsWrite = prescriptionsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(UpdatePrescriptionCommand request, CancellationToken ct)
@@ -208,6 +211,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
             itemDrafts = resolved.Value!;
         }
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var update = p.UpdateDetails(
             effectiveClinicId,
             request.PetId,
@@ -217,7 +221,8 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
             request.Title,
             request.Content,
             request.Notes,
-            request.FollowUpDateUtc);
+            request.FollowUpDateUtc,
+            utcNow);
 
         if (!update.IsSuccess)
             return update;

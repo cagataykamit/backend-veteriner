@@ -163,9 +163,9 @@ public sealed class GetProductStocksListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         var clinicId = Guid.NewGuid();
-        var product = new Product(tid, "VAC", "Adet", 10m, "TRY");
+        var product = new Product(tid, "VAC", "Adet", 10m, "TRY", DateTime.UtcNow);
         AttachProductReflection(product);
-        var stock = new ProductStock(tid, clinicId, product.Id, quantityOnHand: 2m, minimumStockLevel: 5m);
+        var stock = new ProductStock(tid, clinicId, product.Id, quantityOnHand: 2m, minimumStockLevel: 5m, utcNow: DateTime.UtcNow);
         AttachStockProductReflection(stock, product);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -198,10 +198,10 @@ public sealed class GetProductStocksListQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         var clinicId = Guid.NewGuid();
-        var product = new Product(tid, "VAC", "Adet", 10m, "TRY");
+        var product = new Product(tid, "VAC", "Adet", 10m, "TRY", DateTime.UtcNow);
         AttachProductReflection(product);
         // Toplam 8 >= eşik 6, ama 3'ü süresi geçmiş: kullanılabilir 5 < 6.
-        var stock = new ProductStock(tid, clinicId, product.Id, quantityOnHand: 8m, minimumStockLevel: 6m);
+        var stock = new ProductStock(tid, clinicId, product.Id, quantityOnHand: 8m, minimumStockLevel: 6m, utcNow: DateTime.UtcNow);
         AttachStockProductReflection(stock, product);
         var expired = StockBatchMocks.Batch(tid, clinicId, product, 3m, "ESKI", new DateOnly(2026, 1, 1));
         var valid = StockBatchMocks.Batch(tid, clinicId, product, 5m, "YENI", new DateOnly(2027, 1, 1));

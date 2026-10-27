@@ -19,7 +19,7 @@ public sealed class ChangePasswordCommandHandlerTests
     private readonly ChangePasswordCommandValidator _validator = new();
 
     private ChangePasswordCommandHandler CreateHandler()
-        => new(_users.Object, _hasher.Object, _client.Object);
+        => new(_users.Object, _hasher.Object, _client.Object, TimeProvider.System);
 
     private static ChangePasswordCommand ValidCommand()
         => new(CurrentPassword, NewPassword, NewPassword);
@@ -29,7 +29,7 @@ public sealed class ChangePasswordCommandHandlerTests
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var user = new User("user@example.com", StoredHash);
+        var user = new User("user@example.com", StoredHash, DateTime.UtcNow);
         var handler = CreateHandler();
         var command = ValidCommand();
 
@@ -53,7 +53,7 @@ public sealed class ChangePasswordCommandHandlerTests
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var user = new User("user@example.com", StoredHash);
+        var user = new User("user@example.com", StoredHash, DateTime.UtcNow);
         var handler = CreateHandler();
 
         _client.Setup(c => c.UserId).Returns(userId);
@@ -111,7 +111,7 @@ public sealed class ChangePasswordCommandHandlerTests
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var user = new User("user@example.com", StoredHash);
+        var user = new User("user@example.com", StoredHash, DateTime.UtcNow);
         var handler = CreateHandler();
 
         _client.Setup(c => c.UserId).Returns(userId);

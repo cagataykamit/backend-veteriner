@@ -349,15 +349,15 @@ public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<Cust
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tenant = new Tenant($"Dtr-{Guid.NewGuid():N}"[..18]);
+            var tenant = new Tenant($"Dtr-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
             var clinic = new Clinic(tenant.Id, $"Dtr-{Guid.NewGuid():N}"[..14], "Izmir");
             db.Clinics.Add(clinic);
-            var product = new Product(tenant.Id, $"dp-{Guid.NewGuid():N}"[..14], "Adet", 10.00m, "TRY", sku: $"D1-{Guid.NewGuid():N}"[..14]);
+            var product = new Product(tenant.Id, $"dp-{Guid.NewGuid():N}"[..14], "Adet", 10.00m, "TRY", DateTime.UtcNow, sku: $"D1-{Guid.NewGuid():N}"[..14]);
             db.Products.Add(product);
             await db.SaveChangesAsync();
-            db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, 100m, 0));
+            db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, 100m, 0, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             (userId, email) = await Env.SeedUserAsync(db, hasher, tenant.Id, clinic.Id);
@@ -402,13 +402,13 @@ public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<Cust
         {
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             var email = $"dtr-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenantId));
-            db.UserClinics.Add(new UserClinic(user.Id, clinicId));
+            db.UserTenants.Add(new UserTenant(user.Id, tenantId, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinicId, DateTime.UtcNow));
             await db.SaveChangesAsync();
             return (user.Id, email);
         }
@@ -485,7 +485,7 @@ public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<Cust
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var phone = $"90555{Interlocked.Increment(ref _phoneSeed):D7}";
-            var client = new Client(TenantId, name, phone);
+            var client = new Client(TenantId, name, DateTime.UtcNow, phone);
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;

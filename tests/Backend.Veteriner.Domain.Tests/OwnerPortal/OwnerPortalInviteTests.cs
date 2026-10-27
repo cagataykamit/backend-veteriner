@@ -61,18 +61,18 @@ public sealed class OwnerPortalInviteTests
 
     [Fact]
     public void Policy_Should_Allow_Client_With_Email_And_No_OptOut()
-        => OwnerPortalInvitePolicy.CanInvite(new Client(TenantId, "Ayşe Yılmaz", email: "a@b.com")).IsSuccess.Should().BeTrue();
+        => OwnerPortalInvitePolicy.CanInvite(new Client(TenantId, "Ayşe Yılmaz", Now, email: "a@b.com")).IsSuccess.Should().BeTrue();
 
     [Fact]
     public void Policy_Should_Reject_Client_Without_Email()
-        => OwnerPortalInvitePolicy.CanInvite(new Client(TenantId, "Ayşe Yılmaz")).Error.Code
+        => OwnerPortalInvitePolicy.CanInvite(new Client(TenantId, "Ayşe Yılmaz", Now)).Error.Code
             .Should().Be("OwnerPortal.ClientEmailMissing");
 
     [Fact]
     public void Policy_Should_Reject_Kvkk_Declined_Client()
     {
-        var client = new Client(TenantId, "Ayşe Yılmaz", email: "a@b.com");
-        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, DateOnly.FromDateTime(Now), Guid.NewGuid(), null, null);
+        var client = new Client(TenantId, "Ayşe Yılmaz", Now, email: "a@b.com");
+        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, DateOnly.FromDateTime(Now), Guid.NewGuid(), null, null, Now);
 
         OwnerPortalInvitePolicy.CanInvite(client).Error.Code.Should().Be("OwnerPortal.ClientOptedOut");
     }
@@ -80,7 +80,7 @@ public sealed class OwnerPortalInviteTests
     [Fact]
     public void Policy_Should_Reject_Client_With_Reminders_Opted_Out()
     {
-        var client = new Client(TenantId, "Ayşe Yılmaz", email: "a@b.com");
+        var client = new Client(TenantId, "Ayşe Yılmaz", Now, email: "a@b.com");
         client.ApplyContactPreferences(null, remindersOptedOut: true);
 
         OwnerPortalInvitePolicy.CanInvite(client).Error.Code.Should().Be("OwnerPortal.ClientOptedOut");
@@ -88,7 +88,7 @@ public sealed class OwnerPortalInviteTests
 
     [Fact]
     public void Policy_Should_Reject_WalkIn_Client()
-        => OwnerPortalInvitePolicy.CanInvite(Client.CreateWalkIn(TenantId)).Error.Code
+        => OwnerPortalInvitePolicy.CanInvite(Client.CreateWalkIn(TenantId, Now)).Error.Code
             .Should().Be("OwnerPortal.ClientNotInvitable");
 
     [Fact]

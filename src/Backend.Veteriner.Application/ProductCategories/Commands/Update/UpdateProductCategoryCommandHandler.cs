@@ -11,15 +11,18 @@ public sealed class UpdateProductCategoryCommandHandler : IRequestHandler<Update
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<ProductCategory> _categoriesRead;
     private readonly IRepository<ProductCategory> _categoriesWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateProductCategoryCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<ProductCategory> categoriesRead,
-        IRepository<ProductCategory> categoriesWrite)
+        IRepository<ProductCategory> categoriesWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _categoriesRead = categoriesRead;
         _categoriesWrite = categoriesWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(UpdateProductCategoryCommand request, CancellationToken ct)
@@ -41,7 +44,8 @@ public sealed class UpdateProductCategoryCommandHandler : IRequestHandler<Update
         if (duplicate is not null)
             return Result.Failure("ProductCategories.NameAlreadyExists", "Bu kiracı için aynı kategori adı zaten mevcut.");
 
-        category.Update(request.Name, request.Description);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        category.Update(request.Name, request.Description, utcNow);
         await _categoriesWrite.SaveChangesAsync(ct);
         return Result.Success();
     }

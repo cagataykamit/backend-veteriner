@@ -170,10 +170,10 @@ public sealed class PetAlertsIntegrationTests : IClassFixture<CustomWebApplicati
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
-            var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20]);
+            var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             await db.SaveChangesAsync();
-            var client = new Client(tenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "905551110069");
+            var client = new Client(tenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110069");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             var pet = new Pet(tenant.Id, client.Id, $"FPet-{Guid.NewGuid():N}"[..12], speciesId);
@@ -210,18 +210,18 @@ public sealed class PetAlertsIntegrationTests : IClassFixture<CustomWebApplicati
             var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
             var clinic = new Clinic(tenant.Id, $"Alert-{Guid.NewGuid():N}"[..14], "Izmir");
             db.Clinics.Add(clinic);
-            var client = new Client(tenant.Id, $"AClient-{Guid.NewGuid():N}"[..14], "905551110080");
+            var client = new Client(tenant.Id, $"AClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110080");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"alert-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             tenantId = tenant.Id;

@@ -30,7 +30,7 @@ public sealed class ProductClassFieldsTests
     public async Task Create_Should_Default_To_Other_And_NotControlled_When_Fields_Omitted()
     {
         var handler = new CreateProductCommandHandler(
-            _tenantContext.Object, _productsRead.Object, _productsWrite.Object, _categoriesRead.Object);
+            _tenantContext.Object, _productsRead.Object, _productsWrite.Object, _categoriesRead.Object, TimeProvider.System);
 
         var result = await handler.Handle(
             new CreateProductCommand(null, "Mama", null, null, null, "Adet", 10, "TRY"), CancellationToken.None);
@@ -45,7 +45,7 @@ public sealed class ProductClassFieldsTests
     public async Task Create_Should_Store_Class_And_Form_Fields()
     {
         var handler = new CreateProductCommandHandler(
-            _tenantContext.Object, _productsRead.Object, _productsWrite.Object, _categoriesRead.Object);
+            _tenantContext.Object, _productsRead.Object, _productsWrite.Object, _categoriesRead.Object, TimeProvider.System);
 
         var result = await handler.Handle(
             new CreateProductCommand(
@@ -66,14 +66,14 @@ public sealed class ProductClassFieldsTests
         _productsWrite.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductByIdTrackedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(product);
         return new UpdateProductCommandHandler(
-            _tenantContext.Object, _productsRead.Object, _productsWrite.Object, _categoriesRead.Object);
+            _tenantContext.Object, _productsRead.Object, _productsWrite.Object, _categoriesRead.Object, TimeProvider.System);
     }
 
     [Fact]
     public async Task Update_Without_Class_Fields_Should_Not_Touch_Them()
     {
         var product = new Product(
-            _tenantId, "Aşı", "Doz", 1, "TRY", kind: ProductKind.Vaccine,
+            _tenantId, "Aşı", "Doz", 1, "TRY", DateTime.UtcNow, kind: ProductKind.Vaccine,
             controlledClass: ControlledSubstanceClass.Psychotropic, pharmacologicalForm: "Süspansiyon",
             presentationForm: "Flakon", packaging: "Kutu");
 
@@ -94,7 +94,7 @@ public sealed class ProductClassFieldsTests
     public async Task Update_Should_Change_Class_And_Clear_Text_With_Empty_String()
     {
         var product = new Product(
-            _tenantId, "İlaç", "Kutu", 1, "TRY", pharmacologicalForm: "Tablet", presentationForm: "Blister");
+            _tenantId, "İlaç", "Kutu", 1, "TRY", DateTime.UtcNow, pharmacologicalForm: "Tablet", presentationForm: "Blister");
 
         var result = await UpdateHandlerFor(product).Handle(
             new UpdateProductCommand(

@@ -191,7 +191,7 @@ public sealed class ImportValidationQueryCountTests
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"imq-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"imq-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         // Ice aktarma mekanigi testleri ucretli kiracida kosar; deneme kiracisinda tablo basina 500 satir siniri var (TRIAL-004).
         var subscription = TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
@@ -202,18 +202,18 @@ public sealed class ImportValidationQueryCountTests
 
         var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
         var species = new Species($"IMQ{suffix}", $"Imp Tür {suffix}");
-        var vaccine = VaccineDefinition.CreateTenant(tenant.Id, $"IMQV{suffix}", $"Imp Aşı {suffix}");
+        var vaccine = VaccineDefinition.CreateTenant(tenant.Id, $"IMQV{suffix}", $"Imp Aşı {suffix}", DateTime.UtcNow);
         db.Species.Add(species);
         db.VaccineDefinitions.Add(vaccine);
 
-        var existing = new Client(tenant.Id, $"Mevcut {suffix}", "905321230000", null, null);
+        var existing = new Client(tenant.Id, $"Mevcut {suffix}", DateTime.UtcNow, "905321230000", null, null);
         db.Clients.Add(existing);
         var existingPet = new Pet(tenant.Id, existing.Id, "Boncuk", species.Id);
         db.Pets.Add(existingPet);
         await db.SaveChangesAsync();
         db.Vaccinations.Add(new Vaccination(
             tenant.Id, existingPet.Id, clinic.Id, null, vaccine.Id, vaccine.Name, VaccinationStatus.Applied,
-            new DateTime(2024, 4, 10, 9, 0, 0, DateTimeKind.Utc), null, null));
+            new DateTime(2024, 4, 10, 9, 0, 0, DateTimeKind.Utc), null, null, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(factory.Services);

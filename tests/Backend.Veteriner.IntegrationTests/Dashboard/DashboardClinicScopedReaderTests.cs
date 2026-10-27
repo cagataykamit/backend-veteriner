@@ -84,7 +84,7 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     public async Task ListRecentClients_When_NoAppointments_ReturnsEmpty()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         db.AddRange(tenant, clinic);
         await db.SaveChangesAsync();
@@ -99,9 +99,9 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     public async Task ListRecentClients_OneClient_MultipleAppointmentsSamePet_SingleRow_WithLatestScheduledAt()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
-        var client = new Client(tenant.Id, "Ali", "905551112233", "ali@x.com");
+        var client = new Client(tenant.Id, "Ali", DateTime.UtcNow, "905551112233", "ali@x.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "P", speciesId);
         var tOld = new DateTime(2026, 1, 10, 10, 0, 0, DateTimeKind.Utc);
@@ -123,9 +123,9 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     public async Task ListRecentClients_OneClient_TwoPets_UsesMaxLastAtAcrossPets()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
-        var client = new Client(tenant.Id, "Veli", "905559998877", "veli@x.com");
+        var client = new Client(tenant.Id, "Veli", DateTime.UtcNow, "905559998877", "veli@x.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var petA = new Pet(tenant.Id, client.Id, "A", speciesId);
         var petB = new Pet(tenant.Id, client.Id, "B", speciesId);
@@ -147,10 +147,10 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     public async Task ListRecentClients_ExcludesOtherClinic()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinicA = new Clinic(tenant.Id, "A", "Istanbul");
         var clinicB = new Clinic(tenant.Id, "B", "Ankara");
-        var client = new Client(tenant.Id, "Ayşe", "905551010101", "ayse@x.com");
+        var client = new Client(tenant.Id, "Ayşe", DateTime.UtcNow, "905551010101", "ayse@x.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "P", speciesId);
         var tUtc = new DateTime(2026, 5, 1, 12, 0, 0, DateTimeKind.Utc);
@@ -170,11 +170,11 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     public async Task ListRecentClients_OrderByLastAtDesc_ThenTake()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
         var speciesId = await GetAnySpeciesIdAsync(db);
-        var cOlder = new Client(tenant.Id, "Older", "905551010101", "o@x.com");
-        var cNewer = new Client(tenant.Id, "Newer", "905552020202", "n@x.com");
+        var cOlder = new Client(tenant.Id, "Older", DateTime.UtcNow, "905551010101", "o@x.com");
+        var cNewer = new Client(tenant.Id, "Newer", DateTime.UtcNow, "905552020202", "n@x.com");
         var pOld = new Pet(tenant.Id, cOlder.Id, "Po", speciesId);
         var pNew = new Pet(tenant.Id, cNewer.Id, "Pn", speciesId);
         var tOld = new DateTime(2026, 6, 1, 8, 0, 0, DateTimeKind.Utc);
@@ -196,9 +196,9 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     public async Task CountClientsAtClinic_MatchesDistinctClients_WithDuplicateAppointments()
     {
         var db = _db;
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "C", "Istanbul");
-        var client = new Client(tenant.Id, "X", "905553030303", "x@x.com");
+        var client = new Client(tenant.Id, "X", DateTime.UtcNow, "905553030303", "x@x.com");
         var speciesId = await GetAnySpeciesIdAsync(db);
         var pet = new Pet(tenant.Id, client.Id, "P", speciesId);
         db.AddRange(tenant, clinic, client, pet);
@@ -217,12 +217,12 @@ public sealed class DashboardClinicScopedReaderTests : IAsyncLifetime
     public async Task ListRecentClients_QueryTenant_Isolates_FromOtherTenant()
     {
         var db = _db;
-        var t1 = new Tenant("T1");
-        var t2 = new Tenant("T2");
+        var t1 = new Tenant("T1", DateTime.UtcNow);
+        var t2 = new Tenant("T2", DateTime.UtcNow);
         var c1 = new Clinic(t1.Id, "C1", "Istanbul");
         var c2 = new Clinic(t2.Id, "C2", "Istanbul");
         var speciesId = await GetAnySpeciesIdAsync(db);
-        var client2 = new Client(t2.Id, "OtherTenant", "905554040404", "o@x.com");
+        var client2 = new Client(t2.Id, "OtherTenant", DateTime.UtcNow, "905554040404", "o@x.com");
         var pet2 = new Pet(t2.Id, client2.Id, "P2", speciesId);
         db.AddRange(t1, t2, c1, c2, client2, pet2);
         db.Add(new Appointment(t2.Id, c2.Id, pet2.Id, DateTime.UtcNow.AddDays(1), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled));

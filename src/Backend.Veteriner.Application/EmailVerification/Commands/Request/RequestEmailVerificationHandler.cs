@@ -13,6 +13,7 @@ public sealed class RequestEmailVerificationHandler : IRequestHandler<RequestEma
     private readonly ITokenHashService _hash;
     private readonly IEmailSender _email;          // ?? Outbox �zerinden giden sender
     private readonly IAppUrlProvider _url;
+    private readonly TimeProvider _timeProvider;
 
     // Ayn� kullan�c�ya 2 dakika i�inde yeniden do�rulama maili g�ndermeyelim
     private static readonly TimeSpan ResendCooldown = TimeSpan.FromMinutes(2);
@@ -22,13 +23,15 @@ public sealed class RequestEmailVerificationHandler : IRequestHandler<RequestEma
         IVerificationTokenRepository repo,
         ITokenHashService hash,
         IEmailSender email,
-        IAppUrlProvider url)
+        IAppUrlProvider url,
+        TimeProvider timeProvider)
     {
         _users = users;
         _repo = repo;
         _hash = hash;
         _email = email;
         _url = url;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Unit> Handle(RequestEmailVerificationCommand request, CancellationToken ct)
@@ -54,6 +57,7 @@ public sealed class RequestEmailVerificationHandler : IRequestHandler<RequestEma
             VerificationPurpose.EmailVerify,
             ct);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (existing is not null)
         {
             // Son 2 dakika i�inde olu�turulmu�sa yeni mail yollama (cooldown)
@@ -63,7 +67,7 @@ public sealed class RequestEmailVerificationHandler : IRequestHandler<RequestEma
             }
 
             // 2 dakika ge�mi�se, eski token�� kullan�lm�� sayal�m
-            existing.MarkUsed();
+            existing.MarkUsed(utcNow);
         }
 
         // 5) Yeni token �ret (Base64Url)
@@ -74,7 +78,8 @@ public sealed class RequestEmailVerificationHandler : IRequestHandler<RequestEma
             user.Id,
             tokenHash,
             VerificationPurpose.EmailVerify,
-            DateTime.UtcNow.AddHours(24)); // 24 saat ge�erli
+            DateTime.UtcNow.AddHours(24),
+            utcNow); // 24 saat ge�erli
 
         await _repo.AddAsync(vt, ct);
 

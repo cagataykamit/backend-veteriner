@@ -72,7 +72,8 @@ public sealed class GetVaccinationByIdQueryHandlerTests
             VaccinationStatus.Applied,
             DateTime.UtcNow.AddHours(-1),
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         if (vaccinationId.HasValue)
             typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(v, vaccinationId.Value);
         return v;
@@ -96,7 +97,7 @@ public sealed class GetVaccinationByIdQueryHandlerTests
         var pet = new Pet(tenantId, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
 
-        var client = new Client(tenantId, "Ali Veli");
+        var client = new Client(tenantId, "Ali Veli", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
 
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))

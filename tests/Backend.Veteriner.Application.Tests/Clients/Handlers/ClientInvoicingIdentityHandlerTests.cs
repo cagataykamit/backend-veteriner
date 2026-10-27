@@ -41,12 +41,12 @@ public sealed class ClientInvoicingIdentityHandlerTests
 
     public ClientInvoicingIdentityHandlerTests()
     {
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, _tenantId);
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(tenant);
 
-        _existing = new Client(_tenantId, "Ayşe Yılmaz");
+        _existing = new Client(_tenantId, "Ayşe Yılmaz", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(_existing, _clientId);
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(_existing);
         _permissions.Setup(p => p.HasPermission(PermissionCatalog.Clients.Update)).Returns(true);
@@ -56,10 +56,10 @@ public sealed class ClientInvoicingIdentityHandlerTests
         => new(ClientPersonType.Individual, tckn, null, null, null, "İstanbul", "Kadıköy", "Moda Cad. 1");
 
     private UpdateClientCommandHandler UpdateHandler()
-        => new(_tenantContext.Object, _tenants.Object, _clientsRead.Object, _clientsWrite.Object, _outbox.Object);
+        => new(_tenantContext.Object, _tenants.Object, _clientsRead.Object, _clientsWrite.Object, _outbox.Object, TimeProvider.System);
 
     private CreateClientCommandHandler CreateHandler()
-        => new(_tenantContext.Object, _tenants.Object, _clientsRead.Object, _clientsWrite.Object, _outbox.Object);
+        => new(_tenantContext.Object, _tenants.Object, _clientsRead.Object, _clientsWrite.Object, _outbox.Object, TimeProvider.System);
 
     [Fact]
     public async Task Create_Should_Apply_Invoicing_Identity()
@@ -92,7 +92,7 @@ public sealed class ClientInvoicingIdentityHandlerTests
     [Fact]
     public async Task Update_Should_Replace_Identity_When_Given()
     {
-        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, "İzmir", null, null);
+        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, "İzmir", null, null, DateTime.UtcNow);
         var corporate = new ClientInvoicingIdentityDto(ClientPersonType.Corporate, null, Vkn, "Kadıköy VD", "Örnek Ltd.", null, null, null);
 
         var result = await UpdateHandler().Handle(
@@ -108,7 +108,7 @@ public sealed class ClientInvoicingIdentityHandlerTests
     [Fact]
     public async Task Update_Without_Identity_Should_Keep_Existing_Values()
     {
-        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, "İzmir", null, null);
+        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, "İzmir", null, null, DateTime.UtcNow);
 
         var result = await UpdateHandler().Handle(new UpdateClientCommand(_clientId, "Ayşe Yılmaz"), CancellationToken.None);
 
@@ -120,7 +120,7 @@ public sealed class ClientInvoicingIdentityHandlerTests
     [Fact]
     public async Task Full_Identity_Query_Should_Require_Clients_Update()
     {
-        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, null, null, null);
+        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, null, null, null, DateTime.UtcNow);
         _permissions.Setup(p => p.HasPermission(PermissionCatalog.Clients.Update)).Returns(false);
         var handler = new GetClientInvoicingIdentityQueryHandler(_tenantContext.Object, _permissions.Object, _clientsRead.Object);
 
@@ -132,7 +132,7 @@ public sealed class ClientInvoicingIdentityHandlerTests
     [Fact]
     public async Task Full_Identity_Query_Should_Return_Unmasked_Values_For_Editor()
     {
-        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, "İzmir", null, null);
+        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, "İzmir", null, null, DateTime.UtcNow);
         var handler = new GetClientInvoicingIdentityQueryHandler(_tenantContext.Object, _permissions.Object, _clientsRead.Object);
 
         var result = await handler.Handle(new GetClientInvoicingIdentityQuery(_clientId), CancellationToken.None);
@@ -144,7 +144,7 @@ public sealed class ClientInvoicingIdentityHandlerTests
     [Fact]
     public void Summary_Should_Mask_Identity_Numbers()
     {
-        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, null, null, null);
+        _existing.ApplyInvoicingIdentity(ClientPersonType.Individual, Tckn, null, null, null, null, null, null, DateTime.UtcNow);
 
         var summary = ClientInvoicingSummaryDto.From(_existing);
 

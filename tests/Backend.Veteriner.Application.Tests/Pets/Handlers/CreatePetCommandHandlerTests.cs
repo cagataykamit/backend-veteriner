@@ -95,7 +95,7 @@ public sealed class CreatePetCommandHandlerTests
         var cid = Guid.NewGuid();
         var cmd = new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, null, null);
 
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
         tenant.Deactivate();
 
@@ -118,7 +118,7 @@ public sealed class CreatePetCommandHandlerTests
         var cid = Guid.NewGuid();
         var cmd = new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, null, null);
 
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -144,14 +144,14 @@ public sealed class CreatePetCommandHandlerTests
         var unknownSpecies = Guid.NewGuid();
         var cmd = new CreatePetCommand(cid, "Pamuk", unknownSpecies, null, null);
 
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali", null));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, null));
         _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Species?)null);
 
@@ -170,7 +170,7 @@ public sealed class CreatePetCommandHandlerTests
         var cid = Guid.NewGuid();
         var cmd = new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, null, null);
 
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
         var species = new Species("CAT", "Kedi");
         species.Update("CAT", "Kedi", 0, isActive: false);
@@ -179,7 +179,7 @@ public sealed class CreatePetCommandHandlerTests
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali", null));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, null));
         _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(species);
 
@@ -198,7 +198,7 @@ public sealed class CreatePetCommandHandlerTests
         var future = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10));
         var cmd = new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, null, future);
 
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -206,7 +206,7 @@ public sealed class CreatePetCommandHandlerTests
             .ReturnsAsync(tenant);
 
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali", null));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, null));
 
         _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Species("CAT", "Kedi"));
@@ -226,7 +226,7 @@ public sealed class CreatePetCommandHandlerTests
         var cid = Guid.NewGuid();
         var cmd = new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, "Tekir", null);
 
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -234,7 +234,7 @@ public sealed class CreatePetCommandHandlerTests
             .ReturnsAsync(tenant);
 
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali", null));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, null));
 
         _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Species("CAT", "Kedi"));
@@ -268,7 +268,7 @@ public sealed class CreatePetCommandHandlerTests
             4.25m,
             "Sağlıklı, hafif kilo almış.");
 
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -276,7 +276,7 @@ public sealed class CreatePetCommandHandlerTests
             .ReturnsAsync(tenant);
 
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali", null));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, null));
 
         _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Species("CAT", "Kedi"));
@@ -324,14 +324,14 @@ public sealed class CreatePetCommandHandlerTests
             SpecialProtocolNumber: " PROT-001 ",
             IsNeutered: true);
 
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali", null));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, null));
         _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Species("CAT", "Kedi"));
         _petsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByClientNameAndSpeciesIdSpec>(), It.IsAny<CancellationToken>()))
@@ -359,14 +359,14 @@ public sealed class CreatePetCommandHandlerTests
         var cid = Guid.NewGuid();
         var cmd = new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, null, null, null, null, Guid.NewGuid());
 
-        var tenant = new Tenant("X");
+        var tenant = new Tenant("X", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali", null));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, null));
         _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Species("CAT", "Kedi"));
         _colorsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.PetColors.Specs.PetColorByIdSpec>(), It.IsAny<CancellationToken>()))

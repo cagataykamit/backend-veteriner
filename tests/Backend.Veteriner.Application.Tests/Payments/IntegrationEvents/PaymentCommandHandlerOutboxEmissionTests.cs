@@ -79,7 +79,7 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
 
     private static Tenant ActiveTenant(Guid tid)
     {
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         return tenant;
     }
@@ -96,7 +96,7 @@ public sealed class PaymentCommandHandlerOutboxEmissionTests
         _clinicsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "Klinik", "İstanbul"));
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali Veli"));
+            .ReturnsAsync(new Client(tid, "Ali Veli", DateTime.UtcNow));
     }
 
     [Fact]

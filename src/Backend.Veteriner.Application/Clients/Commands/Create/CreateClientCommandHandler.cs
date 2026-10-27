@@ -17,19 +17,22 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
     private readonly IReadRepository<Client> _clientsRead;
     private readonly IRepository<Client> _clientsWrite;
     private readonly IClientIntegrationEventOutbox _eventOutbox;
+    private readonly TimeProvider _timeProvider;
 
     public CreateClientCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Client> clientsRead,
         IRepository<Client> clientsWrite,
-        IClientIntegrationEventOutbox eventOutbox)
+        IClientIntegrationEventOutbox eventOutbox,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
         _clientsRead = clientsRead;
         _clientsWrite = clientsWrite;
         _eventOutbox = eventOutbox;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ClientCreatedDto>> Handle(CreateClientCommand request, CancellationToken ct)
@@ -84,14 +87,15 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
             }
         }
 
-        var client = new Client(tenantId, request.FullName, request.Phone, request.Email, request.Address);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var client = new Client(tenantId, request.FullName, utcNow, request.Phone, request.Email, request.Address);
         var preferences = client.ApplyContactPreferences(request.PreferredContactChannel, request.RemindersOptedOut);
         if (!preferences.IsSuccess)
             return Result<ClientCreatedDto>.Failure(preferences.Error);
 
         if (request.InvoicingIdentity is { } invoicing)
         {
-            var applied = invoicing.ApplyTo(client);
+            var applied = invoicing.ApplyTo(client, utcNow);
             if (!applied.IsSuccess)
                 return Result<ClientCreatedDto>.Failure(applied.Error);
         }

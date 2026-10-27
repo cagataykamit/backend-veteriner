@@ -311,9 +311,10 @@ public static class DevSampleDataSeeder
 
         var name = fallbackClientName ?? clientName;
         var client = await db.Clients.FirstOrDefaultAsync(c => c.TenantId == tenant.Id && c.FullName == name, ct);
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         if (client is null)
         {
-            client = new Client(tenant.Id, name);
+            client = new Client(tenant.Id, name, utcNow);
             await db.Clients.AddAsync(client, ct);
             await db.SaveChangesAsync(ct);
         }

@@ -12,11 +12,11 @@ public sealed class HbsEntryTests
     private static readonly DateTime Now = new(2026, 10, 22, 9, 0, 0, DateTimeKind.Utc);
 
     private static Prescription NewPrescription()
-        => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, Now, "Reçete", "İçerik", null, null);
+        => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, Now, "Reçete", "İçerik", null, null, Now);
 
     private static Vaccination NewVaccination(VaccinationStatus status)
         => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Guid.NewGuid(), "Kuduz", status,
-            status == VaccinationStatus.Applied ? Now : null, status == VaccinationStatus.Applied ? null : Now.AddDays(10), null);
+            status == VaccinationStatus.Applied ? Now : null, status == VaccinationStatus.Applied ? null : Now.AddDays(10), null, Now);
 
     [Fact]
     public void Entered_Should_Trim_Number_And_Stamp_User_And_Time()

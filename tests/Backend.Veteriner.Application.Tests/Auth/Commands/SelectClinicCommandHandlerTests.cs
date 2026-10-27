@@ -36,12 +36,13 @@ public sealed class SelectClinicCommandHandlerTests
             _userTenants.Object,
             _userClinics.Object,
             _clinicsRead.Object,
-            _userOperationClaims.Object);
+            _userOperationClaims.Object,
+            TimeProvider.System);
 
     private (User user, RefreshToken stored) ArrangeRefreshAndTenant(Guid tenantId, bool tenantActive = true)
     {
-        var user = new User("u@test.com", "h");
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, tenantId);
+        var user = new User("u@test.com", "h", DateTime.UtcNow);
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow, tenantId);
         typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
 
         _hash.Setup(h => h.ComputeSha256("raw")).Returns("hash");
@@ -49,7 +50,7 @@ public sealed class SelectClinicCommandHandlerTests
             .Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
 
-        var tenant = new Tenant("T");
+        var tenant = new Tenant("T", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tenantId);
         if (!tenantActive)
             tenant.Deactivate();

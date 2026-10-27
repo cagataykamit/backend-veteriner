@@ -11,11 +11,13 @@ public sealed class SetExaminationTemplateActiveCommandHandler : IRequestHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ExaminationTemplate> _templates;
+    private readonly TimeProvider _timeProvider;
 
-    public SetExaminationTemplateActiveCommandHandler(ITenantContext tenantContext, IRepository<ExaminationTemplate> templates)
+    public SetExaminationTemplateActiveCommandHandler(ITenantContext tenantContext, IRepository<ExaminationTemplate> templates, TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _templates = templates;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(SetExaminationTemplateActiveCommand request, CancellationToken ct)
@@ -28,7 +30,8 @@ public sealed class SetExaminationTemplateActiveCommandHandler : IRequestHandler
         if (template is null)
             return Result.Failure(ExaminationTemplateErrors.NotFound);
 
-        var change = request.IsActive ? template.Activate() : template.Deactivate();
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var change = request.IsActive ? template.Activate(utcNow) : template.Deactivate(utcNow);
         if (!change.IsSuccess)
             return change;
 

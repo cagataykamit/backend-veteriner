@@ -23,7 +23,7 @@ public sealed class CreateTenantCommandHandlerTests
         var command = new CreateTenantCommand("Acme Vet");
 
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByNameCaseInsensitiveSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("acme vet"));
+            .ReturnsAsync(new Tenant("acme vet", DateTime.UtcNow));
 
         var result = await handler.Handle(command, CancellationToken.None);
 

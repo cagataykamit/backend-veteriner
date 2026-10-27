@@ -36,7 +36,8 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandlerTests
             _scopeResolver.Object,
             _clinicsRead.Object,
             _productStocksWrite.Object,
-            StockBatchMocks.ExpiredReader());
+            StockBatchMocks.ExpiredReader(),
+            TimeProvider.System);
 
     private static (Guid Tid, Guid ClinicId, Guid ProductId, Guid StockId, Product Product, ProductStock Stock, Clinic Clinic)
         SeedTrackedStock(decimal qty, decimal min)
@@ -49,10 +50,10 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandlerTests
         var clinic = new Clinic(tid, "Klinik", "Ankara");
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, clinicId);
 
-        var product = new Product(tid, "Ürün X", "Adet", 5m, "TRY", sku: "SKU-X");
+        var product = new Product(tid, "Ürün X", "Adet", 5m, "TRY", DateTime.UtcNow, sku: "SKU-X");
         typeof(Product).GetProperty(nameof(Product.Id))!.SetValue(product, productId);
 
-        var stock = new ProductStock(tid, clinicId, productId, qty, min);
+        var stock = new ProductStock(tid, clinicId, productId, qty, min, DateTime.UtcNow);
         typeof(ProductStock).GetProperty(nameof(ProductStock.Id))!.SetValue(stock, stockId);
         AttachProduct(stock, product);
 
@@ -150,7 +151,8 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandlerTests
             scope.Object,
             _clinicsRead.Object,
             _productStocksWrite.Object,
-            StockBatchMocks.ExpiredReader());
+            StockBatchMocks.ExpiredReader(),
+            TimeProvider.System);
 
         var (_, _, _, stockId, _, stock, clinic) = SeedTrackedStock(3m, 1m);
         SetupReads(stock.TenantId, stock, clinic);
@@ -182,7 +184,8 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandlerTests
             resolver.Object,
             _clinicsRead.Object,
             _productStocksWrite.Object,
-            StockBatchMocks.ExpiredReader());
+            StockBatchMocks.ExpiredReader(),
+            TimeProvider.System);
 
         var result = await handler.Handle(
             new UpdateProductStockMinimumStockLevelCommand(stockId, 22m),

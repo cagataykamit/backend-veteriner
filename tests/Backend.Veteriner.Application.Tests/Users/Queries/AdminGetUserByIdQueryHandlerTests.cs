@@ -43,7 +43,7 @@ public sealed class AdminGetUserByIdQueryHandlerTests
         var id = Guid.NewGuid();
         var query = new AdminGetUserByIdQuery(id);
 
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
         typeof(User).GetProperty(nameof(User.Id))!.SetValue(user, id);
         typeof(User).GetProperty(nameof(User.EmailConfirmed))!.SetValue(user, true);
         typeof(User).GetProperty(nameof(User.CreatedAtUtc))!.SetValue(user, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));

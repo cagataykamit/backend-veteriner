@@ -7,10 +7,12 @@ namespace Backend.Veteriner.Domain.Tests.Clients;
 /// <summary>ADR-021: KVKK açık rıza formu sonucu (Yok/Kabul/Ret), tarih ve işaretleyen kullanıcı; ADR-032: rıza metni sürümü.</summary>
 public sealed class ClientKvkkConsentTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static readonly DateOnly Today = new(2026, 10, 15);
     private static readonly Guid UserId = Guid.NewGuid();
 
-    private static Client CreateClient() => new(Guid.NewGuid(), "Ali Veli", "905555555555");
+    private static Client CreateClient() => new(Guid.NewGuid(), "Ali Veli", Now, "905555555555");
 
     [Fact]
     public void New_Client_Should_Have_No_Consent()
@@ -29,7 +31,7 @@ public sealed class ClientKvkkConsentTests
     {
         var client = CreateClient();
 
-        client.RecordKvkkConsent(status, null, Today, UserId, null, null).IsSuccess.Should().BeTrue();
+        client.RecordKvkkConsent(status, null, Today, UserId, null, null, Now).IsSuccess.Should().BeTrue();
 
         client.KvkkConsentStatus.Should().Be(status);
         client.KvkkConsentRecordedOn.Should().Be(Today);
@@ -42,10 +44,10 @@ public sealed class ClientKvkkConsentTests
     {
         var client = CreateClient();
 
-        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, Today.AddDays(-30), Today, UserId, null, null).IsSuccess.Should().BeTrue();
+        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, Today.AddDays(-30), Today, UserId, null, null, Now).IsSuccess.Should().BeTrue();
         client.KvkkConsentRecordedOn.Should().Be(Today.AddDays(-30));
 
-        var future = client.RecordKvkkConsent(KvkkConsentStatus.Declined, Today.AddDays(1), Today, UserId, null, null);
+        var future = client.RecordKvkkConsent(KvkkConsentStatus.Declined, Today.AddDays(1), Today, UserId, null, null, Now);
         future.IsSuccess.Should().BeFalse();
         future.Error.Code.Should().Be("Clients.Validation");
         client.KvkkConsentStatus.Should().Be(KvkkConsentStatus.Accepted);
@@ -56,12 +58,12 @@ public sealed class ClientKvkkConsentTests
     public void Revert_To_None_Should_Clear_Date_And_User_And_Reject_Date()
     {
         var client = CreateClient();
-        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, null, null);
+        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, null, null, Now);
 
-        client.RecordKvkkConsent(KvkkConsentStatus.None, Today, Today, UserId, null, null).Error.Code.Should().Be("Clients.Validation");
+        client.RecordKvkkConsent(KvkkConsentStatus.None, Today, Today, UserId, null, null, Now).Error.Code.Should().Be("Clients.Validation");
         client.KvkkConsentStatus.Should().Be(KvkkConsentStatus.Accepted);
 
-        client.RecordKvkkConsent(KvkkConsentStatus.None, null, Today, UserId, null, null).IsSuccess.Should().BeTrue();
+        client.RecordKvkkConsent(KvkkConsentStatus.None, null, Today, UserId, null, null, Now).IsSuccess.Should().BeTrue();
         client.KvkkConsentStatus.Should().Be(KvkkConsentStatus.None);
         client.KvkkConsentRecordedOn.Should().BeNull();
         client.KvkkConsentRecordedByUserId.Should().BeNull();
@@ -72,7 +74,7 @@ public sealed class ClientKvkkConsentTests
     {
         var client = CreateClient();
 
-        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, Today, UserId, null, null).IsSuccess.Should().BeTrue();
+        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, Today, UserId, null, null, Now).IsSuccess.Should().BeTrue();
 
         client.RemindersOptedOut.Should().BeTrue();
         Client.AcceptsReminders.Compile()(client).Should().BeFalse();
@@ -84,9 +86,9 @@ public sealed class ClientKvkkConsentTests
     public void Leaving_Declined_Should_Keep_Reminder_OptOut(KvkkConsentStatus next)
     {
         var client = CreateClient();
-        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, Today, UserId, null, null);
+        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, Today, UserId, null, null, Now);
 
-        client.RecordKvkkConsent(next, null, Today, UserId, null, null).IsSuccess.Should().BeTrue();
+        client.RecordKvkkConsent(next, null, Today, UserId, null, null, Now).IsSuccess.Should().BeTrue();
 
         client.RemindersOptedOut.Should().BeTrue();
     }
@@ -96,7 +98,7 @@ public sealed class ClientKvkkConsentTests
     {
         var client = CreateClient();
 
-        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, null, null);
+        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, null, null, Now);
 
         client.RemindersOptedOut.Should().BeFalse();
     }
@@ -106,7 +108,7 @@ public sealed class ClientKvkkConsentTests
     {
         var client = CreateClient();
 
-        client.RecordKvkkConsent(KvkkConsentStatus.Declined, Today.AddDays(1), Today, UserId, null, null).IsSuccess.Should().BeFalse();
+        client.RecordKvkkConsent(KvkkConsentStatus.Declined, Today.AddDays(1), Today, UserId, null, null, Now).IsSuccess.Should().BeFalse();
 
         client.RemindersOptedOut.Should().BeFalse();
     }
@@ -128,7 +130,7 @@ public sealed class ClientKvkkConsentTests
         var client = CreateClient();
         var hash = ClinicKvkkFormTemplate.ComputeTextHash("Rıza metni");
 
-        client.RecordKvkkConsent(status, null, Today, UserId, version, hash).IsSuccess.Should().BeTrue();
+        client.RecordKvkkConsent(status, null, Today, UserId, version, hash, Now).IsSuccess.Should().BeTrue();
 
         client.KvkkConsentTemplateVersion.Should().Be(version);
         client.KvkkConsentTemplateHash.Should().Be(hash);
@@ -138,9 +140,9 @@ public sealed class ClientKvkkConsentTests
     public void Record_Without_Template_Version_Should_Leave_Unknown()
     {
         var client = CreateClient();
-        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, 2, ClinicKvkkFormTemplate.ComputeTextHash("a"));
+        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, 2, ClinicKvkkFormTemplate.ComputeTextHash("a"), Now);
 
-        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, null, null).IsSuccess.Should().BeTrue();
+        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, null, null, Now).IsSuccess.Should().BeTrue();
 
         client.KvkkConsentTemplateVersion.Should().BeNull();
         client.KvkkConsentTemplateHash.Should().BeNull();
@@ -150,9 +152,9 @@ public sealed class ClientKvkkConsentTests
     public void Revert_To_None_Should_Clear_Template_Version()
     {
         var client = CreateClient();
-        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, 1, ClinicKvkkFormTemplate.ComputeTextHash("a"));
+        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, 1, ClinicKvkkFormTemplate.ComputeTextHash("a"), Now);
 
-        client.RecordKvkkConsent(KvkkConsentStatus.None, null, Today, UserId, null, null).IsSuccess.Should().BeTrue();
+        client.RecordKvkkConsent(KvkkConsentStatus.None, null, Today, UserId, null, null, Now).IsSuccess.Should().BeTrue();
 
         client.KvkkConsentTemplateVersion.Should().BeNull();
         client.KvkkConsentTemplateHash.Should().BeNull();
@@ -168,7 +170,7 @@ public sealed class ClientKvkkConsentTests
         var client = CreateClient();
         var actualHash = hash == "valid" ? ClinicKvkkFormTemplate.ComputeTextHash("a") : hash;
 
-        var result = client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, version, actualHash);
+        var result = client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, UserId, version, actualHash, Now);
 
         result.Error.Code.Should().Be("Clients.Validation");
         client.KvkkConsentStatus.Should().Be(KvkkConsentStatus.None);
@@ -180,8 +182,8 @@ public sealed class ClientKvkkConsentTests
     {
         var client = CreateClient();
 
-        client.RecordKvkkConsent((KvkkConsentStatus)9, null, Today, UserId, null, null).Error.Code.Should().Be("Clients.Validation");
-        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, Guid.Empty, null, null).Error.Code.Should().Be("Clients.Validation");
+        client.RecordKvkkConsent((KvkkConsentStatus)9, null, Today, UserId, null, null, Now).Error.Code.Should().Be("Clients.Validation");
+        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, Today, Guid.Empty, null, null, Now).Error.Code.Should().Be("Clients.Validation");
         client.KvkkConsentStatus.Should().Be(KvkkConsentStatus.None);
     }
 }

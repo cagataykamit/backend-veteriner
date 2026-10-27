@@ -9,7 +9,7 @@ public sealed class ExaminationTemplatePrefillTests
     private static readonly DateTime Now = new(2026, 10, 11, 9, 30, 0, DateTimeKind.Utc);
 
     private static Examination Draft(string visitReason = "Kontrol", string? findings = "", string? plan = null)
-        => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), appointmentId: null, ExaminedAt, visitReason, findings, "Değerlendirme", null, plan: plan);
+        => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), appointmentId: null, ExaminedAt, visitReason, findings, "Değerlendirme", null, plan: plan, utcNow: Now);
 
     [Theory]
     [InlineData(null, "Genel durum:", "Genel durum:")]

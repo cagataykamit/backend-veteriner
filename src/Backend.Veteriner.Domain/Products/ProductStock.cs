@@ -25,7 +25,8 @@ public sealed class ProductStock : IClinicScoped
         Guid clinicId,
         Guid productId,
         decimal quantityOnHand,
-        decimal minimumStockLevel)
+        decimal minimumStockLevel,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -43,19 +44,19 @@ public sealed class ProductStock : IClinicScoped
         ProductId = productId;
         QuantityOnHand = quantityOnHand;
         MinimumStockLevel = minimumStockLevel;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void IncreaseQuantity(decimal amount)
+    public void IncreaseQuantity(decimal amount, DateTime utcNow)
     {
         if (amount <= 0)
             throw new ArgumentOutOfRangeException(nameof(amount), "Artış miktarı sıfırdan büyük olmalıdır.");
 
         QuantityOnHand += amount;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void DecreaseQuantity(decimal amount)
+    public void DecreaseQuantity(decimal amount, DateTime utcNow)
     {
         if (amount <= 0)
             throw new ArgumentOutOfRangeException(nameof(amount), "Azalış miktarı sıfırdan büyük olmalıdır.");
@@ -63,26 +64,26 @@ public sealed class ProductStock : IClinicScoped
             throw new InvalidOperationException("Stok miktarı yetersiz.");
 
         QuantityOnHand -= amount;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     /// <summary>Sayım düzeltmesi: eldeki miktarı doğrudan ayarlar (<c>&gt;= 0</c>).</summary>
-    public void SetAbsoluteQuantity(decimal targetQuantityOnHand)
+    public void SetAbsoluteQuantity(decimal targetQuantityOnHand, DateTime utcNow)
     {
         if (targetQuantityOnHand < 0)
             throw new ArgumentOutOfRangeException(nameof(targetQuantityOnHand), "Stok miktarı negatif olamaz.");
 
         QuantityOnHand = targetQuantityOnHand;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     /// <summary>Minimum stok eşiği (<c>&gt;= 0</c>); eldeki miktarı değiştirmez.</summary>
-    public void SetMinimumStockLevel(decimal minimumStockLevel)
+    public void SetMinimumStockLevel(decimal minimumStockLevel, DateTime utcNow)
     {
         if (minimumStockLevel < 0)
             throw new ArgumentOutOfRangeException(nameof(minimumStockLevel), "Minimum seviye negatif olamaz.");
 
         MinimumStockLevel = minimumStockLevel;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 }

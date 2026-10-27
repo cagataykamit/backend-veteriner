@@ -19,6 +19,7 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IReadRepository<ClinicAppointmentSettings> _settingsRead;
     private readonly IRepository<ClinicAppointmentSettings> _settingsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateClinicAppointmentSettingsCommandHandler(
         ITenantContext tenantContext,
@@ -28,7 +29,8 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
         IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinicsRead,
         IReadRepository<ClinicAppointmentSettings> settingsRead,
-        IRepository<ClinicAppointmentSettings> settingsWrite)
+        IRepository<ClinicAppointmentSettings> settingsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
@@ -38,6 +40,7 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
         _clinicsRead = clinicsRead;
         _settingsRead = settingsRead;
         _settingsWrite = settingsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ClinicAppointmentSettingsDto>> Handle(
@@ -85,6 +88,7 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
             new ClinicAppointmentSettingsByClinicSpec(tenantId, request.ClinicId), ct);
 
         ClinicAppointmentSettings row;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         try
         {
             row = existing
@@ -93,14 +97,16 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
                     request.ClinicId,
                     request.DefaultAppointmentDurationMinutes,
                     request.SlotIntervalMinutes,
-                    request.AllowOverlappingAppointments);
+                    request.AllowOverlappingAppointments,
+                    utcNow);
 
             if (existing is not null)
             {
                 row.Update(
                     request.DefaultAppointmentDurationMinutes,
                     request.SlotIntervalMinutes,
-                    request.AllowOverlappingAppointments);
+                    request.AllowOverlappingAppointments,
+                    utcNow);
             }
         }
         catch (ArgumentException ex)

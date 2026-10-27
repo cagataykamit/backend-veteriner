@@ -630,7 +630,7 @@ public sealed class AppointmentProjectionIntegrationTests
     {
         var tenant = await db.Tenants.FirstAsync();
         var clinic = await db.Clinics.FirstAsync(c => c.TenantId == tenant.Id);
-        var client = new Backend.Veteriner.Domain.Clients.Client(tenant.Id, "Projection Pet Client", "905551110055");
+        var client = new Backend.Veteriner.Domain.Clients.Client(tenant.Id, "Projection Pet Client", DateTime.UtcNow, "905551110055");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();

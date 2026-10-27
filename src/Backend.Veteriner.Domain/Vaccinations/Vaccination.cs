@@ -58,7 +58,8 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped
         VaccinationStatus status,
         DateTime? appliedAtUtc,
         DateTime? dueAtUtc,
-        string? notes)
+        string? notes,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -81,7 +82,7 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped
         AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
         DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
@@ -98,14 +99,15 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped
         DateTime appliedAtUtc,
         DateTime? dueAtUtc,
         string? notes,
-        Guid importBatchId)
+        Guid importBatchId,
+        DateTime utcNow)
     {
         if (importBatchId == Guid.Empty)
             throw new ArgumentException("ImportBatchId geçersiz.", nameof(importBatchId));
 
         return new Vaccination(
             tenantId, petId, clinicId, examinationId: null, vaccineDefinitionId, vaccineNameSnapshot,
-            VaccinationStatus.Applied, appliedAtUtc, dueAtUtc, notes)
+            VaccinationStatus.Applied, appliedAtUtc, dueAtUtc, notes, utcNow)
         {
             ImportBatchId = importBatchId,
         };
@@ -120,7 +122,8 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped
         VaccinationStatus status,
         DateTime? appliedAtUtc,
         DateTime? dueAtUtc,
-        string? notes)
+        string? notes,
+        DateTime utcNow)
     {
         if (petId == Guid.Empty)
             return Result.Failure("Vaccinations.Validation", "PetId gecersiz.");
@@ -140,7 +143,7 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped
         AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
         DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 
@@ -148,11 +151,11 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped
     /// Bağlı uygulama iptal edildiğinde aşı kaydını iptal eder. İptal kayıtta uygulama tarihi olmaz (durum/tarih kuralı);
     /// gerçek uygulama zamanı iptal edilen <c>Administration</c> kaydında kalır.
     /// </summary>
-    public void CancelForVoidedAdministration()
+    public void CancelForVoidedAdministration(DateTime utcNow)
     {
         Status = VaccinationStatus.Cancelled;
         AppliedAtUtc = null;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     /// <summary>

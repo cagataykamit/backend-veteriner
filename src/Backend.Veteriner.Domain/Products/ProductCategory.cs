@@ -17,7 +17,7 @@ public sealed class ProductCategory : AggregateRoot
 
     private ProductCategory() { }
 
-    public ProductCategory(Guid tenantId, string name, string? description = null)
+    public ProductCategory(Guid tenantId, string name, DateTime utcNow, string? description = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -28,32 +28,32 @@ public sealed class ProductCategory : AggregateRoot
         Name = name.Trim();
         Description = NormalizeOptional(description);
         IsActive = true;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    public void Update(string name, string? description)
+    public void Update(string name, string? description, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Kategori adı boş olamaz.", nameof(name));
 
         Name = name.Trim();
         Description = NormalizeOptional(description);
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void Activate()
+    public void Activate(DateTime utcNow)
     {
         IsActive = true;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
-    public void Deactivate()
+    public void Deactivate(DateTime utcNow)
     {
         IsActive = false;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 }

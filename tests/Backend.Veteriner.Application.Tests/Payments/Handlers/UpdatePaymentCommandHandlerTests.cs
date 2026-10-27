@@ -105,11 +105,11 @@ public sealed class UpdatePaymentCommandHandlerTests
     private void SetupTenantClinicClient(Guid tid, Guid cid, Guid clientId)
     {
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Client(tid, "Ali"));
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow));
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         var clientId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Payment?)null);
 
@@ -145,7 +145,7 @@ public sealed class UpdatePaymentCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TenantInactive()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("A");
+        var tenant = new Tenant("A", DateTime.UtcNow);
         tenant.Deactivate();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -169,7 +169,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(ctxClinic);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, ctxClinic, clientId));
 
@@ -191,7 +191,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(ctxClinic);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, paymentClinic, clientId));
 
@@ -210,7 +210,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         var paymentId = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -366,7 +366,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Examination(tid, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow.AddHours(-1), "S", "F", null, null));
+            .ReturnsAsync(new Examination(tid, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow.AddHours(-1), "S", "F", null, null, DateTime.UtcNow));
 
         var result = await CreateHandler().Handle(Cmd(paymentId, cid, clientId, examinationId: examinationId), CancellationToken.None);
 
@@ -388,7 +388,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Examination(tid, cid, examinationPetId, null, DateTime.UtcNow.AddHours(-1), "S", "F", null, null));
+            .ReturnsAsync(new Examination(tid, cid, examinationPetId, null, DateTime.UtcNow.AddHours(-1), "S", "F", null, null, DateTime.UtcNow));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
@@ -413,7 +413,7 @@ public sealed class UpdatePaymentCommandHandlerTests
         _paymentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(PaymentWithId(paymentId, tid, cid, clientId));
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Examination(tid, cid, examPetId, null, DateTime.UtcNow.AddHours(-1), "S", "F", null, null));
+            .ReturnsAsync(new Examination(tid, cid, examPetId, null, DateTime.UtcNow.AddHours(-1), "S", "F", null, null, DateTime.UtcNow));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, clientId, "P", TestSpeciesIds.Cat, null, null));
 

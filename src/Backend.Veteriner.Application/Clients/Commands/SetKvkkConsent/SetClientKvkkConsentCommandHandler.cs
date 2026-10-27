@@ -87,14 +87,16 @@ public sealed class SetClientKvkkConsentCommandHandler
             ? null
             : await ResolveCurrentConsentTextAsync(tenantId, ct);
 
-        var today = OperationDayBounds.ToLocalDate(_timeProvider.GetUtcNow().UtcDateTime);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var today = OperationDayBounds.ToLocalDate(utcNow);
         var change = client.RecordKvkkConsent(
             request.Status,
             request.RecordedOn,
             today,
             userId,
             consentText?.TextVersion,
-            consentText?.TextHash);
+            consentText?.TextHash,
+            utcNow);
         if (!change.IsSuccess)
             return Result<ClientKvkkConsentDto>.Failure(change.Error);
 

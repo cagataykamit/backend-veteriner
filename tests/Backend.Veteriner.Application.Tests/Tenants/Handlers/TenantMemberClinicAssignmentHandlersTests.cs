@@ -29,7 +29,7 @@ public sealed class TenantMemberClinicAssignmentHandlersTests
 
     private AssignTenantMemberClinicCommandHandler CreateAssignHandler()
         => new(_tenantContext.Object, _permissions.Object, _userTenantRepo.Object,
-               _clinicsRead.Object, _userClinics.Object, _uow.Object);
+               _clinicsRead.Object, _userClinics.Object, _uow.Object, TimeProvider.System);
 
     private RemoveTenantMemberClinicCommandHandler CreateRemoveHandler()
         => new(_tenantContext.Object, _clientContext.Object, _permissions.Object, _userTenantRepo.Object,

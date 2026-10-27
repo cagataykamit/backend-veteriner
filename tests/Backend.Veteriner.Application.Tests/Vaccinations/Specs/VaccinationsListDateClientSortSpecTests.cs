@@ -17,7 +17,7 @@ public sealed class VaccinationsListDateClientSortSpecTests
     private readonly Guid _clinicId = Guid.NewGuid();
 
     private Vaccination Build(VaccinationStatus status, DateTime? appliedAtUtc, DateTime? dueAtUtc, Guid? petId = null)
-        => new(_tenantId, petId ?? Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Kuduz", status, appliedAtUtc, dueAtUtc, null);
+        => new(_tenantId, petId ?? Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Kuduz", status, appliedAtUtc, dueAtUtc, null, DateTime.UtcNow);
 
     private VaccinationsFilteredPagedSpec Paged(
         IReadOnlyCollection<Guid>? clientPetIds = null,

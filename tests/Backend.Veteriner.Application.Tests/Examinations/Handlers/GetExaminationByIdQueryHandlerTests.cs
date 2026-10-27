@@ -60,7 +60,8 @@ public sealed class GetExaminationByIdQueryHandlerTests
             "Şikayet",
             "Bulgu",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         if (examinationId.HasValue)
             typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(entity, examinationId.Value);
         return entity;
@@ -83,7 +84,7 @@ public sealed class GetExaminationByIdQueryHandlerTests
     {
         var pet = new Pet(tenantId, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
-        var client = new Client(tenantId, "Ali Veli");
+        var client = new Client(tenantId, "Ali Veli", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))

@@ -13,15 +13,18 @@ public sealed class DeactivateVaccineDefinitionCommandHandler : IRequestHandler<
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<VaccineDefinition> _definitionsRead;
     private readonly IRepository<VaccineDefinition> _definitionsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public DeactivateVaccineDefinitionCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<VaccineDefinition> definitionsRead,
-        IRepository<VaccineDefinition> definitionsWrite)
+        IRepository<VaccineDefinition> definitionsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _definitionsRead = definitionsRead;
         _definitionsWrite = definitionsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(DeactivateVaccineDefinitionCommand request, CancellationToken ct)
@@ -47,7 +50,8 @@ public sealed class DeactivateVaccineDefinitionCommandHandler : IRequestHandler<
         if (entity.TenantId != tenantId)
             return Result.Failure("VaccineDefinitions.NotFound", "Aşı tanımı bulunamadı.");
 
-        entity.Deactivate();
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        entity.Deactivate(utcNow);
         await _definitionsWrite.UpdateAsync(entity, ct);
         await _definitionsWrite.SaveChangesAsync(ct);
         return Result.Success();

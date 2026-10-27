@@ -411,31 +411,31 @@ public sealed class ImportPerformanceTests
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"ImpPerf-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"ImpPerf-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, "ImpPerf-Ana", "Izmir");
         db.Clinics.Add(clinic);
-        var settings = TenantReminderSettings.CreateDefault(tenant.Id);
-        settings.Update(false, 24, true, 3, true); // aşı hatırlatması açık, 3 gün önce
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow); // aşı hatırlatması açık, 3 gün önce
         db.TenantReminderSettings.Add(settings);
         await db.SaveChangesAsync();
 
         // Sistemde zaten kayıtlı müşteriler (dosyayla aynı kişi, farklı yazım) ve çipi dosyayla çakışan hayvanlar.
         foreach (var (name, mobile) in gen.ExistingClients)
-            db.Clients.Add(new Client(tenant.Id, name, "90" + mobile[1..]));
+            db.Clients.Add(new Client(tenant.Id, name, DateTime.UtcNow, "90" + mobile[1..]));
         var cat = await db.Species.AsNoTracking().SingleAsync(s => s.Code == "CAT");
-        var owner = new Client(tenant.Id, "Sistem Mevcut Sahip", "905009990000");
+        var owner = new Client(tenant.Id, "Sistem Mevcut Sahip", DateTime.UtcNow, "905009990000");
         db.Clients.Add(owner);
         foreach (var chip in gen.ExistingChips)
             db.Pets.Add(new Pet(tenant.Id, owner.Id, $"Mevcut {chip[^4..]}", cat.Id, microchipNumber: chip));
 
         // Kontrol: elle girilmiş (içe aktarılmamış) aşı, vadesi hatırlatma penceresinde, sahibi e-postalı.
-        var control = new Client(tenant.Id, "Kontrol Sahibi", "905009990001", "kontrol@example.com");
+        var control = new Client(tenant.Id, "Kontrol Sahibi", DateTime.UtcNow, "905009990001", "kontrol@example.com");
         var controlPet = new Pet(tenant.Id, control.Id, "Kontrol", cat.Id);
         var rabies = await db.VaccineDefinitions.AsNoTracking().SingleAsync(v => v.TenantId == null && v.Code == "RABIES");
         var now = DateTime.UtcNow;
-        var vaccination = new Vaccination(tenant.Id, controlPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddDays(-360), now.AddDays(2), null);
+        var vaccination = new Vaccination(tenant.Id, controlPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddDays(-360), now.AddDays(2), null, DateTime.UtcNow);
         db.Clients.Add(control);
         db.Pets.Add(controlPet);
         db.Vaccinations.Add(vaccination);
@@ -517,7 +517,7 @@ public sealed class ImportPerformanceTests
         var editIds = clients.Where((_, i) => i % 500 == 11).ToList();    // ~%0,2
         var edited = await db.Clients.Where(c => editIds.Contains(c.Id)).ToListAsync();
         foreach (var c in edited)
-            c.UpdateDetails(c.FullName, $"duzenlendi-{c.Id:N}"[..20] + "@example.com", c.Phone, c.Address);
+            c.UpdateDetails(c.FullName, $"duzenlendi-{c.Id:N}"[..20] + "@example.com", c.Phone, c.Address, DateTime.UtcNow);
 
         await db.SaveChangesAsync();
         return (visitPets.Count, edited.Count);

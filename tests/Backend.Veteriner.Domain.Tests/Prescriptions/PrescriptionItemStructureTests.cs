@@ -6,8 +6,10 @@ namespace Backend.Veteriner.Domain.Tests.Prescriptions;
 /// <summary>ADR-036 Dilim 2: reçete kaleminde doz, birim ve parti/seri no yapılandırılmış alanlardır.</summary>
 public sealed class PrescriptionItemStructureTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static Prescription NewPrescription()
-        => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, DateTime.UtcNow, "Reçete", "İçerik", null, null);
+        => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, DateTime.UtcNow, "Reçete", "İçerik", null, null, Now);
 
     [Fact]
     public void Structured_Fields_Should_Be_Trimmed_And_Blank_Stored_As_Null()

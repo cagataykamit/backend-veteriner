@@ -213,14 +213,15 @@ public sealed class GetLabResultsListQueryHandlerTests
             "Biyokimya",
             "Değerler normal",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
 
         _labResults.Setup(r => r.CountAsync(It.IsAny<LabResultsFilteredCountSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _labResults.Setup(r => r.ListAsync(It.IsAny<LabResultsFilteredPagedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<LabResult> { lr });
 
-        var client = new Client(tid, "Ali Veli");
+        var client = new Client(tid, "Ali Veli", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Client> { client });

@@ -264,13 +264,13 @@ public sealed class PetTimelineIntegrationTests : IClassFixture<CustomWebApplica
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"timeline-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             tenantId = tenant.Id;
@@ -318,7 +318,7 @@ public sealed class PetTimelineIntegrationTests : IClassFixture<CustomWebApplica
         {
             await using var scope = services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var client = new Client(tenantId, $"TClient-{Guid.NewGuid():N}"[..14], "905551110088");
+            var client = new Client(tenantId, $"TClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110088");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
@@ -358,20 +358,21 @@ public sealed class PetTimelineIntegrationTests : IClassFixture<CustomWebApplica
         public Task AddExaminationAsync(DateTime examinedAtUtc, Guid? onClinicId = null, decimal? weightKg = null, Guid? visitId = null)
             => SaveAsync(_ => new Examination(
                 tenantId, onClinicId ?? clinicId, PetId, null, examinedAtUtc, "Kontrol", null, null, null,
+                DateTime.UtcNow,
                 weightKg: weightKg, visitId: visitId));
 
         public Task AddTreatmentAsync(DateTime atUtc)
-            => SaveAsync(_ => new Treatment(tenantId, clinicId, PetId, null, atUtc, "Serum", "Aciklama", null, null));
+            => SaveAsync(_ => new Treatment(tenantId, clinicId, PetId, null, atUtc, "Serum", "Aciklama", null, null, DateTime.UtcNow));
 
         public Task AddHospitalizationAsync(DateTime admittedAtUtc)
-            => SaveAsync(_ => new Hospitalization(tenantId, clinicId, PetId, null, admittedAtUtc, null, "Gozlem", null));
+            => SaveAsync(_ => new Hospitalization(tenantId, clinicId, PetId, null, admittedAtUtc, null, "Gozlem", null, DateTime.UtcNow));
 
         public async Task AddVaccinationAsync(VaccinationStatus status, DateTime? appliedAtUtc, DateTime? dueAtUtc)
         {
             await using var scope = services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var definitionId = await db.VaccineDefinitions.Select(v => v.Id).FirstAsync();
-            db.Add(new Vaccination(tenantId, PetId, clinicId, null, definitionId, "Karma", status, appliedAtUtc, dueAtUtc, null));
+            db.Add(new Vaccination(tenantId, PetId, clinicId, null, definitionId, "Karma", status, appliedAtUtc, dueAtUtc, null, DateTime.UtcNow));
             await db.SaveChangesAsync();
         }
     }

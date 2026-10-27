@@ -38,7 +38,7 @@ public sealed class ClinicalListSortSpecTests
     [InlineData(true)]
     public void Treatments(bool? descending)
     {
-        Treatment New(DateTime at) => new(_tenantId, _clinicId, Guid.NewGuid(), null, at, "Tedavi", "Açıklama", null, null);
+        Treatment New(DateTime at) => new(_tenantId, _clinicId, Guid.NewGuid(), null, at, "Tedavi", "Açıklama", null, null, DateTime.UtcNow);
         var older = New(Older);
         var newer = New(Newer);
 
@@ -54,7 +54,7 @@ public sealed class ClinicalListSortSpecTests
     [InlineData(true)]
     public void Prescriptions(bool? descending)
     {
-        Prescription New(DateTime at) => new(_tenantId, _clinicId, Guid.NewGuid(), null, null, at, "Reçete", "İçerik", null, null);
+        Prescription New(DateTime at) => new(_tenantId, _clinicId, Guid.NewGuid(), null, null, at, "Reçete", "İçerik", null, null, DateTime.UtcNow);
         var older = New(Older);
         var newer = New(Newer);
 
@@ -71,7 +71,7 @@ public sealed class ClinicalListSortSpecTests
     public void LabResults(bool? descending)
     {
         // Sonuçlu kayıtta RequestedAtUtc = resultDateUtc.
-        LabResult New(DateTime at) => new(_tenantId, _clinicId, Guid.NewGuid(), null, null, null, at, "Hemogram", "Normal", null, null);
+        LabResult New(DateTime at) => new(_tenantId, _clinicId, Guid.NewGuid(), null, null, null, at, "Hemogram", "Normal", null, null, DateTime.UtcNow);
         var older = New(Older);
         var newer = New(Newer);
 
@@ -87,7 +87,7 @@ public sealed class ClinicalListSortSpecTests
     [InlineData(true)]
     public void Hospitalizations(bool? descending)
     {
-        Hospitalization New(DateTime at) => new(_tenantId, _clinicId, Guid.NewGuid(), null, at, null, "Gözlem", null);
+        Hospitalization New(DateTime at) => new(_tenantId, _clinicId, Guid.NewGuid(), null, at, null, "Gözlem", null, DateTime.UtcNow);
         var older = New(Older);
         var newer = New(Newer);
 

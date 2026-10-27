@@ -90,7 +90,7 @@ internal static class ClientProjectionTestSupport
         string? email = null,
         CancellationToken ct = default)
     {
-        var client = new Client(tenantId, fullName, phone, email);
+        var client = new Client(tenantId, fullName, DateTime.UtcNow, phone, email);
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync(ct);
 

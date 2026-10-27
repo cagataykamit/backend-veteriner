@@ -60,7 +60,7 @@ public sealed class HospitalizationModelIntegrationTests : IClassFixture<CustomW
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenantId = (await db.Clinics.SingleAsync(c => c.Id == clinicId)).TenantId;
-        var exam = new Examination(tenantId, clinicId, petId, appointmentId: null, DateTime.UtcNow.AddHours(-3), "Kontrol", "Bulgu", null, null);
+        var exam = new Examination(tenantId, clinicId, petId, appointmentId: null, DateTime.UtcNow.AddHours(-3), "Kontrol", "Bulgu", null, null, utcNow: DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.VisitId))!.SetValue(exam, visitId);
         if (finalized)
             exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();

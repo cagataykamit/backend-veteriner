@@ -44,13 +44,14 @@ public static class ExaminationTemplateSeeder
             .ToHashSet(StringComparer.Ordinal);
 
         var added = 0;
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         foreach (var template in Templates)
         {
             if (!known.Add(TurkishTextKey.Normalize(template.Name)))
                 continue;
 
             await db.ExaminationTemplates.AddAsync(
-                ExaminationTemplate.CreateSystem(template.Name, template.VisitReason, template.Findings, template.Plan), ct);
+                ExaminationTemplate.CreateSystem(template.Name, template.VisitReason, template.Findings, template.Plan, utcNow), ct);
             added++;
         }
 

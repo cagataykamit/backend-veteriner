@@ -10,13 +10,16 @@ public sealed class DeactivateProductCategoryCommandHandler : IRequestHandler<De
 {
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ProductCategory> _categories;
+    private readonly TimeProvider _timeProvider;
 
     public DeactivateProductCategoryCommandHandler(
         ITenantContext tenantContext,
-        IRepository<ProductCategory> categories)
+        IRepository<ProductCategory> categories,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _categories = categories;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(DeactivateProductCategoryCommand request, CancellationToken ct)
@@ -28,9 +31,10 @@ public sealed class DeactivateProductCategoryCommandHandler : IRequestHandler<De
         if (category is null)
             return Result.Failure("ProductCategories.NotFound", "Kategori bulunamadı veya kiracıya ait değil.");
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (category.IsActive)
         {
-            category.Deactivate();
+            category.Deactivate(utcNow);
             await _categories.SaveChangesAsync(ct);
         }
 

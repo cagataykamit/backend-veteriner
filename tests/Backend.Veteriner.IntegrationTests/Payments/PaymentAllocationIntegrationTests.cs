@@ -589,13 +589,13 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         {
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             var email = $"alloc-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenantId));
-            db.UserClinics.Add(new UserClinic(user.Id, clinicId));
+            db.UserTenants.Add(new UserTenant(user.Id, tenantId, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinicId, DateTime.UtcNow));
             await db.SaveChangesAsync();
             return (user.Id, email);
         }
@@ -680,7 +680,7 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var client = new Client(TenantId, $"AClient-{Guid.NewGuid():N}"[..14], "905551110077");
+            var client = new Client(TenantId, $"AClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110077");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;
@@ -735,11 +735,11 @@ public sealed class PaymentAllocationIntegrationTests : IClassFixture<CustomWebA
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16]);
+            var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             await db.SaveChangesAsync();
             var clinic = new Clinic(tenant.Id, $"FClinic-{Guid.NewGuid():N}"[..14], "Ankara");
-            var client = new Client(tenant.Id, $"FClient-{Guid.NewGuid():N}"[..14], "905551110098");
+            var client = new Client(tenant.Id, $"FClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110098");
             db.Clinics.Add(clinic);
             db.Clients.Add(client);
             await db.SaveChangesAsync();

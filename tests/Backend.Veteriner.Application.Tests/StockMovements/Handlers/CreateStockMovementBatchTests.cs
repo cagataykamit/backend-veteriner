@@ -55,7 +55,7 @@ public sealed class CreateStockMovementBatchTests
 
     private Product SetupProduct(ProductKind kind = ProductKind.Other, ControlledSubstanceClass controlled = ControlledSubstanceClass.None)
     {
-        var product = new Product(_tenantId, "Ürün", "Doz", 10m, "TRY", sku: "SKU-1", kind: kind, controlledClass: controlled);
+        var product = new Product(_tenantId, "Ürün", "Doz", 10m, "TRY", DateTime.UtcNow, sku: "SKU-1", kind: kind, controlledClass: controlled);
         typeof(Product).GetProperty(nameof(Product.Id))!.SetValue(product, _productId);
         _productsRead
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Product>>(), It.IsAny<CancellationToken>()))
@@ -84,7 +84,7 @@ public sealed class CreateStockMovementBatchTests
 
     private ProductStock SetupStock(decimal qty)
     {
-        var stock = new ProductStock(_tenantId, _clinicId, _productId, qty, 0);
+        var stock = new ProductStock(_tenantId, _clinicId, _productId, qty, 0, DateTime.UtcNow);
         _productStocksWrite
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<ProductStock>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(stock);

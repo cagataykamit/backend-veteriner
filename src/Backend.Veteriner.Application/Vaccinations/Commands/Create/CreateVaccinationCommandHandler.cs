@@ -45,6 +45,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
     private readonly IRepository<Vaccination> _vaccinationsWrite;
     private readonly IReadRepository<Administration> _administrationsRead;
     private readonly ISender _sender;
+    private readonly TimeProvider _timeProvider;
 
     public CreateVaccinationCommandHandler(
         ITenantContext tenantContext,
@@ -58,7 +59,8 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         IReadRepository<Vaccination> vaccinationsRead,
         IRepository<Vaccination> vaccinationsWrite,
         IReadRepository<Administration> administrationsRead,
-        ISender sender)
+        ISender sender,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -72,6 +74,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         _vaccinationsWrite = vaccinationsWrite;
         _administrationsRead = administrationsRead;
         _sender = sender;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<VaccinationCreateResultDto>> Handle(CreateVaccinationCommand request, CancellationToken ct)
@@ -194,6 +197,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         if (!locked.IsSuccess)
             return Result<VaccinationCreateResultDto>.Failure(locked.Error);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var vaccination = new Vaccination(
             tenantId,
             request.PetId,
@@ -204,7 +208,8 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
             request.Status,
             appliedUtc,
             dueUtc,
-            request.Notes);
+            request.Notes,
+            utcNow);
 
         await _vaccinationsWrite.AddAsync(vaccination, ct);
         await _vaccinationsWrite.SaveChangesAsync(ct);

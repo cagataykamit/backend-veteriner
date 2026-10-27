@@ -56,11 +56,12 @@ public static class DevTestVeterinarianSeeder
         }
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == Email, ct);
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         if (user is null)
         {
-            user = new User(Email, hasher.Hash(Password));
-            user.SetDisplayName(DisplayName);
-            user.ConfirmEmail();
+            user = new User(Email, hasher.Hash(Password), utcNow);
+            user.SetDisplayName(DisplayName, utcNow);
+            user.ConfirmEmail(utcNow);
             await db.Users.AddAsync(user, ct);
             await db.SaveChangesAsync(ct);
             logger?.LogInformation("Test hekim kullanıcısı oluşturuldu.");
@@ -69,7 +70,7 @@ public static class DevTestVeterinarianSeeder
         var tenantLink = await db.UserTenants.FirstOrDefaultAsync(x => x.UserId == user.Id, ct);
         if (tenantLink is null)
         {
-            await db.UserTenants.AddAsync(new UserTenant(user.Id, tenant.Id), ct);
+            await db.UserTenants.AddAsync(new UserTenant(user.Id, tenant.Id, utcNow), ct);
         }
         else if (tenantLink.TenantId != tenant.Id)
         {
@@ -81,7 +82,7 @@ public static class DevTestVeterinarianSeeder
             await db.UserOperationClaims.AddAsync(new UserOperationClaim(user.Id, claim.Id), ct);
 
         if (!await db.UserClinics.AnyAsync(x => x.UserId == user.Id && x.ClinicId == clinic.Id, ct))
-            await db.UserClinics.AddAsync(new UserClinic(user.Id, clinic.Id), ct);
+            await db.UserClinics.AddAsync(new UserClinic(user.Id, clinic.Id, utcNow), ct);
 
         await db.SaveChangesAsync(ct);
         return true;

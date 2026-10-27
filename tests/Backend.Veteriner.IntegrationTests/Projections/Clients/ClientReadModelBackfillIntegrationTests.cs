@@ -84,7 +84,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
         {
             var commandDb = mutateScope.ServiceProvider.GetRequiredService<AppDbContext>();
             var client = await commandDb.Clients.SingleAsync(c => c.Id == clientId);
-            client.UpdateDetails("Yeni İsim", "yeni@example.com", client.Phone, client.Address);
+            client.UpdateDetails("Yeni İsim", "yeni@example.com", client.Phone, client.Address, DateTime.UtcNow);
             await commandDb.SaveChangesAsync();
         }
 
@@ -211,7 +211,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var name in fullNames)
-            commandDb.Clients.Add(new Client(tenantId, name));
+            commandDb.Clients.Add(new Client(tenantId, name, DateTime.UtcNow));
         await commandDb.SaveChangesAsync();
     }
 
@@ -219,7 +219,7 @@ public sealed class ClientReadModelBackfillIntegrationTests
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var client = new Client(tenantId, fullName, phone: null, email: email);
+        var client = new Client(tenantId, fullName, DateTime.UtcNow, phone: null, email: email);
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync();
         return client.Id;

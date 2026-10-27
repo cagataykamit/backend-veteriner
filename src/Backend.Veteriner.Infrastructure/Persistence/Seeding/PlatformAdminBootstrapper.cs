@@ -48,9 +48,10 @@ public static class PlatformAdminBootstrapper
         // Girişte tek kiracı üyeliği zorunlu; platform yöneticisi müşteri kiracısından ayrı, boş "Platform" kiracısına bağlanır
         // (klinik/abonelik oluşturulmaz; aboneliksiz kiracıda yazma komutları zaten reddedilir).
         var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Name == Tenant.PlatformTenantName, ct);
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         if (tenant is null)
         {
-            tenant = new Tenant(Tenant.PlatformTenantName);
+            tenant = new Tenant(Tenant.PlatformTenantName, utcNow);
             await db.Tenants.AddAsync(tenant, ct);
             await db.SaveChangesAsync(ct);
         }
@@ -61,10 +62,10 @@ public static class PlatformAdminBootstrapper
                 $"'{Tenant.PlatformTenantName}' adlı kiracıda klinik veya abonelik var; müşteri kiracısı olabilir. Platform yöneticisi bağlanmadı.");
         }
 
-        var user = new User(email, hasher.Hash(input.Password!));
-        user.ConfirmEmail();
+        var user = new User(email, hasher.Hash(input.Password!), utcNow);
+        user.ConfirmEmail(utcNow);
         await db.Users.AddAsync(user, ct);
-        await db.UserTenants.AddAsync(new UserTenant(user.Id, tenant.Id), ct);
+        await db.UserTenants.AddAsync(new UserTenant(user.Id, tenant.Id, utcNow), ct);
         await db.SaveChangesAsync(ct);
 
         await AdminClaimSeeder.SeedAsync(db, ct, email);

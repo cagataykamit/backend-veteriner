@@ -44,9 +44,10 @@ public static class DataSeeder
         CancellationToken ct)
     {
         var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Name == DefaultTenantName, ct);
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         if (tenant is null)
         {
-            tenant = new Tenant(DefaultTenantName);
+            tenant = new Tenant(DefaultTenantName, utcNow);
             await db.Tenants.AddAsync(tenant, ct);
             await db.SaveChangesAsync(ct);
             logger?.LogInformation("Default tenant seeded: {Name}", DefaultTenantName);
@@ -58,8 +59,8 @@ public static class DataSeeder
 
         if (user is null)
         {
-            user = new User("admin@example.com", hasher.Hash("123456"));
-            user.AddRole("Admin");
+            user = new User("admin@example.com", hasher.Hash("123456"), utcNow);
+            user.AddRole("Admin", utcNow);
 
             await db.Users.AddAsync(user, ct);
             await db.SaveChangesAsync(ct);
@@ -77,8 +78,8 @@ public static class DataSeeder
                 db.Users.RemoveRange(db.Users.Where(u => u.Email == "admin@example.com"));
                 await db.SaveChangesAsync(ct);
 
-                user = new User("admin@example.com", hasher.Hash("123456"));
-                user.AddRole("Admin");
+                user = new User("admin@example.com", hasher.Hash("123456"), utcNow);
+                user.AddRole("Admin", utcNow);
 
                 await db.Users.AddAsync(user, ct);
                 await db.SaveChangesAsync(ct);
@@ -90,7 +91,7 @@ public static class DataSeeder
         var hasUserTenantLink = await db.UserTenants.AnyAsync(x => x.UserId == user.Id, ct);
         if (!hasUserTenantLink)
         {
-            await db.UserTenants.AddAsync(new UserTenant(user.Id, tenant.Id), ct);
+            await db.UserTenants.AddAsync(new UserTenant(user.Id, tenant.Id, utcNow), ct);
             await db.SaveChangesAsync(ct);
             logger?.LogInformation("UserTenant link seeded for admin and default tenant.");
         }
@@ -113,7 +114,7 @@ public static class DataSeeder
 
         if (!await db.UserClinics.AnyAsync(uc => uc.UserId == user.Id && uc.ClinicId == seedClinic.Id, ct))
         {
-            await db.UserClinics.AddAsync(new UserClinic(user.Id, seedClinic.Id), ct);
+            await db.UserClinics.AddAsync(new UserClinic(user.Id, seedClinic.Id, utcNow), ct);
             await db.SaveChangesAsync(ct);
             logger?.LogInformation("UserClinic seeded for admin and {Clinic}.", DefaultSeedClinicName);
         }

@@ -13,11 +13,13 @@ public sealed class UpdateClinicalTermCommandHandler : IRequestHandler<UpdateCli
 {
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ClinicalTerm> _terms;
+    private readonly TimeProvider _timeProvider;
 
-    public UpdateClinicalTermCommandHandler(ITenantContext tenantContext, IRepository<ClinicalTerm> terms)
+    public UpdateClinicalTermCommandHandler(ITenantContext tenantContext, IRepository<ClinicalTerm> terms, TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _terms = terms;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ClinicalTermDto>> Handle(UpdateClinicalTermCommand request, CancellationToken ct)
@@ -32,7 +34,8 @@ public sealed class UpdateClinicalTermCommandHandler : IRequestHandler<UpdateCli
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
             return Result<ClinicalTermDto>.Failure(ClinicalTermErrors.InvalidRowVersion);
 
-        var rename = term.Rename(request.Name);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var rename = term.Rename(request.Name, utcNow);
         if (!rename.IsSuccess)
             return Result<ClinicalTermDto>.Failure(rename.Error);
 

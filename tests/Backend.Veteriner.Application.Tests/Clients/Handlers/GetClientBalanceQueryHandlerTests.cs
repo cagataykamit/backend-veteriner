@@ -35,7 +35,7 @@ public sealed class GetClientBalanceQueryHandlerTests
     {
         _tenant.SetupGet(t => t.TenantId).Returns(_tenantId);
         _clinic.SetupGet(c => c.ClinicId).Returns(_clinicId);
-        _client = new Client(_tenantId, "Ali Veli", "05321111111");
+        _client = new Client(_tenantId, "Ali Veli", DateTime.UtcNow, "05321111111");
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_client);
         SetupCharges();

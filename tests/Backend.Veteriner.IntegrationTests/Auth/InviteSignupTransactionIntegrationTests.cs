@@ -45,7 +45,7 @@ public sealed class InviteSignupTransactionIntegrationTests : IClassFixture<Cust
             var tokenHash = scope.ServiceProvider.GetRequiredService<ITokenHashService>();
             var now = DateTime.UtcNow;
 
-            var tenant = new Tenant($"Tx Kiracı {Guid.NewGuid():N}"[..24]);
+            var tenant = new Tenant($"Tx Kiracı {Guid.NewGuid():N}"[..24], DateTime.UtcNow);
             var clinic = new Clinic(tenant.Id, "Tx Klinik", "İzmir");
             db.Tenants.Add(tenant);
             db.Clinics.Add(clinic);

@@ -45,7 +45,7 @@ public sealed class GetClientPaymentSummaryQueryHandlerTests
 
     private void SetupClient(Guid tenantId, Guid clientId, string name = "Ali")
     {
-        var client = new Client(tenantId, name, "05321111111");
+        var client = new Client(tenantId, name, DateTime.UtcNow, "05321111111");
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(client);
     }

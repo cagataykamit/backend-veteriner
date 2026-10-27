@@ -50,7 +50,8 @@ public sealed class LoginCommandHandlerTests
             _permissionReader.Object,
             _tenants.Object,
             _userTenants.Object,
-            opt);
+            opt,
+            TimeProvider.System);
     }
 
     [Fact]
@@ -75,7 +76,7 @@ public sealed class LoginCommandHandlerTests
         var handler = CreateHandler();
         var cmd = new LoginCommand("user@example.com", "wrong");
 
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
         _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ToLookup(user));
         _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(false);
@@ -95,9 +96,9 @@ public sealed class LoginCommandHandlerTests
         var handler = CreateHandler(sessionOptions);
         var cmd = new LoginCommand("user@example.com", "password");
 
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
         _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -143,8 +144,8 @@ public sealed class LoginCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var cmd = new LoginCommand("user@example.com", "password", tid);
-        var user = new User("user@example.com", "hash");
-        var tenant = new Tenant("Acme");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
         _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -181,8 +182,8 @@ public sealed class LoginCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var cmd = new LoginCommand("user@example.com", "password", tid);
-        var user = new User("user@example.com", "hash");
-        var tenant = new Tenant("Acme");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         tenant.Deactivate();
 
@@ -207,9 +208,9 @@ public sealed class LoginCommandHandlerTests
     {
         var handler = CreateHandler();
         var cmd = new LoginCommand("user@example.com", "password");
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
         _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -242,7 +243,7 @@ public sealed class LoginCommandHandlerTests
     {
         var handler = CreateHandler();
         var cmd = new LoginCommand("user@example.com", "password");
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
 
         _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ToLookup(user));
@@ -263,7 +264,7 @@ public sealed class LoginCommandHandlerTests
         var requested = Guid.NewGuid();
         var memberTid = Guid.NewGuid();
         var cmd = new LoginCommand("user@example.com", "password", requested);
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
 
         _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ToLookup(user));
@@ -282,7 +283,7 @@ public sealed class LoginCommandHandlerTests
     {
         var handler = CreateHandler();
         var cmd = new LoginCommand("user@example.com", "password");
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
 
         _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ToLookup(user));
@@ -303,7 +304,7 @@ public sealed class LoginCommandHandlerTests
         var onlyTid = Guid.NewGuid();
         var wrongTid = Guid.NewGuid();
         var cmd = new LoginCommand("user@example.com", "password", wrongTid);
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
 
         _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ToLookup(user));

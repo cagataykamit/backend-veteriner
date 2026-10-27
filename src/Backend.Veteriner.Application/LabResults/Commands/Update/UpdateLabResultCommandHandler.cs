@@ -34,6 +34,7 @@ public sealed class UpdateLabResultCommandHandler
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Visit> _visits;
     private readonly IRepository<LabResult> _labResultsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateLabResultCommandHandler(
         ITenantContext tenantContext,
@@ -44,7 +45,8 @@ public sealed class UpdateLabResultCommandHandler
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
         IReadRepository<Visit> visits,
-        IRepository<LabResult> labResultsWrite)
+        IRepository<LabResult> labResultsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -55,6 +57,7 @@ public sealed class UpdateLabResultCommandHandler
         _examinations = examinations;
         _visits = visits;
         _labResultsWrite = labResultsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<LabResultWriteResultDto>> Handle(UpdateLabResultCommand request, CancellationToken ct)
@@ -171,6 +174,7 @@ public sealed class UpdateLabResultCommandHandler
         if (!visit.IsSuccess)
             return Result<LabResultWriteResultDto>.Failure(visit.Error);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var update = existing.UpdateDetails(
             effectiveClinicId,
             request.PetId,
@@ -180,7 +184,8 @@ public sealed class UpdateLabResultCommandHandler
             request.TestName,
             request.ResultText,
             request.Interpretation,
-            request.Notes);
+            request.Notes,
+            utcNow);
 
         if (!update.IsSuccess)
             return Result<LabResultWriteResultDto>.Failure(update.Error);

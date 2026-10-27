@@ -312,23 +312,23 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"vac-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"vac-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Va-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
-        var product = new Product(tenant.Id, $"vp-{Guid.NewGuid():N}"[..14], "Doz", 2m, "TRY", sku: $"VSK-{Guid.NewGuid():N}"[..14]);
+        var product = new Product(tenant.Id, $"vp-{Guid.NewGuid():N}"[..14], "Doz", 2m, "TRY", DateTime.UtcNow, sku: $"VSK-{Guid.NewGuid():N}"[..14]);
         db.Products.Add(product);
-        var client = new Client(tenant.Id, $"VacClient-{Guid.NewGuid():N}"[..14], "905551110099");
+        var client = new Client(tenant.Id, $"VacClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110099");
         db.Clients.Add(client);
-        var definition = VaccineDefinition.CreateGlobal($"V{Guid.NewGuid():N}"[..8], "Test karma aşı");
+        var definition = VaccineDefinition.CreateGlobal($"V{Guid.NewGuid():N}"[..8], "Test karma aşı", DateTime.UtcNow);
         db.VaccineDefinitions.Add(definition);
         await db.SaveChangesAsync();
 
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, client.Id, $"VacPet-{Guid.NewGuid():N}"[..12], speciesId);
         db.Pets.Add(pet);
-        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, stock, minimum));
+        db.ProductStocks.Add(new ProductStock(tenant.Id, clinic.Id, product.Id, stock, minimum, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         await IntegrationTestAuthHelper.EnsureRolePermissionBindingsAsync(_factory.Services);

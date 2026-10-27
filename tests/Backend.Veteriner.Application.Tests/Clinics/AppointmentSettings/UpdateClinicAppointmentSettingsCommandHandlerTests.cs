@@ -37,7 +37,8 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandlerTests
             _userClinics.Object,
             _clinicsRead.Object,
             _settingsRead.Object,
-            _settingsWrite.Object);
+            _settingsWrite.Object,
+            TimeProvider.System);
 
     private static Clinic BuildClinic(Guid id, Guid tenantId)
     {
@@ -74,7 +75,7 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandlerTests
         _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(BuildClinic(cid, tid));
 
-        var existing = ClinicAppointmentSettings.Create(tid, cid, 30, 15, false);
+        var existing = ClinicAppointmentSettings.Create(tid, cid, 30, 15, false, DateTime.UtcNow);
         _settingsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 

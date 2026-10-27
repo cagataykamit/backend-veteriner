@@ -34,7 +34,7 @@ public sealed class ExaminationRowVersionConcurrencyIntegrationTests : IClassFix
             await using var scope = _factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var entity = await db.Examinations.SingleAsync(x => x.Id == seed.ExaminationId);
-            entity.UpdateClinicalContent(update).IsSuccess.Should().BeTrue();
+            entity.UpdateClinicalContent(update, DateTime.UtcNow).IsSuccess.Should().BeTrue();
             await db.SaveChangesAsync();
             return await Read();
         }
@@ -112,11 +112,11 @@ public sealed class ExaminationRowVersionConcurrencyIntegrationTests : IClassFix
 
         e1.UpdateClinicalContent(new ExaminationClinicalUpdate(
             e1.ExaminedAtUtc,
-            "Winner visit")).IsSuccess.Should().BeTrue();
+            "Winner visit"), DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         e2.UpdateClinicalContent(new ExaminationClinicalUpdate(
             e2.ExaminedAtUtc,
-            "Loser visit")).IsSuccess.Should().BeTrue();
+            "Loser visit"), DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         e1.SetExpectedRowVersion(staleRowVersion);
         e2.SetExpectedRowVersion(staleRowVersion);

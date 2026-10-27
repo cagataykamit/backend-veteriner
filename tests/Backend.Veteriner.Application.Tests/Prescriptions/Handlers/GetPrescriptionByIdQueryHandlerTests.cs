@@ -67,7 +67,8 @@ public sealed class GetPrescriptionByIdQueryHandlerTests
             "Başlık",
             "İçerik gövdesi",
             "Notlar",
-            DateTime.UtcNow.AddDays(3));
+            DateTime.UtcNow.AddDays(3),
+            DateTime.UtcNow);
         if (prescriptionId.HasValue)
             typeof(Prescription).GetProperty(nameof(Prescription.Id))!.SetValue(pr, prescriptionId.Value);
         return pr;
@@ -91,7 +92,7 @@ public sealed class GetPrescriptionByIdQueryHandlerTests
         var pet = new Pet(tenantId, clientId, "Pamuk", TestSpeciesIds.Cat, null, null);
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
 
-        var client = new Client(tenantId, "Ali Veli");
+        var client = new Client(tenantId, "Ali Veli", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))

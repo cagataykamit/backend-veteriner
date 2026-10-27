@@ -14,15 +14,18 @@ public sealed class AdminCreateUserCommandHandler : IRequestHandler<AdminCreateU
     private readonly IUserRepository _usersWrite;
     private readonly IReadRepository<User> _usersRead;
     private readonly IPasswordHasher _hasher;
+    private readonly TimeProvider _timeProvider;
 
     public AdminCreateUserCommandHandler(
         IUserRepository usersWrite,
         IReadRepository<User> usersRead,
-        IPasswordHasher hasher)
+        IPasswordHasher hasher,
+        TimeProvider timeProvider)
     {
         _usersWrite = usersWrite;
         _usersRead = usersRead;
         _hasher = hasher;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(AdminCreateUserCommand request, CancellationToken ct)
@@ -35,7 +38,8 @@ public sealed class AdminCreateUserCommandHandler : IRequestHandler<AdminCreateU
         var hash = _hasher.Hash(request.Password);
 
         // User constructor/factory sizde farklıysa uyarlayın
-        var user = new User(request.Email, hash);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var user = new User(request.Email, hash, utcNow);
 
         await _usersWrite.AddAsync(user, ct);
         await _usersWrite.SaveChangesAsync(ct);

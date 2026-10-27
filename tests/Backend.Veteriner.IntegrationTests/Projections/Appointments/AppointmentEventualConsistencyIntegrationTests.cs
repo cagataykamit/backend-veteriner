@@ -435,7 +435,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         var clinic = await db.Clinics.SingleAsync(c =>
             c.TenantId == tenant.Id && c.Name == DataSeeder.DefaultSeedClinicName);
-        var client = new Client(tenant.Id, $"ECClient-{Guid.NewGuid():N}"[..12], "905551110077");
+        var client = new Client(tenant.Id, $"ECClient-{Guid.NewGuid():N}"[..12], DateTime.UtcNow, "905551110077");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();

@@ -72,7 +72,7 @@ public sealed class StockMovementByProductIdQueryHandlerTests
     public async Task Handle_Should_Fail_When_NoClinicScope_Provided()
     {
         var tid = Guid.NewGuid();
-        var product = new Product(tid, "P", "Adet", 1m, "TRY");
+        var product = new Product(tid, "P", "Adet", 1m, "TRY", DateTime.UtcNow);
         var page = new PageRequest { Page = 1, PageSize = 20 };
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
@@ -98,7 +98,7 @@ public sealed class StockMovementByProductIdQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         var requestClinicId = Guid.NewGuid();
-        var product = new Product(tid, "P", "Adet", 1m, "TRY");
+        var product = new Product(tid, "P", "Adet", 1m, "TRY", DateTime.UtcNow);
         var page = new PageRequest { Page = 1, PageSize = 20 };
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
@@ -125,7 +125,7 @@ public sealed class StockMovementByProductIdQueryHandlerTests
     public async Task Handle_Should_Fail_When_ClinicContextMismatch()
     {
         var tid = Guid.NewGuid();
-        var product = new Product(tid, "P", "Adet", 1m, "TRY");
+        var product = new Product(tid, "P", "Adet", 1m, "TRY", DateTime.UtcNow);
         var page = new PageRequest { Page = 1, PageSize = 20 };
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
@@ -146,7 +146,7 @@ public sealed class StockMovementByProductIdQueryHandlerTests
     {
         var tid = Guid.NewGuid();
         var clinicId = Guid.NewGuid();
-        var product = new Product(tid, "Vitamin", "Adet", 20m, "TRY");
+        var product = new Product(tid, "Vitamin", "Adet", 20m, "TRY", DateTime.UtcNow);
         var occurred = DateTime.UtcNow.AddMinutes(-30);
         var movement = new StockMovement(
             tid,
@@ -154,7 +154,8 @@ public sealed class StockMovementByProductIdQueryHandlerTests
             product.Id,
             StockMovementType.Adjustment,
             1m,
-            occurred);
+            occurred,
+            DateTime.UtcNow);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);

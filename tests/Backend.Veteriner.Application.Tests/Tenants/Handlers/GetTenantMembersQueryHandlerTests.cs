@@ -128,9 +128,9 @@ public sealed class GetTenantMembersQueryHandlerTests
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
         _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
 
-        var user = new User("x@y.com", "hash");
+        var user = new User("x@y.com", "hash", DateTime.UtcNow);
         typeof(User).GetProperty(nameof(User.Id))!.SetValue(user, uid);
-        user.ConfirmEmail();
+        user.ConfirmEmail(DateTime.UtcNow);
 
         var row = new TenantMemberListProjectionRow(uid, "x@y.com", true, user.CreatedAtUtc);
 
@@ -162,7 +162,7 @@ public sealed class GetTenantMembersQueryHandlerTests
         var rows = new List<TenantMemberListProjectionRow>();
         foreach (var email in new[] { "ali.veli@klinik.com", "MIXED.Case@Example.COM" })
         {
-            var u = new User(email, "hash");
+            var u = new User(email, "hash", DateTime.UtcNow);
             rows.Add(new TenantMemberListProjectionRow(u.Id, email, u.EmailConfirmed, u.CreatedAtUtc));
         }
 

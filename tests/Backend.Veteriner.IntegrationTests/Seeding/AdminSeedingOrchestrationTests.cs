@@ -164,7 +164,7 @@ public sealed class AdminSeedingOrchestrationTests
         await using var db = new AppDbContext(CreateOptions());
         await ResetDatabaseAsync(db);
         await PermissionSeeder.SeedAsync(db);
-        db.Users.Add(new Backend.Veteriner.Domain.Users.User(AdminClaimSeeder.PlatformAdminUserEmail, new StubBcryptPasswordHasher().Hash("x")));
+        db.Users.Add(new Backend.Veteriner.Domain.Users.User(AdminClaimSeeder.PlatformAdminUserEmail, new StubBcryptPasswordHasher().Hash("x"), DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         await AdminClaimSeeder.SeedAsync(db, platformAdminEmail: null);
@@ -227,7 +227,7 @@ public sealed class AdminSeedingOrchestrationTests
         var hasher = new StubBcryptPasswordHasher();
         await PermissionSeeder.SeedAsync(db);
         await AdminClaimSeeder.SeedAsync(db, platformAdminEmail: null);
-        var customerTenant = new Tenant(Tenant.PlatformTenantName);
+        var customerTenant = new Tenant(Tenant.PlatformTenantName, DateTime.UtcNow);
         db.Tenants.Add(customerTenant);
         db.Clinics.Add(new Backend.Veteriner.Domain.Clinics.Clinic(customerTenant.Id, "Müşteri Kliniği", "İstanbul"));
         await db.SaveChangesAsync();

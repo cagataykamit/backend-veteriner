@@ -16,7 +16,7 @@ public sealed class PetProjectionSnapshotFactoryTests
         var breedId = Guid.NewGuid();
         var colorId = Guid.NewGuid();
 
-        var client = new Client(tid, "  Ayşe Yılmaz  ", "05321234567", "ayse@example.com");
+        var client = new Client(tid, "  Ayşe Yılmaz  ", DateTime.UtcNow, "05321234567", "ayse@example.com");
         var species = new Species("CAT", "Kedi");
         var breed = new Breed(species.Id, "Tekir");
         typeof(Breed).GetProperty(nameof(Breed.Id))!.SetValue(breed, breedId);
@@ -61,7 +61,7 @@ public sealed class PetProjectionSnapshotFactoryTests
     public void Create_Should_AllowNullOptionalFields()
     {
         var tid = Guid.NewGuid();
-        var client = new Client(tid, "Ali Veli");
+        var client = new Client(tid, "Ali Veli", DateTime.UtcNow);
         var species = new Species("DOG", "Köpek");
         var pet = new Pet(tid, client.Id, "Rex", species.Id);
 
@@ -82,7 +82,7 @@ public sealed class PetProjectionSnapshotFactoryTests
     public void Create_Should_BeDeterministic_ForSameInputs()
     {
         var tid = Guid.NewGuid();
-        var client = new Client(tid, "Ali Veli");
+        var client = new Client(tid, "Ali Veli", DateTime.UtcNow);
         var species = new Species("CAT", "Kedi");
         var pet = new Pet(tid, client.Id, "Pamuk", species.Id);
 

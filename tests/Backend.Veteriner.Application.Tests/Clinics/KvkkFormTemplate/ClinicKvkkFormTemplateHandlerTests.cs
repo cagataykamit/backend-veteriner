@@ -56,14 +56,14 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
     }
 
     private ClinicKvkkFormTemplate ExistingTemplate(ClinicKvkkFormKind kind = Consent)
-        => ClinicKvkkFormTemplate.Create(_tenantId, _clinicId, kind, "Klinik metni", _userId).Value!;
+        => ClinicKvkkFormTemplate.Create(_tenantId, _clinicId, kind, "Klinik metni", _userId, DateTime.UtcNow).Value!;
 
     private GetClinicKvkkFormTemplateQueryHandler CreateQueryHandler()
         => new(_tenantContext.Object, _clientContext.Object, _assignmentGuard.Object, _userClinics.Object, _clinics.Object, _templatesRead.Object);
 
     private UpdateClinicKvkkFormTemplateCommandHandler CreateCommandHandler()
         => new(_tenantContext.Object, _clientContext.Object, _permissions.Object, _assignmentGuard.Object,
-            _userClinics.Object, _clinics.Object, _templates.Object);
+            _userClinics.Object, _clinics.Object, _templates.Object, TimeProvider.System);
 
     [Fact]
     public async Task Get_Should_Return_Draft_Consent_Default_When_No_Row()

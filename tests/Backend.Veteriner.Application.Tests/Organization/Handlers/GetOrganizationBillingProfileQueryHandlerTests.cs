@@ -67,7 +67,7 @@ public sealed class GetOrganizationBillingProfileQueryHandlerTests
         _tenant.SetupGet(x => x.TenantId).Returns(tenantId);
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
 
-        var profile = TenantBillingProfile.CreateEmpty(tenantId);
+        var profile = TenantBillingProfile.CreateEmpty(tenantId, DateTime.UtcNow);
         profile.Update(
             "YağmurVet",
             "YağmurVet Veteriner Hizmetleri",
@@ -80,7 +80,8 @@ public sealed class GetOrganizationBillingProfileQueryHandlerTests
             "Moda Cd.",
             "Vet Plaza",
             "12",
-            "4");
+            "4",
+            DateTime.UtcNow);
 
         _profilesRead
             .Setup(x => x.FirstOrDefaultAsync(It.IsAny<ISpecification<TenantBillingProfile>>(), It.IsAny<CancellationToken>()))

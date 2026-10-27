@@ -123,7 +123,7 @@ public sealed class GetPetByIdQueryHandlerTests
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, pid);
         typeof(Pet).GetProperty(nameof(Pet.Species))!.SetValue(pet, species);
 
-        var owner = new Client(tid, "Ali Veli", "05321234567", "ali@example.com");
+        var owner = new Client(tid, "Ali Veli", DateTime.UtcNow, "05321234567", "ali@example.com");
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(owner, cid);
 
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))

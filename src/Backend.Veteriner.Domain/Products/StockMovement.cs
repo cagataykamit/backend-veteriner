@@ -45,6 +45,7 @@ public sealed class StockMovement : IClinicScoped
         StockMovementType movementType,
         decimal quantity,
         DateTime occurredAtUtc,
+        DateTime utcNow,
         decimal? unitCost = null,
         string? reason = null,
         string? referenceType = null,
@@ -77,7 +78,7 @@ public sealed class StockMovement : IClinicScoped
         Notes = NormalizeOptional(notes);
         RequestId = requestId == Guid.Empty ? null : requestId;
         ReversesMovementId = reversesMovementId == Guid.Empty ? null : reversesMovementId;
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
     }
 
     /// <summary>
@@ -103,7 +104,8 @@ public sealed class StockMovement : IClinicScoped
         string? notes,
         DateTime occurredAtUtc,
         Guid? createdByUserId,
-        Guid? requestId)
+        Guid? requestId,
+        DateTime utcNow)
     {
         if (!IsReversible)
             throw new InvalidOperationException("Bu hareket tipi geri alınamaz.");
@@ -117,6 +119,7 @@ public sealed class StockMovement : IClinicScoped
             StockMovementType.Reversal,
             Quantity,
             occurredAtUtc,
+            utcNow,
             UnitCost,
             reason,
             ReferenceType,

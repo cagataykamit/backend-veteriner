@@ -24,7 +24,7 @@ namespace Backend.Veteriner.Application.Tests.Vaccinations.Handlers;
 
 public sealed class UpdateVaccinationCommandHandlerTests
 {
-    private static readonly VaccineDefinition TestDefinition = VaccineDefinition.CreateGlobal("TSTX", "Karma aşı");
+    private static readonly VaccineDefinition TestDefinition = VaccineDefinition.CreateGlobal("TSTX", "Karma aşı", DateTime.UtcNow);
 
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
@@ -55,7 +55,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             _definitions.Object,
             _vaccinationsRead.Object,
             _vaccinationsWrite.Object,
-            new Mock<IReadRepository<Administration>>().Object);
+            new Mock<IReadRepository<Administration>>().Object,
+            TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
@@ -87,7 +88,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Vaccination?)null);
 
@@ -113,7 +114,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TenantInactive()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("A");
+        var tenant = new Tenant("A", DateTime.UtcNow);
         tenant.Deactivate();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -143,7 +144,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
         var tid = Guid.NewGuid();
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         var cmd = new UpdateVaccinationCommand(
             Guid.NewGuid(),
@@ -175,7 +176,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = new Vaccination(
             tid,
@@ -187,7 +188,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
-            null);
+            null,
+            DateTime.UtcNow);
         typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -221,7 +223,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = new Vaccination(
             tid,
@@ -233,7 +235,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
-            null);
+            null,
+            DateTime.UtcNow);
         typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -269,7 +272,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = new Vaccination(
             tid,
@@ -281,7 +284,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
-            null);
+            null,
+            DateTime.UtcNow);
         typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -320,7 +324,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = new Vaccination(
             tid,
@@ -332,7 +336,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
-            null);
+            null,
+            DateTime.UtcNow);
         typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -350,7 +355,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
                 "Şikayet",
                 "Bulgu",
                 null,
-                null));
+                null,
+                DateTime.UtcNow));
 
         var cmd = new UpdateVaccinationCommand(
             vaccinationId,
@@ -379,7 +385,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = new Vaccination(
             tid,
@@ -391,7 +397,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
-            null);
+            null,
+            DateTime.UtcNow);
         typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -423,7 +430,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var existing = new Vaccination(
             tid,
@@ -435,7 +442,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
-            null);
+            null,
+            DateTime.UtcNow);
         typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -467,7 +475,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -485,7 +493,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             due,
-            null);
+            null,
+            DateTime.UtcNow);
         typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vid);
 
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -521,7 +530,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -538,7 +547,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             due,
-            null);
+            null,
+            DateTime.UtcNow);
         typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vid);
 
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -575,7 +585,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         // targetExamination: kayıt kesinleşmiş muayeneye taşınmak isteniyor; aksi: kayıt kesinleşmiş muayeneden ayrılmak isteniyor.
         var existing = new Vaccination(
@@ -588,7 +598,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(5),
-            null);
+            null,
+            DateTime.UtcNow);
         typeof(Vaccination).GetProperty(nameof(Vaccination.Id))!.SetValue(existing, vaccinationId);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -597,7 +608,7 @@ public sealed class UpdateVaccinationCommandHandlerTests
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
 
-        var exam = new Examination(tid, clinicId, petId, null, DateTime.UtcNow.AddHours(-1), "Şikayet", "Bulgu", null, null);
+        var exam = new Examination(tid, clinicId, petId, null, DateTime.UtcNow.AddHours(-1), "Şikayet", "Bulgu", null, null, DateTime.UtcNow);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);

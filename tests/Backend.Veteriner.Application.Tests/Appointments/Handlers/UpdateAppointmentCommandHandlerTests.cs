@@ -314,7 +314,7 @@ public sealed class UpdateAppointmentCommandHandlerTests
         _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ClinicWorkingHour>
             {
-                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), null, null)
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), null, null, DateTime.UtcNow)
             });
 
         var cmd = new UpdateAppointmentCommand(aid, cid, pid, scheduledUtc, AppointmentType.Examination, AppointmentStatus.Scheduled, null, DurationMinutes: 30);

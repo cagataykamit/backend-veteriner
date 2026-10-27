@@ -21,7 +21,7 @@ public sealed class GetMeQueryHandlerTests
         var userId = Guid.NewGuid();
         var cmd = new GetMeQuery(userId);
 
-        var user = new Backend.Veteriner.Domain.Users.User("user@example.com", "hash");
+        var user = new Backend.Veteriner.Domain.Users.User("user@example.com", "hash", DateTime.UtcNow);
 
         _users.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByIdWithRolesSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);

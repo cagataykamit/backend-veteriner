@@ -19,6 +19,7 @@ public sealed class UpdateClinicWorkingHoursCommandHandler
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IReadRepository<ClinicWorkingHour> _hoursRead;
     private readonly IRepository<ClinicWorkingHour> _hoursWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateClinicWorkingHoursCommandHandler(
         ITenantContext tenantContext,
@@ -28,7 +29,8 @@ public sealed class UpdateClinicWorkingHoursCommandHandler
         IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinicsRead,
         IReadRepository<ClinicWorkingHour> hoursRead,
-        IRepository<ClinicWorkingHour> hoursWrite)
+        IRepository<ClinicWorkingHour> hoursWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
@@ -38,6 +40,7 @@ public sealed class UpdateClinicWorkingHoursCommandHandler
         _clinicsRead = clinicsRead;
         _hoursRead = hoursRead;
         _hoursWrite = hoursWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<IReadOnlyList<ClinicWorkingHourDto>>> Handle(
@@ -87,6 +90,7 @@ public sealed class UpdateClinicWorkingHoursCommandHandler
         foreach (var row in existing)
             await _hoursWrite.DeleteAsync(row, ct);
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         foreach (var item in request.Items.OrderBy(i => i.DayOfWeek))
         {
             try
@@ -99,7 +103,8 @@ public sealed class UpdateClinicWorkingHoursCommandHandler
                     item.OpensAt,
                     item.ClosesAt,
                     item.BreakStartsAt,
-                    item.BreakEndsAt);
+                    item.BreakEndsAt,
+                    utcNow);
                 await _hoursWrite.AddAsync(entity, ct);
             }
             catch (ArgumentException ex)

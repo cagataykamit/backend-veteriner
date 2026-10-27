@@ -134,7 +134,7 @@ public sealed class PaymentGetByIdReadFlagIsolationTests
         _payments.Setup(x => x.FirstOrDefaultAsync(It.IsAny<PaymentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(payment);
 
-        var client = new Client(tenantId, "Command Client");
+        var client = new Client(tenantId, "Command Client", DateTime.UtcNow);
         typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(client, clientId);
         _clients.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Ardalis.Specification.ISpecification<Client>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(client);

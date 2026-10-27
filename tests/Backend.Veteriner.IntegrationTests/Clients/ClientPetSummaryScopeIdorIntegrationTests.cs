@@ -211,7 +211,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
 
-        var client = new Client(tenant.Id, $"ScopeClient-{Guid.NewGuid():N}"[..14], "905551117766");
+        var client = new Client(tenant.Id, $"ScopeClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551117766");
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -286,7 +286,8 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
             "Kontrol",
             "Bulgu",
             null,
-            null));
+            null,
+            DateTime.UtcNow));
         await db.SaveChangesAsync();
     }
 
@@ -326,12 +327,12 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
 
         var email = $"clients-no-clinic-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password);

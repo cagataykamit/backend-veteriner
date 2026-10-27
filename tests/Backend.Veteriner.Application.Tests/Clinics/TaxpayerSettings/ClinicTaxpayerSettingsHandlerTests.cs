@@ -51,7 +51,7 @@ public sealed class ClinicTaxpayerSettingsHandlerTests
 
     private UpdateClinicTaxpayerSettingsCommandHandler CommandHandler()
         => new(_tenantContext.Object, _clientContext.Object, _permissions.Object, _assignmentGuard.Object,
-            _userClinics.Object, _clinics.Object, _settings.Object);
+            _userClinics.Object, _clinics.Object, _settings.Object, TimeProvider.System);
 
     private UpdateClinicTaxpayerSettingsCommand Command(string? identity = "1234567890", decimal? vat = 20m, decimal? withholding = null)
         => new(_clinicId, ClinicTaxpayerType.Company, identity, "Kadıköy VD", "Örnek Klinik Ltd.", "İstanbul", "Kadıköy",
@@ -101,7 +101,7 @@ public sealed class ClinicTaxpayerSettingsHandlerTests
     [Fact]
     public async Task Update_Should_Change_Existing_Row()
     {
-        var existing = ClinicTaxpayerSettings.Create(_tenantId, _clinicId, null, null, null, null, null, null, null, 20m, null, _userId).Value!;
+        var existing = ClinicTaxpayerSettings.Create(_tenantId, _clinicId, null, null, null, null, null, null, null, 20m, null, _userId, DateTime.UtcNow).Value!;
         ReturnSettings(existing);
 
         var result = await CommandHandler().Handle(Command(identity: "10000000146", vat: 10m), CancellationToken.None);

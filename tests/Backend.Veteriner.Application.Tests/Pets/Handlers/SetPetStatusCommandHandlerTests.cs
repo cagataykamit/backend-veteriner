@@ -26,7 +26,7 @@ public sealed class SetPetStatusCommandHandlerTests
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
     }
 
     private SetPetStatusCommandHandler CreateHandler()

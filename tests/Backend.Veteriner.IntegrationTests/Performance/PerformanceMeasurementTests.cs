@@ -64,7 +64,7 @@ public sealed class PerformanceMeasurementTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             IntegrationTestDatabaseGuard.EnsureSafeDatabase(db.Database.GetConnectionString());
 
-            var tenant = new Tenant($"Perf-{Guid.NewGuid():N}"[..18]);
+            var tenant = new Tenant($"Perf-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
             var clinic = new Clinic(tenant.Id, "Perf-Ana", "Izmir");
@@ -73,12 +73,12 @@ public sealed class PerformanceMeasurementTests
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"perf-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
             db.ChangeTracker.Clear();
 

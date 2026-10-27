@@ -90,14 +90,14 @@ public sealed class TenantInviteAcceptanceService
                 "Davetteki klinik bulunamadı, pasif veya bu kiracıya ait değil.");
         }
 
-        await _userTenantsWrite.AddAsync(new UserTenant(user.Id, invite.TenantId), ct);
+        var utcNow = DateTime.UtcNow;
+        await _userTenantsWrite.AddAsync(new UserTenant(user.Id, invite.TenantId, utcNow), ct);
         if (!await _userClinicRepo.ExistsAsync(user.Id, invite.ClinicId, ct))
-            await _userClinicsWrite.AddAsync(new UserClinic(user.Id, invite.ClinicId), ct);
+            await _userClinicsWrite.AddAsync(new UserClinic(user.Id, invite.ClinicId, utcNow), ct);
 
         if (!await _userOperationClaims.ExistsAsync(user.Id, invite.OperationClaimId, ct))
             await _userOperationClaims.AddAsync(new UserOperationClaim(user.Id, invite.OperationClaimId), ct);
 
-        var utcNow = DateTime.UtcNow;
         invite.MarkAccepted(user.Id, utcNow);
 
         await _uow.SaveChangesAsync(ct);

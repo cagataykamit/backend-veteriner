@@ -130,10 +130,10 @@ public sealed class ClientFilteredListsEndpointTests : IClassFixture<CustomWebAp
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
         var suffix = Guid.NewGuid().ToString("N")[..8];
-        var tenant = new Tenant($"CliF-{suffix}");
+        var tenant = new Tenant($"CliF-{suffix}", DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientA = new Client(tenant.Id, $"Musteri A {suffix}", "905551112201");
-        var clientB = new Client(tenant.Id, $"Musteri B {suffix}", "905551112202");
+        var clientA = new Client(tenant.Id, $"Musteri A {suffix}", DateTime.UtcNow, "905551112201");
+        var clientB = new Client(tenant.Id, $"Musteri B {suffix}", DateTime.UtcNow, "905551112202");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var petA = new Pet(tenant.Id, clientA.Id, $"PetA{suffix}", speciesId);
         var petA2 = new Pet(tenant.Id, clientA.Id, $"PetAiki{suffix}", speciesId);
@@ -145,9 +145,9 @@ public sealed class ClientFilteredListsEndpointTests : IClassFixture<CustomWebAp
 
         var now = DateTime.UtcNow;
         Appointment Appt(Pet pet, int days) => new(tenant.Id, clinic.Id, pet.Id, now.Date.AddDays(days).AddHours(10));
-        Examination Exam(Pet pet, int hours) => new(tenant.Id, clinic.Id, pet.Id, null, now.AddHours(-hours), "Kontrol", "Bulgu", null, null);
+        Examination Exam(Pet pet, int hours) => new(tenant.Id, clinic.Id, pet.Id, null, now.AddHours(-hours), "Kontrol", "Bulgu", null, null, DateTime.UtcNow);
         Vaccination Vacc(Pet pet, int days) => new(tenant.Id, pet.Id, clinic.Id, null, vaccineDefinitionId, "Kuduz",
-            VaccinationStatus.Scheduled, null, now.AddDays(days), null);
+            VaccinationStatus.Scheduled, null, now.AddDays(days), null, DateTime.UtcNow);
 
         var apptsA = new[] { Appt(petA, 1), Appt(petA2, 2) };
         var apptsB = new[] { Appt(petB, 3) };

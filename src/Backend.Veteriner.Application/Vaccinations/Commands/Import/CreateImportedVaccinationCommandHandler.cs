@@ -98,7 +98,8 @@ public sealed class CreateImportedVaccinationCommandHandler : IRequestHandler<Cr
             appliedUtc,
             dueUtc,
             request.Notes,
-            request.ImportBatchId);
+            request.ImportBatchId,
+            now);
 
         await _vaccinations.AddAsync(vaccination, ct);
         await _vaccinations.SaveChangesAsync(ct);

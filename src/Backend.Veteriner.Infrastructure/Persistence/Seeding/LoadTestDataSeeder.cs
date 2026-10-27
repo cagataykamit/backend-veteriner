@@ -652,6 +652,7 @@ public static class LoadTestDataSeeder
             return;
         }
 
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         if (existing.ProductCategories < ProductCategoryCount)
         {
             var start = existing.ProductCategories + 1;
@@ -661,6 +662,7 @@ public static class LoadTestDataSeeder
                     new ProductCategory(
                         context.TenantId,
                         $"LT-Kategori-{i:00}",
+                        utcNow,
                         $"{LoadTestMarker} Yük testi ürün kategorisi {i}"),
                     ct);
 
@@ -698,6 +700,7 @@ public static class LoadTestDataSeeder
                         unit,
                         unitPrice,
                         "TRY",
+                        utcNow,
                         categoryId,
                         sku: $"LT-SKU-{i:000000}",
                         description: $"{LoadTestMarker} Sentetik ürün"),
@@ -754,7 +757,7 @@ public static class LoadTestDataSeeder
                     quantity = minimum * (3m + (i % 4));
 
                 await db.ProductStocks.AddAsync(
-                    new ProductStock(context.TenantId, context.PrimaryClinicId, productId, quantity, minimum),
+                    new ProductStock(context.TenantId, context.PrimaryClinicId, productId, quantity, minimum, utcNow),
                     ct);
 
                 await db.StockMovements.AddAsync(
@@ -765,6 +768,7 @@ public static class LoadTestDataSeeder
                         StockMovementType.Initial,
                         quantity,
                         stockBaseTime.AddHours(i % 72),
+                        utcNow,
                         reason: $"{LoadTestMarker} İlk stok",
                         notes: LoadTestMarker),
                     ct);
@@ -802,6 +806,7 @@ public static class LoadTestDataSeeder
         }
 
         var start = existingCount + 1;
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         for (var i = start; i <= ClientCount; i++)
         {
             var email = $"lt.client.{i:000000}{LoadTestEmailDomain}";
@@ -814,6 +819,7 @@ public static class LoadTestDataSeeder
                 new Client(
                     context.TenantId,
                     $"LT Müşteri {i:000000}",
+                    utcNow,
                     phone,
                     email,
                     address),
@@ -1076,6 +1082,7 @@ public static class LoadTestDataSeeder
         var visitReasons = new[] { "Kontrol", "İshal", "Aşı sonrası takip", "Kulak kaşıntısı", "İştahsızlık" };
         var findings = new[] { "Genel durum iyi", "Hafif dehidrasyon", "Ateş yok", "Deri lezyonu yok" };
 
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         for (var i = start; i < ExaminationCount; i++)
         {
             var clinicIndex = i / ExaminationsPerClinic;
@@ -1097,7 +1104,8 @@ public static class LoadTestDataSeeder
                     visitReasons[i % visitReasons.Length],
                     findings[i % findings.Length],
                     assessment: "Stabil",
-                    notes: $"{LoadTestMarker} Sentetik muayene"),
+                    notes: $"{LoadTestMarker} Sentetik muayene",
+                    utcNow: utcNow),
                 ct);
 
             batchCounter++;
@@ -1148,6 +1156,7 @@ public static class LoadTestDataSeeder
         var start = existingCount;
         var batchCounter = 0;
 
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         for (var i = start; i < VaccinationCount; i++)
         {
             var clinicIndex = i / VaccinationsPerClinic;
@@ -1194,7 +1203,8 @@ public static class LoadTestDataSeeder
                     status,
                     appliedAt,
                     dueAt,
-                    $"{LoadTestMarker} Sentetik aşı"),
+                    $"{LoadTestMarker} Sentetik aşı",
+                    utcNow),
                 ct);
 
             batchCounter++;

@@ -42,7 +42,7 @@ public sealed class HbsEntryHandlerTests
 
     public HbsEntryHandlerTests()
     {
-        var tenant = new Tenant("Klinik");
+        var tenant = new Tenant("Klinik", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, _tenantId);
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _clientContext.SetupGet(c => c.UserId).Returns(_userId);
@@ -55,7 +55,7 @@ public sealed class HbsEntryHandlerTests
 
     private Prescription SetupPrescription()
     {
-        var p = new Prescription(_tenantId, _clinicId, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow, "Reçete", "İçerik", null, null);
+        var p = new Prescription(_tenantId, _clinicId, Guid.NewGuid(), Guid.NewGuid(), null, DateTime.UtcNow, "Reçete", "İçerik", null, null, DateTime.UtcNow);
         _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(p);
         return p;
     }
@@ -126,7 +126,7 @@ public sealed class HbsEntryHandlerTests
     public async Task Vaccination_Patch_On_Scheduled_Vaccination_Should_Fail()
     {
         var v = new Vaccination(_tenantId, Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Kuduz", VaccinationStatus.Scheduled,
-            null, DateTime.UtcNow.AddDays(5), null);
+            null, DateTime.UtcNow.AddDays(5), null, DateTime.UtcNow);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(v);
 
         var result = await VaccinationHandler().Handle(
@@ -140,7 +140,7 @@ public sealed class HbsEntryHandlerTests
     public async Task Vaccination_Patch_On_Applied_Vaccination_Should_Save_Ats_Number()
     {
         var v = new Vaccination(_tenantId, Guid.NewGuid(), _clinicId, null, Guid.NewGuid(), "Kuduz", VaccinationStatus.Applied,
-            DateTime.UtcNow.AddHours(-1), null, null);
+            DateTime.UtcNow.AddHours(-1), null, null, DateTime.UtcNow);
         _vaccinationsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccinationByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(v);
 
         var result = await VaccinationHandler().Handle(

@@ -239,17 +239,17 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"exp-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
 
             var clientName = $"Veri Sahibi {Guid.NewGuid():N}"[..20];
-            var client = new Client(tenant.Id, clientName, "905551110071", $"veri-{Guid.NewGuid():N}@example.com", "Izmir Konak");
+            var client = new Client(tenant.Id, clientName, DateTime.UtcNow, "905551110071", $"veri-{Guid.NewGuid():N}@example.com", "Izmir Konak");
             client.ApplyContactPreferences(ContactChannel.Phone, true);
-            client.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 1, 2), DateOnly.FromDateTime(DateTime.UtcNow), user.Id, 1, new string('a', 64));
+            client.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 1, 2), DateOnly.FromDateTime(DateTime.UtcNow), user.Id, 1, new string('a', 64), DateTime.UtcNow);
             db.Clients.Add(client);
             await db.SaveChangesAsync();
 
@@ -319,17 +319,17 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
                 AppointmentType.Surgery, AppointmentStatus.Scheduled));
 
             db.Examinations.Add(new Examination(tenantId, clinicId, petId, null, now.AddHours(-2), "Kusma",
-                $"{Secret}-bulgu", "Gastrit", $"{Secret}-muayene-notu", anamnesis: $"{Secret}-anamnez", plan: $"{Secret}-plan"));
+                $"{Secret}-bulgu", "Gastrit", $"{Secret}-muayene-notu", DateTime.UtcNow, anamnesis: $"{Secret}-anamnez", plan: $"{Secret}-plan"));
 
             var definition = await db.VaccineDefinitions.Select(v => v.Id).FirstAsync();
             db.Vaccinations.Add(new Vaccination(tenantId, petId, clinicId, null, definition, "Kuduz",
-                VaccinationStatus.Cancelled, null, now.AddDays(10), $"{Secret}-asi-notu"));
+                VaccinationStatus.Cancelled, null, now.AddDays(10), $"{Secret}-asi-notu", DateTime.UtcNow));
 
             db.Treatments.Add(new Treatment(tenantId, clinicId, petId, null, now.AddHours(-1), "Serum",
-                $"{Secret}-tedavi-aciklama", $"{Secret}-tedavi-notu", null));
+                $"{Secret}-tedavi-aciklama", $"{Secret}-tedavi-notu", null, DateTime.UtcNow));
 
             var prescription = new Prescription(tenantId, clinicId, petId, null, null, now.AddHours(-1), "Recete 1",
-                $"{Secret}-recete-icerik", $"{Secret}-recete-notu", null);
+                $"{Secret}-recete-icerik", $"{Secret}-recete-notu", null, DateTime.UtcNow);
             prescription.ReplaceItems([
                 new PrescriptionItemDraft("Ilac A", null, $"{Secret}-kullanim", 1m),
                 new PrescriptionItemDraft("Ilac B", null, null, 2m),
@@ -360,10 +360,10 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
         {
             await using var scope = services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16]);
+            var tenant = new Tenant($"Foreign-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             await db.SaveChangesAsync();
-            var client = new Client(tenant.Id, $"FClient-{Guid.NewGuid():N}"[..14], "905551110098");
+            var client = new Client(tenant.Id, $"FClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110098");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;
@@ -373,7 +373,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
         {
             await using var scope = services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var client = new Client(tenantId, $"Other-{Guid.NewGuid():N}"[..14], "905551110072");
+            var client = new Client(tenantId, $"Other-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110072");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;

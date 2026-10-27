@@ -85,6 +85,7 @@ public sealed class Examination : AggregateRoot, IClinicScoped
         string? findings,
         string? assessment,
         string? notes,
+        DateTime utcNow,
         string? anamnesis = null,
         string? plan = null,
         decimal? weightKg = null,
@@ -121,7 +122,7 @@ public sealed class Examination : AggregateRoot, IClinicScoped
         Plan = NormalizeOptional(plan);
         Notes = NormalizeOptional(notes);
         ApplyVitals(weightKg, temperatureC, heartRateBpm, respiratoryRatePerMin, vitalsMeasuredAtUtc);
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
@@ -130,7 +131,7 @@ public sealed class Examination : AggregateRoot, IClinicScoped
     /// Kural: <c>null</c> = mevcut değere dokunma; metinde boş/boşluk = temizle; vitalleri temizlemek için
     /// <see cref="ExaminationClinicalUpdate.ClearVitals"/> (vital değer/ölçüm zamanı ile birlikte verilemez).
     /// </summary>
-    public Result UpdateClinicalContent(ExaminationClinicalUpdate update)
+    public Result UpdateClinicalContent(ExaminationClinicalUpdate update, DateTime utcNow)
     {
         if (IsFinalized)
             return Result.Failure("Examinations.Finalized", "Kesinleşmiş muayene düzenlenemez; ek not ekleyin.");
@@ -162,7 +163,7 @@ public sealed class Examination : AggregateRoot, IClinicScoped
         Plan = MergeOptional(Plan, update.Plan);
         Notes = MergeOptional(Notes, update.Notes);
         ApplyVitals(weightKg, temperatureC, heartRateBpm, respiratoryRatePerMin, update.VitalsMeasuredAtUtc);
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 

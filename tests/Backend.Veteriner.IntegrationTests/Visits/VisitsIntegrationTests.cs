@@ -482,11 +482,11 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
 
-            var otherTenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20]);
+            var otherTenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
             db.Tenants.Add(otherTenant);
             await db.SaveChangesAsync();
             var otherClinic = new Clinic(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "Ankara");
-            var otherClient = new Client(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "905551110066");
+            var otherClient = new Client(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110066");
             db.AddRange(otherClinic, otherClient);
             await db.SaveChangesAsync();
             var otherPet = new Pet(otherTenant.Id, otherClient.Id, $"FPet-{Guid.NewGuid():N}"[..12], speciesId);
@@ -602,11 +602,11 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
-            var otherTenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20]);
+            var otherTenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..20], DateTime.UtcNow);
             db.Tenants.Add(otherTenant);
             await db.SaveChangesAsync();
             var otherClinic = new Clinic(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "Ankara");
-            var otherClient = new Client(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], "905551110067");
+            var otherClient = new Client(otherTenant.Id, $"Foreign-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110067");
             db.AddRange(otherClinic, otherClient);
             await db.SaveChangesAsync();
             var otherPet = new Pet(otherTenant.Id, otherClient.Id, $"FPet-{Guid.NewGuid():N}"[..12], speciesId);
@@ -1007,7 +1007,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenantId = await db.Clinics.Where(c => c.Id == otherClinic).Select(c => c.TenantId).SingleAsync();
-            var client = new Client(tenantId, $"Foreign-{Guid.NewGuid():N}"[..14], "905551110055");
+            var client = new Client(tenantId, $"Foreign-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110055");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
@@ -1179,6 +1179,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             db.Visits.Add(visit);
             db.Examinations.Add(new Backend.Veteriner.Domain.Examinations.Examination(
                 ctx.TenantId, otherClinic, petId, null, DateTime.UtcNow.AddHours(-1), "Kontrol", "Bulgu", null, null,
+                DateTime.UtcNow,
                 visitId: visit.Id));
             await db.SaveChangesAsync();
             foreignVisitId = visit.Id;
@@ -1231,13 +1232,13 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             email = $"visit-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+            db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             tenantId = tenant.Id;
@@ -1331,7 +1332,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         {
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var client = new Client(TenantId, $"VClient-{Guid.NewGuid():N}"[..14], "905551110077");
+            var client = new Client(TenantId, $"VClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110077");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
@@ -1379,7 +1380,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Hospitalizations.Add(new Hospitalization(
                 TenantId, ClinicId, petId, null, DateTime.UtcNow.AddHours(-3),
-                DateTime.UtcNow.AddDays(1), "Gozlem", null));
+                DateTime.UtcNow.AddDays(1), "Gozlem", null, DateTime.UtcNow));
             await db.SaveChangesAsync();
         }
 
@@ -1397,15 +1398,15 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == claimName);
             var email = $"visit-{claimName.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
-            user.SetDisplayName(displayName);
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
+            user.SetDisplayName(displayName, DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, TenantId));
+            db.UserTenants.Add(new UserTenant(user.Id, TenantId, DateTime.UtcNow));
             if (assignToClinic)
-                db.UserClinics.Add(new UserClinic(user.Id, ClinicId));
+                db.UserClinics.Add(new UserClinic(user.Id, ClinicId, DateTime.UtcNow));
             await db.SaveChangesAsync();
 
             return new SeededUser(user.Id, email);

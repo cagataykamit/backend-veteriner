@@ -21,19 +21,22 @@ public sealed class DischargeHospitalizationCommandHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IRepository<Hospitalization> _hospitalizationsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public DischargeHospitalizationCommandHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Tenant> tenants,
-        IRepository<Hospitalization> hospitalizationsWrite)
+        IRepository<Hospitalization> hospitalizationsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _tenants = tenants;
         _hospitalizationsWrite = hospitalizationsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<HospitalizationWriteResultDto>> Handle(DischargeHospitalizationCommand request, CancellationToken ct)
@@ -73,7 +76,8 @@ public sealed class DischargeHospitalizationCommandHandler
             return Fail("Hospitalizations.Validation", "RowVersion geçerli Base64 (8 bayt) olmalıdır.");
 
         var dischargedUtc = AdmittedAtUtcWindow.ToUtc(request.DischargedAtUtc);
-        var discharge = row.Discharge(dischargedUtc, request.DischargeNote);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var discharge = row.Discharge(dischargedUtc, request.DischargeNote, utcNow);
         if (!discharge.IsSuccess)
             return Result<HospitalizationWriteResultDto>.Failure(discharge.Error);
 

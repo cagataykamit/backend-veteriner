@@ -21,6 +21,7 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
     private readonly IEmailSender _email;
     private readonly AppOptions _appOptions;
     private readonly ILogger<RequestPasswordResetHandler> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public RequestPasswordResetHandler(
         IUserReadRepository users,
@@ -28,7 +29,8 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
         ITokenHashService hash,
         IEmailSender email,
         IOptions<AppOptions> appOptions,
-        ILogger<RequestPasswordResetHandler> logger)
+        ILogger<RequestPasswordResetHandler> logger,
+        TimeProvider timeProvider)
     {
         _users = users;
         _repo = repo;
@@ -36,6 +38,7 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
         _email = email;
         _appOptions = appOptions.Value;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Unit> Handle(RequestPasswordResetCommand request, CancellationToken ct)
@@ -55,6 +58,7 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
 
         // 2) Aktif token kontrol� (kullan�lmam�� ve s�resi dolmam��)
         var active = await _repo.GetActiveByUserAsync(user.Id, VerificationPurpose.PasswordReset, ct);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (active is not null)
         {
             var age = DateTime.UtcNow - active.CreatedAtUtc;
@@ -66,7 +70,7 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
 
             // Cooldown a��ld�ysa mevcut aktifi ge�ersiz k�l (kullan�lm�� i�aretle)
             // Domain entity'nizde MarkUsed() varsa onu �a��r�n:
-            active.MarkUsed();
+            active.MarkUsed(utcNow);
             // Yoksa:
             // active.UsedAtUtc = DateTime.UtcNow;
         }
@@ -85,7 +89,8 @@ public sealed class RequestPasswordResetHandler : IRequestHandler<RequestPasswor
             user.Id,
             tokenHash,
             VerificationPurpose.PasswordReset,
-            DateTime.UtcNow.AddHours(1));
+            DateTime.UtcNow.AddHours(1),
+            utcNow);
 
         await _repo.AddAsync(vt, ct);
 

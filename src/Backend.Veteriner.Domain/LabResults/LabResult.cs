@@ -68,7 +68,8 @@ public sealed class LabResult : AggregateRoot, IClinicScoped
         string testName,
         string? resultText,
         string? interpretation,
-        string? notes)
+        string? notes,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId is invalid.", nameof(tenantId));
@@ -84,7 +85,6 @@ public sealed class LabResult : AggregateRoot, IClinicScoped
             throw new ArgumentException(resultCheck.Error.Message, nameof(resultText));
 
         var hasResult = !string.IsNullOrWhiteSpace(resultText);
-        var now = DateTime.UtcNow;
 
         TenantId = tenantId;
         ClinicId = clinicId;
@@ -94,13 +94,13 @@ public sealed class LabResult : AggregateRoot, IClinicScoped
         Status = hasResult ? LabResultStatus.Resulted : LabResultStatus.Requested;
         InterpretationRequired = true;
         ResultDateUtc = hasResult ? NormalizeUtc(resultDateUtc!.Value) : null;
-        RequestedAtUtc = ResultDateUtc ?? now;
+        RequestedAtUtc = ResultDateUtc ?? utcNow;
         RequestedByUserId = requestedByUserId;
         TestName = testName.Trim();
         ResultText = hasResult ? resultText!.Trim() : null;
         Interpretation = Trimmed(interpretation);
         Notes = Trimmed(notes);
-        CreatedAtUtc = now;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
@@ -117,7 +117,8 @@ public sealed class LabResult : AggregateRoot, IClinicScoped
         string testName,
         string? resultText,
         string? interpretation,
-        string? notes)
+        string? notes,
+        DateTime utcNow)
     {
         if (Status == LabResultStatus.Cancelled)
             return AlreadyCancelled();
@@ -151,12 +152,12 @@ public sealed class LabResult : AggregateRoot, IClinicScoped
         ResultText = hasResult ? resultText!.Trim() : null;
         Interpretation = Trimmed(interpretation);
         Notes = Trimmed(notes);
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 
     /// <summary>Kaydı gerekçeyle iptal eder (silmez). Muayene kilidi denetimi çağıranındır.</summary>
-    public Result Cancel(Guid cancelledByUserId, string? reason)
+    public Result Cancel(Guid cancelledByUserId, string? reason, DateTime utcNow)
     {
         if (Status == LabResultStatus.Cancelled)
             return AlreadyCancelled();
@@ -167,12 +168,11 @@ public sealed class LabResult : AggregateRoot, IClinicScoped
         if (!reasonCheck.IsSuccess)
             return reasonCheck;
 
-        var now = DateTime.UtcNow;
         Status = LabResultStatus.Cancelled;
-        CancelledAtUtc = now;
+        CancelledAtUtc = utcNow;
         CancelledByUserId = cancelledByUserId;
         CancelReason = reason!.Trim();
-        UpdatedAtUtc = now;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 

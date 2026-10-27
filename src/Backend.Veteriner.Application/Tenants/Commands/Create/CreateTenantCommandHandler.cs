@@ -33,7 +33,7 @@ public sealed class CreateTenantCommandHandler : IRequestHandler<CreateTenantCom
                 "Aynı ada sahip bir kiracı zaten var (büyük/küçük harf ayrımı yapılmaz).");
 
         var utcNow = DateTime.UtcNow;
-        var tenant = new Tenant(request.Name);
+        var tenant = new Tenant(request.Name, utcNow);
         await _tenantsWrite.AddAsync(tenant, ct);
 
         var subscription = TenantSubscription.StartTrial(

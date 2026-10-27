@@ -38,7 +38,7 @@ public sealed class SetClientKvkkConsentCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
         _clientContext.SetupGet(c => c.UserId).Returns(_userId);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _userNames.Setup(r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, string?> { [_userId] = "Sekreter Ayşe" });
     }
@@ -57,7 +57,7 @@ public sealed class SetClientKvkkConsentCommandHandlerTests
 
     private Client ReturnClient(Client? client = null)
     {
-        client ??= new Client(_tenantId, "Ali Veli", "905551112233");
+        client ??= new Client(_tenantId, "Ali Veli", DateTime.UtcNow, "905551112233");
         _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientForUpdateByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(client);
         return client;
@@ -89,7 +89,7 @@ public sealed class SetClientKvkkConsentCommandHandlerTests
     [Fact]
     public async Task Handle_Should_Reject_WalkIn_Client()
     {
-        var walkIn = ReturnClient(Client.CreateWalkIn(_tenantId));
+        var walkIn = ReturnClient(Client.CreateWalkIn(_tenantId, DateTime.UtcNow));
 
         var result = await CreateHandler().Handle(
             new SetClientKvkkConsentCommand(walkIn.Id, KvkkConsentStatus.Accepted, null, ValidRowVersion), CancellationToken.None);
@@ -161,7 +161,7 @@ public sealed class SetClientKvkkConsentCommandHandlerTests
     public async Task Handle_Accepted_After_Declined_Should_Keep_Reminder_OptOut()
     {
         var client = ReturnClient();
-        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, IstanbulToday, _userId, null, null);
+        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, IstanbulToday, _userId, null, null, DateTime.UtcNow);
 
         var result = await CreateHandler().Handle(
             new SetClientKvkkConsentCommand(client.Id, KvkkConsentStatus.Accepted, null, ValidRowVersion), CancellationToken.None);
@@ -175,7 +175,7 @@ public sealed class SetClientKvkkConsentCommandHandlerTests
     {
         var client = ReturnClient();
         client.ApplyContactPreferences(null, true);
-        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, IstanbulToday, _userId, null, null);
+        client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, IstanbulToday, _userId, null, null, DateTime.UtcNow);
 
         var result = await CreateHandler().Handle(
             new SetClientKvkkConsentCommand(client.Id, KvkkConsentStatus.None, null, ValidRowVersion), CancellationToken.None);
@@ -214,8 +214,8 @@ public sealed class SetClientKvkkConsentCommandHandlerTests
     public async Task Handle_Should_Record_Saved_Consent_Template_Version_And_Hash()
     {
         var clinicId = SetupClinic();
-        var template = ClinicKvkkFormTemplate.Create(_tenantId, clinicId, ClinicKvkkFormKind.Consent, "Metin 1", _userId).Value!;
-        template.UpdateText("Metin 2", _userId);
+        var template = ClinicKvkkFormTemplate.Create(_tenantId, clinicId, ClinicKvkkFormKind.Consent, "Metin 1", _userId, DateTime.UtcNow).Value!;
+        template.UpdateText("Metin 2", _userId, DateTime.UtcNow);
         _templates.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicKvkkFormTemplateByClinicSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(template);
         var client = ReturnClient();
@@ -268,7 +268,7 @@ public sealed class SetClientKvkkConsentCommandHandlerTests
     {
         SetupClinic();
         var client = ReturnClient();
-        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, IstanbulToday, _userId, 1, ClinicKvkkFormTemplate.ComputeTextHash("a"));
+        client.RecordKvkkConsent(KvkkConsentStatus.Accepted, null, IstanbulToday, _userId, 1, ClinicKvkkFormTemplate.ComputeTextHash("a"), DateTime.UtcNow);
 
         var result = await CreateHandler().Handle(
             new SetClientKvkkConsentCommand(client.Id, KvkkConsentStatus.None, null, ValidRowVersion), CancellationToken.None);

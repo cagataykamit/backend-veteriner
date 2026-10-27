@@ -47,6 +47,7 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped
         DateTime? plannedDischargeAtUtc,
         string reason,
         string? notes,
+        DateTime utcNow,
         Guid? visitId = null,
         string? location = null)
     {
@@ -74,7 +75,7 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped
         Reason = reason.Trim();
         Notes = Trimmed(notes);
         Location = Trimmed(location);
-        CreatedAtUtc = DateTime.UtcNow;
+        CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
     }
 
@@ -91,7 +92,8 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped
         DateTime? plannedDischargeAtUtc,
         string reason,
         string? notes,
-        string? location)
+        string? location,
+        DateTime utcNow)
     {
         if (DischargedAtUtc.HasValue)
             return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
@@ -121,14 +123,14 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped
         Notes = Trimmed(notes);
         if (location is not null)
             Location = Trimmed(location);
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 
     /// <summary>
     /// <paramref name="dischargeNote"/>: null = dokunma, boş/boşluk = temizle, dolu = değiştir. Giriş notuna dokunulmaz.
     /// </summary>
-    public Result Discharge(DateTime dischargedAtUtc, string? dischargeNote)
+    public Result Discharge(DateTime dischargedAtUtc, string? dischargeNote, DateTime utcNow)
     {
         if (DischargedAtUtc.HasValue)
             return Result.Failure("Hospitalizations.AlreadyDischarged", "Hospitalization is already discharged.");
@@ -145,7 +147,7 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped
         if (dischargeNote is not null)
             DischargeNote = Trimmed(dischargeNote);
 
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 

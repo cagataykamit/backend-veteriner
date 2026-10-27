@@ -323,7 +323,7 @@ public sealed class OutstandingBalancesReportIntegrationTests : IClassFixture<Cu
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tenant = new Tenant($"Rpt-{Guid.NewGuid():N}"[..18]);
+            var tenant = new Tenant($"Rpt-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
             db.Tenants.Add(tenant);
             db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
             var clinic = new Clinic(tenant.Id, $"Rpt-{Guid.NewGuid():N}"[..14], "Izmir");
@@ -368,13 +368,13 @@ public sealed class OutstandingBalancesReportIntegrationTests : IClassFixture<Cu
         {
             var claim = await db.OperationClaims.SingleAsync(c => c.Name == "ClinicAdmin");
             var email = $"rpt-user-{Guid.NewGuid():N}@example.com";
-            var user = new User(email, hasher.Hash("123456"));
+            var user = new User(email, hasher.Hash("123456"), DateTime.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
 
             db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-            db.UserTenants.Add(new UserTenant(user.Id, tenantId));
-            db.UserClinics.Add(new UserClinic(user.Id, clinicId));
+            db.UserTenants.Add(new UserTenant(user.Id, tenantId, DateTime.UtcNow));
+            db.UserClinics.Add(new UserClinic(user.Id, clinicId, DateTime.UtcNow));
             await db.SaveChangesAsync();
             return (user.Id, email);
         }
@@ -426,7 +426,7 @@ public sealed class OutstandingBalancesReportIntegrationTests : IClassFixture<Cu
             await using var scope = _services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var phone = $"90555{Interlocked.Increment(ref _phoneSeed):D7}";
-            var client = new Client(TenantId, name, phone);
+            var client = new Client(TenantId, name, DateTime.UtcNow, phone);
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;

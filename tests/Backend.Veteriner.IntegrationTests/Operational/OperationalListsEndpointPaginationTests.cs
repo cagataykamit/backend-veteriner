@@ -273,11 +273,11 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"CliPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"CliPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
 
         var clients = Enumerable.Range(1, clientCount)
-            .Select(i => new Client(tenant.Id, $"Müşteri-{i:D3}", $"90555{i:D7}", $"cli{i}@example.com"))
+            .Select(i => new Client(tenant.Id, $"Müşteri-{i:D3}", DateTime.UtcNow, $"90555{i:D7}", $"cli{i}@example.com"))
             .ToList();
 
         db.Add(tenant);
@@ -304,9 +304,9 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"TrtPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"TrtPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110003", "trtpg@example.com");
+        var clientEntity = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551110003", "trtpg@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, clientEntity.Id, "PetTrt", speciesId);
 
@@ -321,7 +321,8 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
                 $"Tedavi-{i}",
                 "Açıklama",
                 notes: null,
-                followUpDateUtc: null))
+                followUpDateUtc: null,
+                utcNow: DateTime.UtcNow))
             .ToList();
 
         db.Add(tenant);
@@ -350,9 +351,9 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"PrsPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"PrsPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110004", "prspg@example.com");
+        var clientEntity = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551110004", "prspg@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, clientEntity.Id, "PetPrs", speciesId);
 
@@ -368,7 +369,8 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
                 $"Reçete-{i}",
                 "İçerik",
                 notes: null,
-                followUpDateUtc: null))
+                followUpDateUtc: null,
+                utcNow: DateTime.UtcNow))
             .ToList();
 
         db.Add(tenant);
@@ -389,9 +391,9 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"HospPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"HospPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110005", "hosppg@example.com");
+        var clientEntity = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551110005", "hosppg@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pets = Enumerable.Range(0, count)
             .Select(i => new Pet(tenant.Id, clientEntity.Id, $"PetHosp-{i}", speciesId))
@@ -407,7 +409,8 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
                 baseDate.AddDays(i),
                 DateTime.UtcNow.AddDays(i + 2),
                 $"Yatış-{i}",
-                null))
+                null,
+                utcNow: DateTime.UtcNow))
             .ToList();
 
         db.Add(tenant);
@@ -428,9 +431,9 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"LabPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"LabPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110006", "labpg@example.com");
+        var clientEntity = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551110006", "labpg@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, clientEntity.Id, "PetLab", speciesId);
 
@@ -447,7 +450,8 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
                 $"Test-{i}",
                 "Normal",
                 null,
-                null))
+                null,
+                utcNow: DateTime.UtcNow))
             .ToList();
 
         db.Add(tenant);
@@ -468,9 +472,9 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"PayPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"PayPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110007", "paypg@example.com");
+        var clientEntity = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551110007", "paypg@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, clientEntity.Id, "PetPay", speciesId);
 
@@ -508,9 +512,9 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"PetPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"PetPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110000", "petpg@example.com");
+        var clientEntity = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551110000", "petpg@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
 
         var pets = Enumerable.Range(1, petCount)
@@ -543,9 +547,9 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"ApptPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"ApptPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110001", "apptpg@example.com");
+        var clientEntity = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551110001", "apptpg@example.com");
         var species = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => new { s.Id, s.Name }).FirstAsync();
         var pet = new Pet(tenant.Id, clientEntity.Id, "PetAppt", species.Id);
 
@@ -618,9 +622,9 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"ExamPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"ExamPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110003", "exampg@example.com");
+        var clientEntity = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551110003", "exampg@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, clientEntity.Id, "PetExam", speciesId);
 
@@ -635,7 +639,8 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
                 $"Kontrol-{i}",
                 "Bulgu",
                 null,
-                null))
+                null,
+                utcNow: DateTime.UtcNow))
             .ToList();
 
         db.Add(tenant);
@@ -656,9 +661,9 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var tenant = new Tenant($"VacPg-{Guid.NewGuid():N}"[..16]);
+        var tenant = new Tenant($"VacPg-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
         var clinic = new Clinic(tenant.Id, "K1", "Istanbul");
-        var clientEntity = new Client(tenant.Id, "Müşteri", "905551110002", "vacpg@example.com");
+        var clientEntity = new Client(tenant.Id, "Müşteri", DateTime.UtcNow, "905551110002", "vacpg@example.com");
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(tenant.Id, clientEntity.Id, "PetVac", speciesId);
 
@@ -679,7 +684,8 @@ public sealed class OperationalListsEndpointPaginationTests : IClassFixture<Cust
                 VaccinationStatus.Scheduled,
                 appliedAtUtc: null,
                 dueAtUtc: now.AddDays(i + 1),
-                notes: null))
+                notes: null,
+                utcNow: DateTime.UtcNow))
             .ToList();
 
         db.Add(tenant);

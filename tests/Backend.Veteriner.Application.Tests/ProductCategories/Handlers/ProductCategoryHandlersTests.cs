@@ -24,7 +24,7 @@ public sealed class ProductCategoryHandlersTests
         _read.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductCategoryByTenantAndNameSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProductCategory?)null);
 
-        var handler = new CreateProductCategoryCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new CreateProductCategoryCommandHandler(_tenantContext.Object, _read.Object, _write.Object, TimeProvider.System);
         var result = await handler.Handle(new CreateProductCategoryCommand("İlaç", "Açıklama"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -37,9 +37,9 @@ public sealed class ProductCategoryHandlersTests
         var tenantId = Guid.NewGuid();
         _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
         _read.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductCategoryByTenantAndNameSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProductCategory(tenantId, "İlaç"));
+            .ReturnsAsync(new ProductCategory(tenantId, "İlaç", DateTime.UtcNow));
 
-        var handler = new CreateProductCategoryCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new CreateProductCategoryCommandHandler(_tenantContext.Object, _read.Object, _write.Object, TimeProvider.System);
         var result = await handler.Handle(new CreateProductCategoryCommand("İlaç"), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -51,7 +51,7 @@ public sealed class ProductCategoryHandlersTests
     {
         var tenantId = Guid.NewGuid();
         var id = Guid.NewGuid();
-        var existing = new ProductCategory(tenantId, "Eski");
+        var existing = new ProductCategory(tenantId, "Eski", DateTime.UtcNow);
         typeof(ProductCategory).GetProperty(nameof(ProductCategory.Id))!.SetValue(existing, id);
 
         _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
@@ -60,7 +60,7 @@ public sealed class ProductCategoryHandlersTests
         _read.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductCategoryByTenantAndNameSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProductCategory?)null);
 
-        var handler = new UpdateProductCategoryCommandHandler(_tenantContext.Object, _read.Object, _write.Object);
+        var handler = new UpdateProductCategoryCommandHandler(_tenantContext.Object, _read.Object, _write.Object, TimeProvider.System);
         var result = await handler.Handle(new UpdateProductCategoryCommand(id, "Yeni", "D"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -85,14 +85,14 @@ public sealed class ProductCategoryHandlersTests
     public async Task Deactivate_Then_Activate_Should_Succeed()
     {
         var tenantId = Guid.NewGuid();
-        var category = new ProductCategory(tenantId, "K");
+        var category = new ProductCategory(tenantId, "K", DateTime.UtcNow);
         var id = category.Id;
         _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
         _write.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductCategoryByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
-        var deact = new DeactivateProductCategoryCommandHandler(_tenantContext.Object, _write.Object);
-        var act = new ActivateProductCategoryCommandHandler(_tenantContext.Object, _write.Object);
+        var deact = new DeactivateProductCategoryCommandHandler(_tenantContext.Object, _write.Object, TimeProvider.System);
+        var act = new ActivateProductCategoryCommandHandler(_tenantContext.Object, _write.Object, TimeProvider.System);
 
         var d = await deact.Handle(new DeactivateProductCategoryCommand(id), CancellationToken.None);
         var a = await act.Handle(new ActivateProductCategoryCommand(id), CancellationToken.None);

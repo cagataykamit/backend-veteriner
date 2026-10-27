@@ -63,7 +63,7 @@ public sealed class PetCommandHandlerOutboxEmissionTests
 
     private static Tenant ActiveTenant(Guid tid)
     {
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         return tenant;
     }
@@ -76,7 +76,7 @@ public sealed class PetCommandHandlerOutboxEmissionTests
     }
 
     private static Client CreateClient(Guid tid, string fullName = "Ayşe Yılmaz")
-        => new(tid, fullName, "05321234567", "ayse@example.com");
+        => new(tid, fullName, DateTime.UtcNow, "05321234567", "ayse@example.com");
 
     private static Species CreateSpecies(string name = "Kedi")
         => new("CAT", name);

@@ -145,16 +145,16 @@ public sealed class PublicOwnerSignupCommandHandler
         if (!legalCheck.IsSuccess)
             return Result<PublicOwnerSignupResultDto>.Failure(legalCheck.Error);
 
-        var user = new User(email, _hasher.Hash(request.Password));
+        var utcNow = DateTime.UtcNow;
+        var user = new User(email, _hasher.Hash(request.Password), utcNow);
         MarkStep("hashAndCreateUser");
-        var roleResult = user.AddRole("Admin");
+        var roleResult = user.AddRole("Admin", utcNow);
         if (!roleResult.IsSuccess)
             return Result<PublicOwnerSignupResultDto>.Failure(roleResult.Error);
 
-        var tenant = new Tenant(tenantName);
+        var tenant = new Tenant(tenantName, utcNow);
         var clinic = new Clinic(tenant.Id, clinicName, clinicCity);
 
-        var utcNow = DateTime.UtcNow;
         var subscription = TenantSubscription.StartTrial(
             tenant.Id,
             planCode,
@@ -176,8 +176,8 @@ public sealed class PublicOwnerSignupCommandHandler
         await _tenantsWrite.AddAsync(tenant, ct);
         await _subscriptionsWrite.AddAsync(subscription, ct);
         await _clinicsWrite.AddAsync(clinic, ct);
-        await _userTenantsWrite.AddAsync(new UserTenant(user.Id, tenant.Id), ct);
-        await _userClinicsWrite.AddAsync(new UserClinic(user.Id, clinic.Id), ct);
+        await _userTenantsWrite.AddAsync(new UserTenant(user.Id, tenant.Id, utcNow), ct);
+        await _userClinicsWrite.AddAsync(new UserClinic(user.Id, clinic.Id, utcNow), ct);
         await _userOperationClaims.AddAsync(new UserOperationClaim(user.Id, adminClaim.Id), ct);
         await _legalAcceptancesWrite.AddRangeAsync(
             LegalDocumentCatalog.CreateAcceptances(user.Id, tenant.Id, requiredLegalDocuments, utcNow), ct);

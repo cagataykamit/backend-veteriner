@@ -209,7 +209,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         var speciesName = await commandDb.Species.Where(s => s.Id == speciesId).Select(s => s.Name).FirstAsync();
         var breed = await commandDb.Breeds.AsNoTracking().FirstAsync();
         var color = await commandDb.PetColors.AsNoTracking().FirstAsync();
-        var client = new Client(tenantId, "Ayşe Yılmaz");
+        var client = new Client(tenantId, "Ayşe Yılmaz", DateTime.UtcNow);
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync();
 
@@ -251,7 +251,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var speciesId = await commandDb.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
-        var client = new Client(tenantId, "Test Owner");
+        var client = new Client(tenantId, "Test Owner", DateTime.UtcNow);
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync();
 
@@ -266,7 +266,7 @@ public sealed class PetReadModelBackfillIntegrationTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var commandDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var speciesId = await commandDb.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
-        var client = new Client(tenantId, "Single Owner");
+        var client = new Client(tenantId, "Single Owner", DateTime.UtcNow);
         commandDb.Clients.Add(client);
         await commandDb.SaveChangesAsync();
 

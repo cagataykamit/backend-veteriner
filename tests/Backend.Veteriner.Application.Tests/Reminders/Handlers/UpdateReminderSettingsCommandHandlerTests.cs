@@ -14,7 +14,7 @@ public sealed class UpdateReminderSettingsCommandHandlerTests
     private readonly Mock<IRepository<TenantReminderSettings>> _settingsWrite = new();
 
     private UpdateReminderSettingsCommandHandler CreateHandler()
-        => new(_tenant.Object, _settingsRead.Object, _settingsWrite.Object);
+        => new(_tenant.Object, _settingsRead.Object, _settingsWrite.Object, TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_Create_When_RecordMissing()
@@ -37,7 +37,7 @@ public sealed class UpdateReminderSettingsCommandHandlerTests
     public async Task Handle_Should_Update_When_RecordExists()
     {
         _tenant.SetupGet(x => x.TenantId).Returns(Guid.NewGuid());
-        var existing = TenantReminderSettings.CreateDefault(Guid.NewGuid());
+        var existing = TenantReminderSettings.CreateDefault(Guid.NewGuid(), DateTime.UtcNow);
         _settingsRead
             .Setup(x => x.FirstOrDefaultAsync(It.IsAny<ISpecification<TenantReminderSettings>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);

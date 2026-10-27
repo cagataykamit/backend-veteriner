@@ -49,7 +49,7 @@ public sealed class PrescriptionItemsCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(_cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(_tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -62,13 +62,13 @@ public sealed class PrescriptionItemsCommandHandlerTests
         => new(
             _tenantContext.Object, _clinicContext.Object, ClinicReadScopeResolverMock.Default().Object,
             _tenants.Object, _clinics.Object, _pets.Object, _examinations.Object, _treatments.Object,
-            _products.Object, _prescriptionsWrite.Object);
+            _products.Object, _prescriptionsWrite.Object, TimeProvider.System);
 
     private UpdatePrescriptionCommandHandler UpdateHandler()
         => new(
             _tenantContext.Object, _clinicContext.Object, ClinicReadScopeResolverMock.Default().Object,
             _tenants.Object, _clinics.Object, _pets.Object, _examinations.Object, _treatments.Object,
-            _products.Object, _prescriptionsRead.Object, _prescriptionsWrite.Object);
+            _products.Object, _prescriptionsRead.Object, _prescriptionsWrite.Object, TimeProvider.System);
 
     private CreatePrescriptionCommand CreateCmd(IReadOnlyList<PrescriptionItemRequest>? items, Guid? examinationId = null)
         => new(_cid, _petId, examinationId, null, DateTime.UtcNow.AddHours(-1), "Başlık", "İçerik", null, null, items);
@@ -78,7 +78,7 @@ public sealed class PrescriptionItemsCommandHandlerTests
 
     private Prescription Existing(Guid? examinationId = null, params PrescriptionItemDraft[] items)
     {
-        var rx = new Prescription(_tid, _cid, _petId, examinationId, null, DateTime.UtcNow.AddDays(-1), "Eski", "Eski içerik", null, null);
+        var rx = new Prescription(_tid, _cid, _petId, examinationId, null, DateTime.UtcNow.AddDays(-1), "Eski", "Eski içerik", null, null, DateTime.UtcNow);
         rx.ReplaceItems(items);
         _prescriptionsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PrescriptionByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(rx);
@@ -87,9 +87,9 @@ public sealed class PrescriptionItemsCommandHandlerTests
 
     private Product SetupProduct(string name = "Katalog İlaç", bool active = true)
     {
-        var product = new Product(_tid, name, "Kutu", 10m, "TRY");
+        var product = new Product(_tid, name, "Kutu", 10m, "TRY", DateTime.UtcNow);
         if (!active)
-            product.Deactivate();
+            product.Deactivate(DateTime.UtcNow);
         _products.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ProductByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(product);
         return product;
@@ -97,7 +97,7 @@ public sealed class PrescriptionItemsCommandHandlerTests
 
     private Examination SetupFinalizedExamination()
     {
-        var exam = new Examination(_tid, _cid, _petId, null, DateTime.UtcNow.AddHours(-2), "Şikayet", "F", null, null);
+        var exam = new Examination(_tid, _cid, _petId, null, DateTime.UtcNow.AddHours(-2), "Şikayet", "F", null, null, DateTime.UtcNow);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);

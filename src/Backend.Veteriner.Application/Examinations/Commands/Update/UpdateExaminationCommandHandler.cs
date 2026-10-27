@@ -26,6 +26,7 @@ public sealed class UpdateExaminationCommandHandler
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Pet> _pets;
     private readonly IRepository<Examination> _examinationsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateExaminationCommandHandler(
         ITenantContext tenantContext,
@@ -34,7 +35,8 @@ public sealed class UpdateExaminationCommandHandler
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
-        IRepository<Examination> examinationsWrite)
+        IRepository<Examination> examinationsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -43,6 +45,7 @@ public sealed class UpdateExaminationCommandHandler
         _clinics = clinics;
         _pets = pets;
         _examinationsWrite = examinationsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ExaminationWriteResultDto>> Handle(UpdateExaminationCommand request, CancellationToken ct)
@@ -133,6 +136,7 @@ public sealed class UpdateExaminationCommandHandler
         if (pet is null)
             return Result<ExaminationWriteResultDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var domain = e.UpdateClinicalContent(new ExaminationClinicalUpdate(
             examinedUtc,
             request.VisitReason,
@@ -146,7 +150,7 @@ public sealed class UpdateExaminationCommandHandler
             request.HeartRateBpm,
             request.RespiratoryRatePerMin,
             request.VitalsMeasuredAtUtc,
-            request.ClearVitals));
+            request.ClearVitals), utcNow);
 
         if (!domain.IsSuccess)
             return Result<ExaminationWriteResultDto>.Failure(domain.Error);

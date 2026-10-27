@@ -15,7 +15,7 @@ public sealed class AdminCreateUserCommandHandlerTests
     private readonly Mock<IPasswordHasher> _hasher = new();
 
     private AdminCreateUserCommandHandler CreateHandler()
-        => new(_usersWrite.Object, _usersRead.Object, _hasher.Object);
+        => new(_usersWrite.Object, _usersRead.Object, _hasher.Object, TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_EmailAlreadyExists()
@@ -25,7 +25,7 @@ public sealed class AdminCreateUserCommandHandlerTests
         var command = new AdminCreateUserCommand("existing@example.com", "Password123!");
 
         _usersRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByEmailSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User("existing@example.com", "hash"));
+            .ReturnsAsync(new User("existing@example.com", "hash", DateTime.UtcNow));
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);

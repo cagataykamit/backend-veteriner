@@ -87,7 +87,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandlerTests
     public async Task Handle_Should_ReturnFailure_When_SubscriptionNotFound()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
         _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
@@ -110,7 +110,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandlerTests
     public async Task Handle_Should_ReturnSuccess_When_SameTenant_And_SubscriptionsRead()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
 
@@ -138,7 +138,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandlerTests
     public async Task Handle_Should_SetCanManageSubscriptionFalse_When_MissingSubscriptionsManage()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
         var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
 
@@ -165,7 +165,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandlerTests
     {
         var jwtTenant = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
-        var tenant = new Tenant("Other");
+        var tenant = new Tenant("Other", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, otherTenantId);
         var sub = TenantSubscription.StartTrial(otherTenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
 

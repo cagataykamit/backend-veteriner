@@ -6,6 +6,8 @@ namespace Backend.Veteriner.Domain.Tests.Clinics;
 /// <summary>ADR-036 Dilim 1: klinik mükellef ayarları.</summary>
 public sealed class ClinicTaxpayerSettingsTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid ClinicId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
@@ -16,7 +18,7 @@ public sealed class ClinicTaxpayerSettingsTests
         decimal? withholding = null,
         ClinicTaxpayerType? type = ClinicTaxpayerType.Company)
         => ClinicTaxpayerSettings.Create(TenantId, ClinicId, type, identity, "Kadıköy VD", "Örnek Klinik Ltd.",
-            "İstanbul", "Kadıköy", "Moda Cad. 1", vat, withholding, UserId).Value!;
+            "İstanbul", "Kadıköy", "Moda Cad. 1", vat, withholding, UserId, Now).Value!;
 
     [Theory]
     [InlineData("1234567890")]
@@ -39,7 +41,7 @@ public sealed class ClinicTaxpayerSettingsTests
     public void Create_Should_Reject_Invalid_Identity(string identity)
     {
         var result = ClinicTaxpayerSettings.Create(TenantId, ClinicId, ClinicTaxpayerType.SelfEmployed, identity,
-            null, null, null, null, null, 20m, null, UserId);
+            null, null, null, null, null, 20m, null, UserId, Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Clinics.TaxpayerSettings.Validation");
@@ -55,7 +57,7 @@ public sealed class ClinicTaxpayerSettingsTests
         var row = Create();
 
         var result = row.Update(ClinicTaxpayerType.Both, "1234567890", null, null, null, null, null,
-            (decimal)vat, (decimal?)withholding, UserId);
+            (decimal)vat, (decimal?)withholding, UserId, Now);
 
         result.IsSuccess.Should().BeFalse();
         row.DefaultVatRate.Should().Be(20m);
@@ -67,7 +69,7 @@ public sealed class ClinicTaxpayerSettingsTests
         var row = Create();
 
         var result = row.Update(ClinicTaxpayerType.SelfEmployed, " 10000000146 ", null, "Dr. Ayşe Yılmaz", null, null, null,
-            10m, 20m, UserId);
+            10m, 20m, UserId, Now);
 
         result.IsSuccess.Should().BeTrue();
         row.TaxpayerType.Should().Be(ClinicTaxpayerType.SelfEmployed);

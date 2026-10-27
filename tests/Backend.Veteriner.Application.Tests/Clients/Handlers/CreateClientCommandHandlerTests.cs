@@ -20,7 +20,7 @@ public sealed class CreateClientCommandHandlerTests
     private readonly Mock<IClientIntegrationEventOutbox> _eventOutbox = new();
 
     private CreateClientCommandHandler CreateHandler()
-        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object);
+        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object, TimeProvider.System);
 
     private static void AlignTenantId(Tenant tenant, Guid id)
         => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);
@@ -65,7 +65,7 @@ public sealed class CreateClientCommandHandlerTests
         var tid = Guid.NewGuid();
         var cmd = new CreateClientCommand("Ali Veli", Phone: "05321111111");
 
-        var tenant = new Tenant("A.Ş.");
+        var tenant = new Tenant("A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
         tenant.Deactivate();
 
@@ -87,7 +87,7 @@ public sealed class CreateClientCommandHandlerTests
         var tid = Guid.NewGuid();
         var cmd = new CreateClientCommand("Ayşe Yılmaz", Email: "Ayse@Example.com", Phone: "0532 123 45 67");
 
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -112,14 +112,14 @@ public sealed class CreateClientCommandHandlerTests
         var tid = Guid.NewGuid();
         var cmd = new CreateClientCommand("Ahmet Yılmaz", Email: "a@x.com", Phone: "05329999999");
 
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
-        var existing = new Client(tid, "Ahmet Yılmaz", phone: null, email: "a@x.com");
+        var existing = new Client(tid, "Ahmet Yılmaz", DateTime.UtcNow, phone: null, email: "a@x.com");
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndEmailSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndPhoneSpec>(), It.IsAny<CancellationToken>()))
@@ -139,14 +139,14 @@ public sealed class CreateClientCommandHandlerTests
         var tid = Guid.NewGuid();
         var cmd = new CreateClientCommand("Ahmet Yılmaz", Email: "baska@x.com", Phone: "05321111111");
 
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(tenant);
 
-        var existing = new Client(tid, "Ahmet Yılmaz", "05321111111", email: "a@x.com");
+        var existing = new Client(tid, "Ahmet Yılmaz", DateTime.UtcNow, "05321111111", email: "a@x.com");
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndEmailSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Client?)null);
         _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByTenantNormalizedFullNameAndPhoneSpec>(), It.IsAny<CancellationToken>()))
@@ -166,7 +166,7 @@ public sealed class CreateClientCommandHandlerTests
         var tid = Guid.NewGuid();
         var cmd = new CreateClientCommand("Başka İsim", Email: "pay@example.com", Phone: "05321112233");
 
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -191,7 +191,7 @@ public sealed class CreateClientCommandHandlerTests
         var tid = Guid.NewGuid();
         var cmd = new CreateClientCommand("Yeni Kişi", Email: "baska@example.com", Phone: "05321234567");
 
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -216,7 +216,7 @@ public sealed class CreateClientCommandHandlerTests
         var tid = Guid.NewGuid();
         var cmd = new CreateClientCommand("Ayşe Yılmaz", Email: "aile@x.com", Phone: "05325554433");
 
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -241,7 +241,7 @@ public sealed class CreateClientCommandHandlerTests
         var tid = Guid.NewGuid();
         var cmd = new CreateClientCommand("Mehmet Demir", null);
 
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -272,7 +272,7 @@ public sealed class CreateClientCommandHandlerTests
     public async Task Handle_Should_Store_ContactPreferences_When_Given()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("Klinik A.Ş.");
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tid);
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))

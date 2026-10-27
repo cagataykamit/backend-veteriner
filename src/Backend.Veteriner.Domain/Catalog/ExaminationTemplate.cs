@@ -51,7 +51,7 @@ public sealed class ExaminationTemplate : AggregateRoot
     private ExaminationTemplate() { }
 
     /// <summary>Sistem şablonu: yalnız metin (kiracıdan bağımsız ürün bağı olamaz).</summary>
-    public static ExaminationTemplate CreateSystem(string name, string? visitReason, string? findings, string? plan)
+    public static ExaminationTemplate CreateSystem(string name, string? visitReason, string? findings, string? plan, DateTime utcNow)
     {
         var template = new ExaminationTemplate();
         var applied = template.Apply(name, visitReason, findings, plan, []);
@@ -59,7 +59,7 @@ public sealed class ExaminationTemplate : AggregateRoot
             throw new ArgumentException(applied.Error.Message, nameof(name));
 
         template.IsActive = true;
-        template.CreatedAtUtc = DateTime.UtcNow;
+        template.CreatedAtUtc = utcNow;
         return template;
     }
 
@@ -69,7 +69,8 @@ public sealed class ExaminationTemplate : AggregateRoot
         string? visitReason,
         string? findings,
         string? plan,
-        IReadOnlyList<ExaminationTemplateLineDraft> lines)
+        IReadOnlyList<ExaminationTemplateLineDraft> lines,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -80,7 +81,7 @@ public sealed class ExaminationTemplate : AggregateRoot
             return Result<ExaminationTemplate>.Failure(applied.Error);
 
         template.IsActive = true;
-        template.CreatedAtUtc = DateTime.UtcNow;
+        template.CreatedAtUtc = utcNow;
         return Result<ExaminationTemplate>.Success(template);
     }
 
@@ -90,7 +91,8 @@ public sealed class ExaminationTemplate : AggregateRoot
         string? visitReason,
         string? findings,
         string? plan,
-        IReadOnlyList<ExaminationTemplateLineDraft> lines)
+        IReadOnlyList<ExaminationTemplateLineDraft> lines,
+        DateTime utcNow)
     {
         if (IsSystem)
             return SystemReadOnly();
@@ -99,11 +101,11 @@ public sealed class ExaminationTemplate : AggregateRoot
         if (!applied.IsSuccess)
             return applied;
 
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 
-    public Result Activate()
+    public Result Activate(DateTime utcNow)
     {
         if (IsSystem)
             return SystemReadOnly();
@@ -111,13 +113,13 @@ public sealed class ExaminationTemplate : AggregateRoot
         if (!IsActive)
         {
             IsActive = true;
-            UpdatedAtUtc = DateTime.UtcNow;
+            UpdatedAtUtc = utcNow;
         }
 
         return Result.Success();
     }
 
-    public Result Deactivate()
+    public Result Deactivate(DateTime utcNow)
     {
         if (IsSystem)
             return SystemReadOnly();
@@ -125,7 +127,7 @@ public sealed class ExaminationTemplate : AggregateRoot
         if (IsActive)
         {
             IsActive = false;
-            UpdatedAtUtc = DateTime.UtcNow;
+            UpdatedAtUtc = utcNow;
         }
 
         return Result.Success();

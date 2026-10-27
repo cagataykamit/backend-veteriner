@@ -63,9 +63,9 @@ public sealed class ListSessionsQueryHandlerTests
 
         _client.SetupGet(c => c.UserId).Returns(userId);
 
-        var active = new RefreshToken(userId, "hash1", DateTime.UtcNow.AddDays(1), "1.1.1.1", "ua1");
-        var revoked = new RefreshToken(userId, "hash2", DateTime.UtcNow.AddDays(1), "2.2.2.2", "ua2");
-        revoked.Revoke("revoked");
+        var active = new RefreshToken(userId, "hash1", DateTime.UtcNow.AddDays(1), "1.1.1.1", "ua1", DateTime.UtcNow);
+        var revoked = new RefreshToken(userId, "hash2", DateTime.UtcNow.AddDays(1), "2.2.2.2", "ua2", DateTime.UtcNow);
+        revoked.Revoke(DateTime.UtcNow, "revoked");
 
         _repo.Setup(r => r.GetByUserAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<RefreshToken> { active, revoked });

@@ -5,15 +5,17 @@ namespace Backend.Veteriner.Domain.Tests.Products;
 
 public sealed class StockBatchTests
 {
+    private static readonly DateTime Now = new(2026, 10, 27, 9, 0, 0, DateTimeKind.Utc);
+
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid ClinicId = Guid.NewGuid();
 
-    private static Product Plain() => new(TenantId, "Mama", "Adet", 1m, "TRY");
+    private static Product Plain() => new(TenantId, "Mama", "Adet", 1m, "TRY", Now);
 
-    private static Product Vaccine() => new(TenantId, "Kuduz", "Doz", 1m, "TRY", kind: ProductKind.Vaccine);
+    private static Product Vaccine() => new(TenantId, "Kuduz", "Doz", 1m, "TRY", Now, kind: ProductKind.Vaccine);
 
     private static Product Narcotic()
-        => new(TenantId, "Ketamin", "Şişe", 1m, "TRY", controlledClass: ControlledSubstanceClass.Narcotic);
+        => new(TenantId, "Ketamin", "Şişe", 1m, "TRY", Now, controlledClass: ControlledSubstanceClass.Narcotic);
 
     private static StockBatch NewBatch(Product p, decimal qty, DateOnly? expiry = null, DateTime? createdAt = null)
         => StockBatch.Create(
@@ -35,7 +37,7 @@ public sealed class StockBatchTests
     {
         Vaccine().RequiresLotAndExpiry.Should().BeTrue();
         Narcotic().RequiresLotAndExpiry.Should().BeTrue();
-        new Product(TenantId, "İlaç", "Kutu", 1m, "TRY", kind: ProductKind.Medicine).RequiresLotAndExpiry.Should().BeFalse();
+        new Product(TenantId, "İlaç", "Kutu", 1m, "TRY", Now, kind: ProductKind.Medicine).RequiresLotAndExpiry.Should().BeFalse();
     }
 
     [Fact]
@@ -43,7 +45,7 @@ public sealed class StockBatchTests
     {
         var p = Plain();
 
-        p.Update(null, "Mama", "Adet", 1m, "TRY", kind: ProductKind.Medicine,
+        p.Update(null, "Mama", "Adet", 1m, "TRY", Now, kind: ProductKind.Medicine,
             controlledClass: ControlledSubstanceClass.Psychotropic, pharmacologicalForm: "  tablet ",
             presentationForm: " ", packaging: "10 lu blister");
 
@@ -177,7 +179,7 @@ public sealed class StockBatchTests
     {
         var p = Plain();
         var b = NewBatch(p, 10m);
-        var m = new StockMovement(TenantId, ClinicId, p.Id, StockMovementType.Out, 4m, DateTime.UtcNow);
+        var m = new StockMovement(TenantId, ClinicId, p.Id, StockMovementType.Out, 4m, DateTime.UtcNow, Now);
 
         b.Decrease(4m);
         m.LinkBatch(b);

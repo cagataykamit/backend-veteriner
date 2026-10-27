@@ -29,6 +29,7 @@ public sealed class AssignTenantMemberClinicCommandHandler
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IUserClinicRepository _userClinics;
     private readonly IUnitOfWork _uow;
+    private readonly TimeProvider _timeProvider;
 
     public AssignTenantMemberClinicCommandHandler(
         ITenantContext tenantContext,
@@ -36,7 +37,8 @@ public sealed class AssignTenantMemberClinicCommandHandler
         IUserTenantRepository userTenantRepo,
         IReadRepository<Clinic> clinicsRead,
         IUserClinicRepository userClinics,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
@@ -44,6 +46,7 @@ public sealed class AssignTenantMemberClinicCommandHandler
         _clinicsRead = clinicsRead;
         _userClinics = userClinics;
         _uow = uow;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<AssignTenantMemberClinicResultDto>> Handle(
@@ -103,7 +106,8 @@ public sealed class AssignTenantMemberClinicCommandHandler
                 AlreadyAssigned: true));
         }
 
-        var entity = new UserClinic(request.MemberId, request.ClinicId);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var entity = new UserClinic(request.MemberId, request.ClinicId, utcNow);
         await _userClinics.AddAsync(entity, ct);
         await _uow.SaveChangesAsync(ct);
 

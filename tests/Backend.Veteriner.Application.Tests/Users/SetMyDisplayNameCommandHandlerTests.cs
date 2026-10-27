@@ -11,7 +11,7 @@ public sealed class SetMyDisplayNameCommandHandlerTests
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IClientContext> _client = new();
 
-    private SetMyDisplayNameCommandHandler CreateHandler() => new(_users.Object, _client.Object);
+    private SetMyDisplayNameCommandHandler CreateHandler() => new(_users.Object, _client.Object, TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_Fail_When_User_Context_Missing()
@@ -38,7 +38,7 @@ public sealed class SetMyDisplayNameCommandHandlerTests
     [Fact]
     public async Task Handle_Should_Set_Name_And_Save()
     {
-        var user = new User("ali@example.com", "hash");
+        var user = new User("ali@example.com", "hash", DateTime.UtcNow);
         _client.SetupGet(c => c.UserId).Returns(user.Id);
         _users.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
@@ -52,7 +52,7 @@ public sealed class SetMyDisplayNameCommandHandlerTests
     [Fact]
     public async Task Handle_Should_Not_Save_When_Name_Too_Long()
     {
-        var user = new User("ali@example.com", "hash");
+        var user = new User("ali@example.com", "hash", DateTime.UtcNow);
         _client.SetupGet(c => c.UserId).Returns(user.Id);
         _users.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 

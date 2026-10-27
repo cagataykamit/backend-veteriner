@@ -27,14 +27,15 @@ public sealed class RequestPasswordResetHandlerTests
             _hash.Object,
             _email.Object,
             Options.Create(appOptions ?? new AppOptions { FrontendBaseUrl = FrontendBaseUrl }),
-            NullLogger<RequestPasswordResetHandler>.Instance);
+            NullLogger<RequestPasswordResetHandler>.Instance,
+            TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_SendSpaResetLink_When_UserExists()
     {
         // Arrange
         var handler = CreateHandler();
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
         string? capturedRaw = null;
         string? capturedSubject = null;
         string? capturedBody = null;
@@ -78,7 +79,7 @@ public sealed class RequestPasswordResetHandlerTests
     {
         // Arrange
         var handler = CreateHandler(new AppOptions { FrontendBaseUrl = "http://localhost:4200/" });
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
         string? capturedRaw = null;
         string? capturedBody = null;
 

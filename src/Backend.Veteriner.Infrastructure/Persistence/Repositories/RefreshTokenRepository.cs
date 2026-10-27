@@ -8,11 +8,13 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
 {
     private readonly AppDbContext _db;
     private readonly ITokenHashService _hash;
+    private readonly TimeProvider _timeProvider;
 
-    public RefreshTokenRepository(AppDbContext db, ITokenHashService hash)
+    public RefreshTokenRepository(AppDbContext db, ITokenHashService hash, TimeProvider timeProvider)
     {
         _db = db;
         _hash = hash;
+        _timeProvider = timeProvider;
     }
 
     public Task AddAsync(RefreshToken token, CancellationToken ct = default)
@@ -63,7 +65,8 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
 
     public Task RevokeAsync(RefreshToken token, CancellationToken ct = default)
     {
-        token.Revoke("user_revoked_session");
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        token.Revoke(utcNow, "user_revoked_session");
         return Task.CompletedTask;
     }
 

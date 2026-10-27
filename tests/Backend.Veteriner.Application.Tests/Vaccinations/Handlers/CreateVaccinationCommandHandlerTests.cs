@@ -23,7 +23,7 @@ namespace Backend.Veteriner.Application.Tests.Vaccinations.Handlers;
 
 public sealed class CreateVaccinationCommandHandlerTests
 {
-    private static readonly VaccineDefinition TestDefinition = VaccineDefinition.CreateGlobal("TSTX", "Karma aşı");
+    private static readonly VaccineDefinition TestDefinition = VaccineDefinition.CreateGlobal("TSTX", "Karma aşı", DateTime.UtcNow);
 
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<IClinicContext> _clinicContext = new();
@@ -54,7 +54,8 @@ public sealed class CreateVaccinationCommandHandlerTests
             new Mock<IReadRepository<Vaccination>>().Object,
             _vaccinationsWrite.Object,
             new Mock<IReadRepository<Administration>>().Object,
-            new Mock<ISender>().Object);
+            new Mock<ISender>().Object,
+            TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
@@ -81,7 +82,7 @@ public sealed class CreateVaccinationCommandHandlerTests
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(Guid.NewGuid());
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         var cmd = new CreateVaccinationCommand(
             Guid.NewGuid(),
             Guid.NewGuid(),
@@ -115,7 +116,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             null);
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Clinic?)null);
 
@@ -129,7 +130,7 @@ public sealed class CreateVaccinationCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TenantInactive()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("A");
+        var tenant = new Tenant("A", DateTime.UtcNow);
         tenant.Deactivate();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -160,7 +161,7 @@ public sealed class CreateVaccinationCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var cmd = new CreateVaccinationCommand(
             Guid.NewGuid(),
@@ -196,7 +197,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             null);
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -265,7 +266,8 @@ public sealed class CreateVaccinationCommandHandlerTests
             "Şikayet",
             "Bulgu",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(wrongExam);
 
@@ -303,7 +305,8 @@ public sealed class CreateVaccinationCommandHandlerTests
             "Şikayet",
             "Bulgu",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(wrongExam);
 
@@ -686,7 +689,8 @@ public sealed class CreateVaccinationCommandHandlerTests
             "Şikayet",
             "Bulgu",
             null,
-            null);
+            null,
+            DateTime.UtcNow);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
 
@@ -735,8 +739,8 @@ public sealed class CreateVaccinationCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var inactive = VaccineDefinition.CreateGlobal("INACT", "Pasif");
-        inactive.Deactivate();
+        var inactive = VaccineDefinition.CreateGlobal("INACT", "Pasif", DateTime.UtcNow);
+        inactive.Deactivate(DateTime.UtcNow);
         _definitions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccineDefinitionByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(inactive);
 
@@ -765,7 +769,7 @@ public sealed class CreateVaccinationCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var otherTenantDef = VaccineDefinition.CreateTenant(Guid.NewGuid(), "OT", "Başka kiracı");
+        var otherTenantDef = VaccineDefinition.CreateTenant(Guid.NewGuid(), "OT", "Başka kiracı", DateTime.UtcNow);
         _definitions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccineDefinitionByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(otherTenantDef);
 
@@ -794,7 +798,7 @@ public sealed class CreateVaccinationCommandHandlerTests
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
-        var dogOnly = VaccineDefinition.CreateTenant(tid, "DOGONLY", "Köpek aşısı", speciesId: TestSpeciesIds.Dog);
+        var dogOnly = VaccineDefinition.CreateTenant(tid, "DOGONLY", "Köpek aşısı", DateTime.UtcNow, speciesId: TestSpeciesIds.Dog);
         _definitions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<VaccineDefinitionByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(dogOnly);
 
@@ -820,7 +824,7 @@ public sealed class CreateVaccinationCommandHandlerTests
     private void SetupTenantClinicPet(Guid tid, Guid cid, Guid pid)
     {
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -846,7 +850,7 @@ public sealed class CreateVaccinationCommandHandlerTests
             null);
 
         SetupTenantClinicPet(tid, cid, pid);
-        var exam = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Şikayet", "Bulgu", null, null);
+        var exam = new Examination(tid, cid, pid, null, DateTime.UtcNow.AddHours(-1), "Şikayet", "Bulgu", null, null, DateTime.UtcNow);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);

@@ -11,7 +11,7 @@ public sealed class RefreshToken
     public string TokenHash { get; private set; } = default!;   // raw token değil, SHA-256
 
     public DateTime ExpiresAtUtc { get; private set; }
-    public DateTime CreatedAtUtc { get; private set; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; private set; }
 
     public DateTime? LastUsedAtUtc { get; private set; }         // ✅ session kullanımı
     public DateTime? RevokedAtUtc { get; private set; }
@@ -33,40 +33,42 @@ public sealed class RefreshToken
         DateTime expiresAtUtc,
         string? ip,
         string? ua,
+        DateTime utcNow,
         Guid? tenantId = null,
         Guid? clinicId = null)
     {
         UserId = userId;
         TokenHash = tokenHash;
         ExpiresAtUtc = expiresAtUtc;
+        CreatedAtUtc = utcNow;
         IpAddress = ip;
         UserAgent = ua;
         TenantId = tenantId;
         ClinicId = clinicId;
     }
 
-    public bool IsActive => RevokedAtUtc is null && DateTime.UtcNow < ExpiresAtUtc;
+    public bool IsActiveAt(DateTime utcNow) => RevokedAtUtc is null && utcNow < ExpiresAtUtc;
 
-    public void MarkUsed()
+    public void MarkUsed(DateTime utcNow)
     {
         if (RevokedAtUtc is not null)
             throw new InvalidOperationException("Revoked refresh token kullanılamaz.");
 
-        LastUsedAtUtc = DateTime.UtcNow;
+        LastUsedAtUtc = utcNow;
     }
 
-    public void Revoke(string? reason = null)
+    public void Revoke(DateTime utcNow, string? reason = null)
     {
         if (RevokedAtUtc is not null) return;
 
-        RevokedAtUtc = DateTime.UtcNow;
+        RevokedAtUtc = utcNow;
         RevokeReason = string.IsNullOrWhiteSpace(reason) ? "revoked" : reason;
     }
 
-    public void ReplaceWith(string newTokenHash)
+    public void ReplaceWith(string newTokenHash, DateTime utcNow)
     {
         ReplacedByTokenHash = newTokenHash;
-        Revoke("rotated");
+        Revoke(utcNow, "rotated");
     }
 
     public void BindClinic(Guid? clinicId)

@@ -22,7 +22,8 @@ public sealed class ClinicAppointmentSettings
         Guid clinicId,
         int defaultAppointmentDurationMinutes,
         int slotIntervalMinutes,
-        bool allowOverlappingAppointments)
+        bool allowOverlappingAppointments,
+        DateTime utcNow)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -38,7 +39,7 @@ public sealed class ClinicAppointmentSettings
             DefaultAppointmentDurationMinutes = defaultAppointmentDurationMinutes,
             SlotIntervalMinutes = slotIntervalMinutes,
             AllowOverlappingAppointments = allowOverlappingAppointments,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = utcNow,
             UpdatedAtUtc = null,
         };
     }
@@ -46,13 +47,14 @@ public sealed class ClinicAppointmentSettings
     public void Update(
         int defaultAppointmentDurationMinutes,
         int slotIntervalMinutes,
-        bool allowOverlappingAppointments)
+        bool allowOverlappingAppointments,
+        DateTime utcNow)
     {
         Validate(defaultAppointmentDurationMinutes, slotIntervalMinutes);
         DefaultAppointmentDurationMinutes = defaultAppointmentDurationMinutes;
         SlotIntervalMinutes = slotIntervalMinutes;
         AllowOverlappingAppointments = allowOverlappingAppointments;
-        UpdatedAtUtc = DateTime.UtcNow;
+        UpdatedAtUtc = utcNow;
     }
 
     private static void Validate(int duration, int interval)

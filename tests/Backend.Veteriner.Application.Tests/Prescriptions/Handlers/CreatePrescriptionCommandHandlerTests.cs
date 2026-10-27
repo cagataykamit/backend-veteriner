@@ -44,7 +44,8 @@ public sealed class CreatePrescriptionCommandHandlerTests
             _examinations.Object,
             _treatments.Object,
             _products.Object,
-            _prescriptionsWrite.Object);
+            _prescriptionsWrite.Object,
+            TimeProvider.System);
 
     private static CreatePrescriptionCommand Cmd(
         Guid clinicId,
@@ -70,7 +71,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         typeof(Pet).GetProperty(nameof(Pet.Id))!.SetValue(pet, petId);
 
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -106,7 +107,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_TenantInactive()
     {
         var tid = Guid.NewGuid();
-        var tenant = new Tenant("A");
+        var tenant = new Tenant("A", DateTime.UtcNow);
         tenant.Deactivate();
 
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
@@ -127,7 +128,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(Guid.NewGuid());
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var result = await CreateHandler().Handle(Cmd(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
@@ -142,7 +143,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns((Guid?)null);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
 
         var cmd = new CreatePrescriptionCommand(
             Guid.Empty,
@@ -225,7 +226,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Clinic?)null);
 
@@ -244,7 +245,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Tenant("A"));
+            .ReturnsAsync(new Tenant("A", DateTime.UtcNow));
         _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
         _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -286,7 +287,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         SetupTenantClinicPetSafe(tid, cid, petId);
 
-        var exam = new Examination(tid, Guid.NewGuid(), petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, Guid.NewGuid(), petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -308,7 +309,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         SetupTenantClinicPetSafe(tid, cid, petId);
 
-        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
@@ -349,7 +350,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         SetupTenantClinicPetSafe(tid, cid, petId);
 
-        var treatment = new Treatment(tid, Guid.NewGuid(), petId, null, DateTime.UtcNow, "T", "D", null, null);
+        var treatment = new Treatment(tid, Guid.NewGuid(), petId, null, DateTime.UtcNow, "T", "D", null, null, DateTime.UtcNow);
         typeof(Treatment).GetProperty(nameof(Treatment.Id))!.SetValue(treatment, treatmentId);
         _treatments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TreatmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(treatment);
@@ -371,7 +372,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         SetupTenantClinicPetSafe(tid, cid, petId);
 
-        var treatment = new Treatment(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "T", "D", null, null);
+        var treatment = new Treatment(tid, cid, Guid.NewGuid(), null, DateTime.UtcNow, "T", "D", null, null, DateTime.UtcNow);
         typeof(Treatment).GetProperty(nameof(Treatment.Id))!.SetValue(treatment, treatmentId);
         _treatments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TreatmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(treatment);
@@ -395,12 +396,12 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         SetupTenantClinicPetSafe(tid, cid, petId);
 
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
 
-        var treatment = new Treatment(tid, cid, petId, otherExamId, DateTime.UtcNow, "T", "D", null, null);
+        var treatment = new Treatment(tid, cid, petId, otherExamId, DateTime.UtcNow, "T", "D", null, null, DateTime.UtcNow);
         typeof(Treatment).GetProperty(nameof(Treatment.Id))!.SetValue(treatment, treatmentId);
         _treatments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TreatmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(treatment);
@@ -425,12 +426,12 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         SetupTenantClinicPetSafe(tid, cid, petId);
 
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
 
-        var treatment = new Treatment(tid, cid, petId, examId, DateTime.UtcNow, "T", "D", null, null);
+        var treatment = new Treatment(tid, cid, petId, examId, DateTime.UtcNow, "T", "D", null, null, DateTime.UtcNow);
         typeof(Treatment).GetProperty(nameof(Treatment.Id))!.SetValue(treatment, treatmentId);
         _treatments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TreatmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(treatment);
@@ -464,7 +465,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         SetupTenantClinicPetSafe(tid, cid, petId);
 
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
@@ -490,13 +491,13 @@ public sealed class CreatePrescriptionCommandHandlerTests
         _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
         SetupTenantClinicPetSafe(tid, cid, petId);
 
-        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null);
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
         typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
         exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
 
-        var treatment = new Treatment(tid, cid, petId, examId, DateTime.UtcNow, "T", "D", null, null);
+        var treatment = new Treatment(tid, cid, petId, examId, DateTime.UtcNow, "T", "D", null, null, DateTime.UtcNow);
         typeof(Treatment).GetProperty(nameof(Treatment.Id))!.SetValue(treatment, treatmentId);
         _treatments.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TreatmentByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(treatment);

@@ -191,6 +191,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
             var client = new Client(
                 ctx.TenantId,
                 name,
+                ctx.NowUtc,
                 phone: $"05321001{i + 1:D3}",
                 email: string.IsNullOrEmpty(email) ? null : email,
                 address: Tag(address));
@@ -441,6 +442,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         var examination = new Examination(
             ctx.TenantId, ctx.ClinicId, pet.Pet.Id, appointment?.Id, examinedAt,
             reason, c.Findings, c.Assessment, Tag(appointment is null ? "Randevusuz geliş." : "Randevulu muayene."),
+            ctx.NowUtc,
             anamnesis: appointment is null ? "Sahibi bugün fark etmiş, randevusuz geldi." : "Sahibinin ifadesiyle şikâyet 2-3 gündür sürüyor.",
             plan: c.Plan,
             weightKg: weight,
@@ -469,7 +471,8 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
             var treatment = new Treatment(
                 ctx.TenantId, ctx.ClinicId, pet.Pet.Id, examination.Id, examinedAt.AddMinutes(15),
                 c.Treatment, c.TreatmentDescription!, Tag("Muayene sırasında uygulandı."),
-                followUpDateUtc: examinedAt.AddDays(7 + ctx.Random.Next(0, 8)));
+                followUpDateUtc: examinedAt.AddDays(7 + ctx.Random.Next(0, 8)),
+                utcNow: ctx.NowUtc);
             _db.Treatments.Add(treatment);
             result.Treatments.Add(treatment);
         }
@@ -486,7 +489,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         var appliedAt = exam.Examination.ExaminedAtUtc.AddMinutes(10);
         var vaccination = new Vaccination(
             ctx.TenantId, exam.Pet.Pet.Id, ctx.ClinicId, exam.Examination.Id, definition.Id, definition.Name,
-            VaccinationStatus.Applied, appliedAt, appliedAt.AddYears(1), Tag("Uygulandı; bir sonraki doz 1 yıl sonra."));
+            VaccinationStatus.Applied, appliedAt, appliedAt.AddYears(1), Tag("Uygulandı; bir sonraki doz 1 yıl sonra."), ctx.NowUtc);
         _db.Vaccinations.Add(vaccination);
         result.Vaccinations.Add(new VaccinationRecord(vaccination, exam, code));
     }
@@ -506,7 +509,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
             var due = OperationDayBounds.NoonUtcForLocalDate(ctx.Today.AddDays(offset));
             var vaccination = new Vaccination(
                 ctx.TenantId, pet.Pet.Id, ctx.ClinicId, null, definition.Id, definition.Name,
-                VaccinationStatus.Scheduled, null, due, Tag("Planlı rapel; sahibine hatırlatma gönderilecek."));
+                VaccinationStatus.Scheduled, null, due, Tag("Planlı rapel; sahibine hatırlatma gönderilecek."), ctx.NowUtc);
             _db.Vaccinations.Add(vaccination);
             result.Vaccinations.Add(new VaccinationRecord(vaccination, null, definition.Code));
         }
@@ -515,7 +518,8 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         var overdue = new Vaccination(
             ctx.TenantId, overduePet.Pet.Id, ctx.ClinicId, null, mixed.Id, mixed.Name,
             VaccinationStatus.Scheduled, null, OperationDayBounds.NoonUtcForLocalDate(ctx.Today.AddDays(-6)),
-            Tag("Gecikmiş rapel; sahibine ulaşılamadı."));
+            Tag("Gecikmiş rapel; sahibine ulaşılamadı."),
+            ctx.NowUtc);
         _db.Vaccinations.Add(overdue);
         result.Vaccinations.Add(new VaccinationRecord(overdue, null, mixed.Code));
     }
@@ -546,7 +550,8 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
             _db.LabResults.Add(new LabResult(
                 ctx.TenantId, ctx.ClinicId, exam.Pet.Pet.Id, exam.Examination.Id, null, ctx.UserId,
                 resultAt, tests[i].Name, tests[i].Result, tests[i].Interpretation,
-                Tag(tests[i].Interpretation is null ? "Sonuç geldi; hekim yorumu bekleniyor." : "Klinik içi cihazda çalışıldı.")));
+                Tag(tests[i].Interpretation is null ? "Sonuç geldi; hekim yorumu bekleniyor." : "Klinik içi cihazda çalışıldı."),
+                ctx.NowUtc));
             result.LabResults++;
             result.LabCharges.Add((exam, tests[i].Name, 400m));
         }
@@ -554,7 +559,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         var pending = picks[^1];
         _db.LabResults.Add(new LabResult(
             ctx.TenantId, ctx.ClinicId, pending.Pet.Pet.Id, pending.Examination.Id, null, ctx.UserId,
-            null, "Tiroid paneli (T4)", null, null, Tag("Dış laboratuvara gönderildi; sonuç bekleniyor.")));
+            null, "Tiroid paneli (T4)", null, null, Tag("Dış laboratuvara gönderildi; sonuç bekleniyor."), ctx.NowUtc));
         result.LabResults++;
     }
 
@@ -588,6 +593,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         {
             var product = new Product(
                 ctx.TenantId, seed.Name, seed.Unit, seed.Price, Charge.DefaultCurrency,
+                ctx.NowUtc,
                 sku: seed.Sku, description: Tag("Örnek klinik ürünü."), kind: seed.Kind, pharmacologicalForm: seed.Form);
             _db.Products.Add(product);
 
@@ -611,6 +617,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
 
             var entry = new StockMovement(
                 ctx.TenantId, ctx.ClinicId, product.Id, StockMovementType.In, seed.Qty, receivedAt,
+                ctx.NowUtc,
                 unitCost: Math.Round(seed.Price * 0.6m, 2), reason: "Tedarikçi girişi", referenceType: "GoodsReceipt",
                 createdByUserId: ctx.UserId, notes: Tag("Açılış stok girişi."));
             if (batch is not null)
@@ -644,7 +651,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         movements += WriteOut(ctx, products["PARASITE"], 6m, ctx.LocalToUtc(ctx.Today.AddDays(-15), new TimeOnly(16, 20)), null, null, "Reçeteli satış");
 
         foreach (var product in products.Values)
-            _db.ProductStocks.Add(new ProductStock(ctx.TenantId, ctx.ClinicId, product.Product.Id, product.OnHand, product.MinStock));
+            _db.ProductStocks.Add(new ProductStock(ctx.TenantId, ctx.ClinicId, product.Product.Id, product.OnHand, product.MinStock, ctx.NowUtc));
 
         await _db.SaveChangesAsync(ct);
         return new Stock(products.Count, movements);
@@ -657,6 +664,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
 
         var movement = new StockMovement(
             ctx.TenantId, ctx.ClinicId, product.Product.Id, StockMovementType.Out, quantity, occurredAtUtc,
+            ctx.NowUtc,
             reason: reason, referenceType: referenceType, referenceId: referenceId, createdByUserId: ctx.UserId, notes: Tag(reason));
         if (product.Batch is not null)
         {

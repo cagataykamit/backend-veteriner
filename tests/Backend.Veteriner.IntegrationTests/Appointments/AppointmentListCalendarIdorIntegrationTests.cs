@@ -207,13 +207,13 @@ public sealed class AppointmentListCalendarIdorIntegrationTests : IClassFixture<
 
         var email = $"clients-only-{Guid.NewGuid():N}@example.com";
         const string password = "123456";
-        var user = new User(email, hasher.Hash(password));
+        var user = new User(email, hasher.Hash(password), DateTime.UtcNow);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
         db.UserOperationClaims.Add(new UserOperationClaim(user.Id, claim.Id));
-        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id));
-        db.UserClinics.Add(new UserClinic(user.Id, clinic.Id));
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         return (email, password, clinic.Id);

@@ -15,17 +15,20 @@ public sealed class UpdateOrganizationBillingProfileCommandHandler
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<TenantBillingProfile> _profilesRead;
     private readonly IRepository<TenantBillingProfile> _profilesWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateOrganizationBillingProfileCommandHandler(
         ITenantContext tenantContext,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<TenantBillingProfile> profilesRead,
-        IRepository<TenantBillingProfile> profilesWrite)
+        IRepository<TenantBillingProfile> profilesWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
         _profilesRead = profilesRead;
         _profilesWrite = profilesWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<OrganizationBillingProfileDto>> Handle(
@@ -47,9 +50,10 @@ public sealed class UpdateOrganizationBillingProfileCommandHandler
         }
 
         var row = await _profilesRead.FirstOrDefaultAsync(new TenantBillingProfileByTenantSpec(tenantId), ct);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (row is null)
         {
-            row = TenantBillingProfile.CreateEmpty(tenantId);
+            row = TenantBillingProfile.CreateEmpty(tenantId, utcNow);
             row.Update(
                 request.CompanyName,
                 request.LegalCompanyName,
@@ -62,7 +66,8 @@ public sealed class UpdateOrganizationBillingProfileCommandHandler
                 request.InvoiceStreet,
                 request.InvoiceBuildingName,
                 request.InvoiceBuildingNo,
-                request.InvoiceDoorNo);
+                request.InvoiceDoorNo,
+                utcNow);
             await _profilesWrite.AddAsync(row, ct);
         }
         else
@@ -79,7 +84,8 @@ public sealed class UpdateOrganizationBillingProfileCommandHandler
                 request.InvoiceStreet,
                 request.InvoiceBuildingName,
                 request.InvoiceBuildingNo,
-                request.InvoiceDoorNo);
+                request.InvoiceDoorNo,
+                utcNow);
             await _profilesWrite.UpdateAsync(row, ct);
         }
 

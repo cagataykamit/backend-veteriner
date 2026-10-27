@@ -28,6 +28,7 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Treatment> _treatmentsRead;
     private readonly IRepository<Treatment> _treatmentsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateTreatmentCommandHandler(
         ITenantContext tenantContext,
@@ -38,7 +39,8 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
         IReadRepository<Pet> pets,
         IReadRepository<Examination> examinations,
         IReadRepository<Treatment> treatmentsRead,
-        IRepository<Treatment> treatmentsWrite)
+        IRepository<Treatment> treatmentsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -49,6 +51,7 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
         _examinations = examinations;
         _treatmentsRead = treatmentsRead;
         _treatmentsWrite = treatmentsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(UpdateTreatmentCommand request, CancellationToken ct)
@@ -151,6 +154,7 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
         if (!locked.IsSuccess)
             return locked;
 
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var update = t.UpdateDetails(
             effectiveClinicId,
             request.PetId,
@@ -159,7 +163,8 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
             request.Title,
             request.Description,
             request.Notes,
-            request.FollowUpDateUtc);
+            request.FollowUpDateUtc,
+            utcNow);
 
         if (!update.IsSuccess)
             return update;

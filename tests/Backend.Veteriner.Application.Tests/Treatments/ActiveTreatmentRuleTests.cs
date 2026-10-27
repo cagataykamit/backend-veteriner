@@ -17,7 +17,7 @@ public sealed class ActiveTreatmentRuleTests
     private readonly Guid _clinicId = Guid.NewGuid();
 
     private Treatment New(DateTime? followUpUtc)
-        => new(_tenantId, _clinicId, Guid.NewGuid(), null, NowUtc.AddDays(-2), "Tedavi", "Açıklama", null, followUpUtc);
+        => new(_tenantId, _clinicId, Guid.NewGuid(), null, NowUtc.AddDays(-2), "Tedavi", "Açıklama", null, followUpUtc, DateTime.UtcNow);
 
     [Fact]
     public void FollowUpFromUtc_Should_Be_Istanbul_Day_Start()
@@ -46,8 +46,8 @@ public sealed class ActiveTreatmentRuleTests
     [Fact]
     public void Paged_Spec_Should_Honor_Explicit_Sort_With_Active_Filter()
     {
-        var a = new Treatment(_tenantId, _clinicId, Guid.NewGuid(), null, NowUtc.AddDays(-3), "A", "x", null, IstanbulTodayStartUtc.AddDays(1));
-        var b = new Treatment(_tenantId, _clinicId, Guid.NewGuid(), null, NowUtc.AddDays(-1), "B", "x", null, IstanbulTodayStartUtc.AddDays(5));
+        var a = new Treatment(_tenantId, _clinicId, Guid.NewGuid(), null, NowUtc.AddDays(-3), "A", "x", null, IstanbulTodayStartUtc.AddDays(1), DateTime.UtcNow);
+        var b = new Treatment(_tenantId, _clinicId, Guid.NewGuid(), null, NowUtc.AddDays(-1), "B", "x", null, IstanbulTodayStartUtc.AddDays(5), DateTime.UtcNow);
         var sort = new ListSortChoice<TreatmentListSortField>(TreatmentListSortField.TreatmentDateUtc, true);
 
         var spec = new TreatmentsFilteredPagedSpec(_tenantId, _clinicId, null, null, null, 1, 20, null, [], null, sort, IstanbulTodayStartUtc);

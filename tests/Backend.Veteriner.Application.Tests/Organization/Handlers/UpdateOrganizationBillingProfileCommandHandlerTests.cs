@@ -16,7 +16,7 @@ public sealed class UpdateOrganizationBillingProfileCommandHandlerTests
     private readonly Mock<IRepository<TenantBillingProfile>> _profilesWrite = new();
 
     private UpdateOrganizationBillingProfileCommandHandler CreateHandler()
-        => new(_tenant.Object, _permissions.Object, _profilesRead.Object, _profilesWrite.Object);
+        => new(_tenant.Object, _permissions.Object, _profilesRead.Object, _profilesWrite.Object, TimeProvider.System);
 
     private static UpdateOrganizationBillingProfileCommand ValidCommand(string? taxNumber = "1234567890")
         => new(
@@ -83,7 +83,7 @@ public sealed class UpdateOrganizationBillingProfileCommandHandlerTests
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
         _tenant.SetupGet(x => x.TenantId).Returns(tenantId);
 
-        var existing = TenantBillingProfile.CreateEmpty(tenantId);
+        var existing = TenantBillingProfile.CreateEmpty(tenantId, DateTime.UtcNow);
         _profilesRead
             .Setup(x => x.FirstOrDefaultAsync(It.IsAny<ISpecification<TenantBillingProfile>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
@@ -124,8 +124,8 @@ public sealed class UpdateOrganizationBillingProfileCommandHandlerTests
         _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
         _tenant.SetupGet(x => x.TenantId).Returns(tenantId);
 
-        var foreignProfile = TenantBillingProfile.CreateEmpty(foreignTenantId);
-        foreignProfile.Update("Foreign", null, null, "1111111111", null, null, null, null, null, null, null, null);
+        var foreignProfile = TenantBillingProfile.CreateEmpty(foreignTenantId, DateTime.UtcNow);
+        foreignProfile.Update("Foreign", null, null, "1111111111", null, null, null, null, null, null, null, null, DateTime.UtcNow);
 
         _profilesRead
             .Setup(x => x.FirstOrDefaultAsync(It.IsAny<ISpecification<TenantBillingProfile>>(), It.IsAny<CancellationToken>()))

@@ -13,7 +13,7 @@ public sealed class ExaminationsListClientSortSpecTests
     private readonly Guid _clinicId = Guid.NewGuid();
 
     private Examination NewExamination(DateTime examinedAtUtc, Guid? petId = null)
-        => new(_tenantId, _clinicId, petId ?? Guid.NewGuid(), appointmentId: null, examinedAtUtc, "Kontrol", "Bulgu", null, null);
+        => new(_tenantId, _clinicId, petId ?? Guid.NewGuid(), appointmentId: null, examinedAtUtc, "Kontrol", "Bulgu", null, null, utcNow: DateTime.UtcNow);
 
     private ExaminationsFilteredPagedSpec Paged(
         IReadOnlyCollection<Guid>? clientPetIds = null,

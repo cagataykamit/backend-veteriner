@@ -20,15 +20,18 @@ public sealed class UpdateExaminationTemplateCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ExaminationTemplate> _templates;
     private readonly IReadRepository<Product> _products;
+    private readonly TimeProvider _timeProvider;
 
     public UpdateExaminationTemplateCommandHandler(
         ITenantContext tenantContext,
         IRepository<ExaminationTemplate> templates,
-        IReadRepository<Product> products)
+        IReadRepository<Product> products,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _templates = templates;
         _products = products;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ExaminationTemplateDto>> Handle(UpdateExaminationTemplateCommand request, CancellationToken ct)
@@ -46,7 +49,8 @@ public sealed class UpdateExaminationTemplateCommandHandler
 
         // Sistem şablonu ve alan kuralları domain'de reddedilir; hatada kayıt yazılmaz (izlenen değişiklik kaydedilmeden atılır).
         var drafts = request.Lines.Select(l => new ExaminationTemplateLineDraft(l.ProductId, l.Quantity)).ToList();
-        var update = template.Update(request.Name, request.VisitReason, request.Findings, request.Plan, drafts);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var update = template.Update(request.Name, request.VisitReason, request.Findings, request.Plan, drafts, utcNow);
         if (!update.IsSuccess)
             return Result<ExaminationTemplateDto>.Failure(update.Error);
 

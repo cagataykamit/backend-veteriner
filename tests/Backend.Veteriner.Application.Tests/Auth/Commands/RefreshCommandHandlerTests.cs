@@ -38,7 +38,8 @@ public sealed class RefreshCommandHandlerTests
             _permissionReader.Object,
             _tenants.Object,
             _userTenants.Object,
-            _clinics.Object);
+            _clinics.Object,
+            TimeProvider.System);
     }
 
     [Fact]
@@ -78,10 +79,10 @@ public sealed class RefreshCommandHandlerTests
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
 
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
         var tid = Guid.NewGuid();
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, tid);
-        stored.Revoke("reused");
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow, tid);
+        stored.Revoke(DateTime.UtcNow, "reused");
         typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
 
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
@@ -102,9 +103,9 @@ public sealed class RefreshCommandHandlerTests
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
 
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
         var tid = Guid.NewGuid();
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(-1), null, null, tid);
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(-1), null, null, DateTime.UtcNow, tid);
         typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
 
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
@@ -125,7 +126,7 @@ public sealed class RefreshCommandHandlerTests
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
 
         var tid = Guid.NewGuid();
-        var stored = new RefreshToken(Guid.NewGuid(), "hash", DateTime.UtcNow.AddDays(1), null, null, tid);
+        var stored = new RefreshToken(Guid.NewGuid(), "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow, tid);
 
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
@@ -144,8 +145,8 @@ public sealed class RefreshCommandHandlerTests
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
 
-        var user = new User("user@example.com", "hash");
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, null);
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow, null);
         typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
 
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
@@ -165,12 +166,12 @@ public sealed class RefreshCommandHandlerTests
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
 
-        var user = new User("user@example.com", "hash");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
         var tid = Guid.NewGuid();
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, tid);
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow, tid);
         typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
 
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
         _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>()))
@@ -212,10 +213,10 @@ public sealed class RefreshCommandHandlerTests
         var handler = CreateHandler();
         var tid = Guid.NewGuid();
         var cmd = new RefreshCommand("raw-token");
-        var user = new User("user@example.com", "hash");
-        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, tid);
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow, tid);
         typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
-        var tenant = new Tenant("Acme");
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
         typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
 
         _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");

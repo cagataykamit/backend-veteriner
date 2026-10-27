@@ -33,6 +33,7 @@ public sealed class CreateCareInstructionCommandHandler : IRequestHandler<Create
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Visit> _visits;
     private readonly IRepository<CareInstruction> _careInstructionsWrite;
+    private readonly TimeProvider _timeProvider;
 
     public CreateCareInstructionCommandHandler(
         ITenantContext tenantContext,
@@ -45,7 +46,8 @@ public sealed class CreateCareInstructionCommandHandler : IRequestHandler<Create
         IReadRepository<Hospitalization> hospitalizations,
         IReadRepository<Examination> examinations,
         IReadRepository<Visit> visits,
-        IRepository<CareInstruction> careInstructionsWrite)
+        IRepository<CareInstruction> careInstructionsWrite,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -58,6 +60,7 @@ public sealed class CreateCareInstructionCommandHandler : IRequestHandler<Create
         _examinations = examinations;
         _visits = visits;
         _careInstructionsWrite = careInstructionsWrite;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreateCareInstructionCommand request, CancellationToken ct)
@@ -175,6 +178,7 @@ public sealed class CreateCareInstructionCommandHandler : IRequestHandler<Create
             return Result<Guid>.Failure(visit.Error);
 
         CareInstruction entity;
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         try
         {
             entity = new CareInstruction(
@@ -185,7 +189,8 @@ public sealed class CreateCareInstructionCommandHandler : IRequestHandler<Create
                 examinationId,
                 visit.Value,
                 userId,
-                request.Text);
+                request.Text,
+                utcNow);
         }
         catch (ArgumentException ex)
         {

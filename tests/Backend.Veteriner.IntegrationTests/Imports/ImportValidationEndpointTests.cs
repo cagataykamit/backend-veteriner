@@ -1026,7 +1026,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
 
         var species = new Species($"IMV{suffix}", $"Imp Tür {suffix}");
-        var vaccine = VaccineDefinition.CreateTenant(tenantId, $"IMPV{suffix}", $"Imp Aşı {suffix}");
+        var vaccine = VaccineDefinition.CreateTenant(tenantId, $"IMPV{suffix}", $"Imp Aşı {suffix}", DateTime.UtcNow);
         db.Species.Add(species);
         db.VaccineDefinitions.Add(vaccine);
         await db.SaveChangesAsync();
@@ -1038,7 +1038,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var client = new Client(tenantId, fullName, phone, email: null, address: null);
+        var client = new Client(tenantId, fullName, DateTime.UtcNow, phone, email: null, address: null);
         db.Clients.Add(client);
         var pet = new Pet(tenantId, client.Id, petName, cat.SpeciesId, microchipNumber: chip);
         db.Pets.Add(pet);
@@ -1052,7 +1052,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var appliedAt = OperationDayBounds.NoonUtcForLocalDate(appliedOn);
         db.Vaccinations.Add(new Vaccination(
-            ctx.TenantId, petId, ctx.ClinicId, null, vaccineId, "Mevcut aşı", VaccinationStatus.Applied, appliedAt, null, null));
+            ctx.TenantId, petId, ctx.ClinicId, null, vaccineId, "Mevcut aşı", VaccinationStatus.Applied, appliedAt, null, null, DateTime.UtcNow));
         await db.SaveChangesAsync();
     }
 
@@ -1073,7 +1073,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var tenant = new Tenant($"imv-{Guid.NewGuid():N}"[..18]);
+        var tenant = new Tenant($"imv-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Imp-{Guid.NewGuid():N}"[..14], "Istanbul");
