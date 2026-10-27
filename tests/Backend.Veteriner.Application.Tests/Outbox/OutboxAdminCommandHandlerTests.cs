@@ -1,7 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Outbox;
 using Backend.Veteriner.Application.Outbox.Commands.Delete;
-using Backend.Veteriner.Application.Outbox.Commands.Requeue;
 using Backend.Veteriner.Application.Outbox.Commands.RetryAllDeadLetters;
 using Backend.Veteriner.Application.Outbox.Commands.RetryDeadLetter;
 using AwesomeAssertions;
@@ -20,12 +19,26 @@ public sealed class OutboxAdminCommandHandlerTests
     private readonly Mock<IClientContext> _client = new();
 
     [Theory]
-    [InlineData(typeof(RequeueOutboxMessageCommand))]
     [InlineData(typeof(RetryOutboxDeadLetterCommand))]
     [InlineData(typeof(RetryAllOutboxDeadLettersCommand))]
     [InlineData(typeof(DeleteOutboxMessageCommand))]
     public void Commands_Should_Implement_IgnoreTenantWriteSubscriptionGuard(Type commandType)
         => typeof(IIgnoreTenantWriteSubscriptionGuard).IsAssignableFrom(commandType).Should().BeTrue();
+
+    [Fact]
+    public void Commands_Should_Be_Audited_With_Action_And_Target()
+    {
+        var id = Guid.NewGuid();
+        IAuditableRequest[] commands =
+        [
+            new RetryOutboxDeadLetterCommand(id),
+            new RetryAllOutboxDeadLettersCommand(),
+            new DeleteOutboxMessageCommand(id)
+        ];
+
+        commands.Select(c => c.AuditAction).Should().Equal("Outbox.RetryDeadLetter", "Outbox.RetryAllDeadLetters", "Outbox.Delete");
+        commands.Select(c => c.AuditTarget).Should().Equal($"OutboxMessageId={id}", null, $"OutboxMessageId={id}");
+    }
 
     [Theory]
     [InlineData(OutboxRetryOutcome.NotFound, "Outbox.NotFound")]
@@ -56,18 +69,6 @@ public sealed class OutboxAdminCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Requeue_Should_FailWithoutCommit_When_MessageMissing()
-    {
-        _outbox.Setup(x => x.RequeueAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        var handler = new RequeueOutboxMessageCommandHandler(_outbox.Object, _uow.Object);
-
-        var result = await handler.Handle(new RequeueOutboxMessageCommand(Guid.NewGuid()), CancellationToken.None);
-
-        result.Error.Should().Be(OutboxErrors.NotFound);
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

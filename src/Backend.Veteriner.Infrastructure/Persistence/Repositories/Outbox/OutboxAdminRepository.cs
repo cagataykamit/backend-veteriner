@@ -14,40 +14,11 @@ public sealed class OutboxAdminRepository : IOutboxAdminRepository
 
     public OutboxAdminRepository(AppDbContext db) => _db = db;
 
-    public async Task<IReadOnlyList<OutboxPendingMessageDto>> ListOldestPendingAsync(int take, CancellationToken ct)
-        => await _db.OutboxMessages
-            .Where(m => m.ProcessedAtUtc == null && m.DeadLetterAtUtc == null)
-            .OrderBy(m => m.CreatedAtUtc)
-            .Take(take)
-            .Select(m => new OutboxPendingMessageDto(m.Id, m.Type, m.RetryCount, m.CreatedAtUtc, m.NextAttemptAtUtc, m.LastError))
-            .ToListAsync(ct);
-
-    public async Task<IReadOnlyList<OutboxDeadLetterMessageDto>> ListLatestDeadLettersAsync(int take, CancellationToken ct)
-        => await _db.OutboxMessages
-            .Where(m => m.DeadLetterAtUtc != null && m.ProcessedAtUtc == null)
-            .OrderByDescending(m => m.DeadLetterAtUtc)
-            .Take(take)
-            .Select(m => new OutboxDeadLetterMessageDto(m.Id, m.Type, m.RetryCount, m.CreatedAtUtc, m.DeadLetterAtUtc, m.LastError))
-            .ToListAsync(ct);
-
     public Task<PagedResult<OutboxItemDto>> GetPendingPagedAsync(PageRequest req, CancellationToken ct)
         => GetPagedAsync(_db.OutboxMessages.Where(x => x.ProcessedAtUtc == null && x.DeadLetterAtUtc == null), req, ct);
 
     public Task<PagedResult<OutboxItemDto>> GetDeadLettersPagedAsync(PageRequest req, CancellationToken ct)
         => GetPagedAsync(_db.OutboxMessages.Where(x => x.DeadLetterAtUtc != null && x.ProcessedAtUtc == null), req, ct);
-
-    public async Task<bool> RequeueAsync(Guid id, CancellationToken ct)
-    {
-        var msg = await _db.OutboxMessages.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (msg is null) return false;
-
-        msg.DeadLetterAtUtc = null;
-        msg.NextAttemptAtUtc = DateTime.UtcNow;
-        msg.LastError = null;
-        msg.Error = null;
-        msg.RetryCount = 0;
-        return true;
-    }
 
     public async Task<OutboxRetryOutcome> RetryDeadLetterAsync(Guid id, CancellationToken ct)
     {

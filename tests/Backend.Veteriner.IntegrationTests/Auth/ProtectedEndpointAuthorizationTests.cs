@@ -32,8 +32,8 @@ public sealed class ProtectedEndpointAuthorizationTests
     [Fact]
     public async Task ProtectedEndpoint_Should_Return401_When_TokenMissing()
     {
-        // /api/v1/outbox/pending -> [Authorize(Policy = "Outbox.Read")]
-        var response = await _client.GetAsync("/api/v1/outbox/pending");
+        // /api/v1/admin/outbox/pending -> [Authorize(Policy = "Outbox.Read")]
+        var response = await _client.GetAsync("/api/v1/admin/outbox/pending");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -48,7 +48,7 @@ public sealed class ProtectedEndpointAuthorizationTests
         // Burada amaç, JWT bearer auth zincirinin başarılı şekilde çalıştığını doğrulamak.
         // Policy/permission kontrolü production'daki gerçek davranışa göre 200 veya 403 üretebilir;
         // bu adımda yalnızca 401'den farklı ve auth'ün geçtiği bir durum bekliyoruz.
-        var response = await _client.GetAsync("/api/v1/outbox/pending");
+        var response = await _client.GetAsync("/api/v1/admin/outbox/pending");
 
         response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
     }

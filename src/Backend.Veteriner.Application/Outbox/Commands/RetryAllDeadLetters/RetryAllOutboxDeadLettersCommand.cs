@@ -8,7 +8,11 @@ namespace Backend.Veteriner.Application.Outbox.Commands.RetryAllDeadLetters;
 /// Yönetim: işlenmemiş tüm dead-letter mesajları yeniden denemeye açar ve sayısını döner
 /// (<c>POST /api/v1/admin/outbox/retry-dead-all</c>). Platform işlemidir; kiracı abonelik yazma kapısı uygulanmaz.
 /// </summary>
-public sealed record RetryAllOutboxDeadLettersCommand : IRequest<int>, IIgnoreTenantWriteSubscriptionGuard;
+public sealed record RetryAllOutboxDeadLettersCommand : IRequest<int>, IIgnoreTenantWriteSubscriptionGuard, IAuditableRequest
+{
+    public string AuditAction => "Outbox.RetryAllDeadLetters";
+    public string? AuditTarget => null;
+}
 
 public sealed class RetryAllOutboxDeadLettersCommandHandler : IRequestHandler<RetryAllOutboxDeadLettersCommand, int>
 {

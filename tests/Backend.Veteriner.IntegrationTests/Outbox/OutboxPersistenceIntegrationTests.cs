@@ -72,13 +72,6 @@ public sealed class OutboxPersistenceIntegrationTests : IClassFixture<CustomWebA
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await buffer.EnqueueAsync(typeMarker, "{}");
             await db.SaveChangesAsync();
-
-            // GET /outbox/pending en eski 100 bekleyen mesajı döner (CreatedAtUtc artan). Paylaşılan test DB'sinde
-            // diğer sınıfların ürettiği outbox satırları işlenmeden birikir (IntegrationTests'te işleyici döngüsü 1 saat);
-            // 100'ü aşınca yeni mesaj listeye girmez. Mesajı en eskiye çekerek testi koşu sırasından bağımsız kılıyoruz.
-            await db.OutboxMessages
-                .Where(x => x.Type == typeMarker)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreatedAtUtc, new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
         }
 
         using var client = _factory.CreateClient();
@@ -90,21 +83,13 @@ public sealed class OutboxPersistenceIntegrationTests : IClassFixture<CustomWebA
         var token = loginJson.GetProperty("accessToken").GetString()!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var pending = await client.GetAsync("/api/v1/outbox/pending");
+        // Paylaşılan test DB'sinde diğer sınıfların outbox satırları birikir; Type araması yalnız bu testin mesajını getirir.
+        var pending = await client.GetAsync($"/api/v1/admin/outbox/pending?search={typeMarker}");
         pending.EnsureSuccessStatusCode();
         var json = await pending.Content.ReadFromJsonAsync<JsonElement>();
-        json.ValueKind.Should().Be(JsonValueKind.Array);
-        var found = false;
-        foreach (var el in json.EnumerateArray())
-        {
-            if (el.TryGetProperty("type", out var t) && t.GetString() == typeMarker)
-            {
-                found = true;
-                break;
-            }
-        }
-
-        found.Should().BeTrue("pending list should include the message enqueued in this test");
+        json.GetProperty("items").EnumerateArray()
+            .Select(el => el.GetProperty("type").GetString())
+            .Should().Contain(typeMarker, "bekleyen listesi bu testte kuyruğa alınan mesajı içermeli");
 
         await using (var cleanup = _factory.Services.CreateAsyncScope())
         {

@@ -13,115 +13,17 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Outbox;
 
 /// <summary>
-/// Outbox yönetim uçlarının (<c>/api/v1/outbox</c> ve <c>/api/v1/admin/outbox</c>) HTTP sözleşmesi: yanıt şekli, durum
+/// Outbox yönetim uçlarının (<c>/api/v1/admin/outbox</c>) HTTP sözleşmesi: yanıt şekli, durum
 /// kodları, sayfalama/arama/sıralama ve satır üzerindeki etkiler. Paylaşılan test DB'sinde her test kendi <c>Type</c>
 /// işaretiyle seed eder ve arama/kimlik ile yalnız kendi satırlarına bakar.
 /// </summary>
 public sealed class OutboxEndpointsIntegrationTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private const string LegacyBase = "/api/v1/outbox";
     private const string AdminBase = "/api/v1/admin/outbox";
 
     private readonly CustomWebApplicationFactory _factory;
 
     public OutboxEndpointsIntegrationTests(CustomWebApplicationFactory factory) => _factory = factory;
-
-    [Fact]
-    public async Task LegacyPending_Should_ReturnOldestPendingMessages_WithExpectedShape()
-    {
-        var marker = NewMarker();
-        var row = await SeedAsync(marker, createdAtUtc: new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc), retryCount: 2, lastError: "e1");
-
-        try
-        {
-            using var client = await CreateAdminClientAsync();
-            var response = await client.GetAsync($"{LegacyBase}/pending");
-
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
-            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-            json.ValueKind.Should().Be(JsonValueKind.Array);
-            json.GetArrayLength().Should().BeLessThanOrEqualTo(100);
-
-            var item = FindById(json, row.Id);
-            PropertyNames(item).Should().Equal("id", "type", "retryCount", "createdAtUtc", "nextAttemptAtUtc", "lastError");
-            item.GetProperty("type").GetString().Should().Be(marker);
-            item.GetProperty("retryCount").GetInt32().Should().Be(2);
-            item.GetProperty("lastError").GetString().Should().Be("e1");
-        }
-        finally
-        {
-            await CleanupAsync(marker);
-        }
-    }
-
-    [Fact]
-    public async Task LegacyDead_Should_ReturnLatestDeadLettersFirst_WithExpectedShape()
-    {
-        var marker = NewMarker();
-        var row = await SeedAsync(marker, deadLetterAtUtc: new DateTime(2999, 1, 1, 0, 0, 0, DateTimeKind.Utc), retryCount: 7, lastError: "boom");
-
-        try
-        {
-            using var client = await CreateAdminClientAsync();
-            var response = await client.GetAsync($"{LegacyBase}/dead");
-
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
-            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-            json.ValueKind.Should().Be(JsonValueKind.Array);
-            json.GetArrayLength().Should().BeLessThanOrEqualTo(100);
-
-            var first = json[0];
-            first.GetProperty("id").GetGuid().Should().Be(row.Id, "dead-letter listesi DeadLetterAtUtc azalan sıralı");
-            PropertyNames(first).Should().Equal("id", "type", "retryCount", "createdAtUtc", "deadLetterAtUtc", "lastError");
-            first.GetProperty("retryCount").GetInt32().Should().Be(7);
-            first.GetProperty("lastError").GetString().Should().Be("boom");
-        }
-        finally
-        {
-            await CleanupAsync(marker);
-        }
-    }
-
-    [Fact]
-    public async Task LegacyRequeue_Should_Return404_When_MessageMissing()
-    {
-        using var client = await CreateAdminClientAsync();
-
-        var response = await client.PostAsync($"{LegacyBase}/requeue/{Guid.NewGuid()}", content: null);
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task LegacyRequeue_Should_ResetDeadLetterRetryAndErrors()
-    {
-        var marker = NewMarker();
-        var row = await SeedAsync(marker, deadLetterAtUtc: DateTime.UtcNow, retryCount: 5, lastError: "last", error: "stack");
-
-        try
-        {
-            using var client = await CreateAdminClientAsync();
-            var before = DateTime.UtcNow;
-            var response = await client.PostAsync($"{LegacyBase}/requeue/{row.Id}", content: null);
-
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
-            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-            PropertyNames(json).Should().Equal("ok");
-            json.GetProperty("ok").GetBoolean().Should().BeTrue();
-
-            var saved = await LoadAsync(row.Id);
-            saved!.DeadLetterAtUtc.Should().BeNull();
-            saved.LastError.Should().BeNull();
-            saved.Error.Should().BeNull();
-            saved.RetryCount.Should().Be(0);
-            saved.NextAttemptAtUtc.Should().NotBeNull();
-            saved.NextAttemptAtUtc!.Value.Should().BeOnOrAfter(before.AddSeconds(-1));
-        }
-        finally
-        {
-            await CleanupAsync(marker);
-        }
-    }
 
     [Fact]
     public async Task AdminPending_Should_ReturnPagedSortedPendingMessages_MatchingSearch()
@@ -270,6 +172,7 @@ public sealed class OutboxEndpointsIntegrationTests : IClassFixture<CustomWebApp
             saved.NextAttemptAtUtc.Should().NotBeNull();
             saved.RetryCount.Should().Be(5);
             saved.Error.Should().Be("stack");
+            (await IsAuditedAsync("Outbox.RetryDeadLetter", row.Id)).Should().BeTrue();
         }
         finally
         {
@@ -337,6 +240,7 @@ public sealed class OutboxEndpointsIntegrationTests : IClassFixture<CustomWebApp
 
             response.StatusCode.Should().Be(HttpStatusCode.NoContent);
             (await LoadAsync(row.Id)).Should().BeNull();
+            (await IsAuditedAsync("Outbox.Delete", row.Id)).Should().BeTrue("yönetici outbox işlemi denetim kaydına yazılır");
         }
         finally
         {
@@ -347,7 +251,7 @@ public sealed class OutboxEndpointsIntegrationTests : IClassFixture<CustomWebApp
     [Theory]
     [InlineData("GET", AdminBase + "/pending")]
     [InlineData("POST", AdminBase + "/retry-dead-all")]
-    [InlineData("GET", LegacyBase + "/dead")]
+    [InlineData("GET", AdminBase + "/dead")]
     public async Task Endpoints_Should_Return401_When_TokenMissing(string method, string url)
     {
         using var client = _factory.CreateClient();
@@ -360,7 +264,7 @@ public sealed class OutboxEndpointsIntegrationTests : IClassFixture<CustomWebApp
     [Theory]
     [InlineData("GET", AdminBase + "/pending")]
     [InlineData("POST", AdminBase + "/retry-dead-all")]
-    [InlineData("GET", LegacyBase + "/pending")]
+    [InlineData("DELETE", AdminBase + "/00000000-0000-0000-0000-000000000001")]
     public async Task Endpoints_Should_Return403_When_UserLacksOutboxPermissions(string method, string url)
     {
         using var client = _factory.CreateClient();
@@ -425,22 +329,19 @@ public sealed class OutboxEndpointsIntegrationTests : IClassFixture<CustomWebApp
         return await db.OutboxMessages.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
     }
 
+    private async Task<bool> IsAuditedAsync(string action, Guid outboxMessageId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.AuditLogs.AsNoTracking()
+            .AnyAsync(a => a.Action == action && a.TargetId == $"OutboxMessageId={outboxMessageId}" && a.Success);
+    }
+
     private async Task CleanupAsync(string marker)
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.OutboxMessages.Where(x => x.Type.StartsWith(marker)).ExecuteDeleteAsync();
-    }
-
-    private static JsonElement FindById(JsonElement array, Guid id)
-    {
-        foreach (var el in array.EnumerateArray())
-        {
-            if (el.GetProperty("id").GetGuid() == id)
-                return el;
-        }
-
-        throw new InvalidOperationException($"Outbox mesajı listede yok: {id}");
     }
 
     private static IEnumerable<string> PropertyNames(JsonElement obj)

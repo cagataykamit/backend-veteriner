@@ -9,7 +9,11 @@ namespace Backend.Veteriner.Application.Outbox.Commands.Delete;
 /// Yönetim: outbox mesajını siler (<c>DELETE /api/v1/admin/outbox/{id}</c>). Platform işlemidir; kiracı abonelik yazma
 /// kapısı uygulanmaz.
 /// </summary>
-public sealed record DeleteOutboxMessageCommand(Guid Id) : IRequest<Result>, IIgnoreTenantWriteSubscriptionGuard;
+public sealed record DeleteOutboxMessageCommand(Guid Id) : IRequest<Result>, IIgnoreTenantWriteSubscriptionGuard, IAuditableRequest
+{
+    public string AuditAction => "Outbox.Delete";
+    public string? AuditTarget => $"OutboxMessageId={Id}";
+}
 
 public sealed class DeleteOutboxMessageCommandHandler : IRequestHandler<DeleteOutboxMessageCommand, Result>
 {

@@ -9,7 +9,11 @@ namespace Backend.Veteriner.Application.Outbox.Commands.RetryDeadLetter;
 /// Yönetim: dead-letter mesajı yeniden denemeye açar (<c>POST /api/v1/admin/outbox/retry/{id}</c>). Platform işlemidir;
 /// kiracı abonelik yazma kapısı uygulanmaz.
 /// </summary>
-public sealed record RetryOutboxDeadLetterCommand(Guid Id) : IRequest<Result>, IIgnoreTenantWriteSubscriptionGuard;
+public sealed record RetryOutboxDeadLetterCommand(Guid Id) : IRequest<Result>, IIgnoreTenantWriteSubscriptionGuard, IAuditableRequest
+{
+    public string AuditAction => "Outbox.RetryDeadLetter";
+    public string? AuditTarget => $"OutboxMessageId={Id}";
+}
 
 public sealed class RetryOutboxDeadLetterCommandHandler : IRequestHandler<RetryOutboxDeadLetterCommand, Result>
 {
