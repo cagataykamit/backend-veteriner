@@ -32,4 +32,15 @@ internal static class EventualConsistencyTestSupport
 
         throw new TimeoutException(reason);
     }
+
+    /// <summary>
+    /// Sunucunun yazdığı zaman damgalarına göre sıralanan kayıtlarda sıra belirgin olsun: yerel saat verilen anı (1 ms
+    /// payla) geçene kadar yoklar. Sunucu ile test aynı süreçte, aynı saati kullanır.
+    /// </summary>
+    public static Task UntilClockPassesAsync(DateTime utc)
+        => EventuallyAsync(
+            () => Task.FromResult(DateTime.UtcNow > utc.AddMilliseconds(1)),
+            timeout: TimeSpan.FromSeconds(5),
+            pollInterval: TimeSpan.FromMilliseconds(1),
+            because: "Saat verilen anı geçmedi.");
 }

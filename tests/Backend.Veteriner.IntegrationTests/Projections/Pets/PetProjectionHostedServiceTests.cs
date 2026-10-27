@@ -23,9 +23,11 @@ public sealed class PetProjectionHostedServiceTests
             NullLogger<PetProjectionHostedService>.Instance);
 
         await hosted.StartAsync(CancellationToken.None);
-        await Task.Delay(250);
+        // Kapalı servis ExecuteAsync'ten kendiliğinden döner; süre beklemeden tamamlanması beklenir.
+        await hosted.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
         await hosted.StopAsync(CancellationToken.None);
 
+        hosted.ExecuteTask.IsCompletedSuccessfully.Should().BeTrue();
         probe.Invocations.Should().Be(0);
     }
 

@@ -645,8 +645,9 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         var ids = new List<Guid>();
         foreach (var pet in pets)
         {
-            ids.Add((await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = pet })).Result!.Visit.Id);
-            await Task.Delay(20); // arrivedAtUtc sırası belirgin olsun
+            var visit = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = pet })).Result!.Visit;
+            ids.Add(visit.Id);
+            await EventualConsistencyTestSupport.UntilClockPassesAsync(visit.ArrivedAtUtc); // arrivedAtUtc sırası belirgin olsun
         }
 
         // ids[0], ids[1] normal; ids[2] acil bekleyen; ids[3] acil ve devam ediyor

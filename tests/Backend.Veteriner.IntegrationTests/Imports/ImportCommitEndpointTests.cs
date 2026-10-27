@@ -408,9 +408,11 @@ public sealed class ImportCommitEndpointTests : IClassFixture<CustomWebApplicati
                 .Should().Be(HttpStatusCode.Accepted);
 
             // İstemci yoklamadan iş sürer; burada yalnız sonucu bekliyoruz.
-            var sw = Stopwatch.StartNew();
-            while ((await StatusAsync(id)) == ImportBatchStatus.Committing && sw.Elapsed < TimeSpan.FromSeconds(60))
-                await Task.Delay(250);
+            await EventualConsistencyTestSupport.EventuallyAsync(
+                async () => await StatusAsync(id) != ImportBatchStatus.Committing,
+                timeout: TimeSpan.FromSeconds(60),
+                pollInterval: TimeSpan.FromMilliseconds(250),
+                because: "Barındırılan işçi uygulamayı bitirmeli.");
         }
         finally
         {

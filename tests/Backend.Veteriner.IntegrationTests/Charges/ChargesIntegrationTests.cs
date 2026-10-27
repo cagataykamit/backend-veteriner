@@ -404,8 +404,9 @@ public sealed class ChargesIntegrationTests : IClassFixture<CustomWebApplication
         var ids = new List<Guid>();
         for (var i = 0; i < 3; i++)
         {
-            ids.Add((await ctx.PostChargeAsync(ctx.Body(description: $"Satir {i}"))).Result!.Charge.Id);
-            await Task.Delay(20);
+            var charge = (await ctx.PostChargeAsync(ctx.Body(description: $"Satir {i}"))).Result!.Charge;
+            ids.Add(charge.Id);
+            await EventualConsistencyTestSupport.UntilClockPassesAsync(charge.CreatedAtUtc);
         }
 
         var page1 = await ctx.Http.GetFromJsonAsync<PagedResult<ChargeDto>>(
