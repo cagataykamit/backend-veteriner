@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
@@ -65,7 +66,7 @@ public sealed class ClientsController : ControllerBase
             nameof(GetById),
             new
             {
-                version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0",
+                version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0",
                 id = dto.Id
             },
             dto);
@@ -97,7 +98,7 @@ public sealed class ClientsController : ControllerBase
             nameof(GetById),
             new
             {
-                version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0",
+                version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0",
                 id = dto.ClientId
             },
             dto);

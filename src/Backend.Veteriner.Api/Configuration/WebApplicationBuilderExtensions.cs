@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Auth;
 using Backend.Veteriner.Api.Health;
 using Backend.Veteriner.Api.Middleware;
@@ -15,7 +16,6 @@ using Backend.Veteriner.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry;
 using OpenTelemetry.Instrumentation.EntityFrameworkCore;
@@ -111,19 +111,19 @@ public static class WebApplicationBuilderExtensions
                 };
             });
 
-        builder.Services.AddApiVersioning(opt =>
-        {
-            opt.AssumeDefaultVersionWhenUnspecified = true;
-            opt.DefaultApiVersion = new ApiVersion(1, 0);
-            opt.ReportApiVersions = true;
-            opt.ApiVersionReader = new Microsoft.AspNetCore.Mvc.Versioning.UrlSegmentApiVersionReader();
-        });
-
-        builder.Services.AddVersionedApiExplorer(opt =>
-        {
-            opt.GroupNameFormat = "'v'VVV";
-            opt.SubstituteApiVersionInUrl = true;
-        });
+        builder.Services
+            .AddApiVersioning(opt =>
+            {
+                opt.DefaultApiVersion = new ApiVersion(1, 0);
+                opt.ReportApiVersions = true;
+                opt.ApiVersionReader = new UrlSegmentApiVersionReader();
+            })
+            .AddMvc()
+            .AddApiExplorer(opt =>
+            {
+                opt.GroupNameFormat = "'v'VVV";
+                opt.SubstituteApiVersionInUrl = true;
+            });
 
         builder.Services.AddApplication();
         builder.Services.AddBackendMediator();

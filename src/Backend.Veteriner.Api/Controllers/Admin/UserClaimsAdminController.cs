@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Users.Commands.Claims.Add;

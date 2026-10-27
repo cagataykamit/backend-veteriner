@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Application.EmailVerification.Commands.Confirm;
 using Backend.Veteriner.Application.EmailVerification.Commands.Request;
 using Mediator;

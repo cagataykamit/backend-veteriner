@@ -129,12 +129,7 @@ public sealed class ReverseStockMovementCommandHandler
                 return Fail("StockBatches.NotFound", "Hareketin partisi bulunamadı.");
         }
 
-        if (original.ReversalIncreasesStock)
-        {
-            batch?.Increase(original.Quantity);
-            stock!.IncreaseQuantity(original.Quantity);
-        }
-        else
+        if (!original.ReversalIncreasesStock)
         {
             // Giriş geri alınırken o partinin (partisizse partisiz bakiyenin) kalanı miktarı karşılamalı.
             var available = batch?.RemainingQuantity
@@ -142,9 +137,6 @@ public sealed class ReverseStockMovementCommandHandler
                     tenantId, original.ClinicId, original.ProductId, stock!.QuantityOnHand, ct);
             if (available < original.Quantity)
                 return Fail("StockMovements.InsufficientStock", "Geri alma için yeterli stok yok.");
-
-            batch?.Decrease(original.Quantity);
-            stock!.DecreaseQuantity(original.Quantity);
         }
 
         var reversal = original.CreateReversal(
@@ -153,18 +145,14 @@ public sealed class ReverseStockMovementCommandHandler
             DateTime.UtcNow,
             _clientContext.UserId,
             request.RequestId);
-        if (batch is not null)
-            reversal.LinkBatch(batch);
 
-        // Ters hareket ve stok değişimi tek SaveChanges'te, tek toplu yazımdır; benzersiz kurallar burada eler.
+        // Ters hareket tek başına önce yazılır (AddAsync ve hemen ardından SaveChanges): benzersiz kurallar (requestId, tek ters hareket)
+        // kaybedeni ilk yazımında eler ve işlemde kaybedenin stok/parti değişikliği kalmaz. Başarısız SaveChanges'in kısmi
+        // yazımını geri alacak savepoint'e güvenilmez (EF, MARS açık bağlantıda savepoint açmaz).
         try
         {
             await _stockMovementsWrite.AddAsync(reversal, ct);
             await _stockMovementsWrite.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return ConcurrencyConflict();
         }
         catch (DbUpdateException)
         {
@@ -186,6 +174,21 @@ public sealed class ReverseStockMovementCommandHandler
             throw;
         }
 
+        if (original.ReversalIncreasesStock)
+        {
+            batch?.Increase(original.Quantity);
+            stock!.IncreaseQuantity(original.Quantity);
+        }
+        else
+        {
+            batch?.Decrease(original.Quantity);
+            stock!.DecreaseQuantity(original.Quantity);
+        }
+
+        if (batch is not null)
+            reversal.LinkBatch(batch); // bakiye, değişiklikten sonraki parti kalanıdır
+
+        // Mevcut satır eşzamanlı değiştiyse (rowVersion) başarısız sonuç işlemi geri alır; ters hareket de kalmaz.
         try
         {
             await _uow.SaveChangesAsync(ct);

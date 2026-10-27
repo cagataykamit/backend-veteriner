@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Application.Files.Queries.GetSignedContent;
 using Mediator;

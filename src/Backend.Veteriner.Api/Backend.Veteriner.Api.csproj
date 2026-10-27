@@ -9,8 +9,9 @@
   </PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Asp.Versioning.Mvc" Version="10.2.1" />
+		<PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="10.2.1" />
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
-		<PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
 		<PackageReference Include="Mediator.Abstractions" Version="3.0.2" />
 		<!-- Kaynak üretici yalnız en dış çalıştırılabilir projede (ADR-038): IMediator uygulaması ve işleyici kayıtları burada üretilir. -->
 		<PackageReference Include="Mediator.SourceGenerator" Version="3.0.2">
@@ -18,8 +19,6 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
-		<PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.1.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14">
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 			<PrivateAssets>all</PrivateAssets>
@@ -30,12 +29,12 @@
 		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
 		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
 
-		<!-- OpenTelemetry instrumentation (1.15.x ailesi, OTel core ile hizalı) -->
+		<!-- OpenTelemetry instrumentation (1.20.x ailesi, OTel core ile hizalı; EF Core paketi yalnız beta yayımlanıyor) -->
 		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.1" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.20.1" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.20.1" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.20.1" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.15.1-beta.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.20.1-beta.1" />
 
 		<!-- Serilog & Swagger -->
 		<PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />

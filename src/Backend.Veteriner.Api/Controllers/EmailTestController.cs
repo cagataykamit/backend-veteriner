@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Microsoft.AspNetCore.Authorization;

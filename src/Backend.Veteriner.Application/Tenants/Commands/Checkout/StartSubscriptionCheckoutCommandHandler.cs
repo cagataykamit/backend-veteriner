@@ -73,6 +73,13 @@ public sealed class StartSubscriptionCheckoutCommandHandler
                 "Hedef plan kodu geçersiz.");
         }
 
+        if (!TryParseBillingPeriod(request.BillingPeriod, out var billingPeriod))
+        {
+            return Result<SubscriptionCheckoutSessionDto>.Failure(
+                "Subscriptions.Checkout.Validation.BillingPeriodInvalid",
+                "billingPeriod Monthly ya da Yearly olmalı.");
+        }
+
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(request.TenantId), ct);
         if (tenant is null)
             return Result<SubscriptionCheckoutSessionDto>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
@@ -101,7 +108,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
 
         // Dönem (BILL-001): verilmezse ücretli abonelikte mevcut dönem, hiç ödeme yoksa aylık. Etkin ücretli dönemde
         // aylıktan yıllığa hemen geçilir (kalan günler düşülür); yıllıktan aylığa yalnız dönem bitince (yenilemede).
-        var requestedPeriod = request.BillingPeriod ?? (sub.ActivatedAtUtc is null ? BillingPeriodKind.Monthly : sub.BillingPeriod);
+        var requestedPeriod = billingPeriod ?? (sub.ActivatedAtUtc is null ? BillingPeriodKind.Monthly : sub.BillingPeriod);
         var inPaidPeriod = !isExpiredReadOnly && sub.Status == TenantSubscriptionStatus.Active;
         var switchesToYearly = inPaidPeriod && sub.BillingPeriod == BillingPeriodKind.Monthly && requestedPeriod == BillingPeriodKind.Yearly;
         if (inPaidPeriod && sub.BillingPeriod == BillingPeriodKind.Yearly && requestedPeriod == BillingPeriodKind.Monthly)
@@ -426,6 +433,22 @@ public sealed class StartSubscriptionCheckoutCommandHandler
 
         minor = 0;
         return false;
+    }
+
+    /// <summary>Boş değer geçerlidir (<c>null</c>: varsayılan dönem). Ad büyük/küçük harf duyarsız; sayısal değer (<c>"1"</c>) geçersiz.</summary>
+    private static bool TryParseBillingPeriod(string? value, out BillingPeriodKind? period)
+    {
+        period = null;
+        if (string.IsNullOrWhiteSpace(value))
+            return true;
+
+        if (int.TryParse(value, out _)
+            || !Enum.TryParse<BillingPeriodKind>(value.Trim(), ignoreCase: true, out var parsed)
+            || !Enum.IsDefined(parsed))
+            return false;
+
+        period = parsed;
+        return true;
     }
 
     private static bool TryGetDictionaryValue<T>(IReadOnlyDictionary<string, T>? map, string key, out T value)

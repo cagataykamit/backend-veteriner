@@ -1,11 +1,12 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Mediator;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using System;
 
-namespace Backend.Veteriner.Application.Common.Behaviors;
+namespace Backend.Veteriner.Infrastructure.Behaviors;
 
 /// <summary>
 /// Transactional command'leri tek DB transaction içinde çalıştırır.

@@ -713,11 +713,46 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
             .ReturnsAsync((BillingCheckoutSession s, CancellationToken _) => s);
 
         var result = await CreateHandler(CreateBillingOptions())
-            .Handle(new StartSubscriptionCheckoutCommand(tid, "Premium", BillingPeriodKind.Yearly), CancellationToken.None);
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Premium", "Yearly"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         _chargedMinor.Should().Be(300_000L, "yıllık fiyat 10 aylık tutardır (2 ay hediye)");
         created!.BillingPeriod.Should().Be(BillingPeriodKind.Yearly);
+        result.Value!.BillingPeriod.Should().Be("Yearly");
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("2")]
+    [InlineData("Weekly")]
+    public async Task Handle_Should_Reject_Unrecognized_Billing_Period_Before_Any_Write(string billingPeriod)
+    {
+        var tid = Guid.NewGuid();
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Premium);
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        SetupManualCheckoutProvider();
+
+        var result = await CreateHandler(CreateBillingOptions())
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Premium", billingPeriod), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.Checkout.Validation.BillingPeriodInvalid");
+        _checkoutSessionsWrite.Verify(
+            x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Accept_Billing_Period_Case_Insensitively()
+    {
+        var tid = Guid.NewGuid();
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Premium);
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        SetupManualCheckoutProvider();
+
+        var result = await CreateHandler(CreateBillingOptions())
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Premium", " yearly "), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
         result.Value!.BillingPeriod.Should().Be("Yearly");
     }
 
@@ -748,7 +783,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         SetupManualCheckoutProvider();
 
         var result = await CreateHandler(CreateBillingOptions())
-            .Handle(new StartSubscriptionCheckoutCommand(tid, "Premium", BillingPeriodKind.Yearly), CancellationToken.None);
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Premium", "Yearly"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         _chargedMinor.Should().BeInRange(300_000L - 30_000L, 300_000L - 1, "kalan aylık günler yıllık fiyattan düşülür");
@@ -781,7 +816,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
 
         var result = await CreateHandler(CreateBillingOptions())
-            .Handle(new StartSubscriptionCheckoutCommand(tid, "Pro", BillingPeriodKind.Monthly), CancellationToken.None);
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Pro", "Monthly"), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Subscriptions.PeriodChangeAtPeriodEnd");
@@ -808,7 +843,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         };
 
         var result = await CreateHandler(billing)
-            .Handle(new StartSubscriptionCheckoutCommand(tid, "Basic", BillingPeriodKind.Yearly), CancellationToken.None);
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Basic", "Yearly"), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Billing.YearlyNotSupportedByProvider");
@@ -825,7 +860,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         SetupManualCheckoutProvider();
 
         var result = await CreateHandler(CreateBillingOptions())
-            .Handle(new StartSubscriptionCheckoutCommand(tid, "Basic", BillingPeriodKind.Yearly), CancellationToken.None);
+            .Handle(new StartSubscriptionCheckoutCommand(tid, "Basic", "Yearly"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         monthlyOpen.Status.Should().Be(BillingCheckoutSessionStatus.Cancelled);

@@ -2,15 +2,20 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Ardalis.Specification;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.StockMovements.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories;
 using AwesomeAssertions;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -705,6 +710,46 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
         sumBatches.Should().Be(stock);
     }
 
+    // Eşzamanlı testin nadiren yakaladığı pencere: kaybeden istek ön kontrolü kazanan yazılmadan yapar, satırları kazananın
+    // commit'inden sonra güncel okur. Yazımı benzersiz kurala çarpınca kendi stok/parti değişikliği işlemde kalmamalı.
+
+    [Fact]
+    public async Task Same_RequestId_Out_That_Missed_Winner_In_PreCheck_Should_Replay_Without_Deducting_Again()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx);
+        var batch = await EnterBatchAsync(client, ctx, 10m, "RACE", Date(100));
+        var requestId = Guid.NewGuid();
+        (await PostMovementAsync(client, ctx, 2, 3m, requestId: requestId, batchId: batch)).StatusCode
+            .Should().Be(HttpStatusCode.Created);
+
+        await using var racing = PreCheckMissingHost();
+        var loser = await PostMovementAsync(ClientFor(ctx, racing), ctx, 2, 3m, requestId: requestId, batchId: batch);
+
+        loser.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await RemainingAsync(batch)).Should().Be(7m);
+        (await GetStockAsync(ctx)).Should().Be(7m);
+    }
+
+    [Fact]
+    public async Task Same_RequestId_Reverse_That_Missed_Winner_In_PreCheck_Should_Replay_Without_Restoring_Again()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx);
+        var batch = await EnterBatchAsync(client, ctx, 10m, "RRACE", Date(100));
+        var outMovement = await (await PostMovementAsync(client, ctx, 2, 3m, batchId: batch)).Content.ReadFromJsonAsync<JsonElement>();
+        var outId = outMovement.GetProperty("id").GetGuid();
+        var requestId = Guid.NewGuid();
+        (await ReverseAsync(client, outId, requestId)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        await using var racing = PreCheckMissingHost();
+        var loser = await ReverseAsync(ClientFor(ctx, racing), outId, requestId);
+
+        loser.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await RemainingAsync(batch)).Should().Be(10m);
+        (await GetStockAsync(ctx)).Should().Be(10m);
+    }
+
     // ---------------------------------------------------------------- Ürün alanları, yetki, kapsam
 
     [Fact]
@@ -767,9 +812,9 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
 
     // ---------------------------------------------------------------- Yardımcılar
 
-    private HttpClient ClientFor(SeedCtx ctx)
+    private HttpClient ClientFor(SeedCtx ctx, WebApplicationFactory<global::Program>? host = null)
     {
-        var client = _factory.CreateClient();
+        var client = (host ?? _factory).CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
         return client;
     }
@@ -809,8 +854,26 @@ public sealed class StockBatchesEndpointTests : IClassFixture<CustomWebApplicati
             acknowledgeExpired,
         });
 
-    private static Task<HttpResponseMessage> ReverseAsync(HttpClient client, Guid movementId)
-        => client.PostAsJsonAsync($"/api/v1/stock-movements/{movementId}/reverse", new { reason = "Yanlış giriş" });
+    private static Task<HttpResponseMessage> ReverseAsync(HttpClient client, Guid movementId, Guid? requestId = null)
+        => client.PostAsJsonAsync($"/api/v1/stock-movements/{movementId}/reverse", new { reason = "Yanlış giriş", requestId });
+
+    /// <summary>
+    /// requestId ve ters hareket ön kontrolünü (istek başına ilk sorgu) kör eden host; kazananı sonradan arayan sorgu gerçeği görür.
+    /// </summary>
+    private WebApplicationFactory<global::Program> PreCheckMissingHost()
+        => _factory.WithWebHostBuilder(b => b.ConfigureTestServices(services =>
+            services.AddScoped<IRepository<StockMovement>, PreCheckMissingStockMovementRepository>()));
+
+    private sealed class PreCheckMissingStockMovementRepository(AppDbContext db) : EfRepository<StockMovement>(db)
+    {
+        private readonly HashSet<Type> _missed = new();
+
+        public override Task<StockMovement?> FirstOrDefaultAsync(
+            ISpecification<StockMovement> specification, CancellationToken cancellationToken = default)
+            => specification is StockMovementByRequestIdSpec or StockMovementReversalOfSpec && _missed.Add(specification.GetType())
+                ? Task.FromResult<StockMovement?>(null)
+                : base.FirstOrDefaultAsync(specification, cancellationToken);
+    }
 
     private static Task<HttpResponseMessage> PostAdministrationAsync(
         HttpClient client, SeedCtx ctx, decimal quantity, Guid? requestId = null, Guid? batchId = null)

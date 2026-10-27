@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Auth;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
@@ -165,5 +166,5 @@ public sealed class SalesPartnersAdminController : ControllerBase
         return File(result.Value!.ContentUtf8Bom, ReportFileContentTypes.CsvUtf8, result.Value.FileDownloadName);
     }
 
-    private string ApiVersionText() => HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0";
+    private string ApiVersionText() => HttpContext.RequestedApiVersion?.ToString() ?? "1.0";
 }

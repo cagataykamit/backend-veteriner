@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Auth.Commands.UserOperationClaims.Assign;

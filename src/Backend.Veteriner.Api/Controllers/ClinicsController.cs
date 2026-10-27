@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Backend.Veteriner.Api.Auth;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
@@ -78,7 +79,7 @@ public sealed class ClinicsController : ControllerBase
             nameof(GetById),
             new
             {
-                version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0",
+                version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0",
                 id
             },
             id);
@@ -395,7 +396,7 @@ public sealed class ClinicsController : ControllerBase
 
         return CreatedAtAction(
             nameof(GetHospitalizationWards),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id },
             result.Value);
     }
 
@@ -477,7 +478,7 @@ public sealed class ClinicsController : ControllerBase
 
         return CreatedAtAction(
             nameof(GetHospitalizationWards),
-            new { version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0", id },
+            new { version = HttpContext.RequestedApiVersion?.ToString() ?? "1.0", id },
             result.Value);
     }
 
