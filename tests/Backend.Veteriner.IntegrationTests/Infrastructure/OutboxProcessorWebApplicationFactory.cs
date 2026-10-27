@@ -12,7 +12,7 @@ namespace Backend.IntegrationTests.Infrastructure;
 
 /// <summary>
 /// Paylaşılan VetinityCommandDb_IntegrationTests veritabanında OutboxProcessor çakışmasını önlemek için
-/// ayrı LocalDB veritabanı ve hızlı döngü/no-op SMTP kullanır.
+/// ayrı LocalDB veritabanı ve kayıt tutan sahte SMTP kullanır.
 /// </summary>
 public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory<global::Program>
 {
@@ -75,12 +75,11 @@ public sealed class OutboxProcessorWebApplicationFactory : WebApplicationFactory
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IEmailSenderImmediate>();
-            services.AddScoped<IEmailSenderImmediate, NoOpEmailSenderImmediate>();
-            services.PostConfigure<OutboxOptions>(o =>
-            {
-                o.LoopIntervalSeconds = 2;
-                o.BatchSize = 50;
-            });
+            services.AddSingleton<RecordingEmailSenderImmediate>();
+            services.AddSingleton<IEmailSenderImmediate>(sp => sp.GetRequiredService<RecordingEmailSenderImmediate>());
+
+            // Barındırılan döngü kapalı: testler partiyi kendi OutboxProcessor örnekleriyle deterministik işletir.
+            services.PostConfigure<OutboxOptions>(o => o.Enabled = false);
         });
     }
 
