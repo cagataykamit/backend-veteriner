@@ -39,7 +39,8 @@
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
-  <!-- Kiracı filtresi kuralı (RS0030, ADR-040): parametresiz IgnoreQueryFilters yasak; önem derecesi .editorconfig'de. -->
+  <!-- RS0030: saat kaynağı kuralı (B4, DateTime.UtcNow yerine TimeProvider) ve kiracı filtresi kuralı (ADR-040, parametresiz
+       IgnoreQueryFilters yasak); önem derecesi .editorconfig'de. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0">
       <PrivateAssets>all</PrivateAssets>

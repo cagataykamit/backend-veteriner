@@ -51,6 +51,15 @@
 		<ProjectReference Include="..\Backend.Veteriner.Domain\Backend.Veteriner.Domain.csproj" />
 	</ItemGroup>
 
+	<!-- RS0030: saat kaynağı kuralı (B4, DateTime.UtcNow yerine TimeProvider) ve kiracı filtresi kuralı (ADR-040); önem derecesi .editorconfig'de. -->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+		</PackageReference>
+		<AdditionalFiles Include="BannedSymbols.txt" />
+	</ItemGroup>
+
 	<!-- Publish hygiene: dev/test/production overlays excluded; Staging overlay ships in artifact -->
 	<ItemGroup>
 		<Content Update="appsettings.Development.json">

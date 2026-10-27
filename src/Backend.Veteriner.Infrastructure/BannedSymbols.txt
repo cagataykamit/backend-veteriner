@@ -1,1 +1,6 @@
+P:System.DateTime.UtcNow;Infrastructure'da saat DI'daki TimeProvider ile alınır: _timeProvider.GetUtcNow().UtcDateTime; statik seed kodunda TimeProvider.System (B4).
+P:System.DateTime.Now;Yerel saat kullanılmaz; TimeProvider.GetUtcNow().
+P:System.DateTime.Today;Yerel gün kullanılmaz; TimeProvider.GetUtcNow().
+P:System.DateTimeOffset.UtcNow;Saat TimeProvider ile alınır: _timeProvider.GetUtcNow().
+P:System.DateTimeOffset.Now;Yerel saat kullanılmaz.
 M:Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.IgnoreQueryFilters``1(System.Linq.IQueryable{``0});Kiracı filtresi IgnoreQueryFilters ile kalkmaz: adlı filtre kullanın, IgnoreQueryFilters(QueryFilterNames.Ignorable); kiracılar arası iş ITenantScope.AsSystem (ADR-040).

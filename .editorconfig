@@ -16,9 +16,10 @@ charset = utf-8
 indent_style = space
 indent_size = 4
 
-# Saat kaynagi kurali (BannedSymbols.txt, Domain + Application): Domain saati utcNow parametresiyle alir, Application
-# TimeProvider kullanir (B4 temizligi tamam). Yeni dogrudan DateTime.UtcNow/Now/Today kullanimi derlemeyi kirar.
-# Kiraci filtresi kurali (Application + Infrastructure, ADR-040): parametresiz IgnoreQueryFilters yasak; adli filtre kullanilir.
+# Saat kaynagi kurali (BannedSymbols.txt, Domain + Application + Infrastructure + Api): Domain saati utcNow parametresiyle
+# alir, diger katmanlar TimeProvider kullanir (B4 temizligi tamam; statik seed kodu TimeProvider.System).
+# Yeni dogrudan DateTime.UtcNow/Now/Today kullanimi derlemeyi kirar.
+# Kiraci filtresi kurali (Application + Infrastructure + Api, ADR-040): parametresiz IgnoreQueryFilters yasak; adli filtre kullanilir.
 dotnet_diagnostic.RS0030.severity = error
 
 [tests/**/*.cs]
