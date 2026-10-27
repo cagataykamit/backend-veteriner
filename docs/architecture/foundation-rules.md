@@ -9,11 +9,18 @@ Bu belge **Backend.Veteriner** deposunun güncel mimari ve süreç kurallarını
 | Katman | Bağımlılık |
 |--------|------------|
 | **Backend.Veteriner.Api** | Application, Infrastructure, Domain (doğrudan veya dolaylı) |
-| **Backend.Veteriner.Application** | Yalnızca **Domain** (ve gerekli .NET / paket soyutlamaları) |
+| **Backend.Veteriner.Application** | **Domain** ve gerekli .NET / paket soyutlamaları; EF Core yalnız aşağıdaki sınırla |
 | **Backend.Veteriner.Domain** | Dış uygulama / altyapı assembly’lerine **bağımlı olmaz** |
 | **Backend.Veteriner.Infrastructure** | Application + Domain |
 
 **Kural:** Domain’e EF, HTTP, SMTP, `IConfiguration` vb. sızması yasaktır. Uygulama arabirimleri (`IRepository`, `IOutbox`, `IEmailSender` …) Application’da tanımlanır; implementasyon Infrastructure’da kalır.
+
+**Application’da EF Core sınırı (karar 2026-10-27):** Application EF Core paketine bağlıdır ve bu bilinçlidir. İzin verilen kullanım:
+
+- Specification ve sorgu ifadeleri: `AsNoTracking`, `Include`, `EF.Functions.Like` / `Collate`.
+- EF’nin kayıt istisnalarını iş sonucuna çevirmek: `DbUpdateException`, `DbUpdateConcurrencyException`.
+
+Yasak: `DbContext`, `DbSet`, migration, model yapılandırması ve bağlantı/transaction yönetimi. Bunlar Infrastructure’da kalır; Application veriye repository, specification ve okuma arabirimleri üzerinden erişir.
 
 ---
 
@@ -45,7 +52,7 @@ Bu belge **Backend.Veteriner** deposunun güncel mimari ve süreç kurallarını
 
 **Kurallar:**
 
-- Bir dosyada tek public type (okunabilirlik ve review kolaylığı).
+- Bir dosyada bir ana public type. Ana tiple birlikte anlamlı olan küçük yardımcı tipler aynı dosyada kalabilir: komutun sonuç/DTO kaydı, aynı komutun handler’ı, yalnız o tipin kullandığı enum veya iç kayıt. Bağımsız kullanılan ya da büyüyen tip kendi dosyasına taşınır (karar 2026-10-27).
 - Validator’lar **Application** katmanında; AbstractValidator ile command/query’ye bağlanır.
 - Handler’lar `IRequestHandler<,>` implemente eder; yan etkiler için repository / unit of work / outbox arabirimleri kullanılır.
 
