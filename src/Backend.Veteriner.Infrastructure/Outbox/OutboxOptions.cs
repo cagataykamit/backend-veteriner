@@ -16,4 +16,10 @@ public sealed class OutboxOptions
 
     /// D�ng� periyodu (saniye)
     public int LoopIntervalSeconds { get; set; } = 5;
+
+    /// <summary>
+    /// Claim (lease) süresi (saniye): mesajı alan instance bu süre içinde sonucu yazmazsa (ör. çökme) mesaj başka
+    /// instance tarafından yeniden alınır. Bir partinin gönderim süresinden uzun olmalı.
+    /// </summary>
+    public int ClaimLeaseSeconds { get; set; } = 300;
 }

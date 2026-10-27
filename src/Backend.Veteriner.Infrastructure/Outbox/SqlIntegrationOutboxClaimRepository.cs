@@ -10,8 +10,9 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Backend.Veteriner.Infrastructure.Outbox;
 
 /// <summary>
-/// Projeksiyon işlemcileri için claim/lease tabanlı outbox deposu (tek yer). Olay tipi listesi dışında Client, Pet ve
-/// Payment akışları aynıdır; türevler yalnız tip listesini verir. Randevu akışı sıra (sequence) kuralı taşıdığı için
+/// Outbox işlemcileri için claim/lease tabanlı outbox deposu (tek yer). Olay tipi listesi dışında Client, Pet ve
+/// Payment akışları aynıdır; türevler yalnız tip listesini verir. Generic işlemci aynı akışı tip listesini hariç tutarak
+/// kullanır (<see cref="SqlGenericOutboxClaimRepository"/>). Randevu akışı sıra (sequence) kuralı taşıdığı için
 /// kendi sınıfında kalır (<see cref="SqlAppointmentOutboxClaimRepository"/>).
 /// Kilit: UPDLOCK + READPAST + ROWLOCK ile aynı mesaj iki instance tarafından alınmaz; lease süresi dolan mesaj yeniden alınır.
 /// </summary>
@@ -22,7 +23,14 @@ public abstract class SqlIntegrationOutboxClaimRepository
     private readonly AppDbContext _dbContext;
     private readonly TimeProvider _timeProvider;
 
-    protected SqlIntegrationOutboxClaimRepository(AppDbContext dbContext, TimeProvider timeProvider, IReadOnlyCollection<string> eventTypes)
+    /// <param name="excludeEventTypes">
+    /// <c>true</c> ise <paramref name="eventTypes"/> dışındaki tipler alınır (generic outbox: projeksiyon olayları hariç).
+    /// </param>
+    protected SqlIntegrationOutboxClaimRepository(
+        AppDbContext dbContext,
+        TimeProvider timeProvider,
+        IReadOnlyCollection<string> eventTypes,
+        bool excludeEventTypes = false)
     {
         if (eventTypes.Count == 0)
             throw new ArgumentException("En az bir olay tipi gerekir.", nameof(eventTypes));
@@ -30,7 +38,7 @@ public abstract class SqlIntegrationOutboxClaimRepository
         _dbContext = dbContext;
         _timeProvider = timeProvider;
         _eventTypes = eventTypes.ToArray();
-        _claimSql = BuildClaimSql(_eventTypes.Length);
+        _claimSql = BuildClaimSql(_eventTypes.Length, excludeEventTypes);
     }
 
     public async Task<IReadOnlyList<ClaimedIntegrationOutboxMessage>> ClaimNextBatchAsync(
@@ -180,7 +188,7 @@ public abstract class SqlIntegrationOutboxClaimRepository
         command.Parameters.Add(new SqlParameter("@workerId", SqlDbType.NVarChar, 128) { Value = workerId });
     }
 
-    private static string BuildClaimSql(int eventTypeCount)
+    private static string BuildClaimSql(int eventTypeCount, bool excludeEventTypes)
     {
         var typeInClause = new StringBuilder();
         for (var i = 0; i < eventTypeCount; i++)
@@ -197,7 +205,7 @@ public abstract class SqlIntegrationOutboxClaimRepository
                 FROM OutboxMessages o WITH (UPDLOCK, READPAST, ROWLOCK)
                 WHERE o.ProcessedAtUtc IS NULL
                   AND o.DeadLetterAtUtc IS NULL
-                  AND o.Type IN ({typeInClause})
+                  AND o.Type {(excludeEventTypes ? "NOT IN" : "IN")} ({typeInClause})
                   AND (o.NextAttemptAtUtc IS NULL OR o.NextAttemptAtUtc <= @nowUtc)
                   AND (o.ClaimToken IS NULL OR o.LeaseExpiresAtUtc IS NULL OR o.LeaseExpiresAtUtc <= @nowUtc)
                 ORDER BY o.CreatedAtUtc, o.Id

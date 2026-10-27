@@ -1,10 +1,7 @@
 using System.Text.Json;
-using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Outbox;
-using Backend.Veteriner.Infrastructure.Persistence;
-using Backend.Veteriner.Infrastructure.Persistence.Entities;
-using Microsoft.EntityFrameworkCore;
+using Backend.Veteriner.Application.Projections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -20,9 +17,14 @@ namespace Backend.Veteriner.Infrastructure.Outbox;
 /// (foundation-rules §9); tanınmayan tip dead-letter'a düşer.
 ///
 /// Kurumsal davranış: retry / exponential backoff / jitter, dead-letter desteği.
+/// Mesajlar işlenmeden önce kısa süreli claim (lease) ile sahiplenilir (<see cref="SqlGenericOutboxClaimRepository"/>);
+/// iki instance aynı mesajı almaz. Her mesajın sonucu gönderimden hemen sonra kendi UPDATE'iyle yazılır; çökme yalnız
+/// sonucu yazılmamış mesajları lease süresi dolunca yeniden denemeye bırakır.
 /// </summary>
 public sealed class OutboxProcessor : BackgroundService
 {
+    private const int MaxWorkerIdLength = 128;
+
     private readonly IServiceProvider _sp;
     private readonly OutboxOptions _opt;
     private readonly TimeProvider _timeProvider;
@@ -34,7 +36,13 @@ public sealed class OutboxProcessor : BackgroundService
         _sp = sp;
         _opt = opt.Value;
         _timeProvider = timeProvider;
+
+        var workerId = $"outbox:{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
+        WorkerId = workerId.Length <= MaxWorkerIdLength ? workerId : workerId[..MaxWorkerIdLength];
     }
+
+    /// <summary>Claim sahibi kimliği (instance başına tekil).</summary>
+    public string WorkerId { get; }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -45,63 +53,13 @@ public sealed class OutboxProcessor : BackgroundService
         }
 
         var interval = TimeSpan.FromSeconds(Math.Max(1, _opt.LoopIntervalSeconds));
-        var timer = new PeriodicTimer(interval);
+        using var timer = new PeriodicTimer(interval);
 
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
             try
             {
-                using var scope = _sp.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-                var now = _timeProvider.GetUtcNow().UtcDateTime;
-
-                // Hazir, islenmemis, dead-letter olmayan mesajlar (projection integration eventleri SQL'de haric:
-                // appointment + client + pet; bunlarin kendi dedike projection processor'lari vardir).
-                var batch = await OutboxMessageQueryFilters
-                    .ExcludingProjectionIntegrationEvents(db.OutboxMessages)
-                    .Where(m => m.ProcessedAtUtc == null
-                             && m.DeadLetterAtUtc == null
-                             && (m.NextAttemptAtUtc == null || m.NextAttemptAtUtc <= now))
-                    .OrderBy(m => m.CreatedAtUtc)
-                    .ThenBy(m => m.Id)
-                    .Take(Math.Max(1, _opt.BatchSize))
-                    .ToListAsync(stoppingToken);
-
-                batch = batch.Where(m => !OutboxMessageQueryFilters.IsProjectionIntegrationEvent(m.Type)).ToList();
-
-                if (batch.Count == 0)
-                    continue;
-
-                foreach (var msg in batch)
-                {
-                    try
-                    {
-                        await ProcessMessageAsync(msg, scope.ServiceProvider, stoppingToken);
-
-                        OutboxRetryHelper.ApplySuccess(msg, _timeProvider.GetUtcNow().UtcDateTime);
-                    }
-                    catch (Exception ex)
-                    {
-                        OutboxRetryHelper.ApplyFailure(msg, _opt, ex, _timeProvider.GetUtcNow().UtcDateTime);
-
-                        if (msg.DeadLetterAtUtc is not null)
-                        {
-                            Log.Error(ex,
-                                "Outbox dead-letter. Type={Type} Id={Id} Retry={Retry}",
-                                msg.Type, msg.Id, msg.RetryCount);
-                        }
-                        else
-                        {
-                            var backoff = OutboxRetryHelper.ComputeBackoff(_opt.BaseDelaySeconds, msg.RetryCount);
-                            Log.Warning(ex,
-                                "Outbox retry in {DelaySeconds}s. Type={Type} Id={Id} Retry={Retry}",
-                                (int)backoff.TotalSeconds, msg.Type, msg.Id, msg.RetryCount);
-                        }
-                    }
-                }
-
-                await db.SaveChangesAsync(stoppingToken);
+                await ProcessBatchAsync(stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -114,7 +72,74 @@ public sealed class OutboxProcessor : BackgroundService
         }
     }
 
-    private static async Task ProcessMessageAsync(OutboxMessage msg, IServiceProvider sp, CancellationToken ct)
+    /// <summary>Bir parti mesajı claim eder ve sırayla işler.</summary>
+    /// <returns>Başarıyla işlenen mesaj sayısı.</returns>
+    public async Task<int> ProcessBatchAsync(CancellationToken cancellationToken)
+    {
+        using var scope = _sp.CreateScope();
+        var claims = scope.ServiceProvider.GetRequiredService<SqlGenericOutboxClaimRepository>();
+
+        var claimed = await claims.ClaimNextBatchAsync(
+            WorkerId,
+            Math.Max(1, _opt.BatchSize),
+            TimeSpan.FromSeconds(Math.Max(1, _opt.ClaimLeaseSeconds)),
+            cancellationToken);
+
+        var processedCount = 0;
+        foreach (var msg in claimed)
+        {
+            try
+            {
+                await ProcessMessageAsync(msg, scope.ServiceProvider, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Kalan claim'ler lease süresi dolunca yeniden alınır.
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await MarkFailureAsync(claims, msg, ex);
+                continue;
+            }
+
+            // Gönderim yapıldı: kapanışta iptal edilip mesajın yeniden gönderilmemesi için sonuç iptalsiz yazılır.
+            if (await claims.MarkProcessedAsync(msg.Id, msg.ClaimToken, WorkerId, CancellationToken.None))
+                processedCount++;
+            else
+                Log.Warning("Outbox completion rejected (claim lost). Type={Type} Id={Id}", msg.Type, msg.Id);
+        }
+
+        return processedCount;
+    }
+
+    private async Task MarkFailureAsync(SqlGenericOutboxClaimRepository claims, ClaimedIntegrationOutboxMessage msg, Exception ex)
+    {
+        var retryCount = msg.RetryCount + 1;
+        if (retryCount >= _opt.MaxRetryCount)
+        {
+            if (await claims.MarkDeadLetterAsync(msg.Id, msg.ClaimToken, WorkerId, ex.Message, CancellationToken.None))
+                Log.Error(ex, "Outbox dead-letter. Type={Type} Id={Id} Retry={Retry}", msg.Type, msg.Id, retryCount);
+            else
+                Log.Warning("Outbox dead-letter rejected (claim lost). Type={Type} Id={Id}", msg.Type, msg.Id);
+            return;
+        }
+
+        var backoff = OutboxRetryHelper.ComputeBackoff(_opt.BaseDelaySeconds, retryCount);
+        var nextAttemptAtUtc = _timeProvider.GetUtcNow().UtcDateTime.Add(backoff);
+        if (await claims.MarkRetryAsync(msg.Id, msg.ClaimToken, WorkerId, retryCount, nextAttemptAtUtc, ex.Message, CancellationToken.None))
+        {
+            Log.Warning(ex,
+                "Outbox retry in {DelaySeconds}s. Type={Type} Id={Id} Retry={Retry}",
+                (int)backoff.TotalSeconds, msg.Type, msg.Id, retryCount);
+        }
+        else
+        {
+            Log.Warning("Outbox retry rejected (claim lost). Type={Type} Id={Id}", msg.Type, msg.Id);
+        }
+    }
+
+    private static async Task ProcessMessageAsync(ClaimedIntegrationOutboxMessage msg, IServiceProvider sp, CancellationToken ct)
     {
         switch (msg.Type)
         {

@@ -30,6 +30,9 @@ public static class OutboxMessageQueryFilters
         .. PaymentIntegrationEventTypeValues
     ];
 
+    /// <summary>Generic outbox işlemcisinin almadığı tipler (claim deposu hariç tutma listesi).</summary>
+    public static IReadOnlyCollection<string> ProjectionIntegrationEventTypes => ProjectionIntegrationEventTypeValues;
+
     public static IQueryable<OutboxMessage> ExcludingAppointmentIntegrationEvents(IQueryable<OutboxMessage> query)
         => query.Where(m => !AppointmentIntegrationEventTypeValues.Contains(m.Type));
 
@@ -47,10 +50,4 @@ public static class OutboxMessageQueryFilters
 
     public static IQueryable<OutboxMessage> PaymentIntegrationEventsOnly(IQueryable<OutboxMessage> query)
         => query.Where(m => PaymentIntegrationEventTypeValues.Contains(m.Type));
-
-    public static bool IsProjectionIntegrationEvent(string type)
-        => AppointmentIntegrationEventTypes.IsKnown(type)
-           || ClientIntegrationEventTypes.IsKnown(type)
-           || PetIntegrationEventTypes.IsKnown(type)
-           || PaymentIntegrationEventTypes.IsKnown(type);
 }

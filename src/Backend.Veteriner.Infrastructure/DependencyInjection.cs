@@ -257,6 +257,7 @@ public static class DependencyInjection
         services.AddSingleton<ICatalogCacheInvalidator>(sp => sp.GetRequiredService<CatalogListCache>());
 
         // ===== Outbox background worker =====
+        services.AddScoped<SqlGenericOutboxClaimRepository>();
         services.AddHostedService<OutboxProcessor>();
 
         services.AddScoped<IAppointmentProjectionSnapshotFactory, AppointmentProjectionSnapshotFactory>();
