@@ -150,8 +150,9 @@ public sealed class CreateImportBatchCommandHandler
 
         try
         {
-            // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); komut işlem içindedir (ITransactionalRequest).
+            // Parti hemen kaydedilir (benzersizlik burada elenir); komut işlem içindedir (ITransactionalRequest).
             await _batchesWrite.AddAsync(batch, ct);
+            await _batchesWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateException)
         {
@@ -176,6 +177,7 @@ public sealed class CreateImportBatchCommandHandler
                 ImportSourceRowJson.Serialize(t.Headers, r.Cells),
                 normalizedJson: null)));
         await _rowsWrite.AddRangeAsync(rows, ct);
+        await _rowsWrite.SaveChangesAsync(ct);
 
         var headers = tables.ToDictionary(t => t.Table, t => t.Headers);
         var warnings = read.Value.Warnings

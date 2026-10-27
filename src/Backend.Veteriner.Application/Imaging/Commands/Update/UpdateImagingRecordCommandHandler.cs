@@ -89,6 +89,7 @@ public sealed class UpdateImagingRecordCommandHandler
         try
         {
             await _records.UpdateAsync(existing, ct);
+            await _records.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {

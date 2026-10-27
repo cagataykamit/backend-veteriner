@@ -221,8 +221,9 @@ public sealed class CreateAdministrationCommandHandler
         var administration = created.Value!;
         try
         {
-            // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); requestId benzersizliği stoktan önce elenir.
+            // Kayıt hemen yapılır (işlem içinde); requestId benzersizliği stoktan önce elenir.
             await _administrationsWrite.AddAsync(administration, ct);
+            await _administrationsWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateException) when (request.RequestId.HasValue)
         {
@@ -272,6 +273,8 @@ public sealed class CreateAdministrationCommandHandler
 
             await _chargeSuggestions.AddAsync(suggestion.Value!, ct);
         }
+
+        await _administrationsWrite.SaveChangesAsync(ct);
 
         var stock = await _stocks.FirstOrDefaultAsync(
             new ProductStockForUpdateSpec(tenantId, clinicId, request.ProductId), ct);

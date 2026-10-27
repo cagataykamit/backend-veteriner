@@ -173,6 +173,7 @@ public sealed class VoidAdministrationCommandHandler
         try
         {
             await _administrations.UpdateAsync(administration, ct);
+            await _administrations.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -196,6 +197,7 @@ public sealed class VoidAdministrationCommandHandler
         try
         {
             await _chargeSuggestions.UpdateAsync(suggestion, ct);
+            await _chargeSuggestions.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -220,6 +222,7 @@ public sealed class VoidAdministrationCommandHandler
 
         vaccination.CancelForVoidedAdministration();
         await _vaccinations.UpdateAsync(vaccination, ct);
+        await _vaccinations.SaveChangesAsync(ct);
     }
 
     private static Result<AdministrationDto> Fail(string code, string message)

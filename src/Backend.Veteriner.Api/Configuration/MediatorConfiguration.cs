@@ -26,7 +26,8 @@ public static class MediatorConfiguration
             // 5) ActivationSignal: başarılı IActivationSignalRequest sonrası ilk aksiyon işareti (transaction dışında).
             // 6) Performance: yavaş işleyici uyarısı.
             // 7) Logging: istek başı / sonu logu.
-            // 8) Transaction (Infrastructure): ITransactionalRequest için DB transaction; işleyiciye en yakın katman.
+            // 8) Transaction (Infrastructure): ITransactionalRequest için DB transaction.
+            // 9) UnsavedChangesGuard (Infrastructure): başarılı istekte kaydedilmemiş değişiklik kalmasın (ADR-039); işleyiciye en yakın katman.
             options.PipelineBehaviors =
             [
                 typeof(UnhandledExceptionBehavior<,>),
@@ -37,6 +38,7 @@ public static class MediatorConfiguration
                 typeof(PerformanceBehavior<,>),
                 typeof(LoggingBehavior<,>),
                 typeof(TransactionBehavior<,>),
+                typeof(UnsavedChangesGuardBehavior<,>),
             ];
         });
 

@@ -5,7 +5,7 @@ namespace Backend.Veteriner.Application.Common.Abstractions;
 
 /// <summary>
 /// UserOperationClaim veri erişimi.
-/// Not: Projede UnitOfWork olmadığı için implementasyonlar SaveChanges çağırır.
+/// Not: Yazım metotları SaveChanges çağırmaz; commit handler'da <see cref="IUnitOfWork"/> ile yapılır (ADR-039).
 /// </summary>
 public interface IUserOperationClaimRepository
 {

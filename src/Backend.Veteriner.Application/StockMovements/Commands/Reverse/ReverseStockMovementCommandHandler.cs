@@ -146,12 +146,13 @@ public sealed class ReverseStockMovementCommandHandler
             _clientContext.UserId,
             request.RequestId);
 
-        // Ters hareket tek başına önce yazılır (AddAsync SaveChanges içerir): benzersiz kurallar (requestId, tek ters hareket)
+        // Ters hareket tek başına önce yazılır (AddAsync ve hemen ardından SaveChanges): benzersiz kurallar (requestId, tek ters hareket)
         // kaybedeni ilk yazımında eler ve işlemde kaybedenin stok/parti değişikliği kalmaz. Başarısız SaveChanges'in kısmi
         // yazımını geri alacak savepoint'e güvenilmez (EF, MARS açık bağlantıda savepoint açmaz).
         try
         {
             await _stockMovementsWrite.AddAsync(reversal, ct);
+            await _stockMovementsWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateException)
         {

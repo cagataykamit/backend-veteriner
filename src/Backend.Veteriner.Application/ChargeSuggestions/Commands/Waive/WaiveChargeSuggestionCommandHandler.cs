@@ -78,6 +78,7 @@ public sealed class WaiveChargeSuggestionCommandHandler
         try
         {
             await _suggestions.UpdateAsync(suggestion, ct);
+            await _suggestions.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {

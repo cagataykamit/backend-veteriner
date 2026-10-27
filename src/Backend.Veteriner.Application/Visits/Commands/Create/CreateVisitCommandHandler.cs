@@ -211,8 +211,9 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
 
         try
         {
-            // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir).
+            // Geliş, randevu geri alma ve olayı tek SaveChanges'te yazılır; benzersizlik burada elenir.
             await _visitsWrite.AddAsync(visit, ct);
+            await _visitsWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateException)
         {

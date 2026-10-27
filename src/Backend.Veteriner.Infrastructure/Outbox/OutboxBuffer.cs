@@ -11,6 +11,9 @@ public sealed class OutboxBuffer : IOutboxBuffer
 
     public OutboxBuffer(ILogger<OutboxBuffer> logger) => _logger = logger;
 
+    /// <summary>Henüz bir SaveChanges ile boşaltılmamış mesaj sayısı.</summary>
+    public int PendingCount => _items.Count;
+
     public Task EnqueueAsync(
         string type,
         string payload,

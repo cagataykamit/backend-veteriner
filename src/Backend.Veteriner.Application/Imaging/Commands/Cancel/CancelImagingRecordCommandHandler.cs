@@ -76,6 +76,7 @@ public sealed class CancelImagingRecordCommandHandler
         try
         {
             await _records.UpdateAsync(existing, ct);
+            await _records.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {

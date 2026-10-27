@@ -319,10 +319,11 @@ public sealed class CreateStockMovementCommandHandler
                     "Desteklenmeyen hareket tipi.");
         }
 
-        // Repository AddAsync kaydı hemen kalıcılaştırır (SaveChanges içerir); işlem sınırı TransactionBehavior'dadır.
+        // Hareket tek başına önce kaydedilir (yalnız INSERT); benzersiz kurallar kaybedeni burada eler. İşlem sınırı TransactionBehavior'dadır.
         try
         {
             await _stockMovementsWrite.AddAsync(movement, ct);
+            await _stockMovementsWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateException)
         {
@@ -352,6 +353,7 @@ public sealed class CreateStockMovementCommandHandler
             try
             {
                 await _productStocksWrite.AddAsync(newStock, ct);
+                await _productStocksWrite.SaveChangesAsync(ct);
             }
             catch (DbUpdateException)
             {

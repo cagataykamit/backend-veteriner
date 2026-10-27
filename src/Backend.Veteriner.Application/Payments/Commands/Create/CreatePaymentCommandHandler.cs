@@ -279,6 +279,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         try
         {
             await _paymentsWrite.AddAsync(payment, ct);
+            await _paymentsWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateException)
         {
@@ -309,6 +310,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
 
             // Tahsis satırları + ödeme/ücret sayaçları + outbox tek SaveChanges'te; sayaç token'ları iki kullanıcı çakışmasını yakalar.
             await _allocationsWrite.AddRangeAsync(allocated.Value!, ct);
+            await _allocationsWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {

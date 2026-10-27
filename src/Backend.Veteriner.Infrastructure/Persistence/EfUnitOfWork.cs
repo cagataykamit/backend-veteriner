@@ -15,5 +15,5 @@ public sealed class EfUnitOfWork : IUnitOfWork
     }
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
-        => _db.SaveChangesAsync(ct);
+        => _db.CommitAsync(ct);
 }

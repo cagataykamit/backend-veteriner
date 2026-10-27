@@ -89,6 +89,7 @@ public sealed class StoredFileMaintenanceProcessor
             await storage.DeleteAsync(file.StorageKey, ct);
             file.MarkDeleted(null, now);
             await files.UpdateAsync(file, ct);
+            await files.SaveChangesAsync(ct);
             return true;
         }
         catch (DbUpdateConcurrencyException)
