@@ -83,7 +83,7 @@ public static class LoadTestDataSeeder
         EnsureTargetDatabase(db);
 
         var sw = Stopwatch.StartNew();
-        var now = DateTime.UtcNow;
+        var now = TimeProvider.System.GetUtcNow().UtcDateTime;
 
         var context = await ResolveSeedContextAsync(db, logger, ct);
         var before = await GetLoadTestCountsAsync(db, context, ct);
@@ -883,7 +883,7 @@ public static class LoadTestDataSeeder
                 : globalPetIndex % 2 == 0 ? PetGender.Male : PetGender.Female;
 
             var birthDate = DateOnly.FromDateTime(
-                DateTime.UtcNow.AddDays(-random.Next(365, 365 * 15)));
+                TimeProvider.System.GetUtcNow().UtcDateTime.AddDays(-random.Next(365, 365 * 15)));
 
             var weight = isDog
                 ? Math.Round((decimal)(random.Next(500, 4000) / 100.0), 1)

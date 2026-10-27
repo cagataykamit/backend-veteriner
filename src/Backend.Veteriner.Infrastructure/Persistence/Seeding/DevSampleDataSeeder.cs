@@ -133,7 +133,7 @@ public static class DevSampleDataSeeder
         ILogger? logger,
         CancellationToken ct)
     {
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = TimeProvider.System.GetUtcNow().UtcDateTime;
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, ClinicTimeZone);
         var today = localNow.Date;
         var floor = today.AddMinutes(Math.Floor(localNow.TimeOfDay.TotalMinutes / SlotMinutes) * SlotMinutes);
@@ -248,7 +248,7 @@ public static class DevSampleDataSeeder
         var paid = await handlers.CreatePayment.Handle(
             new CreatePaymentCommand(
                 clinicId, persona.Client.Id, persona.Pet.Id, null, null, amount, Charge.DefaultCurrency, method,
-                DateTime.UtcNow, $"{Prefix} ödeme ({scenario})", paymentRequestId, allocations), ct);
+                TimeProvider.System.GetUtcNow().UtcDateTime, $"{Prefix} ödeme ({scenario})", paymentRequestId, allocations), ct);
         if (!paid.IsSuccess)
         {
             await tx.RollbackAsync(ct);
@@ -268,12 +268,13 @@ public static class DevSampleDataSeeder
         CancellationToken ct)
     {
         var notes = $"{Prefix} eski ödeme (tahsissiz)";
+        var utcNow = TimeProvider.System.GetUtcNow().UtcDateTime;
         if (await db.Payments.AnyAsync(x => x.TenantId == tenantId && x.ClientId == persona.Client.Id && x.Notes == notes, ct))
             return 0;
 
         var payment = new Payment(
             tenantId, clinic.Id, persona.Client.Id, null, null, null,
-            500m, Charge.DefaultCurrency, PaymentMethod.Cash, DateTime.UtcNow, notes);
+            500m, Charge.DefaultCurrency, PaymentMethod.Cash, utcNow, notes);
         await db.Payments.AddAsync(payment, ct);
 
         var outbox = new PaymentIntegrationEventOutbox(outboxBuffer);
@@ -281,7 +282,7 @@ public static class DevSampleDataSeeder
             PaymentIntegrationEventTypes.Created,
             new PaymentCreatedIntegrationEvent(
                 Guid.NewGuid(),
-                DateTime.UtcNow,
+                utcNow,
                 PaymentProjectionSnapshotFactory.Create(payment, persona.Client.FullName, clinic.Name, null)),
             ct);
         await db.SaveChangesAsync(ct);

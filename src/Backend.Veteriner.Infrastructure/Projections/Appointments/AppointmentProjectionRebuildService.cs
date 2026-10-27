@@ -21,19 +21,22 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
     private readonly QueryDbContext _queryDb;
     private readonly ILogger<AppointmentProjectionRebuildService> _logger;
     private readonly AppointmentProjectionMetrics _metrics;
+    private readonly TimeProvider _timeProvider;
 
     public AppointmentProjectionRebuildService(
         AppDbContext commandDb,
         ITenantScope tenantScope,
         QueryDbContext queryDb,
         ILogger<AppointmentProjectionRebuildService> logger,
-        AppointmentProjectionMetrics metrics)
+        AppointmentProjectionMetrics metrics,
+        TimeProvider timeProvider)
     {
         _commandDb = commandDb;
         _tenantScope = tenantScope;
         _queryDb = queryDb;
         _logger = logger;
         _metrics = metrics;
+        _timeProvider = timeProvider;
     }
 
     public async Task<AppointmentProjectionRebuildResult> RebuildAsync(
@@ -42,7 +45,7 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
     {
         // Okuma modelini tüm kiracılar için yeniden kurar (platform bakım işi, ADR-040).
         using var system = _tenantScope.AsSystem();
-        var started = DateTime.UtcNow;
+        var started = _timeProvider.GetUtcNow().UtcDateTime;
         batchSize = Math.Max(1, batchSize);
 
         try
@@ -51,7 +54,7 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
         }
         catch (Exception ex)
         {
-            _metrics.RecordRebuildCompleted((DateTime.UtcNow - started).TotalMilliseconds, success: false);
+            _metrics.RecordRebuildCompleted((_timeProvider.GetUtcNow().UtcDateTime - started).TotalMilliseconds, success: false);
             _logger.LogError(ex, "Appointment projection rebuild failed.");
             throw;
         }
@@ -77,7 +80,7 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
         }
 
         var commandAppointmentCount = await _commandDb.Appointments.CountAsync(cancellationToken);
-        var rebuildStartedAtUtc = DateTime.UtcNow;
+        var rebuildStartedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
 
         var petActivity = new Dictionary<(Guid TenantId, Guid ClinicId, Guid PetId), ActivitySnapshot>();
         var clientActivity = new Dictionary<(Guid TenantId, Guid ClinicId, Guid ClientId), ActivitySnapshot>();
@@ -125,7 +128,7 @@ public class AppointmentProjectionRebuildService : IAppointmentProjectionRebuild
             throw;
         }
 
-        var duration = DateTime.UtcNow - started;
+        var duration = _timeProvider.GetUtcNow().UtcDateTime - started;
         var result = new AppointmentProjectionRebuildResult(
             Success: true,
             CommandAppointmentCount: commandAppointmentCount,

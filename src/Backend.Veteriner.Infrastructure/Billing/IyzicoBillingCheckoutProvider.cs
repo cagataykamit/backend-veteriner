@@ -27,6 +27,7 @@ public sealed class IyzicoBillingCheckoutProvider : IBillingCheckoutProvider
     private readonly IClientContext _clientContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IHostEnvironment _hostEnvironment;
+    private readonly TimeProvider _timeProvider;
 
     public IyzicoBillingCheckoutProvider(
         IOptions<BillingOptions> billingOptions,
@@ -34,7 +35,8 @@ public sealed class IyzicoBillingCheckoutProvider : IBillingCheckoutProvider
         IUserReadRepository users,
         IClientContext clientContext,
         IHttpContextAccessor httpContextAccessor,
-        IHostEnvironment hostEnvironment)
+        IHostEnvironment hostEnvironment,
+        TimeProvider timeProvider)
     {
         _billingOptions = billingOptions.Value;
         _logger = logger;
@@ -42,6 +44,7 @@ public sealed class IyzicoBillingCheckoutProvider : IBillingCheckoutProvider
         _clientContext = clientContext;
         _httpContextAccessor = httpContextAccessor;
         _hostEnvironment = hostEnvironment;
+        _timeProvider = timeProvider;
     }
 
     public BillingProvider Provider => BillingProvider.Iyzico;
@@ -148,6 +151,7 @@ public sealed class IyzicoBillingCheckoutProvider : IBillingCheckoutProvider
         var amountText = amountTry.ToString("F2", CultureInfo.InvariantCulture);
         var locale = NormalizeLocale(iyzico.Locale);
         var (buyerName, buyerSurname) = DeriveBuyerNameFromEmail(buyerEmail);
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         return new CreateCheckoutFormInitializeRequest
         {
@@ -170,8 +174,8 @@ public sealed class IyzicoBillingCheckoutProvider : IBillingCheckoutProvider
                 GsmNumber = "+905321234567",
                 Email = buyerEmail,
                 IdentityNumber = "11111111111",
-                LastLoginDate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
-                RegistrationDate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                LastLoginDate = now.ToString("yyyy-MM-dd HH:mm:ss"),
+                RegistrationDate = now.ToString("yyyy-MM-dd HH:mm:ss"),
                 RegistrationAddress = $"{iyzico.City}, Turkey — tenant {tenantId[..8]}",
                 Ip = buyerIp,
                 City = iyzico.City,

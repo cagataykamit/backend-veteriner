@@ -17,7 +17,7 @@ public sealed class OutboxMessage
     /// <summary>
     /// Mesaj�n olu�turuldu�u UTC zaman
     /// </summary>
-    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; set; } = TimeProvider.System.GetUtcNow().UtcDateTime;
 
     /// <summary>
     /// ��lendi�i zaman (e�er i�lendi)

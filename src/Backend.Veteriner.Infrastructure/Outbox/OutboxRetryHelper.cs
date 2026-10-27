@@ -15,21 +15,21 @@ internal static class OutboxRetryHelper
         return TimeSpan.FromSeconds(Math.Max(1, (int)withJitter));
     }
 
-    public static void ApplyFailure(OutboxMessage msg, OutboxOptions options, Exception ex)
+    public static void ApplyFailure(OutboxMessage msg, OutboxOptions options, Exception ex, DateTime utcNow)
     {
         msg.RetryCount++;
         msg.LastError = ex.Message;
         msg.Error = ex.ToString();
 
         if (msg.RetryCount >= options.MaxRetryCount)
-            msg.DeadLetterAtUtc = DateTime.UtcNow;
+            msg.DeadLetterAtUtc = utcNow;
         else
-            msg.NextAttemptAtUtc = DateTime.UtcNow.Add(ComputeBackoff(options.BaseDelaySeconds, msg.RetryCount));
+            msg.NextAttemptAtUtc = utcNow.Add(ComputeBackoff(options.BaseDelaySeconds, msg.RetryCount));
     }
 
-    public static void ApplySuccess(OutboxMessage msg)
+    public static void ApplySuccess(OutboxMessage msg, DateTime utcNow)
     {
-        msg.ProcessedAtUtc = DateTime.UtcNow;
+        msg.ProcessedAtUtc = utcNow;
         msg.LastError = null;
         msg.Error = null;
         msg.NextAttemptAtUtc = null;

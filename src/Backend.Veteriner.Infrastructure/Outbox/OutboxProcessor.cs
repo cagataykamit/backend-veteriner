@@ -25,13 +25,15 @@ public sealed class OutboxProcessor : BackgroundService
 {
     private readonly IServiceProvider _sp;
     private readonly OutboxOptions _opt;
+    private readonly TimeProvider _timeProvider;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public OutboxProcessor(IServiceProvider sp, IOptions<OutboxOptions> opt)
+    public OutboxProcessor(IServiceProvider sp, IOptions<OutboxOptions> opt, TimeProvider timeProvider)
     {
         _sp = sp;
         _opt = opt.Value;
+        _timeProvider = timeProvider;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -52,7 +54,7 @@ public sealed class OutboxProcessor : BackgroundService
                 using var scope = _sp.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-                var now = DateTime.UtcNow;
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
 
                 // Hazir, islenmemis, dead-letter olmayan mesajlar (projection integration eventleri SQL'de haric:
                 // appointment + client + pet; bunlarin kendi dedike projection processor'lari vardir).
@@ -77,11 +79,11 @@ public sealed class OutboxProcessor : BackgroundService
                     {
                         await ProcessMessageAsync(msg, scope.ServiceProvider, stoppingToken);
 
-                        OutboxRetryHelper.ApplySuccess(msg);
+                        OutboxRetryHelper.ApplySuccess(msg, _timeProvider.GetUtcNow().UtcDateTime);
                     }
                     catch (Exception ex)
                     {
-                        OutboxRetryHelper.ApplyFailure(msg, _opt, ex);
+                        OutboxRetryHelper.ApplyFailure(msg, _opt, ex, _timeProvider.GetUtcNow().UtcDateTime);
 
                         if (msg.DeadLetterAtUtc is not null)
                         {

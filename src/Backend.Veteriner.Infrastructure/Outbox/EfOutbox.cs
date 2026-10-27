@@ -9,16 +9,23 @@ namespace Backend.Veteriner.Infrastructure.Outbox;
 public sealed class EfOutbox : IOutbox
 {
     private readonly AppDbContext _db;
-    public EfOutbox(AppDbContext db) => _db = db;
+    private readonly TimeProvider _timeProvider;
+
+    public EfOutbox(AppDbContext db, TimeProvider timeProvider)
+    {
+        _db = db;
+        _timeProvider = timeProvider;
+    }
 
     public async Task EnqueueAsync(string type, string payloadJson, CancellationToken ct = default)
     {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var msg = new OutboxMessage
         {
             Type = type,
             Payload = payloadJson,
-            CreatedAtUtc = DateTime.UtcNow,
-            NextAttemptAtUtc = DateTime.UtcNow
+            CreatedAtUtc = now,
+            NextAttemptAtUtc = now
         };
 
         await _db.OutboxMessages.AddAsync(msg, ct);

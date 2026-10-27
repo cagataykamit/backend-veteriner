@@ -9,18 +9,24 @@ namespace Backend.Veteriner.Infrastructure.Outbox;
 public sealed class OutboxService : IOutbox
 {
     private readonly AppDbContext _db;
+    private readonly TimeProvider _timeProvider;
 
-    public OutboxService(AppDbContext db) => _db = db;
+    public OutboxService(AppDbContext db, TimeProvider timeProvider)
+    {
+        _db = db;
+        _timeProvider = timeProvider;
+    }
 
     public async Task EnqueueAsync(string type, string payloadJson, CancellationToken ct = default)
     {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var msg = new OutboxMessage
         {
             Type = type,
             Payload = payloadJson,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = now,
             RetryCount = 0,
-            NextAttemptAtUtc = DateTime.UtcNow // ilk deneme hemen
+            NextAttemptAtUtc = now // ilk deneme hemen
         };
         await _db.OutboxMessages.AddAsync(msg, ct);
         await _db.SaveChangesAsync(ct);

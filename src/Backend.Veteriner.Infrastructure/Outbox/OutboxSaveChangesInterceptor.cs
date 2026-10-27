@@ -11,11 +11,16 @@ public sealed class OutboxSaveChangesInterceptor : SaveChangesInterceptor
 {
     private readonly OutboxBuffer _buffer; // somut kullan�yoruz ki Drain eri�ilsin
     private readonly ILogger<OutboxSaveChangesInterceptor> _logger;
+    private readonly TimeProvider _timeProvider;
 
-    public OutboxSaveChangesInterceptor(OutboxBuffer buffer, ILogger<OutboxSaveChangesInterceptor> logger)
+    public OutboxSaveChangesInterceptor(
+        OutboxBuffer buffer,
+        ILogger<OutboxSaveChangesInterceptor> logger,
+        TimeProvider timeProvider)
     {
         _buffer = buffer;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
@@ -47,7 +52,7 @@ public sealed class OutboxSaveChangesInterceptor : SaveChangesInterceptor
 
         _logger.LogInformation("OutboxInterceptor: drained {Count} item(s).", batch.Count);
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         foreach (var item in batch)
         {
             _logger.LogDebug("OutboxInterceptor: append type={Type}, len={Len}", item.Type, item.Payload?.Length ?? 0);

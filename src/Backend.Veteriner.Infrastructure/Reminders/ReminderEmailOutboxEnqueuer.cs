@@ -8,10 +8,12 @@ namespace Backend.Veteriner.Infrastructure.Reminders;
 public sealed class ReminderEmailOutboxEnqueuer : IReminderEmailOutboxEnqueuer
 {
     private readonly AppDbContext _db;
+    private readonly TimeProvider _timeProvider;
 
-    public ReminderEmailOutboxEnqueuer(AppDbContext db)
+    public ReminderEmailOutboxEnqueuer(AppDbContext db, TimeProvider timeProvider)
     {
         _db = db;
+        _timeProvider = timeProvider;
     }
 
     public Task<Guid> EnqueueReminderEmailAsync(
@@ -34,7 +36,7 @@ public sealed class ReminderEmailOutboxEnqueuer : IReminderEmailOutboxEnqueuer
             Id = Guid.NewGuid(),
             Type = OutboxMessageTypes.Email,
             Payload = JsonSerializer.Serialize(payload),
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime,
             RetryCount = 0
         };
 

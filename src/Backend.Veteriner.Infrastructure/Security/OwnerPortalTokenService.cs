@@ -19,9 +19,11 @@ public sealed class OwnerPortalTokenService : IOwnerPortalTokenService
     private readonly JwtOptions _jwt;
     private readonly OwnerPortalOptions _portal;
     private readonly SigningCredentials _signingCredentials;
+    private readonly TimeProvider _timeProvider;
 
-    public OwnerPortalTokenService(IOptions<JwtOptions> jwt, IOptions<OwnerPortalOptions> portal)
+    public OwnerPortalTokenService(IOptions<JwtOptions> jwt, IOptions<OwnerPortalOptions> portal, TimeProvider timeProvider)
     {
+        _timeProvider = timeProvider;
         _jwt = jwt.Value ?? throw new ArgumentNullException(nameof(jwt));
         _portal = portal.Value ?? throw new ArgumentNullException(nameof(portal));
         if (string.IsNullOrWhiteSpace(_jwt.Key) || _jwt.Key.Length < 32)
@@ -36,8 +38,9 @@ public sealed class OwnerPortalTokenService : IOwnerPortalTokenService
 
     public (string AccessToken, DateTime ExpiresAtUtc) CreateAccessToken(OwnerAccount account)
     {
-        // JwtBearer doğrulaması sistem saatini kullanır; süre de ondan hesaplanır (personel JwtTokenService ile aynı).
-        var now = DateTime.UtcNow;
+        // Süre DI'daki saatten hesaplanır (üretimde sistem saati; JwtBearer doğrulaması da onu kullanır), personel
+        // JwtTokenService ile aynı.
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var expires = now.AddMinutes(_portal.AccessTokenMinutes);
 
         var claims = new List<Claim>

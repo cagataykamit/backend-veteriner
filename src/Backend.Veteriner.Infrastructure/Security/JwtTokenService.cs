@@ -14,9 +14,11 @@ public sealed class JwtTokenService : IJwtTokenService
 {
     private readonly JwtOptions _opt;
     private readonly SigningCredentials _signingCredentials;
+    private readonly TimeProvider _timeProvider;
 
-    public JwtTokenService(IOptions<JwtOptions> options)
+    public JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider)
     {
+        _timeProvider = timeProvider;
         _opt = options.Value ?? throw new ArgumentNullException(nameof(options));
         if (string.IsNullOrWhiteSpace(_opt.Key) || _opt.Key.Length < 32)
             throw new InvalidOperationException("Jwt:Key en az 32 karakter olmalı.");
@@ -43,7 +45,7 @@ public sealed class JwtTokenService : IJwtTokenService
         IReadOnlyList<string> roleNames,
         IEnumerable<Claim>? extraClaims = null)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         var jti = Guid.NewGuid().ToString("N");
 
         var claims = new List<Claim>

@@ -139,7 +139,7 @@ public static class DataSeeder
         if (await db.TenantSubscriptions.AsNoTracking().AnyAsync(s => s.TenantId == tenantId, ct))
             return;
 
-        var now = DateTime.UtcNow;
+        var now = TimeProvider.System.GetUtcNow().UtcDateTime;
         var sub = TenantSubscription.StartTrial(
             tenantId,
             SubscriptionPlanCode.Premium,

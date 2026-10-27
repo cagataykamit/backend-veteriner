@@ -12,15 +12,18 @@ public sealed class RefreshTokenCleanupHostedService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RefreshTokenCleanupHostedService> _logger;
     private readonly RefreshTokenCleanupOptions _opt;
+    private readonly TimeProvider _timeProvider;
 
     public RefreshTokenCleanupHostedService(
         IServiceScopeFactory scopeFactory,
         IOptions<RefreshTokenCleanupOptions> options,
-        ILogger<RefreshTokenCleanupHostedService> logger)
+        ILogger<RefreshTokenCleanupHostedService> logger,
+        TimeProvider timeProvider)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _opt = options.Value;
+        _timeProvider = timeProvider;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -73,7 +76,7 @@ public sealed class RefreshTokenCleanupHostedService : BackgroundService
 
     private async Task RunOnce(CancellationToken ct)
     {
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var cutoff = now.AddDays(-Math.Max(0, _opt.RetentionDays));
         var batchSize = Math.Max(100, _opt.BatchSize);
 

@@ -253,7 +253,7 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
                 var applyResult = await ApplyTransactionallyAsync(
                     integrationEvent, eventId, occurredAtUtc, cancellationToken);
 
-                OutboxRetryHelper.ApplySuccess(msg);
+                OutboxRetryHelper.ApplySuccess(msg, _timeProvider.GetUtcNow().UtcDateTime);
                 await _commandDb.SaveChangesAsync(cancellationToken);
                 processedCount++;
 
@@ -285,7 +285,7 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
             }
             catch (Exception ex)
             {
-                OutboxRetryHelper.ApplyFailure(msg, _outboxOptions, ex);
+                OutboxRetryHelper.ApplyFailure(msg, _outboxOptions, ex, _timeProvider.GetUtcNow().UtcDateTime);
 
                 if (msg.DeadLetterAtUtc is not null)
                 {

@@ -11,8 +11,13 @@ public sealed class OutboxAdminRepository : IOutboxAdminRepository
     private const int MaxPageSize = 200;
 
     private readonly AppDbContext _db;
+    private readonly TimeProvider _timeProvider;
 
-    public OutboxAdminRepository(AppDbContext db) => _db = db;
+    public OutboxAdminRepository(AppDbContext db, TimeProvider timeProvider)
+    {
+        _db = db;
+        _timeProvider = timeProvider;
+    }
 
     public Task<PagedResult<OutboxItemDto>> GetPendingPagedAsync(PageRequest req, CancellationToken ct)
         => GetPagedAsync(_db.OutboxMessages.Where(x => x.ProcessedAtUtc == null && x.DeadLetterAtUtc == null), req, ct);
@@ -27,7 +32,7 @@ public sealed class OutboxAdminRepository : IOutboxAdminRepository
         if (msg.DeadLetterAtUtc is null) return OutboxRetryOutcome.NotDeadLetter;
 
         msg.DeadLetterAtUtc = null;
-        msg.NextAttemptAtUtc = DateTime.UtcNow;
+        msg.NextAttemptAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
         msg.LastError = null;
         return OutboxRetryOutcome.Retried;
     }
@@ -38,7 +43,7 @@ public sealed class OutboxAdminRepository : IOutboxAdminRepository
             .Where(x => x.DeadLetterAtUtc != null && x.ProcessedAtUtc == null)
             .ToListAsync(ct);
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         foreach (var m in list)
         {

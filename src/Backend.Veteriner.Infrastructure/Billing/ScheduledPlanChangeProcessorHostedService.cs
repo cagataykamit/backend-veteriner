@@ -12,13 +12,16 @@ public sealed class ScheduledPlanChangeProcessorHostedService : BackgroundServic
 {
     private readonly IServiceProvider _sp;
     private readonly ScheduledPlanChangeProcessorOptions _opt;
+    private readonly TimeProvider _timeProvider;
 
     public ScheduledPlanChangeProcessorHostedService(
         IServiceProvider sp,
-        IOptions<ScheduledPlanChangeProcessorOptions> opt)
+        IOptions<ScheduledPlanChangeProcessorOptions> opt,
+        TimeProvider timeProvider)
     {
         _sp = sp;
         _opt = opt.Value;
+        _timeProvider = timeProvider;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -41,7 +44,7 @@ public sealed class ScheduledPlanChangeProcessorHostedService : BackgroundServic
                 var subsWrite = scope.ServiceProvider.GetRequiredService<IRepository<TenantSubscription>>();
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
-                var now = DateTime.UtcNow;
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
 
                 // Vadesi gelen değişiklikleri bulmak kiracılar arasıdır (ADR-040); her değişiklik kendi kiracısının
                 // kapsamında uygulanır ve kaydedilir.

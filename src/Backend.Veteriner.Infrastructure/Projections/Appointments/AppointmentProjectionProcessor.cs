@@ -276,7 +276,7 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
                         eventId);
                 }
 
-                OutboxRetryHelper.ApplySuccess(head);
+                OutboxRetryHelper.ApplySuccess(head, _timeProvider.GetUtcNow().UtcDateTime);
                 await _commandDb.SaveChangesAsync(cancellationToken);
                 processedCount++;
                 _metrics.RecordEventProcessed(head.Type, applyResult.LagMs);
@@ -284,7 +284,7 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
             catch (Exception ex)
             {
                 failedCount++;
-                OutboxRetryHelper.ApplyFailure(head, _outboxOptions, ex);
+                OutboxRetryHelper.ApplyFailure(head, _outboxOptions, ex, _timeProvider.GetUtcNow().UtcDateTime);
                 _metrics.RecordEventFailed(head.Type);
 
                 if (head.DeadLetterAtUtc is not null)

@@ -251,7 +251,7 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
                 var applyResult = await ApplyTransactionallyAsync(
                     snapshot, eventId, occurredAtUtc, voided, cancellationToken);
 
-                OutboxRetryHelper.ApplySuccess(msg);
+                OutboxRetryHelper.ApplySuccess(msg, _timeProvider.GetUtcNow().UtcDateTime);
                 await _commandDb.SaveChangesAsync(cancellationToken);
                 processedCount++;
 
@@ -283,7 +283,7 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
             }
             catch (Exception ex)
             {
-                OutboxRetryHelper.ApplyFailure(msg, _outboxOptions, ex);
+                OutboxRetryHelper.ApplyFailure(msg, _outboxOptions, ex, _timeProvider.GetUtcNow().UtcDateTime);
 
                 if (msg.DeadLetterAtUtc is not null)
                 {
