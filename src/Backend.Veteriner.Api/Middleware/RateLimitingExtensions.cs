@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
 using Microsoft.AspNetCore.Builder;
@@ -58,7 +59,7 @@ public static class RateLimitingExtensions
                 problem.Extensions["traceId"] = traceId;
                 problem.Extensions["correlationId"] = correlationId;
                 problem.Extensions["retryAfterSeconds"] = retryAfterSeconds;
-                problem.Extensions["timestampUtc"] = DateTime.UtcNow;
+                problem.AddTimestamp(context.HttpContext);
 
                 await context.HttpContext.Response.WriteAsJsonAsync(problem, cancellationToken: token);
             };

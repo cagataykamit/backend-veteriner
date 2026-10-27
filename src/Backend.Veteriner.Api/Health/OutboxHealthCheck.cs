@@ -14,12 +14,18 @@ public sealed class OutboxHealthCheck : IHealthCheck
     private readonly AppDbContext _db;
     private readonly OutboxHealthOptions _options;
     private readonly OperationsMetrics _metrics;
+    private readonly TimeProvider _timeProvider;
 
-    public OutboxHealthCheck(AppDbContext db, IOptions<OutboxHealthOptions> options, OperationsMetrics metrics)
+    public OutboxHealthCheck(
+        AppDbContext db,
+        IOptions<OutboxHealthOptions> options,
+        OperationsMetrics metrics,
+        TimeProvider timeProvider)
     {
         _db = db;
         _options = options.Value;
         _metrics = metrics;
+        _timeProvider = timeProvider;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -38,7 +44,7 @@ public sealed class OutboxHealthCheck : IHealthCheck
             : null;
 
         TimeSpan? oldestAge = oldestCreatedAt is { } created
-            ? TimeSpan.FromTicks(Math.Max(0, (DateTime.UtcNow - created).Ticks))
+            ? TimeSpan.FromTicks(Math.Max(0, (_timeProvider.GetUtcNow().UtcDateTime - created).Ticks))
             : null;
 
         var status = new OutboxStatus(pending, dead, oldestAge);

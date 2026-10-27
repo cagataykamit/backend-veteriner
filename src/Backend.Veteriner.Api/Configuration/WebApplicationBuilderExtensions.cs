@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Backend.Veteriner.Api.Auth;
+using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Api.Health;
 using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Api.Observability;
@@ -103,7 +104,7 @@ public static class WebApplicationBuilderExtensions
                     problem.Extensions["traceId"] = traceId;
                     problem.Extensions["correlationId"] = correlationId;
                     problem.Extensions["code"] = "Validation.ModelStateInvalid";
-                    problem.Extensions["timestampUtc"] = DateTime.UtcNow;
+                    problem.AddTimestamp(http);
 
                     return new BadRequestObjectResult(problem)
                     {

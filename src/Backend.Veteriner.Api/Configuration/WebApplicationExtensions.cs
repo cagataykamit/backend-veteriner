@@ -1,3 +1,4 @@
+using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Api.Health;
 using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.Common.Constants;
@@ -117,7 +118,7 @@ public static class WebApplicationExtensions
             pd.Extensions["traceId"] = traceId;
             pd.Extensions["correlationId"] = correlationId;
             pd.Extensions["code"] = code;
-            pd.Extensions["timestampUtc"] = DateTime.UtcNow;
+            pd.AddTimestamp(ctx);
 
             await ctx.Response.WriteAsJsonAsync(pd);
         });

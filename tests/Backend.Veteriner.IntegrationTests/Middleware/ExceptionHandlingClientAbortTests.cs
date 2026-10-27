@@ -67,6 +67,7 @@ public sealed class ExceptionHandlingClientAbortTests
             var reporter = new FakeErrorReporter();
             var logs = new CapturingLoggerProvider();
             builder.Services.AddSingleton<IErrorReporter>(reporter);
+            builder.Services.AddSingleton(TimeProvider.System);
             builder.Logging.ClearProviders().AddProvider(logs);
 
             var app = builder.Build();

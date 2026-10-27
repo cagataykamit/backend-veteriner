@@ -4,6 +4,7 @@ using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Tenancy;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Middleware;
 
@@ -47,7 +48,12 @@ public sealed class TenantContextMiddlewareTests
 
     private static async Task<(HttpContext Context, bool NextCalled)> RunAsync(ClaimsPrincipal user, Guid? query)
     {
-        var context = new DefaultHttpContext { User = user };
+        var context = new DefaultHttpContext
+        {
+            User = user,
+            // Ret gövdesindeki timestampUtc DI saatinden okunur.
+            RequestServices = new ServiceCollection().AddSingleton(TimeProvider.System).BuildServiceProvider()
+        };
         context.Response.Body = new MemoryStream();
         if (query is { } q)
             context.Request.QueryString = new QueryString($"?tenantId={q:D}");

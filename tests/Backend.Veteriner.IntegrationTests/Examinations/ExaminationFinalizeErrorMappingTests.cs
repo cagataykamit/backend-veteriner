@@ -3,6 +3,7 @@ using Backend.Veteriner.Domain.Shared;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Examinations;
 
@@ -15,7 +16,14 @@ public sealed class ExaminationFinalizeErrorMappingTests
     {
         var controller = new TestController
         {
-            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+            ControllerContext = new ControllerContext
+            {
+                // Hata gövdesindeki timestampUtc DI saatinden okunur.
+                HttpContext = new DefaultHttpContext
+                {
+                    RequestServices = new ServiceCollection().AddSingleton(TimeProvider.System).BuildServiceProvider()
+                }
+            },
         };
 
         var result = Result.Failure(code, "x").ToActionResult(controller);

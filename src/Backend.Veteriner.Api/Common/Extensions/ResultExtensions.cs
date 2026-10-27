@@ -54,7 +54,7 @@ public static class ResultExtensions
         }
         problem.Extensions["traceId"] = traceId;
         problem.Extensions["correlationId"] = correlationId;
-        problem.Extensions["timestampUtc"] = DateTime.UtcNow;
+        problem.AddTimestamp(controller.HttpContext);
 
         return controller.StatusCode(statusCode, problem);
     }

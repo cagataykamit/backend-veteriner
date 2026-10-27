@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Claims;
+using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Tenancy;
 using Microsoft.AspNetCore.Mvc;
@@ -60,7 +61,7 @@ public sealed class TenantContextMiddleware
         problem.Extensions["traceId"] = traceId;
         problem.Extensions["correlationId"] = correlationId;
         problem.Extensions["code"] = "Context.TenantConflict";
-        problem.Extensions["timestampUtc"] = DateTime.UtcNow;
+        problem.AddTimestamp(context);
 
         await context.Response.WriteAsJsonAsync(problem);
     }

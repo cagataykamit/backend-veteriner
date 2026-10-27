@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using FluentValidation;
@@ -71,7 +72,7 @@ public static class ExceptionHandlingExtensions
                         detail: env.IsDevelopment()
                             ? "Exception alınamadı (null)."
                             : "Beklenmeyen bir hata oluştu.",
-                        instance: ctx.Request.Path,
+                        ctx: ctx,
                         traceId: traceId,
                         correlationId: correlationId,
                         env: env,
@@ -106,7 +107,7 @@ public static class ExceptionHandlingExtensions
                     vpd.Extensions["traceId"] = traceId;
                     vpd.Extensions["correlationId"] = correlationId;
                     vpd.Extensions["code"] = "Validation.FluentValidation";
-                    vpd.Extensions["timestampUtc"] = DateTime.UtcNow;
+                    vpd.AddTimestamp(ctx);
 
                     if (env.IsDevelopment())
                         vpd.Extensions["stackTrace"] = ex.StackTrace;
@@ -158,7 +159,7 @@ public static class ExceptionHandlingExtensions
                     title: title,
                     type: typeUrl,
                     detail: detailText,
-                    instance: ctx.Request.Path,
+                    ctx: ctx,
                     traceId: traceId,
                     correlationId: correlationId,
                     env: env,
@@ -184,7 +185,7 @@ public static class ExceptionHandlingExtensions
         string title,
         string type,
         string? detail,
-        string instance,
+        HttpContext ctx,
         string traceId,
         string? correlationId,
         IWebHostEnvironment env,
@@ -196,7 +197,7 @@ public static class ExceptionHandlingExtensions
             Title = title,
             Type = type,
             Detail = detail,
-            Instance = instance
+            Instance = ctx.Request.Path
         };
 
         pd.Extensions["traceId"] = traceId;
@@ -209,7 +210,7 @@ public static class ExceptionHandlingExtensions
             ClientClosedRequest => "Errors.RequestCancelled",
             _ => "Errors.Unhandled"
         };
-        pd.Extensions["timestampUtc"] = DateTime.UtcNow;
+        pd.AddTimestamp(ctx);
 
         if (env.IsDevelopment() && ex is not null)
             pd.Extensions["stackTrace"] = ex.StackTrace;
