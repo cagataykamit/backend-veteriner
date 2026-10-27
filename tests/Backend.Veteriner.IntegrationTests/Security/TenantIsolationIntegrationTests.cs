@@ -16,7 +16,8 @@ namespace Backend.IntegrationTests.Security;
 
 /// <summary>
 /// Kiracı izolasyonu (ADR-040): kapalı varsayılanlı global kiracı filtresi ve açık kapsam. Spec'teki elle yazılan
-/// <c>TenantId</c> koşulu unutulsa bile sorgu yalnız etkin kiracının satırını döndürür; bağlam yoksa boş döner.
+/// <c>TenantId</c> koşulu unutulsa bile sorgu yalnız etkin kiracının satırını döndürür; bağlam yoksa boş döner. Başka kiracının
+/// <c>TenantId</c>'siyle yazma reddedilir.
 /// </summary>
 public sealed class TenantIsolationIntegrationTests : IClassFixture<CustomWebApplicationFactory>
 {
@@ -115,6 +116,42 @@ public sealed class TenantIsolationIntegrationTests : IClassFixture<CustomWebApp
             .ToListAsync();
 
         tenantIds.Should().Equal(ownTenantId);
+    }
+
+    [Fact]
+    public async Task Write_With_Another_Tenants_TenantId_Should_Throw()
+    {
+        var ownTenantId = await DefaultTenantIdAsync();
+        var (_, foreignClientId) = await SeedClientsInTwoTenantsAsync();
+        Guid foreignTenantId;
+        await using (var seed = _factory.Services.CreateSystemScope())
+        {
+            foreignTenantId = await seed.ServiceProvider.GetRequiredService<AppDbContext>().Clients
+                .Where(c => c.Id == foreignClientId).Select(c => c.TenantId).SingleAsync();
+        }
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        using var tenant = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(ownTenantId);
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Clients.Add(new Client(foreignTenantId, "Sızan Kayıt", DateTime.UtcNow));
+
+        var save = () => db.SaveChangesAsync();
+
+        await save.Should().ThrowAsync<InvalidOperationException>().WithMessage("*etkin kiracıya ait değil*");
+    }
+
+    [Fact]
+    public async Task Write_Without_Tenant_Context_Should_Throw()
+    {
+        var ownTenantId = await DefaultTenantIdAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Clients.Add(new Client(ownTenantId, "Bağlamsız Kayıt", DateTime.UtcNow));
+
+        var save = () => db.SaveChangesAsync();
+
+        await save.Should().ThrowAsync<InvalidOperationException>();
     }
 
     private async Task<Guid> DefaultTenantIdAsync()

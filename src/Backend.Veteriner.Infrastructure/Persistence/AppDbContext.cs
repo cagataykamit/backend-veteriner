@@ -55,6 +55,45 @@ public class AppDbContext : DbContext
     private Guid? CurrentTenantId => _tenantContext.TenantId;
     private bool TenantFilterDisabled => _tenantContext.IsSystem;
 
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        EnsureTenantWrites();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        EnsureTenantWrites();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// Yazma koruması (ADR-040): eklenen ya da değiştirilen kiracılı varlık etkin kiracıya ait olmalıdır (değişiklikte
+    /// eski değer de). Sistem kapsamı hariç; kiracı yoksa kiracılı varlık yazılamaz.
+    /// </summary>
+    private void EnsureTenantWrites()
+    {
+        if (TenantFilterDisabled)
+            return;
+
+        var tenantId = CurrentTenantId;
+        foreach (var entry in ChangeTracker.Entries<ITenantOwned>())
+        {
+            var foreign = entry.State switch
+            {
+                EntityState.Added => entry.Entity.TenantId != tenantId,
+                EntityState.Modified => entry.Entity.TenantId != tenantId
+                    || (Guid)entry.Property(nameof(ITenantOwned.TenantId)).OriginalValue! != tenantId,
+                _ => false,
+            };
+            if (foreign)
+            {
+                throw new InvalidOperationException(
+                    $"{entry.Metadata.ClrType.Name} etkin kiracıya ait değil; başka kiracının kaydı yazılamaz (ADR-040).");
+            }
+        }
+    }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Model ile migration snapshot arasında uyumsuzluk olduğunda (ör. geliştirme sırasında)
