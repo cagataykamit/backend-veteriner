@@ -1,6 +1,8 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 
-public sealed class AppointmentReadModel
+public sealed class AppointmentReadModel : ITenantOwned
 {
     public Guid AppointmentId { get; set; }
     public Guid TenantId { get; set; }

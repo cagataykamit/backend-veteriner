@@ -1,4 +1,5 @@
 using Backend.Veteriner.Infrastructure.Persistence.Query.Models;
+using Backend.Veteriner.Infrastructure.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -7,10 +8,13 @@ namespace Backend.Veteriner.Infrastructure.Persistence;
 /// <summary>
 /// CQRS query tarafı için ayrı SQL Server veritabanı context'i.
 /// Projection read-model tablolarını yönetir; command entity configuration'ları yüklenmez.
+/// Kiracılı okuma modelleri komut tarafıyla aynı kiracı filtresi ve yazma korumasıyla korunur (ADR-040); projeksiyon
+/// işçileri kiracılar arası yazdığı için sistem kapsamında çalışır.
 /// </summary>
-public sealed class QueryDbContext : DbContext
+public sealed class QueryDbContext : TenantIsolatedDbContext
 {
-    public QueryDbContext(DbContextOptions<QueryDbContext> options) : base(options) { }
+    public QueryDbContext(DbContextOptions<QueryDbContext> options, TenantContext tenantContext)
+        : base(options, tenantContext) { }
 
     public DbSet<AppointmentReadModel> AppointmentReadModels => Set<AppointmentReadModel>();
     public DbSet<ClientReadModel> ClientReadModels => Set<ClientReadModel>();
@@ -37,5 +41,7 @@ public sealed class QueryDbContext : DbContext
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(QueryDbContext).Assembly,
             type => type.Namespace == "Backend.Veteriner.Infrastructure.Persistence.Query.Configurations");
+
+        ApplyTenantFilters(modelBuilder);
     }
 }

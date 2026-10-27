@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 /// CQRS-12C-1: yalnızca şema temeli. Projection processor / event emission bu fazın dışındadır.
 /// Client/Species/Color adları okuma performansı için denormalize tutulur; rename propagation bu fazda yok.
 /// </summary>
-public sealed class PetReadModel
+public sealed class PetReadModel : ITenantOwned
 {
     public Guid PetId { get; set; }
     public Guid TenantId { get; set; }

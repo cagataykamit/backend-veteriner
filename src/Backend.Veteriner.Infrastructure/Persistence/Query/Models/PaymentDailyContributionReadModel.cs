@@ -1,10 +1,12 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 
 /// <summary>
 /// Per-payment finance projection katkı durumu. Günlük aggregate recompute için SUM kaynağıdır;
 /// <c>payment.updated</c> eski bucket'ı event'te <c>Previous</c> olmadığı için bu satırdan okunur.
 /// </summary>
-public sealed class PaymentDailyContributionReadModel
+public sealed class PaymentDailyContributionReadModel : ITenantOwned
 {
     public Guid PaymentId { get; set; }
     public Guid TenantId { get; set; }

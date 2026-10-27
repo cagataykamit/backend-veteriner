@@ -1,10 +1,12 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 
 /// <summary>
 /// Client list/search için CQRS query read-model (tenant kapsamlı).
 /// CQRS-12B-3: Client projection processor bu satırları integration event'lerden upsert eder.
 /// </summary>
-public sealed class ClientReadModel
+public sealed class ClientReadModel : ITenantOwned
 {
     public Guid ClientId { get; set; }
     public Guid TenantId { get; set; }

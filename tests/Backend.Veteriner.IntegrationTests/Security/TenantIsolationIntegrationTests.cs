@@ -7,6 +7,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -153,6 +154,49 @@ public sealed class TenantIsolationIntegrationTests : IClassFixture<CustomWebApp
 
         await save.Should().ThrowAsync<InvalidOperationException>();
     }
+
+    [Fact]
+    public async Task Read_Model_Query_Should_Return_Only_Active_Tenant_Rows_And_Empty_Without_Context()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var rowA = ClientReadModel(tenantA);
+        var rowB = ClientReadModel(tenantB);
+        await using (var seed = _factory.Services.CreateSystemScope())
+        {
+            var queryDb = seed.ServiceProvider.GetRequiredService<QueryDbContext>();
+            queryDb.ClientReadModels.AddRange(rowA, rowB);
+            await queryDb.SaveChangesAsync();
+        }
+
+        Guid[] ids = [rowA.ClientId, rowB.ClientId];
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
+            (await queryDb.ClientReadModels.AsNoTracking().CountAsync(x => ids.Contains(x.ClientId))).Should().Be(0);
+
+            using var tenant = scope.ServiceProvider.GetRequiredService<ITenantScope>().UseTenant(tenantA);
+            (await queryDb.ClientReadModels.AsNoTracking().Where(x => ids.Contains(x.ClientId)).Select(x => x.ClientId).ToListAsync())
+                .Should().Equal(rowA.ClientId);
+
+            queryDb.ClientReadModels.Add(ClientReadModel(tenantB));
+            var save = () => queryDb.SaveChangesAsync();
+            await save.Should().ThrowAsync<InvalidOperationException>();
+        }
+    }
+
+    private static ClientReadModel ClientReadModel(Guid tenantId) => new()
+    {
+        ClientId = Guid.NewGuid(),
+        TenantId = tenantId,
+        FullName = "Okuma Modeli",
+        FullNameNormalized = "okuma modeli",
+        CreatedAtUtc = DateTime.UtcNow,
+        LastEventId = Guid.NewGuid(),
+        LastProjectedAtUtc = DateTime.UtcNow,
+        LastEventOccurredAtUtc = DateTime.UtcNow,
+    };
 
     private async Task<Guid> DefaultTenantIdAsync()
     {

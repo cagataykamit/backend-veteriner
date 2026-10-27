@@ -232,7 +232,7 @@ public sealed class AppointmentEventualConsistencyIntegrationTests
             .UseSqlServer(DashboardQueryReadModelBrokenQueryWebApplicationFactory.InvalidQueryConnection)
             .Options;
 
-        await using var brokenQueryDb = new QueryDbContext(brokenQueryOptions);
+        await using var brokenQueryDb = IntegrationTestDbContexts.CreateSystemQuery(brokenQueryOptions);
         using var metrics = new AppointmentProjectionMetrics(new AppointmentProjectionMetricsSnapshotHolder());
         var processor = new AppointmentProjectionProcessor(
             commandDb,

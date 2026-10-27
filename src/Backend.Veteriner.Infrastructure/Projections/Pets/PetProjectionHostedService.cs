@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Projections.Pets;
+using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -45,7 +46,8 @@ public sealed class PetProjectionHostedService : BackgroundService
 
             try
             {
-                using var scope = _sp.CreateScope();
+                // Projeksiyon olayları tüm kiracılarındır; okuma modeli kiracılar arası yazılır (ADR-040).
+                using var scope = _sp.CreateSystemScope();
                 var processor = scope.ServiceProvider.GetRequiredService<IPetProjectionProcessor>();
                 processedCount = await processor.ProcessBatchAsync(stoppingToken);
             }

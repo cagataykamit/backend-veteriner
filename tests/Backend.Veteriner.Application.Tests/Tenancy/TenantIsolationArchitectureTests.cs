@@ -48,6 +48,10 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Infrastructure/Projections/Payments/PaymentReadModelBackfillService.cs"] = "Okuma modeli doldurma (kiracısız çağrı)",
         ["Backend.Veteriner.Infrastructure/Projections/Payments/PaymentReadModelHealthReader.cs"] = "Sağlık sinyali sayımı",
         ["Backend.Veteriner.Infrastructure/Projections/Pets/PetReadModelBackfillService.cs"] = "Okuma modeli doldurma (kiracısız çağrı)",
+        ["Backend.Veteriner.Infrastructure/Projections/Appointments/AppointmentProjectionHostedService.cs"] = "Projeksiyon işçisi",
+        ["Backend.Veteriner.Infrastructure/Projections/Clients/ClientProjectionHostedService.cs"] = "Projeksiyon işçisi",
+        ["Backend.Veteriner.Infrastructure/Projections/Payments/PaymentProjectionHostedService.cs"] = "Projeksiyon işçisi",
+        ["Backend.Veteriner.Infrastructure/Projections/Pets/PetProjectionHostedService.cs"] = "Projeksiyon işçisi",
         ["Backend.Veteriner.DbMigrator/Program.cs"] = "Migration, seed, bakım komutları",
     };
 

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// DI dışında kurulan <see cref="AppDbContext"/> (seed ve okuyucu testleri). Test yardımcısı kiracılar arası veri
+/// DI dışında kurulan <see cref="AppDbContext"/> ve <see cref="QueryDbContext"/> (seed ve okuyucu testleri). Test yardımcısı kiracılar arası veri
 /// okur ve yazar; kiracı filtresi kapalı sistem kapsamıyla çalışır (ADR-040). DI'dan alınan bağlamlar için
 /// <c>CreateSystemScope</c> kullanılır.
 /// </summary>
@@ -23,6 +23,13 @@ internal static class IntegrationTestDbContexts
         var db = new AppDbContext(options, tenantContext);
         TenantContexts.Add(db, tenantContext);
         return db;
+    }
+
+    public static QueryDbContext CreateSystemQuery(DbContextOptions<QueryDbContext> options)
+    {
+        var tenantContext = new TenantContext(new HttpContextAccessor());
+        tenantContext.AsSystem();
+        return new QueryDbContext(options, tenantContext);
     }
 
     /// <summary>Bağlamın kiracı kapsamı; doğrudan kurulan servis aynı kapsamı paylaşır (DI kapsamındaki gibi).</summary>

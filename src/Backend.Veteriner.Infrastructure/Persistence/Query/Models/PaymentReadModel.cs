@@ -1,10 +1,12 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 
 /// <summary>
 /// Payment list/search/recent için CQRS query read-model (tenant + clinic kapsamlı).
 /// CQRS-14B: tablo/migration; 14C: projection processor doldurur.
 /// </summary>
-public sealed class PaymentReadModel
+public sealed class PaymentReadModel : ITenantOwned
 {
     public Guid PaymentId { get; set; }
     public Guid TenantId { get; set; }

@@ -28,12 +28,10 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Domain.Vaccinations;
-using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
 using Backend.Veteriner.Infrastructure.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using System.Reflection;
 
 namespace Backend.Veteriner.Infrastructure.Persistence;
 
@@ -43,56 +41,10 @@ namespace Backend.Veteriner.Infrastructure.Persistence;
 /// - Fluent API tanımları ve external configuration'ları birleştirir.
 /// - Outbox, auth, authorization ve user persistence işlemlerinin merkezidir.
 /// </summary>
-public class AppDbContext : DbContext
+public class AppDbContext : TenantIsolatedDbContext
 {
-    private readonly TenantContext _tenantContext;
-
-    public AppDbContext(DbContextOptions<AppDbContext> options, TenantContext tenantContext) : base(options)
-        => _tenantContext = tenantContext;
-
-    // Kiracı filtresi (ADR-040): EF bu iki değeri her sorguda DbContext örneğinden parametre olarak okur.
-    // Kiracı yoksa CurrentTenantId null'dır ve kiracılı sorgu satır döndürmez (kapalı varsayılan).
-    private Guid? CurrentTenantId => _tenantContext.TenantId;
-    private bool TenantFilterDisabled => _tenantContext.IsSystem;
-
-    public override int SaveChanges(bool acceptAllChangesOnSuccess)
-    {
-        EnsureTenantWrites();
-        return base.SaveChanges(acceptAllChangesOnSuccess);
-    }
-
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
-    {
-        EnsureTenantWrites();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-    }
-
-    /// <summary>
-    /// Yazma koruması (ADR-040): eklenen ya da değiştirilen kiracılı varlık etkin kiracıya ait olmalıdır (değişiklikte
-    /// eski değer de). Sistem kapsamı hariç; kiracı yoksa kiracılı varlık yazılamaz.
-    /// </summary>
-    private void EnsureTenantWrites()
-    {
-        if (TenantFilterDisabled)
-            return;
-
-        var tenantId = CurrentTenantId;
-        foreach (var entry in ChangeTracker.Entries<ITenantOwned>())
-        {
-            var foreign = entry.State switch
-            {
-                EntityState.Added => entry.Entity.TenantId != tenantId,
-                EntityState.Modified => entry.Entity.TenantId != tenantId
-                    || (Guid)entry.Property(nameof(ITenantOwned.TenantId)).OriginalValue! != tenantId,
-                _ => false,
-            };
-            if (foreign)
-            {
-                throw new InvalidOperationException(
-                    $"{entry.Metadata.ClrType.Name} etkin kiracıya ait değil; başka kiracının kaydı yazılamaz (ADR-040).");
-            }
-        }
-    }
+    public AppDbContext(DbContextOptions<AppDbContext> options, TenantContext tenantContext)
+        : base(options, tenantContext) { }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -312,24 +264,4 @@ public class AppDbContext : DbContext
 
         base.OnModelCreating(b);
     }
-
-    /// <summary>
-    /// <see cref="ITenantOwned"/> uygulayan her kök varlığa adlı kiracı filtresi (ADR-040). Filtre yalnız
-    /// <c>ITenantScope.AsSystem</c> ile kalkar; <c>IgnoreQueryFilters</c> onu kaldırmaz (<see cref="QueryFilterNames"/>).
-    /// </summary>
-    private void ApplyTenantFilters(ModelBuilder b)
-    {
-        var apply = typeof(AppDbContext).GetMethod(nameof(ApplyTenantFilter), BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var tenantOwned = b.Model.GetEntityTypes()
-            .Where(t => t.BaseType is null && !t.IsOwned() && typeof(ITenantOwned).IsAssignableFrom(t.ClrType))
-            .Select(t => t.ClrType)
-            .ToList();
-        foreach (var clrType in tenantOwned)
-            apply.MakeGenericMethod(clrType).Invoke(this, [b]);
-    }
-
-    private void ApplyTenantFilter<TEntity>(ModelBuilder b) where TEntity : class, ITenantOwned
-        => b.Entity<TEntity>().HasQueryFilter(
-            QueryFilterNames.Tenant,
-            e => TenantFilterDisabled || e.TenantId == CurrentTenantId);
 }

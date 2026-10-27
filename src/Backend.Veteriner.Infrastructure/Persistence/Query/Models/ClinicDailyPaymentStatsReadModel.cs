@@ -1,10 +1,12 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Infrastructure.Persistence.Query.Models;
 
 /// <summary>
 /// Klinik + gün + para birimi bazında ödenen tahsilat istatistikleri (dashboard finance projection hedefi).
 /// 13B: tablo/migration; 13C: projection processor doldurur.
 /// </summary>
-public sealed class ClinicDailyPaymentStatsReadModel
+public sealed class ClinicDailyPaymentStatsReadModel : ITenantOwned
 {
     public Guid TenantId { get; set; }
     public Guid ClinicId { get; set; }
