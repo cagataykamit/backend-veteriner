@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Application.SpeciesReference.Commands.Create;
+using Backend.Veteriner.Infrastructure.Behaviors;
 using Backend.Veteriner.Domain.Shared;
 using AwesomeAssertions;
 using Mediator;
@@ -36,7 +37,8 @@ public sealed class MediatorPipelineOrderTests : IClassFixture<CustomWebApplicat
             typeof(ActivationSignalBehavior<,>),
             typeof(PerformanceBehavior<,>),
             typeof(LoggingBehavior<,>),
-            typeof(TransactionBehavior<,>));
+            typeof(TransactionBehavior<,>),
+            typeof(UnsavedChangesGuardBehavior<,>));
     }
 
     [Fact]
