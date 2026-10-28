@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Reports.DailyTransactions;
 using Backend.Veteriner.Application.Reports.DailyTransactions.Queries;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Contracts.Dtos;
@@ -34,9 +35,9 @@ public sealed partial class DailyTransactionsReportIntegrationTests
         var env = await SeedTenantAsync();
         var a = await env.SeedClientAsync("Pano Acar");
         var b = await env.SeedClientAsync("Pano Bal");
-        var chargeA = await env.SeedChargeAsync(a, 500m, DateTime.UtcNow.AddMinutes(-30));
-        await env.SeedChargeAsync(b, 250m, DateTime.UtcNow.AddMinutes(-25));
-        await env.PayAsync(a, chargeA, 300m, PaymentMethod.Card, DateTime.UtcNow.AddMinutes(-10));
+        var chargeA = await env.SeedChargeAsync(a, 500m, EarlierToday(TimeSpan.FromMinutes(30)));
+        await env.SeedChargeAsync(b, 250m, EarlierToday(TimeSpan.FromMinutes(25)));
+        await env.PayAsync(a, chargeA, 300m, PaymentMethod.Card, EarlierToday(TimeSpan.FromMinutes(10)));
         var http = await env.NewHttpForAnotherUserAsync(AllReportPermissions);
         var range = $"from={Today:yyyy-MM-dd}&to={Today:yyyy-MM-dd}";
 
@@ -65,6 +66,14 @@ public sealed partial class DailyTransactionsReportIntegrationTests
 
         var withoutCompare = await http.GetFromJsonAsync<PerformanceSummaryDto>($"{Performance}?{range}&compare=false");
         withoutCompare!.Previous.Should().BeNull();
+    }
+
+    /// <summary>Şimdiden önce ama İstanbul günü içinde (gece yarısından hemen sonra koşuda dünkü güne düşmesin).</summary>
+    private static DateTime EarlierToday(TimeSpan before)
+    {
+        var dayStart = OperationDayBounds.ForLocalDate(Today).DayStartUtc;
+        var at = DateTime.UtcNow - before;
+        return at < dayStart ? dayStart : at;
     }
 
     [Fact]
