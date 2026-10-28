@@ -34,7 +34,7 @@ namespace Backend.IntegrationTests.Reports;
 /// düzeltmenin denetim kaydından gelmesi, ekran = CSV = XLSX, kasa özeti = döküm toplamı, kiracı izolasyonu, yetki, açık işlerin Bugün ile aynı kuraldan gelmesi.
 /// </summary>
 [Collection("pilot-smoke-api")]
-public sealed class DailyTransactionsReportIntegrationTests : IClassFixture<CustomWebApplicationFactory>
+public sealed partial class DailyTransactionsReportIntegrationTests : IClassFixture<CustomWebApplicationFactory>
 {
     private const string Daily = "/api/v1/reports/daily-transactions";
     private const string Cash = "/api/v1/reports/cash-summary";
