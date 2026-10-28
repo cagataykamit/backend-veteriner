@@ -20,6 +20,7 @@ public sealed class OwnerAccountClientLinkConfiguration : IEntityTypeConfigurati
         b.Property(x => x.Status).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.CreatedByUserId).IsRequired();
+        b.Property(x => x.CloseReason);
 
         b.HasIndex(x => x.OwnerAccountId);
         b.HasIndex(x => new { x.TenantId, x.ClientId }, "UX_OwnerAccountClientLinks_ActivePerClient")

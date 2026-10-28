@@ -2369,13 +2369,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("nvarchar(320)");
 
@@ -2398,7 +2400,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[Email] IS NOT NULL");
 
                     b.ToTable("OwnerAccounts", (string)null);
                 });
@@ -2414,6 +2417,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("CloseReason")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("ClosedAtUtc")
                         .HasColumnType("datetime2");
