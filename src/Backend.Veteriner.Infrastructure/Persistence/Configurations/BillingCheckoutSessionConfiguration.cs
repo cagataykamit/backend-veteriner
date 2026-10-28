@@ -47,8 +47,22 @@ public sealed class BillingCheckoutSessionConfiguration : IEntityTypeConfigurati
         b.Property(x => x.GrossAmountMinor);
         b.Property(x => x.DiscountAmountMinor);
 
+        b.Property(x => x.RefundStatus)
+            .IsRequired()
+            .HasConversion<int>();
+        b.Property(x => x.DuplicatePaymentDetectedAtUtc);
+        b.Property(x => x.RefundedAtUtc);
+        b.Property(x => x.RefundAttemptCount).IsRequired();
+        b.Property(x => x.RefundFailureReason)
+            .HasMaxLength(BillingCheckoutSession.RefundFailureReasonMaxLength);
+
         b.HasIndex(x => new { x.TenantId, x.Status, x.ExpiresAtUtc })
             .HasDatabaseName("IX_BillingCheckoutSessions_Tenant_OpenStatus");
+
+        // Bekleyen iadeleri arka plan işi, tüm çift ödemeleri yönetici ekranı tarar (BILL-005).
+        b.HasIndex(x => x.RefundStatus)
+            .HasDatabaseName("IX_BillingCheckoutSessions_RefundStatus")
+            .HasFilter("[RefundStatus] <> 0");
 
         b.HasOne<Tenant>()
             .WithMany()
