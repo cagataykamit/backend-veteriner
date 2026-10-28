@@ -285,7 +285,7 @@ public sealed class PetAlertsIntegrationTests : IClassFixture<CustomWebApplicati
             await using var scope = services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Appointments.Add(new Appointment(
-                tenantId, ClinicId, petId, DateTime.UtcNow.AddMinutes(30), 30, AppointmentType.Consultation));
+                tenantId, ClinicId, petId, TodaySlot.FromNow(TimeSpan.FromMinutes(30)), 30, AppointmentType.Consultation));
             await db.SaveChangesAsync();
         }
     }

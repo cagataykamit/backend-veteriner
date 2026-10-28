@@ -1348,7 +1348,7 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var appointment = new Appointment(
-                TenantId, ClinicId, petId ?? PetId, DateTime.UtcNow.Add(fromNow), 30,
+                TenantId, ClinicId, petId ?? PetId, TodaySlot.FromNow(fromNow), 30,
                 AppointmentType.Consultation, AppointmentStatus.Scheduled);
             db.Appointments.Add(appointment);
             await db.SaveChangesAsync();
