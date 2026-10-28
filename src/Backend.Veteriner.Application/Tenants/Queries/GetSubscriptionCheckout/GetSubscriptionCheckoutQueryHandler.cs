@@ -65,7 +65,8 @@ public sealed class GetSubscriptionCheckoutQueryHandler
             null,
             null,
             TrialPlanChangeApplied: false,
-            BillingPeriod: session.BillingPeriod.ToString());
+            BillingPeriod: session.BillingPeriod.ToString(),
+            RefundStatus: session.RefundStatus == BillingCheckoutRefundStatus.None ? null : session.RefundStatus.ToString());
 
         return Result<SubscriptionCheckoutSessionDto>.Success(dto);
     }

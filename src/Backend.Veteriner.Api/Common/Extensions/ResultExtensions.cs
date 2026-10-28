@@ -177,6 +177,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Çift ödemenin otomatik iadesi sürüyor (BILL-005): elle "iade edildi" işaretlenemez (durum çakışması).
+        if (normalized is "billing.duplicatepaymentrefundinprogress")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Pasif oda/bölüm yeni yatışa atanamaz (HOSP-002): tanımın durumu ile çakışma.
         if (normalized is "hospitalizations.roominactive")
         {

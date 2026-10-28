@@ -93,6 +93,9 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
                 "Checkout tamamlanmış ancak abonelik durumu beklenenle uyuşmuyor.");
         }
 
+        if (session.RefundStatus != BillingCheckoutRefundStatus.None)
+            return DuplicatePayment();
+
         // Panel finalize (Manual) ödemeyi sağlayıcıdan doğrulamaz; yalnız Manual (geliştirme/test) sağlayıcı oturumunu
         // etkinleştirebilir. Iyzico/Stripe oturumları imzası doğrulanan webhook ile etkinleşir (BILL-002).
         if (source == BillingActivationSource.Manual && session.Provider != BillingProvider.Manual)
@@ -118,6 +121,27 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
             return Result<SubscriptionCheckoutSessionDto>.Failure(
                 "Subscriptions.CheckoutSessionNotOpen",
                 "Checkout session kapanmış; finalize edilemez.");
+        }
+
+        // Çift ödeme (BILL-005): bu oturum açıldıktan sonra başka bir oturum paketi açtıysa iki ödeme aynı denemeye aittir
+        // (ör. paket değiştirilip eski ödeme sayfası da ödendi). İlk işlenen geçerlidir; bu ödeme iade edilir, paket değişmez.
+        // Oturum açılmadan önce tamamlanmış ödeme ayrı bir satın almadır (ör. aylıktan sonra yıllığa geçiş).
+        if (verifiedPayment)
+        {
+            var settledBefore = await _sessionsRead.FirstOrDefaultAsync(
+                new CheckoutSessionCompletedAfterSpec(session.TenantId, session.Id, session.CreatedAtUtc), ct);
+            if (settledBefore is not null)
+            {
+                _logger.LogWarning(
+                    "Çift ödeme: oturum paket açmadan iadeye alındı. SessionId={SessionId} SettledSessionId={SettledSessionId} Source={Source}",
+                    session.Id,
+                    settledBefore.Id,
+                    source);
+                session.MarkDuplicatePayment(utcNow);
+                await _sessionsWrite.UpdateAsync(session, ct);
+                await _sessionsWrite.SaveChangesAsync(ct);
+                return DuplicatePayment();
+            }
         }
 
         var sub = await _subscriptionsRead.FirstOrDefaultAsync(new TenantSubscriptionByTenantIdSpec(session.TenantId), ct);
@@ -151,12 +175,26 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
         if (source is BillingActivationSource.Webhook or BillingActivationSource.ProviderVerified)
             await _partnerDiscounts.RecordCollectionAsync(session, utcNow, ct);
 
+        // Paket açıldı: kiracının başka açık oturumu kapanır. "Ödemeye devam et" o sayfaya dönmez; sağlayıcıda hâlâ ödenirse
+        // yukarıdaki kural onu çift ödeme sayar. Bundan sonra açılan oturum yeni bir satın almadır.
+        var otherOpen = await _sessionsRead.ListAsync(new OpenBillingCheckoutSessionByTenantSpec(session.TenantId, utcNow), ct);
+        foreach (var open in otherOpen.Where(x => x.Id != session.Id))
+        {
+            open.MarkCancelled(utcNow);
+            await _sessionsWrite.UpdateAsync(open, ct);
+        }
+
         await _subscriptionsWrite.UpdateAsync(sub, ct);
         await _sessionsWrite.UpdateAsync(session, ct);
         await _sessionsWrite.SaveChangesAsync(ct);
 
         return Result<SubscriptionCheckoutSessionDto>.Success(MapDto(session, utcNow));
     }
+
+    private static Result<SubscriptionCheckoutSessionDto> DuplicatePayment()
+        => Result<SubscriptionCheckoutSessionDto>.Failure(
+            ISubscriptionCheckoutActivationService.DuplicatePaymentErrorCode,
+            "Bu ödeme aynı ödeme denemesinde ikinci ödeme; paket değişmedi, ödeme iade edilecek.");
 
     private static SubscriptionCheckoutSessionDto MapDto(BillingCheckoutSession session, DateTime utcNow)
         => new(

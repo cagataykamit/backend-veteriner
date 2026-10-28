@@ -21,6 +21,12 @@ public sealed class SubscriptionCheckoutActivationServiceTests
 
     private readonly Mock<IRepository<DiscountRedemption>> _redemptions = new();
 
+    public SubscriptionCheckoutActivationServiceTests()
+    {
+        _sessionsRead.Setup(x => x.ListAsync(It.IsAny<OpenBillingCheckoutSessionByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+    }
+
     private SubscriptionCheckoutActivationService CreateService()
         => new(
             _subscriptionsRead.Object,
@@ -63,6 +69,81 @@ public sealed class SubscriptionCheckoutActivationServiceTests
         session.Status.Should().Be(BillingCheckoutSessionStatus.Completed);
         sub.PlanCode.Should().Be(SubscriptionPlanCode.Pro);
         sub.Status.Should().Be(TenantSubscriptionStatus.Active);
+    }
+
+    [Theory]
+    [InlineData(BillingActivationSource.Webhook)]
+    [InlineData(BillingActivationSource.ProviderVerified)]
+    public async Task TryActivateAsync_Should_MarkDuplicate_When_AnotherSessionSettledAfterThisOneOpened(BillingActivationSource source)
+    {
+        // BILL-005: paket değiştirildi (yeni oturum ödendi), eski sayfa da ödendi. İlk işlenen geçerli; bu ödeme iadeye alınır.
+        var tenantId = Guid.NewGuid();
+        var session = BillingCheckoutSession.CreatePending(
+            tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Pro, BillingProvider.Iyzico, DateTime.UtcNow.AddMinutes(-20), DateTime.UtcNow.AddMinutes(10));
+        session.SetRedirectReady("https://sandbox.example/checkout?token=a", "a", DateTime.UtcNow.AddMinutes(-20));
+        session.MarkCancelled(DateTime.UtcNow.AddMinutes(-15));
+        var settled = BillingCheckoutSession.CreatePending(
+            tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Premium, BillingProvider.Iyzico, DateTime.UtcNow.AddMinutes(-15), DateTime.UtcNow.AddMinutes(15));
+        settled.MarkCompleted(DateTime.UtcNow.AddMinutes(-5));
+
+        var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-2), 14);
+        _sessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<BillingCheckoutSessionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+        _sessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<CheckoutSessionCompletedAfterSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settled);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var result = await CreateService().TryActivateAsync(session.Id, null, BillingProvider.Iyzico, null, source, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be(ISubscriptionCheckoutActivationService.DuplicatePaymentErrorCode);
+        session.RefundStatus.Should().Be(BillingCheckoutRefundStatus.Pending);
+        session.Status.Should().Be(BillingCheckoutSessionStatus.Cancelled);
+        sub.PlanCode.Should().Be(SubscriptionPlanCode.Basic);
+        _subscriptionsWrite.Verify(x => x.UpdateAsync(It.IsAny<TenantSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+        _sessionsWrite.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task TryActivateAsync_Should_ReturnDuplicate_Without_Writing_When_AlreadyMarked()
+    {
+        // Aynı ödemenin bildirimi tekrar gelirse (webhook yeniden deneme, uzlaştırma) sonuç aynı, yazım yok.
+        var session = BillingCheckoutSession.CreatePending(
+            Guid.NewGuid(), SubscriptionPlanCode.Basic, SubscriptionPlanCode.Pro, BillingProvider.Iyzico, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
+        session.MarkDuplicatePayment(DateTime.UtcNow);
+        _sessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<BillingCheckoutSessionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+
+        var result = await CreateService().TryActivateAsync(session.Id, null, BillingProvider.Iyzico, null, BillingActivationSource.Webhook, CancellationToken.None);
+
+        result.Error.Code.Should().Be(ISubscriptionCheckoutActivationService.DuplicatePaymentErrorCode);
+        _sessionsWrite.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task TryActivateAsync_Should_CancelTenantsOtherOpenSession_When_Activated()
+    {
+        // Paket açılınca kiracının başka açık oturumu kapanır: sonraki ödeme yeni satın alma sayılır, eski sayfa çift ödemedir.
+        var tenantId = Guid.NewGuid();
+        var session = BillingCheckoutSession.CreatePending(
+            tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Pro, BillingProvider.Iyzico, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
+        var other = BillingCheckoutSession.CreatePending(
+            tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Premium, BillingProvider.Iyzico, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30));
+        var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+        _sessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<BillingCheckoutSessionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+        _sessionsRead.Setup(x => x.ListAsync(It.IsAny<OpenBillingCheckoutSessionByTenantSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([session, other]);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var result = await CreateService().TryActivateAsync(session.Id, null, BillingProvider.Iyzico, null, BillingActivationSource.ProviderVerified, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        session.Status.Should().Be(BillingCheckoutSessionStatus.Completed);
+        other.Status.Should().Be(BillingCheckoutSessionStatus.Cancelled);
+        _sessionsWrite.Verify(x => x.UpdateAsync(other, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

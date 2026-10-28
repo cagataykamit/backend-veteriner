@@ -214,6 +214,10 @@ public sealed class ProcessBillingWebhookCommandHandler
             BillingActivationSource.Webhook,
             ct);
 
+        // Çift ödeme iadeye alındı: olay işlendi, sağlayıcı yeniden göndermesin (BILL-005).
+        if (!activation.IsSuccess && activation.Error.Code == ISubscriptionCheckoutActivationService.DuplicatePaymentErrorCode)
+            return Result.Success();
+
         if (!activation.IsSuccess)
         {
             _logger.LogWarning(

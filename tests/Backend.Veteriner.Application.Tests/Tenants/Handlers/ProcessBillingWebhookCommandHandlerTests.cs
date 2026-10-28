@@ -134,6 +134,28 @@ public sealed class ProcessBillingWebhookCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnSuccess_When_PaymentSucceeded_IsDuplicatePayment()
+    {
+        // BILL-005: çift ödeme iadeye alındı; olay işlendi sayılır, sağlayıcı yeniden göndermez.
+        var sessionId = Guid.NewGuid();
+        var parsed = new BillingWebhookNormalizedEvent("evt_dup", "checkout.session.completed", BillingWebhookEventKind.PaymentSucceeded, sessionId, "pay_dup");
+
+        _signatureVerifier.Setup(x => x.Verify(It.IsAny<BillingProvider>(), It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>()))
+            .Returns(Result.Success());
+        _payloadParser.Setup(x => x.Parse(It.IsAny<BillingProvider>(), It.IsAny<string>()))
+            .Returns(Result<BillingWebhookNormalizedEvent>.Success(parsed));
+        _receiptRead.SetupSequence(x => x.FirstOrDefaultAsync(It.IsAny<BillingWebhookReceiptByProviderEventIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((BillingWebhookReceipt?)null);
+        _receiptWrite.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _activation.Setup(x => x.TryActivateAsync(sessionId, null, BillingProvider.Stripe, "pay_dup", BillingActivationSource.Webhook, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<SubscriptionCheckoutSessionDto>.Failure(ISubscriptionCheckoutActivationService.DuplicatePaymentErrorCode, "dup"));
+
+        var result = await CreateHandler().Handle(CreateCommand(BillingProvider.Stripe), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnSuccessAndAudit_When_PaymentSucceeded_ActivationSucceeds()
     {
         var sessionId = Guid.NewGuid();

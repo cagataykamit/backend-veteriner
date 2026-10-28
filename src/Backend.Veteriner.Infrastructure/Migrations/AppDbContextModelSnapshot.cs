@@ -3834,6 +3834,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<long?>("DiscountAmountMinor")
                         .HasColumnType("bigint");
 
+                    b.Property<DateTime?>("DuplicatePaymentDetectedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime?>("ExpiresAtUtc")
                         .HasColumnType("datetime2");
 
@@ -3850,6 +3853,19 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int>("Provider")
                         .HasColumnType("int");
 
+                    b.Property<int>("RefundAttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RefundFailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("RefundStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RefundedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -3863,6 +3879,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RefundStatus")
+                        .HasDatabaseName("IX_BillingCheckoutSessions_RefundStatus")
+                        .HasFilter("[RefundStatus] <> 0");
 
                     b.HasIndex("TenantId", "Status", "ExpiresAtUtc")
                         .HasDatabaseName("IX_BillingCheckoutSessions_Tenant_OpenStatus");

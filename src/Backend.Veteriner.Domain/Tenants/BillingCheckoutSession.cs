@@ -29,6 +29,16 @@ public sealed class BillingCheckoutSession : AggregateRoot, ITenantOwned
     /// <summary>Uygulanan satış ortağı kodu indirimi (kuruş); çekilen tutar = brüt − indirim (ADR-037).</summary>
     public long? DiscountAmountMinor { get; private set; }
 
+    /// <summary>Çift ödeme iadesinin durumu (BILL-005); olağan oturumda <see cref="BillingCheckoutRefundStatus.None"/>.</summary>
+    public BillingCheckoutRefundStatus RefundStatus { get; private set; }
+
+    public DateTime? DuplicatePaymentDetectedAtUtc { get; private set; }
+    public DateTime? RefundedAtUtc { get; private set; }
+    public int RefundAttemptCount { get; private set; }
+    public string? RefundFailureReason { get; private set; }
+
+    public const int RefundFailureReasonMaxLength = 500;
+
     private BillingCheckoutSession() { }
 
     public static BillingCheckoutSession CreatePending(
@@ -116,6 +126,68 @@ public sealed class BillingCheckoutSession : AggregateRoot, ITenantOwned
         UpdatedAtUtc = CompletedAtUtc;
         if (!string.IsNullOrWhiteSpace(externalReference))
             ExternalReference = externalReference.Trim();
+    }
+
+    /// <summary>
+    /// Doğrulanmış ödeme, aynı denemede başka bir ödeme paketi zaten açtıktan sonra geldi: paket açılmaz, ödeme iade edilecek.
+    /// Açık oturum kapanır; tamamlanmış oturum çift ödeme sayılamaz.
+    /// </summary>
+    public void MarkDuplicatePayment(DateTime utcNow)
+    {
+        if (Status == BillingCheckoutSessionStatus.Completed)
+            throw new InvalidOperationException("Tamamlanmış checkout session çift ödeme olarak işaretlenemez.");
+        if (RefundStatus != BillingCheckoutRefundStatus.None)
+            throw new InvalidOperationException("Bu checkout session zaten çift ödeme olarak işaretlenmiş.");
+
+        var now = NormalizeUtc(utcNow);
+        if (Status is BillingCheckoutSessionStatus.Pending or BillingCheckoutSessionStatus.RedirectReady)
+            Status = BillingCheckoutSessionStatus.Cancelled;
+        RefundStatus = BillingCheckoutRefundStatus.Pending;
+        DuplicatePaymentDetectedAtUtc = now;
+        UpdatedAtUtc = now;
+    }
+
+    public void RecordRefundSucceeded(DateTime utcNow)
+    {
+        EnsureRefundPending();
+        var now = NormalizeUtc(utcNow);
+        RefundAttemptCount++;
+        RefundStatus = BillingCheckoutRefundStatus.Refunded;
+        RefundedAtUtc = now;
+        RefundFailureReason = null;
+        UpdatedAtUtc = now;
+    }
+
+    /// <param name="requiresManualRefund">Yeniden denenmeyecek: platform yöneticisi sağlayıcı panelinden iade eder.</param>
+    public void RecordRefundFailed(DateTime utcNow, string reason, bool requiresManualRefund)
+    {
+        EnsureRefundPending();
+        RefundAttemptCount++;
+        var trimmed = reason?.Trim() ?? "";
+        RefundFailureReason = trimmed.Length == 0 ? null : trimmed[..Math.Min(trimmed.Length, RefundFailureReasonMaxLength)];
+        if (requiresManualRefund)
+            RefundStatus = BillingCheckoutRefundStatus.ManualRequired;
+        UpdatedAtUtc = NormalizeUtc(utcNow);
+    }
+
+    /// <summary>Platform yöneticisi iadeyi sağlayıcı panelinden yaptı. Tekrarında değişiklik yok.</summary>
+    public void MarkRefundedManually(DateTime utcNow)
+    {
+        if (RefundStatus == BillingCheckoutRefundStatus.Refunded)
+            return;
+        if (RefundStatus != BillingCheckoutRefundStatus.ManualRequired)
+            throw new InvalidOperationException("Yalnız elle iade bekleyen çift ödeme işaretlenebilir.");
+
+        var now = NormalizeUtc(utcNow);
+        RefundStatus = BillingCheckoutRefundStatus.Refunded;
+        RefundedAtUtc = now;
+        UpdatedAtUtc = now;
+    }
+
+    private void EnsureRefundPending()
+    {
+        if (RefundStatus != BillingCheckoutRefundStatus.Pending)
+            throw new InvalidOperationException("Bu checkout session için bekleyen iade yok.");
     }
 
     public void MarkFailed(DateTime utcNow, string? externalReference = null)

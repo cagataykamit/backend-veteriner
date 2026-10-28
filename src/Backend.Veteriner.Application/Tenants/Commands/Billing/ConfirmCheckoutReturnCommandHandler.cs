@@ -12,18 +12,15 @@ public sealed class ConfirmCheckoutReturnCommandHandler : IRequestHandler<Confir
     private readonly IReadRepository<BillingCheckoutSession> _sessionsRead;
     private readonly ICheckoutPaymentReconciler _reconciler;
     private readonly ITenantScope _tenantScope;
-    private readonly TimeProvider _timeProvider;
 
     public ConfirmCheckoutReturnCommandHandler(
         IReadRepository<BillingCheckoutSession> sessionsRead,
         ICheckoutPaymentReconciler reconciler,
-        ITenantScope tenantScope,
-        TimeProvider timeProvider)
+        ITenantScope tenantScope)
     {
         _sessionsRead = sessionsRead;
         _reconciler = reconciler;
         _tenantScope = tenantScope;
-        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid?>> Handle(ConfirmCheckoutReturnCommand request, CancellationToken ct)
@@ -45,7 +42,9 @@ public sealed class ConfirmCheckoutReturnCommandHandler : IRequestHandler<Confir
         if (session is null)
             return Result<Guid?>.Success(null);
 
-        if (session.IsOpen(_timeProvider.GetUtcNow().UtcDateTime))
+        // Kapanmış oturum da sorulur: kullanıcı paket değişince iptal edilmiş eski sekmede ödemiş olabilir. Ödeme ya paketi
+        // açar ya da çift ödeme olarak iadeye alınır; dönüş sayfası sonucu webhook'u beklemeden gösterir (BILL-005).
+        if (session.Status != BillingCheckoutSessionStatus.Completed && session.RefundStatus == BillingCheckoutRefundStatus.None)
         {
             using var tenantScope = _tenantScope.UseTenant(session.TenantId);
             await _reconciler.ReconcileAsync(session, tenantIdConstraint: null, ct);
