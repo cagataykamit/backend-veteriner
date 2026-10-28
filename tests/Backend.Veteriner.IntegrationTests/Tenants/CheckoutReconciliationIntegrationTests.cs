@@ -42,7 +42,7 @@ public sealed class CheckoutReconciliationIntegrationTests : IClassFixture<Custo
             services.AddScoped<IBillingCheckoutProvider, PaidIyzicoProvider>();
         }));
         var tenantId = await SignupOwnerAsync(app);
-        var sessionId = await SeedCancelledIyzicoSessionAsync(app, tenantId);
+        var (sessionId, _) = await SeedCancelledIyzicoSessionAsync(app, tenantId);
 
         int paid;
         await using (var scope = app.Services.CreateAsyncScope())
@@ -71,7 +71,7 @@ public sealed class CheckoutReconciliationIntegrationTests : IClassFixture<Custo
             services.AddSingleton<IBillingCheckoutProvider>(new PaidIyzicoProvider(refundSucceeds));
         }));
         var tenantId = await SignupOwnerAsync(app);
-        var duplicateId = await SeedCancelledIyzicoSessionAsync(app, tenantId);
+        var (duplicateId, _) = await SeedCancelledIyzicoSessionAsync(app, tenantId);
         await SeedSettledPremiumSessionAsync(app, tenantId);
 
         await using (var scope = app.Services.CreateAsyncScope())
@@ -112,13 +112,13 @@ public sealed class CheckoutReconciliationIntegrationTests : IClassFixture<Custo
             services.AddScoped<IBillingCheckoutProvider, PaidIyzicoProvider>();
         }));
         var tenantId = await SignupOwnerAsync(app);
-        var duplicateId = await SeedCancelledIyzicoSessionAsync(app, tenantId);
+        var (duplicateId, paidToken) = await SeedCancelledIyzicoSessionAsync(app, tenantId);
         await SeedSettledPremiumSessionAsync(app, tenantId);
 
         var client = app.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var response = await client.PostAsync(
             "/api/v1/billing/iyzico/callback",
-            new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = "paid-token" }));
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = paidToken }));
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
         await using var check = app.Services.CreateSystemScope();
@@ -143,18 +143,20 @@ public sealed class CheckoutReconciliationIntegrationTests : IClassFixture<Custo
         await db.SaveChangesAsync();
     }
 
-    private static async Task<Guid> SeedCancelledIyzicoSessionAsync(WebApplicationFactory<Program> app, Guid tenantId)
+    /// <summary>Token her oturumda benzersizdir: dönüş ucu oturumu token ile arar, aynı koşudaki başka testin oturumunu bulmamalı.</summary>
+    private static async Task<(Guid Id, string Token)> SeedCancelledIyzicoSessionAsync(WebApplicationFactory<Program> app, Guid tenantId)
     {
         await using var scope = app.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var now = DateTime.UtcNow;
+        var token = $"paid-token-{Guid.NewGuid():N}";
         var session = BillingCheckoutSession.CreatePending(
             tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Pro, BillingProvider.Iyzico, now.AddMinutes(-20), now.AddMinutes(10));
-        session.SetRedirectReady("https://sandbox.example/checkout?token=paid-token", "paid-token", now.AddMinutes(-20));
+        session.SetRedirectReady($"https://sandbox.example/checkout?token={token}", token, now.AddMinutes(-20));
         session.MarkCancelled(now.AddMinutes(-15));
         db.BillingCheckoutSessions.Add(session);
         await db.SaveChangesAsync();
-        return session.Id;
+        return (session.Id, token);
     }
 
     private static async Task<Guid> SignupOwnerAsync(WebApplicationFactory<Program> app)
