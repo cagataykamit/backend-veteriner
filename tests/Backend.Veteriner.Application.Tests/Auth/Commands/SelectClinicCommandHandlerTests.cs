@@ -190,6 +190,10 @@ public sealed class SelectClinicCommandHandlerTests
         capturedClaims
             .Should()
             .Contain(c => c.Type == VeterinerClaims.TenantId && c.Value == tid.ToString("D"));
+
+        // platform_admin yalnız PlatformAdmin OperationClaim'inde; kiracı yöneticisi/sahibi almaz.
+        capturedClaims.Any(c => c.Type == VeterinerClaims.PlatformAdmin && c.Value == bool.TrueString)
+            .Should().Be(claimName == "PlatformAdmin");
     }
 
     [Fact]

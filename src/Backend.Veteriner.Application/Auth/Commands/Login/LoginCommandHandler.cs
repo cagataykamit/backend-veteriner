@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Auth.Contracts;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -31,6 +32,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
     private readonly IClientContext _client;
     private readonly IJwtOptionsProvider _jwtOpt;
     private readonly IPermissionReader _permissionReader;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
     private readonly ITenantScope _tenantScope;
@@ -47,6 +49,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         IClientContext client,
         IJwtOptionsProvider jwtOpt,
         IPermissionReader permissionReader,
+        IUserOperationClaimRepository userOperationClaims,
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
         ITenantScope tenantScope,
@@ -62,6 +65,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         _client = client;
         _jwtOpt = jwtOpt;
         _permissionReader = permissionReader;
+        _userOperationClaims = userOperationClaims;
         _tenants = tenants;
         _userTenants = userTenants;
         _tenantScope = tenantScope;
@@ -169,7 +173,9 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
             extraClaims.Add(new Claim("permission", code));
         MarkStep("permissionClaimsBuild");
 
-        if (IsPlatformAdmin(roleNames))
+        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(loginUser.Id, ct);
+        MarkStep("operationClaimNames");
+        if (TenantWideClaimNames.IsPlatformAdmin(operationClaimNames))
             extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));
 
         var memberships = await _userTenants.GetTenantIdsByUserIdAsync(loginUser.Id, ct);
@@ -282,7 +288,4 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
 
         return int.TryParse(parts[2], out var cost) ? cost : null;
     }
-
-    private static bool IsPlatformAdmin(IReadOnlyList<string> roleNames)
-        => roleNames.Any(r => string.Equals(r, "PlatformAdmin", StringComparison.OrdinalIgnoreCase));
 }

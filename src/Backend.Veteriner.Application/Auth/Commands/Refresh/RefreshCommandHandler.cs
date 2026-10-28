@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Auth.Commands.Login;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clinics;
@@ -22,6 +23,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
     private readonly IJwtTokenService _jwt;
     private readonly IJwtOptionsProvider _opt;
     private readonly IPermissionReader _permissionReader;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IUserTenantRepository _userTenants;
     private readonly ITenantScope _tenantScope;
@@ -35,6 +37,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         IJwtTokenService jwt,
         IJwtOptionsProvider opt,
         IPermissionReader permissionReader,
+        IUserOperationClaimRepository userOperationClaims,
         IReadRepository<Tenant> tenants,
         IUserTenantRepository userTenants,
         ITenantScope tenantScope,
@@ -47,6 +50,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         _jwt = jwt;
         _opt = opt;
         _permissionReader = permissionReader;
+        _userOperationClaims = userOperationClaims;
         _tenants = tenants;
         _userTenants = userTenants;
         _tenantScope = tenantScope;
@@ -139,7 +143,8 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         foreach (var code in permissionCodes)
             extraClaims.Add(new Claim("permission", code));
 
-        if (user.Roles.Any(r => string.Equals(r.Name, "PlatformAdmin", StringComparison.OrdinalIgnoreCase)))
+        var operationClaimNames = await _userOperationClaims.GetOperationClaimNamesByUserIdAsync(user.Id, ct);
+        if (TenantWideClaimNames.IsPlatformAdmin(operationClaimNames))
             extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(sessionTenantId), ct);

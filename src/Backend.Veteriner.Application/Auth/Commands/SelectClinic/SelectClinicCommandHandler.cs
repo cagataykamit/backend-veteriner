@@ -204,7 +204,7 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
             extraClaims.Add(new Claim("permission", code));
         MarkStep("permissionClaimsBuild");
 
-        if (user.Roles.Any(r => string.Equals(r.Name, "PlatformAdmin", StringComparison.OrdinalIgnoreCase)))
+        if (TenantWideClaimNames.IsPlatformAdmin(claimNames))
             extraClaims.Add(new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString, ClaimValueTypes.Boolean));
 
         extraClaims.Add(new Claim(VeterinerClaims.TenantId, sessionTenantId.ToString("D")));

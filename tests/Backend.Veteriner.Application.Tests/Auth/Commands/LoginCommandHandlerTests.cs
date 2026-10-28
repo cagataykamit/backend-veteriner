@@ -29,6 +29,7 @@ public sealed class LoginCommandHandlerTests
     private readonly Mock<IClientContext> _client = new();
     private readonly Mock<IJwtOptionsProvider> _jwtOpt = new();
     private readonly Mock<IPermissionReader> _permissionReader = new();
+    private readonly Mock<IUserOperationClaimRepository> _userOperationClaims = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IUserTenantRepository> _userTenants = new();
 
@@ -39,6 +40,8 @@ public sealed class LoginCommandHandlerTests
             .ReturnsAsync((Tenant?)null);
         _users.Setup(r => r.GetRoleNamesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<string>());
+        _userOperationClaims.Setup(r => r.GetOperationClaimNamesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<string>());
         return new LoginCommandHandler(
             _users.Object,
             _hasher.Object,
@@ -48,6 +51,7 @@ public sealed class LoginCommandHandlerTests
             _client.Object,
             _jwtOpt.Object,
             _permissionReader.Object,
+            _userOperationClaims.Object,
             _tenants.Object,
             _userTenants.Object,
             Mock.Of<ITenantScope>(),
@@ -137,6 +141,42 @@ public sealed class LoginCommandHandlerTests
         _refreshRepo.Verify(r => r.RevokeAllByUserAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Once);
         _refreshRepo.Verify(r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Once);
         _refreshRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Platform yöneticisi OperationClaim'inden gelir (seed ve <c>create-platform-admin</c> oraya bağlar); "Admin" rolü yetmez.</summary>
+    [Theory]
+    [InlineData("PlatformAdmin", true)]
+    [InlineData("Admin", false)]
+    public async Task Handle_Should_AddPlatformAdminClaim_Only_For_PlatformAdmin_OperationClaim(string claimName, bool expected)
+    {
+        var handler = CreateHandler();
+        var cmd = new LoginCommand("admin@example.com", "password");
+        var user = new User("admin@example.com", "hash", DateTime.UtcNow);
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("Platform", DateTime.UtcNow);
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
+
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ToLookup(user));
+        _users.Setup(r => r.GetRoleNamesByUserIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(new[] { "Admin" });
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(new List<Guid> { tid });
+        _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(tenant);
+        _permissionReader.Setup(r => r.GetPermissionsAsync(It.IsAny<Guid>(), null, It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<string>());
+        _userOperationClaims.Setup(r => r.GetOperationClaimNamesByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { claimName });
+        _jwtOpt.SetupGet(o => o.RefreshTokenDays).Returns(7);
+
+        List<Claim>? captured = null;
+        _jwt.Setup(j => j.Create(user.Id, user.Email, It.IsAny<IReadOnlyList<string>>(), It.IsAny<IEnumerable<Claim>>()))
+            .Callback<Guid, string, IReadOnlyList<string>, IEnumerable<Claim>?>((_, _, _, c) => captured = c?.ToList())
+            .Returns(("access-token", "refresh-token-raw", DateTime.UtcNow.AddMinutes(5)));
+        _tokenHash.Setup(t => t.ComputeSha256("refresh-token-raw")).Returns("refresh-hash");
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.Any(c => c.Type == VeterinerClaims.PlatformAdmin && c.Value == bool.TrueString).Should().Be(expected);
     }
 
     [Fact]

@@ -43,4 +43,11 @@ internal static class TenantWideClaimNames
 
         return false;
     }
+
+    /// <summary>
+    /// Platform yöneticisi mi? Kaynak OperationClaim adlarıdır (<c>AdminClaimSeeder</c> ve <c>create-platform-admin</c> buraya bağlar);
+    /// giriş, klinik seçimi ve yenileme JWT'ye <c>platform_admin</c> claim'ini bu sonuca göre ekler.
+    /// </summary>
+    public static bool IsPlatformAdmin(IReadOnlyCollection<string>? operationClaimNames)
+        => operationClaimNames?.Any(n => string.Equals(n, PlatformAdmin, StringComparison.OrdinalIgnoreCase)) == true;
 }

@@ -22,6 +22,7 @@ public sealed class RefreshCommandHandlerTests
     private readonly Mock<IJwtTokenService> _jwt = new();
     private readonly Mock<IJwtOptionsProvider> _opt = new();
     private readonly Mock<IPermissionReader> _permissionReader = new();
+    private readonly Mock<IUserOperationClaimRepository> _userOperationClaims = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IUserTenantRepository> _userTenants = new();
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
@@ -30,12 +31,15 @@ public sealed class RefreshCommandHandlerTests
     {
         _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Tenant?)null);
+        _userOperationClaims.Setup(r => r.GetOperationClaimNamesByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<string>());
         return new RefreshCommandHandler(
             _refreshRepo.Object,
             _hash.Object,
             _jwt.Object,
             _opt.Object,
             _permissionReader.Object,
+            _userOperationClaims.Object,
             _tenants.Object,
             _userTenants.Object,
             Mock.Of<ITenantScope>(),
@@ -206,6 +210,42 @@ public sealed class RefreshCommandHandlerTests
 
         _refreshRepo.Verify(r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Once);
         _refreshRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Platform yöneticisi OperationClaim'inden gelir (seed ve <c>create-platform-admin</c> oraya bağlar); rol tablosu belirleyici değildir.</summary>
+    [Theory]
+    [InlineData("PlatformAdmin", true)]
+    [InlineData("Admin", false)]
+    public async Task Handle_Should_AddPlatformAdminClaim_Only_For_PlatformAdmin_OperationClaim(string claimName, bool expected)
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cmd = new RefreshCommand("raw-token");
+        var user = new User("admin@example.com", "hash", DateTime.UtcNow);
+        var stored = new RefreshToken(user.Id, "hash", DateTime.UtcNow.AddDays(1), null, null, DateTime.UtcNow, tid);
+        typeof(RefreshToken).GetProperty(nameof(RefreshToken.User))!.SetValue(stored, user);
+        var tenant = new Tenant("Acme", DateTime.UtcNow);
+        typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, tid);
+
+        _hash.Setup(h => h.ComputeSha256(cmd.RefreshToken)).Returns("hash");
+        _refreshRepo.Setup(r => r.GetByHashAsync("hash", It.IsAny<CancellationToken>())).ReturnsAsync(stored);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(tenant);
+        _userTenants.Setup(r => r.ExistsAsync(user.Id, tid, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _permissionReader.Setup(r => r.GetPermissionsAsync(user.Id, null, It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<string>());
+        _userOperationClaims.Setup(r => r.GetOperationClaimNamesByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { claimName });
+        _opt.SetupGet(o => o.RefreshTokenDays).Returns(7);
+
+        List<Claim>? captured = null;
+        _jwt.Setup(j => j.Create(user, It.IsAny<IEnumerable<Claim>>()))
+            .Callback<User, IEnumerable<Claim>?>((_, c) => captured = c?.ToList())
+            .Returns(("a", "raw-new", DateTime.UtcNow.AddMinutes(5)));
+        _hash.Setup(h => h.ComputeSha256("raw-new")).Returns("h-new");
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        captured!.Any(c => c.Type == VeterinerClaims.PlatformAdmin && c.Value == bool.TrueString).Should().Be(expected);
     }
 
     [Fact]
