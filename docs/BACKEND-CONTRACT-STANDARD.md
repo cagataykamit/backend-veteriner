@@ -1184,6 +1184,7 @@ FluentValidation (validator’lar) → `400` `ValidationProblemDetails` (Mediato
 - **Iyzico callback** — `POST /api/v1/billing/iyzico/callback` (`AllowAnonymous`, form POST): **üretim kodu yalnızca HTTP redirect** ile panel subscription URL’sine köprüler (`checkout=processing`, `provider=iyzico`, isteğe bağlı `checkoutSessionId`). **Ödeme/aktivasyon doğrulaması burada yapılmaz**; kaynak gerçeklik **webhook** veya panel **`…/finalize`** ile **§24**’te anlatıldığı gibi.
 - **Webhook** — `POST /api/v1/webhooks/billing/stripe` | `…/iyzico`: ham gövde + imza; `ProcessBillingWebhookCommand` → idempotent aktivasyon hattı.
 - **Finalize** — `POST /api/v1/tenants/{tenantId}/subscription-checkout/{checkoutSessionId}/finalize` (`Subscriptions.Manage`): **`BillingActivationSource.Manual`** ile `ISubscriptionCheckoutActivationService.TryActivateAsync`; read-only tenant için guard **muafiyeti** **§24.4**.
+- **Vazgeçme** — `POST /api/v1/tenants/{tenantId}/subscription-checkout/{checkoutSessionId}/cancel` (`Subscriptions.Manage`, gövde yok, **204**): panel sağlayıcıdan iptal dönüşü (`checkout=cancel`) alınca çağırır. Açık (`Pending`/`RedirectReady`) oturum `Cancelled` olur; sağlayıcı o sayfanın token'ını geçersiz kıldığı için oturum açık kalırsa sonraki başlatma ölü sayfayı (iyzico "Geçersiz token") yeniden kullanırdı. Kapalı oturumda işlem yapmaz, yine **204**; bilinmeyen oturum **404** `Subscriptions.CheckoutSessionNotFound`. Read-only tenant için guard muafiyeti finalize ile aynıdır.
 
 #### Read-only tenant
 
