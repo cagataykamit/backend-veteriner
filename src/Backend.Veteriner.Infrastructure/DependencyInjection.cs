@@ -354,6 +354,9 @@ public static class DependencyInjection
         services.AddScoped<IBillingWebhookSignatureVerifier, BillingWebhookSignatureVerifier>();
         services.AddScoped<IBillingWebhookPayloadParser, BillingWebhookPayloadParser>();
         services.AddHostedService<ScheduledPlanChangeProcessorHostedService>();
+        services.Configure<CheckoutReconciliationOptions>(configuration.GetSection("Billing:CheckoutReconciliation"));
+        services.AddScoped<CheckoutReconciliationProcessor>();
+        services.AddHostedService<CheckoutReconciliationHostedService>();
 
         services.Configure<ReminderProcessorOptions>(configuration.GetSection("Reminders:Processor"));
         services.AddScoped<IReminderEmailOutboxEnqueuer, ReminderEmailOutboxEnqueuer>();

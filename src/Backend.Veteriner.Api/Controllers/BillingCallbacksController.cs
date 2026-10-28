@@ -14,7 +14,8 @@ namespace Backend.Veteriner.Api.Controllers;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/billing")]
 [AllowAnonymous]
-[DisableRateLimiting]
+// Anonim dönüş ucu her istekte sağlayıcıya sorgu yapar; IP başına sınırlı (gerçek kullanıcı ödeme başına bir kez döner).
+[EnableRateLimiting("billing-callback")]
 public sealed class BillingCallbacksController : ControllerBase
 {
     private readonly BillingOptions _billingOptions;

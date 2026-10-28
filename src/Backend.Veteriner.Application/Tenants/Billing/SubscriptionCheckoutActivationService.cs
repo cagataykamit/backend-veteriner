@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
+using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Tenants.Billing;
 
@@ -17,6 +18,7 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
     private readonly ITenantScope _tenantScope;
     private readonly ISalesPartnerDiscountBilling _partnerDiscounts;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger<SubscriptionCheckoutActivationService> _logger;
 
     public SubscriptionCheckoutActivationService(
         IReadRepository<TenantSubscription> subscriptionsRead,
@@ -25,7 +27,8 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
         IRepository<BillingCheckoutSession> sessionsWrite,
         ITenantScope tenantScope,
         ISalesPartnerDiscountBilling partnerDiscounts,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ILogger<SubscriptionCheckoutActivationService> logger)
     {
         _subscriptionsRead = subscriptionsRead;
         _subscriptionsWrite = subscriptionsWrite;
@@ -34,6 +37,7 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
         _tenantScope = tenantScope;
         _partnerDiscounts = partnerDiscounts;
         _timeProvider = timeProvider;
+        _logger = logger;
     }
 
     public async Task<Result<SubscriptionCheckoutSessionDto>> TryActivateAsync(
@@ -98,7 +102,11 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
                 "Bu oturumun ödemesi sağlayıcı tarafından doğrulanmalıdır; elle tamamlanamaz.");
         }
 
-        if (!session.IsOpen(utcNow))
+        // Sağlayıcının doğruladığı ödeme (webhook ya da sorgu) oturum kapanmış olsa da (süresi dolmuş, iptal, başarısız deneme)
+        // etkinleşir: para alınmıştır. Doğrulanmamış elle tamamlama yalnız açık oturumda olur.
+        var verifiedPayment = source is BillingActivationSource.Webhook or BillingActivationSource.ProviderVerified;
+        var wasOpen = session.IsOpen(utcNow);
+        if (!wasOpen && !verifiedPayment)
         {
             if (session.Status is BillingCheckoutSessionStatus.Pending or BillingCheckoutSessionStatus.RedirectReady)
             {
@@ -122,7 +130,20 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
 
         var completionReference = ResolveCompletionReference(session, externalReference);
         sub.ActivatePaidPlan(session.TargetPlanCode, session.BillingPeriod, utcNow);
-        session.MarkCompleted(utcNow, completionReference);
+        if (wasOpen)
+        {
+            session.MarkCompleted(utcNow, completionReference);
+        }
+        else
+        {
+            // Olağan dışı: kullanıcı dönmedi, webhook geç geldi ya da oturum ödeme sırasında yenilendi. İzlenebilsin diye kayıt.
+            _logger.LogWarning(
+                "Kapanmış checkout oturumu doğrulanmış ödemeyle tamamlandı. SessionId={SessionId} PreviousStatus={Status} Source={Source}",
+                session.Id,
+                session.Status,
+                source);
+            session.MarkCompletedByVerifiedPayment(utcNow, completionReference);
+        }
 
         // Satış ortağı komisyonu yalnız gerçek tahsilatta (ADR-037 madde 4): imzası doğrulanan sağlayıcı olayı ya da backend'in
         // sağlayıcıdan doğruladığı ödeme. Panel finalize ödemeyi doğrulamadığı için (Manual) komisyon üretmez. Aynı iş biriminde

@@ -29,7 +29,41 @@ public sealed class SubscriptionCheckoutActivationServiceTests
             _sessionsWrite.Object,
             Mock.Of<ITenantScope>(),
             new SalesPartnerDiscountBilling(_redemptions.Object, NullLogger<SalesPartnerDiscountBilling>.Instance),
-            TimeProvider.System);
+            TimeProvider.System,
+            NullLogger<SubscriptionCheckoutActivationService>.Instance);
+
+    [Theory]
+    [InlineData(BillingActivationSource.Webhook, "expired")]
+    [InlineData(BillingActivationSource.ProviderVerified, "expired")]
+    [InlineData(BillingActivationSource.ProviderVerified, "cancelled")]
+    [InlineData(BillingActivationSource.Webhook, "failed")]
+    public async Task TryActivateAsync_Should_Activate_ClosedSession_When_PaymentVerifiedByProvider(BillingActivationSource source, string closedAs)
+    {
+        // Para sağlayıcıda alınmışsa oturumun bizdeki kapanışı (süre, yenileme, başarısız deneme) paketi engellemez.
+        var tenantId = Guid.NewGuid();
+        var session = BillingCheckoutSession.CreatePending(
+            tenantId, SubscriptionPlanCode.Basic, SubscriptionPlanCode.Pro, BillingProvider.Iyzico, DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddMinutes(-30));
+        session.SetRedirectReady("https://sandbox.example/checkout?token=t", "t", DateTime.UtcNow.AddHours(-1));
+        switch (closedAs)
+        {
+            case "expired": session.MarkExpired(DateTime.UtcNow); break;
+            case "cancelled": session.MarkCancelled(DateTime.UtcNow); break;
+            case "failed": session.MarkFailed(DateTime.UtcNow); break;
+        }
+
+        var sub = TenantSubscription.StartTrial(tenantId, SubscriptionPlanCode.Basic, DateTime.UtcNow.AddDays(-20), 14);
+        _sessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<BillingCheckoutSessionByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+        _subscriptionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantSubscriptionByTenantIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sub);
+
+        var result = await CreateService().TryActivateAsync(session.Id, null, BillingProvider.Iyzico, null, source, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        session.Status.Should().Be(BillingCheckoutSessionStatus.Completed);
+        sub.PlanCode.Should().Be(SubscriptionPlanCode.Pro);
+        sub.Status.Should().Be(TenantSubscriptionStatus.Active);
+    }
 
     [Fact]
     public async Task TryActivateAsync_Should_ReturnFailure_When_SessionNotFound()
