@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Domain.OwnerPortal;
 
 /// <summary>
@@ -10,6 +12,9 @@ public sealed class OwnerAccount
     public const int MaxEmailLength = 320;
     public const int MaxDisplayNameLength = 100;
 
+    /// <summary>Silinen hesabın görünen adı (ADR-041 K3).</summary>
+    public const string DeletedDisplayName = "Silinmiş hesap";
+
     /// <summary>Art arda bu kadar başarısız giriş (yanlış parola veya kod) hesabı kilitler.</summary>
     public const int MaxFailedSignInAttempts = 5;
 
@@ -17,8 +22,8 @@ public sealed class OwnerAccount
 
     public Guid Id { get; private set; } = Guid.NewGuid();
 
-    /// <summary>Trim + küçük harf; benzersiz.</summary>
-    public string Email { get; private set; } = default!;
+    /// <summary>Trim + küçük harf; benzersiz. Yalnız silinen hesapta null (adres yeni davete serbest kalır).</summary>
+    public string? Email { get; private set; }
 
     /// <summary>BCrypt özeti; yalnız kodla giren hesapta null.</summary>
     public string? PasswordHash { get; private set; }
@@ -32,6 +37,8 @@ public sealed class OwnerAccount
     public int FailedSignInCount { get; private set; }
 
     public DateTime? LockedUntilUtc { get; private set; }
+
+    public DateTime? DeletedAtUtc { get; private set; }
 
     private OwnerAccount() { }
 
@@ -101,6 +108,27 @@ public sealed class OwnerAccount
     }
 
     public void Disable() => Status = OwnerAccountStatus.Disabled;
+
+    /// <summary>
+    /// Hasta sahibinin kendi isteğiyle silme (ADR-041 seçenek C): kişisel alanlar geri döndürülemez biçimde boşaltılır, satır
+    /// kimliksiz iz olarak kalır (<see cref="Id"/>, <see cref="CreatedAtUtc"/>). Silinen hesap pasiftir; oturum, kod ve bağ
+    /// kapatma çağıranın işidir.
+    /// </summary>
+    public Result Delete(DateTime utcNow)
+    {
+        if (Status == OwnerAccountStatus.Deleted)
+            return Result.Failure("Portal.Account.AlreadyDeleted", "Portal hesabı zaten silinmiş.");
+
+        Email = null;
+        PasswordHash = null;
+        DisplayName = DeletedDisplayName;
+        LastLoginAtUtc = null;
+        FailedSignInCount = 0;
+        LockedUntilUtc = null;
+        Status = OwnerAccountStatus.Deleted;
+        DeletedAtUtc = ToUtc(utcNow);
+        return Result.Success();
+    }
 
     /// <summary>Hesap e-postası karşılaştırma ve saklama kuralı (trim + küçük harf); boşsa null.</summary>
     public static string? NormalizeEmail(string? email)

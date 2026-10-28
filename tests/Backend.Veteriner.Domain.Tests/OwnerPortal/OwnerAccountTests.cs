@@ -102,4 +102,43 @@ public sealed class OwnerAccountTests
 
         account.CanAttemptSignIn(Now).Should().BeFalse();
     }
+
+    [Fact]
+    public void Delete_Should_Clear_Personal_Fields_And_Keep_Identity()
+    {
+        var account = OwnerAccount.Create("a@b.com", "Ayşe", Now.AddDays(-3));
+        account.SetPasswordHash("hash");
+        account.RecordSuccessfulSignIn(Now.AddDays(-1));
+        account.RecordFailedSignIn(Now);
+        var id = account.Id;
+
+        var result = account.Delete(Now);
+
+        result.IsSuccess.Should().BeTrue();
+        account.Id.Should().Be(id);
+        account.CreatedAtUtc.Should().Be(Now.AddDays(-3));
+        account.Email.Should().BeNull();
+        account.HasPassword.Should().BeFalse();
+        account.DisplayName.Should().Be(OwnerAccount.DeletedDisplayName);
+        account.LastLoginAtUtc.Should().BeNull();
+        account.FailedSignInCount.Should().Be(0);
+        account.LockedUntilUtc.Should().BeNull();
+        account.Status.Should().Be(OwnerAccountStatus.Deleted);
+        account.DeletedAtUtc.Should().Be(Now);
+        account.IsActive.Should().BeFalse();
+        account.CanAttemptSignIn(Now).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Delete_Twice_Should_Fail_And_Keep_First_Time()
+    {
+        var account = OwnerAccount.Create("a@b.com", "Ad", Now);
+        account.Delete(Now);
+
+        var result = account.Delete(Now.AddHours(1));
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Portal.Account.AlreadyDeleted");
+        account.DeletedAtUtc.Should().Be(Now);
+    }
 }
