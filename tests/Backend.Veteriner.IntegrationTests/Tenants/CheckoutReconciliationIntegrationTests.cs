@@ -101,6 +101,33 @@ public sealed class CheckoutReconciliationIntegrationTests : IClassFixture<Custo
             .Should().Be(BillingCheckoutRefundStatus.Refunded);
     }
 
+    [Fact]
+    public async Task Callback_Should_Mark_Old_Tab_Payment_As_Duplicate_Without_Waiting_For_Webhook()
+    {
+        // Eski (paket değişince iptal edilmiş) sekmede ödeme yapıldı: dönüş, kapalı oturumu da sağlayıcıya sorar.
+        await using var app = _factory.WithWebHostBuilder(b => b.ConfigureServices(services =>
+        {
+            services.RemoveAll<IBillingCheckoutProvider>();
+            services.AddScoped<IBillingCheckoutProvider, ManualBillingCheckoutProvider>();
+            services.AddScoped<IBillingCheckoutProvider, PaidIyzicoProvider>();
+        }));
+        var tenantId = await SignupOwnerAsync(app);
+        var duplicateId = await SeedCancelledIyzicoSessionAsync(app, tenantId);
+        await SeedSettledPremiumSessionAsync(app, tenantId);
+
+        var client = app.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var response = await client.PostAsync(
+            "/api/v1/billing/iyzico/callback",
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = "paid-token" }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        await using var check = app.Services.CreateSystemScope();
+        var db = check.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.BillingCheckoutSessions.AsNoTracking().SingleAsync(s => s.Id == duplicateId)).RefundStatus
+            .Should().Be(BillingCheckoutRefundStatus.Pending);
+        (await db.TenantSubscriptions.AsNoTracking().SingleAsync(s => s.TenantId == tenantId)).PlanCode.Should().Be(SubscriptionPlanCode.Premium);
+    }
+
     private static async Task SeedSettledPremiumSessionAsync(WebApplicationFactory<Program> app, Guid tenantId)
     {
         await using var scope = app.Services.CreateSystemScope();

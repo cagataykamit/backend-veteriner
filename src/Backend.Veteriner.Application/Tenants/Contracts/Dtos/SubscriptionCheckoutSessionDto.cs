@@ -9,6 +9,8 @@ namespace Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 /// <see cref="TrialPlanChangeApplied"/> true olur. Bu durumda frontend ödeme akışı beklememelidir.
 /// <see cref="ProratedChargeMinor"/> çekilecek (satış ortağı kodu indirimi sonrası) tutardır; <see cref="DiscountAmountMinor"/>
 /// uygulanan kod indirimidir, yoksa <c>null</c> (ADR-037).
+/// <see cref="RefundStatus"/> oturumun ödemesi çift ödeme sayılıp iadeye alındıysa doludur (<c>Pending</c>, <c>Refunded</c>,
+/// <c>ManualRequired</c>; BILL-005), aksi halde <c>null</c>.
 /// </summary>
 public sealed record SubscriptionCheckoutSessionDto(
     Guid? CheckoutSessionId,
@@ -25,5 +27,6 @@ public sealed record SubscriptionCheckoutSessionDto(
     decimal? ProrationRatio,
     bool TrialPlanChangeApplied,
     long? DiscountAmountMinor = null,
-    string BillingPeriod = "Monthly");
+    string BillingPeriod = "Monthly",
+    string? RefundStatus = null);
 
