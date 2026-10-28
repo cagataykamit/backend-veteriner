@@ -29,7 +29,9 @@ public sealed class CheckoutReconciliationHostedService : BackgroundService
             try
             {
                 using var scope = _sp.CreateScope();
-                await scope.ServiceProvider.GetRequiredService<CheckoutReconciliationProcessor>().RunOnceAsync(stoppingToken);
+                var processor = scope.ServiceProvider.GetRequiredService<CheckoutReconciliationProcessor>();
+                await processor.RunOnceAsync(stoppingToken);
+                await processor.RefundPendingOnceAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
