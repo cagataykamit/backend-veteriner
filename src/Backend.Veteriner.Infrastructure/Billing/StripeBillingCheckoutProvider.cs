@@ -155,4 +155,8 @@ public sealed class StripeBillingCheckoutProvider : IBillingCheckoutProvider
     /// <summary>Stripe Checkout oturumu iptal dönüşünde kapatılır (cancel ucu), aksi hâlde süresi dolana kadar ödenebilir.</summary>
     public Task<CheckoutPageState> GetCheckoutPageStateAsync(BillingCheckoutSession session, CancellationToken ct = default)
         => Task.FromResult(CheckoutPageState.Payable);
+
+    /// <summary>Stripe için otomatik iade yazılmadı; çift ödeme platform yöneticisine elle iade olarak düşer.</summary>
+    public Task<ProviderRefundResult> RefundPaymentAsync(BillingCheckoutSession session, CancellationToken ct = default)
+        => Task.FromResult(ProviderRefundResult.NotSupported("Stripe otomatik iadesi yok; Stripe panelinden iade edin."));
 }

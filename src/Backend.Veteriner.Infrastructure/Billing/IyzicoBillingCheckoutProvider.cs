@@ -183,6 +183,89 @@ public sealed class IyzicoBillingCheckoutProvider : IBillingCheckoutProvider
         }
     }
 
+    /// <summary>
+    /// Çift ödemeyi geri verir (BILL-005): ödeme formundan ödeme kimliği ve tutar alınır; önce iptal denenir (gün sonu
+    /// mutabakatından önce, karttan çekim düşer), olmazsa tutar bazlı iade. İkisi de reddedilirse yeniden denenir.
+    /// </summary>
+    public async Task<ProviderRefundResult> RefundPaymentAsync(BillingCheckoutSession session, CancellationToken ct = default)
+    {
+        var iyzico = _billingOptions.Iyzico;
+        var token = session.ExternalReference?.Trim();
+        if (string.IsNullOrEmpty(token))
+            return ProviderRefundResult.NotSupported("Oturumda iyzico token'ı yok; ödeme bulunamıyor.");
+        if (string.IsNullOrWhiteSpace(iyzico.ApiKey)
+            || string.IsNullOrWhiteSpace(iyzico.SecretKey)
+            || string.IsNullOrWhiteSpace(iyzico.BaseUrl))
+            return ProviderRefundResult.Failed("Iyzico yapılandırması eksik.");
+
+        try
+        {
+            var options = new Iyzipay.Options
+            {
+                ApiKey = iyzico.ApiKey.Trim(),
+                SecretKey = iyzico.SecretKey.Trim(),
+                BaseUrl = iyzico.BaseUrl.Trim(),
+            };
+            var conversationId = session.Id.ToString("D");
+            var locale = NormalizeLocale(iyzico.Locale);
+
+            var form = await CheckoutForm.Retrieve(
+                new RetrieveCheckoutFormRequest { Token = token, ConversationId = conversationId, Locale = locale },
+                options);
+            if (ToPageState(form.Status, form.PaymentStatus, form.ErrorCode) != CheckoutPageState.Paid
+                || string.IsNullOrWhiteSpace(form.PaymentId))
+            {
+                return ProviderRefundResult.Failed(
+                    $"Ödeme formu ödenmiş görünmüyor: Status={form.Status} PaymentStatus={form.PaymentStatus} ErrorCode={form.ErrorCode}");
+            }
+
+            var cancel = await Cancel.Create(
+                new CreateCancelRequest
+                {
+                    PaymentId = form.PaymentId,
+                    ConversationId = conversationId,
+                    Locale = locale,
+                    Reason = RefundReason.DOUBLE_PAYMENT.ToString(),
+                    Description = "Vetinity: aynı ödeme denemesinde ikinci ödeme",
+                },
+                options);
+            if (IsSuccess(cancel.Status))
+            {
+                _logger.LogInformation("Iyzico çift ödeme iptal edildi. Session {SessionId} PaymentId={PaymentId}", session.Id, form.PaymentId);
+                return ProviderRefundResult.Success();
+            }
+
+            var refund = await Refund.CreateAmountBasedRefundRequest(
+                new CreateAmountBasedRefundRequest
+                {
+                    PaymentId = form.PaymentId,
+                    Price = form.PaidPrice,
+                    ConversationId = conversationId,
+                    Locale = locale,
+                },
+                options);
+            if (IsSuccess(refund.Status))
+            {
+                _logger.LogInformation(
+                    "Iyzico çift ödeme iade edildi (iptal reddedildi: {CancelError}). Session {SessionId} PaymentId={PaymentId}",
+                    cancel.ErrorMessage,
+                    session.Id,
+                    form.PaymentId);
+                return ProviderRefundResult.Success();
+            }
+
+            return ProviderRefundResult.Failed(
+                $"İptal: {cancel.ErrorCode} {cancel.ErrorMessage}; iade: {refund.ErrorCode} {refund.ErrorMessage}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Iyzico çift ödeme iadesi hatası. Session: {SessionId}", session.Id);
+            return ProviderRefundResult.Failed("Iyzico iade isteği beklenmeyen hata verdi.");
+        }
+    }
+
+    private static bool IsSuccess(string? status) => string.Equals(status, "success", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>iyzico "gönderilen tokena ait ödeme bilgisi bulunamadı": form henüz ödenmeye çalışılmadı.</summary>
     public const string NoPaymentYetErrorCode = "5122";
 

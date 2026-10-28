@@ -20,4 +20,7 @@ public interface IBillingCheckoutProvider
     /// ödeme denemesi sonrası) bildirmeden tüketmiş olabilir. Emin olunamazsa <see cref="CheckoutPageState.Unusable"/>.
     /// </summary>
     Task<CheckoutPageState> GetCheckoutPageStateAsync(BillingCheckoutSession session, CancellationToken ct = default);
+
+    /// <summary>Oturumun tahsil edilmiş ödemesini sağlayıcıda tamamen geri verir (çift ödeme, BILL-005).</summary>
+    Task<ProviderRefundResult> RefundPaymentAsync(BillingCheckoutSession session, CancellationToken ct = default);
 }

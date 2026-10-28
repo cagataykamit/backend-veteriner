@@ -20,4 +20,8 @@ public sealed class ManualBillingCheckoutProvider : IBillingCheckoutProvider
     /// <summary>Manuel oturumun sağlayıcı sayfası yoktur; açık olduğu sürece kullanılabilir.</summary>
     public Task<CheckoutPageState> GetCheckoutPageStateAsync(BillingCheckoutSession session, CancellationToken ct = default)
         => Task.FromResult(CheckoutPageState.Payable);
+
+    /// <summary>Manuel oturum sağlayıcıdan doğrulanmadığı için çift ödeme olarak işaretlenmez.</summary>
+    public Task<ProviderRefundResult> RefundPaymentAsync(BillingCheckoutSession session, CancellationToken ct = default)
+        => Task.FromResult(ProviderRefundResult.NotSupported("Manuel sağlayıcıda tahsilat yok."));
 }
