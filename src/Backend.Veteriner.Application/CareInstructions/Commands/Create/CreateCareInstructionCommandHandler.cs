@@ -90,11 +90,9 @@ public sealed class CreateCareInstructionCommandHandler : IRequestHandler<Create
                 "Pasif kiracı için bakım talimatı oluşturulamaz.");
         }
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<Guid>.Failure(
-                $"{Prefix}.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<Guid>.Failure(ClinicContextRule.Mismatch(Prefix));
         }
 
         var clinicId = _clinicContext.ClinicId ?? request.ClinicId;

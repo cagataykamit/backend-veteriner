@@ -48,12 +48,9 @@ public sealed class GetAdministrationsListQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue
-            && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PagedResult<AdministrationDto>>.Failure(
-                "Administrations.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PagedResult<AdministrationDto>>.Failure(ClinicContextRule.Mismatch("Administrations"));
         }
 
         // Kapsamsız kiracı geneli liste yoktur (ücret listesiyle aynı kural).

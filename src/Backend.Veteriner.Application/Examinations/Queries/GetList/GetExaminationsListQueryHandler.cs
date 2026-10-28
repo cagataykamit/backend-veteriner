@@ -88,11 +88,9 @@ public sealed class GetExaminationsListQueryHandler
             stepSw.Restart();
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PagedResult<ExaminationListItemDto>>.Failure(
-                "Examinations.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PagedResult<ExaminationListItemDto>>.Failure(ClinicContextRule.Mismatch("Examinations"));
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;

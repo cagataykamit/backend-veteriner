@@ -70,11 +70,9 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
                 "Pasif kiracı için tedavi kaydı oluşturulamaz.");
         }
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<Guid>.Failure(
-                "Treatments.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<Guid>.Failure(ClinicContextRule.Mismatch("Treatments"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

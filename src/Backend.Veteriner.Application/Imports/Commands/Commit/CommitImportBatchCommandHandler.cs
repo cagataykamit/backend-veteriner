@@ -152,8 +152,9 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
         if (batch.ClinicId is not { } clinicId)
             return Result.Failure("Imports.ClinicRequired", "Aşı tablosu içeren partide klinik zorunludur.");
 
-        if (_clinicContext.ClinicId is { } active && active != clinicId)
-            return Result.Failure("Imports.ClinicContextMismatch", "Partinin kliniği aktif klinik bağlamıyla uyuşmuyor.");
+        if (ClinicContextRule.Conflicts(clinicId, _clinicContext.ClinicId))
+            return Result.Failure(
+                ClinicContextRule.Mismatch("Imports", "Partinin kliniği aktif klinik bağlamıyla uyuşmuyor."));
 
         return await VaccinationClinicWriteScope.EnsureWriteAccessAsync(_clinicScopeResolver, tenantId, clinicId, ct);
     }

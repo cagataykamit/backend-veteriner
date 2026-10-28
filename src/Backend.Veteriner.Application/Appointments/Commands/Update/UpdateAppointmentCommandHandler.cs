@@ -85,8 +85,8 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
                 return Result.Failure(window.Error);
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
-            return Result.Failure("Appointments.ClinicContextMismatch", "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
+            return Result.Failure(ClinicContextRule.Mismatch("Appointments"));
 
         var clinicAccess = await AppointmentClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
             _clinicScopeResolver,
@@ -98,8 +98,9 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
             return clinicAccess;
 
         var clinicId = request.ClinicId ?? appointment.ClinicId;
-        if (_clinicContext.ClinicId is { } currentClinicId && clinicId != currentClinicId)
-            return Result.Failure("Appointments.ClinicContextMismatch", "Randevu sadece aktif clinic bağlamında güncellenebilir.");
+        if (ClinicContextRule.Conflicts(clinicId, _clinicContext.ClinicId))
+            return Result.Failure(
+                ClinicContextRule.Mismatch("Appointments", "Randevu sadece aktif clinic bağlamında güncellenebilir."));
 
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, clinicId), ct);
         if (clinic is null)

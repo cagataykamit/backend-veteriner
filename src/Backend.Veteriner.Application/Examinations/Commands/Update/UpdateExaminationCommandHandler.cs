@@ -85,11 +85,10 @@ public sealed class UpdateExaminationCommandHandler
         if (!clinicAccess.IsSuccess)
             return Result<ExaminationWriteResultDto>.Failure(clinicAccess.Error);
 
-        if (_clinicContext.ClinicId is { } currentClinicId && e.ClinicId != currentClinicId)
+        if (ClinicContextRule.Conflicts(e.ClinicId, _clinicContext.ClinicId))
         {
             return Result<ExaminationWriteResultDto>.Failure(
-                "Examinations.ClinicContextMismatch",
-                "Muayene kaydı sadece aktif clinic bağlamında güncellenebilir.");
+                ClinicContextRule.Mismatch("Examinations", "Muayene kaydı sadece aktif clinic bağlamında güncellenebilir."));
         }
 
         if (request.ClinicId is { } requestClinicId && requestClinicId != e.ClinicId)

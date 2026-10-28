@@ -69,12 +69,9 @@ internal sealed record RegisterReportFilter(
                 $"Tarih aralığı en fazla {RegisterReportConstants.MaxRangeDays} gün olabilir.");
         }
 
-        if (query.ClinicId.HasValue && clinicContext.ClinicId.HasValue
-                                    && query.ClinicId.Value != clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(query.ClinicId, clinicContext.ClinicId))
         {
-            return Result<RegisterReportFilter>.Failure(
-                "Registers.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<RegisterReportFilter>.Failure(ClinicContextRule.Mismatch("Registers"));
         }
 
         var scopeResult = await scopeResolver.ResolveAsync(tenantId, query.ClinicId ?? clinicContext.ClinicId, ct);

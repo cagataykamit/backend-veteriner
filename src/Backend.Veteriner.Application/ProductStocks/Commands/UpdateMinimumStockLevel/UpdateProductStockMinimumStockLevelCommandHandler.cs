@@ -62,11 +62,10 @@ public sealed class UpdateProductStockMinimumStockLevelCommandHandler
                 "Stok satırı bulunamadı veya kiracıya ait değil.");
         }
 
-        if (_clinicContext.ClinicId.HasValue && stock.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(stock.ClinicId, _clinicContext.ClinicId))
         {
             return Result<ProductStockDto>.Failure(
-                "ProductStocks.ClinicContextMismatch",
-                "Bu stok satırı aktif clinic bağlamı ile uyuşmuyor.");
+                ClinicContextRule.Mismatch("ProductStocks", "Bu stok satırı aktif clinic bağlamı ile uyuşmuyor."));
         }
 
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, stock.ClinicId, ct);

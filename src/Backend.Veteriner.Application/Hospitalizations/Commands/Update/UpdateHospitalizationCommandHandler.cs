@@ -95,11 +95,9 @@ public sealed class UpdateHospitalizationCommandHandler
         if (existing is null)
             return Fail("Hospitalizations.NotFound", "Yatış kaydı bulunamadı.");
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Fail(
-                "Hospitalizations.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<HospitalizationWriteResultDto>.Failure(ClinicContextRule.Mismatch("Hospitalizations"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
@@ -114,11 +112,10 @@ public sealed class UpdateHospitalizationCommandHandler
         if (!clinicAccess.IsSuccess)
             return Result<HospitalizationWriteResultDto>.Failure(clinicAccess.Error);
 
-        if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
+        if (ClinicContextRule.Conflicts(effectiveClinicId, _clinicContext.ClinicId))
         {
-            return Fail(
-                "Hospitalizations.ClinicContextMismatch",
-                "Yatış kaydı sadece aktif clinic bağlamında güncellenebilir.");
+            return Result<HospitalizationWriteResultDto>.Failure(
+                ClinicContextRule.Mismatch("Hospitalizations", "Yatış kaydı sadece aktif clinic bağlamında güncellenebilir."));
         }
 
         if (!ExaminationRowVersion.TryDecodeOptional(request.RowVersion, out var expectedRowVersion))

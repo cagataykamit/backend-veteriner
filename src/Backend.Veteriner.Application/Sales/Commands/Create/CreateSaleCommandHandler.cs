@@ -91,12 +91,9 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         if (!tenant.IsActive)
             return Fail("Tenants.TenantInactive", "Pasif kiracı için satış oluşturulamaz.");
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue
-            && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Fail(
-                "Sales.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<SaleCreateResultDto>.Failure(ClinicContextRule.Mismatch("Sales"));
         }
 
         if ((_clinicContext.ClinicId ?? request.ClinicId) is not { } clinicId)

@@ -109,11 +109,9 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
                 return Result.Failure(dw.Error);
         }
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result.Failure(
-                "Vaccinations.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result.Failure(ClinicContextRule.Mismatch("Vaccinations"));
         }
 
         var v = await _vaccinationsRead.FirstOrDefaultAsync(
@@ -130,11 +128,10 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
         if (!clinicAccess.IsSuccess)
             return clinicAccess;
 
-        if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
+        if (ClinicContextRule.Conflicts(effectiveClinicId, _clinicContext.ClinicId))
         {
             return Result.Failure(
-                "Vaccinations.ClinicContextMismatch",
-                "Aşı kaydı sadece aktif clinic bağlamında güncellenebilir.");
+                ClinicContextRule.Mismatch("Vaccinations", "Aşı kaydı sadece aktif clinic bağlamında güncellenebilir."));
         }
 
         var clinic = await _clinics.FirstOrDefaultAsync(

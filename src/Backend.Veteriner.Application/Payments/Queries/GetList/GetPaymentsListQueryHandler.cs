@@ -98,11 +98,9 @@ public sealed class GetPaymentsListQueryHandler
             stepSw.Restart();
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PagedResult<PaymentListItemDto>>.Failure(
-                "Payments.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PagedResult<PaymentListItemDto>>.Failure(ClinicContextRule.Mismatch("Payments"));
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;

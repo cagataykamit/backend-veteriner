@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
@@ -71,11 +72,10 @@ public sealed class CreateClientPortalInviteCommandHandler
                 "Müşterinin portal erişimi zaten açık.");
         }
 
-        if (request.ClinicId is { } bodyClinicId && _clinicContext.ClinicId is { } contextClinicId && bodyClinicId != contextClinicId)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
             return Result<ClientPortalInviteDto>.Failure(
-                "OwnerPortal.ClinicContextMismatch",
-                "İstek clinicId değeri aktif klinik bağlamı ile uyuşmuyor.");
+                ClinicContextRule.Mismatch("OwnerPortal", "İstek clinicId değeri aktif klinik bağlamı ile uyuşmuyor."));
         }
 
         if ((_clinicContext.ClinicId ?? request.ClinicId) is not { } clinicId)

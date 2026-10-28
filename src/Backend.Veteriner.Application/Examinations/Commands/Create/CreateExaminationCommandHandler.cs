@@ -148,11 +148,9 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
                     "Gelmedi işaretli randevu için muayene kaydı oluşturulamaz; önce geliş kaydı açın veya işareti geri alın.");
             }
 
-            if (requestClinicId.HasValue && _clinicContext.ClinicId.HasValue && requestClinicId.Value != _clinicContext.ClinicId.Value)
+            if (ClinicContextRule.Conflicts(requestClinicId, _clinicContext.ClinicId))
             {
-                return Result<ExaminationWriteResultDto>.Failure(
-                    "Examinations.ClinicContextMismatch",
-                    "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+                return Result<ExaminationWriteResultDto>.Failure(ClinicContextRule.Mismatch("Examinations"));
             }
 
             clinicId = _clinicContext.ClinicId ?? requestClinicId ?? appt.ClinicId;

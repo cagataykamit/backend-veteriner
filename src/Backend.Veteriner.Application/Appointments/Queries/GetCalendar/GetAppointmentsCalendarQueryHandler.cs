@@ -81,11 +81,9 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 "Tarih aralığı en fazla 45 gün olabilir.");
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(
-                "Appointments.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(ClinicContextRule.Mismatch("Appointments"));
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;

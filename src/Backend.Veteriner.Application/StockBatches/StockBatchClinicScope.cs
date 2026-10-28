@@ -14,12 +14,9 @@ internal static class StockBatchClinicScope
         IClinicReadScopeResolver scopeResolver,
         CancellationToken ct)
     {
-        if (requestedClinicId.HasValue && clinicContext.ClinicId.HasValue
-            && requestedClinicId.Value != clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(requestedClinicId, clinicContext.ClinicId))
         {
-            return Result<Guid>.Failure(
-                "StockBatches.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<Guid>.Failure(ClinicContextRule.Mismatch("StockBatches"));
         }
 
         if ((requestedClinicId ?? clinicContext.ClinicId) is not { } clinicId)

@@ -39,12 +39,9 @@ internal sealed record OutstandingBalancesReportFilter(
                 "minAmount negatif olamaz.");
         }
 
-        if (requestClinicId.HasValue && clinicContext.ClinicId.HasValue
-                                      && requestClinicId.Value != clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(requestClinicId, clinicContext.ClinicId))
         {
-            return Result<OutstandingBalancesReportFilter>.Failure(
-                "OutstandingBalances.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<OutstandingBalancesReportFilter>.Failure(ClinicContextRule.Mismatch("OutstandingBalances"));
         }
 
         var scopeResult = await scopeResolver.ResolveAsync(tenantId, requestClinicId ?? clinicContext.ClinicId, ct);

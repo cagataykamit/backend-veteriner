@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Shared;
 using AwesomeAssertions;
 
@@ -89,29 +90,13 @@ public sealed class TenantIsolationArchitectureTests
     [Fact]
     public void System_Scope_Should_Only_Be_Used_In_Allowed_Files()
     {
-        var src = Path.Combine(RepositoryRoot(), "src");
-        var used = Directory.EnumerateFiles(src, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
-                        && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+        var used = RepositoryPaths.SourceFiles()
             .Where(f => SystemScopeUsage.IsMatch(File.ReadAllText(f)))
-            .Select(f => Path.GetRelativePath(src, f).Replace(Path.DirectorySeparatorChar, '/'))
+            .Select(RepositoryPaths.RelativeToSrc)
             .ToHashSet();
 
         used.Except(AllowedSystemScopeFiles.Keys).Should().BeEmpty(
             "kiracı filtresini kapatan sistem kapsamı gerekçesiyle izinli listeye eklenmelidir (ADR-040)");
         AllowedSystemScopeFiles.Keys.Except(used).Should().BeEmpty("kullanımı kalkan dosya listeden çıkarılmalıdır");
-    }
-
-    private static string RepositoryRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null)
-        {
-            if (File.Exists(Path.Combine(dir.FullName, "Veteriner.sln")))
-                return dir.FullName;
-            dir = dir.Parent;
-        }
-
-        throw new InvalidOperationException("Veteriner.sln bulunamadı.");
     }
 }

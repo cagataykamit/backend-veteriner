@@ -72,11 +72,9 @@ public sealed class CreateStockMovementCommandHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<StockMovementCreateResult>.Failure(
-                "StockMovements.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<StockMovementCreateResult>.Failure(ClinicContextRule.Mismatch("StockMovements"));
         }
 
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, request.ClinicId, ct);

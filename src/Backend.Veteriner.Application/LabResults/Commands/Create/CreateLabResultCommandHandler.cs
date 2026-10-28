@@ -80,11 +80,9 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
                 "Pasif kiracı için laboratuvar sonucu kaydı oluşturulamaz.");
         }
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<Guid>.Failure(
-                "LabResults.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<Guid>.Failure(ClinicContextRule.Mismatch("LabResults"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

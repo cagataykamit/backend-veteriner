@@ -81,11 +81,9 @@ public sealed class CreateImportBatchCommandHandler
         // Klinik yalnız aşı satırları için gerekir; bağlamdan varsayılmaz, açıkça seçilir.
         if (request.ClinicId is { } clinicId)
         {
-            if (_clinicContext.ClinicId is { } contextClinicId && contextClinicId != clinicId)
+            if (ClinicContextRule.Conflicts(clinicId, _clinicContext.ClinicId))
             {
-                return Fail(
-                    "Imports.ClinicContextMismatch",
-                    "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+                return Result<ImportBatchCreateResultDto>.Failure(ClinicContextRule.Mismatch("Imports"));
             }
 
             var clinicAccess = await _clinicScopeResolver.ResolveAsync(tenantId, clinicId, ct);

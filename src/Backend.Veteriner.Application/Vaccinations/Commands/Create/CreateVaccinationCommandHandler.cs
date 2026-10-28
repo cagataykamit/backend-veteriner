@@ -139,11 +139,9 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
                 return Result<VaccinationCreateResultDto>.Failure(dw.Error);
         }
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<VaccinationCreateResultDto>.Failure(
-                "Vaccinations.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<VaccinationCreateResultDto>.Failure(ClinicContextRule.Mismatch("Vaccinations"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

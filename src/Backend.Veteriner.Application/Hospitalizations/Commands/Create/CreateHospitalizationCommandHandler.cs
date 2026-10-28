@@ -86,11 +86,9 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
                 "Pasif kiracı için yatış kaydı oluşturulamaz.");
         }
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<Guid>.Failure(
-                "Hospitalizations.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<Guid>.Failure(ClinicContextRule.Mismatch("Hospitalizations"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
