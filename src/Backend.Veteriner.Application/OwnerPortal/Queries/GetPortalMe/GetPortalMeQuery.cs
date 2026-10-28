@@ -24,7 +24,7 @@ public sealed class GetPortalMeQueryHandler : IRequestHandler<GetPortalMeQuery, 
         var links = await _access.ListActiveLinksAsync(account.Id, ct);
         return Result<PortalMeDto>.Success(new PortalMeDto(
             account.Id,
-            account.Email,
+            account.Email!,
             account.DisplayName,
             account.HasPassword,
             links.Select(l => new PortalLinkSummaryDto(l.Link.Id, l.Link.ClinicId, l.ClinicName, l.ClientFullName)).ToArray()));

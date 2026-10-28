@@ -36,6 +36,24 @@ public sealed class OwnerPortalRefreshTokenByHashSpec
     }
 }
 
+/// <summary>Hesabın tüm kodları (hesap silmede fiziksel olarak silinir, ADR-041 K3).</summary>
+public sealed class OwnerPortalCodesByAccountSpec : Specification<OwnerPortalCode>
+{
+    public OwnerPortalCodesByAccountSpec(Guid ownerAccountId)
+    {
+        Query.Where(x => x.OwnerAccountId == ownerAccountId);
+    }
+}
+
+/// <summary>Hesabın tüm oturumları, iptal edilmişler dahil (hesap silmede fiziksel olarak silinir, ADR-041 K3).</summary>
+public sealed class OwnerPortalRefreshTokensByAccountSpec : Specification<OwnerPortalRefreshToken>
+{
+    public OwnerPortalRefreshTokensByAccountSpec(Guid ownerAccountId)
+    {
+        Query.Where(x => x.OwnerAccountId == ownerAccountId);
+    }
+}
+
 /// <summary>Hesabın iptal edilmemiş oturumları (izlenir; toplu çıkış/sıfırlama/tekrar kullanım tespitinde kapatılır).</summary>
 public sealed class OpenOwnerPortalRefreshTokensByAccountSpec : Specification<OwnerPortalRefreshToken>
 {

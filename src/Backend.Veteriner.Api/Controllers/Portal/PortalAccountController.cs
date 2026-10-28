@@ -4,6 +4,8 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.OwnerPortal;
 using Backend.Veteriner.Application.OwnerPortal.Commands.AcceptPortalLegalDocuments;
 using Backend.Veteriner.Application.OwnerPortal.Commands.AcknowledgePortalClinicDisclosure;
+using Backend.Veteriner.Application.OwnerPortal.Commands.DeletePortalAccount;
+using Backend.Veteriner.Application.OwnerPortal.Commands.RequestPortalAccountDeletionCode;
 using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalClinicDisclosure;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalLegalStatus;
@@ -16,7 +18,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Backend.Veteriner.Api.Controllers.Portal;
 
 /// <summary>
-/// Oturumlu hasta sahibi uçları (docs/PORTAL_API_CONTRACT.md §5.8–5.9): hesap, hukuki kabul, klinik aydınlatma metni.
+/// Oturumlu hasta sahibi uçları (docs/PORTAL_API_CONTRACT.md §5.8–5.10): hesap, hesap silme, hukuki kabul, klinik aydınlatma metni.
 /// Bağ kapsamlı uçlar sahipliği <c>OwnerPortalAccess</c> ile denetler.
 /// </summary>
 [ApiController]
@@ -40,6 +42,34 @@ public sealed class PortalAccountController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetPortalMeQuery(ownerAccountId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Hesap silme onay kodunu hesabın e-postasına gönderir (bekleme süresindeyse yeni kod gitmez).</summary>
+    [HttpPost("me/deletion-code")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RequestDeletionCode(CancellationToken ct)
+    {
+        if (!this.TryGetOwnerAccountId(out var ownerAccountId, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new RequestPortalAccountDeletionCodeCommand(ownerAccountId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Hesabı kodla onaylayıp siler (ADR-041): anonimleştirme ve tüm klinik bağlarını kapatma; geri alınamaz.</summary>
+    [HttpDelete("me")]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DeleteAccount([FromBody] PortalAccountDeletionBody body, CancellationToken ct)
+    {
+        if (!this.TryGetOwnerAccountId(out var ownerAccountId, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new DeletePortalAccountCommand(ownerAccountId, body.OneTimeCode ?? string.Empty), ct);
         return result.ToActionResult(this);
     }
 

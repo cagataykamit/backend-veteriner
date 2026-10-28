@@ -40,13 +40,14 @@ public sealed class OwnerPortalTokenService : IOwnerPortalTokenService
     {
         // Süre DI'daki saatten hesaplanır (üretimde sistem saati; JwtBearer doğrulaması da onu kullanır), personel
         // JwtTokenService ile aynı.
+        var email = account.Email ?? throw new InvalidOperationException("Silinmiş hesaba oturum açılmaz.");
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var expires = now.AddMinutes(_portal.AccessTokenMinutes);
 
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, account.Id.ToString("D")),
-            new(JwtRegisteredClaimNames.Email, account.Email),
+            new(JwtRegisteredClaimNames.Email, email),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new(OwnerPortalAuth.PrincipalTypeClaim, OwnerPortalAuth.OwnerPrincipalType),

@@ -7,7 +7,7 @@ using Backend.Veteriner.Domain.OwnerPortal;
 namespace Backend.Veteriner.Application.OwnerPortal.Sessions;
 
 /// <summary>
-/// Tek kullanımlık e-posta kodunun üretimi ve doğrulaması (giriş ve parola sıfırlama). Düz kod yalnız e-postada bulunur;
+/// Tek kullanımlık e-posta kodunun üretimi ve doğrulaması (giriş, parola sıfırlama ve hesap silme). Düz kod yalnız e-postada bulunur;
 /// özet kod satırının kimliğiyle tuzlanır. Süre/deneme/bekleme kuralları <see cref="OwnerPortalCode"/>'dadır.
 /// </summary>
 public sealed class OwnerPortalCodeService
@@ -35,6 +35,7 @@ public sealed class OwnerPortalCodeService
     /// </summary>
     public async Task IssueAndSendAsync(OwnerAccount account, OwnerPortalCodePurpose purpose, DateTime utcNow, CancellationToken ct)
     {
+        var email = account.Email ?? throw new InvalidOperationException("Silinmiş hesaba kod gönderilmez.");
         var open = await _codes.ListAsync(new OpenOwnerPortalCodesSpec(account.Id, purpose, utcNow), ct);
         if (open.Any(c => c.IsInResendCooldown(utcNow)))
             return;
@@ -47,7 +48,7 @@ public sealed class OwnerPortalCodeService
         var code = OwnerPortalCode.Issue(id, account.Id, purpose, ComputeHash(id, rawCode), utcNow);
 
         var message = OwnerPortalEmails.Code(purpose, rawCode);
-        await _email.SendAsync(account.Email, message.Subject, message.Body, ct);
+        await _email.SendAsync(email, message.Subject, message.Body, ct);
         await _codes.AddAsync(code, ct);
         await _codes.SaveChangesAsync(ct);
     }

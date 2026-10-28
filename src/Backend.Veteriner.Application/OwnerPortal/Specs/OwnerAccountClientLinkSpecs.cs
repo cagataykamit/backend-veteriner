@@ -42,6 +42,15 @@ public sealed class OwnerAccountClientLinksByClientSpec : Specification<OwnerAcc
     }
 }
 
+/// <summary>Hesabın tüm aktif bağları, kiracılar arası (izlenir; hesap silmede kapatılır, ADR-041 K4).</summary>
+public sealed class ActiveOwnerAccountClientLinksForCloseByAccountSpec : Specification<OwnerAccountClientLink>
+{
+    public ActiveOwnerAccountClientLinksForCloseByAccountSpec(Guid ownerAccountId)
+    {
+        Query.Where(x => x.OwnerAccountId == ownerAccountId && x.Status == OwnerAccountClientLinkStatus.Active);
+    }
+}
+
 public sealed class ActiveOwnerAccountClientLinksByAccountSpec : Specification<OwnerAccountClientLink>
 {
     public ActiveOwnerAccountClientLinksByAccountSpec(Guid ownerAccountId)

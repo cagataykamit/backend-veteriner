@@ -82,9 +82,9 @@ public sealed class PortalSignInHandlerTests
     public async Task CodeSignIn_With_Correct_Code_Should_Issue_Session_And_Consume_Code()
     {
         var account = GivenAccount();
-        await RequestHandler().Handle(new RequestPortalCodeCommand(account.Email, OwnerPortalCodePurpose.SignIn), CancellationToken.None);
+        await RequestHandler().Handle(new RequestPortalCodeCommand(account.Email!, OwnerPortalCodePurpose.SignIn), CancellationToken.None);
 
-        var result = await CodeHandler().Handle(new PortalCodeSignInCommand(account.Email, "123456"), CancellationToken.None);
+        var result = await CodeHandler().Handle(new PortalCodeSignInCommand(account.Email!, "123456"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.AccessToken.Should().Be("access");
@@ -92,7 +92,7 @@ public sealed class PortalSignInHandlerTests
         _f.AddedCodes.Single().ConsumedAtUtc.Should().NotBeNull();
         account.LastLoginAtUtc.Should().Be(OwnerPortalTestFixture.Now);
 
-        var reuse = await CodeHandler().Handle(new PortalCodeSignInCommand(account.Email, "123456"), CancellationToken.None);
+        var reuse = await CodeHandler().Handle(new PortalCodeSignInCommand(account.Email!, "123456"), CancellationToken.None);
         reuse.Error.Code.Should().Be(InvalidCredentials, "kod tek kullanımlıktır");
     }
 
@@ -100,9 +100,9 @@ public sealed class PortalSignInHandlerTests
     public async Task CodeSignIn_With_Wrong_Code_Should_Count_Attempt_And_Save()
     {
         var account = GivenAccount();
-        await RequestHandler().Handle(new RequestPortalCodeCommand(account.Email, OwnerPortalCodePurpose.SignIn), CancellationToken.None);
+        await RequestHandler().Handle(new RequestPortalCodeCommand(account.Email!, OwnerPortalCodePurpose.SignIn), CancellationToken.None);
 
-        var result = await CodeHandler().Handle(new PortalCodeSignInCommand(account.Email, "000000"), CancellationToken.None);
+        var result = await CodeHandler().Handle(new PortalCodeSignInCommand(account.Email!, "000000"), CancellationToken.None);
 
         result.Error.Code.Should().Be(InvalidCredentials);
         account.FailedSignInCount.Should().Be(1);
@@ -122,11 +122,11 @@ public sealed class PortalSignInHandlerTests
     public async Task CodeSignIn_On_Locked_Account_Should_Reject_Even_Correct_Code()
     {
         var account = GivenAccount();
-        await RequestHandler().Handle(new RequestPortalCodeCommand(account.Email, OwnerPortalCodePurpose.SignIn), CancellationToken.None);
+        await RequestHandler().Handle(new RequestPortalCodeCommand(account.Email!, OwnerPortalCodePurpose.SignIn), CancellationToken.None);
         for (var i = 0; i < OwnerAccount.MaxFailedSignInAttempts; i++)
             account.RecordFailedSignIn(OwnerPortalTestFixture.Now);
 
-        var result = await CodeHandler().Handle(new PortalCodeSignInCommand(account.Email, "123456"), CancellationToken.None);
+        var result = await CodeHandler().Handle(new PortalCodeSignInCommand(account.Email!, "123456"), CancellationToken.None);
 
         result.Error.Code.Should().Be(InvalidCredentials);
         _f.AddedCodes.Single().ConsumedAtUtc.Should().BeNull();
@@ -150,12 +150,12 @@ public sealed class PortalSignInHandlerTests
 
         for (var i = 0; i < OwnerAccount.MaxFailedSignInAttempts; i++)
         {
-            (await PasswordHandler().Handle(new PortalPasswordSignInCommand(account.Email, "Wrong123!"), CancellationToken.None))
+            (await PasswordHandler().Handle(new PortalPasswordSignInCommand(account.Email!, "Wrong123!"), CancellationToken.None))
                 .Error.Code.Should().Be(InvalidCredentials);
         }
 
         account.IsLockedOut(OwnerPortalTestFixture.Now).Should().BeTrue();
-        var locked = await PasswordHandler().Handle(new PortalPasswordSignInCommand(account.Email, "Abc12345!"), CancellationToken.None);
+        var locked = await PasswordHandler().Handle(new PortalPasswordSignInCommand(account.Email!, "Abc12345!"), CancellationToken.None);
         locked.Error.Code.Should().Be(InvalidCredentials);
         _f.AddedRefreshTokens.Should().BeEmpty();
     }
@@ -167,7 +167,7 @@ public sealed class PortalSignInHandlerTests
             .Error.Code.Should().Be(InvalidCredentials);
 
         var codeOnly = GivenAccount();
-        (await PasswordHandler().Handle(new PortalPasswordSignInCommand(codeOnly.Email, "Abc12345!"), CancellationToken.None))
+        (await PasswordHandler().Handle(new PortalPasswordSignInCommand(codeOnly.Email!, "Abc12345!"), CancellationToken.None))
             .Error.Code.Should().Be(InvalidCredentials);
         codeOnly.FailedSignInCount.Should().Be(1);
     }
