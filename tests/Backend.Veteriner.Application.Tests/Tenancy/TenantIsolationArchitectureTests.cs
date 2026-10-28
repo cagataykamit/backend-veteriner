@@ -34,6 +34,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Application/SalesPartners/DiscountCodeRedemptionService.cs"] = "Kod kullanım limiti tüm kiracılarda sayılır",
         // Platform yönetimi
         ["Backend.Veteriner.Api/Controllers/SalesPartnersAdminController.cs"] = "Satış ortakları (platform yöneticisi)",
+        ["Backend.Veteriner.Api/Controllers/BillingAdminController.cs"] = "Çift ödemeler ve iadeler (platform yöneticisi)",
         ["Backend.Veteriner.Infrastructure/Tenants/TrialActivationMetricsReader.cs"] = "Deneme metrikleri (platform yöneticisi)",
         // Arka plan ve bakım
         ["Backend.Veteriner.Infrastructure/Imports/ImportValidationProcessor.cs"] = "Kuyruk taraması",
