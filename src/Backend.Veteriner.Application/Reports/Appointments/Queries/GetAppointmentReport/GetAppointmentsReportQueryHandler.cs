@@ -97,37 +97,15 @@ public sealed class GetAppointmentsReportQueryHandler
             accessibleClinicIds,
             ct);
 
-        var scheduled = 0;
-        var completed = 0;
-        var cancelled = 0;
-        var noShow = 0;
-        foreach (var row in statusRows)
-        {
-            switch (row.Status)
-            {
-                case AppointmentStatus.Scheduled:
-                    scheduled = row.Count;
-                    break;
-                case AppointmentStatus.Completed:
-                    completed = row.Count;
-                    break;
-                case AppointmentStatus.Cancelled:
-                    cancelled = row.Count;
-                    break;
-                case AppointmentStatus.NoShow:
-                    noShow = row.Count;
-                    break;
-            }
-        }
-
-        var breakdownSum = scheduled + completed + cancelled + noShow;
+        var statusCounts = AppointmentStatusCounts.From(statusRows);
+        var breakdownSum = statusCounts.Scheduled + statusCounts.Completed + statusCounts.Cancelled + statusCounts.NoShow;
         var total = request.Status.HasValue
             ? request.Status.Value switch
             {
-                AppointmentStatus.Scheduled => scheduled,
-                AppointmentStatus.Completed => completed,
-                AppointmentStatus.Cancelled => cancelled,
-                AppointmentStatus.NoShow => noShow,
+                AppointmentStatus.Scheduled => statusCounts.Scheduled,
+                AppointmentStatus.Completed => statusCounts.Completed,
+                AppointmentStatus.Cancelled => statusCounts.Cancelled,
+                AppointmentStatus.NoShow => statusCounts.NoShow,
                 _ => breakdownSum,
             }
             : breakdownSum;
@@ -152,8 +130,6 @@ public sealed class GetAppointmentsReportQueryHandler
             ct);
 
         var items = await AppointmentsReportItemMapping.MapAsync(tenantId, rows, _clients, _pets, _clinics, ct);
-
-        var statusCounts = new AppointmentReportStatusCountsDto(scheduled, completed, cancelled, noShow);
 
         return Result<AppointmentReportResultDto>.Success(
             new AppointmentReportResultDto(total, items, statusCounts));
