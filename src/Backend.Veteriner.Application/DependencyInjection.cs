@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<TenantSubscriptionSeatEvaluator>();
         services.AddScoped<TenantInviteAcceptanceService>();
         services.AddScoped<ISubscriptionCheckoutActivationService, SubscriptionCheckoutActivationService>();
+        services.AddScoped<ICheckoutPaymentReconciler, CheckoutPaymentReconciler>();
 
         // Satış ortağı indirim kodu (ADR-037): kod kullanımı, checkout indirimi ve tahsilat komisyonu.
         services.AddScoped<DiscountCodeRedemptionService>();

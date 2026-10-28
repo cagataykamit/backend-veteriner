@@ -30,6 +30,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Application/Files/Queries/GetSignedContent/GetSignedStoredFileContentQuery.cs"] = "İmzalı dosya bağlantısı",
         ["Backend.Veteriner.Application/Tenants/Billing/SubscriptionCheckoutActivationService.cs"] = "Webhook: oturum kimlikle aranır",
         ["Backend.Veteriner.Application/Tenants/Commands/Billing/ProcessBillingWebhookCommandHandler.cs"] = "Webhook: oturum kimlikle aranır",
+        ["Backend.Veteriner.Application/Tenants/Commands/Billing/ConfirmCheckoutReturnCommandHandler.cs"] = "Sağlayıcı dönüşü: oturum kimlik ya da token ile aranır",
         ["Backend.Veteriner.Application/SalesPartners/DiscountCodeRedemptionService.cs"] = "Kod kullanım limiti tüm kiracılarda sayılır",
         // Platform yönetimi
         ["Backend.Veteriner.Api/Controllers/SalesPartnersAdminController.cs"] = "Satış ortakları (platform yöneticisi)",
@@ -41,6 +42,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Infrastructure/Imports/ImportMaintenanceProcessor.cs"] = "Bakım taraması",
         ["Backend.Veteriner.Infrastructure/Files/StoredFileMaintenanceProcessor.cs"] = "Bakım taraması",
         ["Backend.Veteriner.Infrastructure/Billing/ScheduledPlanChangeProcessorHostedService.cs"] = "Vadesi gelen plan değişiklikleri",
+        ["Backend.Veteriner.Infrastructure/Billing/CheckoutReconciliationProcessor.cs"] = "Ödeme oturumlarının sağlayıcıyla uzlaştırması",
         ["Backend.Veteriner.Infrastructure/Reminders/ReminderProcessorService.cs"] = "Hatırlatması açık kiracılar ve günlük uzlaştırması",
         ["Backend.Veteriner.Infrastructure/Projections/Appointments/AppointmentProjectionRebuildService.cs"] = "Okuma modelini yeniden kurma",
         ["Backend.Veteriner.Infrastructure/Projections/Clients/ClientReadModelBackfillService.cs"] = "Okuma modeli doldurma (kiracısız çağrı)",

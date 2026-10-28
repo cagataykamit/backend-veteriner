@@ -80,6 +80,22 @@ public static class RateLimitingExtensions
                     });
             });
 
+            // -- BILLING CALLBACK: anonim; her istek saglayiciya bir sorgu tetikler (IP bazli)
+            options.AddPolicy("billing-callback", httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 20,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
             // -- LOGIN: brute-force korumas� (IP bazl�)
             options.AddPolicy("login", httpContext =>
             {

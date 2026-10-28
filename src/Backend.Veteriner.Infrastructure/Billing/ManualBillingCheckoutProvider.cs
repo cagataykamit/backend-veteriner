@@ -16,4 +16,8 @@ public sealed class ManualBillingCheckoutProvider : IBillingCheckoutProvider
         CancellationToken ct = default)
         => Task.FromResult(Result<CheckoutPrepareResult>.Success(
             new CheckoutPrepareResult(null, null, chargeCurrencyCode, chargeAmountMinor, prorationRatio)));
+
+    /// <summary>Manuel oturumun sağlayıcı sayfası yoktur; açık olduğu sürece kullanılabilir.</summary>
+    public Task<CheckoutPageState> GetCheckoutPageStateAsync(BillingCheckoutSession session, CancellationToken ct = default)
+        => Task.FromResult(CheckoutPageState.Payable);
 }

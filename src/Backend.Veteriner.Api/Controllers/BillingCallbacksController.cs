@@ -1,6 +1,8 @@
 using Asp.Versioning;
 using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Tenants.Commands.Billing;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -12,24 +14,28 @@ namespace Backend.Veteriner.Api.Controllers;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/billing")]
 [AllowAnonymous]
-[DisableRateLimiting]
+// Anonim dönüş ucu her istekte sağlayıcıya sorgu yapar; IP başına sınırlı (gerçek kullanıcı ödeme başına bir kez döner).
+[EnableRateLimiting("billing-callback")]
 public sealed class BillingCallbacksController : ControllerBase
 {
     private readonly BillingOptions _billingOptions;
+    private readonly IMediator _mediator;
     private readonly ILogger<BillingCallbacksController> _logger;
 
     public BillingCallbacksController(
         IOptions<BillingOptions> billingOptions,
+        IMediator mediator,
         ILogger<BillingCallbacksController> logger)
     {
         _billingOptions = billingOptions.Value;
+        _mediator = mediator;
         _logger = logger;
     }
 
     /// <summary>
-    /// Iyzico hosted checkout dönüş endpoint'i.
-    /// Webhook-first mimaride callback yalnız redirect bridge olarak kullanılır.
-    /// Aktivasyon source-of-truth: webhook hattıdır.
+    /// Iyzico hosted checkout dönüş endpoint'i: kullanıcıyı panele yönlendirir. Yönlendirmeden önce oturum iyzico'ya sorulur;
+    /// ödeme alınmışsa abonelik hemen etkinleşir (webhook kaybolsa da ödeme boşa gitmez). Formdaki veriye güvenilmez, yalnız
+    /// oturumu bulmaya yarar; doğrulama sağlayıcı sorgusudur. Webhook ayrıca çalışır ve tamamlanmış oturumda tekrar işlem yapmaz.
     /// </summary>
     [HttpPost("iyzico/callback")]
     [Consumes("application/x-www-form-urlencoded")]
@@ -41,10 +47,22 @@ public sealed class BillingCallbacksController : ControllerBase
         var checkoutSessionIdHint = Guid.TryParse(conversationHint, out var parsedHint) ? parsedHint : (Guid?)null;
 
         _logger.LogInformation(
-            "Iyzico callback bridge alındı (webhook-first). TokenHint={TokenHint}, ConversationHint={ConversationHint}, FormKeys={FormKeys}",
+            "Iyzico callback alındı. TokenHint={TokenHint}, ConversationHint={ConversationHint}, FormKeys={FormKeys}",
             ToTokenHint(token),
             ToHint(conversationHint),
             string.Join(",", callbackForm.Keys));
+
+        try
+        {
+            var confirmed = await _mediator.Send(new ConfirmCheckoutReturnCommand(checkoutSessionIdHint, token), ct);
+            if (confirmed.IsSuccess && confirmed.Value is { } sessionId)
+                checkoutSessionIdHint = sessionId;
+        }
+        catch (Exception ex)
+        {
+            // Doğrulama yapılamazsa yönlendirme yine yapılır; webhook ya da sonraki ödeme başlatma uzlaştırır.
+            _logger.LogWarning(ex, "Iyzico dönüşünde ödeme doğrulanamadı. TokenHint={TokenHint}", ToTokenHint(token));
+        }
 
         return Redirect(BuildProcessingReturnUrl(checkoutSessionIdHint));
     }

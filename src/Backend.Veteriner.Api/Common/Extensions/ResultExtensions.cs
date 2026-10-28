@@ -171,6 +171,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Açık oturumun ödemesi sağlayıcıda alınmış, aktivasyon bekleniyor: yeni ödeme başlatılmaz (durum çakışması).
+        if (normalized is "subscriptions.checkoutalreadypaid")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Pasif oda/bölüm yeni yatışa atanamaz (HOSP-002): tanımın durumu ile çakışma.
         if (normalized is "hospitalizations.roominactive")
         {

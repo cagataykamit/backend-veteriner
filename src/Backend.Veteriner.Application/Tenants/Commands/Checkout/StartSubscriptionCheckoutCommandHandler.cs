@@ -26,6 +26,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
     private readonly IReadRepository<BillingCheckoutSession> _checkoutSessionsRead;
     private readonly IOptions<BillingOptions> _billingOptions;
     private readonly IBillingCheckoutProviderResolver _checkoutProviderResolver;
+    private readonly ICheckoutPaymentReconciler _paymentReconciler;
     private readonly ISalesPartnerDiscountBilling _partnerDiscounts;
     private readonly ILogger<StartSubscriptionCheckoutCommandHandler> _logger;
     private readonly TimeProvider _timeProvider;
@@ -41,6 +42,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         IReadRepository<BillingCheckoutSession> checkoutSessionsRead,
         IOptions<BillingOptions> billingOptions,
         IBillingCheckoutProviderResolver checkoutProviderResolver,
+        ICheckoutPaymentReconciler paymentReconciler,
         ISalesPartnerDiscountBilling partnerDiscounts,
         ILogger<StartSubscriptionCheckoutCommandHandler> logger,
         TimeProvider timeProvider)
@@ -55,6 +57,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         _checkoutSessionsRead = checkoutSessionsRead;
         _billingOptions = billingOptions;
         _checkoutProviderResolver = checkoutProviderResolver;
+        _paymentReconciler = paymentReconciler;
         _partnerDiscounts = partnerDiscounts;
         _logger = logger;
         _timeProvider = timeProvider;
@@ -98,6 +101,22 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         }
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        // Açık oturum her şeyden önce sağlayıcıyla uzlaştırılır: ödemesi alınmış ama webhook'u gelmemişse burada etkinleşir ve
+        // istek başka bir şeye dokunmadan döner. Böylece ödenmiş oturum yeni başlatmada iptal edilmez (para alınıp paket açılmazdı).
+        var openSession = await _checkoutSessionsRead.FirstOrDefaultAsync(new OpenBillingCheckoutSessionByTenantSpec(request.TenantId, now), ct);
+        CheckoutPageState? openPageState = null;
+        if (openSession is not null && openSession.IsOpen(now))
+        {
+            openPageState = await _paymentReconciler.ReconcileAsync(openSession, request.TenantId, ct);
+            if (openPageState == CheckoutPageState.Paid)
+            {
+                return Result<SubscriptionCheckoutSessionDto>.Failure(
+                    "Subscriptions.CheckoutAlreadyPaid",
+                    "Önceki ödemeniz alınmış ve aboneliğinize işlendi. Sayfayı yenileyin.");
+            }
+        }
+
         var effective = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, now);
         if (effective == TenantSubscriptionStatus.Cancelled)
         {
@@ -247,8 +266,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             discountMinor = price.CodeDiscountMinor > 0 ? price.CodeDiscountMinor : null;
         }
 
-        var existingOpen = await _checkoutSessionsRead.FirstOrDefaultAsync(
-            new OpenBillingCheckoutSessionByTenantSpec(request.TenantId, now), ct);
+        var existingOpen = openSession;
 
         // Süresi dolmuş oturumlar DB'de Pending/RedirectReady kalabilir veya spec dışı yarış durumunda
         // gelirse Iyzico'da "geçersiz token" ile reuse edilmesin: Expired yap, yeni session aç.
@@ -263,10 +281,13 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             existingOpen = null;
         }
 
+        // Aynı hedef için açık oturum, sağlayıcı sayfası hâlâ ödenebiliyorsa (başta sorulan durum) yeniden kullanılır; iyzico
+        // ödemesi tamamlanan sayfayı "geçersiz token" ile kapatır, ödenemeyen sayfa yenilenir.
         if (existingOpen is not null
             && existingOpen.TargetPlanCode == targetPlanCode
             && existingOpen.BillingPeriod == requestedPeriod
-            && existingOpen.IsOpen(now))
+            && existingOpen.IsOpen(now)
+            && openPageState == CheckoutPageState.Payable)
         {
             return Result<SubscriptionCheckoutSessionDto>.Success(
                 Map(existingOpen, now, chargeCurrency, proratedChargeMinor, prorationRatio, discountMinor));

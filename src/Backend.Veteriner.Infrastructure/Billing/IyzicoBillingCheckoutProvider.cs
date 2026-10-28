@@ -136,6 +136,68 @@ public sealed class IyzicoBillingCheckoutProvider : IBillingCheckoutProvider
         }
     }
 
+    /// <summary>
+    /// Açık oturum yeniden kullanılmadan önce iyzico ödeme formu sorgulanır. Ödeme tamamlanınca form "Geçersiz token" verir;
+    /// bildirim (webhook) bize ulaşmadıysa oturum açık kalır ve sorulmadan dönülürse kullanıcı ölü sayfaya gider.
+    /// Sandbox'ta gözlenen (2026-10-28), form ödenebilir kalanlar: hiç açılmamış ya da vazgeçilmiş (<c>failure</c> +
+    /// <see cref="NoPaymentYetErrorCode"/>), kartı reddedilmiş ve 3D adımı iptal edilmiş (<c>FAILURE</c>, yeniden denenebilir).
+    /// Başarılı ödeme sonrası <c>success</c> + <c>SUCCESS</c>.
+    /// </summary>
+    public async Task<CheckoutPageState> GetCheckoutPageStateAsync(BillingCheckoutSession session, CancellationToken ct = default)
+    {
+        var iyzico = _billingOptions.Iyzico;
+        var token = session.ExternalReference?.Trim();
+        if (string.IsNullOrEmpty(token)
+            || string.IsNullOrWhiteSpace(iyzico.ApiKey)
+            || string.IsNullOrWhiteSpace(iyzico.SecretKey)
+            || string.IsNullOrWhiteSpace(iyzico.BaseUrl))
+            return CheckoutPageState.Unusable;
+
+        try
+        {
+            var options = new Iyzipay.Options
+            {
+                ApiKey = iyzico.ApiKey.Trim(),
+                SecretKey = iyzico.SecretKey.Trim(),
+                BaseUrl = iyzico.BaseUrl.Trim(),
+            };
+            var form = await CheckoutForm.Retrieve(
+                new RetrieveCheckoutFormRequest { Token = token, ConversationId = session.Id.ToString("D") },
+                options);
+
+            var state = ToPageState(form.Status, form.PaymentStatus, form.ErrorCode);
+            _logger.LogInformation(
+                "Iyzico ödeme formu durumu: Session {SessionId} Status={Status} PaymentStatus={PaymentStatus} ErrorCode={ErrorCode} ErrorMessage={ErrorMessage} State={State}",
+                session.Id,
+                form.Status,
+                form.PaymentStatus,
+                form.ErrorCode,
+                form.ErrorMessage,
+                state);
+            return state;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Iyzico ödeme formu durumu sorgulanamadı; oturum yenilenecek. Session: {SessionId}", session.Id);
+            return CheckoutPageState.Unusable;
+        }
+    }
+
+    /// <summary>iyzico "gönderilen tokena ait ödeme bilgisi bulunamadı": form henüz ödenmeye çalışılmadı.</summary>
+    public const string NoPaymentYetErrorCode = "5122";
+
+    public static CheckoutPageState ToPageState(string? status, string? paymentStatus, string? errorCode)
+    {
+        if (string.Equals(status, "success", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(paymentStatus, "SUCCESS", StringComparison.OrdinalIgnoreCase))
+            return CheckoutPageState.Paid;
+
+        return string.Equals(errorCode, NoPaymentYetErrorCode, StringComparison.Ordinal)
+            || string.Equals(paymentStatus, "FAILURE", StringComparison.OrdinalIgnoreCase)
+            ? CheckoutPageState.Payable
+            : CheckoutPageState.Unusable;
+    }
+
     private CreateCheckoutFormInitializeRequest BuildRequest(
         BillingCheckoutSession session,
         string targetPlan,

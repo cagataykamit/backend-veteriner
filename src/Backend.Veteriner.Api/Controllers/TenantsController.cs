@@ -625,6 +625,24 @@ public sealed class TenantsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Kullanıcı sağlayıcının ödeme sayfasında vazgeçti: açık oturum kapatılır, sonraki ödeme yeni sayfa alır.</summary>
+    [HttpPost("{tenantId:guid}/subscription-checkout/{checkoutSessionId:guid}/cancel")]
+    [Authorize(Policy = PermissionCatalog.Subscriptions.Manage)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CancelSubscriptionCheckout(
+        [FromRoute] Guid tenantId,
+        [FromRoute] Guid checkoutSessionId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CancelSubscriptionCheckoutCommand(tenantId, checkoutSessionId), ct);
+        return result.ToActionResult(this);
+    }
+
     /// <summary>Kiracının satış ortağı kodu durumu (ADR-037); ortak bilgisi ve komisyon dönmez.</summary>
     [HttpGet("{tenantId:guid}/subscription-discount")]
     [Authorize(Policy = PermissionCatalog.Subscriptions.Read)]

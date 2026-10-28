@@ -94,6 +94,23 @@ public sealed class BillingCheckoutSession : AggregateRoot, ITenantOwned
     public void MarkCompleted(DateTime utcNow, string? externalReference = null)
     {
         EnsureMutableOpen();
+        Complete(utcNow, externalReference);
+    }
+
+    /// <summary>
+    /// Sağlayıcının doğruladığı ödeme oturumu kapanmış olsa da (süresi dolmuş, iptal ya da başarısız denemeyle işaretlenmiş)
+    /// tamamlar: para alınmıştır, paket açılmalıdır. Yalnız tamamlanmış oturum değiştirilemez.
+    /// </summary>
+    public void MarkCompletedByVerifiedPayment(DateTime utcNow, string? externalReference = null)
+    {
+        if (Status == BillingCheckoutSessionStatus.Completed)
+            throw new InvalidOperationException("Bu checkout session zaten tamamlanmış.");
+
+        Complete(utcNow, externalReference);
+    }
+
+    private void Complete(DateTime utcNow, string? externalReference)
+    {
         Status = BillingCheckoutSessionStatus.Completed;
         CompletedAtUtc = NormalizeUtc(utcNow);
         UpdatedAtUtc = CompletedAtUtc;

@@ -151,4 +151,8 @@ public sealed class StripeBillingCheckoutProvider : IBillingCheckoutProvider
 
         return false;
     }
+
+    /// <summary>Stripe Checkout oturumu iptal dönüşünde kapatılır (cancel ucu), aksi hâlde süresi dolana kadar ödenebilir.</summary>
+    public Task<CheckoutPageState> GetCheckoutPageStateAsync(BillingCheckoutSession session, CancellationToken ct = default)
+        => Task.FromResult(CheckoutPageState.Payable);
 }
