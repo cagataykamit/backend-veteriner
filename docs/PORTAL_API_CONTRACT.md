@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-031-hasta-sahibi-portali-ve-mobil-uygulama.md` (K3, K4, K6; AK-2 giriş ikisi birden, AK-3 tek hesap çok klinik, AK-6 v0 SMS yok, AK-8, AK-9), ADR-029 (sürümlü kabul), ADR-025 (KVKK Ret → hatırlatma kapalı), ADR-021/024 (aydınlatma metni). Hata zarfı standart `ProblemDetails` + `extensions.code` (`BACKEND-CONTRACT-STANDARD.md` §9).
 
-> **Durum:** Dilim **A** (hesap, davet, giriş, güvenlik temeli) uygulandı, dal `feat/portal-a-hesap-giris`. Dilim **B** (salt okunur uçlar, §6) uygulandı, dal `feat/portal-b-okuma-uclari`; B migration gerektirmez. Portal frontend'i bu şekle uyar, değişiklik önce burada yapılır. Migration `AddOwnerPortalAccounts` üretildi, **hiçbir paylaşılan/geliştirme veritabanına uygulanmadı**. Yeni izin `OwnerPortal.Manage` kataloğa ve rol bağlarına eklendi; seed çalıştırılmadı.
+> **Durum:** Dilim **A** (hesap, davet, giriş, güvenlik temeli) uygulandı, dal `feat/portal-a-hesap-giris`. Dilim **B** (salt okunur uçlar, §6) uygulandı, dal `feat/portal-b-okuma-uclari`; B migration gerektirmez. Hesap silme (§5.10, ADR-041) uygulandı, dal `feat/portal-hesap-silme`, migration `AddOwnerAccountDeletion` (yalnız yerel geliştirme DB'sine uygulandı). Portal frontend'i bu şekle uyar, değişiklik önce burada yapılır. Migration `AddOwnerPortalAccounts` üretildi, **hiçbir paylaşılan/geliştirme veritabanına uygulanmadı**. Yeni izin `OwnerPortal.Manage` kataloğa ve rol bağlarına eklendi; seed çalıştırılmadı.
 
 İşaretler: **[A]** dilim A, uygulandı · **[B]** dilim B, uygulandı · **[v1]** v0 dışında, taslak yer tutucu (uç yok).
 
@@ -25,10 +25,10 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-031-ha
 
 | Tablo | Anlam | Not |
 |---|---|---|
-| `OwnerAccounts` | Kişi başına tek hesap | `Email` benzersiz (trim + küçük harf), `PasswordHash` opsiyonel (BCrypt, personelle aynı hasher), `DisplayName`, `Status` (`Active`/`Disabled`), `CreatedAtUtc`, `LastLoginAtUtc`, `FailedSignInCount`, `LockedUntilUtc` |
-| `OwnerAccountClientLinks` | Hesap ↔ `Client` bağı | `OwnerAccountId`, `TenantId`, `ClinicId` (daveti gönderen klinik; aydınlatma metni bu kliniğin), `ClientId`, `Status` (`Active`/`Closed`), `CreatedAtUtc`, `CreatedByUserId`, `ClosedAtUtc`, `ClosedByUserId`, `DisclosureAcknowledgedAtUtc`. Bir müşteri kaydında **en fazla bir aktif bağ** (filtreli benzersiz indeks). Kapatılan bağ silinmez |
+| `OwnerAccounts` | Kişi başına tek hesap | `Email` benzersiz (trim + küçük harf; silinen hesapta boş, indeks yalnız dolu adresleri kapsar), `PasswordHash` opsiyonel (BCrypt, personelle aynı hasher), `DisplayName`, `Status` (`Active`/`Disabled`/`Deleted`), `CreatedAtUtc`, `LastLoginAtUtc`, `FailedSignInCount`, `LockedUntilUtc`, `DeletedAtUtc` |
+| `OwnerAccountClientLinks` | Hesap ↔ `Client` bağı | `OwnerAccountId`, `TenantId`, `ClinicId` (daveti gönderen klinik; aydınlatma metni bu kliniğin), `ClientId`, `Status` (`Active`/`Closed`), `CreatedAtUtc`, `CreatedByUserId`, `ClosedAtUtc`, `ClosedByUserId` (hesap silmeyle kapanan bağda boş), `CloseReason` (`ClinicClosed`/`OwnerAccountDeleted`; aktif bağda boş), `DisclosureAcknowledgedAtUtc`. Bir müşteri kaydında **en fazla bir aktif bağ** (filtreli benzersiz indeks). Kapatılan bağ silinmez |
 | `OwnerPortalInvites` | Davet | `TenantId`, `ClinicId`, `ClientId`, `Email` (gönderim anındaki müşteri e-postası), `TokenHash` (SHA-256; ham token yalnız e-postadadır, saklanmaz/loglanmaz), `Status` (`Pending`/`Accepted`/`Revoked`), `ExpiresAtUtc`, `CreatedAtUtc`, `CreatedByUserId`, `AcceptedAtUtc`, `AcceptedOwnerAccountId`, `RevokedAtUtc`, `RevokedByUserId` |
-| `OwnerPortalCodes` | Tek kullanımlık e-posta kodu | `OwnerAccountId`, `Purpose` (`SignIn`/`PasswordReset`), `CodeHash` (kod satır kimliğiyle tuzlanmış SHA-256), `ExpiresAtUtc`, `FailedAttempts`, `ConsumedAtUtc`, `InvalidatedAtUtc` |
+| `OwnerPortalCodes` | Tek kullanımlık e-posta kodu | `OwnerAccountId`, `Purpose` (`SignIn`/`PasswordReset`/`AccountDeletion`), `CodeHash` (kod satır kimliğiyle tuzlanmış SHA-256), `ExpiresAtUtc`, `FailedAttempts`, `ConsumedAtUtc`, `InvalidatedAtUtc` |
 | `OwnerPortalRefreshTokens` | Portal oturumu | Personel `RefreshTokens` tablosundan **ayrı**; `TokenHash`, `ExpiresAtUtc`, `LastUsedAtUtc`, `RevokedAtUtc`, `RevokeReason`, `ReplacedByTokenHash`. IP/cihaz tutulmaz (veri azaltma) |
 | `LegalAcceptances` (genişletildi) | ADR-029 kabul kaydı | Yeni `OwnerAccountId` sütunu; `UserId` ve `TenantId` artık boş olabilir. Satırda **ya** `UserId` **ya** `OwnerAccountId` dolu (CHECK). Personel kayıtları değişmez |
 
@@ -45,7 +45,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-031-ha
 | Hız sınırı (IP) | `portal-auth` 10/dk (anonim kimlik uçları), `portal-refresh` ~30/dk, `portal` 120/dk (oturumlu uçlar). Üçü de IP anahtarlıdır (hız sınırı kimlik doğrulamadan önce çalışır). **Hesap bazlı** koruma kilit + kod deneme hakkı + kod bekleme süresidir (veritabanında, `Domain/OwnerPortal`) | `RateLimitingExtensions` |
 | Refresh | Her yenilemede döndürülür; iptal edilmiş token tekrar kullanılırsa hesabın **tüm** portal oturumları kapanır | `RefreshPortalSessionCommandHandler` |
 | Sahiplik | Her bağ kapsamlı uç `OwnerPortalAccess.ResolveLinkAsync`: bağ bu hesaba ait, `Active`, kiracı aktif; değilse **404** `Portal.Links.NotFound` (başka hesabın/kiracının bağı ile ayırt edilemez) | `OwnerPortalAccess` |
-| Denetim | AuditBehavior: davet oluşturma/iptal, bağ kapatma, davet kabulü, kod isteği, kodla/parolayla giriş, şifre sıfırlama, çıkış, kabul, aydınlatma onayı ve dilim B okuma uçları (`Portal.Read.*`, §6; içerik yazılmaz). Parola, token, `oneTimeCode` maskelenir. Portal isteklerinde `ActorUserId` boştur (personel kimliğiyle karışmaz); hedef `OwnerAccountId=...` | `AuditBehavior` |
+| Denetim | AuditBehavior: davet oluşturma/iptal, bağ kapatma, davet kabulü, kod isteği, kodla/parolayla giriş, şifre sıfırlama, çıkış, hesap silme kodu ve hesap silme (`OwnerPortal.Account.*`), kabul, aydınlatma onayı ve dilim B okuma uçları (`Portal.Read.*`, §6; içerik yazılmaz). Parola, token, `oneTimeCode` maskelenir. Portal isteklerinde `ActorUserId` boştur (personel kimliğiyle karışmaz); hedef `OwnerAccountId=...` | `AuditBehavior` |
 
 ## 4) Klinik paneli uçları [A]
 
@@ -62,7 +62,7 @@ Müşteri kartındaki "Portal" bölümü: bağ durumu ve davet listesi (son 20 d
   "inviteBlockedCode": "OwnerPortal.ClientOptedOut",
   "links": [
     { "linkId": "…", "clinicId": "…", "clinicName": "Merkez", "status": "Active", "accountEmail": "a@b.com",
-      "linkedAtUtc": "2026-10-16T10:00:00Z", "closedAtUtc": null }
+      "linkedAtUtc": "2026-10-16T10:00:00Z", "closedAtUtc": null, "closeReason": null }
   ],
   "invites": [
     { "inviteId": "…", "clinicId": "…", "email": "a@b.com", "status": "Pending",
@@ -73,6 +73,7 @@ Müşteri kartındaki "Portal" bölümü: bağ durumu ve davet listesi (son 20 d
 
 - `canInvite`: müşteri davet kuralına uyuyor **ve** aktif bağı yok. Değilse `inviteBlockedCode` (`OwnerPortal.ClientEmailMissing`, `OwnerPortal.ClientOptedOut`, `OwnerPortal.ClientNotInvitable`, `OwnerPortal.AlreadyLinked`).
 - Davet `status`: `Pending`, `Accepted`, `Revoked`, `Expired` (bekleyen ama süresi geçmiş; hesaplanır).
+- Bağ `closeReason`: kapalı bağda `ClinicClosed` (personel kapattı) ya da `OwnerAccountDeleted` (hasta sahibi hesabını sildi, §5.10); aktif bağda `null`. Silinen hesabın bağında `accountEmail` `null` döner; tarih `closedAtUtc`'dir.
 
 ### 4.2 `POST /api/v1/clients/{clientId}/portal-invites`
 
@@ -221,6 +222,28 @@ Personel belgeleri (`Terms`, `Privacy`, `DataProcessing`) ve personel uçları d
 `POST /api/portal/v1/links/{linkId}/clinic-disclosure/acknowledge` → **204**; ilk onay zamanı bağa yazılır, tekrar çağrı değiştirmez (bilgilendirme kaydı; açık rıza değildir).
 
 Hatalar: bağ bu hesabın değil/kapalı → 404 `Portal.Links.NotFound`.
+
+### 5.10 Hesap silme (ADR-041 seçenek C)
+
+Yalnız hesap sahibi, oturumlu portaldan. Personel hasta sahibinin hesabını silemez; personelin aracı bağ kapatmadır (§4.4).
+
+`POST /api/portal/v1/me/deletion-code` → **204**. Hesabın e-postasına 6 haneli onay kodu gider (amaç `AccountDeletion`; süre, deneme ve bekleme kuralları §3 "Kod" ile aynı). Bekleme süresindeyse yeni kod gitmez, yanıt yine 204. Parolalı hesapta da kod istenir.
+
+`DELETE /api/portal/v1/me` — `{ "oneTimeCode": "123456" }` → **204**. Tek kayıtta:
+
+- Hesap anonimleşir: e-posta, parola özeti ve son giriş boşalır, görünen ad "Silinmiş hesap", durum `Deleted`, `DeletedAtUtc` yazılır. `Id` ve `CreatedAtUtc` kalır.
+- Hesabın tüm oturumları (`OwnerPortalRefreshTokens`) ve kodları (`OwnerPortalCodes`) fiziksel olarak silinir.
+- Tüm kiracılardaki aktif bağlar `Closed` olur, `CloseReason = OwnerAccountDeleted`, `ClosedByUserId` boş. Bağ satırı ve aydınlatma onay zamanı kalır.
+- Eski adrese tek bir onay e-postası outbox'a yazılır (klinik ve hayvan bilgisi yok).
+- Kalanlar: klinik kayıtları, `LegalAcceptances` (hesap kimliğiyle), davetler (`OwnerPortalInvites`), denetim kayıtları.
+
+Sonrası: silinen hesap pasiftir. Giriş, kod isteği, yenileme ve parola sıfırlama hesap yokmuş gibi yanıtlanır (§5.4–5.7). Kalan erişim jetonuyla `me` 401 `Portal.Auth.Unauthorized.AccountUnavailable`, bağ kapsamlı uçlar 401 döner. Aynı e-postaya yeni davet yeni hesap açar; eski bağlar geri açılmaz.
+
+| Kod | HTTP | Durum |
+|---|---|---|
+| `Portal.Account.DeletionCodeInvalid` | 400 | Kod yanlış, süresi dolmuş, kullanılmış ya da deneme hakkı bitmiş (yanlış deneme kodda sayılır) |
+| `Validation.FluentValidation` | 400 | `oneTimeCode` boş ya da 20 karakterden uzun |
+| `Portal.Auth.Unauthorized.AccountUnavailable` | 401 | Oturumdaki hesap pasif ya da silinmiş |
 
 ## 6) Portal uçları — Dilim B [B] (salt okunur)
 
@@ -392,6 +415,8 @@ Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıd
 | POST | `/api/portal/v1/auth/logout` | A | Portal |
 | POST | `/api/portal/v1/auth/logout-all` | A | Portal |
 | GET | `/api/portal/v1/me` | A | Portal |
+| POST | `/api/portal/v1/me/deletion-code` | A | Portal |
+| DELETE | `/api/portal/v1/me` | A | Portal |
 | GET/POST | `/api/portal/v1/me/legal-acceptances` | A | Portal |
 | GET | `/api/portal/v1/links/{linkId}/clinic-disclosure` | A | Portal |
 | POST | `/api/portal/v1/links/{linkId}/clinic-disclosure/acknowledge` | A | Portal |
@@ -410,4 +435,4 @@ Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıd
 
 ## 9) Kapsam dışı (v0)
 
-SMS ve telefon doğrulaması (AK-6), push, hesap silme/veri talebi ucu (K4, v1), portal bayrağı ile klinik bazında kapatma (K8), personel tarafı kiracı geneli davet listesi ekranı, oturum listesi ekranı, access token kara listesi.
+SMS ve telefon doğrulaması (AK-6), push, klinikteki veriler için veri talebi ucu (K4, PORTAL-007), portal bayrağı ile klinik bazında kapatma (K8), personel tarafı kiracı geneli davet listesi ekranı, oturum listesi ekranı, access token kara listesi.
