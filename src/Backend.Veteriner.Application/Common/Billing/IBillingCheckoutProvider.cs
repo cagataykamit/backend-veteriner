@@ -14,4 +14,10 @@ public interface IBillingCheckoutProvider
         long? chargeAmountMinor,
         decimal? prorationRatio,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Açık oturumun ödeme sayfası hâlâ ödenebilir mi? Yeniden kullanmadan önce sorulur: sağlayıcı sayfayı (ör. iyzico'da
+    /// ödeme denemesi sonrası) bildirmeden tüketmiş olabilir. Emin olunamazsa <see cref="CheckoutPageState.Unusable"/>.
+    /// </summary>
+    Task<CheckoutPageState> GetCheckoutPageStateAsync(BillingCheckoutSession session, CancellationToken ct = default);
 }

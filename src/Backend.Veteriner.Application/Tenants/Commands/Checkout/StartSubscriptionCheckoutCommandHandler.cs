@@ -263,13 +263,27 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             existingOpen = null;
         }
 
+        // Aynı hedef için açık oturum, sağlayıcı sayfası hâlâ ödenebiliyorsa yeniden kullanılır. iyzico ödeme denemesinden
+        // sonra token'ı bildirmeden tüketir; sorulmadan dönülürse kullanıcı "geçersiz token" görür. Ödeme alınmışsa oturum
+        // kapatılmaz: webhook kapalı oturumu etkinleştirmez, para alınıp paket açılmazdı.
         if (existingOpen is not null
             && existingOpen.TargetPlanCode == targetPlanCode
             && existingOpen.BillingPeriod == requestedPeriod
             && existingOpen.IsOpen(now))
         {
-            return Result<SubscriptionCheckoutSessionDto>.Success(
-                Map(existingOpen, now, chargeCurrency, proratedChargeMinor, prorationRatio, discountMinor));
+            var pageState = await _checkoutProviderResolver.Resolve(existingOpen.Provider).GetCheckoutPageStateAsync(existingOpen, ct);
+            if (pageState == CheckoutPageState.Payable)
+            {
+                return Result<SubscriptionCheckoutSessionDto>.Success(
+                    Map(existingOpen, now, chargeCurrency, proratedChargeMinor, prorationRatio, discountMinor));
+            }
+
+            if (pageState == CheckoutPageState.Paid)
+            {
+                return Result<SubscriptionCheckoutSessionDto>.Failure(
+                    "Subscriptions.CheckoutAlreadyPaid",
+                    "Bu ödeme alındı; onay birkaç dakika içinde aboneliğinize yansır.");
+            }
         }
 
         if (existingOpen is not null)
