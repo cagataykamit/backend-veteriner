@@ -387,7 +387,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Appointments.Add(new Backend.Veteriner.Domain.Appointments.Appointment(
-                TenantId, ClinicId, PetId, DateTime.UtcNow.AddMinutes(30), 30,
+                TenantId, ClinicId, PetId, TodaySlot.FromNow(TimeSpan.FromMinutes(30)), 30,
                 Backend.Veteriner.Domain.Appointments.AppointmentType.Consultation,
                 Backend.Veteriner.Domain.Appointments.AppointmentStatus.Scheduled));
             await db.SaveChangesAsync();

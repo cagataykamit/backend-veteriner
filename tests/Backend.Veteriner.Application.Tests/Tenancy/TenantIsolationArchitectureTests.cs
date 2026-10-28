@@ -24,6 +24,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Infrastructure/Persistence/Repositories/UserTenantRepository.cs"] = "Kullanıcının üyelikleri (giriş, tek kiracı kuralı)",
         ["Backend.Veteriner.Application/OwnerPortal/Access/OwnerPortalAccess.cs"] = "Portal bağı hesaba göre aranır",
         ["Backend.Veteriner.Application/OwnerPortal/Invites/OwnerPortalInviteResolver.cs"] = "Portal daveti token ile aranır",
+        ["Backend.Veteriner.Application/OwnerPortal/Commands/DeletePortalAccount/DeletePortalAccountCommand.cs"] = "Hesap silme: hesabın tüm kiracılardaki bağları kapanır",
         ["Backend.Veteriner.Application/Public/Commands/AcceptInvite/AcceptTenantInviteCommandHandler.cs"] = "Personel daveti token ile aranır",
         ["Backend.Veteriner.Application/Public/Commands/SignupAndAcceptInvite/SignupAndAcceptTenantInviteCommandHandler.cs"] = "Personel daveti token ile aranır",
         ["Backend.Veteriner.Application/Public/Queries/InviteDetail/GetPublicTenantInviteDetailQueryHandler.cs"] = "Personel daveti token ile aranır",

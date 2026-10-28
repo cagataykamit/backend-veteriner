@@ -59,7 +59,7 @@ public sealed class GetClientPortalAccessQueryHandler : IRequestHandler<GetClien
 
         var accountIds = links.Select(l => l.OwnerAccountId).Distinct().ToArray();
         var accountEmails = accountIds.Length == 0
-            ? new Dictionary<Guid, string>()
+            ? new Dictionary<Guid, string?>()
             : (await _accounts.ListAsync(new OwnerAccountsByIdsSpec(accountIds), ct)).ToDictionary(a => a.Id, a => a.Email);
 
         var eligibility = OwnerPortalInvitePolicy.CanInvite(scope.Client);
@@ -79,7 +79,8 @@ public sealed class GetClientPortalAccessQueryHandler : IRequestHandler<GetClien
                     l.Status,
                     accountEmails.GetValueOrDefault(l.OwnerAccountId),
                     l.CreatedAtUtc,
-                    l.ClosedAtUtc))
+                    l.ClosedAtUtc,
+                    l.CloseReason))
                 .ToArray(),
             invites.Select(i => ClientPortalInviteDto.From(i, utcNow)).ToArray()));
     }

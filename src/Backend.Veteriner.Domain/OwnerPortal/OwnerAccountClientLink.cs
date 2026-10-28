@@ -5,8 +5,8 @@ namespace Backend.Veteriner.Domain.OwnerPortal;
 /// <summary>
 /// Portal hesabı ↔ klinik müşteri kaydı bağı (ADR-031 K3, AK-3). Yalnız davet kabulüyle kurulur; kiracı ve daveti gönderen
 /// klinik bağlamını taşır (aydınlatma metni bu kliniğindir). Bir müşteri kaydında en fazla bir aktif bağ olur
-/// (veritabanında filtreli benzersiz indeks). Klinik erişimi kapatınca bağ <see cref="OwnerAccountClientLinkStatus.Closed"/>
-/// olur ve silinmez.
+/// (veritabanında filtreli benzersiz indeks). Klinik erişimi kapatınca ya da hasta sahibi hesabını silince bağ
+/// <see cref="OwnerAccountClientLinkStatus.Closed"/> olur ve silinmez; gerekçe <see cref="CloseReason"/>'dadır.
 /// </summary>
 public sealed class OwnerAccountClientLink : ITenantOwned
 {
@@ -22,7 +22,11 @@ public sealed class OwnerAccountClientLink : ITenantOwned
     public Guid CreatedByUserId { get; private set; }
 
     public DateTime? ClosedAtUtc { get; private set; }
+
+    /// <summary>Kapatan personel; hasta sahibinin hesap silmesiyle kapanan bağda boştur.</summary>
     public Guid? ClosedByUserId { get; private set; }
+
+    public OwnerAccountClientLinkCloseReason? CloseReason { get; private set; }
 
     /// <summary>Hasta sahibinin kliniğin aydınlatma metnini ilk onayladığı an (bilgilendirme kaydı; açık rıza değildir).</summary>
     public DateTime? DisclosureAcknowledgedAtUtc { get; private set; }
@@ -70,6 +74,19 @@ public sealed class OwnerAccountClientLink : ITenantOwned
         Status = OwnerAccountClientLinkStatus.Closed;
         ClosedAtUtc = ToUtc(utcNow);
         ClosedByUserId = closedByUserId;
+        CloseReason = OwnerAccountClientLinkCloseReason.ClinicClosed;
+        return Result.Success();
+    }
+
+    /// <summary>Hasta sahibi hesabını sildi (ADR-041 K4); bağ ve aydınlatma onay zamanı korunur.</summary>
+    public Result CloseByOwnerDeletion(DateTime utcNow)
+    {
+        if (!IsActive)
+            return Result.Failure("OwnerPortal.LinkAlreadyClosed", "Portal erişimi zaten kapalı.");
+
+        Status = OwnerAccountClientLinkStatus.Closed;
+        ClosedAtUtc = ToUtc(utcNow);
+        CloseReason = OwnerAccountClientLinkCloseReason.OwnerAccountDeleted;
         return Result.Success();
     }
 

@@ -43,6 +43,11 @@ public sealed class PortalRefreshBody
     public string? RefreshToken { get; init; }
 }
 
+public sealed class PortalAccountDeletionBody
+{
+    public string? OneTimeCode { get; init; }
+}
+
 public sealed class PortalLegalAcceptBody
 {
     public IReadOnlyList<LegalDocumentAcceptanceInput>? Documents { get; init; }

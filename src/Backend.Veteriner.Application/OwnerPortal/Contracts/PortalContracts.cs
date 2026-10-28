@@ -70,7 +70,8 @@ public sealed record ClientPortalLinkDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] OwnerAccountClientLinkStatus Status,
     string? AccountEmail,
     DateTime LinkedAtUtc,
-    DateTime? ClosedAtUtc);
+    DateTime? ClosedAtUtc,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] OwnerAccountClientLinkCloseReason? CloseReason);
 
 /// <summary>Klinik paneli: davet (<c>Status</c> metni <c>Pending</c>/<c>Accepted</c>/<c>Revoked</c>/<c>Expired</c>).</summary>
 public sealed record ClientPortalInviteDto(

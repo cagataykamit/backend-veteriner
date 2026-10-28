@@ -52,7 +52,7 @@ public sealed class OwnerPortalAccess
         var account = await _accounts.FirstOrDefaultAsync(new OwnerAccountByIdSpec(ownerAccountId), ct);
         return account is { IsActive: true }
             ? Result<OwnerAccount>.Success(account)
-            : Result<OwnerAccount>.Failure("Portal.Auth.Unauthorized.AccountUnavailable", "Portal hesabı kullanılamıyor; yeniden giriş yapın.");
+            : Result<OwnerAccount>.Failure(OwnerPortalErrors.AccountUnavailable);
     }
 
     public async Task<Result<OwnerPortalLinkScope>> ResolveLinkAsync(Guid ownerAccountId, Guid linkId, CancellationToken ct)
