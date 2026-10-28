@@ -138,7 +138,7 @@ public sealed class AppointmentNoShowIntegrationTests : IClassFixture<CustomWebA
         var ctx = await SeedAsync();
         var arrived = await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(1));
         (await ctx.PostAsync("/api/v1/visits", new { appointmentId = arrived })).StatusCode.Should().Be(HttpStatusCode.Created);
-        await ctx.SetScheduledAtAsync(arrived, DateTime.UtcNow.AddMinutes(-10));
+        await ctx.SetScheduledAtAsync(arrived, TodaySlot.BeforeNow(TimeSpan.FromMinutes(10)));
 
         var hasVisit = await ctx.PostAsync($"/api/v1/appointments/{arrived}/no-show");
         hasVisit.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -442,14 +442,18 @@ public sealed class AppointmentNoShowIntegrationTests : IClassFixture<CustomWebA
             await db.SaveChangesAsync();
         }
 
-        /// <summary>Doğrudan veritabanına randevu yazar (zaman/slot doğrulaması atlanır; geçmiş saat mümkün), her biri için ayrı hayvan.</summary>
+        /// <summary>
+        /// Doğrudan veritabanına randevu yazar (zaman/slot doğrulaması atlanır; geçmiş saat mümkün), her biri için ayrı hayvan.
+        /// Geçmiş saat bugünün içinde kalır (<see cref="TodaySlot.BeforeNow"/>): Bugün ve Özet sayıları gece yarısından hemen sonra da tutar.
+        /// </summary>
         public async Task<Guid> SeedAppointmentAsync(TimeSpan fromNow, AppointmentStatus? status = null)
         {
             await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var petId = await SeedPetAsync();
             var appointment = new Appointment(
-                TenantId, ClinicId, petId, DateTime.UtcNow.Add(fromNow), 30, AppointmentType.Consultation, status);
+                TenantId, ClinicId, petId, fromNow < TimeSpan.Zero ? TodaySlot.BeforeNow(fromNow.Negate()) : DateTime.UtcNow.Add(fromNow), 30,
+                AppointmentType.Consultation, status);
             db.Appointments.Add(appointment);
             await db.SaveChangesAsync();
             return appointment.Id;
