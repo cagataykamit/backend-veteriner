@@ -80,11 +80,9 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
                 "Pasif kiracı için reçete kaydı oluşturulamaz.");
         }
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<Guid>.Failure(
-                "Prescriptions.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<Guid>.Failure(ClinicContextRule.Mismatch("Prescriptions"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

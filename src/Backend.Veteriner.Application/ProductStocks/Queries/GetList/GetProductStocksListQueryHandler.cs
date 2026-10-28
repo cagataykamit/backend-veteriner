@@ -53,12 +53,9 @@ public sealed class GetProductStocksListQueryHandler
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue &&
-            request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PagedResult<ProductStockDto>>.Failure(
-                "ProductStocks.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PagedResult<ProductStockDto>>.Failure(ClinicContextRule.Mismatch("ProductStocks"));
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;

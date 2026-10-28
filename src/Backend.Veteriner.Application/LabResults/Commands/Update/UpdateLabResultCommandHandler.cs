@@ -85,11 +85,9 @@ public sealed class UpdateLabResultCommandHandler
         if (existing is null)
             return Fail("LabResults.NotFound", "Laboratuvar sonucu bulunamadı.");
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Fail(
-                "LabResults.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<LabResultWriteResultDto>.Failure(ClinicContextRule.Mismatch("LabResults"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
@@ -104,11 +102,10 @@ public sealed class UpdateLabResultCommandHandler
         if (!clinicAccess.IsSuccess)
             return Result<LabResultWriteResultDto>.Failure(clinicAccess.Error);
 
-        if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
+        if (ClinicContextRule.Conflicts(effectiveClinicId, _clinicContext.ClinicId))
         {
-            return Fail(
-                "LabResults.ClinicContextMismatch",
-                "Laboratuvar sonucu sadece aktif clinic bağlamında güncellenebilir.");
+            return Result<LabResultWriteResultDto>.Failure(
+                ClinicContextRule.Mismatch("LabResults", "Laboratuvar sonucu sadece aktif clinic bağlamında güncellenebilir."));
         }
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))

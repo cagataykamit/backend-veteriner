@@ -40,12 +40,9 @@ public sealed class GetSalesListQueryHandler : IRequestHandler<GetSalesListQuery
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue
-            && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PagedResult<SaleDto>>.Failure(
-                "Sales.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PagedResult<SaleDto>>.Failure(ClinicContextRule.Mismatch("Sales"));
         }
 
         // Kapsamsız kiracı geneli liste yoktur (ücret ve uygulama listeleriyle aynı kural).

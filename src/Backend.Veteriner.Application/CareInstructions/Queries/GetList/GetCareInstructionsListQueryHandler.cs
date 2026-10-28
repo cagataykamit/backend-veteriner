@@ -41,11 +41,9 @@ public sealed class GetCareInstructionsListQueryHandler
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PagedResult<CareInstructionDto>>.Failure(
-                "CareInstructions.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PagedResult<CareInstructionDto>>.Failure(ClinicContextRule.Mismatch("CareInstructions"));
         }
 
         // Yatış listesiyle aynı güvenlik kuralı: açık klinik kapsamı yoksa kiracının tüm talimatları döndürülmez.

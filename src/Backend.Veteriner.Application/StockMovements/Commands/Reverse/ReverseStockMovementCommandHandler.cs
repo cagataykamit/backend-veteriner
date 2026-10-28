@@ -69,11 +69,10 @@ public sealed class ReverseStockMovementCommandHandler
         if (original is null)
             return Fail("StockMovements.NotFound", "Stok hareketi bulunamadı veya kiracıya ait değil.");
 
-        if (_clinicContext.ClinicId.HasValue && original.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(original.ClinicId, _clinicContext.ClinicId))
         {
-            return Fail(
-                "StockMovements.ClinicContextMismatch",
-                "Hareketin kliniği aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<StockMovementCreateResult>.Failure(
+                ClinicContextRule.Mismatch("StockMovements", "Hareketin kliniği aktif clinic bağlamı ile uyuşmuyor."));
         }
 
         var scopeResult = await _clinicScopeResolver.ResolveAsync(tenantId, original.ClinicId, ct);

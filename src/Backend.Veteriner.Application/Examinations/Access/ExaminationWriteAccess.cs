@@ -49,11 +49,10 @@ internal static class ExaminationWriteAccess
         if (!clinicAccess.IsSuccess)
             return Result<Examination>.Failure(clinicAccess.Error);
 
-        if (clinicContext.ClinicId is { } currentClinicId && e.ClinicId != currentClinicId)
+        if (ClinicContextRule.Conflicts(e.ClinicId, clinicContext.ClinicId))
         {
             return Result<Examination>.Failure(
-                "Examinations.ClinicContextMismatch",
-                "Muayene kaydı sadece aktif clinic bağlamında değiştirilebilir.");
+                ClinicContextRule.Mismatch("Examinations", "Muayene kaydı sadece aktif clinic bağlamında değiştirilebilir."));
         }
 
         return Result<Examination>.Success(e);

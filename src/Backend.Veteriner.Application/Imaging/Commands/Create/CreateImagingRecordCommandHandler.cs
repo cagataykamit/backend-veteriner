@@ -62,11 +62,9 @@ public sealed class CreateImagingRecordCommandHandler : IRequestHandler<CreateIm
         if (_clientContext.UserId is not { } userId)
             return Result<Guid>.Failure("Auth.UserContextMissing", "Kullanıcı bağlamı bulunamadı.");
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<Guid>.Failure(
-                "ImagingRecords.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<Guid>.Failure(ClinicContextRule.Mismatch("ImagingRecords"));
         }
 
         var clinicId = _clinicContext.ClinicId ?? request.ClinicId;

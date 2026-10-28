@@ -113,12 +113,9 @@ public sealed class CreateAdministrationCommandHandler
         if (!tenant.IsActive)
             return Fail("Tenants.TenantInactive", "Pasif kiracı için uygulama kaydı oluşturulamaz.");
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue
-            && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Fail(
-                "Administrations.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<AdministrationCreateResultDto>.Failure(ClinicContextRule.Mismatch("Administrations"));
         }
 
         if ((_clinicContext.ClinicId ?? request.ClinicId) is not { } clinicId)

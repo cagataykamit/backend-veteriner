@@ -88,11 +88,9 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         if (p is null)
             return Result.Failure("Prescriptions.NotFound", "Reçete kaydı bulunamadı.");
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result.Failure(
-                "Prescriptions.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result.Failure(ClinicContextRule.Mismatch("Prescriptions"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
@@ -107,11 +105,10 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         if (!clinicAccess.IsSuccess)
             return clinicAccess;
 
-        if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
+        if (ClinicContextRule.Conflicts(effectiveClinicId, _clinicContext.ClinicId))
         {
             return Result.Failure(
-                "Prescriptions.ClinicContextMismatch",
-                "Reçete kaydı sadece aktif clinic bağlamında güncellenebilir.");
+                ClinicContextRule.Mismatch("Prescriptions", "Reçete kaydı sadece aktif clinic bağlamında güncellenebilir."));
         }
 
         var prescribedUtc = PrescribedAtUtcWindow.ToUtc(request.PrescribedAtUtc);

@@ -47,12 +47,9 @@ public sealed class GetChargesListQueryHandler : IRequestHandler<GetChargesListQ
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue
-            && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PagedResult<ChargeDto>>.Failure(
-                "Charges.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PagedResult<ChargeDto>>.Failure(ClinicContextRule.Mismatch("Charges"));
         }
 
         // Kapsamsız kiracı geneli liste yoktur (ödeme listesiyle aynı kural).

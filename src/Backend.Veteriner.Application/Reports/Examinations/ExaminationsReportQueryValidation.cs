@@ -44,12 +44,9 @@ internal static class ExaminationsReportQueryValidation
                 $"Tarih aralığı en fazla {ExaminationsReportConstants.MaxRangeDays} gün olabilir.");
         }
 
-        if (requestClinicId.HasValue && clinicContext.ClinicId.HasValue
-                                      && requestClinicId.Value != clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(requestClinicId, clinicContext.ClinicId))
         {
-            return Result<(Guid, Guid?, IReadOnlyCollection<Guid>?, DateTime, DateTime)>.Failure(
-                "Examinations.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<(Guid, Guid?, IReadOnlyCollection<Guid>?, DateTime, DateTime)>.Failure(ClinicContextRule.Mismatch("Examinations"));
         }
 
         var requestedClinicId = requestClinicId ?? clinicContext.ClinicId;

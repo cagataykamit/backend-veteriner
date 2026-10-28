@@ -96,12 +96,9 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
                 "Pasif kiracı için geliş kaydı oluşturulamaz.");
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue
-            && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<VisitCreateResultDto>.Failure(
-                "Visits.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<VisitCreateResultDto>.Failure(ClinicContextRule.Mismatch("Visits"));
         }
 
         Appointment? appointment = null;

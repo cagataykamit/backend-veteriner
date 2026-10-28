@@ -79,11 +79,9 @@ public sealed class GetAppointmentsListQueryHandler
         var page = Math.Max(1, request.PageRequest.Page);
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PagedResult<AppointmentListItemDto>>.Failure(
-                "Appointments.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PagedResult<AppointmentListItemDto>>.Failure(ClinicContextRule.Mismatch("Appointments"));
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;

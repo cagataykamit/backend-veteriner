@@ -97,11 +97,9 @@ public sealed class GetVaccinationsListQueryHandler
             stepSw.Restart();
         }
 
-        if (request.ClinicId.HasValue && _clinicContext.ClinicId.HasValue && request.ClinicId.Value != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PagedResult<VaccinationListItemDto>>.Failure(
-                "Vaccinations.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PagedResult<VaccinationListItemDto>>.Failure(ClinicContextRule.Mismatch("Vaccinations"));
         }
 
         var requestedClinicId = request.ClinicId ?? _clinicContext.ClinicId;

@@ -113,11 +113,9 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         if (!window.IsSuccess)
             return Result<PaymentCreateResultDto>.Failure(window.Error);
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result<PaymentCreateResultDto>.Failure(
-                "Payments.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result<PaymentCreateResultDto>.Failure(ClinicContextRule.Mismatch("Payments"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;

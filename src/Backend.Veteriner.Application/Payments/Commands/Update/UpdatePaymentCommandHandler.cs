@@ -110,11 +110,9 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         if (payment is null)
             return Result.Failure("Payments.NotFound", "Ödeme kaydı bulunamadı.");
 
-        if (_clinicContext.ClinicId.HasValue && request.ClinicId != _clinicContext.ClinicId.Value)
+        if (ClinicContextRule.Conflicts(request.ClinicId, _clinicContext.ClinicId))
         {
-            return Result.Failure(
-                "Payments.ClinicContextMismatch",
-                "İstek clinicId değeri aktif clinic bağlamı ile uyuşmuyor.");
+            return Result.Failure(ClinicContextRule.Mismatch("Payments"));
         }
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
@@ -126,11 +124,10 @@ public sealed class UpdatePaymentCommandHandler : IRequestHandler<UpdatePaymentC
         if (!clinicAccess.IsSuccess)
             return clinicAccess;
 
-        if (_clinicContext.ClinicId is { } currentClinicId && effectiveClinicId != currentClinicId)
+        if (ClinicContextRule.Conflicts(effectiveClinicId, _clinicContext.ClinicId))
         {
             return Result.Failure(
-                "Payments.ClinicContextMismatch",
-                "Ödeme kaydı sadece aktif clinic bağlamında güncellenebilir.");
+                ClinicContextRule.Mismatch("Payments", "Ödeme kaydı sadece aktif clinic bağlamında güncellenebilir."));
         }
 
         var clinic = await _clinics.FirstOrDefaultAsync(
