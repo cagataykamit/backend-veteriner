@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.SalesPartners.Specs;
+using Backend.Veteriner.Application.Tenants.Billing;
 using Backend.Veteriner.Application.Tenants.Commands.Checkout;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.SalesPartners;
@@ -27,6 +28,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     private readonly Mock<IReadRepository<BillingCheckoutSession>> _checkoutSessionsRead = new();
     private readonly Mock<IBillingCheckoutProviderResolver> _resolver = new();
     private readonly Mock<IRepository<DiscountRedemption>> _redemptions = new();
+    private readonly Mock<ISubscriptionCheckoutActivationService> _activation = new();
 
     private StartSubscriptionCheckoutCommandHandler CreateHandler(BillingOptions billing)
         => new(
@@ -40,6 +42,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
             _checkoutSessionsRead.Object,
             Options.Create(billing),
             _resolver.Object,
+            new CheckoutPaymentReconciler(_resolver.Object, _activation.Object, NullLogger<CheckoutPaymentReconciler>.Instance),
             new SalesPartnerDiscountBilling(_redemptions.Object, NullLogger<SalesPartnerDiscountBilling>.Instance),
             NullLogger<StartSubscriptionCheckoutCommandHandler>.Instance,
             TimeProvider.System);
@@ -273,8 +276,10 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    [Fact]
-    public async Task Handle_Should_KeepSession_AndReturnAlreadyPaid_When_ProviderPageAlreadyPaid()
+    [Theory]
+    [InlineData("Pro")]
+    [InlineData("Premium")]
+    public async Task Handle_Should_ActivatePaidOpenSession_AndNotCancelIt_EvenForDifferentTarget(string requestedPlan)
     {
         var tid = Guid.NewGuid();
         var tenant = CreateTenant(tid);
@@ -292,12 +297,19 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         SetupCheckoutInfrastructure(tid, tenant, sub, session);
         SetupPageStateProvider(CheckoutPageState.Paid);
 
-        var result = await CreatePricedManualHandler().Handle(new StartSubscriptionCheckoutCommand(tid, "Pro"), CancellationToken.None);
+        var result = await CreatePricedManualHandler().Handle(new StartSubscriptionCheckoutCommand(tid, requestedPlan), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Subscriptions.CheckoutAlreadyPaid");
-        session.Status.Should().Be(BillingCheckoutSessionStatus.RedirectReady, "ödemesi alınmış oturum kapatılırsa webhook onu etkinleştirmez");
+        _activation.Verify(
+            x => x.TryActivateAsync(session.Id, tid, BillingProvider.Manual, null, BillingActivationSource.ProviderVerified, It.IsAny<CancellationToken>()),
+            Times.Once);
+        session.Status.Should().NotBe(BillingCheckoutSessionStatus.Cancelled, "ödemesi alınmış oturum iptal edilirse ödeme boşa gider");
         _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
+        _planChangesRead.Verify(
+            x => x.FirstOrDefaultAsync(It.IsAny<OpenScheduledPlanChangeByTenantSpec>(), It.IsAny<CancellationToken>()),
+            Times.Never,
+            "ödeme işlendiğinde istek başka hiçbir şeye dokunmaz");
     }
 
     private StartSubscriptionCheckoutCommandHandler CreatePricedManualHandler()
@@ -468,6 +480,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
             .ReturnsAsync((ScheduledSubscriptionPlanChange?)null);
         _checkoutSessionsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<OpenBillingCheckoutSessionByTenantSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(staleSession);
+        SetupPageStateProvider(CheckoutPageState.Payable);
 
         var billing = new BillingOptions { DefaultCheckoutProvider = "Manual" };
         var handler = CreateHandler(billing);

@@ -236,6 +236,7 @@ public sealed class SubscriptionCheckoutActivationServiceTests
 
     [Theory]
     [InlineData(BillingActivationSource.Webhook, BillingProvider.Iyzico, 1)]
+    [InlineData(BillingActivationSource.ProviderVerified, BillingProvider.Iyzico, 1)]
     [InlineData(BillingActivationSource.Manual, BillingProvider.Manual, 0)]
     public async Task TryActivateAsync_Should_Record_Partner_Commission_Only_For_Verified_Webhook_Collection(
         BillingActivationSource source, BillingProvider provider, int expectedCollections)

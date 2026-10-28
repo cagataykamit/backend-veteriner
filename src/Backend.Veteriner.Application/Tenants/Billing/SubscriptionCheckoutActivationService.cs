@@ -124,9 +124,10 @@ public sealed class SubscriptionCheckoutActivationService : ISubscriptionCheckou
         sub.ActivatePaidPlan(session.TargetPlanCode, session.BillingPeriod, utcNow);
         session.MarkCompleted(utcNow, completionReference);
 
-        // Satış ortağı komisyonu yalnız gerçek tahsilatta (ADR-037 madde 4): imzası doğrulanan sağlayıcı olayı. Panel finalize
-        // ödemeyi sağlayıcıdan doğrulamadığı için (Manual) komisyon üretmez. Aynı iş biriminde kaydedilir.
-        if (source == BillingActivationSource.Webhook)
+        // Satış ortağı komisyonu yalnız gerçek tahsilatta (ADR-037 madde 4): imzası doğrulanan sağlayıcı olayı ya da backend'in
+        // sağlayıcıdan doğruladığı ödeme. Panel finalize ödemeyi doğrulamadığı için (Manual) komisyon üretmez. Aynı iş biriminde
+        // kaydedilir; ikinci yol oturumu tamamlanmış bulduğundan komisyon iki kez yazılmaz.
+        if (source is BillingActivationSource.Webhook or BillingActivationSource.ProviderVerified)
             await _partnerDiscounts.RecordCollectionAsync(session, utcNow, ct);
 
         await _subscriptionsWrite.UpdateAsync(sub, ct);

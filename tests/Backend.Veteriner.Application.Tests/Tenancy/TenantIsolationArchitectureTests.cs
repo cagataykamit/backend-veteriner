@@ -30,6 +30,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Application/Files/Queries/GetSignedContent/GetSignedStoredFileContentQuery.cs"] = "İmzalı dosya bağlantısı",
         ["Backend.Veteriner.Application/Tenants/Billing/SubscriptionCheckoutActivationService.cs"] = "Webhook: oturum kimlikle aranır",
         ["Backend.Veteriner.Application/Tenants/Commands/Billing/ProcessBillingWebhookCommandHandler.cs"] = "Webhook: oturum kimlikle aranır",
+        ["Backend.Veteriner.Application/Tenants/Commands/Billing/ConfirmCheckoutReturnCommandHandler.cs"] = "Sağlayıcı dönüşü: oturum kimlik ya da token ile aranır",
         ["Backend.Veteriner.Application/SalesPartners/DiscountCodeRedemptionService.cs"] = "Kod kullanım limiti tüm kiracılarda sayılır",
         // Platform yönetimi
         ["Backend.Veteriner.Api/Controllers/SalesPartnersAdminController.cs"] = "Satış ortakları (platform yöneticisi)",
