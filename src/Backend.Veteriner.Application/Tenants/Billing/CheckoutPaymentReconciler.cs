@@ -33,7 +33,8 @@ public sealed class CheckoutPaymentReconciler : ICheckoutPaymentReconciler
             externalReference: null,
             BillingActivationSource.ProviderVerified,
             ct);
-        if (!activation.IsSuccess)
+        // Çift ödeme iadeye alındıysa etkinleştirme bilerek yapılmadı (BILL-005); uyarı gerekmez.
+        if (!activation.IsSuccess && activation.Error.Code != ISubscriptionCheckoutActivationService.DuplicatePaymentErrorCode)
         {
             _logger.LogWarning(
                 "Sağlayıcıda ödemesi alınmış oturum etkinleştirilemedi: {Code} {Message} SessionId={SessionId}",

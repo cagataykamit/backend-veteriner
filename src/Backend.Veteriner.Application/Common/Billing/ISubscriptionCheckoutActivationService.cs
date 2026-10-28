@@ -7,6 +7,12 @@ namespace Backend.Veteriner.Application.Common.Billing;
 public interface ISubscriptionCheckoutActivationService
 {
     /// <summary>
+    /// Doğrulanmış ödeme çift ödeme çıktı (BILL-005): paket açılmadı, ödeme iadeye alındı. Ödeme olayı işlenmiş sayılır
+    /// (webhook 200 döner, yeniden denenmez).
+    /// </summary>
+    public const string DuplicatePaymentErrorCode = "Billing.DuplicatePayment";
+
+    /// <summary>
     /// Checkout session'ı hedef plana göre Active yapar; tekrar çağrılarda idempotent davranır.
     /// <paramref name="tenantIdConstraint"/> doluysa session bu kiracıya ait olmalı (panel finalize).
     /// Webhook için null geçilir; session yalnızca id ile yüklenir.
