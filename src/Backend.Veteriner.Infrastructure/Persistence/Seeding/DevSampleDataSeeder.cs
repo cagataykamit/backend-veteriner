@@ -20,9 +20,11 @@ using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
+using Backend.Veteriner.Infrastructure.Projections.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Seeding;
 
@@ -52,6 +54,7 @@ public static class DevSampleDataSeeder
     public static async Task<Summary?> SeedAsync(
         AppDbContext db,
         IOutboxBuffer outboxBuffer,
+        IOptions<PaymentProjectionOptions> paymentProjection,
         IHostEnvironment environment,
         ILogger? logger = null,
         CancellationToken ct = default)
@@ -79,7 +82,7 @@ public static class DevSampleDataSeeder
             return null;
         }
 
-        var handlers = new Handlers(db, outboxBuffer, tenant.Id, clinic.Id, userId.Value);
+        var handlers = new Handlers(db, outboxBuffer, paymentProjection, tenant.Id, clinic.Id, userId.Value);
 
         var maksut = await ResolveAsync(db, tenant, species, "Maksut Kamit", "Cedi", $"{Prefix} Müşteri A", ct);
         var mehmet = await ResolveAsync(db, tenant, species, "Mehmet Çağatay Kamit", "Çomar", $"{Prefix} Müşteri B", ct);
@@ -113,7 +116,7 @@ public static class DevSampleDataSeeder
         payments += p;
 
         // (d) tahsissiz eski ödeme: handler tahsis zorunlu kıldığı için yalnızca domain kurucusuyla (AllocatedAmount = 0) yazılır.
-        payments += await SeedLegacyPaymentAsync(db, outboxBuffer, tenant.Id, clinic, legacy, ct);
+        payments += await SeedLegacyPaymentAsync(db, outboxBuffer, paymentProjection, tenant.Id, clinic, legacy, ct);
 
         var summary = new Summary(appointments, charges, payments);
         logger?.LogInformation(
@@ -262,6 +265,7 @@ public static class DevSampleDataSeeder
     private static async Task<int> SeedLegacyPaymentAsync(
         AppDbContext db,
         IOutboxBuffer outboxBuffer,
+        IOptions<PaymentProjectionOptions> paymentProjection,
         Guid tenantId,
         Clinic clinic,
         Persona persona,
@@ -277,7 +281,7 @@ public static class DevSampleDataSeeder
             500m, Charge.DefaultCurrency, PaymentMethod.Cash, utcNow, notes);
         await db.Payments.AddAsync(payment, ct);
 
-        var outbox = new PaymentIntegrationEventOutbox(outboxBuffer);
+        var outbox = new PaymentIntegrationEventOutbox(outboxBuffer, paymentProjection);
         await outbox.EnqueueAsync(
             PaymentIntegrationEventTypes.Created,
             new PaymentCreatedIntegrationEvent(
@@ -356,7 +360,7 @@ public static class DevSampleDataSeeder
         public CreateChargeCommandHandler CreateCharge { get; }
         public CreatePaymentCommandHandler CreatePayment { get; }
 
-        public Handlers(AppDbContext db, IOutboxBuffer outboxBuffer, Guid tenantId, Guid clinicId, Guid userId)
+        public Handlers(AppDbContext db, IOutboxBuffer outboxBuffer, IOptions<PaymentProjectionOptions> paymentProjection, Guid tenantId, Guid clinicId, Guid userId)
         {
             var tenantContext = new FixedTenantContext(tenantId);
             var clinicContext = new FixedClinicContext(clinicId);
@@ -416,7 +420,7 @@ public static class DevSampleDataSeeder
                 new EfRepository<Charge>(db),
                 new EfRepository<PaymentAllocation>(db),
                 TimeProvider.System,
-                new PaymentIntegrationEventOutbox(outboxBuffer));
+                new PaymentIntegrationEventOutbox(outboxBuffer, paymentProjection));
         }
     }
 

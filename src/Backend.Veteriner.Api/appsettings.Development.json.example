@@ -84,6 +84,7 @@
 
   "PetProjection": {
     "Enabled": false,
+    "WriteEvents": false,
     "BatchSize": 50,
     "LoopIntervalSeconds": 2,
     "ConsumerName": "pet-read-model-v1",
@@ -100,6 +101,7 @@
 
   "PaymentProjection": {
     "Enabled": false,
+    "WriteEvents": false,
     "BatchSize": 50,
     "LoopIntervalSeconds": 2,
     "ConsumerName": "payment-finance-v1",

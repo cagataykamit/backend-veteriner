@@ -1,8 +1,10 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Infrastructure.Outbox;
+using Backend.Veteriner.Infrastructure.Projections.Pets;
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Backend.IntegrationTests.Outbox;
 
@@ -68,7 +70,7 @@ public sealed class PetIntegrationEventInfrastructureTests
     public async Task Adapter_Should_Enqueue_TypeAndPayload_To_Buffer_Without_DatabaseAccess()
     {
         var buffer = new OutboxBuffer(NullLogger<OutboxBuffer>.Instance);
-        var adapter = new PetIntegrationEventOutbox(buffer);
+        var adapter = new PetIntegrationEventOutbox(buffer, Options.Create(new PetProjectionOptions()));
 
         var integrationEvent = new PetCreatedIntegrationEvent(
             Guid.NewGuid(),
@@ -92,7 +94,7 @@ public sealed class PetIntegrationEventInfrastructureTests
     [Fact]
     public async Task Adapter_Should_Reject_UnknownEventType()
     {
-        var adapter = new PetIntegrationEventOutbox(new OutboxBuffer(NullLogger<OutboxBuffer>.Instance));
+        var adapter = new PetIntegrationEventOutbox(new OutboxBuffer(NullLogger<OutboxBuffer>.Instance), Options.Create(new PetProjectionOptions()));
 
         var integrationEvent = new PetCreatedIntegrationEvent(
             Guid.NewGuid(),
@@ -107,7 +109,7 @@ public sealed class PetIntegrationEventInfrastructureTests
     [Fact]
     public async Task Adapter_Should_Reject_PayloadTypeMismatch()
     {
-        var adapter = new PetIntegrationEventOutbox(new OutboxBuffer(NullLogger<OutboxBuffer>.Instance));
+        var adapter = new PetIntegrationEventOutbox(new OutboxBuffer(NullLogger<OutboxBuffer>.Instance), Options.Create(new PetProjectionOptions()));
 
         var mismatched = new PetUpdatedIntegrationEvent(
             Guid.NewGuid(),
