@@ -6,12 +6,14 @@ using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
+using Backend.Veteriner.Infrastructure.Projections.Payments;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Backend.IntegrationTests.Seeding;
 
@@ -66,8 +68,8 @@ public sealed class DevSampleDataSeederTests
         await using var db = await PrepareAsync();
         var env = new FakeEnvironment(Environments.Development);
 
-        var first = await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), env, ct: default);
-        var second = await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), env, ct: default);
+        var first = await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), Options.Create(new PaymentProjectionOptions()), env, ct: default);
+        var second = await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), Options.Create(new PaymentProjectionOptions()), env, ct: default);
 
         first.Should().NotBeNull();
         first!.Charges.Should().Be(4);
@@ -102,8 +104,8 @@ public sealed class DevSampleDataSeederTests
         await using var db = await PrepareAsync();
         var env = new FakeEnvironment(Environments.Development);
 
-        await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), env, ct: default);
-        await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), env, ct: default);
+        await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), Options.Create(new PaymentProjectionOptions()), env, ct: default);
+        await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), Options.Create(new PaymentProjectionOptions()), env, ct: default);
 
         var appointments = await db.Appointments.ToListAsync();
         appointments.Should().OnlyContain(a => a.Status == AppointmentStatus.Scheduled && a.Notes!.StartsWith("ÖRNEK"));
@@ -119,7 +121,7 @@ public sealed class DevSampleDataSeederTests
     {
         await using var db = await PrepareAsync();
 
-        var act = () => DevSampleDataSeeder.SeedAsync(db, NewBuffer(), new FakeEnvironment(environmentName));
+        var act = () => DevSampleDataSeeder.SeedAsync(db, NewBuffer(), Options.Create(new PaymentProjectionOptions()), new FakeEnvironment(environmentName));
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         (await db.Charges.AnyAsync()).Should().BeFalse();
@@ -132,7 +134,7 @@ public sealed class DevSampleDataSeederTests
     {
         await using var db = await PrepareAsync(withTenant: false);
 
-        var summary = await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), new FakeEnvironment(Environments.Development));
+        var summary = await DevSampleDataSeeder.SeedAsync(db, NewBuffer(), Options.Create(new PaymentProjectionOptions()), new FakeEnvironment(Environments.Development));
 
         summary.Should().BeNull();
         (await db.Clients.AnyAsync()).Should().BeFalse();
