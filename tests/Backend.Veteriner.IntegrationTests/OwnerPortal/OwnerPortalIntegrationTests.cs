@@ -422,6 +422,54 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
     }
 
     [Fact]
+    public async Task Owner_Should_Turn_Reminders_Off_And_On_From_Portal_Through_Client_Flag()
+    {
+        var staff = await SeedStaffAsync([PermissionCatalog.OwnerPortal.Manage, PermissionCatalog.Clients.Read]);
+        var session = await InviteAndAcceptAsync(staff);
+        var other = await InviteAndAcceptAsync(staff);
+        var url = $"/api/portal/v1/links/{session.LinkId}/reminder-preferences";
+
+        var initial = await (await SendAsync(HttpMethod.Get, url, session.AccessToken)).Content.ReadFromJsonAsync<JsonElement>();
+        initial.GetProperty("remindersOptedOut").GetBoolean().Should().BeFalse();
+        initial.GetProperty("canEnableReminders").GetBoolean().Should().BeTrue();
+
+        var off = await SendAsync(HttpMethod.Put, url, session.AccessToken, new { remindersOptedOut = true });
+        off.StatusCode.Should().Be(HttpStatusCode.OK, await off.Content.ReadAsStringAsync());
+        (await off.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("remindersOptedOut").GetBoolean().Should().BeTrue();
+        var staffView = await (await SendAsync(HttpMethod.Get, $"/api/v1/clients/{session.ClientId}", staff.Token)).Content.ReadFromJsonAsync<JsonElement>();
+        staffView.GetProperty("remindersOptedOut").GetBoolean().Should().BeTrue("personel aynı müşteri bayrağını görür");
+
+        (await SendAsync(HttpMethod.Put, url, session.AccessToken, new { })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await SendAsync(HttpMethod.Put, url, other.AccessToken, new { remindersOptedOut = false })).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await SendAsync(HttpMethod.Get, url, staff.Token)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var on = await SendAsync(HttpMethod.Put, url, session.AccessToken, new { remindersOptedOut = false });
+        on.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await on.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("remindersOptedOut").GetBoolean().Should().BeFalse();
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var client = await db.Clients.SingleAsync(c => c.Id == session.ClientId);
+            client.RemindersOptedOut.Should().BeFalse();
+            client.RecordKvkkConsent(KvkkConsentStatus.Declined, null, DateOnly.FromDateTime(DateTime.UtcNow), Guid.NewGuid(), null, null, DateTime.UtcNow)
+                .IsSuccess.Should().BeTrue();
+            await db.SaveChangesAsync();
+            var accountId = (await db.OwnerAccounts.AsNoTracking().SingleAsync(o => o.Email == session.Email)).Id;
+            var target = $"OwnerAccountId={accountId};LinkId={session.LinkId}";
+            (await db.AuditLogs.AsNoTracking().CountAsync(a => a.Action == "Portal.ReminderPreferences.Update" && a.Success && a.ActorUserId == null && a.TargetId == target))
+                .Should().Be(2);
+        }
+
+        var declined = await (await SendAsync(HttpMethod.Get, url, session.AccessToken)).Content.ReadFromJsonAsync<JsonElement>();
+        declined.GetProperty("remindersOptedOut").GetBoolean().Should().BeTrue("KVKK Ret hatırlatmayı kapatır");
+        declined.GetProperty("canEnableReminders").GetBoolean().Should().BeFalse();
+        var blocked = await SendAsync(HttpMethod.Put, url, session.AccessToken, new { remindersOptedOut = false });
+        blocked.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(blocked)).Should().Be("Clients.RemindersKvkkDeclined");
+    }
+
+    [Fact]
     public async Task Staff_Without_OwnerPortal_Manage_Should_Be_Forbidden()
     {
         var staff = await SeedStaffAsync([PermissionCatalog.Clients.Read]);

@@ -52,3 +52,9 @@ public sealed class PortalLegalAcceptBody
 {
     public IReadOnlyList<LegalDocumentAcceptanceInput>? Documents { get; init; }
 }
+
+public sealed class PortalReminderPreferencesBody
+{
+    /// <summary>Zorunlu: true = hatırlatma istemiyorum.</summary>
+    public bool? RemindersOptedOut { get; init; }
+}

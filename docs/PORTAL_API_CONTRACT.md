@@ -45,7 +45,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-031-ha
 | Hız sınırı (IP) | `portal-auth` 10/dk (anonim kimlik uçları), `portal-refresh` ~30/dk, `portal` 120/dk (oturumlu uçlar). Üçü de IP anahtarlıdır (hız sınırı kimlik doğrulamadan önce çalışır). **Hesap bazlı** koruma kilit + kod deneme hakkı + kod bekleme süresidir (veritabanında, `Domain/OwnerPortal`) | `RateLimitingExtensions` |
 | Refresh | Her yenilemede döndürülür; iptal edilmiş token tekrar kullanılırsa hesabın **tüm** portal oturumları kapanır | `RefreshPortalSessionCommandHandler` |
 | Sahiplik | Her bağ kapsamlı uç `OwnerPortalAccess.ResolveLinkAsync`: bağ bu hesaba ait, `Active`, kiracı aktif; değilse **404** `Portal.Links.NotFound` (başka hesabın/kiracının bağı ile ayırt edilemez) | `OwnerPortalAccess` |
-| Denetim | AuditBehavior: davet oluşturma/iptal, bağ kapatma, davet kabulü, kod isteği, kodla/parolayla giriş, şifre sıfırlama, çıkış, hesap silme kodu ve hesap silme (`OwnerPortal.Account.*`), kabul, aydınlatma onayı ve dilim B okuma uçları (`Portal.Read.*`, §6; içerik yazılmaz). Parola, token, `oneTimeCode` maskelenir. Portal isteklerinde `ActorUserId` boştur (personel kimliğiyle karışmaz); hedef `OwnerAccountId=...` | `AuditBehavior` |
+| Denetim | AuditBehavior: davet oluşturma/iptal, bağ kapatma, davet kabulü, kod isteği, kodla/parolayla giriş, şifre sıfırlama, çıkış, hesap silme kodu ve hesap silme (`OwnerPortal.Account.*`), kabul, aydınlatma onayı, hatırlatma tercihi (§5.11) ve dilim B okuma uçları (`Portal.Read.*`, §6; içerik yazılmaz). Parola, token, `oneTimeCode` maskelenir. Portal isteklerinde `ActorUserId` boştur (personel kimliğiyle karışmaz); hedef `OwnerAccountId=...` | `AuditBehavior` |
 
 ## 4) Klinik paneli uçları [A]
 
@@ -245,6 +245,31 @@ Sonrası: silinen hesap pasiftir. Giriş, kod isteği, yenileme ve parola sıfı
 | `Validation.FluentValidation` | 400 | `oneTimeCode` boş ya da 20 karakterden uzun |
 | `Portal.Auth.Unauthorized.AccountUnavailable` | 401 | Oturumdaki hesap pasif ya da silinmiş |
 
+### 5.11 Hatırlatma tercihi (APPT-014)
+
+Hasta sahibi, bağın müşteri kaydı için otomatik aşı/randevu hatırlatmalarını kendisi kapatıp açar. Ayrı alan yoktur: tercih müşteri kaydındaki **`RemindersOptedOut`** bayrağıdır (personelin müşteri formunda değiştirdiği ve KVKK Ret'in açtığı bayrak; ADR-025). Aday dışlama yine tek yerdedir (`Client.AcceptsReminders`, hatırlatma işleyicisi). Bağ başınadır: hesabın her klinikteki müşteri kaydı ayrı tercih taşır. **Migration yoktur.**
+
+`GET /api/portal/v1/links/{linkId}/reminder-preferences` → 200:
+
+```json
+{ "remindersOptedOut": false, "canEnableReminders": true }
+```
+
+`PUT /api/portal/v1/links/{linkId}/reminder-preferences` — `{ "remindersOptedOut": true }` → 200, GET ile aynı şekil (yazımdan sonraki değer).
+
+- `remindersOptedOut: true` = hatırlatma gönderilmez. Kapatma her zaman serbesttir.
+- `canEnableReminders: false` = müşterinin klinikte KVKK açık rıza kaydı **Ret**; sahip hatırlatmayı portaldan açamaz (Ret hatırlatmayı kapatır; portal tercihi imzalı rıza kaydının yerine geçmez, bayrağı klinik açar). Kural tek yerde: `Client.SetRemindersOptedOutByOwner` / `Client.OwnerCanEnableReminders`.
+- Değer değişmezse kayıt güncellenmez (200 döner). Kiracı aboneliği salt okunur olsa da yazım kabul edilir (hatırlatmayı durdurmak sahibin hakkı).
+- Denetim: `Portal.Read.ReminderPreferences` (GET), `Portal.ReminderPreferences.Update` (PUT); hedef `OwnerAccountId=…;LinkId=…`, `ActorUserId` boş.
+- Davet kuralıyla ilişkisi (§3): `RemindersOptedOut` açık müşteriye **yeni** davet gitmez; mevcut aktif bağ etkilenmez, sahip portalı kullanmaya devam eder. Bağ kapatılıp yeniden davet gerekirse klinik önce bayrağı kapatmalıdır.
+
+| Kod | HTTP | Durum |
+|---|---|---|
+| `Clients.RemindersKvkkDeclined` | 409 | KVKK Ret kaydı varken `remindersOptedOut: false` |
+| `Clients.ConcurrencyConflict` | 409 | Kayıt aynı anda klinikte değişti; yeniden okuyup tekrar deneyin |
+| `Validation.FluentValidation` | 400 | `remindersOptedOut` yok |
+| `Portal.Links.NotFound` | 404 | Bağ bu hesabın değil, kapalı ya da kiracı pasif |
+
 ## 6) Portal uçları — Dilim B [B] (salt okunur)
 
 Ortak kurallar:
@@ -420,6 +445,7 @@ Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıd
 | GET/POST | `/api/portal/v1/me/legal-acceptances` | A | Portal |
 | GET | `/api/portal/v1/links/{linkId}/clinic-disclosure` | A | Portal |
 | POST | `/api/portal/v1/links/{linkId}/clinic-disclosure/acknowledge` | A | Portal |
+| GET/PUT | `/api/portal/v1/links/{linkId}/reminder-preferences` | A (APPT-014) | Portal |
 | GET | `/api/portal/v1/links/{linkId}/clinic`, `/pets`, `/pets/{petId}`, `/appointments`, `/pets/{petId}/vaccinations`, `/balance`, `/payments` | B | Portal |
 | GET | `/api/portal/v1/links/{linkId}/pets/{petId}/prescriptions`, `/treatments` | v1 | Portal |
 
