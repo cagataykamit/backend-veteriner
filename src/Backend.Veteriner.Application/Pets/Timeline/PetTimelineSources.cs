@@ -137,7 +137,8 @@ internal sealed class PrescriptionTimelineSource(IReadRepository<Prescription> r
             RelatedExaminationId: p.ExaminationId,
             RelatedVisitId: null,
             RelatedAppointmentId: null,
-            UpdatedAtUtc: p.UpdatedAtUtc);
+            UpdatedAtUtc: p.UpdatedAtUtc,
+            RelatedTreatmentId: p.TreatmentId);
 }
 
 internal sealed class LabResultTimelineSource(IReadRepository<LabResult> repository)
