@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 var cmd = args.Length > 0 ? args[0].Trim().ToLowerInvariant() : "help";
 
@@ -67,7 +68,12 @@ try
         case "seed-dev-sample-data":
             {
                 var summary = await DevSampleDataSeeder.SeedAsync(
-                    db, sp.GetRequiredService<IOutboxBuffer>(), sp.GetRequiredService<IHostEnvironment>(), logger, CancellationToken.None);
+                    db,
+                    sp.GetRequiredService<IOutboxBuffer>(),
+                    sp.GetRequiredService<IOptions<PaymentProjectionOptions>>(),
+                    sp.GetRequiredService<IHostEnvironment>(),
+                    logger,
+                    CancellationToken.None);
                 logger.LogInformation("Dev sample data seed finished (ready: {Ready}).", summary is not null);
                 break;
             }

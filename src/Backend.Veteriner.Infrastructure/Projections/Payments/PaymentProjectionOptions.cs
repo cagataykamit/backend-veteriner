@@ -7,6 +7,13 @@ public sealed class PaymentProjectionOptions
     /// <summary>False ise hosted service hiç poll etmez (processor manuel çağrılabilir kalır).</summary>
     public bool Enabled { get; set; } = false;
 
+    /// <summary>
+    /// False ise payment integration event'leri outbox'a yazılmaz (doğrulama yine yapılır). Projeksiyon kullanılmayan
+    /// ortamda tablo boşuna büyümesin diye; okuma modeli sonradan backfill ile kurulur. Varsayılan true: ayarı olmayan
+    /// ortamda olay kaybolmaz. Açılış sırası: WriteEvents → backfill → Enabled (docs/cqrs).
+    /// </summary>
+    public bool WriteEvents { get; set; } = true;
+
     public int BatchSize { get; set; } = 50;
 
     public int LoopIntervalSeconds { get; set; } = 2;
