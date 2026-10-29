@@ -56,7 +56,7 @@ Yerelde üretmek için (derleme sonrası):
 dotnet ef migrations script --idempotent --project src/Backend.Veteriner.Infrastructure --startup-project src/Backend.Veteriner.Infrastructure --context AppDbContext --configuration Release --no-build --output AppDbContext.sql
 ```
 
-Araç sürümü: `dotnet-ef 9.0.9` (EF Core paketleriyle aynı). Tasarım zamanı fabrikaları veritabanına bağlanmaz.
+Araç sürümü: `dotnet-ef 10.0.14` (EF Core paketleriyle ve CI'daki `DOTNET_EF_VERSION` ile aynı). Tasarım zamanı fabrikaları veritabanına bağlanmaz.
 
 ## Kullanıcı yapılacaklar
 
