@@ -24,6 +24,7 @@ using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Prescriptions;
+using Backend.Veteriner.Domain.RecordHistory;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Users;
@@ -106,6 +107,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Examination> Examinations => Set<Examination>();
     public DbSet<ExaminationAddendum> ExaminationAddenda => Set<ExaminationAddendum>();
+    public DbSet<RecordChange> RecordChanges => Set<RecordChange>();
     public DbSet<Visit> Visits => Set<Visit>();
     public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
     public DbSet<VaccineDefinition> VaccineDefinitions => Set<VaccineDefinition>();
