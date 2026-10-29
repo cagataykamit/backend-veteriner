@@ -196,7 +196,7 @@ public sealed class DailyTransactionsReportTests
         var full = CashSummaryBuilder.Build(
             new DateOnly(2026, 10, 14), new DateOnly(2026, 10, 14),
             [Cash(false, "2026-10-14T07:00:00Z", 100m, PaymentMethod.Card, collectedBy: UserA)]);
-        var export = RegisterReportRunner.BuildFile(CashSummaryBuilder.ExportSpec, CashSummaryBuilder.ToExportRows(full), RegisterExportFormat.Csv, DateTime.UtcNow);
+        var export = RegisterReportRunner.BuildFile(CashSummaryBuilder.ExportSpec, CashSummaryBuilder.ToExportRows(full), RegisterExportFormat.Csv, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 1), DateTime.UtcNow);
 
         export.FileDownloadName.Should().MatchRegex(@"^kasa-ozeti-\d{8}\.csv$");
         var lines = Encoding.UTF8.GetString(export.Content).TrimEnd().Split("\r\n");

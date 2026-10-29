@@ -18,6 +18,10 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
+    <!-- Rapor PDF (REPORT-007). 6.2.4 MIT lisanslı son sürüm; 6.5.0 ve sonrası AGPL-3.0: yükseltmeyin (dependabot.yml ignore). -->
+    <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
+    <!-- PDFsharp geçişli 8.0.1 sürümü bilinen açık taşır (NU1902/NU1903); Infrastructure ile aynı sürüme sabitlenir. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
   <!-- Saat kaynağı kuralı (RS0030): DateTime.UtcNow yerine TimeProvider; önem derecesi .editorconfig'de. -->

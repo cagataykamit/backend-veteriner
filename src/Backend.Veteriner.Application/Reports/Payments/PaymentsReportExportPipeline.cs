@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Payments.ReadModels;
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -16,7 +17,7 @@ using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Reports.Payments;
 
-/// <summary>CSV ve XLSX export için ortak doğrulama + satır yükleme.</summary>
+/// <summary>CSV, XLSX ve PDF export için ortak doğrulama + satır yükleme.</summary>
 internal static class PaymentsReportExportPipeline
 {
     public sealed record Loaded(IReadOnlyList<PaymentReportItemDto> Items, DateTime FromUtc, DateTime ToUtc);
@@ -42,6 +43,7 @@ internal static class PaymentsReportExportPipeline
         IPetReadModelLookupReader petLookupReader,
         IPaymentsReportExportReadModelReader exportReadModelReader,
         ITrialLimitPolicy trialLimitPolicy,
+        RegisterExportFormat format,
         CancellationToken ct)
     {
         var validated = await PaymentsReportQueryValidation.ValidateAsync(
@@ -57,8 +59,8 @@ internal static class PaymentsReportExportPipeline
 
         var (tenantId, effectiveClinicId, accessibleClinicIds, validatedFrom, validatedTo) = validated.Value;
 
-        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
-        var rowLimit = await trialLimitPolicy.GetExportRowLimitAsync(tenantId, ct);
+        // Satır tavanı kiracıya ve biçime göre (TRIAL-004, REPORT-007): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows, PDF en çok MaxPdfExportRows.
+        var rowLimit = (await trialLimitPolicy.GetExportRowLimitAsync(tenantId, ct)).ForFormat(format);
 
         // CQRS-15J + 15N: payment export Query DB routing (PaymentReadModels).
         // Flag açık + scope represent edilebiliyorsa (tek klinik veya tenant-wide) Query DB'den okunur (search boş veya dolu).

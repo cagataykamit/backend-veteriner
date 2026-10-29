@@ -12,6 +12,7 @@ using Backend.Veteriner.Application.Reports.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Payments.Queries.ExportPaymentReport;
 using Backend.Veteriner.Application.Reports.Payments.Queries.GetPaymentReport;
 using Backend.Veteriner.Application.Reports.Payments.ReadModels;
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -617,6 +618,7 @@ public sealed class PaymentsReportExportReadRoutingTests
             _petLookupReader.Object,
             _exportReader.Object,
             TrialLimitPolicyStub.Paid,
+            RegisterExportFormat.Csv,
             CancellationToken.None);
 
         _clients.Verify(
@@ -656,6 +658,7 @@ public sealed class PaymentsReportExportReadRoutingTests
             _petLookupReader.Object,
             _exportReader.Object,
             TrialLimitPolicyStub.Paid,
+            RegisterExportFormat.Csv,
             CancellationToken.None);
 
         _clients.Verify(

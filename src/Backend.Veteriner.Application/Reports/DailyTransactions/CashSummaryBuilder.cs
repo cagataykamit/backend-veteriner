@@ -25,7 +25,8 @@ internal static class CashSummaryBuilder
         RegisterColumn<CashSummaryExportRow>.Money(null, "Net", r => r.Net),
     ],
     "Kasa Ozeti",
-    "kasa-ozeti");
+    "kasa-ozeti",
+    "Kasa Özeti");
 
     public static CashSummaryReportDto Build(DateOnly from, DateOnly to, IReadOnlyList<CashEventRow> rows)
     {

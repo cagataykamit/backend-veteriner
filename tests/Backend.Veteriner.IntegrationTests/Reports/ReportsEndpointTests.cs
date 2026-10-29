@@ -8,6 +8,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.Reports;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Auth;
@@ -215,6 +216,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
 
         var csv = await client.GetAsync($"/api/v1/reports/payments/export{Query(from, to)}");
         var xlsx = await client.GetAsync($"/api/v1/reports/payments/export-xlsx{Query(from, to)}");
+        var pdf = await client.GetAsync($"/api/v1/reports/payments/export-pdf{Query(from, to)}");
 
         csv.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var problem = await csv.Content.ReadFromJsonAsync<JsonElement>();
@@ -223,6 +225,46 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
             "Deneme sürümünde dışa aktarma en fazla 1000 satır sınırı; abonelikle kalkar. Filtreyi daraltın.");
         xlsx.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         (await ReadProblemCodeAsync(xlsx)).Should().Be("Trial.ExportLimitExceeded");
+        pdf.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await ReadProblemCodeAsync(pdf)).Should().Be("Trial.ExportLimitExceeded");
+    }
+
+    [Fact]
+    public async Task GetPaymentsExportPdf_Should_Return200_Pdf_With_Embedded_Font()
+    {
+        // REPORT-007: gerçek PDF (application/pdf, %PDF imzası, gömülü yazı tipi), dosya adı CSV ile aynı kalıp.
+        var client = _factory.CreateClient();
+        var ctx = await SeedTenantWithSinglePaymentAsync(new DateTime(2026, 8, 5, 10, 0, 0, DateTimeKind.Utc));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        var from = new DateTime(2026, 7, 31, 21, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 8, 31, 20, 59, 59, DateTimeKind.Utc);
+
+        var response = await client.GetAsync($"/api/v1/reports/payments/export-pdf{Query(from, to)}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/pdf");
+        response.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^tahsilat-raporu-\d{8}-\d{8}\.pdf$");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Encoding.ASCII.GetString(bytes.AsSpan(0, 5)).Should().Be("%PDF-");
+        Encoding.ASCII.GetString(bytes).Should().Contain("/FontFile2");
+    }
+
+    [Fact]
+    public async Task GetPaymentsExportPdf_Should_Return400_When_PaidTenant_Exceeds_PdfRowCap()
+    {
+        // PDF tavanı (ReportsSharedLimits.MaxPdfExportRows = 5.000) ücretli kiracıda da geçerli; CSV aynı veride 200 döner.
+        var client = _factory.CreateClient();
+        var ctx = await SeedTenantWithManyPaymentsAsync(ReportsSharedLimits.MaxPdfExportRows + 1, new DateTime(2027, 1, 5, 10, 0, 0, DateTimeKind.Utc), paidPlan: true);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+        var from = new DateTime(2027, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2027, 1, 31, 23, 59, 59, DateTimeKind.Utc);
+
+        var pdf = await client.GetAsync($"/api/v1/reports/payments/export-pdf{Query(from, to)}");
+        var csv = await client.GetAsync($"/api/v1/reports/payments/export{Query(from, to)}");
+
+        pdf.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(pdf)).Should().Be("Payments.ReportExportTooManyRows");
+        csv.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]

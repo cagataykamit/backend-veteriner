@@ -1,12 +1,13 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.OutstandingBalances.Contracts.Dtos;
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Reports.OutstandingBalances;
 
-/// <summary>CSV ve XLSX export için ortak doğrulama + satır yükleme (JSON ile aynı okuyucu ve sıralama).</summary>
+/// <summary>CSV, XLSX ve PDF export için ortak doğrulama + satır yükleme (JSON ile aynı okuyucu ve sıralama).</summary>
 internal static class OutstandingBalancesReportExportPipeline
 {
     public static async Task<Result<IReadOnlyList<OutstandingBalanceItemDto>>> LoadAsync(
@@ -18,6 +19,7 @@ internal static class OutstandingBalancesReportExportPipeline
         decimal? minAmount,
         string? search,
         ITrialLimitPolicy trialLimitPolicy,
+        RegisterExportFormat format,
         CancellationToken ct)
     {
         var filter = await OutstandingBalancesReportFilter.ResolveAsync(
@@ -25,8 +27,8 @@ internal static class OutstandingBalancesReportExportPipeline
         if (!filter.IsSuccess)
             return Result<IReadOnlyList<OutstandingBalanceItemDto>>.Failure(filter.Error);
 
-        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
-        var rowLimit = await trialLimitPolicy.GetExportRowLimitAsync(filter.Value!.TenantId, ct);
+        // Satır tavanı kiracıya ve biçime göre (TRIAL-004, REPORT-007): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows, PDF en çok MaxPdfExportRows.
+        var rowLimit = (await trialLimitPolicy.GetExportRowLimitAsync(filter.Value!.TenantId, ct)).ForFormat(format);
         var read = await reader.ReadAsync(filter.Value.ToReadRequest(0, rowLimit.MaxRows), ct);
 
         var withinLimit = rowLimit.Ensure(read.TotalCount, "OutstandingBalances.ReportExportTooManyRows");

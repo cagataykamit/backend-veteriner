@@ -12,7 +12,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-001 madde 5 (trial hesab�
 |---|---|
 | K1 | Kısıtlar yalnız **deneme** kiracısında geçerlidir. Deneme = abonelik kaydının saklanan durumu `Trialing`. Süresi bitmiş deneme (etkin durum `ReadOnly`, yazma zaten kapalı) da ücretli değildir; okuma/dışa aktarma kısıtı sürer. Kısıt **abonelikle kalkar** (`ActivatePaidPlan` → `Active`). Abonelik kaydı olmayan kiracı güvenli taraf olarak kısıtlı sayılır. |
 | K2 | **Hatırlatma e-postası:** kiracı başına **UTC gün** içinde en fazla **20** e-posta kuyruğa alınır. Fazlası gönderilmez; dispatch log'a `Skipped` + neden `TrialDailyLimit` yazılır. |
-| K3 | **Rapor dışa aktarımı (CSV/XLSX):** eşleşen satır **> 1.000** ise `422 Trial.ExportLimitExceeded`. Ücretli kiracıda tavan `ReportsSharedLimits.MaxExportRows` (50.000) ve modülün kendi `*.ExportTooManyRows` kodu değişmeden kalır. |
+| K3 | **Rapor dışa aktarımı (CSV/XLSX/PDF):** eşleşen satır **> 1.000** ise `422 Trial.ExportLimitExceeded` (PDF REPORT-007 ile eklendi, aynı kural; `REPORT_PDF_EXPORT_API_CONTRACT.md`). Ücretli kiracıda tavan `ReportsSharedLimits.MaxExportRows` (50.000) ve modülün kendi `*.ExportTooManyRows` kodu değişmeden kalır. |
 | K4 | **İçe aktarma:** dosyada **tablo başına > 500** veri satırı ise `422 Trial.ImportLimitExceeded` (parti oluşturulmaz). Ücretli kiracıda `Imports:Limits.MaxRowsPerTable` (10.000) ve `Imports.TooManyRows` (400) değişmez. Parti toplamı (25.000) ve diğer tavanlar her kiracıda aynıdır. |
 | K5 | HBS/e-belge ve ödeme sağlayıcı entegrasyonları üründe yok; kısıt gerekmez. SMS yok. |
 | K6 | Kısıt kullanıcıya **açık** gösterilir: `code` `Trial.` önekli, `detail` "Deneme sürümünde … sınırı; abonelikle kalkar" biçiminde. |
@@ -28,7 +28,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-001 madde 5 (trial hesab�
 
 ### 3.1 Rapor dışa aktarımı — `Trial.ExportLimitExceeded` (422)
 
-Tüm CSV/XLSX export uçları; JSON/sayfalı uçlar etkilenmez.
+Tüm CSV/XLSX/PDF export uçları (`/export`, `/export-xlsx`, `/export-pdf`); JSON/sayfalı uçlar etkilenmez. PDF ücretli kiracıda ayrıca 5.000 satırla sınırlıdır (`ExportRowLimit.ForFormat`).
 
 | Uç | Ücretli kod (değişmedi, 400) |
 |---|---|
@@ -74,6 +74,7 @@ Arka plan işleyicisi; API yanıtı yoktur. Görünürlük `GET /reminders/logs`
 |---|---|---|---|---|
 | Hatırlatma e-postası / UTC gün / kiracı | 20 | sınırsız | log `TrialDailyLimit` | — |
 | Export satır (CSV/XLSX) | 1.000 | 50.000 | `Trial.ExportLimitExceeded` | 422 |
+| Export satır (PDF) | 1.000 | 5.000 | `Trial.ExportLimitExceeded` | 422 |
 | İçe aktarma tablo başına satır | 500 | 10.000 (`Imports:Limits`) | `Trial.ImportLimitExceeded` | 422 |
 
 ## 5) Frontend etkisi

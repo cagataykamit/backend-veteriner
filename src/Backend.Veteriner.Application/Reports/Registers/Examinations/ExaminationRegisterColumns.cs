@@ -1,7 +1,7 @@
 namespace Backend.Veteriner.Application.Reports.Registers.Examinations;
 
 /// <summary>
-/// Muayene defteri sütunlarının tek tanımı (CSV ve XLSX bunu okur). Resmî biçim doğrulandığında yalnız bu liste güncellenir.
+/// Muayene defteri sütunlarının tek tanımı (CSV, XLSX ve PDF bunu okur). Resmî biçim doğrulandığında yalnız bu liste güncellenir.
 /// </summary>
 internal static class ExaminationRegisterColumns
 {
@@ -28,6 +28,10 @@ internal static class ExaminationRegisterColumns
         RegisterColumn<ExaminationRegisterItemDto>.Text(null, "Tedavi Şekli, Reçete Bilgileri, Satışa Eklenen İlaçlar", FormatTreatmentCell),
         RegisterColumn<ExaminationRegisterItemDto>.Text(null, "Veteriner Hekimin Adı Soyadı", r => r.VeterinarianName),
     ];
+
+    /// <summary>PDF dışa aktarma tanımı (CSV/XLSX işleyicileri sütunları doğrudan kullanır).</summary>
+    public static readonly RegisterExportSpec<ExaminationRegisterItemDto> Export =
+        new(All, "Muayene Defteri", "muayene-defteri", "Hayvan Muayene Kayıt Defteri");
 
     /// <summary>Tek hücre: tedaviler, <c>Reçete: ...</c>, <c>Satış: ...</c>; boş bölümler atlanır, bölümler ve kayıtlar <c>; </c> ile ayrılır.</summary>
     private static string FormatTreatmentCell(ExaminationRegisterItemDto r)

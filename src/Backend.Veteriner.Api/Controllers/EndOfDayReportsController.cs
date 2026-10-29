@@ -97,6 +97,25 @@ public sealed class EndOfDayReportsController : ControllerBase
             new ExportDailyTransactionsReportQuery(from, to, clinicId, kind, paymentMethod, performedByUserId, RegisterExportFormat.Xlsx),
             ReportFileContentTypes.Xlsx, ct);
 
+    /// <summary>Günlük işlem dökümü PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("daily-transactions/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Payments.Read)]
+    [Authorize(Policy = PermissionCatalog.Charges.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportDailyTransactionsPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] DailyTransactionKind? kind = null,
+        [FromQuery] PaymentMethod? paymentMethod = null,
+        [FromQuery] Guid? performedByUserId = null,
+        CancellationToken ct = default)
+        => SendExportAsync(
+            new ExportDailyTransactionsReportQuery(from, to, clinicId, kind, paymentMethod, performedByUserId, RegisterExportFormat.Pdf),
+            ReportFileContentTypes.Pdf, ct);
+
     /// <summary>Tahsilat/kasa özeti: ödeme türüne göre toplam, iptal edilen tahsilatlar, günlük ve kullanıcı kırılımı.</summary>
     [HttpGet("cash-summary")]
     [Authorize(Policy = PermissionCatalog.Payments.Read)]
@@ -141,6 +160,19 @@ public sealed class EndOfDayReportsController : ControllerBase
         [FromQuery] Guid? clinicId = null,
         CancellationToken ct = default)
         => SendExportAsync(new ExportCashSummaryReportQuery(from, to, clinicId, RegisterExportFormat.Xlsx), ReportFileContentTypes.Xlsx, ct);
+
+    /// <summary>Kasa özeti PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; özet satırları olduğu için satır tavanı yok.</summary>
+    [HttpGet("cash-summary/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Payments.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportCashSummaryPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        CancellationToken ct = default)
+        => SendExportAsync(new ExportCashSummaryReportQuery(from, to, clinicId, RegisterExportFormat.Pdf), ReportFileContentTypes.Pdf, ct);
 
     /// <summary>Gün sonu açık işler (tek klinik): ücretsiz ziyaret, ödeme bekleyen, bekleyen lab, tamamlanmamış geliş. Hesap <c>IVisitOpenItemsReader</c>'dadır.</summary>
     [HttpGet("end-of-day/open-items")]

@@ -12,7 +12,7 @@ public static class TrialLimits
     /// <summary>Kiracı başına, UTC gün içinde gönderilen (kuyruğa alınan) hatırlatma e-postası tavanı.</summary>
     public const int ReminderEmailsPerDay = 20;
 
-    /// <summary>CSV/XLSX rapor dışa aktarımında satır tavanı (ücretlide <c>ReportsSharedLimits.MaxExportRows</c>).</summary>
+    /// <summary>CSV/XLSX/PDF rapor dışa aktarımında satır tavanı (ücretlide <c>ReportsSharedLimits.MaxExportRows</c>; PDF'te <c>MaxPdfExportRows</c>).</summary>
     public const int ExportMaxRows = 1_000;
 
     /// <summary>İçe aktarma dosyasında tablo başına veri satırı tavanı (ücretlide <c>ImportFileLimits.MaxRowsPerTable</c>).</summary>

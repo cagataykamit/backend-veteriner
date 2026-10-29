@@ -21,5 +21,5 @@ internal static class VaccineRegisterColumns
         RegisterColumn<VaccineRegisterItemDto>.Text(null, "Fatura No", r => r.InvoiceNumber),
     ];
 
-    public static readonly RegisterExportSpec<VaccineRegisterItemDto> Export = new(All, "Aşı Kayıt Defteri", "asi-kayit-defteri");
+    public static readonly RegisterExportSpec<VaccineRegisterItemDto> Export = new(All, "Aşı Kayıt Defteri", "asi-kayit-defteri", "Aşı Kayıt Defteri");
 }

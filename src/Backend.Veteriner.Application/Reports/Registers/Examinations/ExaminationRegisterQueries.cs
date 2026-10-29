@@ -24,6 +24,12 @@ public sealed record ExportExaminationRegisterXlsxQuery(
     Guid? ClinicId,
     bool IncludeVoided) : IRequest<Result<RegisterExportResult>>;
 
+public sealed record ExportExaminationRegisterPdfQuery(
+    DateOnly From,
+    DateOnly To,
+    Guid? ClinicId,
+    bool IncludeVoided) : IRequest<Result<RegisterExportResult>>;
+
 public sealed class GetExaminationRegisterQueryHandler
     : IRequestHandler<GetExaminationRegisterQuery, Result<RegisterReadResult<ExaminationRegisterItemDto>>>
 {
@@ -64,7 +70,7 @@ public sealed class ExportExaminationRegisterQueryHandler
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportExaminationRegisterQuery request, CancellationToken ct)
     {
         var loaded = await _runner.LoadForExportAsync(
-            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, request.IncludeVoided), ct);
+            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, request.IncludeVoided), RegisterExportFormat.Csv, ct);
         if (!loaded.IsSuccess)
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
@@ -93,7 +99,7 @@ public sealed class ExportExaminationRegisterXlsxQueryHandler
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportExaminationRegisterXlsxQuery request, CancellationToken ct)
     {
         var loaded = await _runner.LoadForExportAsync(
-            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, request.IncludeVoided), ct);
+            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, request.IncludeVoided), RegisterExportFormat.Xlsx, ct);
         if (!loaded.IsSuccess)
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
@@ -101,4 +107,25 @@ public sealed class ExportExaminationRegisterXlsxQueryHandler
             RegisterXlsxWriter.WriteWorkbook(SheetName, ExaminationRegisterColumns.All, loaded.Value!),
             $"muayene-defteri-{RegisterReportRunner.FileDateStamp(_timeProvider.GetUtcNow().UtcDateTime)}.xlsx"));
     }
+}
+
+public sealed class ExportExaminationRegisterPdfQueryHandler
+    : IRequestHandler<ExportExaminationRegisterPdfQuery, Result<RegisterExportResult>>
+{
+    private readonly RegisterReportRunner _runner;
+    private readonly IRegisterReader<ExaminationRegisterItemDto> _reader;
+
+    public ExportExaminationRegisterPdfQueryHandler(RegisterReportRunner runner, IRegisterReader<ExaminationRegisterItemDto> reader)
+    {
+        _runner = runner;
+        _reader = reader;
+    }
+
+    public ValueTask<Result<RegisterExportResult>> Handle(ExportExaminationRegisterPdfQuery request, CancellationToken ct)
+        => new(_runner.ExportAsync(
+            _reader,
+            new RegisterQuery(request.From, request.To, request.ClinicId, request.IncludeVoided),
+            RegisterExportFormat.Pdf,
+            ExaminationRegisterColumns.Export,
+            ct));
 }

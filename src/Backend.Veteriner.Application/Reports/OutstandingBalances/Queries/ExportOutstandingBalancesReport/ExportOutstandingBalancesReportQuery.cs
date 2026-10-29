@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
 
@@ -12,6 +13,11 @@ public sealed record ExportOutstandingBalancesReportXlsxQuery(
     Guid? ClinicId,
     decimal? MinAmount,
     string? Search) : IRequest<Result<OutstandingBalancesXlsxExportResult>>;
+
+public sealed record ExportOutstandingBalancesReportPdfQuery(
+    Guid? ClinicId,
+    decimal? MinAmount,
+    string? Search) : IRequest<Result<RegisterExportResult>>;
 
 /// <summary>CSV bytes (UTF-8 BOM) + dosya adı.</summary>
 public sealed record OutstandingBalancesCsvExportResult(byte[] ContentUtf8Bom, string FileDownloadName);

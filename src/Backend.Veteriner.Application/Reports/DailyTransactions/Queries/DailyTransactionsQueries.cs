@@ -102,8 +102,8 @@ public sealed class ExportDailyTransactionsReportQueryHandler
         if (!filter.IsSuccess)
             return Result<RegisterExportResult>.Failure(filter.Error);
 
-        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
-        var rowLimit = await _trialLimitPolicy.GetExportRowLimitAsync(filter.Value!.TenantId, ct);
+        // Satır tavanı kiracıya ve biçime göre (TRIAL-004, REPORT-007): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows, PDF en çok MaxPdfExportRows.
+        var rowLimit = (await _trialLimitPolicy.GetExportRowLimitAsync(filter.Value!.TenantId, ct)).ForFormat(request.Format);
         var read = await _reader.ReadAsync(filter.Value, 0, rowLimit.MaxRows, ct);
         var withinLimit = rowLimit.Ensure(read.TotalCount, "Registers.ExportTooManyRows");
         if (!withinLimit.IsSuccess)
@@ -111,6 +111,6 @@ public sealed class ExportDailyTransactionsReportQueryHandler
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         return Result<RegisterExportResult>.Success(
-            RegisterReportRunner.BuildFile(DailyTransactionsReportColumns.Export, read.Items, request.Format, utcNow));
+            RegisterReportRunner.BuildFile(DailyTransactionsReportColumns.Export, read.Items, request.Format, request.From, request.To, utcNow));
     }
 }

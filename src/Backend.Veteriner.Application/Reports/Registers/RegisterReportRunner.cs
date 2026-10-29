@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Reports.Pdf;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Shared;
 
@@ -53,14 +54,15 @@ public sealed class RegisterReportRunner
     public async Task<Result<IReadOnlyList<TRow>>> LoadForExportAsync<TRow>(
         IRegisterReader<TRow> reader,
         RegisterQuery query,
+        RegisterExportFormat format,
         CancellationToken ct)
     {
         var filter = await RegisterReportFilter.ResolveAsync(_tenantContext, _clinicContext, _scopeResolver, query, ct);
         if (!filter.IsSuccess)
             return Result<IReadOnlyList<TRow>>.Failure(filter.Error);
 
-        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
-        var rowLimit = await _trialLimitPolicy.GetExportRowLimitAsync(filter.Value!.TenantId, ct);
+        // Satır tavanı kiracıya ve biçime göre (TRIAL-004, REPORT-007): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows, PDF en çok MaxPdfExportRows.
+        var rowLimit = (await _trialLimitPolicy.GetExportRowLimitAsync(filter.Value!.TenantId, ct)).ForFormat(format);
         var read = await reader.ReadAsync(filter.Value.ToReadRequest(0, rowLimit.MaxRows), ct);
 
         var withinLimit = rowLimit.Ensure(read.TotalCount, "Registers.ExportTooManyRows");
@@ -78,21 +80,36 @@ public sealed class RegisterReportRunner
         RegisterExportSpec<TRow> spec,
         CancellationToken ct)
     {
-        var loaded = await LoadForExportAsync(reader, query, ct);
+        var loaded = await LoadForExportAsync(reader, query, format, ct);
         if (!loaded.IsSuccess)
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-        return Result<RegisterExportResult>.Success(BuildFile(spec, loaded.Value!, format, utcNow));
+        return Result<RegisterExportResult>.Success(BuildFile(spec, loaded.Value!, format, query.From, query.To, utcNow));
     }
 
-    /// <summary>Hazır satırlardan seçilen biçimde dosya üretir (dosya adı: önek + İstanbul tarihi).</summary>
-    public static RegisterExportResult BuildFile<TRow>(RegisterExportSpec<TRow> spec, IReadOnlyList<TRow> rows, RegisterExportFormat format, DateTime utcNow)
+    /// <summary>
+    /// Hazır satırlardan seçilen biçimde dosya üretir (dosya adı: önek + İstanbul tarihi). <paramref name="from"/>/<paramref name="to"/>
+    /// yalnız PDF başlığındaki dönem içindir.
+    /// </summary>
+    public static RegisterExportResult BuildFile<TRow>(
+        RegisterExportSpec<TRow> spec,
+        IReadOnlyList<TRow> rows,
+        RegisterExportFormat format,
+        DateOnly from,
+        DateOnly to,
+        DateTime utcNow)
     {
         var stamp = FileDateStamp(utcNow);
-        return format == RegisterExportFormat.Csv
-            ? new RegisterExportResult(RegisterCsvWriter.WriteUtf8Bom(spec.Columns, rows), $"{spec.FileBaseName}-{stamp}.csv")
-            : new RegisterExportResult(RegisterXlsxWriter.WriteWorkbook(spec.SheetName, spec.Columns, rows), $"{spec.FileBaseName}-{stamp}.xlsx");
+        return format switch
+        {
+            RegisterExportFormat.Csv => new RegisterExportResult(RegisterCsvWriter.WriteUtf8Bom(spec.Columns, rows), $"{spec.FileBaseName}-{stamp}.csv"),
+            RegisterExportFormat.Xlsx => new RegisterExportResult(
+                RegisterXlsxWriter.WriteWorkbook(spec.SheetName, spec.Columns, rows), $"{spec.FileBaseName}-{stamp}.xlsx"),
+            _ => new RegisterExportResult(
+                ReportPdfWriter.Write(new ReportPdfHeader(spec.Title, ReportPdfHeader.PeriodText(from, to), utcNow), spec.Columns, rows),
+                $"{spec.FileBaseName}-{stamp}.pdf"),
+        };
     }
 
     /// <summary>Dosya adındaki İstanbul takvim günü.</summary>

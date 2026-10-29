@@ -417,7 +417,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
         // Başka kiracının ürün filtresi hata vermez, satır da getirmez.
         (await one.GetAsync<VaccineInfoRegisterItemDto>(VaccineInfo, $"&productId={vaccineTwo}")).TotalCount.Should().Be(0);
 
-        foreach (var suffix in new[] { "", "/export", "/export-xlsx" })
+        foreach (var suffix in new[] { "", "/export", "/export-xlsx", "/export-pdf" })
         {
             foreach (var url in new[] { Vaccines, Medications, Controlled, VaccineInfo })
             {
@@ -442,7 +442,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
             [PermissionCatalog.Administrations.Read, PermissionCatalog.Vaccinations.Read, PermissionCatalog.Products.Read]);
         var query = $"?from={Day}&to={Day}";
 
-        foreach (var suffix in new[] { "", "/export", "/export-xlsx" })
+        foreach (var suffix in new[] { "", "/export", "/export-xlsx", "/export-pdf" })
         {
             foreach (var url in new[] { Vaccines, Medications, Controlled, VaccineInfo })
                 (await anonymous.GetAsync($"{url}{suffix}{query}")).StatusCode.Should().Be(HttpStatusCode.Unauthorized, url);
@@ -471,7 +471,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
     {
         var env = await SeedTenantAsync();
 
-        foreach (var suffix in new[] { "", "/export", "/export-xlsx" })
+        foreach (var suffix in new[] { "", "/export", "/export-xlsx", "/export-pdf" })
         {
             foreach (var url in new[] { Vaccines, Medications, Controlled, VaccineInfo })
             {
@@ -491,7 +491,7 @@ public sealed class BatchRegistersIntegrationTests : IClassFixture<CustomWebAppl
 
     private static string[] AllUrls()
         => new[] { Vaccines, Medications, Controlled, VaccineInfo }
-            .SelectMany(u => new[] { u, $"{u}/export", $"{u}/export-xlsx" }).ToArray();
+            .SelectMany(u => new[] { u, $"{u}/export", $"{u}/export-xlsx", $"{u}/export-pdf" }).ToArray();
 
     // ---- Kurulum ----
 

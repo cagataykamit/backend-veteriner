@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Reports;
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Tenants;
@@ -28,6 +29,13 @@ public sealed record ExportRowLimit(int MaxRows, bool IsTrial)
     public static ExportRowLimit Trial { get; } = new(TrialLimits.ExportMaxRows, IsTrial: true);
 
     public static ExportRowLimit For(bool isTrial) => isTrial ? Trial : Paid;
+
+    /// <summary>
+    /// Biçime göre tavan: PDF'te <see cref="ReportsSharedLimits.MaxPdfExportRows"/> ile sınırlanır (küçük olan geçerli);
+    /// deneme kiracısı yine <c>Trial.ExportLimitExceeded</c> alır. CSV/XLSX değişmez.
+    /// </summary>
+    public ExportRowLimit ForFormat(RegisterExportFormat format)
+        => format == RegisterExportFormat.Pdf ? this with { MaxRows = Math.Min(MaxRows, ReportsSharedLimits.MaxPdfExportRows) } : this;
 
     /// <summary>Eşleşen satır sayısı tavanı aşıyorsa hata; <paramref name="paidErrorCode"/> yalnız ücretli kiracıda kullanılır.</summary>
     public Result Ensure(long totalRows, string paidErrorCode)

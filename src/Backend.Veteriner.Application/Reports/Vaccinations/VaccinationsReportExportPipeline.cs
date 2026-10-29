@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Vaccinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.Vaccinations.Specs;
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -31,6 +32,7 @@ internal static class VaccinationsReportExportPipeline
         VaccinationStatus? status,
         string? search,
         ITrialLimitPolicy trialLimitPolicy,
+        RegisterExportFormat format,
         CancellationToken ct)
     {
         var validated = await VaccinationsReportQueryValidation.ValidateAsync(
@@ -80,8 +82,8 @@ internal static class VaccinationsReportExportPipeline
                 accessibleClinicIds),
             ct);
 
-        // Satır tavanı kiracıya göre (TRIAL-004): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows.
-        var rowLimit = await trialLimitPolicy.GetExportRowLimitAsync(tenantId, ct);
+        // Satır tavanı kiracıya ve biçime göre (TRIAL-004, REPORT-007): deneme 1.000, ücretli ReportsSharedLimits.MaxExportRows, PDF en çok MaxPdfExportRows.
+        var rowLimit = (await trialLimitPolicy.GetExportRowLimitAsync(tenantId, ct)).ForFormat(format);
         var withinLimit = rowLimit.Ensure(total, "Vaccinations.ReportExportTooManyRows");
         if (!withinLimit.IsSuccess)
             return Result<Loaded>.Failure(withinLimit.Error);
