@@ -12,6 +12,8 @@ Hata zarfı (`ProblemDetails`, `extensions.code`, validation vs. iş kuralı ayr
 | `password` | Evet | |
 | `tenantId` | İsteğe bağlı | Nihai model: kullanıcı **tek kiracılı** (`UserTenants.UserId` benzersiz). Gövdede yok/aynı kiracı kabul; farklı GUID `Auth.TenantMismatch`. Veride birden fazla kiracı üyeliği kalmışsa `Auth.UserMultipleTenantsForbidden`. |
 
+**Hesap kilidi (SEC-001):** art arda 5 yanlış parola hesabı 15 dakika kilitler (kural `SignInLockout`; hasta sahibi portalıyla aynı). Kilitli hesap doğru parolayla da, olmayan hesap ve yanlış parola gibi `401 Auth.Unauthorized.InvalidCredentials` alır; üç durumda da parola özeti doğrulandığından yanıt süresi hesabın varlığını ele vermez. Başarılı giriş ve parola değişikliği/sıfırlama sayacı ve kilidi temizler. Kilitlenme `AuditLogs`'a `Auth.Login.LockedOut` olarak yazılır. IP başına `login` hız sınırı (5/dk) ayrıca geçerlidir.
+
 Sunucu `UserTenant` üzerinden üyeliği doğrular. Üyelik yoksa `Auth.TenantMembershipRequired`; üyelik var ama token kiracısı doğrulanamazsa `Auth.TenantNotMember`.
 
 Başarılı yanıtta: `accessToken`, `refreshToken`, `expiresAt`, `resolvedTenantId`, login cevabında `tenantMembershipCount` her zaman `1` (tek kiracı). Refresh/select-clinic yanıtlarında `tenantMembershipCount` genelde `null`; `resolvedTenantId` oturum kiracısıdır.
