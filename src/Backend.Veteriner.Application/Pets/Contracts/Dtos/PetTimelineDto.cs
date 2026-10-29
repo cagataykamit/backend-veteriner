@@ -8,6 +8,7 @@ public sealed record PetTimelineLinkRefDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] PetRecordKind Type,
     Guid Id);
 
+/// <param name="RelatedTreatmentId">Reçete ve uygulamanın bağlı tedavisi (yoksa null); diğer türlerde her zaman null.</param>
 public sealed record PetTimelineItemDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] PetRecordKind Type,
     Guid SourceId,
@@ -23,7 +24,8 @@ public sealed record PetTimelineItemDto(
     Guid? RelatedVisitId,
     Guid? RelatedAppointmentId,
     DateTime? UpdatedAtUtc,
-    bool AddedAfterFinalization);
+    bool AddedAfterFinalization,
+    Guid? RelatedTreatmentId);
 
 /// <param name="NextCursor">Opak; null ise sayfa sonu.</param>
 /// <param name="OmittedTypes">Yetki yok nedeniyle sorguya girmeyen türler (boş sonuçtan ayırt etmek için).</param>

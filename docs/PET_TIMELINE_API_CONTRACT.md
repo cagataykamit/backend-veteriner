@@ -108,7 +108,8 @@ Yanıt (`200`):
       "relatedVisitId": null,
       "relatedAppointmentId": "…",
       "addedAfterFinalization": false,
-      "updatedAtUtc": null
+      "updatedAtUtc": null,
+      "relatedTreatmentId": null
     }
   ],
   "nextCursor": "opak-metin-veya-null",
@@ -128,6 +129,7 @@ Alanlar:
 - `relatedExaminationId`: Treatment/Prescription/LabResult/Hospitalization/Vaccination için bağlı muayene (yoksa `null`); Examination satırında `null`. **Visit satırında** gelişe bağlı muayene (`Examination.VisitId`): birden fazla muayene bağlıysa **en yenisi** (`ExaminedAtUtc` DESC, eşitse `Id` DESC); bağlı muayene yoksa `null`. Muayene bağı klinik kapsamına uyar (kapsam dışı klinikteki muayene sayılmaz). Kullanıcıda `Examinations.Read` yoksa Visit satırında **her zaman `null`** döner (izin süzmesiyle tutarlı; muayene kimliği sızmaz). Doldurma `types` süzgecinden bağımsızdır (`types=Visit` ile de gelir). Gelişin tüm muayeneleri için istemci `relatedVisitId` ile Examination satırlarını gruplar.
 - `relatedVisitId`: yalnız Examination; muayenenin bağlı olduğu geliş (`Examination.VisitId`, yoksa `null`). Muayeneleri geliş altında gruplamak istemcidedir.
 - `relatedAppointmentId`: yalnız Visit; randevulu gelişte randevu kimliği (randevu **ayrı satır olmaz**, Visit içine katlanır). Randevunun içeriği döndürülmez (`Appointments.Read` gerektirir).
+- `relatedTreatmentId` (Guid?, TIMELINE-004 ile eklendi, geriye uyumlu): yalnız Prescription ve Administration; kaydın bağlı olduğu tedavi (`TreatmentId`, yoksa `null`). Diğer türlerde her zaman `null`. `relatedExaminationId` gibi kimlik taşır, tedavinin içeriğini döndürmez (`Treatments.Read` ile `GET /treatments/{id}`). Muayeneye değil yalnız tedaviye bağlı uygulama ve reçetenin kaynağına giden tek bağdır.
 - `updatedAtUtc`: kayıt güncelleme tarihi (varsa); Visit için `null`.
 - **`Administration` (uygulama kaydı, ADR-013):** aşı kaydına bağlı uygulama (`vaccinationId` dolu) **bu türde gösterilmez**, olay `Vaccination` satırıdır (çift satır yok). `Administrations.Read` ister; izin yoksa `omittedTypes` içine düşer. `eventAtUtc` = `administeredAtUtc`; `title` = ürünün adı; `summary` = `"<miktar> <birim>"` (ör. `"1.5 şişe"`; serbest klinik metin değil); `status` = `Active` | `Voided`; `relatedExaminationId` = uygulamanın bağlı muayenesi (yoksa `null`); `linkRef` = `{ type: "Administration", id }`. İptal edilenler varsayılan gizli, `includeVoided=true` ile `isVoided=true` olarak gelir. Klinik kapsamı diğer türlerle aynıdır.
 - `addedAfterFinalization` (bool): yalnız `Administration` satırlarında anlamlıdır; bağlı muayene kayıt anında kesinleşmişse `true` ("Kesinleştirmeden sonra eklendi" rozeti). Diğer türlerde her zaman `false`. Gerekçe (`lateEntryReason`) timeline'a konmaz; `GET /administrations/{id}` ile alınır.

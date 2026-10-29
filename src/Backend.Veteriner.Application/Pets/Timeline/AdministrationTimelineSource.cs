@@ -54,7 +54,8 @@ internal sealed class AdministrationTimelineSource(
                 RelatedVisitId: null,
                 RelatedAppointmentId: null,
                 UpdatedAtUtc: null,
-                AddedAfterFinalization: a.AddedAfterFinalization);
+                AddedAfterFinalization: a.AddedAfterFinalization,
+                RelatedTreatmentId: a.TreatmentId);
         }).ToList();
     }
 }

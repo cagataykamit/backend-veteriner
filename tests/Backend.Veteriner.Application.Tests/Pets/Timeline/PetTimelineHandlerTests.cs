@@ -129,11 +129,11 @@ public sealed class PetTimelineHandlerTests
         return h;
     }
 
-    private Administration NewAdministration(DateTime at, bool lateEntry = false, bool voided = false, Product? product = null, Guid? examinationId = null)
+    private Administration NewAdministration(DateTime at, bool lateEntry = false, bool voided = false, Product? product = null, Guid? examinationId = null, Guid? treatmentId = null)
     {
         product ??= NewProduct();
         var a = Administration.Create(
-            _tenantId, _clinicId, _petId, examinationId, null, product.Id, 1.5m, at, null,
+            _tenantId, _clinicId, _petId, examinationId, treatmentId, product.Id, 1.5m, at, null,
             lateEntry, lateEntry ? "Muayene sonrası uygulandı" : null, Guid.NewGuid(), at, null).Value!;
         if (voided)
             a.Void(Guid.NewGuid(), "Yanlış ürün seçildi", AdministrationVoidStockOutcome.StockReturned, at.AddMinutes(1));
@@ -468,6 +468,24 @@ public sealed class PetTimelineHandlerTests
         item.EventAtUtc.Should().Be(T0);
         item.Status.Should().Be("Discharged");
         item.SourceId.Should().Be(h.Id);
+    }
+
+    [Fact]
+    public async Task Prescription_And_Administration_Rows_Carry_Related_Treatment_Other_Rows_Do_Not()
+    {
+        var treatment = NewTreatment(T0);
+        var rx = new Prescription(_tenantId, _clinicId, _petId, null, treatment.Id, T0.AddHours(1), "Antibiyotik", "Amoksisilin 2x1", null, null, DateTime.UtcNow);
+        _rx.Add(rx);
+        var administration = NewAdministration(T0.AddHours(2), treatmentId: treatment.Id);
+        var standalone = NewAdministration(T0.AddHours(3));
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        var items = result.Value!.Items;
+        items.Single(i => i.SourceId == rx.Id).RelatedTreatmentId.Should().Be(treatment.Id);
+        items.Single(i => i.SourceId == administration.Id).RelatedTreatmentId.Should().Be(treatment.Id);
+        items.Single(i => i.SourceId == standalone.Id).RelatedTreatmentId.Should().BeNull();
+        items.Single(i => i.SourceId == treatment.Id).RelatedTreatmentId.Should().BeNull();
     }
 
     [Fact]

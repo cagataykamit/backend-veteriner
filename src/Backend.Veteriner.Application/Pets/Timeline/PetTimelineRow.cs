@@ -16,7 +16,8 @@ public sealed record PetTimelineRow(
     Guid? RelatedVisitId,
     Guid? RelatedAppointmentId,
     DateTime? UpdatedAtUtc,
-    bool AddedAfterFinalization = false);
+    bool AddedAfterFinalization = false,
+    Guid? RelatedTreatmentId = null);
 
 /// <param name="Take">Kaynak başına en çok satır (sayfa boyutu + 1).</param>
 public sealed record PetTimelineSourceQuery(
