@@ -21,9 +21,6 @@ public sealed record PortalPasswordSignInCommand(string Email, string Password)
 
 public sealed class PortalPasswordSignInCommandHandler : IRequestHandler<PortalPasswordSignInCommand, Result<PortalAuthTokensDto>>
 {
-    private static readonly object DummyHashLock = new();
-    private static string? _dummyHash;
-
     private readonly IReadRepository<OwnerAccount> _accounts;
     private readonly IPasswordHasher _hasher;
     private readonly OwnerPortalSessionIssuer _sessions;
@@ -52,7 +49,7 @@ public sealed class PortalPasswordSignInCommandHandler : IRequestHandler<PortalP
 
         if (account is null || !account.HasPassword || !account.CanAttemptSignIn(utcNow))
         {
-            _hasher.Verify(request.Password, DummyHash());
+            _hasher.VerifyAgainstDummyHash(request.Password);
             if (account is not null && account.CanAttemptSignIn(utcNow))
             {
                 // Parolası olmayan hesapta parola denemesi de başarısız giriştir.
@@ -72,13 +69,5 @@ public sealed class PortalPasswordSignInCommandHandler : IRequestHandler<PortalP
 
         account.RecordSuccessfulSignIn(utcNow);
         return Result<PortalAuthTokensDto>.Success(await _sessions.IssueAsync(account, utcNow, ct));
-    }
-
-    private string DummyHash()
-    {
-        if (_dummyHash is not null)
-            return _dummyHash;
-        lock (DummyHashLock)
-            return _dummyHash ??= _hasher.Hash(Guid.NewGuid().ToString("N"));
     }
 }
