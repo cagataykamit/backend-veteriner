@@ -21,6 +21,8 @@ contract, `GetPetsListQueryHandler` routing, route/auth/permission/tenant scope 
 
 `Get-CqrsPetRolloutSequence` ile birebir; **flag açma en sonda**dır.
 
+> **Ön koşul (2026-10-29):** pilotta hasta olayları outbox'a yazılmaz (`PetProjection:WriteEvents=false`). 1. adımdan önce `PetProjection__WriteEvents=true` → API restart; backfill olay yazma açıldıktan **sonra** çalışmalı, aksi halde aradaki değişiklikler okuma modeline girmez.
+
 | # | Adım | Komut / aksiyon | Doğrulama |
 |---|------|-----------------|-----------|
 | 1 | `query-migration` | `dotnet run --project src/Backend.Veteriner.DbMigrator -- migrate-query` | `PetReadModels` tablosu mevcut; bekleyen migration yok |

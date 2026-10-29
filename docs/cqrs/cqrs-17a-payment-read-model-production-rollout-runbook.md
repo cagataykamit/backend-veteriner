@@ -129,7 +129,10 @@ Payment search Query path, client/pet lookup read-model'lerine bağımlıdır (e
 
 ### Faz 0 — Altyapı (read flag'ler kapalı)
 
+> **Ön koşul (2026-10-29):** pilotta ödeme olayları outbox'a yazılmaz (`PaymentProjection:WriteEvents=false`). Olay yazma backfill'den **önce** açılmalı; aksi halde backfill ile yazmanın açılması arasındaki değişiklikler okuma modeline girmez.
+
 ```text
+0. PaymentProjection:WriteEvents=true → API restart (olaylar yeniden yazılır)
 1. migrate-query
 2. PaymentProjection:Enabled=true → API restart
 3. backfill-payment-read-models
