@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Auth.Contracts;
 using Backend.Veteriner.Application.Auth.Commands.Login;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -19,9 +20,9 @@ namespace Backend.Veteriner.Application.Tests.Auth.Commands;
 public sealed class LoginCommandHandlerTests
 {
     private static LoginUserLookupResult ToLookup(User u)
-        => new(u.Id, u.Email, u.EmailConfirmed, u.PasswordHash);
+        => new(u.Id, u.Email, u.EmailConfirmed, u.PasswordHash, u.FailedLoginCount, u.LockedUntilUtc);
 
-    private readonly Mock<IUserReadRepository> _users = new();
+    private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IPasswordHasher> _hasher = new();
     private readonly Mock<IJwtTokenService> _jwt = new();
     private readonly Mock<ITokenHashService> _tokenHash = new();
@@ -32,6 +33,7 @@ public sealed class LoginCommandHandlerTests
     private readonly Mock<IUserOperationClaimRepository> _userOperationClaims = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private readonly Mock<IUserTenantRepository> _userTenants = new();
+    private readonly Mock<IAuditLogWriter> _auditLogWriter = new();
 
     private LoginCommandHandler CreateHandler(SessionOptions? sessionOptions = null)
     {
@@ -56,6 +58,7 @@ public sealed class LoginCommandHandlerTests
             _userTenants.Object,
             Mock.Of<ITenantScope>(),
             opt,
+            _auditLogWriter.Object,
             TimeProvider.System);
     }
 
@@ -73,6 +76,93 @@ public sealed class LoginCommandHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Auth.Unauthorized.InvalidCredentials");
         _refreshRepo.Verify(r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Never);
+        // Olmayan hesapta da parola doğrulaması çalışır; yanıt süresi hesabın varlığını ele vermez.
+        _hasher.Verify(h => h.Verify(cmd.Password, It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_CountFailure_When_PasswordIsInvalid()
+    {
+        var handler = CreateHandler();
+        var cmd = new LoginCommand("user@example.com", "wrong");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
+        SetupLookup(user);
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(false);
+
+        await handler.Handle(cmd, CancellationToken.None);
+
+        user.FailedLoginCount.Should().Be(1);
+        user.LockedUntilUtc.Should().BeNull();
+        _users.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _auditLogWriter.Verify(w => w.WriteAsync(It.IsAny<AuditLogEntry>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_LockAccountAndAudit_When_MaxFailedAttemptsReached()
+    {
+        var handler = CreateHandler();
+        var cmd = new LoginCommand("user@example.com", "wrong");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
+        for (var i = 0; i < SignInLockout.MaxFailedAttempts - 1; i++)
+            user.RecordFailedLogin(DateTime.UtcNow);
+        SetupLookup(user);
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(false);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.Error.Code.Should().Be("Auth.Unauthorized.InvalidCredentials");
+        user.IsLockedOut(DateTime.UtcNow).Should().BeTrue();
+        _auditLogWriter.Verify(
+            w => w.WriteAsync(
+                It.Is<AuditLogEntry>(e => e.Action == "Auth.Login.LockedOut" && e.TargetId == user.Id.ToString("D") && e.RequestPayload == null),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_RejectCorrectPassword_When_AccountIsLocked()
+    {
+        var handler = CreateHandler();
+        var cmd = new LoginCommand("user@example.com", "password");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
+        for (var i = 0; i < SignInLockout.MaxFailedAttempts; i++)
+            user.RecordFailedLogin(DateTime.UtcNow);
+        SetupLookup(user);
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.Error.Code.Should().Be("Auth.Unauthorized.InvalidCredentials");
+        _hasher.Verify(h => h.Verify(cmd.Password, user.PasswordHash), Times.Never);
+        _hasher.Verify(h => h.Verify(cmd.Password, It.IsAny<string>()), Times.Once);
+        _users.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _refreshRepo.Verify(r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ClearFailures_When_PasswordIsCorrect()
+    {
+        var handler = CreateHandler();
+        var cmd = new LoginCommand("user@example.com", "password");
+        var user = new User("user@example.com", "hash", DateTime.UtcNow);
+        user.RecordFailedLogin(DateTime.UtcNow);
+        SetupLookup(user);
+        _hasher.Setup(h => h.Verify(cmd.Password, user.PasswordHash)).Returns(true);
+        _userTenants.Setup(r => r.GetTenantIdsByUserIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Guid>());
+
+        await handler.Handle(cmd, CancellationToken.None);
+
+        user.FailedLoginCount.Should().Be(0);
+        _users.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private void SetupLookup(User user)
+    {
+        _users.Setup(r => r.GetForLoginByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ToLookup(user));
+        _users.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
     }
 
     [Fact]

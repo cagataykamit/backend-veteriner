@@ -34,6 +34,11 @@ public class User : AggregateRoot
     /// </summary>
     public DateTime? UpdatedAtUtc { get; private set; }
 
+    /// <summary>Kilitten bu yana art arda başarısız giriş sayısı (SEC-001).</summary>
+    public int FailedLoginCount { get; private set; }
+
+    public DateTime? LockedUntilUtc { get; private set; }
+
     public IReadOnlyCollection<UserRole> Roles => _roles.AsReadOnly();
     public IReadOnlyCollection<RefreshToken> RefreshTokens => _refreshTokens.AsReadOnly();
 
@@ -99,9 +104,28 @@ public class User : AggregateRoot
         UpdatedAtUtc = utcNow;
     }
 
+    /// <summary>Yeni parolayla eski tahminler geçersizleşir; kilit ve sayaç da temizlenir.</summary>
     public void UpdatePasswordHash(string newHash, DateTime utcNow)
     {
         PasswordHash = newHash ?? throw new ArgumentNullException(nameof(newHash));
         UpdatedAtUtc = utcNow;
+        ClearLockout();
+    }
+
+    public bool IsLockedOut(DateTime utcNow) => SignInLockout.IsLockedOut(LockedUntilUtc, utcNow);
+
+    /// <summary>Başarısız giriş; kural <see cref="SignInLockout.RecordFailure"/>. Hesap bu denemeyle kilitlendiyse true.</summary>
+    public bool RecordFailedLogin(DateTime utcNow)
+    {
+        var wasLockedOut = IsLockedOut(utcNow);
+        (FailedLoginCount, LockedUntilUtc) = SignInLockout.RecordFailure(FailedLoginCount, LockedUntilUtc, utcNow);
+        return !wasLockedOut && IsLockedOut(utcNow);
+    }
+
+    /// <summary>Başarılı giriş veya parola değişikliği: sayaç ve kilit temizlenir.</summary>
+    public void ClearLockout()
+    {
+        FailedLoginCount = 0;
+        LockedUntilUtc = null;
     }
 }

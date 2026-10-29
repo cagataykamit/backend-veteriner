@@ -171,6 +171,11 @@ public class AppDbContext : TenantIsolatedDbContext
 
             e.Property(x => x.UpdatedAtUtc);
 
+            e.Property(x => x.FailedLoginCount)
+                .IsRequired();
+
+            e.Property(x => x.LockedUntilUtc);
+
             e.HasIndex(x => x.Email)
                 .IsUnique();
 
