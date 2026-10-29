@@ -1,8 +1,8 @@
-# Rapor tercihleri — API sözleşmesi (REPORT-003 favoriler)
+# Rapor tercihleri — API sözleşmesi (REPORT-003 favoriler, REPORT-004 kayıtlı filtreler)
 
-Backend tek doğruluk kaynağıdır. Kaynak: backlog REPORT-003 (ürün deposu), ADR-003 (Rapor Merkezi). Hata zarfı standart `ProblemDetails` + `extensions.code` (`BACKEND-CONTRACT-STANDARD.md` §9).
+Backend tek doğruluk kaynağıdır. Kaynak: backlog REPORT-003 ve REPORT-004 (ürün deposu), ADR-003 (Rapor Merkezi). Hata zarfı standart `ProblemDetails` + `extensions.code` (`BACKEND-CONTRACT-STANDARD.md` §9).
 
-> **Durum:** uygulandı, dal `feat/rapor-favori-filtre`. Migration `AddReportFavorites` (tablo `ReportFavorites`). Yeni izin yok.
+> **Durum:** uygulandı, dal `feat/rapor-favori-filtre`. Migration `AddReportFavorites` (tablo `ReportFavorites`) ve `AddReportSavedFilters` (tablo `ReportSavedFilters`). Yeni izin yok.
 
 ## 1) Kapsam ve kurallar
 
@@ -29,8 +29,38 @@ Hatalar:
 
 Benzersizlik: `(TenantId, UserId, ReportKey)` benzersiz indeks.
 
-## 3) Testler
+## 3) Kayıtlı filtreler
 
-- Domain: `ReportFavoriteTests` (anahtar biçimi, oluşturma).
-- Application: `ReportFavoriteHandlersTests` (ekleme, idempotent ekleme, tavan, kullanıcı bağlamı yok, silme, listeleme, doğrulayıcı).
-- Entegrasyon: `ReportPreferencesIntegrationTests` (401, kullanıcı ayrımı, kiracı ayrımı, idempotent ekle/çıkar, geçersiz anahtar 400).
+Bir rapordaki filtre setini adla kaydetme, listeleme, uygulama (panel) ve silme. Kiracıda paylaşım yoktur; güncelleme yoktur (sil + yeniden kaydet).
+
+| Uç | Yanıt | Not |
+|---|---|---|
+| `GET /api/v1/reports/saved-filters?reportKey=payments` | 200 `[ReportSavedFilterDto]` | Oturumdaki kullanıcının o rapordaki kayıtları, ada göre (Türkçe karşılaştırma anahtarı) |
+| `POST /api/v1/reports/saved-filters` | 201 `ReportSavedFilterDto` | Gövde: `{ "reportKey": "payments", "name": "Nakit tahsilatlar", "filters": { "method": "Cash", "clinicId": "…" } }` |
+| `DELETE /api/v1/reports/saved-filters/{id}` | 204 | Başka kullanıcının kaydı 404 |
+
+`ReportSavedFilterDto`: `{ "id": "…", "reportKey": "payments", "name": "Nakit tahsilatlar", "filters": { "method": "Cash" }, "createdAtUtc": "…" }`
+
+Kurallar (`Domain/Reports/ReportSavedFilter`, tek yer):
+
+- `name`: kırpılır, art arda boşluk teke iner; 1–100 karakter. Aynı kullanıcının aynı raporunda Türkçe harf ve büyük-küçük farkı yok sayılarak benzersiz (`İptaller` = `iptaller`).
+- `filters`: JSON nesnesi, metin → metin. En çok 20 alan; alan adı harfle başlar, yalnız harf/rakam (en çok 50); değer boş olamaz, en çok 200 karakter. Boş nesne geçerli. Backend alanları **yorumlamaz**: panelin rapor sorgu parametreleridir (`clinicId`, `search`, `method`, `status`, `minAmount`, `includeVoided`, `productId`, `veterinarianId`, `hbsStatus`, `kind`, `paymentMethod`, `performedByUserId`). Uygulanırken rapor ucu her değeri yine kendi kuralıyla doğrular (kayıtlı `clinicId` erişimi kalkmışsa rapor ucu 403 döner, panel filtreyi temizler).
+- Panel tarih aralığını kaydetmez: uygulandığında ekrandaki dönem korunur (kaydedilen filtre her dönemde yeniden kullanılır).
+- Kullanıcı başına, rapor başına en çok 20 kayıt.
+
+Hatalar:
+
+| Durum | Kod |
+|---|---|
+| 400 | `Validation` (anahtar, ad, filtre biçimi) |
+| 400 | `ReportSavedFilters.LimitReached` |
+| 404 | `ReportSavedFilters.NotFound` |
+| 409 | `ReportSavedFilters.DuplicateName` |
+
+Benzersizlik: `(TenantId, UserId, ReportKey, NormalizedName)` benzersiz indeks; filtreler `FiltersJson` kolonunda (nvarchar(max)).
+
+## 4) Testler
+
+- Domain: `ReportFavoriteTests` (anahtar biçimi, oluşturma), `ReportSavedFilterTests` (ad, normalleştirme, filtre sınırları).
+- Application: `ReportFavoriteHandlersTests` (ekleme, idempotent ekleme, tavan, kullanıcı bağlamı yok, silme, listeleme, doğrulayıcı), `ReportSavedFilterHandlersTests` (kayıt, aynı ad, tavan, başkasının kaydı 404, silme, listeleme, doğrulayıcı).
+- Entegrasyon: `ReportPreferencesIntegrationTests` (401, kullanıcı ayrımı, kiracı ayrımı, idempotent ekle/çıkar, geçersiz anahtar 400; kayıtlı filtre oluştur/listele/sil, kullanıcı ve rapor ayrımı, Türkçe büyük-küçük harf duyarsız 409, geçersiz alan adı 400).

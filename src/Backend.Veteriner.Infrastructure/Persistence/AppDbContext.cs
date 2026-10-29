@@ -124,6 +124,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<LabResult> LabResults => Set<LabResult>();
     public DbSet<ReportFavorite> ReportFavorites => Set<ReportFavorite>();
+    public DbSet<ReportSavedFilter> ReportSavedFilters => Set<ReportSavedFilter>();
     public DbSet<ImagingRecord> ImagingRecords => Set<ImagingRecord>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<Hospitalization> Hospitalizations => Set<Hospitalization>();

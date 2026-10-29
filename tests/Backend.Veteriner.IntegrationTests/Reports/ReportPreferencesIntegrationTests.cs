@@ -70,6 +70,66 @@ public sealed class ReportPreferencesIntegrationTests : IClassFixture<CustomWebA
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task SavedFilters_Should_Create_List_Delete_Per_User_And_Report()
+    {
+        var tenantId = await SeedTenantAsync();
+        var alice = ClientFor(tenantId, Guid.NewGuid());
+        var bob = ClientFor(tenantId, Guid.NewGuid());
+
+        var created = await alice.PostAsJsonAsync("/api/v1/reports/saved-filters", new
+        {
+            ReportKey = "payments",
+            Name = "Nakit tahsilatlar",
+            Filters = new Dictionary<string, string> { ["method"] = "Cash", ["search"] = "Pamuk" }
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created, await created.Content.ReadAsStringAsync());
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var id = body.GetProperty("id").GetGuid();
+        body.GetProperty("filters").GetProperty("method").GetString().Should().Be("Cash");
+
+        var mine = await alice.GetFromJsonAsync<JsonElement>("/api/v1/reports/saved-filters?reportKey=payments");
+        mine.GetArrayLength().Should().Be(1);
+        mine[0].GetProperty("name").GetString().Should().Be("Nakit tahsilatlar");
+        mine[0].GetProperty("filters").GetProperty("search").GetString().Should().Be("Pamuk");
+
+        (await alice.GetFromJsonAsync<JsonElement>("/api/v1/reports/saved-filters?reportKey=appointments")).GetArrayLength().Should().Be(0);
+        (await bob.GetFromJsonAsync<JsonElement>("/api/v1/reports/saved-filters?reportKey=payments")).GetArrayLength().Should().Be(0);
+
+        (await bob.DeleteAsync($"/api/v1/reports/saved-filters/{id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await alice.DeleteAsync($"/api/v1/reports/saved-filters/{id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await alice.GetFromJsonAsync<JsonElement>("/api/v1/reports/saved-filters?reportKey=payments")).GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SavedFilters_Should_Return409_For_Same_Name_Ignoring_Turkish_Case()
+    {
+        var client = ClientFor(await SeedTenantAsync(), Guid.NewGuid());
+        var filters = new Dictionary<string, string> { ["status"] = "Completed" };
+
+        (await client.PostAsJsonAsync("/api/v1/reports/saved-filters", new { ReportKey = "appointments", Name = "İptaller", Filters = filters }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+        var duplicate = await client.PostAsJsonAsync("/api/v1/reports/saved-filters", new { ReportKey = "appointments", Name = "iptaller", Filters = filters });
+
+        duplicate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await duplicate.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("ReportSavedFilters.DuplicateName");
+    }
+
+    [Fact]
+    public async Task SavedFilters_Should_Return400_For_Invalid_Filter_Key()
+    {
+        var client = ClientFor(await SeedTenantAsync(), Guid.NewGuid());
+
+        var response = await client.PostAsJsonAsync("/api/v1/reports/saved-filters", new
+        {
+            ReportKey = "payments",
+            Name = "Bozuk",
+            Filters = new Dictionary<string, string> { ["bad-key"] = "x" }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private static async Task<string[]> FavoriteKeysAsync(HttpClient client)
     {
         var json = await client.GetFromJsonAsync<JsonElement>("/api/v1/reports/favorites");
