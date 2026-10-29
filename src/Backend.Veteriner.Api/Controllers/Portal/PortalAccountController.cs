@@ -6,10 +6,12 @@ using Backend.Veteriner.Application.OwnerPortal.Commands.AcceptPortalLegalDocume
 using Backend.Veteriner.Application.OwnerPortal.Commands.AcknowledgePortalClinicDisclosure;
 using Backend.Veteriner.Application.OwnerPortal.Commands.DeletePortalAccount;
 using Backend.Veteriner.Application.OwnerPortal.Commands.RequestPortalAccountDeletionCode;
+using Backend.Veteriner.Application.OwnerPortal.Commands.UpdatePortalReminderPreferences;
 using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalClinicDisclosure;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalLegalStatus;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalMe;
+using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalReminderPreferences;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +20,8 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Backend.Veteriner.Api.Controllers.Portal;
 
 /// <summary>
-/// Oturumlu hasta sahibi uçları (docs/PORTAL_API_CONTRACT.md §5.8–5.10): hesap, hesap silme, hukuki kabul, klinik aydınlatma metni.
+/// Oturumlu hasta sahibi uçları (docs/PORTAL_API_CONTRACT.md §5.8–5.11): hesap, hesap silme, hukuki kabul, klinik aydınlatma metni,
+/// hatırlatma tercihi.
 /// Bağ kapsamlı uçlar sahipliği <c>OwnerPortalAccess</c> ile denetler.
 /// </summary>
 [ApiController]
@@ -127,6 +130,37 @@ public sealed class PortalAccountController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new AcknowledgePortalClinicDisclosureCommand(ownerAccountId, linkId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Bu bağdaki (klinikteki) aşı/randevu hatırlatma tercihi (APPT-014).</summary>
+    [HttpGet("links/{linkId:guid}/reminder-preferences")]
+    [ProducesResponseType(typeof(PortalReminderPreferencesDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetReminderPreferences([FromRoute] Guid linkId, CancellationToken ct)
+    {
+        if (!this.TryGetOwnerAccountId(out var ownerAccountId, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetPortalReminderPreferencesQuery(ownerAccountId, linkId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Hatırlatmaları kapatır/açar; KVKK "Ret" kaydı varken açma 409 <c>Clients.RemindersKvkkDeclined</c>.</summary>
+    [HttpPut("links/{linkId:guid}/reminder-preferences")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(PortalReminderPreferencesDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateReminderPreferences([FromRoute] Guid linkId, [FromBody] PortalReminderPreferencesBody body, CancellationToken ct)
+    {
+        if (!this.TryGetOwnerAccountId(out var ownerAccountId, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new UpdatePortalReminderPreferencesCommand(ownerAccountId, linkId, body.RemindersOptedOut), ct);
         return result.ToActionResult(this);
     }
 }

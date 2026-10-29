@@ -139,6 +139,35 @@ public sealed class Client : AggregateRoot, ITenantOwned
     }
 
     /// <summary>
+    /// Hasta sahibi hatırlatmaları kendisi açabilir mi (APPT-014): KVKK "Ret" kaydı varken hayır. Ret hatırlatmayı kapatır
+    /// (ADR-025 madde 4); sahibin portal tercihi klinikteki imzalı rıza kaydının yerine geçmez, bayrağı klinik elle açar.
+    /// </summary>
+    public bool OwnerCanEnableReminders => KvkkConsentStatus != KvkkConsentStatus.Declined;
+
+    /// <summary>
+    /// Hasta sahibinin portaldan kendi hatırlatma tercihi (APPT-014). Personel tercihiyle aynı bayrağı
+    /// (<see cref="RemindersOptedOut"/>) değiştirir; aday dışlama yine <see cref="AcceptsReminders"/> ile tek yerdedir.
+    /// Kapatma her zaman serbesttir; açma <see cref="OwnerCanEnableReminders"/> değilse reddedilir. Değer değişmiyorsa kayıt
+    /// güncellenmez. Kural yalnızca burada yaşar.
+    /// </summary>
+    public Result SetRemindersOptedOutByOwner(bool optedOut, DateTime utcNow)
+    {
+        if (!optedOut && !OwnerCanEnableReminders)
+        {
+            return Result.Failure(
+                "Clients.RemindersKvkkDeclined",
+                "Klinikteki KVKK açık rıza kaydınız \"Ret\" olduğu için hatırlatmalar açılamaz; açmak için kliniğinizle görüşün.");
+        }
+
+        if (RemindersOptedOut == optedOut)
+            return Result.Success();
+
+        RemindersOptedOut = optedOut;
+        UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    /// <summary>
     /// Fatura kimliğini tam değiştirir (ADR-036 Dilim 1; tüm alanlar isteğe bağlı). Kişi türü yokken kimlik/vergi alanı,
     /// bireyselde vergi numarası/vergi dairesi/unvan, kurumsalda TCKN alanı verilemez; TCKN doluysa geçerli TCKN, vergi
     /// numarası doluysa geçerli VKN veya (şahıs şirketi) geçerli TCKN olmalıdır (<see cref="TurkishTaxIdentity"/>).

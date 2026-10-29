@@ -104,3 +104,9 @@ public sealed record ClientPortalAccessDto(
     string? InviteBlockedCode,
     IReadOnlyList<ClientPortalLinkDto> Links,
     IReadOnlyList<ClientPortalInviteDto> Invites);
+
+/// <summary>
+/// Hasta sahibinin bu bağdaki hatırlatma tercihi (APPT-014, docs/PORTAL_API_CONTRACT.md §5.11). <c>RemindersOptedOut</c> müşteri
+/// kaydındaki bayrağın kendisidir (personel tercihiyle aynı); <c>CanEnableReminders</c> false iken sahip hatırlatmayı açamaz.
+/// </summary>
+public sealed record PortalReminderPreferencesDto(bool RemindersOptedOut, bool CanEnableReminders);
