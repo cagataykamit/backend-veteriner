@@ -140,6 +140,34 @@ public sealed class ReportsController : ControllerBase
         return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
     }
 
+    /// <summary>Ödeme (tahsilat) raporu PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("payments/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Payments.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportPaymentsReportPdf(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] PaymentMethod? method = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportPaymentsReportPdfQuery(from, to, clinicId, method, clientId, petId, search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Pdf, v.FileDownloadName);
+    }
+
     /// <summary>
     /// Randevu raporu (sayfalı). <c>from</c>/<c>to</c> UTC — <c>ScheduledAtUtc</c> <c>[from,to]</c> dahil.
     /// </summary>
@@ -222,6 +250,34 @@ public sealed class ReportsController : ControllerBase
 
         var v = result.Value!;
         return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
+    }
+
+    /// <summary>Randevu raporu PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("appointments/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Appointments.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportAppointmentsReportPdf(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] AppointmentStatus? status = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportAppointmentsReportPdfQuery(from, to, clinicId, status, clientId, petId, search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Pdf, v.FileDownloadName);
     }
 
     /// <summary>
@@ -331,6 +387,41 @@ public sealed class ReportsController : ControllerBase
         return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
     }
 
+    /// <summary>Muayene raporu PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("examinations/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportExaminationsReportPdf(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] Guid? appointmentId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportExaminationsReportPdfQuery(
+            from,
+            to,
+            clinicId,
+            clientId,
+            petId,
+            appointmentId,
+            search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Pdf, v.FileDownloadName);
+    }
+
     /// <summary>
     /// Aşı raporu (sayfalı). <c>from</c>/<c>to</c> UTC kapalı aralık; rapor tarih ekseni §31.1 (Applied → <c>AppliedAtUtc</c>; Scheduled/Cancelled → <c>DueAtUtc</c>).
     /// </summary>
@@ -418,6 +509,35 @@ public sealed class ReportsController : ControllerBase
         return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
     }
 
+    /// <summary>Aşı raporu PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("vaccinations/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportVaccinationsReportPdf(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] VaccinationStatus? status = null,
+        [FromQuery] Guid? clientId = null,
+        [FromQuery] Guid? petId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var query = new ExportVaccinationsReportPdfQuery(
+            from, to, clinicId, status, clientId, petId, search);
+        var result = await _mediator.Send(query, ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Pdf, v.FileDownloadName);
+    }
+
     /// <summary>
     /// Borç / açık bakiye raporu (sayfalı): müşteri bazlı <b>şu anki</b> kalan tutar (tarih parametresi yok), kalan tutara göre azalan.
     /// Kural <c>GET /clients/{id}/balance</c> ile aynıdır; klinik kapsamı <c>payments</c> raporu ile aynı çözümleyicidir.
@@ -487,6 +607,29 @@ public sealed class ReportsController : ControllerBase
 
         var v = result.Value!;
         return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
+    }
+
+    /// <summary>Borç raporu PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("outstanding-balances/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Charges.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportOutstandingBalancesReportPdf(
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ExportOutstandingBalancesReportPdfQuery(clinicId, minAmount, search), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Pdf, v.FileDownloadName);
     }
 
     /// <summary>
@@ -562,6 +705,30 @@ public sealed class ReportsController : ControllerBase
         return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
     }
 
+    /// <summary>Muayene kayıt defteri PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("registers/examinations/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportExaminationRegisterPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ExportExaminationRegisterPdfQuery(from, to, clinicId, includeVoided), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Pdf, v.FileDownloadName);
+    }
+
     /// <summary>
     /// Reçete kayıt defteri (sayfalı; sayfa ve sayım reçete bazlı). <c>from</c>/<c>to</c>: İstanbul takvim günleri, ikisi dahil
     /// (en çok 366 gün). Resmî biçime uygunluk doğrulanmadı.
@@ -632,6 +799,29 @@ public sealed class ReportsController : ControllerBase
         return File(v.Content, ReportFileContentTypes.Xlsx, v.FileDownloadName);
     }
 
+    /// <summary>Reçete kayıt defteri PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("registers/prescriptions/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExportPrescriptionRegisterPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ExportPrescriptionRegisterPdfQuery(from, to, clinicId), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var v = result.Value!;
+        return File(v.Content, ReportFileContentTypes.Pdf, v.FileDownloadName);
+    }
+
     // ---- Parti (lot) verisinden türetilen defterler ve Aşı Bilgi raporu (REGISTERS_API_CONTRACT.md bölüm II) ----
 
     /// <summary>
@@ -683,6 +873,21 @@ public sealed class ReportsController : ControllerBase
         => SendRegisterExportAsync(
             new ExportVaccineRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), RegisterExportFormat.Xlsx), ct);
 
+    /// <summary>Aşı kayıt defteri PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("registers/vaccines/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportVaccineRegisterPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportVaccineRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), RegisterExportFormat.Pdf), ct);
+
     /// <summary>
     /// İlaç kayıt defteri (ilaç stok girişleri; aşılar hariç, sayfalı). Tarih ve süzgeç kuralları aşı kayıt defteriyle aynıdır.
     /// Resmî biçime uygunluk doğrulanmadı.
@@ -731,6 +936,21 @@ public sealed class ReportsController : ControllerBase
         CancellationToken ct = default)
         => SendRegisterExportAsync(
             new ExportMedicationRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), RegisterExportFormat.Xlsx), ct);
+
+    /// <summary>İlaç kayıt defteri PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("registers/medications/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportMedicationRegisterPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportMedicationRegisterQuery(new RegisterQuery(from, to, clinicId, includeVoided), RegisterExportFormat.Pdf), ct);
 
     /// <summary>
     /// Narkotik ve psikotropik ürünler stok ve sarf defteri (kontrollü ürünlerin stok hareketleri, hareket başına bir satır, sayfalı).
@@ -782,6 +1002,21 @@ public sealed class ReportsController : ControllerBase
         CancellationToken ct = default)
         => SendRegisterExportAsync(
             new ExportControlledSubstanceRegisterQuery(new RegisterQuery(from, to, clinicId, IncludeVoided: false), RegisterExportFormat.Xlsx), ct);
+
+    /// <summary>Narkotik ve psikotropik defteri PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("registers/controlled-substances/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.StockMovements.Read)]
+    [Authorize(Policy = PermissionCatalog.Administrations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportControlledSubstanceRegisterPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportControlledSubstanceRegisterQuery(new RegisterQuery(from, to, clinicId, IncludeVoided: false), RegisterExportFormat.Pdf), ct);
 
     /// <summary>
     /// Aşı bilgi raporu (hayvan bazlı aşı uygulamaları, sayfalı). Süzgeçler: tarih aralığı, <c>productId</c>, <c>veterinarianId</c>
@@ -852,6 +1087,27 @@ public sealed class ReportsController : ControllerBase
                 new RegisterQuery(from, to, clinicId, includeVoided, productId, veterinarianId), RegisterExportFormat.Xlsx),
             ct);
 
+    /// <summary>Aşı bilgi raporu PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("registers/vaccine-info/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Administrations.Read)]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [Authorize(Policy = PermissionCatalog.Products.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportVaccineInfoRegisterPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? productId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] bool includeVoided = false,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportVaccineInfoRegisterQuery(
+                new RegisterQuery(from, to, clinicId, includeVoided, productId, veterinarianId), RegisterExportFormat.Pdf),
+            ct);
+
     /// <summary>
     /// HBS takibi — reçeteler (sayfalı; ADR-036 Dilim 2). <c>hbsStatus</c> verilmezse "Girilmedi" (iş listesi); <c>veterinarianId</c> geliş
     /// sorumlu hekimi. Bkz. docs/HBS_ASSISTANT_API_CONTRACT.md bölüm 6.
@@ -905,6 +1161,22 @@ public sealed class ReportsController : ControllerBase
         => SendRegisterExportAsync(
             new ExportHbsPrescriptionRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), RegisterExportFormat.Xlsx), ct);
 
+    /// <summary>HBS takibi — reçeteler PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("registers/hbs-prescriptions/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportHbsPrescriptionRegisterPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportHbsPrescriptionRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), RegisterExportFormat.Pdf), ct);
+
     /// <summary>
     /// HBS takibi — aşılar (sayfalı; ADR-036 Dilim 2): yalnız uygulanmış ve içe aktarılmamış aşılar. <c>hbsStatus</c> verilmezse "Girilmedi".
     /// </summary>
@@ -957,6 +1229,22 @@ public sealed class ReportsController : ControllerBase
         => SendRegisterExportAsync(
             new ExportHbsVaccinationRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), RegisterExportFormat.Xlsx), ct);
 
+    /// <summary>HBS takibi — aşılar PDF (A4 yatay, yazdırmaya uygun; REPORT-007). Filtreler CSV ile aynı; sayfa yok. Satır tavanı: deneme 1.000, ücretli 5.000.</summary>
+    [HttpGet("registers/hbs-vaccinations/export-pdf")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public Task<IActionResult> ExportHbsVaccinationRegisterPdf(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianId = null,
+        [FromQuery] HbsEntryStatus? hbsStatus = null,
+        CancellationToken ct = default)
+        => SendRegisterExportAsync(
+            new ExportHbsVaccinationRegisterQuery(HbsRegisterQuery(from, to, clinicId, veterinarianId, hbsStatus), RegisterExportFormat.Pdf), ct);
+
     private static RegisterQuery HbsRegisterQuery(DateOnly from, DateOnly to, Guid? clinicId, Guid? veterinarianId, HbsEntryStatus? hbsStatus)
         => new(from, to, clinicId, IncludeVoided: false, VeterinarianUserId: veterinarianId, HbsStatus: hbsStatus);
 
@@ -969,7 +1257,7 @@ public sealed class ReportsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>CSV/XLSX dışa aktarma: dosya içerik türü, istekteki biçime göre seçilir.</summary>
+    /// <summary>CSV/XLSX/PDF dışa aktarma: dosya içerik türü, istekteki biçime göre seçilir.</summary>
     private async Task<IActionResult> SendRegisterExportAsync(IRequest<Result<RegisterExportResult>> request, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -980,9 +1268,6 @@ public sealed class ReportsController : ControllerBase
             return result.ToActionResult(this);
 
         var file = result.Value!;
-        return File(
-            file.Content,
-            file.FileDownloadName.EndsWith(".xlsx", StringComparison.Ordinal) ? ReportFileContentTypes.Xlsx : ReportFileContentTypes.CsvUtf8,
-            file.FileDownloadName);
+        return File(file.Content, ReportFileContentTypes.ForFileName(file.FileDownloadName), file.FileDownloadName);
     }
 }

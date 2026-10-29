@@ -23,7 +23,7 @@ internal static class VaccineInfoRegisterColumns
         RegisterColumn<VaccineInfoRegisterItemDto>.Number(null, "Toplam", r => r.TotalPrice),
     ];
 
-    public static readonly RegisterExportSpec<VaccineInfoRegisterItemDto> Export = new(All, "Aşı Bilgi Raporu", "asi-bilgi-raporu");
+    public static readonly RegisterExportSpec<VaccineInfoRegisterItemDto> Export = new(All, "Aşı Bilgi Raporu", "asi-bilgi-raporu", "Aşı Bilgi Raporu");
 
     /// <summary>Ürün adı + sonradan eklendi + iptal işaretleri (sözleşme bölüm 16).</summary>
     private static string FormatProduct(VaccineInfoRegisterItemDto r)

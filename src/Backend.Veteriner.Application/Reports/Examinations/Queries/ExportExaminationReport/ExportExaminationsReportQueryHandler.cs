@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Examinations;
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -63,6 +64,7 @@ public sealed class ExportExaminationsReportQueryHandler
             request.AppointmentId,
             request.Search,
             _trialLimitPolicy,
+            RegisterExportFormat.Csv,
             ct);
         if (!loaded.IsSuccess)
             return Result<ExaminationsCsvExportResult>.Failure(loaded.Error);

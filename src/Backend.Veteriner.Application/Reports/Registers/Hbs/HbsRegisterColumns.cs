@@ -23,7 +23,7 @@ internal static class HbsPrescriptionRegisterColumns
         RegisterColumn<HbsPrescriptionRegisterItemDto>.Date(null, "HBS İşaret Tarihi", r => r.MarkedAtUtc),
     ];
 
-    public static readonly RegisterExportSpec<HbsPrescriptionRegisterItemDto> Export = new(All, "HBS Reçeteler", "hbs-receteler");
+    public static readonly RegisterExportSpec<HbsPrescriptionRegisterItemDto> Export = new(All, "HBS Reçeteler", "hbs-receteler", "HBS Takibi — Reçeteler");
 }
 
 /// <summary>HBS takibi — aşılar: sütunların tek tanımı (CSV ve XLSX bunu okur).</summary>
@@ -48,5 +48,5 @@ internal static class HbsVaccinationRegisterColumns
         RegisterColumn<HbsVaccinationRegisterItemDto>.Date(null, "HBS İşaret Tarihi", r => r.MarkedAtUtc),
     ];
 
-    public static readonly RegisterExportSpec<HbsVaccinationRegisterItemDto> Export = new(All, "HBS Aşılar", "hbs-asilar");
+    public static readonly RegisterExportSpec<HbsVaccinationRegisterItemDto> Export = new(All, "HBS Aşılar", "hbs-asilar", "HBS Takibi — Aşılar");
 }

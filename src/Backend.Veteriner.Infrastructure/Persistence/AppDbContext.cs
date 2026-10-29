@@ -25,6 +25,7 @@ using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Products;
+using Backend.Veteriner.Domain.Reports;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -122,6 +123,8 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<LabResult> LabResults => Set<LabResult>();
+    public DbSet<ReportFavorite> ReportFavorites => Set<ReportFavorite>();
+    public DbSet<ReportSavedFilter> ReportSavedFilters => Set<ReportSavedFilter>();
     public DbSet<ImagingRecord> ImagingRecords => Set<ImagingRecord>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<Hospitalization> Hospitalizations => Set<Hospitalization>();

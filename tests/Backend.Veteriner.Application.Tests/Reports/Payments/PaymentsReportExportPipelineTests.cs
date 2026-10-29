@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Application.Reports.Payments.ReadModels;
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -227,5 +228,6 @@ public sealed class PaymentsReportExportPipelineTests
             _petLookupReader.Object,
             _exportReader.Object,
             TrialLimitPolicyStub.Paid,
+            RegisterExportFormat.Csv,
             CancellationToken.None);
 }

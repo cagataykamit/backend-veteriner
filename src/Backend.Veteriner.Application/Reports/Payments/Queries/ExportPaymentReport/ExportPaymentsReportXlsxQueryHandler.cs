@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Reports.Payments;
 using Backend.Veteriner.Application.Reports.Payments.ReadModels;
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -85,6 +86,7 @@ public sealed class ExportPaymentsReportXlsxQueryHandler
             _petLookupReader,
             _exportReadModelReader,
             _trialLimitPolicy,
+            RegisterExportFormat.Xlsx,
             ct);
         if (!loaded.IsSuccess)
             return Result<PaymentsXlsxExportResult>.Failure(loaded.Error);

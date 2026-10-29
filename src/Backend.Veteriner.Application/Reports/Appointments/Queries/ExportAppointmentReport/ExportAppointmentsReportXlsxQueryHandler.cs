@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Appointments;
+using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
@@ -63,6 +64,7 @@ public sealed class ExportAppointmentsReportXlsxQueryHandler
             request.PetId,
             request.Search,
             _trialLimitPolicy,
+            RegisterExportFormat.Xlsx,
             ct);
         if (!loaded.IsSuccess)
             return Result<AppointmentsXlsxExportResult>.Failure(loaded.Error);

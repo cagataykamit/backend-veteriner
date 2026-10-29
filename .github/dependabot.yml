@@ -15,6 +15,9 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: [version-update:semver-major]
+      # PDFsharp 6.5.0 ve sonrası AGPL-3.0; 6.2.4 (MIT) sabit kalır (REPORT-007).
+      - dependency-name: "PDFsharp*"
+        versions: [">= 6.3.0"]
 
   - package-ecosystem: github-actions
     directory: /

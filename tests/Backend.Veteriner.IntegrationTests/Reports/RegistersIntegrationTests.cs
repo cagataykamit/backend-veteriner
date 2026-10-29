@@ -206,6 +206,12 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         rows.Select(r => ws.Cell(r, 3).GetString()).Should().Equal(screen.Items.Select(i => i.OwnerName));
         rows.Select(r => ws.Cell(r, 15).GetString()).Should().Equal(screen.Items.Select(i => i.Complaint));
         ws.Cell(3, 2).GetDateTime().Should().Be(new DateTime(2026, 3, 10));
+
+        var pdfResponse = await env.Http.GetAsync($"{ExaminationsUrl}/export-pdf?from={Day}&to={Day}");
+        pdfResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        pdfResponse.Content.Headers.ContentType!.MediaType.Should().Be("application/pdf");
+        pdfResponse.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^muayene-defteri-\d{8}\.pdf$");
+        Encoding.ASCII.GetString((await pdfResponse.Content.ReadAsByteArrayAsync()).AsSpan(0, 5)).Should().Be("%PDF-");
     }
 
     [Fact]
@@ -293,7 +299,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         (await env.GetExaminationsAsync($"&clinicId={env.ClinicId}")).TotalCount.Should().Be(1);
         (await env.GetPrescriptionsAsync()).Items.Select(i => i.PrescriptionId).Should().Equal(myRx);
 
-        foreach (var url in new[] { ExaminationsUrl, $"{ExaminationsUrl}/export", $"{ExaminationsUrl}/export-xlsx", PrescriptionsUrl, $"{PrescriptionsUrl}/export", $"{PrescriptionsUrl}/export-xlsx" })
+        foreach (var url in new[] { ExaminationsUrl, $"{ExaminationsUrl}/export", $"{ExaminationsUrl}/export-xlsx", $"{ExaminationsUrl}/export-pdf", PrescriptionsUrl, $"{PrescriptionsUrl}/export", $"{PrescriptionsUrl}/export-xlsx", $"{PrescriptionsUrl}/export-pdf" })
         {
             var foreign = await env.Http.GetAsync($"{url}?from={Day}&to={Day}&clinicId={clinicB}");
             foreign.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -318,7 +324,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         (await one.GetPrescriptionsAsync()).Items.Select(i => i.PrescriptionId).Should().Equal(r1);
         (await two.GetPrescriptionsAsync()).Items.Select(i => i.PrescriptionId).Should().Equal(r2);
 
-        foreach (var suffix in new[] { "", "/export", "/export-xlsx" })
+        foreach (var suffix in new[] { "", "/export", "/export-xlsx", "/export-pdf" })
         {
             foreach (var baseUrl in new[] { ExaminationsUrl, PrescriptionsUrl })
             {
@@ -338,7 +344,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         var neither = await env.NewHttpForAnotherUserAsync([PermissionCatalog.Pets.Read, PermissionCatalog.Clients.Read]);
         var query = $"?from={Day}&to={Day}";
 
-        foreach (var suffix in new[] { "", "/export", "/export-xlsx" })
+        foreach (var suffix in new[] { "", "/export", "/export-xlsx", "/export-pdf" })
         {
             (await anonymous.GetAsync($"{ExaminationsUrl}{suffix}{query}")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
             (await anonymous.GetAsync($"{PrescriptionsUrl}{suffix}{query}")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -360,7 +366,7 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
 
         foreach (var baseUrl in new[] { ExaminationsUrl, PrescriptionsUrl })
         {
-            foreach (var suffix in new[] { "", "/export", "/export-xlsx" })
+            foreach (var suffix in new[] { "", "/export", "/export-xlsx", "/export-pdf" })
             {
                 await ExpectAsync(env.Http, $"{baseUrl}{suffix}", "Registers.DateRangeInvalid");
                 await ExpectAsync(env.Http, $"{baseUrl}{suffix}?from=2026-03-11&to=2026-03-10", "Registers.DateRangeInvalid");

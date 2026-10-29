@@ -21,7 +21,8 @@ internal static class DailyTransactionsReportColumns
         RegisterColumn<DailyTransactionItemDto>.Text(null, "İşlemi Yapan", r => r.PerformedByName),
     ],
     "Islem Dokumu",
-    "gunluk-islem-dokumu");
+    "gunluk-islem-dokumu",
+    "Günlük İşlem Dökümü");
 
     public static string KindLabel(DailyTransactionKind kind)
         => kind switch

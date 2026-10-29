@@ -214,6 +214,8 @@ public sealed partial class DailyTransactionsReportIntegrationTests : IClassFixt
         var screen = await env.GetAsync<DailyTransactionsReportResultDto>($"{Daily}?{query}&pageSize=200");
         var csv = await env.GetBytesAsync($"{Daily}/export?{query}", "text/csv");
         var xlsx = await env.GetBytesAsync($"{Daily}/export-xlsx?{query}", "spreadsheetml");
+        var pdf = await env.GetBytesAsync($"{Daily}/export-pdf?{query}", "application/pdf");
+        Encoding.ASCII.GetString(pdf.AsSpan(0, 5)).Should().Be("%PDF-");
 
         var lines = Encoding.UTF8.GetString(csv).TrimEnd().Split(Environment.NewLine);
         lines.Should().HaveCount(screen.Items.Count + 1);
@@ -273,7 +275,7 @@ public sealed partial class DailyTransactionsReportIntegrationTests : IClassFixt
         var paymentsOnly = await env.NewHttpForAnotherUserAsync([PermissionCatalog.Payments.Read]);
         var chargesOnly = await env.NewHttpForAnotherUserAsync([PermissionCatalog.Charges.Read]);
         var noVisits = await env.NewHttpForAnotherUserAsync([PermissionCatalog.Payments.Read, PermissionCatalog.Charges.Read]);
-        foreach (var suffix in new[] { "", "/export", "/export-xlsx" })
+        foreach (var suffix in new[] { "", "/export", "/export-xlsx", "/export-pdf" })
         {
             (await anonymous.GetAsync($"{Daily}{suffix}?{Range()}")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
             (await paymentsOnly.GetAsync($"{Daily}{suffix}?{Range()}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);

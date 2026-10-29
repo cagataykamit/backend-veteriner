@@ -94,6 +94,6 @@ public sealed class ExportCashSummaryReportQueryHandler : IRequestHandler<Export
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         return Result<RegisterExportResult>.Success(RegisterReportRunner.BuildFile(
-            CashSummaryBuilder.ExportSpec, CashSummaryBuilder.ToExportRows(report.Value!), request.Format, utcNow));
+            CashSummaryBuilder.ExportSpec, CashSummaryBuilder.ToExportRows(report.Value!), request.Format, request.From, request.To, utcNow));
     }
 }

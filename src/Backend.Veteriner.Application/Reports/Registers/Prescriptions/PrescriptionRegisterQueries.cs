@@ -21,6 +21,11 @@ public sealed record ExportPrescriptionRegisterXlsxQuery(
     DateOnly To,
     Guid? ClinicId) : IRequest<Result<RegisterExportResult>>;
 
+public sealed record ExportPrescriptionRegisterPdfQuery(
+    DateOnly From,
+    DateOnly To,
+    Guid? ClinicId) : IRequest<Result<RegisterExportResult>>;
+
 public sealed class GetPrescriptionRegisterQueryHandler
     : IRequestHandler<GetPrescriptionRegisterQuery, Result<RegisterReadResult<PrescriptionRegisterEntryDto>>>
 {
@@ -61,7 +66,7 @@ public sealed class ExportPrescriptionRegisterQueryHandler
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterQuery request, CancellationToken ct)
     {
         var loaded = await _runner.LoadForExportAsync(
-            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), ct);
+            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), RegisterExportFormat.Csv, ct);
         if (!loaded.IsSuccess)
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
@@ -90,7 +95,7 @@ public sealed class ExportPrescriptionRegisterXlsxQueryHandler
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterXlsxQuery request, CancellationToken ct)
     {
         var loaded = await _runner.LoadForExportAsync(
-            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), ct);
+            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), RegisterExportFormat.Xlsx, ct);
         if (!loaded.IsSuccess)
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
@@ -98,4 +103,25 @@ public sealed class ExportPrescriptionRegisterXlsxQueryHandler
             RegisterXlsxWriter.WriteWorkbook(SheetName, PrescriptionRegisterColumns.All, loaded.Value!),
             $"recete-defteri-{RegisterReportRunner.FileDateStamp(_timeProvider.GetUtcNow().UtcDateTime)}.xlsx"));
     }
+}
+
+public sealed class ExportPrescriptionRegisterPdfQueryHandler
+    : IRequestHandler<ExportPrescriptionRegisterPdfQuery, Result<RegisterExportResult>>
+{
+    private readonly RegisterReportRunner _runner;
+    private readonly IRegisterReader<PrescriptionRegisterEntryDto> _reader;
+
+    public ExportPrescriptionRegisterPdfQueryHandler(RegisterReportRunner runner, IRegisterReader<PrescriptionRegisterEntryDto> reader)
+    {
+        _runner = runner;
+        _reader = reader;
+    }
+
+    public ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterPdfQuery request, CancellationToken ct)
+        => new(_runner.ExportAsync(
+            _reader,
+            new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false),
+            RegisterExportFormat.Pdf,
+            PrescriptionRegisterColumns.Export,
+            ct));
 }

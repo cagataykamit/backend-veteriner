@@ -20,5 +20,5 @@ internal static class MedicationRegisterColumns
         RegisterColumn<MedicationRegisterItemDto>.Text(null, "Seri No", r => r.LotNumber),
     ];
 
-    public static readonly RegisterExportSpec<MedicationRegisterItemDto> Export = new(All, "İlaç Kayıt Defteri", "ilac-kayit-defteri");
+    public static readonly RegisterExportSpec<MedicationRegisterItemDto> Export = new(All, "İlaç Kayıt Defteri", "ilac-kayit-defteri", "İlaç Kayıt Defteri");
 }

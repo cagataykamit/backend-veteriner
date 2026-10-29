@@ -1,7 +1,7 @@
 namespace Backend.Veteriner.Application.Reports.Registers.Prescriptions;
 
 /// <summary>
-/// Reçete defteri sütunlarının tek tanımı (CSV ve XLSX bunu okur). Resmî biçim doğrulandığında yalnız bu liste güncellenir.
+/// Reçete defteri sütunlarının tek tanımı (CSV, XLSX ve PDF bunu okur). Resmî biçim doğrulandığında yalnız bu liste güncellenir.
 /// </summary>
 internal static class PrescriptionRegisterColumns
 {
@@ -25,6 +25,10 @@ internal static class PrescriptionRegisterColumns
         RegisterColumn<PrescriptionRegisterEntryDto>.Number(Animal, "Sayısı", r => r.AnimalCount),
         RegisterColumn<PrescriptionRegisterEntryDto>.Text(null, "İlacın Adı, Farmakolojik Şekli, Ambalajı, Adedi", r => string.Join("; ", r.Items.Select(FormatItem))),
     ];
+
+    /// <summary>PDF dışa aktarma tanımı (CSV/XLSX işleyicileri sütunları doğrudan kullanır).</summary>
+    public static readonly RegisterExportSpec<PrescriptionRegisterEntryDto> Export =
+        new(All, "Recete Defteri", "recete-defteri", "Reçete Kayıt Defteri");
 
     /// <summary><c>Ad (farmakolojik şekil, ambalaj) ×Adet</c>; boş parçalar atlanır.</summary>
     private static string FormatItem(PrescriptionRegisterItemDto item)

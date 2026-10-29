@@ -135,7 +135,7 @@ public sealed class RegisterReportTests
             .Setup(r => r.ReadAsync(It.IsAny<RegisterReadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegisterReadResult<ExaminationRegisterItemDto>(ReportsSharedLimits.MaxExportRows + 1, []));
 
-        var r = await Runner().LoadForExportAsync(_reader.Object, Query(), CancellationToken.None);
+        var r = await Runner().LoadForExportAsync(_reader.Object, Query(), RegisterExportFormat.Csv, CancellationToken.None);
 
         r.Error.Code.Should().Be("Registers.ExportTooManyRows");
     }

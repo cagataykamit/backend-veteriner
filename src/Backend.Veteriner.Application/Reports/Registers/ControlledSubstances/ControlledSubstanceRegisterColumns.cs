@@ -25,7 +25,7 @@ internal static class ControlledSubstanceRegisterColumns
     ];
 
     public static readonly RegisterExportSpec<ControlledSubstanceRegisterItemDto> Export =
-        new(All, "Narkotik-Psikotropik", "narkotik-psikotropik-defteri");
+        new(All, "Narkotik-Psikotropik", "narkotik-psikotropik-defteri", "Narkotik ve Psikotropik Ürünler Stok ve Sarf Defteri");
 
     /// <summary><c>Ad (farmakolojik şekil)</c>; şekil yoksa yalnız ad.</summary>
     private static string FormatProduct(ControlledSubstanceRegisterItemDto r)
