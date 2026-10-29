@@ -29,6 +29,7 @@ Kapsam: yalnız statik kod okuma (`C:\Users\DELL\source\repos\Veteriner`, `main`
 - Kanıt: `LockoutEnd`/`FailedLogin` benzeri alan yok (`grep` boş). Kullanıcı yokken yanıt, var olup parola yanlışken BCrypt süresi kadar sonra döner.
 - İstismar: dağıtık IP'lerle tek hesaba yavaş tahmin; zamanlama farkıyla e-posta numaralandırma. Hata mesajı aynı olduğu için yalnız zamanlama sızar.
 - Öneri: hesap bazlı ardışık hata sayacı + geçici kilit (veya hesap+IP birleşik limit), kullanıcı yokken sahte hash doğrulaması. Çaba: orta (migration gerekir; onay şart).
+- Durum (2026-10-29): giderildi (SEC-001). 5 hatalı denemede 15 dk kilit, olmayan/kilitli hesapta sahte hash doğrulaması, `Auth.Login.LockedOut` denetim kaydı; migration `AddUserLoginLockout`. Ayrıntı: `AUTH_TENANT_CONTRACT.md` Login.
 
 **O4. Güvenlik başlıkları ve HSTS yok; CORS varsayılanı üretimde `localhost`; `AllowedHosts: "*"`**
 - Konum: `appsettings.json:236` (`AllowedHosts`), `WebApplicationBuilderExtensions.cs:134-146` (`AllowedOrigins` yoksa `http://localhost:4200`, `AllowCredentials`), `appsettings*.json` içinde `AllowedOrigins` anahtarı **yok**. `UseHsts`, `X-Content-Type-Options`, `X-Frame-Options`, CSP için hiçbir kod bulunmadı.

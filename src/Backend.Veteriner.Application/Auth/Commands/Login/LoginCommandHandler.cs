@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Auth.Contracts;
@@ -24,7 +25,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
     /// <summary>Tanılama: ardışık login denemelerinde userLookup süresini karşılaştırmak için (1. genelde soğuk path).</summary>
     private static long _loginUserLookupAttemptCounter;
 
-    private readonly IUserReadRepository _users;
+    private readonly IUserRepository _users;
     private readonly IPasswordHasher _hasher;
     private readonly IJwtTokenService _jwt;
     private readonly ITokenHashService _tokenHash;
@@ -37,11 +38,12 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
     private readonly IUserTenantRepository _userTenants;
     private readonly ITenantScope _tenantScope;
     private readonly SessionOptions _sessionOpt;
+    private readonly IAuditLogWriter _auditLogWriter;
     private readonly ILogger<LoginCommandHandler> _logger;
     private readonly TimeProvider _timeProvider;
 
     public LoginCommandHandler(
-        IUserReadRepository users,
+        IUserRepository users,
         IPasswordHasher hasher,
         IJwtTokenService jwt,
         ITokenHashService tokenHash,
@@ -54,6 +56,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         IUserTenantRepository userTenants,
         ITenantScope tenantScope,
         IOptions<SessionOptions> sessionOpt,
+        IAuditLogWriter auditLogWriter,
         TimeProvider timeProvider,
         ILogger<LoginCommandHandler>? logger = null)
     {
@@ -70,7 +73,8 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
         _userTenants = userTenants;
         _tenantScope = tenantScope;
         _sessionOpt = sessionOpt.Value;
-        _logger = logger ?? NullLogger<LoginCommandHandler>.Instance;
+        _auditLogWriter = auditLogWriter;
+        _logger =logger ?? NullLogger<LoginCommandHandler>.Instance;
         _timeProvider = timeProvider;
     }
 
@@ -130,12 +134,13 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
                 stepElapsedMs.GetValueOrDefault("userLookup", -1));
         }
 
-        if (loginUser is null)
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        if (loginUser is null || SignInLockout.IsLockedOut(loginUser.LockedUntilUtc, utcNow))
         {
+            // Hesap yok veya kilitli: yanlış parolayla aynı yanıt ve aynı süre (SEC-001).
+            _hasher.VerifyAgainstDummyHash(request.Password);
             LogStepBreakdown("invalid-credentials");
-            return Result<LoginResultDto>.Failure(
-                "Auth.Unauthorized.InvalidCredentials",
-                "Kullanıcı veya şifre hatalı.");
+            return InvalidCredentials();
         }
 
         var passwordOk = _hasher.Verify(request.Password, loginUser.PasswordHash);
@@ -150,10 +155,17 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
 
         if (!passwordOk)
         {
+            await RecordFailedLoginAsync(loginUser.Id, utcNow, ct);
             LogStepBreakdown("invalid-credentials");
-            return Result<LoginResultDto>.Failure(
-                "Auth.Unauthorized.InvalidCredentials",
-                "Kullanıcı veya şifre hatalı.");
+            return InvalidCredentials();
+        }
+
+        if (loginUser.FailedLoginCount > 0 || loginUser.LockedUntilUtc is not null)
+        {
+            var user = await _users.GetByIdAsync(loginUser.Id, ct);
+            user?.ClearLockout();
+            await _users.SaveChangesAsync(ct);
+            MarkStep("clearLockout");
         }
 
         var roleNames = await _users.GetRoleNamesByUserIdAsync(loginUser.Id, ct);
@@ -243,8 +255,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
 
         var refreshHash = _tokenHash.ComputeSha256(refreshRaw);
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-        var rt = new Backend.Veteriner.Domain.Users.RefreshToken(
+        var rt =new Backend.Veteriner.Domain.Users.RefreshToken(
             loginUser.Id,
             refreshHash,
             utcNow.AddDays(_jwtOpt.RefreshTokenDays),
@@ -271,6 +282,48 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
 
         var dto = new LoginResultDto(access, refreshRaw, accessExp, tenantId, 1);
         return Result<LoginResultDto>.Success(dto);
+    }
+
+    private static Result<LoginResultDto> InvalidCredentials()
+        => Result<LoginResultDto>.Failure(
+            "Auth.Unauthorized.InvalidCredentials",
+            "Kullanıcı veya şifre hatalı.");
+
+    /// <summary>Yanlış parola sayacı (SEC-001); hesap bu denemeyle kilitlendiyse uyarı loglanır ve denetim kaydı yazılır.</summary>
+    private async Task RecordFailedLoginAsync(Guid userId, DateTime utcNow, CancellationToken ct)
+    {
+        var user = await _users.GetByIdAsync(userId, ct);
+        if (user is null)
+            return;
+
+        var lockedNow = user.RecordFailedLogin(utcNow);
+        await _users.SaveChangesAsync(ct);
+        if (!lockedNow)
+            return;
+
+        _logger.LogWarning(
+            "Login: account locked after {MaxFailedAttempts} failed attempts. UserId={UserId} LockedUntilUtc={LockedUntilUtc}",
+            SignInLockout.MaxFailedAttempts,
+            userId,
+            user.LockedUntilUtc);
+
+        await _auditLogWriter.WriteAsync(
+            new AuditLogEntry(
+                ActorUserId: null,
+                Action: "Auth.Login.LockedOut",
+                TargetType: nameof(User),
+                TargetId: userId.ToString("D"),
+                Success: false,
+                FailureReason: $"Art arda {SignInLockout.MaxFailedAttempts} hatalı parola; hesap {SignInLockout.Duration.TotalMinutes:0} dakika kilitlendi.",
+                Route: _client.Path,
+                HttpMethod: _client.Method,
+                IpAddress: _client.IpAddress,
+                UserAgent: _client.UserAgent,
+                CorrelationId: _client.CorrelationId,
+                RequestName: nameof(LoginCommand),
+                RequestPayload: null,
+                OccurredAtUtc: utcNow),
+            ct);
     }
 
     /// <summary>

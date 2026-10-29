@@ -7,4 +7,6 @@ public sealed record LoginUserLookupResult(
     Guid Id,
     string Email,
     bool EmailConfirmed,
-    string PasswordHash);
+    string PasswordHash,
+    int FailedLoginCount,
+    DateTime? LockedUntilUtc);

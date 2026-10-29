@@ -45,7 +45,9 @@ public sealed class UserRepository : EfRepository<User>, IUserRepository
                 u.Id,
                 u.Email,
                 u.EmailConfirmed,
-                u.PasswordHash));
+                u.PasswordHash,
+                u.FailedLoginCount,
+                u.LockedUntilUtc));
 
         if (_logger.IsEnabled(LogLevel.Debug))
         {

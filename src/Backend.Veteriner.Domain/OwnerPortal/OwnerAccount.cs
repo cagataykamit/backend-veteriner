@@ -5,7 +5,7 @@ namespace Backend.Veteriner.Domain.OwnerPortal;
 /// <summary>
 /// Hasta sahibi portal hesabı (ADR-031 K3, AK-3): kişi başına tek hesap, klinik/müşteri kayıtlarına
 /// <see cref="OwnerAccountClientLink"/> ile bağlanır. Personel kullanıcısından (<c>User</c>) ayrı bir kimliktir.
-/// Parola opsiyoneldir; hesap e-posta koduyla da girer (AK-2). Kilit kuralı yalnızca burada yaşar.
+/// Parola opsiyoneldir; hesap e-posta koduyla da girer (AK-2). Kilit kuralı <see cref="SignInLockout"/>'tadır.
 /// </summary>
 public sealed class OwnerAccount
 {
@@ -16,9 +16,9 @@ public sealed class OwnerAccount
     public const string DeletedDisplayName = "Silinmiş hesap";
 
     /// <summary>Art arda bu kadar başarısız giriş (yanlış parola veya kod) hesabı kilitler.</summary>
-    public const int MaxFailedSignInAttempts = 5;
+    public const int MaxFailedSignInAttempts = SignInLockout.MaxFailedAttempts;
 
-    public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+    public static readonly TimeSpan LockoutDuration = SignInLockout.Duration;
 
     public Guid Id { get; private set; } = Guid.NewGuid();
 
@@ -63,7 +63,7 @@ public sealed class OwnerAccount
 
     public bool IsActive => Status == OwnerAccountStatus.Active;
 
-    public bool IsLockedOut(DateTime utcNow) => LockedUntilUtc is { } until && ToUtc(utcNow) < until;
+    public bool IsLockedOut(DateTime utcNow) => SignInLockout.IsLockedOut(LockedUntilUtc, utcNow);
 
     /// <summary>Kimlik bilgisi (parola/kod) denenebilir mi: hesap aktif ve kilitli değil.</summary>
     public bool CanAttemptSignIn(DateTime utcNow) => IsActive && !IsLockedOut(utcNow);
@@ -75,23 +75,9 @@ public sealed class OwnerAccount
         PasswordHash = passwordHash;
     }
 
-    /// <summary>
-    /// Başarısız giriş: sayaç artar, <see cref="MaxFailedSignInAttempts"/>'a ulaşınca hesap <see cref="LockoutDuration"/>
-    /// kilitlenir ve sayaç sıfırlanır. Kilitliyken çağrı kilidi uzatmaz.
-    /// </summary>
+    /// <summary>Başarısız giriş; sayaç ve kilit kuralı <see cref="SignInLockout.RecordFailure"/>.</summary>
     public void RecordFailedSignIn(DateTime utcNow)
-    {
-        var now = ToUtc(utcNow);
-        if (IsLockedOut(now))
-            return;
-
-        FailedSignInCount++;
-        if (FailedSignInCount >= MaxFailedSignInAttempts)
-        {
-            LockedUntilUtc = now.Add(LockoutDuration);
-            FailedSignInCount = 0;
-        }
-    }
+        => (FailedSignInCount, LockedUntilUtc) = SignInLockout.RecordFailure(FailedSignInCount, LockedUntilUtc, utcNow);
 
     public void RecordSuccessfulSignIn(DateTime utcNow)
     {

@@ -43,7 +43,8 @@ public sealed class RateLimitingIntegrationTests : IClassFixture<CustomWebApplic
     {
         var body = new
         {
-            Email = "admin@example.com",
+            // Ortak yönetici hesabı kilitlenmesin (SEC-001); olmayan hesap da aynı 401 yolundan geçer.
+            Email = "rate-limit-unknown@example.com",
             Password = "wrong-password"
         };
 
