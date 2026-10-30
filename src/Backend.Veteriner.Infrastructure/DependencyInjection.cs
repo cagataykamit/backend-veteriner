@@ -6,7 +6,10 @@ using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.Queries;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
+using Backend.Veteriner.Infrastructure.AppointmentRequests;
+using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Clinics;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories.Notifications;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Visits;
 using Backend.Veteriner.Application.Auth.Contracts;                              // IPermissionReader
@@ -187,6 +190,7 @@ public static class DependencyInjection
         services.AddScoped<IVisitTodayReader, VisitTodayReader>();
         services.AddScoped<IVisitOpenItemsReader, VisitOpenItemsReader>();
         services.AddScoped<IClinicVeterinarianReader, ClinicVeterinarianReader>();
+        services.AddScoped<IUserNotificationRecipientReader, UserNotificationRecipientReader>();
         services.AddScoped<IDashboardFinancePaymentAggregatesReader, DashboardFinancePaymentAggregatesReader>();
         services.AddScoped<IPaymentPetCountReader, PaymentPetCountReader>();
         services.AddScoped<IAppointmentsReportStatusBreakdownReader, AppointmentsReportStatusBreakdownReader>();
@@ -339,6 +343,9 @@ public static class DependencyInjection
         services.AddScoped<IPaymentReadModelHealthReader, PaymentReadModelHealthReader>();
 
         // ===== RefreshToken cleanup background worker =====
+        services.Configure<AppointmentRequestExpiryOptions>(configuration.GetSection("AppointmentRequestExpiry"));
+        services.AddHostedService<AppointmentRequestExpiryHostedService>();
+
         services.Configure<RefreshTokenCleanupOptions>(configuration.GetSection("RefreshTokenCleanup"));
         services.AddHostedService<RefreshTokenCleanupHostedService>();
 
