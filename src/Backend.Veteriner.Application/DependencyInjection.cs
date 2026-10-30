@@ -1,4 +1,10 @@
 using System.Reflection;
+using Backend.Veteriner.Application.AppointmentRequests;
+using Backend.Veteriner.Application.AppointmentRequests.Staff;
+using Backend.Veteriner.Application.Appointments;
+using Backend.Veteriner.Application.Notifications;
+using Backend.Veteriner.Application.Appointments.Availability;
+using Backend.Veteriner.Application.Clinics.OnlineBooking;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
@@ -50,6 +56,16 @@ public static class DependencyInjection
         services.AddScoped<IClinicAssignmentAccessGuard, ClinicAssignmentAccessGuard>();
         services.AddScoped<IClinicReadScopeResolver, ClinicReadScopeResolver>();
         services.AddScoped<IHospitalizationWardClinicAccess, HospitalizationWardClinicAccess>();
+        services.AddScoped<ClinicDefinitionAccess>();
+        services.AddScoped<AppointmentAssignment>();
+        services.AddScoped<AppointmentAvailabilityService>();
+        services.AddScoped<OnlineBookingClinicResolver>();
+        services.AddScoped<IUserNotificationPublisher, UserNotificationPublisher>();
+        services.AddScoped<AppointmentRequestEmailComposer>();
+        services.AddScoped<AppointmentRequestVerificationService>();
+        services.AddScoped<AppointmentRequestIntake>();
+        services.AddScoped<StaffAppointmentRequestAccess>();
+        services.AddScoped<StaffAppointmentRequestMapper>();
         services.AddScoped<StockBatchResolver>();
         services.AddScoped<ExpiredStockReader>();
         services.AddScoped<SaleDtoAssembler>();

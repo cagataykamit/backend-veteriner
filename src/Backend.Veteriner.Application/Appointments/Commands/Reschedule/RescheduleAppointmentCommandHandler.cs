@@ -25,6 +25,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
     private readonly IRepository<Appointment> _appointmentsWrite;
     private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
     private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
+    private readonly AppointmentAssignment _assignment;
     private readonly TimeProvider _timeProvider;
 
     public RescheduleAppointmentCommandHandler(
@@ -37,6 +38,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         IRepository<Appointment> appointmentsWrite,
         IAppointmentProjectionSnapshotFactory snapshotFactory,
         IAppointmentIntegrationEventOutbox eventOutbox,
+        AppointmentAssignment assignment,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -48,6 +50,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         _appointmentsWrite = appointmentsWrite;
         _snapshotFactory = snapshotFactory;
         _eventOutbox = eventOutbox;
+        _assignment = assignment;
         _timeProvider = timeProvider;
     }
 
@@ -130,6 +133,14 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
             return Result.Failure(
                 "Appointments.PetTimeConflict",
                 "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
+        }
+
+        if (appointment.VeterinarianUserId is { } vetId)
+        {
+            var vetFree = await _assignment.EnsureVeterinarianFreeAsync(
+                tenantId, vetId, scheduledUtc, endUtc, appointment.Id, ct);
+            if (!vetFree.IsSuccess)
+                return vetFree;
         }
 
         var hoursRows = await _clinicWorkingHoursRead.ListAsync(

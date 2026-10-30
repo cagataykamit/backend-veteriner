@@ -145,6 +145,214 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.AppointmentRequests.AppointmentRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AppointmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ApprovedStartUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ApprovedVeterinarianUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ContactEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("OwnerAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OwnerNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("PetBreed")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PetName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PetSpecies")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<Guid>("ReasonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReasonName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("RequestedStartUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("WasRescheduled")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("ReasonId");
+
+                    b.HasIndex("Status", "RequestedStartUtc");
+
+                    b.HasIndex("TenantId", "OwnerAccountId");
+
+                    b.HasIndex("TenantId", "ClinicId", "ContactEmail", "Status");
+
+                    b.HasIndex("TenantId", "ClinicId", "Status", "RequestedStartUtc");
+
+                    b.ToTable("AppointmentRequests", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.AppointmentRequests.AppointmentRequestEmailVerification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("ConsumedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("InvalidatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId", "Email", "CreatedAtUtc");
+
+                    b.ToTable("AppointmentRequestEmailVerifications", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.AppointmentRequests.ClinicAppointmentRequestEmailTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("ClinicAppointmentRequestEmailTemplates", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.Appointment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -175,6 +383,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("PetId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ReasonId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("ScheduledAtUtc")
                         .HasColumnType("datetime2");
 
@@ -184,7 +395,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("VeterinarianUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ReasonId");
 
                     b.HasIndex("TenantId");
 
@@ -198,9 +414,59 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenantId", "ClinicId", "PetId"), new[] { "ScheduledAtUtc" });
 
+                    b.HasIndex("TenantId", "VeterinarianUserId", "ScheduledAtUtc");
+
                     b.HasIndex("TenantId", "ClinicId", "ScheduledAtUtc", "Status");
 
                     b.ToTable("Appointments", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.AppointmentReason", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DefaultDurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsOnlineBookable")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId", "Name")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("AppointmentReasons", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Auth.OperationClaim", b =>
@@ -1309,6 +1575,55 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("ClinicKvkkFormTemplates", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicOnlineBookingSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BookingCode")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(12)");
+
+                    b.Property<DateTime>("BookingCodeGeneratedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaxAdvanceDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MinLeadMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingCode")
+                        .IsUnique();
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicOnlineBookingSettings", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicTaxpayerSettings", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2374,6 +2689,56 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("CK_LegalAcceptances_SingleAcceptor", "([UserId] IS NOT NULL AND [TenantId] IS NOT NULL AND [OwnerAccountId] IS NULL) OR ([UserId] IS NULL AND [TenantId] IS NULL AND [OwnerAccountId] IS NOT NULL)");
                         });
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Notifications.UserNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TargetType")
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "UserId", "CreatedAtUtc");
+
+                    b.HasIndex("TenantId", "UserId", "ReadAtUtc");
+
+                    b.ToTable("UserNotifications", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.OwnerAccount", b =>
@@ -4915,6 +5280,130 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.AppointmentRequests.AppointmentRequest", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Appointments.AppointmentReason", null)
+                        .WithMany()
+                        .HasForeignKey("ReasonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsMany("Backend.Veteriner.Domain.AppointmentRequests.AppointmentRequestStatusChange", "History", b1 =>
+                        {
+                            b1.Property<long>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("bigint");
+
+                            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b1.Property<long>("Id"));
+
+                            b1.Property<int>("ActorKind")
+                                .HasColumnType("int");
+
+                            b1.Property<Guid?>("ActorUserId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<Guid>("AppointmentRequestId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<DateTime>("AtUtc")
+                                .HasColumnType("datetime2");
+
+                            b1.Property<int?>("FromStatus")
+                                .HasColumnType("int");
+
+                            b1.Property<string>("Note")
+                                .HasMaxLength(500)
+                                .HasColumnType("nvarchar(500)");
+
+                            b1.Property<int>("ToStatus")
+                                .HasColumnType("int");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("AppointmentRequestId");
+
+                            b1.ToTable("AppointmentRequestStatusChanges", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("AppointmentRequestId");
+                        });
+
+                    b.Navigation("History");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.AppointmentRequests.AppointmentRequestEmailVerification", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.AppointmentRequests.ClinicAppointmentRequestEmailTemplate", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.Appointment", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Appointments.AppointmentReason", null)
+                        .WithMany()
+                        .HasForeignKey("ReasonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.AppointmentReason", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsMany("Backend.Veteriner.Domain.Appointments.AppointmentReasonVeterinarian", "Veterinarians", b1 =>
+                        {
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("int");
+
+                            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b1.Property<int>("Id"));
+
+                            b1.Property<Guid>("AppointmentReasonId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<Guid>("UserId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("AppointmentReasonId", "UserId")
+                                .IsUnique();
+
+                            b1.ToTable("AppointmentReasonVeterinarians", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("AppointmentReasonId");
+                        });
+
+                    b.Navigation("Veterinarians");
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Auth.OperationClaimPermission", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Auth.OperationClaim", null)
@@ -5024,6 +5513,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ClinicId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicOnlineBookingSettings", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

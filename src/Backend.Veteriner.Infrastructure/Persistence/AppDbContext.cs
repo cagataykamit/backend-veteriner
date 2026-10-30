@@ -1,5 +1,6 @@
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.DemoRequests;
+using Backend.Veteriner.Domain.AppointmentRequests;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Visits;
@@ -21,6 +22,7 @@ using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.LabResults;
+using Backend.Veteriner.Domain.Notifications;
 using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Prescriptions;
@@ -98,6 +100,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<UserClinic> UserClinics => Set<UserClinic>();
     public DbSet<ClinicWorkingHour> ClinicWorkingHours => Set<ClinicWorkingHour>();
     public DbSet<ClinicAppointmentSettings> ClinicAppointmentSettings => Set<ClinicAppointmentSettings>();
+    public DbSet<ClinicOnlineBookingSettings> ClinicOnlineBookingSettings => Set<ClinicOnlineBookingSettings>();
     public DbSet<ClinicKvkkFormTemplate> ClinicKvkkFormTemplates => Set<ClinicKvkkFormTemplate>();
     public DbSet<ClinicTaxpayerSettings> ClinicTaxpayerSettings => Set<ClinicTaxpayerSettings>();
     public DbSet<Client> Clients => Set<Client>();
@@ -106,6 +109,11 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Breed> Breeds => Set<Breed>();
     public DbSet<PetColor> PetColors => Set<PetColor>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<AppointmentReason> AppointmentReasons => Set<AppointmentReason>();
+    public DbSet<AppointmentRequest> AppointmentRequests => Set<AppointmentRequest>();
+    public DbSet<AppointmentRequestEmailVerification> AppointmentRequestEmailVerifications => Set<AppointmentRequestEmailVerification>();
+    public DbSet<ClinicAppointmentRequestEmailTemplate> ClinicAppointmentRequestEmailTemplates => Set<ClinicAppointmentRequestEmailTemplate>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
     public DbSet<Examination> Examinations => Set<Examination>();
     public DbSet<ExaminationAddendum> ExaminationAddenda => Set<ExaminationAddendum>();
     public DbSet<RecordChange> RecordChanges => Set<RecordChange>();

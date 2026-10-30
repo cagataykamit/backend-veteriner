@@ -185,6 +185,9 @@ public static class RolePermissionBindings
 
                 // Hasta sahibi portalı daveti ve erişim yönetimi yalnız yönetici düzeyi (ADR-031).
                 PermissionCatalog.OwnerPortal.Manage,
+
+                // Online randevu talep kuyruğu (ADR-042 K4).
+                PermissionCatalog.AppointmentRequests.Manage,
             ],
 
             // Tenant sahibi: Admin ile aynı operasyonel paket (ürün kararı: Owner ≈ Admin).
@@ -318,6 +321,9 @@ public static class RolePermissionBindings
 
                 // Hasta sahibi portalı daveti ve erişim yönetimi yalnız yönetici düzeyi (ADR-031).
                 PermissionCatalog.OwnerPortal.Manage,
+
+                // Online randevu talep kuyruğu (ADR-042 K4).
+                PermissionCatalog.AppointmentRequests.Manage,
             ],
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini
@@ -450,6 +456,9 @@ public static class RolePermissionBindings
 
                 // Hasta sahibi portalı daveti ve erişim yönetimi yalnız yönetici düzeyi (ADR-031).
                 PermissionCatalog.OwnerPortal.Manage,
+
+                // Online randevu talep kuyruğu (ADR-042 K4).
+                PermissionCatalog.AppointmentRequests.Manage,
             ],
 
             // Tıbbi operasyon: klinik kayıtlarını (muayene/aşı/tedavi/reçete/lab/yatış) yönetir.
@@ -592,6 +601,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.ExaminationTemplates.Read,
 
                 PermissionCatalog.Reminders.Read,
+
+                // Online randevu talep kuyruğu resepsiyon işidir (ADR-042 K4).
+                PermissionCatalog.AppointmentRequests.Manage,
             ],
         };
 

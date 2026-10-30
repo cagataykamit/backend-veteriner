@@ -8,4 +8,7 @@ public interface IOwnerPortalSecretGenerator
 
     /// <summary>Verilen uzunlukta, eşit dağılımlı rakam dizisi.</summary>
     string CreateNumericCode(int length);
+
+    /// <summary>Bağlantıda paylaşılacak kod: küçük harf ve rakam, karışan karakterler (0/o, 1/l/i) yok.</summary>
+    string CreateLinkCode(int length);
 }

@@ -12,14 +12,15 @@ public static class OwnerPortalEmails
 {
     public sealed record Message(string Subject, string Body);
 
-    /// <summary>Davet bağlantısı: <c>{PortalBaseUrl}/invite?token=…</c>; kök boşsa <c>{FrontendBaseUrl}/portal</c>.</summary>
-    public static string InviteLink(OwnerPortalOptions portal, AppOptions app, string rawToken)
-    {
-        var root = string.IsNullOrWhiteSpace(portal.PortalBaseUrl)
+    /// <summary>Portal kökü: <c>PortalBaseUrl</c>; boşsa <c>{FrontendBaseUrl}/portal</c>.</summary>
+    public static string PortalRoot(OwnerPortalOptions portal, AppOptions app)
+        => string.IsNullOrWhiteSpace(portal.PortalBaseUrl)
             ? $"{(app.FrontendBaseUrl ?? string.Empty).TrimEnd('/')}/portal"
             : portal.PortalBaseUrl.TrimEnd('/');
-        return $"{root}/invite?token={Uri.EscapeDataString(rawToken)}";
-    }
+
+    /// <summary>Davet bağlantısı: <c>{PortalBaseUrl}/invite?token=…</c>; kök boşsa <c>{FrontendBaseUrl}/portal</c>.</summary>
+    public static string InviteLink(OwnerPortalOptions portal, AppOptions app, string rawToken)
+        => $"{PortalRoot(portal, app)}/invite?token={Uri.EscapeDataString(rawToken)}";
 
     public static Message Invite(string clinicName, string link, int expiryDays) => new(
         $"{clinicName} sizi hasta sahibi portalına davet ediyor",

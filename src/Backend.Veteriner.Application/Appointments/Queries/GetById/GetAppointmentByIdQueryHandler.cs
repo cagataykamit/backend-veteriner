@@ -127,7 +127,9 @@ public sealed class GetAppointmentByIdQueryHandler
             a.DurationMinutes,
             a.ScheduledEndUtc,
             a.Status,
-            a.Notes);
+            a.Notes,
+            a.ReasonId,
+            a.VeterinarianUserId);
         return Result<AppointmentDetailDto>.Success(dto);
     }
 }

@@ -265,6 +265,12 @@ public static class PermissionCatalog
         public const string Manage = "OwnerPortal.Manage";
     }
 
+    /// <summary>Online randevu talepleri (ADR-042 K4): kuyruğu görme, onay/red. Klinik yöneticisi ve resepsiyon.</summary>
+    public static class AppointmentRequests
+    {
+        public const string Manage = "AppointmentRequests.Manage";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -421,6 +427,8 @@ public static class PermissionCatalog
         new(Imports.Commit, "İçe aktarmayı onaylayıp uygulama, hatırlatmaları serbest bırakma ve geri alma yetkisi", "Imports"),
 
         new(OwnerPortal.Manage, "Hasta sahibi portalı daveti gönderme/iptal etme, bağ durumunu görme ve erişimi kapatma yetkisi", "OwnerPortal"),
+
+        new(AppointmentRequests.Manage, "Online randevu taleplerini görme, onaylama ve reddetme yetkisi", "AppointmentRequests"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 

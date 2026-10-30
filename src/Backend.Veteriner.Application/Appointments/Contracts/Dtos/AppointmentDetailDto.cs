@@ -21,4 +21,6 @@ public sealed record AppointmentDetailDto(
     int DurationMinutes,
     DateTime ScheduledEndUtc,
     AppointmentStatus Status,
-    string? Notes);
+    string? Notes,
+    Guid? ReasonId = null,
+    Guid? VeterinarianUserId = null);

@@ -1,0 +1,92 @@
+using Backend.Veteriner.Domain.Shared;
+
+namespace Backend.Veteriner.Domain.Notifications;
+
+/// <summary>Bildirim türü (ADR-042 K5; UX-008). Sayısal değerler stabildir.</summary>
+public enum UserNotificationType
+{
+    /// <summary>Yeni online randevu talebi (talep kuyruğu yetkisi olanlara).</summary>
+    AppointmentRequestCreated = 0,
+
+    /// <summary>Sahip bekleyen talebini iptal etti.</summary>
+    AppointmentRequestCancelled = 1,
+
+    /// <summary>Kişiye atanan iş: randevu bir hekime atandı.</summary>
+    AppointmentAssigned = 2,
+}
+
+/// <summary>
+/// Kullanıcıya kalıcı bildirim (APPT-015, UX-008): kime, hangi olay, hangi kayıt, okundu mu. Yalnız olay tabanlı ve kişiye yönelik
+/// olaylar buraya girer; kaynak kayıttan hesaplanan açık işler listesinin yerini almaz (ASAMA8 D-N1/D-N2).
+/// </summary>
+public sealed class UserNotification : ITenantOwned
+{
+    public const int TitleMaxLength = 200;
+    public const int BodyMaxLength = 500;
+    public const int TargetTypeMaxLength = 50;
+
+    public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid TenantId { get; private set; }
+    public Guid? ClinicId { get; private set; }
+    public Guid UserId { get; private set; }
+    public UserNotificationType Type { get; private set; }
+    public string Title { get; private set; } = default!;
+    public string? Body { get; private set; }
+
+    /// <summary>Tıklanınca açılacak kayıt türü (ör. <c>AppointmentRequest</c>, <c>Appointment</c>).</summary>
+    public string? TargetType { get; private set; }
+
+    public Guid? TargetId { get; private set; }
+    public DateTime CreatedAtUtc { get; private set; }
+    public DateTime? ReadAtUtc { get; private set; }
+
+    public bool IsRead => ReadAtUtc is not null;
+
+    private UserNotification() { }
+
+    public static UserNotification Create(
+        Guid tenantId,
+        Guid? clinicId,
+        Guid userId,
+        UserNotificationType type,
+        string title,
+        string? body,
+        string? targetType,
+        Guid? targetId,
+        DateTime utcNow)
+    {
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
+        if (userId == Guid.Empty)
+            throw new ArgumentException("UserId geçersiz.", nameof(userId));
+        if (!Enum.IsDefined(type))
+            throw new ArgumentOutOfRangeException(nameof(type));
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ArgumentException("Başlık boş olamaz.", nameof(title));
+
+        return new UserNotification
+        {
+            TenantId = tenantId,
+            ClinicId = clinicId,
+            UserId = userId,
+            Type = type,
+            Title = Truncate(title.Trim(), TitleMaxLength),
+            Body = string.IsNullOrWhiteSpace(body) ? null : Truncate(body.Trim(), BodyMaxLength),
+            TargetType = targetType,
+            TargetId = targetId,
+            CreatedAtUtc = utcNow,
+        };
+    }
+
+    /// <summary>Okundu işaretler; zaten okunduysa değişiklik yok (<c>false</c>).</summary>
+    public bool MarkRead(DateTime utcNow)
+    {
+        if (ReadAtUtc is not null)
+            return false;
+
+        ReadAtUtc = utcNow;
+        return true;
+    }
+
+    private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max];
+}
