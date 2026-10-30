@@ -1,3 +1,6 @@
+using Backend.Veteriner.Application.Appointments;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
+using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.Appointments.Commands.Reschedule;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
@@ -24,6 +27,13 @@ public sealed class AppointmentConcurrencyCommandHandlerTests
     private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
     private readonly Mock<IAppointmentProjectionSnapshotFactory> _snapshotFactory = new();
     private readonly Mock<IAppointmentIntegrationEventOutbox> _eventOutbox = new();
+
+    private AppointmentAssignment AssignmentRules() => new(
+        new Mock<IReadRepository<AppointmentReason>>().Object,
+        _appointmentsRead.Object,
+        new Mock<IClinicVeterinarianReader>().Object,
+        new Mock<IUserNotificationPublisher>().Object,
+        new Mock<IClientContext>().Object);
 
     public AppointmentConcurrencyCommandHandlerTests()
     {
@@ -61,6 +71,7 @@ public sealed class AppointmentConcurrencyCommandHandlerTests
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
             _eventOutbox.Object,
+            AssignmentRules(),
             TimeProvider.System);
 
         var result = await handler.Handle(

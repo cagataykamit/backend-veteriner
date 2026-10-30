@@ -1,3 +1,6 @@
+using Backend.Veteriner.Application.Appointments;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
+using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.Appointments.Commands.Cancel;
 using Backend.Veteriner.Application.Appointments.Commands.Complete;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
@@ -36,6 +39,13 @@ public sealed class AppointmentMutationSequenceTests
     private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
     private readonly Mock<IAppointmentProjectionSnapshotFactory> _snapshotFactory = new();
     private readonly Mock<IAppointmentIntegrationEventOutbox> _eventOutbox = new();
+
+    private AppointmentAssignment AssignmentRules() => new(
+        new Mock<IReadRepository<AppointmentReason>>().Object,
+        _appointmentsRead.Object,
+        new Mock<IClinicVeterinarianReader>().Object,
+        new Mock<IUserNotificationPublisher>().Object,
+        new Mock<IClientContext>().Object);
 
     public AppointmentMutationSequenceTests()
     {
@@ -79,6 +89,7 @@ public sealed class AppointmentMutationSequenceTests
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
             _eventOutbox.Object,
+            AssignmentRules(),
             TimeProvider.System);
 
         var result = await handler.Handle(
@@ -121,6 +132,7 @@ public sealed class AppointmentMutationSequenceTests
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
             _eventOutbox.Object,
+            AssignmentRules(),
             TimeProvider.System);
 
         var result = await handler.Handle(new RescheduleAppointmentCommand(appt.Id, SlotAlignedUtcPlusDays(3)), CancellationToken.None);
@@ -232,6 +244,7 @@ public sealed class AppointmentMutationSequenceTests
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
             _eventOutbox.Object,
+            AssignmentRules(),
             TimeProvider.System);
 
         var result = await handler.Handle(

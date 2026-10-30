@@ -29,6 +29,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
     private readonly IRepository<Appointment> _appointmentsWrite;
     private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
     private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
+    private readonly AppointmentAssignment _assignment;
     private readonly TimeProvider _timeProvider;
 
     public UpdateAppointmentCommandHandler(
@@ -43,6 +44,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         IRepository<Appointment> appointmentsWrite,
         IAppointmentProjectionSnapshotFactory snapshotFactory,
         IAppointmentIntegrationEventOutbox eventOutbox,
+        AppointmentAssignment assignment,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -56,6 +58,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
         _appointmentsWrite = appointmentsWrite;
         _snapshotFactory = snapshotFactory;
         _eventOutbox = eventOutbox;
+        _assignment = assignment;
         _timeProvider = timeProvider;
     }
 
@@ -151,6 +154,16 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
                     "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
             }
 
+            var reasonResult = await _assignment.ResolveReasonAsync(
+                tenantId, clinicId, request.ReasonId, appointment.ReasonId, ct);
+            if (!reasonResult.IsSuccess)
+                return Result.Failure(reasonResult.Error);
+
+            var vetCheck = await _assignment.EnsureVeterinarianAsync(
+                tenantId, clinicId, request.VeterinarianUserId, appointment.VeterinarianUserId, scheduledUtc, endUtc, appointment.Id, ct);
+            if (!vetCheck.IsSuccess)
+                return vetCheck;
+
             var hoursRows = await _clinicWorkingHoursRead.ListAsync(
                 new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
             var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);
@@ -160,6 +173,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
 
         var previous = await _snapshotFactory.CreateAsync(appointment, ct);
         var sequenceBefore = appointment.MutationSequence;
+        var previousVeterinarianUserId = appointment.VeterinarianUserId;
 
         var domain = appointment.ApplyWriteUpdate(
             request.Status,
@@ -168,12 +182,16 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
             scheduledUtc,
             durationMinutes,
             request.AppointmentType,
-            request.Notes);
+            request.Notes,
+            request.ReasonId,
+            request.VeterinarianUserId);
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
 
         if (appointment.MutationSequence != sequenceBefore)
         {
+            await _assignment.NotifyIfAssignedAsync(appointment, previousVeterinarianUserId, ct);
+
             var referencesChanged = previous.ClinicId != clinicId || previous.PetId != request.PetId;
             var current = referencesChanged
                 ? await _snapshotFactory.CreateAsync(appointment, ct)

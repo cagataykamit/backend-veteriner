@@ -1,3 +1,6 @@
+using Backend.Veteriner.Application.Clinics.Veterinarians;
+using Backend.Veteriner.Application.Notifications;
+using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Appointments.Commands.Cancel;
 using Backend.Veteriner.Application.Appointments.Commands.Complete;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
@@ -32,6 +35,14 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Appointment>> _appointmentsRead = new();
+
+    private AppointmentAssignment AssignmentRules() => new(
+        new Mock<IReadRepository<AppointmentReason>>().Object,
+        _appointmentsRead.Object,
+        new Mock<IClinicVeterinarianReader>().Object,
+        new Mock<IUserNotificationPublisher>().Object,
+        new Mock<IClientContext>().Object);
+
     private readonly Mock<IReadRepository<ClinicAppointmentSettingsEntity>> _clinicAppointmentSettings = new();
     private readonly Mock<IReadRepository<ClinicWorkingHour>> _clinicWorkingHoursRead = new();
     private readonly Mock<IRepository<Appointment>> _appointmentsWrite = new();
@@ -313,6 +324,7 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
             _eventOutbox.Object,
+            AssignmentRules(),
             TimeProvider.System);
 
     private UpdateAppointmentCommandHandler CreateUpdateHandler()
@@ -328,6 +340,7 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
             _eventOutbox.Object,
+            AssignmentRules(),
             TimeProvider.System);
 
     private RescheduleAppointmentCommandHandler CreateRescheduleHandler()
@@ -341,6 +354,7 @@ public sealed class AppointmentCommandHandlerOutboxEmissionTests
             _appointmentsWrite.Object,
             _snapshotFactory.Object,
             _eventOutbox.Object,
+            AssignmentRules(),
             TimeProvider.System);
 
     private CancelAppointmentCommandHandler CreateCancelHandler()

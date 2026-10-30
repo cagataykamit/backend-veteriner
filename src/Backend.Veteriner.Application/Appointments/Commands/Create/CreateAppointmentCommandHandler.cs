@@ -32,6 +32,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
     private readonly IRepository<Appointment> _appointmentsWrite;
     private readonly IAppointmentProjectionSnapshotFactory _snapshotFactory;
     private readonly IAppointmentIntegrationEventOutbox _eventOutbox;
+    private readonly AppointmentAssignment _assignment;
     private readonly TimeProvider _timeProvider;
 
     public CreateAppointmentCommandHandler(
@@ -47,6 +48,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         IRepository<Appointment> appointmentsWrite,
         IAppointmentProjectionSnapshotFactory snapshotFactory,
         IAppointmentIntegrationEventOutbox eventOutbox,
+        AppointmentAssignment assignment,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -61,6 +63,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         _appointmentsWrite = appointmentsWrite;
         _snapshotFactory = snapshotFactory;
         _eventOutbox = eventOutbox;
+        _assignment = assignment;
         _timeProvider = timeProvider;
     }
 
@@ -131,11 +134,17 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         var appointmentSettingsRow = await _clinicAppointmentSettings.FirstOrDefaultAsync(
             new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
 
+        var reasonResult = await _assignment.ResolveReasonAsync(tenantId, clinicId, request.ReasonId, null, ct);
+        if (!reasonResult.IsSuccess)
+            return Result<Guid>.Failure(reasonResult.Error);
+
+        // Süre önceliği: istekteki süre → nedenin varsayılan süresi → klinik varsayılanı (ADR-042 K2).
         int durationMinutes;
         if (request.DurationMinutes is { } requestedDuration)
             durationMinutes = requestedDuration;
         else
-            durationMinutes = appointmentSettingsRow?.DefaultAppointmentDurationMinutes
+            durationMinutes = reasonResult.Value?.DefaultDurationMinutes
+                ?? appointmentSettingsRow?.DefaultAppointmentDurationMinutes
                 ?? ClinicAppointmentSettingsDefaults.Build().DefaultAppointmentDurationMinutes;
 
         if (!Appointment.IsValidDurationMinutes(durationMinutes))
@@ -180,6 +189,11 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
                     "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
             }
 
+            var vetCheck = await _assignment.EnsureVeterinarianAsync(
+                tenantId, clinicId, request.VeterinarianUserId, null, scheduledUtc, endUtc, null, ct);
+            if (!vetCheck.IsSuccess)
+                return Result<Guid>.Failure(vetCheck.Error);
+
             var hoursRows = await _clinicWorkingHoursRead.ListAsync(
                 new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
             var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);
@@ -195,9 +209,12 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
             durationMinutes,
             request.AppointmentType,
             request.Status,
-            request.Notes);
+            request.Notes,
+            request.ReasonId,
+            request.VeterinarianUserId);
 
         await _appointmentsWrite.AddAsync(appointment, ct);
+        await _assignment.NotifyIfAssignedAsync(appointment, null, ct);
 
         var sequence = appointment.AdvanceMutationSequence();
         var current = await _snapshotFactory.CreateAsync(appointment, ct);

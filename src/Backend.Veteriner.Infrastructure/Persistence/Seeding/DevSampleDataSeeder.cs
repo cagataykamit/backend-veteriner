@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
+using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
 using Backend.Veteriner.Application.Charges.Commands.Create;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Outbox;
+using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.Payments.Commands.Create;
 using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
@@ -13,12 +15,15 @@ using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Notifications;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories.Clinics;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories.Notifications;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Projections.Payments;
 using Microsoft.EntityFrameworkCore;
@@ -388,6 +393,15 @@ public static class DevSampleDataSeeder
                 new EfRepository<Appointment>(db),
                 new AppointmentProjectionSnapshotFactory(db),
                 new AppointmentIntegrationEventOutbox(outboxBuffer),
+                new AppointmentAssignment(
+                    new EfReadRepository<AppointmentReason>(db),
+                    appointmentsRead,
+                    new ClinicVeterinarianReader(db),
+                    new UserNotificationPublisher(
+                        new UserNotificationRecipientReader(db),
+                        new EfRepository<UserNotification>(db),
+                        TimeProvider.System),
+                    clientContext),
                 TimeProvider.System);
 
             CreateCharge = new CreateChargeCommandHandler(

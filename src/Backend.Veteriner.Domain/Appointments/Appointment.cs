@@ -24,6 +24,12 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
     public AppointmentStatus Status { get; private set; }
     public string? Notes { get; private set; }
 
+    /// <summary>Randevu nedeni (ADR-042 K2); isteğe bağlı. Süre nedenden önerilir; randevuda kalıcı olan <see cref="DurationMinutes"/>'dır.</summary>
+    public Guid? ReasonId { get; private set; }
+
+    /// <summary>Randevunun hekimi (ADR-042 K3); isteğe bağlı. Hekim bazlı çakışma ve müsaitlik bu alana göre hesaplanır.</summary>
+    public Guid? VeterinarianUserId { get; private set; }
+
     /// <summary>
     /// Başarılı domain mutasyon sayacı; optimistic concurrency token.
     /// Yeni kayıt 0 ile başlar; ilk başarılı mutasyon 1 üretir.
@@ -47,7 +53,9 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
         int durationMinutes = DefaultDurationMinutes,
         AppointmentType appointmentType = AppointmentType.Other,
         AppointmentStatus? initialStatus = null,
-        string? notes = null)
+        string? notes = null,
+        Guid? reasonId = null,
+        Guid? veterinarianUserId = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -59,6 +67,10 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
             throw new ArgumentOutOfRangeException(nameof(durationMinutes), "Randevu süresi 5-240 dakika arasında olmalıdır.");
         if (!Enum.IsDefined(appointmentType))
             throw new ArgumentOutOfRangeException(nameof(appointmentType));
+        if (reasonId == Guid.Empty)
+            throw new ArgumentException("ReasonId geçersiz.", nameof(reasonId));
+        if (veterinarianUserId == Guid.Empty)
+            throw new ArgumentException("VeterinarianUserId geçersiz.", nameof(veterinarianUserId));
 
         var status = initialStatus ?? AppointmentStatus.Scheduled;
         if (!Enum.IsDefined(status))
@@ -72,6 +84,8 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
         AppointmentType = appointmentType;
         Status = status;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        ReasonId = reasonId;
+        VeterinarianUserId = veterinarianUserId;
     }
 
     /// <summary>Başarılı domain mutasyonundan sonra tam bir kez çağrılır.</summary>
@@ -223,7 +237,9 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
         DateTime scheduledAtUtc,
         int durationMinutes,
         AppointmentType appointmentType,
-        string? notes)
+        string? notes,
+        Guid? reasonId = null,
+        Guid? veterinarianUserId = null)
     {
         if (Status != AppointmentStatus.Scheduled)
         {
@@ -242,6 +258,10 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
                 "Randevu süresi 5-240 dakika arasında olmalıdır.");
         if (!Enum.IsDefined(appointmentType))
             return Result.Failure("Appointments.Validation", "Randevu türü geçersiz.");
+        if (reasonId == Guid.Empty)
+            return Result.Failure("Appointments.Validation", "ReasonId geçersiz.");
+        if (veterinarianUserId == Guid.Empty)
+            return Result.Failure("Appointments.Validation", "VeterinarianUserId geçersiz.");
 
         ClinicId = clinicId;
         PetId = petId;
@@ -249,6 +269,8 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
         DurationMinutes = durationMinutes;
         AppointmentType = appointmentType;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        ReasonId = reasonId;
+        VeterinarianUserId = veterinarianUserId;
         AdvanceMutationSequence();
         return Result.Success();
     }
@@ -292,7 +314,9 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
         DateTime scheduledAtUtc,
         int durationMinutes,
         AppointmentType appointmentType,
-        string? notes)
+        string? notes,
+        Guid? reasonId = null,
+        Guid? veterinarianUserId = null)
     {
         if (!Enum.IsDefined(requestedStatus))
             return Result.Failure("Appointments.Validation", "Randevu durumu geçersiz.");
@@ -304,7 +328,7 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
         if (Status != AppointmentStatus.Scheduled)
             return Result.Success();
 
-        return UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes);
+        return UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes, reasonId, veterinarianUserId);
     }
 
     private static DateTime NormalizeUtc(DateTime value)

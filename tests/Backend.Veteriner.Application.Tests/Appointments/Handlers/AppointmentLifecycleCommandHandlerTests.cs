@@ -1,3 +1,6 @@
+using Backend.Veteriner.Application.Clinics.Veterinarians;
+using Backend.Veteriner.Application.Notifications;
+using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Appointments.Commands.Cancel;
 using Backend.Veteriner.Application.Appointments.Commands.Complete;
 using Backend.Veteriner.Application.Appointments.Commands.Reschedule;
@@ -21,6 +24,14 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     private readonly Mock<IClinicContext> _clinicContext = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Appointment>> _read = new();
+
+    private AppointmentAssignment AssignmentRules() => new(
+        new Mock<IReadRepository<AppointmentReason>>().Object,
+        _read.Object,
+        new Mock<IClinicVeterinarianReader>().Object,
+        new Mock<IUserNotificationPublisher>().Object,
+        new Mock<IClientContext>().Object);
+
     private readonly Mock<IReadRepository<ClinicAppointmentSettings>> _clinicAppointmentSettings = new();
     private readonly Mock<IReadRepository<ClinicWorkingHour>> _clinicWorkingHoursRead = new();
     private readonly Mock<IRepository<Appointment>> _write = new();
@@ -53,6 +64,7 @@ public sealed class AppointmentLifecycleCommandHandlerTests
             _write.Object,
             _snapshotFactory.Object,
             _eventOutbox.Object,
+            AssignmentRules(),
             TimeProvider.System);
 
     // Faz 4B-7: Hafta sonuna denk gelen ileri tarihler için Pazartesi'ye kaydır.

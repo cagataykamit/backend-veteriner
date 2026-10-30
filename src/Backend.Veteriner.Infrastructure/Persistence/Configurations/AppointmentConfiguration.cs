@@ -39,6 +39,9 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         b.Property(x => x.Notes)
             .HasMaxLength(2000);
 
+        b.Property(x => x.ReasonId);
+        b.Property(x => x.VeterinarianUserId);
+
         b.Property(x => x.MutationSequence)
             .IsRequired()
             .HasDefaultValue(0L)
@@ -50,6 +53,13 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         // Bugünkü durum sayımları (GROUP BY Status) ve klinik + tarih aralığı; Status son kolonda kapsayıcı tarama.
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.ScheduledAtUtc, x.Status });
         b.HasIndex(x => new { x.TenantId, x.PetId });
+        // Hekim bazlı çakışma ve müsaitlik (ADR-042 K3).
+        b.HasIndex(x => new { x.TenantId, x.VeterinarianUserId, x.ScheduledAtUtc });
+
+        b.HasOne<AppointmentReason>()
+            .WithMany()
+            .HasForeignKey(x => x.ReasonId)
+            .OnDelete(DeleteBehavior.Restrict);
         // Dashboard clinic-scope: TenantId+ClinicId seek, PetId DISTINCT/GROUP BY, ScheduledAtUtc MAX (covering).
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.PetId })
             .IncludeProperties(x => x.ScheduledAtUtc);

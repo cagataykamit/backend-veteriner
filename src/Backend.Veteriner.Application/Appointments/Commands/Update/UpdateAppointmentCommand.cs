@@ -12,4 +12,6 @@ public sealed record UpdateAppointmentCommand(
     AppointmentType AppointmentType,
     AppointmentStatus Status,
     string? Notes = null,
-    int? DurationMinutes = null) : IRequest<Result>;
+    int? DurationMinutes = null,
+    Guid? ReasonId = null,
+    Guid? VeterinarianUserId = null) : IRequest<Result>;
