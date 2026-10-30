@@ -66,7 +66,7 @@ Gövdeye opsiyonel `items` eklenir; diğer alanlar değişmez.
 |---|---|
 | alan yok / `null` | **Dokunma**: mevcut satırlar korunur. (Eski istemci PUT'u satırları silmez.) |
 | `[]` | Tüm satırları sil. |
-| dolu dizi | Tüm satırları bu liste ile **değiştir**. Satır `id`'leri her değiştirmede yeniden üretilir; istemci satır kimliğine güvenmemelidir. |
+| dolu dizi | Satır listesi bu liste olur. **RECORD-008 (2026-10-30):** satırda `id` (GET ile dönen) verilirse o satır **yerinde güncellenir, kimliği korunur**; `id` verilmeyen satır yenidir; listede olmayan satır silinir. Reçeteye ait olmayan veya iki kez geçen `id` → `Prescriptions.Validation` (400). |
 
 ## 5) `GET /api/v1/prescriptions/{id}`
 
@@ -94,10 +94,47 @@ Satır yazan her yol (POST, PUT) mevcut reçete kurallarının tamamından geçe
 | Satır sayısı > 30, `name` boş (ürünsüz), `quantity` ≤ 0 veya sınır dışı, uzunluk aşımı | doğrulama (`Validation`) | 400 |
 
 ### Düzeltme yolu (D3)
-Kesinleşmiş muayenede reçete değişmez. D3'ün "gerekçeli iptal + yeni kayıt" düzeltmesi reçete için **bu dilimde yoktur** (reçetede durum/iptal kavramı bulunmuyor); ayrı karar/iş olarak açıktır.
+Kesinleşmiş muayenede mevcut reçete değişmez. Düzeltme yolu **gerekçeli iptal + yeni reçete**dir (RECORD-008, bölüm 8).
 
 ---
 
 ## 7) Veri modeli ve migration
 
 Yeni tablo `PrescriptionItems`: `Id` (istemci üretimli guid, `ValueGeneratedNever`), `PrescriptionId` (FK → `Prescriptions`, cascade), `SortOrder`, `Name` (200), `ProductId?` (FK → `Products`, restrict), `Instructions?` (1000), `Quantity?` (decimal 18,3). `Prescriptions` tablosu **değişmez**; mevcut kayıtlar için backfill yok.
+
+---
+
+## 8) İptal ve sonradan ekleme (RECORD-008, 2026-10-30)
+
+ADR-013 ilkelerinin reçeteye uyarlanması. Yeni izin yoktur.
+
+### `POST /api/v1/prescriptions/{id}/cancel` — `Prescriptions.Update`
+
+Gövde `{ "reason": "string" }` (kırpılır, 5–500). Yanıt **204**. Reçete **silinmez**; `cancelledAtUtc`, iptal eden ve gerekçe saklanır. Kesinleşmiş muayeneye bağlı reçetede de yapılır (muayene kilidine takılmaz).
+
+| Durum | Kod | HTTP |
+|---|---|---|
+| Gerekçe yok / 5–500 dışı | `Prescriptions.Validation` | 400 |
+| Zaten iptal | `Prescriptions.AlreadyCancelled` | 409 |
+| İptal edilmiş reçeteye PUT (alan veya satır) | `Prescriptions.AlreadyCancelled` | 409 |
+
+HBS geri kaydı (`PATCH .../hbs`) iptalden etkilenmez; iptal edilen reçete HBS takip listesine ve "HBS'e girilmedi" sayacına girmez (`hbs.isTracked = false`).
+
+### Sonradan ekleme (kesinleşmiş muayene)
+
+`POST /prescriptions` gövdesine opsiyonel `lateEntryReason` eklendi. Bağlı muayene (doğrudan `examinationId` veya `treatmentId`'nin muayenesi) **kesinleşmişse** reçete artık reddedilmez: `lateEntryReason` zorunludur (yoksa/5–500 dışıysa `Prescriptions.LateEntryReasonRequired`, 400; kayıt yazılmaz) ve reçete `addedAfterFinalization: true` ile yazılır. Muayene taslaksa alan yok sayılır. **Mevcut** reçetenin PUT'u kilitli kalır (`Examinations.Finalized`, 409).
+
+### Okuma alanları
+
+| Uç | Yeni alanlar |
+|---|---|
+| `GET /prescriptions/{id}` | `status` (`Active` \| `Cancelled`), `cancelledAtUtc`, `cancelledByName`, `cancelReason`, `addedAfterFinalization`, `lateEntryReason` |
+| `GET /prescriptions` | Satırda `status`, `addedAfterFinalization`. İptal edilen reçete listede kalır |
+| `GET /examinations/{id}/related-summary` | Reçete satırında `isCancelled`, `addedAfterFinalization` |
+| Hasta timeline | İptal edilen reçete varsayılan gizli; `includeVoided=true` ile `status = Cancelled`, `isVoided = true` döner (lab iptali ile aynı) |
+
+Kayıt defterleri (muayene/reçete defteri) bu sürümde değişmedi: iptal edilen reçete defterde işaretsiz görünür (açık konu).
+
+### Veri modeli
+
+Migration `AddPrescriptionCancellationAndLateEntry`: `Prescriptions` tablosuna `CancelledAtUtc`, `CancelledByUserId`, `CancelReason` (500), `AddedAfterFinalization` (bit, varsayılan 0), `LateEntryReason` (500); tutarlılık CHECK kısıtları `CK_Prescriptions_Cancel_Consistent`, `CK_Prescriptions_LateEntry_Consistent`. Mevcut satırlar etkin ve normal kalır, backfill yok.

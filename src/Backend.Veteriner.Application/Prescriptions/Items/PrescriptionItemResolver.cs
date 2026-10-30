@@ -62,7 +62,7 @@ internal static class PrescriptionItemResolver
             }
 
             drafts.Add(new PrescriptionItemDraft(
-                name ?? string.Empty, item.ProductId, item.Instructions, item.Quantity, item.Dose, unit, item.LotNumber));
+                name ?? string.Empty, item.ProductId, item.Instructions, item.Quantity, item.Dose, unit, item.LotNumber, item.Id));
         }
 
         return Result<IReadOnlyList<PrescriptionItemDraft>>.Success(drafts);

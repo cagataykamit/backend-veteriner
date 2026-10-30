@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
 
 /// <summary>
 /// Reçete defteri: kapsamdaki reçeteler tarih sıralı sayfalanır (sayfa ve sayım reçete bazlı); satırlar reçeteyle birlikte
-/// tek sorguda gelir. Satırsız (eski, serbest metin) reçete tek ilaç satırı verir (ad = <c>Content</c>). Sütunlar ve hekim kuralı sözleşmede.
+/// tek sorguda gelir. İptal edilen reçete varsayılan dahildir (durum + gerekçe); <c>IncludeVoided = false</c> gizler. Satırsız (eski, serbest metin) reçete tek ilaç satırı verir (ad = <c>Content</c>). Sütunlar ve hekim kuralı sözleşmede.
 /// </summary>
 public sealed class PrescriptionRegisterReader : IRegisterReader<PrescriptionRegisterEntryDto>
 {
@@ -23,6 +23,10 @@ public sealed class PrescriptionRegisterReader : IRegisterReader<PrescriptionReg
             .Where(p => p.TenantId == request.TenantId
                         && p.PrescribedAtUtc >= request.FromUtc
                         && p.PrescribedAtUtc < request.ToUtcExclusive);
+
+        // İptal edilen reçete defterde kalır; yalnız "iptal edilenleri gizle" ile çıkarılır (RECORD-008).
+        if (!request.IncludeVoided)
+            prescriptions = prescriptions.Where(p => p.CancelledAtUtc == null);
 
         if (request.ClinicId.HasValue)
         {
@@ -60,6 +64,8 @@ public sealed class PrescriptionRegisterReader : IRegisterReader<PrescriptionReg
                 p.Id,
                 p.PrescribedAtUtc,
                 p.Content,
+                p.CancelledAtUtc,
+                p.CancelReason,
                 ClinicAddress = clinic.Address,
                 OwnerName = c.FullName,
                 OwnerAddress = c.Address,
@@ -92,7 +98,9 @@ public sealed class PrescriptionRegisterReader : IRegisterReader<PrescriptionReg
             AnimalCount: 1,
             r.Items.Count == 0
                 ? [new PrescriptionRegisterItemDto(r.Content, null, null, null)]
-                : r.Items.Select(item => new PrescriptionRegisterItemDto(item.Name, null, null, item.Quantity)).ToList())).ToList();
+                : r.Items.Select(item => new PrescriptionRegisterItemDto(item.Name, null, null, item.Quantity)).ToList(),
+            r.CancelledAtUtc != null,
+            r.CancelReason)).ToList();
 
         return new RegisterReadResult<PrescriptionRegisterEntryDto>(totalCount, entries);
     }

@@ -18,6 +18,12 @@ public sealed class UpdatePrescriptionBody
     public string? Notes { get; init; }
     public DateTime? FollowUpDateUtc { get; init; }
 
-    /// <summary>null = satırlara dokunma; [] = tümünü sil; dolu dizi = tümünü değiştir.</summary>
+    /// <summary>null = satırlara dokunma; [] = tümünü sil; dolu dizi = liste bu olur (kimliği verilen satır yerinde güncellenir, RECORD-008).</summary>
     public IReadOnlyList<PrescriptionItemRequest>? Items { get; init; }
+}
+
+/// <summary>POST /prescriptions/{id}/cancel gövdesi; gerekçe 5–500 karakter.</summary>
+public sealed class CancelPrescriptionBody
+{
+    public string? Reason { get; init; }
 }

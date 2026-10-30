@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Prescriptions;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common;
@@ -163,7 +164,9 @@ public sealed class GetPrescriptionsListQueryHandler
                     pr.ExaminationId,
                     pr.TreatmentId,
                     pr.FollowUpDateUtc,
-                    pr.HbsStatus);
+                    pr.HbsStatus,
+                    PrescriptionStatusText.Of(pr),
+                    pr.AddedAfterFinalization);
             })
             .ToList();
 

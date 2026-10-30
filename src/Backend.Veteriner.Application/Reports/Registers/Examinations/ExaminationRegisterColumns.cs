@@ -44,14 +44,15 @@ internal static class ExaminationRegisterColumns
         return string.Join("; ", parts);
     }
 
-    /// <summary><c>Başlık: İlaç ×Miktar, İlaç</c>; satırsız (eski) reçetede yalnız başlık.</summary>
+    /// <summary><c>Başlık: İlaç ×Miktar, İlaç</c>; satırsız (eski) reçetede yalnız başlık; iptal edilen reçetede ` (iptal)` eki.</summary>
     private static string FormatPrescription(RegisterPrescriptionDto p)
     {
+        var suffix = p.IsCancelled ? " (iptal)" : string.Empty;
         if (p.Items.Count == 0)
-            return p.Title;
+            return p.Title + suffix;
 
         var items = p.Items.Select(i => i.Quantity is { } q ? $"{i.Name} ×{RegisterDisplay.Quantity(q)}" : i.Name);
-        return $"{p.Title}: {string.Join(", ", items)}";
+        return $"{p.Title}: {string.Join(", ", items)}{suffix}";
     }
 
     /// <summary><c>Ürün Miktar Birim</c> + sonradan eklenen için ek + iptal için ek.</summary>

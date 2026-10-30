@@ -1,8 +1,10 @@
 using System.Text.Json.Serialization;
+using Backend.Veteriner.Application.Prescriptions;
 using Backend.Veteriner.Domain.Hbs;
 
 namespace Backend.Veteriner.Application.Prescriptions.Contracts.Dtos;
 
+/// <summary>Liste satırı; iptal edilen reçete listede kalır, <see cref="Status"/> <c>Cancelled</c> döner (RECORD-008).</summary>
 public sealed record PrescriptionListItemDto(
     Guid Id,
     Guid ClinicId,
@@ -15,4 +17,6 @@ public sealed record PrescriptionListItemDto(
     Guid? ExaminationId,
     Guid? TreatmentId,
     DateTime? FollowUpDateUtc,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] HbsEntryStatus? HbsStatus = null);
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] HbsEntryStatus? HbsStatus = null,
+    string Status = PrescriptionStatusText.Active,
+    bool AddedAfterFinalization = false);

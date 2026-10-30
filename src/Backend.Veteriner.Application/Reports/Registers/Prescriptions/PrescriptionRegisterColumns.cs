@@ -16,6 +16,7 @@ internal static class PrescriptionRegisterColumns
         RegisterColumn<PrescriptionRegisterEntryDto>.Date(Prescription, "Tarihi", r => r.PrescribedAtUtc),
         RegisterColumn<PrescriptionRegisterEntryDto>.Text(Prescription, "Sınıfı", r => r.PrescriptionClass),
         RegisterColumn<PrescriptionRegisterEntryDto>.Text(Prescription, "Cilt/Sıra No", r => r.VolumeSequenceNumber),
+        RegisterColumn<PrescriptionRegisterEntryDto>.Text(Prescription, "Durumu", r => r.IsCancelled ? "İptal" : "Geçerli"),
         RegisterColumn<PrescriptionRegisterEntryDto>.Text(Veterinarian, "Adı Soyadı", r => r.VeterinarianName),
         RegisterColumn<PrescriptionRegisterEntryDto>.Text(Veterinarian, "Adresi", r => r.VeterinarianAddress),
         RegisterColumn<PrescriptionRegisterEntryDto>.Text(Owner, "Adı Soyadı", r => r.OwnerName),

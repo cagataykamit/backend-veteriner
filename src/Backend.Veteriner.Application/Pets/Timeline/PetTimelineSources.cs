@@ -11,6 +11,7 @@ using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
 using Backend.Veteriner.Application.Common.Specifications;
+using Backend.Veteriner.Application.Prescriptions;
 
 namespace Backend.Veteriner.Application.Pets.Timeline;
 
@@ -119,7 +120,9 @@ internal sealed class PrescriptionTimelineSource(IReadRepository<Prescription> r
     protected override Expression<Func<Prescription, Guid>> Id => p => p.Id;
 
     protected override Expression<Func<Prescription, bool>> Filter(PetTimelineSourceQuery q)
-        => p => p.TenantId == q.TenantId && p.PetId == q.PetId;
+        => q.IncludeVoided
+            ? p => p.TenantId == q.TenantId && p.PetId == q.PetId
+            : p => p.TenantId == q.TenantId && p.PetId == q.PetId && p.CancelledAtUtc == null;
 
     protected override ISpecificationBuilder<Prescription> ApplyClinicScope(ISpecificationBuilder<Prescription> builder, PetTimelineSourceQuery q)
         => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
@@ -132,8 +135,8 @@ internal sealed class PrescriptionTimelineSource(IReadRepository<Prescription> r
             p.ClinicId,
             p.Title,
             Summary: null,
-            Status: null,
-            IsVoided: false,
+            Status: p.CancelledAtUtc == null ? null : PrescriptionStatusText.Cancelled,
+            IsVoided: p.CancelledAtUtc != null,
             RelatedExaminationId: p.ExaminationId,
             RelatedVisitId: null,
             RelatedAppointmentId: null,

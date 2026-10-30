@@ -3,28 +3,35 @@ using Mediator;
 
 namespace Backend.Veteriner.Application.Reports.Registers.Prescriptions;
 
-/// <summary>Reçete defteri (sayfalı; sayfa ve sayım reçete bazlı). <c>From</c>/<c>To</c>: İstanbul takvim günleri, ikisi dahil.</summary>
+/// <summary>
+/// Reçete defteri (sayfalı; sayfa ve sayım reçete bazlı). <c>From</c>/<c>To</c>: İstanbul takvim günleri, ikisi dahil.
+/// İptal edilen reçete defterde "İptal" durumuyla kalır; <c>HideCancelled</c> yalnız isteyen için gizler (RECORD-008).
+/// </summary>
 public sealed record GetPrescriptionRegisterQuery(
     DateOnly From,
     DateOnly To,
     Guid? ClinicId,
     int Page,
-    int PageSize) : IRequest<Result<RegisterReadResult<PrescriptionRegisterEntryDto>>>;
+    int PageSize,
+    bool HideCancelled = false) : IRequest<Result<RegisterReadResult<PrescriptionRegisterEntryDto>>>;
 
 public sealed record ExportPrescriptionRegisterQuery(
     DateOnly From,
     DateOnly To,
-    Guid? ClinicId) : IRequest<Result<RegisterExportResult>>;
+    Guid? ClinicId,
+    bool HideCancelled = false) : IRequest<Result<RegisterExportResult>>;
 
 public sealed record ExportPrescriptionRegisterXlsxQuery(
     DateOnly From,
     DateOnly To,
-    Guid? ClinicId) : IRequest<Result<RegisterExportResult>>;
+    Guid? ClinicId,
+    bool HideCancelled = false) : IRequest<Result<RegisterExportResult>>;
 
 public sealed record ExportPrescriptionRegisterPdfQuery(
     DateOnly From,
     DateOnly To,
-    Guid? ClinicId) : IRequest<Result<RegisterExportResult>>;
+    Guid? ClinicId,
+    bool HideCancelled = false) : IRequest<Result<RegisterExportResult>>;
 
 public sealed class GetPrescriptionRegisterQueryHandler
     : IRequestHandler<GetPrescriptionRegisterQuery, Result<RegisterReadResult<PrescriptionRegisterEntryDto>>>
@@ -43,7 +50,7 @@ public sealed class GetPrescriptionRegisterQueryHandler
         CancellationToken ct)
         => new(_runner.ReadPageAsync(
             _reader,
-            new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false),
+            new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: !request.HideCancelled),
             request.Page,
             request.PageSize,
             ct));
@@ -66,7 +73,7 @@ public sealed class ExportPrescriptionRegisterQueryHandler
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterQuery request, CancellationToken ct)
     {
         var loaded = await _runner.LoadForExportAsync(
-            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), RegisterExportFormat.Csv, ct);
+            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: !request.HideCancelled), RegisterExportFormat.Csv, ct);
         if (!loaded.IsSuccess)
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
@@ -95,7 +102,7 @@ public sealed class ExportPrescriptionRegisterXlsxQueryHandler
     public async ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterXlsxQuery request, CancellationToken ct)
     {
         var loaded = await _runner.LoadForExportAsync(
-            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false), RegisterExportFormat.Xlsx, ct);
+            _reader, new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: !request.HideCancelled), RegisterExportFormat.Xlsx, ct);
         if (!loaded.IsSuccess)
             return Result<RegisterExportResult>.Failure(loaded.Error);
 
@@ -120,7 +127,7 @@ public sealed class ExportPrescriptionRegisterPdfQueryHandler
     public ValueTask<Result<RegisterExportResult>> Handle(ExportPrescriptionRegisterPdfQuery request, CancellationToken ct)
         => new(_runner.ExportAsync(
             _reader,
-            new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: false),
+            new RegisterQuery(request.From, request.To, request.ClinicId, IncludeVoided: !request.HideCancelled),
             RegisterExportFormat.Pdf,
             PrescriptionRegisterColumns.Export,
             ct));

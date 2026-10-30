@@ -93,12 +93,13 @@ public sealed class ExaminationRegisterReader : IRegisterReader<ExaminationRegis
                 {
                     ExaminationId = p.ExaminationId!.Value,
                     p.Title,
+                    IsCancelled = p.CancelledAtUtc != null,
                     Items = p.Items.OrderBy(i => i.SortOrder)
                         .Select(i => new RegisterPrescriptionLineDto(i.Name, i.Quantity, i.Instructions))
                         .ToList(),
                 })
                 .ToListAsync(ct))
-            .ToLookup(p => p.ExaminationId, p => new RegisterPrescriptionDto(p.Title, p.Items));
+            .ToLookup(p => p.ExaminationId, p => new RegisterPrescriptionDto(p.Title, p.Items, p.IsCancelled));
 
         var administrations = (await (
                 from a in _db.Administrations.AsNoTracking()

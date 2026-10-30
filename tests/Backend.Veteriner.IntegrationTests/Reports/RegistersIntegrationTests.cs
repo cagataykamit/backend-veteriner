@@ -262,7 +262,9 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         ws.Cell(1, 2).GetString().Should().Be("Reçetenin");
         ws.Cell(2, 2).GetString().Should().Be("Tarihi");
         var rows = Enumerable.Range(3, ws.LastRowUsed()!.RowNumber() - 2).ToList();
-        rows.Select(r => ws.Cell(r, 12).GetString()).Should().Equal("Amoksilin ×2,5; Probiyotik", "Serbest metin recete");
+        ws.Cell(2, 5).GetString().Should().Be("Durumu");
+        rows.Select(r => ws.Cell(r, 5).GetString()).Should().Equal("Geçerli", "Geçerli");
+        rows.Select(r => ws.Cell(r, 13).GetString()).Should().Equal("Amoksilin ×2,5; Probiyotik", "Serbest metin recete");
     }
 
     [Fact]
@@ -282,6 +284,31 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         page1.Items.Sum(e => e.Items.Count).Should().Be(4);
         page2.Items.Select(e => e.PrescriptionId).Should().Equal(c);
         page2.Items[0].RowNumber.Should().Be(3);
+    }
+
+    /// <summary>RECORD-008: iptal edilen reçete defterden çıkmaz (durum + gerekçe); yalnız hideCancelled=true gizler. Muayene defterinde " (iptal)" ekiyle.</summary>
+    [Fact]
+    public async Task Cancelled_Prescription_Should_Stay_With_Status_And_Hide_Only_On_Request()
+    {
+        var env = await SeedTenantAsync();
+        var pet = await env.SeedPetAsync(await env.SeedClientAsync("Iptal Test"), "Iptal");
+        var examId = await env.SeedExaminationAsync(pet, DayStartUtc.AddHours(1), "Kontrol");
+        var kept = await env.SeedPrescriptionAsync(pet, examId, DayStartUtc.AddHours(2), ("A", 1m));
+        var cancelled = await env.SeedPrescriptionAsync(pet, examId, DayStartUtc.AddHours(3), ("B", 1m));
+        await env.CancelPrescriptionAsync(cancelled, "Yanlış hastaya yazıldı");
+
+        var all = await env.GetPrescriptionsAsync();
+        all.Items.Select(e => e.PrescriptionId).Should().Equal(kept, cancelled);
+        var row = all.Items.Single(e => e.PrescriptionId == cancelled);
+        row.IsCancelled.Should().BeTrue();
+        row.CancelReason.Should().Be("Yanlış hastaya yazıldı");
+        all.Items.Single(e => e.PrescriptionId == kept).IsCancelled.Should().BeFalse();
+
+        (await env.GetPrescriptionsAsync("&hideCancelled=true")).Items.Select(e => e.PrescriptionId).Should().Equal(kept);
+
+        var exam = (await env.GetExaminationsAsync()).Items.Single(i => i.ExaminationId == examId);
+        exam.Prescriptions.Should().HaveCount(2);
+        exam.Prescriptions.Count(p => p.IsCancelled).Should().Be(1);
     }
 
     [Fact]
@@ -553,6 +580,15 @@ public sealed class RegistersIntegrationTests : IClassFixture<CustomWebApplicati
         public Task<Guid> SeedPrescriptionInClinicAsync(
             Guid clinicId, Guid petId, DateTime atUtc, params (string Name, decimal? Quantity)[] items)
             => SeedPrescriptionCoreAsync(petId, null, atUtc, null, clinicId, items);
+
+        public async Task CancelPrescriptionAsync(Guid prescriptionId, string reason)
+        {
+            await using var scope = _services.CreateSystemScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var prescription = await db.Prescriptions.SingleAsync(p => p.Id == prescriptionId);
+            prescription.Cancel(Guid.NewGuid(), reason, DateTime.UtcNow).IsSuccess.Should().BeTrue();
+            await db.SaveChangesAsync();
+        }
 
         /// <summary>Eski, serbest metin reçete: satırı yoktur.</summary>
         public Task<Guid> SeedLegacyPrescriptionAsync(Guid petId, Guid? examinationId, DateTime atUtc, string content)

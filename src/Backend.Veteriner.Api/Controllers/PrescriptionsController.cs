@@ -7,6 +7,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Prescriptions.Commands.Cancel;
 using Backend.Veteriner.Application.Prescriptions.Commands.Create;
 using Backend.Veteriner.Application.Prescriptions.Commands.Update;
 using Backend.Veteriner.Application.Prescriptions.Commands.UpdateHbs;
@@ -106,6 +107,24 @@ public sealed class PrescriptionsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetRecordHistoryQuery(RecordHistoryTypes.Prescription, id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Reçeteyi gerekçeyle iptal eder, silmez (RECORD-008); kesinleşmiş muayeneye bağlı reçetede de yapılır. İptal edilen reçete değiştirilemez.</summary>
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = PermissionCatalog.Prescriptions.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Cancel([FromRoute] Guid id, [FromBody] CancelPrescriptionBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CancelPrescriptionCommand(id, body.Reason), ct);
         return result.ToActionResult(this);
     }
 

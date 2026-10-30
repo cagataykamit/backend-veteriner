@@ -164,7 +164,7 @@ public sealed class PrescriptionItemsCommandHandlerTests
     }
 
     [Fact]
-    public async Task Create_Should_Fail_When_ExaminationFinalized_EvenWithItems()
+    public async Task Create_Should_Require_LateEntryReason_When_ExaminationFinalized_EvenWithItems()
     {
         var exam = SetupFinalizedExamination();
 
@@ -173,7 +173,7 @@ public sealed class PrescriptionItemsCommandHandlerTests
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Examinations.Finalized");
+        result.Error.Code.Should().Be("Prescriptions.LateEntryReasonRequired");
         _prescriptionsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
