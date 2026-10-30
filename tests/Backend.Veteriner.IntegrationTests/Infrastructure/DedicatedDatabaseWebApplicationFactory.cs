@@ -121,13 +121,13 @@ public abstract class DedicatedDatabaseWebApplicationFactory : WebApplicationFac
     }
 
     // Önce host (hosted servisler + tüm DbContext bağlantıları) kapanır, ardından test veritabanları güvenli force-drop ile
-    // kaldırılır; LocalDB'de stale veritabanı veya .mdf/.ldf kalmaz.
+    // kaldırılır; LocalDB'de stale veritabanı veya .mdf/.ldf kalmaz. Düşürme hatası koşuyu kırmaz (bkz. TryEnsureDroppedAsync).
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
-        await IntegrationTestDatabaseReset.EnsureDroppedAsync(CommandConnection);
+        await IntegrationTestDatabaseReset.TryEnsureDroppedAsync(CommandConnection);
         if (_ownsQueryDatabase)
-            await IntegrationTestDatabaseReset.EnsureDroppedAsync(QueryConnection);
+            await IntegrationTestDatabaseReset.TryEnsureDroppedAsync(QueryConnection);
     }
 
     protected override void Dispose(bool disposing)
@@ -135,9 +135,9 @@ public abstract class DedicatedDatabaseWebApplicationFactory : WebApplicationFac
         base.Dispose(disposing);
         if (disposing)
         {
-            IntegrationTestDatabaseReset.EnsureDroppedAsync(CommandConnection).GetAwaiter().GetResult();
+            IntegrationTestDatabaseReset.TryEnsureDroppedAsync(CommandConnection).GetAwaiter().GetResult();
             if (_ownsQueryDatabase)
-                IntegrationTestDatabaseReset.EnsureDroppedAsync(QueryConnection).GetAwaiter().GetResult();
+                IntegrationTestDatabaseReset.TryEnsureDroppedAsync(QueryConnection).GetAwaiter().GetResult();
         }
     }
 }
