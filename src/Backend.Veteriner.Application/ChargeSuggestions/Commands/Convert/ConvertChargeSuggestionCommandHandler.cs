@@ -125,7 +125,10 @@ public sealed class ConvertChargeSuggestionCommandHandler
         }
 
         // Satır türü kalemin katalog ürününden türer (ADR-036); KDV oranı boş = klinik varsayılanı.
-        var product = await _products.FirstOrDefaultAsync(new ProductByIdSpec(tenantId, suggestion.ProductId), ct);
+        // Paket kaleminin ürünü yoktur (EXAM-007): satır türü varsayılan (hizmet) kalır.
+        var product = suggestion.ProductId is { } productId
+            ? await _products.FirstOrDefaultAsync(new ProductByIdSpec(tenantId, productId), ct)
+            : null;
         var tax = product is null
             ? null
             : new ChargeTaxDto(ChargeLineKinds.FromProductKind(product.Kind), null);

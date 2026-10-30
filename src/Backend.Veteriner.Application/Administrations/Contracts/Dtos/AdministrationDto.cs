@@ -2,7 +2,8 @@ namespace Backend.Veteriner.Application.Administrations.Contracts.Dtos;
 
 /// <summary>Uygulama kaydı. <see cref="Status"/>: <c>Active</c> veya <c>Voided</c>; iptal alanları (<see cref="VoidStockOutcome"/>: <c>StockReturned</c>/<c>WrittenOff</c> dahil) yalnız <c>Voided</c> iken dolu;
 /// <see cref="LateEntryReason"/> yalnız <see cref="AddedAfterFinalization"/> iken dolu.
-/// <see cref="VaccinationId"/> dolu ise uygulama bir aşı kaydı ile birlikte yazılmıştır.</summary>
+/// <see cref="VaccinationId"/> dolu ise uygulama bir aşı kaydı ile birlikte yazılmıştır.
+/// <see cref="PackageChargeSuggestionId"/> dolu ise uygulama fiyatlı tedavi paketine dahildir; ücreti paket kalemindedir (EXAM-007).</summary>
 public sealed record AdministrationDto(
     Guid Id,
     Guid ClinicId,
@@ -29,7 +30,8 @@ public sealed record AdministrationDto(
     Guid? BatchId = null,
     string? LotNumber = null,
     DateOnly? ExpiryDate = null,
-    Guid? VaccinationId = null);
+    Guid? VaccinationId = null,
+    Guid? PackageChargeSuggestionId = null);
 
 /// <summary>Düşümden sonraki stok durumu; düşük stok yalnız bilgidir, kaydı engellemez. <see cref="IsBelowMinimum"/> kullanılabilir miktara bakar.</summary>
 public sealed record AdministrationStockDto(

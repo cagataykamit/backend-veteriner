@@ -113,7 +113,7 @@ public sealed class ExaminationTemplatesController : ControllerBase
 
         var result = await _mediator.Send(
             new UpdateExaminationTemplateCommand(
-                id, body.Name, body.VisitReason, body.Findings, body.Plan, body.Lines!, body.RowVersion),
+                id, body.Name, body.VisitReason, body.Findings, body.Plan, body.Lines!, body.RowVersion, body.PackagePrice),
             ct);
         return result.ToActionResult(this);
     }
@@ -168,4 +168,7 @@ public sealed class UpdateExaminationTemplateBody
 
     /// <summary>Base64 version from GET/list; required.</summary>
     public string? RowVersion { get; init; }
+
+    /// <summary>Paket fiyatı (EXAM-007); tam güncelleme: gönderilmezse kaldırılır.</summary>
+    public decimal? PackagePrice { get; init; }
 }

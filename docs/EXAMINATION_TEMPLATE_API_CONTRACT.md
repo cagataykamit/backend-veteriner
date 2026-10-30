@@ -31,6 +31,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-020-cl
 | `visitReason` | string \| null | Şikâyete eklenecek metin |
 | `findings` | string \| null | Bulguya eklenecek metin (çok satırlı olabilir) |
 | `plan` | string \| null | Plana eklenecek metin |
+| `packagePrice` | decimal \| null | Paket fiyatı (EXAM-007); bölüm 11 |
 | `isActive` | bool | |
 | `isSystem` | bool | `true` ise salt okunur (düzenle/pasifleştir düğmelerini gizleyin) |
 | `lines` | `ExaminationTemplateLineDto[]` | Sırayla; sistem şablonunda boş |
@@ -192,3 +193,11 @@ Hekim kendi paketini oluşturup düzeltir ve uygular; listeyi sadeleştirme (pas
 ## 10) Bu dilimde yok
 
 Sistem şablonunu kiracı bazında gizleme/kopyalama ucu (istemci içeriği kopyalayıp yeni adla POST edebilir); tür/ırk filtresi; şablonda tanı (S3 sözlüğü serbest metin olarak `assessment`'a yazılır, şablon değerlendirme alanına dokunmaz); aşı satırı; şablonda fiyat/indirim; uygulamayı geri alma ucu (yazılan uygulama mevcut iptal akışıyla, hizmet kalemi "ücretsiz say" ile kapatılır); hangi şablonun uygulandığının muayenede izi (audit kaydında `ExaminationTemplate.Apply` olarak bulunur).
+
+## 11) Paket fiyatı ve pakete dahil kalemler (EXAM-007, kullanıcı kararı 2026-10-30)
+
+- `POST` ve `PUT` gövdesine opsiyonel `packagePrice` (decimal, `> 0`, ≤ 10.000.000, en çok 2 ondalık; yalnız en az bir satırı olan şablonda). PUT tam güncellemedir: gönderilmezse fiyat kaldırılır. Hata `ExaminationTemplates.Validation` (400). Sistem şablonunda yoktur.
+- **Fiyat boş:** bugünkü davranış — satırlar kalem kalem ücretlenir (bölüm 7).
+- **Fiyat dolu:** uygula (bölüm 7) önce tek "ücret bekliyor" paket kalemi yazar (`CHARGE_SUGGESTION_API_CONTRACT.md`, `sourceType = "ExaminationPackage"`); stoklu satırlar **pakete dahil** uygulama kaydı olur (stok düşer, kendi kalemini doğurmaz, `packageChargeSuggestionId` paket kalemidir); hizmet satırları kalem doğurmaz (`services[].includedInPackage = true`, `chargeSuggestionId = null`). Yanıta `packageChargeSuggestionId` eklendi (fiyatsızda `null`). Hepsi ya da hiçbiri kuralı aynıdır.
+- Önizleme: istemci paket fiyatını ve satırların `currentUnitPrice × quantity` toplamını gösterebilir (bilgi; tahsil edilen paket fiyatıdır).
+- Migration `AddExaminationPackagePrice`: `ExaminationTemplates.PackagePrice` (decimal(18,2), null), `Administrations.PackageChargeSuggestionId` (null, FK → `ChargeSuggestions`, Restrict), `ChargeSuggestions.ProductId` boş olabilir. Mevcut satırlar değişmez. Down, ürünsüz paket kalemi varsa başarısız olur.

@@ -11,7 +11,8 @@ public sealed record CreateExaminationTemplateCommand(
     string? VisitReason,
     string? Findings,
     string? Plan,
-    IReadOnlyList<ExaminationTemplateLineRequest>? Lines)
+    IReadOnlyList<ExaminationTemplateLineRequest>? Lines,
+    decimal? PackagePrice = null)
     : IRequest<Result<ExaminationTemplateDto>>, IAuditableRequest
 {
     public string AuditAction => "ExaminationTemplate.Create";

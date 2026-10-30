@@ -240,3 +240,7 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 - Fiyatı > 0 olan üründe uygulama (aşı ucundan yazılan dahil) aynı transaction'da bir "ücret bekliyor" kalemi doğurur; ayrıntı `CHARGE_SUGGESTION_API_CONTRACT.md`. Uygulama yanıtı değişmez.
 - İptal: bekleyen kalem aynı transaction'da düşer; ücreti kesilmiş kalem değişmez. Eşzamanlı ücrete çevirme kazanırsa iptal `Administrations.ConcurrencyConflict` (409) döner; tekrar denenir.
 - Hizmet (`kind = Service`) ürünü uygulanamaz: `Products.NotStockTracked` (400).
+
+## 11) Pakete dahil uygulama (EXAM-007, 2026-10-30)
+
+`AdministrationDto.packageChargeSuggestionId` (guid?): uygulama fiyatlı tedavi paketiyle yazıldıysa paketin "ücret bekliyor" kalemi. Doluysa uygulama **pakete dahildir**: stok normal düşer, kendi kalemini doğurmaz (ücret paket kalemindedir). Alan yalnız şablon uygulamasıyla dolar; `POST /administrations` gövdesinde yoktur. Ayrıntı `EXAMINATION_TEMPLATE_API_CONTRACT.md` bölüm 11.

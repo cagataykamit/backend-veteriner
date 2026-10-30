@@ -2,6 +2,7 @@ namespace Backend.Veteriner.Application.ChargeSuggestions.Contracts.Dtos;
 
 /// <summary>
 /// "Ücret bekliyor" kalemi. <see cref="ClientId"/>/<see cref="ClientName"/> hayvanın güncel sahibidir (ücretin müşterisi);
+/// <see cref="ProductId"/> paket kaleminde (<c>sourceType = ExaminationPackage</c>, EXAM-007) boştur;
 /// <see cref="SuggestedUnitPrice"/> kalem doğduğu andaki katalog fiyatıdır, yoksa <c>null</c> (resepsiyon girer).
 /// </summary>
 public sealed record ChargeSuggestionDto(
@@ -15,7 +16,7 @@ public sealed record ChargeSuggestionDto(
     string PetName,
     Guid? ExaminationId,
     Guid? VisitId,
-    Guid ProductId,
+    Guid? ProductId,
     string Description,
     decimal Quantity,
     string Unit,

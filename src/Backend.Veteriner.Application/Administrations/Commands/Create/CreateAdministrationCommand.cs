@@ -12,6 +12,7 @@ namespace Backend.Veteriner.Application.Administrations.Commands.Create;
 /// <see cref="BatchId"/> düşülecek partidir; verilmezse FEFO ile süresi geçmemiş ilk yeterli parti seçilir.
 ///
 /// <see cref="VaccinationId"/> yalnız aşı kaydı oluşturma akışı tarafından verilir (HTTP gövdesinde yoktur); uygulamayı o aşı kaydına bağlar.
+/// <see cref="PackageChargeSuggestionId"/> yalnız fiyatlı tedavi paketi uygulaması verir (HTTP gövdesinde yoktur): uygulama pakete dahildir, kendi kalemini doğurmaz.
 ///
 /// <see cref="LateEntryReason"/> bağlı muayene kesinleşmişse zorunludur (sonradan ekleme), aksi hâlde yok sayılır.
 /// </summary>
@@ -27,7 +28,8 @@ public sealed record CreateAdministrationCommand(
     string? LateEntryReason,
     Guid? RequestId,
     Guid? BatchId = null,
-    Guid? VaccinationId = null)
+    Guid? VaccinationId = null,
+    Guid? PackageChargeSuggestionId = null)
     : IRequest<Result<AdministrationCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Administration.Create";

@@ -34,7 +34,8 @@ internal static class AdministrationMappings
             a.BatchId,
             batch?.LotNumber,
             batch?.ExpiryDate,
-            a.VaccinationId);
+            a.VaccinationId,
+            a.PackageChargeSuggestionId);
 
     public static AdministrationStockDto ToDto(this ProductStock stock, decimal expiredQuantity)
     {

@@ -3,7 +3,10 @@ using Backend.Veteriner.Domain.Products;
 
 namespace Backend.Veteriner.Application.ExaminationTemplates.Contracts.Dtos;
 
-/// <summary>Muayene şablonu. <c>IsSystem</c> true ise salt okunur sistem varsayılanıdır (ürün satırı yoktur).</summary>
+/// <summary>
+/// Muayene şablonu. <c>IsSystem</c> true ise salt okunur sistem varsayılanıdır (ürün satırı yoktur). <c>PackagePrice</c> doluysa tedavi paketidir:
+/// uygulanınca tek "ücret bekliyor" kalemi doğar, satırlar pakete dahil uygulanır (EXAM-007).
+/// </summary>
 public sealed record ExaminationTemplateDto(
     Guid Id,
     string Name,
@@ -13,7 +16,8 @@ public sealed record ExaminationTemplateDto(
     bool IsActive,
     bool IsSystem,
     IReadOnlyList<ExaminationTemplateLineDto> Lines,
-    string RowVersion);
+    string RowVersion,
+    decimal? PackagePrice = null);
 
 /// <summary>
 /// Şablon satırı; ürün alanları ürün kartının <b>güncel</b> hâlidir (şablonda fiyat/ad saklanmaz). <c>Kind = Service</c> satırı

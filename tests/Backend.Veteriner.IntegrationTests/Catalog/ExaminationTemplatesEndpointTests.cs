@@ -255,6 +255,43 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
         (await StockAsync(ctx)).Should().Be(16m);
     }
 
+    /// <summary>EXAM-007: fiyatlı paket tek ücret kalemi doğurur; stoklu satır pakete dahil uygulanır (stok düşer), hizmet ayrı kalem doğurmaz.</summary>
+    [Fact]
+    public async Task Apply_Priced_Package_Should_Create_One_Charge_Item_And_Include_Lines()
+    {
+        var ctx = await SeedAsync();
+        var vet = await ClientAsync(ctx, VeterinarianPermissions);
+        var templateId = await CreateTemplateAsync(vet, ctx, drugQuantity: 2m, packagePrice: 450m);
+        (await (await vet.GetAsync($"{Url}/{templateId}")).Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("packagePrice").GetDecimal().Should().Be(450m);
+
+        var apply = await vet.PostAsJsonAsync(
+            $"/api/v1/examinations/{ctx.ExaminationId}/apply-template", new { templateId, rowVersion = await ExamRowVersionAsync(ctx) });
+
+        apply.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await apply.Content.ReadFromJsonAsync<JsonElement>();
+        var packageId = result.GetProperty("packageChargeSuggestionId").GetGuid();
+        result.GetProperty("administrations").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("packageChargeSuggestionId").GetGuid().Should().Be(packageId);
+        var service = result.GetProperty("services").EnumerateArray().Should().ContainSingle().Subject;
+        service.GetProperty("includedInPackage").GetBoolean().Should().BeTrue();
+        service.GetProperty("chargeSuggestionId").ValueKind.Should().Be(JsonValueKind.Null);
+        (await StockAsync(ctx)).Should().Be(18m);
+
+        var suggestion = (await SuggestionsAsync(ctx)).Should().ContainSingle().Subject;
+        suggestion.Id.Should().Be(packageId);
+        suggestion.SourceType.Should().Be(ChargeSuggestion.ExaminationPackageSource);
+        suggestion.ProductId.Should().BeNull();
+        suggestion.SuggestedUnitPrice.Should().Be(450m);
+        suggestion.Quantity.Should().Be(1m);
+
+        // Paket kalemi ürünsüz de ücrete çevrilir (satır türü varsayılan).
+        var reception = await ClientAsync(ctx, ["Charges.Create", "Charges.Read", "Examinations.Read"]);
+        var convert = await reception.PostAsJsonAsync($"/api/v1/charge-suggestions/{packageId}/convert", new { requestId = Guid.NewGuid() });
+        convert.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await convert.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("charge").GetProperty("amount").GetDecimal().Should().Be(450m);
+    }
+
     [Fact]
     public async Task Apply_Should_Roll_Back_Everything_When_A_Line_Fails()
     {
@@ -309,7 +346,7 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
 
     private static Guid Id(JsonElement item) => item.GetProperty("id").GetGuid();
 
-    private static async Task<Guid> CreateTemplateAsync(HttpClient client, SeedCtx ctx, decimal drugQuantity)
+    private static async Task<Guid> CreateTemplateAsync(HttpClient client, SeedCtx ctx, decimal drugQuantity, decimal? packagePrice = null)
     {
         var create = await client.PostAsJsonAsync(Url, new
         {
@@ -317,6 +354,7 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
             visitReason = "Kulak kaşıntısı",
             findings = "Otoskopi: ",
             plan = "Kontrol: 7 gün",
+            packagePrice,
             lines = new object[]
             {
                 new { productId = ctx.ServiceId, quantity = 1m },
