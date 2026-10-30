@@ -240,3 +240,22 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 - Fiyatı > 0 olan üründe uygulama (aşı ucundan yazılan dahil) aynı transaction'da bir "ücret bekliyor" kalemi doğurur; ayrıntı `CHARGE_SUGGESTION_API_CONTRACT.md`. Uygulama yanıtı değişmez.
 - İptal: bekleyen kalem aynı transaction'da düşer; ücreti kesilmiş kalem değişmez. Eşzamanlı ücrete çevirme kazanırsa iptal `Administrations.ConcurrencyConflict` (409) döner; tekrar denenir.
 - Hizmet (`kind = Service`) ürünü uygulanamaz: `Products.NotStockTracked` (400).
+
+## 12) Satırda ücret görünürlüğü (RECORD-001, 2026-10-30)
+
+`GET /administrations` ve `GET /administrations/{id}` satırına `billing` nesnesi eklendi. **Yalnız `Charges.Read` iznine sahip kullanıcıda dolu**; izin yoksa `billing: null` (finans bilgisi sızmaz). Yeni uç, izin veya migration yoktur.
+
+```json
+"billing": { "status": "Charged", "suggestedUnitPrice": 250, "suggestedAmount": 500, "chargeId": "guid", "chargeAmount": 500, "waiveReason": null }
+```
+
+| `status` | Anlam | Dolu alanlar |
+|---|---|---|
+| `None` | "Ücret bekliyor" kalemi doğmadı (ürün fiyatı 0 veya özellikten önceki kayıt) | — |
+| `Pending` | Ücret bekliyor | `suggestedUnitPrice`, `suggestedAmount` (= fiyat × miktar, 2 ondalık) |
+| `Charged` | Ücrete çevrildi | + `chargeId`, `chargeAmount` (kesilen ücret; öneriden farklı olabilir) |
+| `ChargeVoided` | Ücrete çevrildi, ücret kaydı sonradan iptal edildi | + `chargeId`, `chargeAmount` |
+| `Waived` | Ücretsiz sayıldı | + `waiveReason` |
+| `Cancelled` | Uygulama iptal edildi, bekleyen kalem düştü | öneri alanları |
+
+Kural tek yerde: `AdministrationBilling` (Application). Kaynak: `ChargeSuggestion` (`sourceType = Administration`) ve bağlı `Charge` (`CHARGE_SUGGESTION_API_CONTRACT.md`). Fatura (e-belge) bağı bu sürümde yoktur; "fatura satırı" karşılığı ücret kaydıdır.

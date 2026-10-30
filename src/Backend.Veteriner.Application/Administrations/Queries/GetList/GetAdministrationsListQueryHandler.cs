@@ -6,6 +6,8 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
@@ -21,6 +23,9 @@ public sealed class GetAdministrationsListQueryHandler
     private readonly IReadRepository<Administration> _administrations;
     private readonly IReadRepository<Product> _products;
     private readonly IReadRepository<StockBatch> _batches;
+    private readonly IReadRepository<ChargeSuggestion> _chargeSuggestions;
+    private readonly IReadRepository<Charge> _charges;
+    private readonly ICurrentUserPermissionChecker _permissions;
 
     public GetAdministrationsListQueryHandler(
         ITenantContext tenantContext,
@@ -28,7 +33,10 @@ public sealed class GetAdministrationsListQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Administration> administrations,
         IReadRepository<Product> products,
-        IReadRepository<StockBatch> batches)
+        IReadRepository<StockBatch> batches,
+        IReadRepository<ChargeSuggestion> chargeSuggestions,
+        IReadRepository<Charge> charges,
+        ICurrentUserPermissionChecker permissions)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -36,6 +44,9 @@ public sealed class GetAdministrationsListQueryHandler
         _administrations = administrations;
         _products = products;
         _batches = batches;
+        _chargeSuggestions = chargeSuggestions;
+        _charges = charges;
+        _permissions = permissions;
     }
 
     public async ValueTask<Result<PagedResult<AdministrationDto>>> Handle(
@@ -86,9 +97,12 @@ public sealed class GetAdministrationsListQueryHandler
             : (await _batches.ListAsync(new StockBatchesByIdsSpec(tenantId, batchIds), ct))
                 .ToDictionary(b => b.Id);
 
+        var billing = await AdministrationBilling.ReadAsync(
+            _permissions, _chargeSuggestions, _charges, tenantId, rows.Select(r => r.Id).ToArray(), ct);
         var items = rows
             .Where(r => products.ContainsKey(r.ProductId))
             .Select(r => r.ToDto(products[r.ProductId], r.BatchId is { } id && batches.TryGetValue(id, out var batch) ? batch : null))
+            .Select(dto => dto with { Billing = billing?.GetValueOrDefault(dto.Id) })
             .ToList();
 
         return Result<PagedResult<AdministrationDto>>.Success(
