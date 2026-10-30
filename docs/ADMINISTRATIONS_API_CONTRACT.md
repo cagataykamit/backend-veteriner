@@ -266,6 +266,7 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 | `ChargeVoided` | Ücrete çevrildi, ücret kaydı sonradan iptal edildi | + `chargeId`, `chargeAmount` |
 | `Waived` | Ücretsiz sayıldı | + `waiveReason` |
 | `Cancelled` | Uygulama iptal edildi, bekleyen kalem düştü | öneri alanları |
+| `IncludedInPackage` | Fiyatlı tedavi paketine dahil (EXAM-007, bkz. §13); kendi kalemi yok, ücreti paket kalemindedir | — |
 
 Kural tek yerde: `AdministrationBilling` (Application). Kaynak: `ChargeSuggestion` (`sourceType = Administration`) ve bağlı `Charge` (`CHARGE_SUGGESTION_API_CONTRACT.md`). Fatura (e-belge) bağı bu sürümde yoktur; "fatura satırı" karşılığı ücret kaydıdır.
 

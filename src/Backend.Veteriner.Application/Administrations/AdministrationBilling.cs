@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.ChargeSuggestions.Specs;
 using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ChargeSuggestions;
 
@@ -24,19 +25,23 @@ internal static class AdministrationBilling
     public const string Waived = "Waived";
     /// <summary>Uygulama iptal edildi, bekleyen kalem düştü.</summary>
     public const string Cancelled = "Cancelled";
+    /// <summary>Fiyatlı tedavi paketine dahil (EXAM-007): kendi kalemi yok, ücreti paket kalemindedir.</summary>
+    public const string IncludedInPackage = "IncludedInPackage";
 
     public static async Task<IReadOnlyDictionary<Guid, AdministrationBillingDto>?> ReadAsync(
         ICurrentUserPermissionChecker permissions,
         IReadRepository<ChargeSuggestion> suggestions,
         IReadRepository<Charge> charges,
         Guid tenantId,
-        IReadOnlyCollection<Guid> administrationIds,
+        IReadOnlyCollection<Administration> administrations,
         CancellationToken ct)
     {
         if (!permissions.HasPermission(PermissionCatalog.Charges.Read))
             return null;
-        if (administrationIds.Count == 0)
+        if (administrations.Count == 0)
             return new Dictionary<Guid, AdministrationBillingDto>();
+
+        var administrationIds = administrations.Where(a => !a.IsIncludedInPackage).Select(a => a.Id).Distinct().ToArray();
 
         var rows = await suggestions.ListAsync(
             new ChargeSuggestionsBySourcesSpec(tenantId, ChargeSuggestion.AdministrationSource, administrationIds), ct);
@@ -46,9 +51,11 @@ internal static class AdministrationBilling
             : (await charges.ListAsync(new ChargesByIdsSpec(tenantId, chargeIds), ct)).ToDictionary(c => c.Id);
         var bySource = rows.ToDictionary(s => s.SourceId);
 
-        return administrationIds.Distinct().ToDictionary(
-            id => id,
-            id => bySource.TryGetValue(id, out var s) ? ToDto(s, chargesById) : new AdministrationBillingDto(None));
+        return administrations.DistinctBy(a => a.Id).ToDictionary(
+            a => a.Id,
+            a => a.IsIncludedInPackage
+                ? new AdministrationBillingDto(IncludedInPackage)
+                : bySource.TryGetValue(a.Id, out var s) ? ToDto(s, chargesById) : new AdministrationBillingDto(None));
     }
 
     private static AdministrationBillingDto ToDto(ChargeSuggestion s, IReadOnlyDictionary<Guid, Charge> chargesById)

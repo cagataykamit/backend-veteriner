@@ -79,7 +79,7 @@ public sealed class GetAdministrationByIdQueryHandler
             : null;
 
         var billing = await AdministrationBilling.ReadAsync(
-            _permissions, _chargeSuggestions, _charges, tenantId, [administration.Id], ct);
+            _permissions, _chargeSuggestions, _charges, tenantId, [administration], ct);
         return Result<AdministrationDto>.Success(
             administration.ToDto(product, batch) with { Billing = billing?.GetValueOrDefault(administration.Id) });
     }

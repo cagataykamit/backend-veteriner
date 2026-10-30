@@ -98,7 +98,7 @@ public sealed class GetAdministrationsListQueryHandler
                 .ToDictionary(b => b.Id);
 
         var billing = await AdministrationBilling.ReadAsync(
-            _permissions, _chargeSuggestions, _charges, tenantId, rows.Select(r => r.Id).ToArray(), ct);
+            _permissions, _chargeSuggestions, _charges, tenantId, rows, ct);
         var items = rows
             .Where(r => products.ContainsKey(r.ProductId))
             .Select(r => r.ToDto(products[r.ProductId], r.BatchId is { } id && batches.TryGetValue(id, out var batch) ? batch : null))

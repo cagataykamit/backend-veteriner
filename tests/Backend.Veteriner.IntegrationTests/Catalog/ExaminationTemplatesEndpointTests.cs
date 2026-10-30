@@ -290,6 +290,12 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
         var convert = await reception.PostAsJsonAsync($"/api/v1/charge-suggestions/{packageId}/convert", new { requestId = Guid.NewGuid() });
         convert.StatusCode.Should().Be(HttpStatusCode.Created);
         (await convert.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("charge").GetProperty("amount").GetDecimal().Should().Be(450m);
+
+        // Satırda ücret durumu (RECORD-001): pakete dahil uygulama kendi kalemini değil "pakete dahil" durumunu gösterir.
+        var administrationId = result.GetProperty("administrations").EnumerateArray().Single().GetProperty("id").GetGuid();
+        var reader = await ClientAsync(ctx, ["Administrations.Read", "Charges.Read"]);
+        var detail = await (await reader.GetAsync($"/api/v1/administrations/{administrationId}")).Content.ReadFromJsonAsync<JsonElement>();
+        detail.GetProperty("billing").GetProperty("status").GetString().Should().Be("IncludedInPackage");
     }
 
     [Fact]
