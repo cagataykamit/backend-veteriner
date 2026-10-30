@@ -528,5 +528,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
             _codes.Enqueue(code);
             return code;
         }
+
+        public string CreateLinkCode(int length) => _inner.CreateLinkCode(length);
     }
 }

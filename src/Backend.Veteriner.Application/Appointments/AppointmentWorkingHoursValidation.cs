@@ -24,15 +24,7 @@ internal static class AppointmentWorkingHoursValidation
         }
 
         var day = localStart.DayOfWeek;
-        var source = clinicHoursRows.Count == 0
-            ? ClinicWorkingHoursDefaults.BuildWeek()
-            : clinicHoursRows.Select(x => new ClinicWorkingHourDto(
-                x.DayOfWeek,
-                x.IsClosed,
-                x.OpensAt,
-                x.ClosesAt,
-                x.BreakStartsAt,
-                x.BreakEndsAt)).ToList();
+        var source = ClinicWorkingHoursDefaults.Effective(clinicHoursRows);
 
         var row = source.FirstOrDefault(x => x.DayOfWeek == day);
         if (row is null || row.IsClosed)
