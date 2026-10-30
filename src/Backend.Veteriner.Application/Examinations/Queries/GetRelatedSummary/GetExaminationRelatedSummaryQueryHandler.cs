@@ -203,7 +203,9 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 p.ClinicId,
                 ClinicName(p.ClinicId),
                 p.Title,
-                p.TreatmentId))
+                p.TreatmentId,
+                p.IsCancelled,
+                p.AddedAfterFinalization))
             .ToList();
 
         var labDtos = labs

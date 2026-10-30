@@ -92,6 +92,13 @@ public sealed class GetPrescriptionByIdQueryHandler
             : null;
         var clientName = client?.FullName ?? string.Empty;
 
+        string? cancelledByName = null;
+        if (p.CancelledByUserId is { } cancelledBy)
+        {
+            var names = await _names.GetNamesAsync([cancelledBy], ct);
+            cancelledByName = names.TryGetValue(cancelledBy, out var name) ? name : null;
+        }
+
         var dto = new PrescriptionDetailDto(
             p.Id,
             p.TenantId,
@@ -113,7 +120,13 @@ public sealed class GetPrescriptionByIdQueryHandler
                 .OrderBy(i => i.SortOrder)
                 .Select(i => new PrescriptionItemDto(i.Id, i.SortOrder, i.Name, i.ProductId, i.Instructions, i.Quantity, i.Dose, i.Unit, i.LotNumber))
                 .ToList(),
-            await HbsEntryDtoFactory.ForPrescriptionAsync(p, _names, ct));
+            await HbsEntryDtoFactory.ForPrescriptionAsync(p, _names, ct),
+            PrescriptionStatusText.Of(p),
+            p.CancelledAtUtc,
+            cancelledByName,
+            p.CancelReason,
+            p.AddedAfterFinalization,
+            p.LateEntryReason);
 
         return Result<PrescriptionDetailDto>.Success(dto);
     }

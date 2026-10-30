@@ -12,7 +12,9 @@ namespace Backend.Veteriner.Application.Examinations.Access;
 /// ilgili muayenelerden biri kesinleşmişse yazma reddedilir (kural <see cref="Examination.EnsureAcceptsLinkedRecords"/>).
 /// Hem hedef hem mevcut (taşınan/ayrılan) muayene verilmelidir; muayenesi bulunamayanlar burada atlanır, varlık denetimi çağıranındır.
 /// Kontrollü istisna (ADR-013): uygulama kaydı (administration) bu kilide takılmaz; kesinleşmiş muayeneye gerekçeli "sonradan ekleme" olarak
-/// yazılır (kural <c>CreateAdministrationCommandHandler</c> ve <c>Administration.Create</c> içinde), tedavi/reçete/aşı/yatış kilidi değişmez.
+/// yazılır (kural <c>CreateAdministrationCommandHandler</c> ve <c>Administration.Create</c> içinde), tedavi/aşı/yatış kilidi değişmez.
+/// Reçete (RECORD-008, ADR-013 uyarlaması): <b>yeni</b> reçete aynı istisnayla gerekçeli sonradan ekleme olur
+/// (<see cref="AnyFinalizedAsync"/>, <c>Prescription.MarkAddedAfterFinalization</c>); mevcut reçete kilitli kalır, düzeltme gerekçeli iptal + yeni reçetedir.
 /// HBS geri kaydı (e-Reçete No / ATS seri no, ADR-036 Dilim 2) klinik içerik değildir; ayrı PATCH uçları bu kilidi çağırmaz
 /// (<c>UpdatePrescriptionHbsCommandHandler</c>, <c>UpdateVaccinationHbsCommandHandler</c>).
 /// </summary>
@@ -36,6 +38,23 @@ internal static class ExaminationLinkedRecordLock
         }
 
         return Result.Success();
+    }
+
+    /// <summary>Verilen muayenelerden biri kesinleşmiş mi (sonradan ekleme kararı için); bulunamayan muayene atlanır.</summary>
+    public static async Task<bool> AnyFinalizedAsync(
+        IReadRepository<Examination> examinations,
+        Guid tenantId,
+        IEnumerable<Guid?> examinationIds,
+        CancellationToken ct)
+    {
+        foreach (var id in examinationIds.Where(x => x.HasValue).Select(x => x!.Value).Distinct())
+        {
+            var exam = await examinations.FirstOrDefaultAsync(new ExaminationByIdSpec(tenantId, id), ct);
+            if (exam is { IsFinalized: true })
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>

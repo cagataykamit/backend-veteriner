@@ -53,7 +53,8 @@ public sealed class CreatePrescriptionCommandHandlerTests
         Guid? examinationId = null,
         Guid? treatmentId = null,
         DateTime? prescribedAt = null,
-        DateTime? followUp = null)
+        DateTime? followUp = null,
+        string? lateEntryReason = null)
         => new(
             clinicId,
             petId,
@@ -63,7 +64,8 @@ public sealed class CreatePrescriptionCommandHandlerTests
             "Başlık",
             "İçerik",
             null,
-            followUp);
+            followUp,
+            LateEntryReason: lateEntryReason);
 
     private void SetupTenantClinicPetSafe(Guid tid, Guid cid, Guid petId)
     {
@@ -455,7 +457,7 @@ public sealed class CreatePrescriptionCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnFailure_When_ExaminationFinalized()
+    public async Task Handle_Should_RequireLateEntryReason_When_ExaminationFinalized()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -474,13 +476,13 @@ public sealed class CreatePrescriptionCommandHandlerTests
         var result = await CreateHandler().Handle(Cmd(cid, petId, examinationId: examId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Examinations.Finalized");
+        result.Error.Code.Should().Be("Prescriptions.LateEntryReasonRequired");
         _prescriptionsWrite.Verify(r => r.AddAsync(It.IsAny<Prescription>(), It.IsAny<CancellationToken>()), Times.Never);
         _prescriptionsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnFailure_When_TreatmentBelongsToFinalizedExamination()
+    public async Task Handle_Should_RequireLateEntryReason_When_TreatmentBelongsToFinalizedExamination()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -505,7 +507,36 @@ public sealed class CreatePrescriptionCommandHandlerTests
         var result = await CreateHandler().Handle(Cmd(cid, petId, treatmentId: treatmentId), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Examinations.Finalized");
+        result.Error.Code.Should().Be("Prescriptions.LateEntryReasonRequired");
         _prescriptionsWrite.Verify(r => r.AddAsync(It.IsAny<Prescription>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_AddAsLateEntry_When_ExaminationFinalized_WithReason()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var examId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupTenantClinicPetSafe(tid, cid, petId);
+
+        var exam = new Examination(tid, cid, petId, null, DateTime.UtcNow, "V", "F", null, null, DateTime.UtcNow);
+        typeof(Examination).GetProperty(nameof(Examination.Id))!.SetValue(exam, examId);
+        exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exam);
+        Prescription? added = null;
+        _prescriptionsWrite.Setup(r => r.AddAsync(It.IsAny<Prescription>(), It.IsAny<CancellationToken>()))
+            .Callback<Prescription, CancellationToken>((p, _) => added = p)
+            .ReturnsAsync((Prescription p, CancellationToken _) => p);
+
+        var result = await CreateHandler().Handle(
+            Cmd(cid, petId, examinationId: examId, lateEntryReason: "  Kesinleştirmeden sonra yazıldı "), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        added!.AddedAfterFinalization.Should().BeTrue();
+        added.LateEntryReason.Should().Be("Kesinleştirmeden sonra yazıldı");
     }
 }

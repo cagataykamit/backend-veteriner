@@ -10,7 +10,7 @@ public static class HbsEntryDtoFactory
 {
     public static async Task<HbsEntryDto> ForPrescriptionAsync(Prescription p, IClinicVeterinarianReader names, CancellationToken ct)
         => new(p.HbsStatus, p.HbsReferenceNumber, p.HbsNotRequiredReason, p.HbsMarkedAtUtc, p.HbsMarkedByUserId,
-            await NameAsync(p.HbsMarkedByUserId, names, ct), IsTracked: true);
+            await NameAsync(p.HbsMarkedByUserId, names, ct), HbsTracking.IsTracked(p));
 
     public static async Task<HbsEntryDto> ForVaccinationAsync(Vaccination v, IClinicVeterinarianReader names, CancellationToken ct)
         => new(v.HbsStatus, v.HbsReferenceNumber, v.HbsNotRequiredReason, v.HbsMarkedAtUtc, v.HbsMarkedByUserId,

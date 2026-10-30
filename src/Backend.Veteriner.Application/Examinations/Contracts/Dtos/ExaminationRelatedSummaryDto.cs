@@ -36,7 +36,9 @@ public sealed record ExaminationRelatedPrescriptionItemDto(
     Guid ClinicId,
     string ClinicName,
     string Title,
-    Guid? TreatmentId);
+    Guid? TreatmentId,
+    bool IsCancelled = false,
+    bool AddedAfterFinalization = false);
 
 public sealed record ExaminationRelatedLabResultItemDto(
     Guid Id,

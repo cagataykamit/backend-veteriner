@@ -177,10 +177,9 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             }
         }
 
-        var locked = await ExaminationLinkedRecordLock.EnsureOpenAsync(
+        // Kesinleşmiş muayene yeni reçeteyi reddetmez (ADR-013 uyarlaması): gerekçeli sonradan ekleme olarak yazılır.
+        var addedAfterFinalization = await ExaminationLinkedRecordLock.AnyFinalizedAsync(
             _examinations, tenantId, [request.ExaminationId, linkedTreatmentExaminationId], ct);
-        if (!locked.IsSuccess)
-            return Result<Guid>.Failure(locked.Error);
 
         IReadOnlyList<PrescriptionItemDraft>? itemDrafts = null;
         if (request.Items is { Count: > 0 } itemRequests)
@@ -204,6 +203,13 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             request.Notes,
             request.FollowUpDateUtc,
             utcNow);
+
+        if (addedAfterFinalization)
+        {
+            var late = prescription.MarkAddedAfterFinalization(request.LateEntryReason);
+            if (!late.IsSuccess)
+                return Result<Guid>.Failure(late.Error);
+        }
 
         if (itemDrafts is not null)
         {
