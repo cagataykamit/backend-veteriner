@@ -93,3 +93,13 @@ public sealed class PendingChargeSuggestionVisitIdsSpec : Specification<ChargeSu
         Query.Select(s => s.VisitId!.Value);
     }
 }
+
+/// <summary>Kaynak kayıtlarından doğan kalemler, durumdan bağımsız (RECORD-001 satır ücret görünürlüğü).</summary>
+public sealed class ChargeSuggestionsBySourcesSpec : Specification<ChargeSuggestion>
+{
+    public ChargeSuggestionsBySourcesSpec(Guid tenantId, string sourceType, IReadOnlyCollection<Guid> sourceIds)
+    {
+        Query.AsNoTracking();
+        Query.Where(s => s.TenantId == tenantId && s.SourceType == sourceType && sourceIds.Contains(s.SourceId));
+    }
+}

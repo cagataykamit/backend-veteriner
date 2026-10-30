@@ -249,3 +249,22 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 - **Üretici:** ürün kartına `manufacturer` (en çok 200) eklendi (`POST/PUT /products`, ürün DTO'su; PUT'ta `null` = dokunma, `""` = temizle — şekil alanlarıyla aynı). Tedarikçiden (parti girişindeki "firma") ayrıdır. `AdministrationDto.productManufacturer` ve aşı detayındaki bağlı uygulama özetinde `productManufacturer` döner (ürünün **güncel** üreticisi; anlık görüntü değildir).
 - Lot/son kullanma parti üzerinden zaten döner (`lotNumber`, `expiryDate`).
 - **Migration:** `AddAdministrationRouteSiteAndManufacturer` — `Administrations` ve `Vaccinations` tablolarına `Route` (int, null) ve `Site` (nvarchar(100), null), `Products` tablosuna `Manufacturer` (nvarchar(200), null). Mevcut satırlar boş kalır, backfill yok.
+
+## 12) Satırda ücret görünürlüğü (RECORD-001, 2026-10-30)
+
+`GET /administrations` ve `GET /administrations/{id}` satırına `billing` nesnesi eklendi. **Yalnız `Charges.Read` iznine sahip kullanıcıda dolu**; izin yoksa `billing: null` (finans bilgisi sızmaz). Yeni uç, izin veya migration yoktur.
+
+```json
+"billing": { "status": "Charged", "suggestedUnitPrice": 250, "suggestedAmount": 500, "chargeId": "guid", "chargeAmount": 500, "waiveReason": null }
+```
+
+| `status` | Anlam | Dolu alanlar |
+|---|---|---|
+| `None` | "Ücret bekliyor" kalemi doğmadı (ürün fiyatı 0 veya özellikten önceki kayıt) | — |
+| `Pending` | Ücret bekliyor | `suggestedUnitPrice`, `suggestedAmount` (= fiyat × miktar, 2 ondalık) |
+| `Charged` | Ücrete çevrildi | + `chargeId`, `chargeAmount` (kesilen ücret; öneriden farklı olabilir) |
+| `ChargeVoided` | Ücrete çevrildi, ücret kaydı sonradan iptal edildi | + `chargeId`, `chargeAmount` |
+| `Waived` | Ücretsiz sayıldı | + `waiveReason` |
+| `Cancelled` | Uygulama iptal edildi, bekleyen kalem düştü | öneri alanları |
+
+Kural tek yerde: `AdministrationBilling` (Application). Kaynak: `ChargeSuggestion` (`sourceType = Administration`) ve bağlı `Charge` (`CHARGE_SUGGESTION_API_CONTRACT.md`). Fatura (e-belge) bağı bu sürümde yoktur; "fatura satırı" karşılığı ücret kaydıdır.

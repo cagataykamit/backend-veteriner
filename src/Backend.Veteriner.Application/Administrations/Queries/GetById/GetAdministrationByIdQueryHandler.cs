@@ -5,6 +5,8 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Application.StockBatches.Specs;
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
@@ -20,6 +22,9 @@ public sealed class GetAdministrationByIdQueryHandler
     private readonly IReadRepository<Administration> _administrations;
     private readonly IReadRepository<Product> _products;
     private readonly IReadRepository<StockBatch> _batches;
+    private readonly IReadRepository<ChargeSuggestion> _chargeSuggestions;
+    private readonly IReadRepository<Charge> _charges;
+    private readonly ICurrentUserPermissionChecker _permissions;
 
     public GetAdministrationByIdQueryHandler(
         ITenantContext tenantContext,
@@ -27,7 +32,10 @@ public sealed class GetAdministrationByIdQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Administration> administrations,
         IReadRepository<Product> products,
-        IReadRepository<StockBatch> batches)
+        IReadRepository<StockBatch> batches,
+        IReadRepository<ChargeSuggestion> chargeSuggestions,
+        IReadRepository<Charge> charges,
+        ICurrentUserPermissionChecker permissions)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -35,6 +43,9 @@ public sealed class GetAdministrationByIdQueryHandler
         _administrations = administrations;
         _products = products;
         _batches = batches;
+        _chargeSuggestions = chargeSuggestions;
+        _charges = charges;
+        _permissions = permissions;
     }
 
     public async ValueTask<Result<AdministrationDto>> Handle(GetAdministrationByIdQuery request, CancellationToken ct)
@@ -67,7 +78,10 @@ public sealed class GetAdministrationByIdQueryHandler
             ? await _batches.FirstOrDefaultAsync(new StockBatchByIdSpec(tenantId, batchId), ct)
             : null;
 
-        return Result<AdministrationDto>.Success(administration.ToDto(product, batch));
+        var billing = await AdministrationBilling.ReadAsync(
+            _permissions, _chargeSuggestions, _charges, tenantId, [administration.Id], ct);
+        return Result<AdministrationDto>.Success(
+            administration.ToDto(product, batch) with { Billing = billing?.GetValueOrDefault(administration.Id) });
     }
 
     private static Result<AdministrationDto> NotFound()

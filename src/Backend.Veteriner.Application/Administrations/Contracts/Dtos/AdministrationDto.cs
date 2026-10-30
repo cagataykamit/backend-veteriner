@@ -32,7 +32,8 @@ public sealed record AdministrationDto(
     Guid? VaccinationId = null,
     string? Route = null,
     string? Site = null,
-    string? ProductManufacturer = null);
+    string? ProductManufacturer = null,
+    AdministrationBillingDto? Billing = null);
 
 /// <summary>Düşümden sonraki stok durumu; düşük stok yalnız bilgidir, kaydı engellemez. <see cref="IsBelowMinimum"/> kullanılabilir miktara bakar.</summary>
 public sealed record AdministrationStockDto(
@@ -44,3 +45,16 @@ public sealed record AdministrationStockDto(
 
 /// <summary>Oluşturma sonucu; <see cref="Created"/> false ise aynı <c>requestId</c> ile tekrar istek ilk kaydı döndürmüştür.</summary>
 public sealed record AdministrationCreateResultDto(bool Created, AdministrationDto Administration, AdministrationStockDto Stock);
+
+/// <summary>
+/// Uygulama satırının ücret durumu (RECORD-001; yalnız <c>Charges.Read</c> ile dolu). <see cref="Status"/>: <c>None</c> (ücret kalemi doğmadı),
+/// <c>Pending</c> (ücret bekliyor), <c>Charged</c> (ücrete çevrildi), <c>ChargeVoided</c> (ücret sonradan iptal), <c>Waived</c> (ücretsiz sayıldı),
+/// <c>Cancelled</c> (uygulama iptaliyle düştü). <see cref="SuggestedAmount"/> = katalog fiyatı × miktar; <see cref="ChargeAmount"/> kesilen ücrettir.
+/// </summary>
+public sealed record AdministrationBillingDto(
+    string Status,
+    decimal? SuggestedUnitPrice = null,
+    decimal? SuggestedAmount = null,
+    Guid? ChargeId = null,
+    decimal? ChargeAmount = null,
+    string? WaiveReason = null);

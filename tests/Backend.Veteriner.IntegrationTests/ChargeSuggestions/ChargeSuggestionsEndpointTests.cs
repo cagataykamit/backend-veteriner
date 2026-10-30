@@ -305,6 +305,41 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
         return ctx with { PetId = pet.Id, ExaminationId = exam.Id };
     }
 
+    /// <summary>RECORD-001: uygulama satırı ücret durumunu (bekliyor → ücrete çevrildi) taşır; finans izni yoksa blok gelmez.</summary>
+    [Fact]
+    public async Task Administration_Should_Show_Billing_From_Pending_To_Charged_Only_With_ChargesRead()
+    {
+        var ctx = await SeedAsync();
+        var client = await ClientAsync(ctx, ReceptionPermissions);
+        var administrationId = await AdministerAsync(client, ctx, 2m);
+
+        var pending = await BillingAsync(client, administrationId);
+        pending.GetProperty("status").GetString().Should().Be("Pending");
+        pending.GetProperty("suggestedAmount").GetDecimal().Should().Be(500m);
+
+        var id = Id((await PendingAsync(client, ctx)).Single());
+        (await client.PostAsJsonAsync($"/api/v1/charge-suggestions/{id}/convert", new { requestId = Guid.NewGuid() }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var charged = await BillingAsync(client, administrationId);
+        charged.GetProperty("status").GetString().Should().Be("Charged");
+        charged.GetProperty("chargeAmount").GetDecimal().Should().Be(500m);
+        var list = await (await client.GetAsync($"/api/v1/administrations?clinicId={ctx.ClinicId:D}&petId={ctx.PetId:D}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        list.GetProperty("items").EnumerateArray().Single().GetProperty("billing").GetProperty("status").GetString().Should().Be("Charged");
+
+        var withoutFinance = await ClientAsync(ctx, ["Administrations.Read"]);
+        var row = await (await withoutFinance.GetAsync($"/api/v1/administrations/{administrationId:D}")).Content.ReadFromJsonAsync<JsonElement>();
+        row.GetProperty("billing").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    private static async Task<JsonElement> BillingAsync(HttpClient client, Guid administrationId)
+    {
+        var response = await client.GetAsync($"/api/v1/administrations/{administrationId:D}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("billing");
+    }
+
     private async Task<Guid> AddClientAsync(Guid tenantId)
     {
         await using var scope = _factory.Services.CreateSystemScope();
