@@ -31,6 +31,18 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
     public DateTime? HbsMarkedAtUtc { get; private set; }
     public Guid? HbsMarkedByUserId { get; private set; }
 
+    /// <summary>İptal (RECORD-008): reçete silinmez; gerekçe ve iptal eden saklanır, iptal edilen reçete değiştirilemez.</summary>
+    public DateTime? CancelledAtUtc { get; private set; }
+    public Guid? CancelledByUserId { get; private set; }
+    public string? CancelReason { get; private set; }
+    public bool IsCancelled => CancelledAtUtc.HasValue;
+
+    /// <summary>Bağlı muayene kayıt anında kesinleşmişse true (ADR-013 uyarlaması, RECORD-008); gerekçe <see cref="LateEntryReason"/>.</summary>
+    public bool AddedAfterFinalization { get; private set; }
+    public string? LateEntryReason { get; private set; }
+
+    public const string LateEntryReasonRequiredCode = "Prescriptions.LateEntryReasonRequired";
+
     private readonly List<PrescriptionItem> _items = new();
 
     /// <summary>Yapılandırılmış reçete satırları; eski (serbest metin) reçetelerde boştur.</summary>
@@ -88,6 +100,8 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
         DateTime? followUpDateUtc,
         DateTime utcNow)
     {
+        if (IsCancelled)
+            return CancelledFailure();
         if (clinicId == Guid.Empty)
             return Result.Failure("Prescriptions.Validation", "ClinicId is invalid.");
         if (petId == Guid.Empty)
@@ -110,15 +124,26 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
         return Result.Success();
     }
 
-    /// <summary>Tüm satırları verilen liste ile değiştirir (boş liste = hepsini siler); sıra dizideki sıradır.</summary>
+    /// <summary>
+    /// Satır listesini verilen liste yapar (boş liste = hepsini siler); sıra dizideki sıradır. Kimliği verilen satır yerinde
+    /// güncellenir (kimlik kararlıdır, RECORD-008), kimliksiz satır yeni eklenir, listede olmayan satır silinir.
+    /// </summary>
     public Result ReplaceItems(IReadOnlyList<PrescriptionItemDraft> drafts)
     {
+        if (IsCancelled)
+            return CancelledFailure();
         if (drafts.Count > PrescriptionItem.MaxPerPrescription)
         {
             return Result.Failure(
                 "Prescriptions.Validation",
                 $"A prescription can have at most {PrescriptionItem.MaxPerPrescription} items.");
         }
+
+        var ids = drafts.Where(d => d.Id.HasValue).Select(d => d.Id!.Value).ToList();
+        if (ids.Distinct().Count() != ids.Count)
+            return Result.Failure("Prescriptions.Validation", "An item id can appear only once.");
+        if (ids.Any(id => _items.All(i => i.Id != id)))
+            return Result.Failure("Prescriptions.Validation", "Item id does not belong to this prescription.");
 
         foreach (var draft in drafts)
         {
@@ -127,12 +152,56 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
                 return valid;
         }
 
-        _items.Clear();
+        _items.RemoveAll(i => !ids.Contains(i.Id));
         for (var i = 0; i < drafts.Count; i++)
-            _items.Add(new PrescriptionItem(Id, i + 1, drafts[i]));
+        {
+            var draft = drafts[i];
+            var existing = draft.Id is { } id ? _items.Single(x => x.Id == id) : null;
+            if (existing is not null)
+                existing.Apply(i + 1, draft);
+            else
+                _items.Add(new PrescriptionItem(Id, i + 1, draft));
+        }
 
         return Result.Success();
     }
+
+    /// <summary>Kesinleşmiş muayeneye sonradan eklenen reçeteyi işaretler; gerekçe zorunlu (5–500). Yalnız oluşturmada çağrılır.</summary>
+    public Result MarkAddedAfterFinalization(string? reason)
+    {
+        var check = CorrectionReason.Validate(reason, LateEntryReasonRequiredCode);
+        if (!check.IsSuccess)
+            return check;
+
+        AddedAfterFinalization = true;
+        LateEntryReason = reason!.Trim();
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Reçeteyi gerekçeyle iptal eder (silmez). Kesinleşmiş muayeneye bağlı reçetede de yapılabilir: düzeltme yolu
+    /// "gerekçeli iptal + yeni kayıt"tır (ADR-013, Aşama 5 D3).
+    /// </summary>
+    public Result Cancel(Guid cancelledByUserId, string? reason, DateTime utcNow)
+    {
+        if (IsCancelled)
+            return Result.Failure("Prescriptions.AlreadyCancelled", "Reçete zaten iptal edilmiş.");
+        if (cancelledByUserId == Guid.Empty)
+            return Result.Failure("Prescriptions.Validation", "İptal eden kullanıcı geçersiz.");
+
+        var check = CorrectionReason.Validate(reason, "Prescriptions.Validation");
+        if (!check.IsSuccess)
+            return check;
+
+        CancelledAtUtc = NormalizeUtc(utcNow);
+        CancelledByUserId = cancelledByUserId;
+        CancelReason = reason!.Trim();
+        UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    private static Result CancelledFailure()
+        => Result.Failure("Prescriptions.AlreadyCancelled", "İptal edilmiş reçete değiştirilemez.");
 
     /// <summary>HBS geri kaydını yazar (kural <see cref="HbsEntryRules"/>); klinik alanlara ve <see cref="UpdatedAtUtc"/>'e dokunmaz.</summary>
     public Result ApplyHbsEntry(

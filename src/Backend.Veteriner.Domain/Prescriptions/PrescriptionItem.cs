@@ -38,6 +38,12 @@ public sealed class PrescriptionItem
     internal PrescriptionItem(Guid prescriptionId, int sortOrder, PrescriptionItemDraft draft)
     {
         PrescriptionId = prescriptionId;
+        Apply(sortOrder, draft);
+    }
+
+    /// <summary>Satırı yerinde günceller; kimlik değişmez (RECORD-008). Doğrulama <see cref="Validate"/> ile önceden yapılmış olmalıdır.</summary>
+    internal void Apply(int sortOrder, PrescriptionItemDraft draft)
+    {
         SortOrder = sortOrder;
         Name = draft.Name.Trim();
         ProductId = draft.ProductId;
@@ -75,7 +81,10 @@ public sealed class PrescriptionItem
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
-/// <summary>Satır girdisi; <see cref="Name"/> ve <see cref="Unit"/> uygulama katmanında (ürün varsayılanı) çözülmüş olmalıdır.</summary>
+/// <summary>
+/// Satır girdisi; <see cref="Name"/> ve <see cref="Unit"/> uygulama katmanında (ürün varsayılanı) çözülmüş olmalıdır.
+/// <see cref="Id"/> verilirse mevcut satır yerinde güncellenir (kararlı kimlik), verilmezse yeni satır eklenir.
+/// </summary>
 public sealed record PrescriptionItemDraft(
     string Name,
     Guid? ProductId,
@@ -83,4 +92,5 @@ public sealed record PrescriptionItemDraft(
     decimal? Quantity,
     string? Dose = null,
     string? Unit = null,
-    string? LotNumber = null);
+    string? LotNumber = null,
+    Guid? Id = null);

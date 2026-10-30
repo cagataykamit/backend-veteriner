@@ -10,7 +10,11 @@ public sealed class PrescriptionConfiguration : IEntityTypeConfiguration<Prescri
 {
     public void Configure(EntityTypeBuilder<Prescription> b)
     {
-        b.ToTable("Prescriptions");
+        b.ToTable("Prescriptions", t =>
+        {
+            t.HasCheckConstraint("CK_Prescriptions_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL)");
+            t.HasCheckConstraint("CK_Prescriptions_LateEntry_Consistent", "([AddedAfterFinalization] = 0 AND [LateEntryReason] IS NULL) OR ([AddedAfterFinalization] = 1 AND [LateEntryReason] IS NOT NULL)");
+        });
 
         b.HasKey(x => x.Id);
 
@@ -32,6 +36,11 @@ public sealed class PrescriptionConfiguration : IEntityTypeConfiguration<Prescri
         b.Property(x => x.HbsStatus).IsRequired();
         b.Property(x => x.HbsReferenceNumber).HasMaxLength(HbsEntryRules.ReferenceNumberMaxLength);
         b.Property(x => x.HbsNotRequiredReason).HasMaxLength(CorrectionReason.MaxLength);
+
+        // İptal ve sonradan ekleme (RECORD-008); tutarlılık tablo CHECK kısıtlarında.
+        b.Property(x => x.CancelReason).HasMaxLength(CorrectionReason.MaxLength);
+        b.Property(x => x.LateEntryReason).HasMaxLength(CorrectionReason.MaxLength);
+        b.Property(x => x.AddedAfterFinalization).HasDefaultValue(false);
         b.Property(x => x.HbsMarkedAtUtc);
         b.Property(x => x.HbsMarkedByUserId);
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.HbsStatus });
