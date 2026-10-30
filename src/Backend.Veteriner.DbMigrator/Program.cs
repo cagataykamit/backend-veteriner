@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Outbox;
 using Backend.Veteriner.Infrastructure;
@@ -27,6 +28,8 @@ var builder = Host.CreateApplicationBuilder(args);
 if (builder.Environment.IsDevelopment())
     builder.Configuration.AddUserSecrets<Program>();
 
+// Infrastructure bazı uygulama servislerine bağlıdır (ör. ödeme uzlaştırma); Development DI doğrulaması onları da çözmeli.
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 using var host = builder.Build();
