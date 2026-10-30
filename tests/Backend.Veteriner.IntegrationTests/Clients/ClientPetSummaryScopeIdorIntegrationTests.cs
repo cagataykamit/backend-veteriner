@@ -201,6 +201,7 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
         await db.PaymentAllocations.Where(a => a.TenantId == tenant.Id).ExecuteDeleteAsync();
         await db.Payments.Where(p => p.TenantId == tenant.Id).ExecuteDeleteAsync();
+        await db.AppointmentRequests.Where(a => a.TenantId == tenant.Id).ExecuteDeleteAsync();
         await db.Appointments.Where(a => a.TenantId == tenant.Id).ExecuteDeleteAsync();
         await db.Examinations.Where(e => e.TenantId == tenant.Id).ExecuteDeleteAsync();
     }

@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.ExampleClinic;
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.AppointmentRequests;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.CareInstructions;
 using Backend.Veteriner.Domain.ChargeSuggestions;
@@ -136,6 +137,8 @@ public sealed class ExampleClinicDataCleaner : IExampleClinicCleaner
         other += await scope.ExaminationAddenda.ExecuteDeleteAsync(ct);
         var examinations = await scope.Examinations.ExecuteDeleteAsync(ct);
         other += await scope.Visits.ExecuteDeleteAsync(ct);
+        // Örnek müşteri/hastaya bağlı online talepler (onaylananın randevusu da örnek kümededir).
+        other += await scope.AppointmentRequests.ExecuteDeleteAsync(ct);
         var appointments = await scope.Appointments.ExecuteDeleteAsync(ct);
         other += await scope.OwnerPortalInvites.ExecuteDeleteAsync(ct);
         other += await scope.OwnerPortalLinks.ExecuteDeleteAsync(ct);
@@ -295,6 +298,9 @@ public sealed class ExampleClinicDataCleaner : IExampleClinicCleaner
         public IQueryable<Client> Clients => db.Clients.Where(x => x.TenantId == TenantId && ClientIds.Contains(x.Id));
         public IQueryable<Pet> Pets => db.Pets.Where(x => x.TenantId == TenantId && PetIds.Contains(x.Id));
         public IQueryable<Appointment> Appointments => db.Appointments.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
+        public IQueryable<AppointmentRequest> AppointmentRequests => db.AppointmentRequests.Where(x =>
+            x.TenantId == TenantId
+            && ((x.PetId != null && PetIds.Contains(x.PetId.Value)) || (x.ClientId != null && ClientIds.Contains(x.ClientId.Value))));
         public IQueryable<Visit> Visits => db.Visits.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
         public IQueryable<Examination> Examinations => db.Examinations.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
         public IQueryable<ExaminationAddendum> ExaminationAddenda
