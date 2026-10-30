@@ -223,7 +223,7 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 | Yer | Değişiklik |
 |---|---|
 | `POST /vaccinations` | İstek: opsiyonel `productId`, `quantity`, `batchId`, `requestId`. Yanıt: `productId` yoksa **eskisi gibi çıplak guid, 201**. `productId` varsa `{ created, id, administration: AdministrationDto, stock: AdministrationStockDto }`, 201 (yeni) / 200 (`requestId` tekrarı) |
-| `GET /vaccinations/{id}` | `administrationId`, `productId`, `productName`, `quantity`, `unit`, `batchId`, `lotNumber`, `expiryDate` (bağlı değilse `null`) |
+| `GET /vaccinations/{id}` | İç içe `administration` nesnesi: `administrationId`, `productId`, `productName`, `quantity`, `unit`, `batchId`, `lotNumber`, `expiryDate`, `productManufacturer` (bağlı değilse `administration: null`). *Düzeltme (2026-10-30): bu satır önceden alanları düz (üst düzeyde) yazıyordu; uygulama baştan beri iç içe döndürüyor, sözleşme koda göre düzeltildi.* |
 | `GET /vaccinations` | Her satırda `administrationId` (bağlı değilse `null`) |
 | `GET /administrations` / detay | `vaccinationId` |
 | `PUT /vaccinations/{id}` | Bağlı kayıtta kilitli alanlar için `Vaccinations.LinkedToAdministration` (409); ekranda bu alanları pasif göster, iptal için "uygulamayı iptal et" akışı |
