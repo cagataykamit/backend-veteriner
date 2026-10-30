@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Shared;
@@ -26,6 +27,8 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
         b.Property(x => x.DueAtUtc);
         b.Property(x => x.Status).IsRequired();
         b.Property(x => x.Notes).HasMaxLength(4000);
+        b.Property(x => x.Route).HasConversion<int?>();
+        b.Property(x => x.Site).HasMaxLength(AdministrationRouteSite.SiteMaxLength);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
 

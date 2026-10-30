@@ -36,6 +36,8 @@ public sealed class AdministrationConfiguration : IEntityTypeConfiguration<Admin
         b.Property(x => x.Quantity).HasPrecision(18, Administration.QuantityDecimals).IsRequired();
         b.Property(x => x.AdministeredAtUtc).IsRequired();
         b.Property(x => x.Notes).HasMaxLength(Administration.MaxNotesLength);
+        b.Property(x => x.Route).HasConversion<int?>();
+        b.Property(x => x.Site).HasMaxLength(AdministrationRouteSite.SiteMaxLength);
 
         b.Property(x => x.VoidedAtUtc);
         b.Property(x => x.VoidedByUserId);
