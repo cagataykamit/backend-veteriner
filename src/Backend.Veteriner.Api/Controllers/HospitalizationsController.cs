@@ -1,3 +1,6 @@
+using Backend.Veteriner.Application.RecordHistory.Contracts.Dtos;
+using Backend.Veteriner.Application.RecordHistory.Queries.GetRecordHistory;
+using Backend.Veteriner.Domain.RecordHistory;
 using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
@@ -108,6 +111,20 @@ public sealed class HospitalizationsController : ControllerBase
 
         var cmd = new DischargeHospitalizationCommand(id, body.DischargedAtUtc, body.DischargeNote ?? body.Notes, body.RowVersion);
         var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Yatışın değişiklik geçmişi (RECORD-002), yeniden eskiye; bkz. docs/RECORD_HISTORY_API_CONTRACT.md.</summary>
+    [HttpGet("{id:guid}/history")]
+    [Authorize(Policy = PermissionCatalog.Hospitalizations.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<RecordChangeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetHistory([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetRecordHistoryQuery(RecordHistoryTypes.Hospitalization, id), ct);
         return result.ToActionResult(this);
     }
 

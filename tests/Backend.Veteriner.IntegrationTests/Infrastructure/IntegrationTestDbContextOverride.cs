@@ -1,5 +1,6 @@
 using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence;
+using Backend.Veteriner.Infrastructure.RecordHistory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -29,6 +30,7 @@ internal static class IntegrationTestDbContextOverride
             opt.UseSqlServer(connectionString);
             opt.AddInterceptors(
                 sp.GetRequiredService<OutboxSaveChangesInterceptor>(),
+                sp.GetRequiredService<RecordHistorySaveChangesInterceptor>(),
                 sp.GetRequiredService<SlowQueryLoggingInterceptor>(),
                 sp.GetRequiredService<DbConnectionSlowOpenInterceptor>());
         });

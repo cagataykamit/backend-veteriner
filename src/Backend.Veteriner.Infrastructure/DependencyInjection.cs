@@ -74,6 +74,7 @@ using Backend.Veteriner.Application.Files;
 using Backend.Veteriner.Infrastructure.Files;
 using Microsoft.Extensions.Logging;
 using Backend.Veteriner.Infrastructure.Security;                                  // JwtOptions, JwtTokenService, Sha256TokenHashService, BcryptPasswordHasher, JwtOptionsProvider
+using Backend.Veteriner.Infrastructure.RecordHistory;                             // RecordHistorySaveChangesInterceptor
 using Backend.Veteriner.Infrastructure.Web;                                       // ClientContext, TenantContext, ClinicContext, AppUrlProvider, HttpAuditContext, CurrentUserPermissionChecker
 using Backend.Veteriner.Infrastructure.Auditing;                                  // AuditLogWriter
 using Backend.Veteriner.Infrastructure.Billing;
@@ -148,6 +149,7 @@ public static class DependencyInjection
         services.AddScoped<IPetIntegrationEventOutbox, PetIntegrationEventOutbox>();
         services.AddScoped<IPaymentIntegrationEventOutbox, PaymentIntegrationEventOutbox>();
         services.AddScoped<OutboxSaveChangesInterceptor>();
+        services.AddScoped<RecordHistorySaveChangesInterceptor>();
         services.AddScoped<SlowQueryLoggingInterceptor>();
         services.AddScoped<DbConnectionSlowOpenInterceptor>();
 
@@ -157,6 +159,7 @@ public static class DependencyInjection
             opt.UseSqlServer(connStr);
             opt.AddInterceptors(
                 sp.GetRequiredService<OutboxSaveChangesInterceptor>(),
+                sp.GetRequiredService<RecordHistorySaveChangesInterceptor>(),
                 sp.GetRequiredService<SlowQueryLoggingInterceptor>(),
                 sp.GetRequiredService<DbConnectionSlowOpenInterceptor>());
         });

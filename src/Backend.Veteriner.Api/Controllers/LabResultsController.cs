@@ -1,3 +1,6 @@
+using Backend.Veteriner.Application.RecordHistory.Contracts.Dtos;
+using Backend.Veteriner.Application.RecordHistory.Queries.GetRecordHistory;
+using Backend.Veteriner.Domain.RecordHistory;
 using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
@@ -112,6 +115,20 @@ public sealed class LabResultsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new CancelLabResultCommand(id, body.Reason, body.RowVersion), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Laboratuvar sonucunun değişiklik geçmişi (RECORD-002), yeniden eskiye; bkz. docs/RECORD_HISTORY_API_CONTRACT.md.</summary>
+    [HttpGet("{id:guid}/history")]
+    [Authorize(Policy = PermissionCatalog.LabResults.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<RecordChangeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetHistory([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetRecordHistoryQuery(RecordHistoryTypes.LabResult, id), ct);
         return result.ToActionResult(this);
     }
 
