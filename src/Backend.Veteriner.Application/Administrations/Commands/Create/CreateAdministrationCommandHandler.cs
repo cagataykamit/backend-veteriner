@@ -213,7 +213,8 @@ public sealed class CreateAdministrationCommandHandler
             request.RequestId,
             request.VaccinationId,
             request.Route,
-            request.Site);
+            request.Site,
+            request.PackageChargeSuggestionId);
         if (!created.IsSuccess)
             return Result<AdministrationCreateResultDto>.Failure(created.Error);
 
@@ -264,7 +265,7 @@ public sealed class CreateAdministrationCommandHandler
         }
 
         // Ücretlendirilebilir uygulama "ücret bekliyor" kalemi doğurur (ADR-018); hekim ücret yazmaz, resepsiyon çevirir.
-        if (ChargeSuggestion.IsChargeable(product))
+        if (ChargeSuggestion.IsChargeable(administration, product))
         {
             var suggestion = ChargeSuggestion.ForAdministration(administration, product, visitId);
             if (!suggestion.IsSuccess)

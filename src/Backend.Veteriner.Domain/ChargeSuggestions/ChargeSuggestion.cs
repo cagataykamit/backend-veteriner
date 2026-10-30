@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Products;
@@ -23,6 +24,14 @@ public sealed class ChargeSuggestion : AggregateRoot, IClinicScoped, ITenantOwne
     /// </summary>
     public const string ExaminationServiceSource = "ExaminationService";
 
+    /// <summary>
+    /// Kaynak türü: fiyatlı tedavi paketi (EXAM-007): muayeneye uygulanan şablonun paket fiyatı tek kalemdir; ürünü yoktur (<see cref="ProductId"/> boş).
+    /// Kalemin kendisi paket kaydıdır (<see cref="SourceId"/> = <see cref="Id"/>); pakete dahil uygulamalar ona bağlanır.
+    /// </summary>
+    public const string ExaminationPackageSource = "ExaminationPackage";
+
+    public const string PackageUnit = "Paket";
+
     public const int MaxSourceTypeLength = 50;
     public const int MaxUnitLength = 50;
 
@@ -41,7 +50,8 @@ public sealed class ChargeSuggestion : AggregateRoot, IClinicScoped, ITenantOwne
 
     public string SourceType { get; private set; } = default!;
     public Guid SourceId { get; private set; }
-    public Guid ProductId { get; private set; }
+    /// <summary>Katalog ürünü; paket kaleminde (<see cref="ExaminationPackageSource"/>) boştur.</summary>
+    public Guid? ProductId { get; private set; }
 
     /// <summary>Ücret açıklaması önerisi (ürün/hizmet adı, kalem doğduğu andaki).</summary>
     public string Description { get; private set; } = default!;
@@ -75,6 +85,17 @@ public sealed class ChargeSuggestion : AggregateRoot, IClinicScoped, ITenantOwne
 
     /// <summary>Katalogda bedelsiz (fiyat 0) tanımlı ürün ücretlendirilmez, kalem doğurmaz (pilot kuralı, ADR-018).</summary>
     public static bool IsChargeable(Product product) => product.UnitPrice > 0;
+
+    /// <summary>
+    /// Uygulama kendi kalemini doğurur mu: fiyatlı ürün ve pakete dahil değil. Fiyatlı pakete dahil uygulamanın ücreti paket kalemindedir
+    /// (EXAM-007; ADR-018 "fiyatlı her uygulama kalem doğurur" kuralının tek istisnası).
+    /// </summary>
+    public static bool IsChargeable(Administration administration, Product product)
+        => !administration.IsIncludedInPackage && IsChargeable(product);
+
+    /// <summary>Paket hizmet satırı kendi kalemini doğurur mu: paket fiyatsız ve hizmet fiyatlı (fiyatlı pakette hizmet pakete dahildir).</summary>
+    public static bool IsChargeableServiceLine(ExaminationTemplate template, Product product)
+        => template.PackagePrice is null && IsChargeable(product);
 
     /// <summary>Uygulamadan kalem üretir; fiyat ürün kataloğundan (kalem doğduğu andaki) alınır.</summary>
     public static Result<ChargeSuggestion> ForAdministration(Administration administration, Product product, Guid? visitId)
@@ -129,6 +150,37 @@ public sealed class ChargeSuggestion : AggregateRoot, IClinicScoped, ITenantOwne
             Quantity = quantity,
             Unit = Truncate(product.Unit, MaxUnitLength),
             SuggestedUnitPrice = CatalogPrice(product),
+            OccurredAtUtc = occurredAtUtc,
+            CreatedAtUtc = occurredAtUtc,
+            Status = ChargeSuggestionStatus.Pending,
+        };
+        suggestion.SourceId = suggestion.Id;
+        return Result<ChargeSuggestion>.Success(suggestion);
+    }
+
+    /// <summary>
+    /// Fiyatlı paketten tek kalem üretir (miktar 1, birim "Paket", açıklama paket adı, fiyat paket fiyatı); paket fiyatsızsa hata.
+    /// Paketin stoklu satırları bu kalemin kimliğiyle "pakete dahil" uygulanır, hizmet satırları ayrı kalem doğurmaz.
+    /// </summary>
+    public static Result<ChargeSuggestion> ForExaminationPackage(Examination examination, ExaminationTemplate template, DateTime nowUtc)
+    {
+        if (template.PackagePrice is not { } price)
+            return Result<ChargeSuggestion>.Failure("ChargeSuggestions.Validation", "Paket fiyatı yok; satırlar kalem kalem ücretlenir.");
+
+        var occurredAtUtc = NormalizeUtc(nowUtc);
+        var suggestion = new ChargeSuggestion
+        {
+            TenantId = examination.TenantId,
+            ClinicId = examination.ClinicId,
+            PetId = examination.PetId,
+            ExaminationId = examination.Id,
+            VisitId = examination.VisitId,
+            SourceType = ExaminationPackageSource,
+            ProductId = null,
+            Description = Truncate(template.Name, Charge.MaxDescriptionLength),
+            Quantity = 1,
+            Unit = PackageUnit,
+            SuggestedUnitPrice = price,
             OccurredAtUtc = occurredAtUtc,
             CreatedAtUtc = occurredAtUtc,
             Status = ChargeSuggestionStatus.Pending,

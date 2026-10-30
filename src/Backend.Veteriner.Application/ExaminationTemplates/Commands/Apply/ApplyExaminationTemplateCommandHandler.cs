@@ -117,6 +117,18 @@ public sealed class ApplyExaminationTemplateCommandHandler
                 "Muayene kaydı eşzamanlı olarak güncellendi; formu yenileyip tekrar deneyin."));
         }
 
+        // Fiyatlı paket (EXAM-007): önce tek paket kalemi; stoklu satırlar ona bağlanır, hizmet satırları ayrı kalem doğurmaz.
+        Guid? packageSuggestionId = null;
+        if (template.PackagePrice.HasValue)
+        {
+            var package = ChargeSuggestion.ForExaminationPackage(examination, template, nowUtc);
+            if (!package.IsSuccess)
+                return Fail(package.Error);
+
+            await _chargeSuggestions.AddAsync(package.Value!, ct);
+            packageSuggestionId = package.Value!.Id;
+        }
+
         var administrations = new List<AdministrationDto>();
         var services = new List<AppliedServiceLineDto>();
         foreach (var line in lines)
@@ -135,7 +147,8 @@ public sealed class ApplyExaminationTemplateCommandHandler
                         AdministeredAtUtc: nowUtc,
                         Notes: null,
                         LateEntryReason: null,
-                        RequestId: null),
+                        RequestId: null,
+                        PackageChargeSuggestionId: packageSuggestionId),
                     ct);
                 if (!administration.IsSuccess)
                     return Fail(WithProduct(administration.Error, product.Id));
@@ -145,7 +158,7 @@ public sealed class ApplyExaminationTemplateCommandHandler
             }
 
             Guid? suggestionId = null;
-            if (ChargeSuggestion.IsChargeable(product))
+            if (ChargeSuggestion.IsChargeableServiceLine(template, product))
             {
                 var suggestion = ChargeSuggestion.ForExaminationService(examination, product, line.Quantity, nowUtc);
                 if (!suggestion.IsSuccess)
@@ -155,7 +168,7 @@ public sealed class ApplyExaminationTemplateCommandHandler
                 suggestionId = suggestion.Value!.Id;
             }
 
-            services.Add(new AppliedServiceLineDto(product.Id, product.Name, product.Unit, line.Quantity, suggestionId));
+            services.Add(new AppliedServiceLineDto(product.Id, product.Name, product.Unit, line.Quantity, suggestionId, packageSuggestionId.HasValue));
         }
 
         return Result<ExaminationTemplateApplyResultDto>.Success(new ExaminationTemplateApplyResultDto(
@@ -163,7 +176,8 @@ public sealed class ApplyExaminationTemplateCommandHandler
             ExaminationRowVersion.Encode(examination.RowVersion),
             prefill.Value!,
             administrations,
-            services));
+            services,
+            packageSuggestionId));
     }
 
     /// <summary>Reddedilen satırın ürünü ProblemDetails'te <c>productId</c> olarak döner (arayüz satırı işaretler).</summary>

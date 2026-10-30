@@ -268,3 +268,7 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 | `Cancelled` | Uygulama iptal edildi, bekleyen kalem düştü | öneri alanları |
 
 Kural tek yerde: `AdministrationBilling` (Application). Kaynak: `ChargeSuggestion` (`sourceType = Administration`) ve bağlı `Charge` (`CHARGE_SUGGESTION_API_CONTRACT.md`). Fatura (e-belge) bağı bu sürümde yoktur; "fatura satırı" karşılığı ücret kaydıdır.
+
+## 13) Pakete dahil uygulama (EXAM-007, 2026-10-30)
+
+`AdministrationDto.packageChargeSuggestionId` (guid?): uygulama fiyatlı tedavi paketiyle yazıldıysa paketin "ücret bekliyor" kalemi. Doluysa uygulama **pakete dahildir**: stok normal düşer, kendi kalemini doğurmaz (ücret paket kalemindedir). Alan yalnız şablon uygulamasıyla dolar; `POST /administrations` gövdesinde yoktur. Ayrıntı `EXAMINATION_TEMPLATE_API_CONTRACT.md` bölüm 11.

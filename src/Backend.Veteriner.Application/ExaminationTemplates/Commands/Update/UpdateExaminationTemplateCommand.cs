@@ -16,7 +16,8 @@ public sealed record UpdateExaminationTemplateCommand(
     string? Findings,
     string? Plan,
     IReadOnlyList<ExaminationTemplateLineRequest> Lines,
-    string? RowVersion)
+    string? RowVersion,
+    decimal? PackagePrice = null)
     : IRequest<Result<ExaminationTemplateDto>>, IAuditableRequest
 {
     public string AuditAction => "ExaminationTemplate.Update";

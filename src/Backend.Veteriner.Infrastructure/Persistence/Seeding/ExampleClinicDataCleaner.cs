@@ -336,7 +336,9 @@ public sealed class ExampleClinicDataCleaner : IExampleClinicCleaner
         public IQueryable<Guid> ProductUsages(Guid[] productIds)
             => db.SaleLines.Where(x => productIds.Contains(x.ProductId) && !Sales.Select(s => s.Id).Contains(x.SaleId)).Select(x => x.ProductId)
                 .Concat(db.Administrations.Where(x => productIds.Contains(x.ProductId) && !PetIds.Contains(x.PetId)).Select(x => x.ProductId))
-                .Concat(db.ChargeSuggestions.Where(x => productIds.Contains(x.ProductId) && !PetIds.Contains(x.PetId)).Select(x => x.ProductId))
+                .Concat(db.ChargeSuggestions
+                    .Where(x => x.ProductId != null && productIds.Contains(x.ProductId.Value) && !PetIds.Contains(x.PetId))
+                    .Select(x => x.ProductId!.Value))
                 .Concat(db.ExaminationTemplateLines.Where(x => productIds.Contains(x.ProductId)).Select(x => x.ProductId))
                 .Concat(db.Set<PrescriptionItem>()
                     .Where(x => x.ProductId != null && productIds.Contains(x.ProductId.Value) && !Prescriptions.Select(p => p.Id).Contains(x.PrescriptionId))

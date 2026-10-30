@@ -36,7 +36,8 @@ public sealed class ChargeSuggestionConfiguration : IEntityTypeConfiguration<Cha
 
         b.Property(x => x.SourceType).IsRequired().HasMaxLength(ChargeSuggestion.MaxSourceTypeLength);
         b.Property(x => x.SourceId).IsRequired();
-        b.Property(x => x.ProductId).IsRequired();
+        // Paket kaleminde (ExaminationPackage) ürün yoktur (EXAM-007).
+        b.Property(x => x.ProductId);
 
         b.Property(x => x.Description).IsRequired().HasMaxLength(Charge.MaxDescriptionLength);
         b.Property(x => x.Quantity).HasPrecision(18, Charge.QuantityDecimals).IsRequired();

@@ -38,7 +38,8 @@ internal static class ExaminationTemplateMappings
                 .Where(l => products.ContainsKey(l.ProductId))
                 .Select(l => l.ToDto(products[l.ProductId]))
                 .ToList(),
-            ExaminationRowVersion.Encode(t.RowVersion));
+            ExaminationRowVersion.Encode(t.RowVersion),
+            t.PackagePrice);
 
     private static ExaminationTemplateLineDto ToDto(this ExaminationTemplateLine l, Product p)
         => new(p.Id, p.Name, p.Unit, p.Kind, p.IsActive, l.Quantity, p.UnitPrice, p.Currency);

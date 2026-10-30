@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Catalog;
+using Backend.Veteriner.Domain.Charges;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -20,6 +21,7 @@ public sealed class ExaminationTemplateConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.VisitReason).HasMaxLength(ExaminationTemplate.MaxVisitReasonLength);
         b.Property(x => x.Findings).HasMaxLength(ExaminationTemplate.MaxTextLength);
         b.Property(x => x.Plan).HasMaxLength(ExaminationTemplate.MaxTextLength);
+        b.Property(x => x.PackagePrice).HasPrecision(18, Charge.UnitPriceDecimals);
         b.Property(x => x.IsActive).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);

@@ -58,6 +58,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<Guid?>("PackageChargeSuggestionId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("PetId")
                         .HasColumnType("uniqueidentifier");
 
@@ -109,6 +112,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BatchId");
+
+                    b.HasIndex("PackageChargeSuggestionId");
 
                     b.HasIndex("VaccinationId");
 
@@ -488,6 +493,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<decimal?>("PackagePrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Plan")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
@@ -837,7 +846,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("PetId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("ProductId")
+                    b.Property<Guid?>("ProductId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("Quantity")
@@ -4893,6 +4902,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasOne("Backend.Veteriner.Domain.Products.StockBatch", null)
                         .WithMany()
                         .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Backend.Veteriner.Domain.ChargeSuggestions.ChargeSuggestion", null)
+                        .WithMany()
+                        .HasForeignKey("PackageChargeSuggestionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Backend.Veteriner.Domain.Vaccinations.Vaccination", null)

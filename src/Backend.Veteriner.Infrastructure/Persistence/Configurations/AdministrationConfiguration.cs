@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -70,6 +71,12 @@ public sealed class AdministrationConfiguration : IEntityTypeConfiguration<Admin
         b.HasOne<Vaccination>()
             .WithMany()
             .HasForeignKey(x => x.VaccinationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Pakete dahil uygulama paketin ücret kalemine bağlanır (EXAM-007).
+        b.HasOne<ChargeSuggestion>()
+            .WithMany()
+            .HasForeignKey(x => x.PackageChargeSuggestionId)
             .OnDelete(DeleteBehavior.Restrict);
 
         b.HasIndex(x => new { x.TenantId, x.VaccinationId })

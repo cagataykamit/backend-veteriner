@@ -50,7 +50,7 @@ public sealed class UpdateExaminationTemplateCommandHandler
         // Sistem şablonu ve alan kuralları domain'de reddedilir; hatada kayıt yazılmaz (izlenen değişiklik kaydedilmeden atılır).
         var drafts = request.Lines.Select(l => new ExaminationTemplateLineDraft(l.ProductId, l.Quantity)).ToList();
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-        var update = template.Update(request.Name, request.VisitReason, request.Findings, request.Plan, drafts, utcNow);
+        var update = template.Update(request.Name, request.VisitReason, request.Findings, request.Plan, drafts, utcNow, request.PackagePrice);
         if (!update.IsSuccess)
             return Result<ExaminationTemplateDto>.Failure(update.Error);
 

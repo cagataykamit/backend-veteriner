@@ -38,7 +38,7 @@ public sealed class CreateExaminationTemplateCommandHandler
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var created = ExaminationTemplate.CreateForTenant(
-            tenantId, request.Name, request.VisitReason, request.Findings, request.Plan, drafts, utcNow);
+            tenantId, request.Name, request.VisitReason, request.Findings, request.Plan, drafts, utcNow, request.PackagePrice);
         if (!created.IsSuccess)
             return Result<ExaminationTemplateDto>.Failure(created.Error);
 

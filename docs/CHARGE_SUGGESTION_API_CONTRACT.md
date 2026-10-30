@@ -27,7 +27,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-018-ch
 | Alan | Tip | Not |
 |---|---|---|
 | `id` | guid | Kalem kimliği (çevirme/ücretsiz sayma uçları bununla) |
-| `sourceType` | string | `"Administration"` \| `"ExaminationService"` |
+| `sourceType` | string | `"Administration"` \| `"ExaminationService"` \| `"ExaminationPackage"` (EXAM-007, fiyatlı tedavi paketi; `productId` boş) |
 | `sourceId` | guid | Uygulama kimliği; `ExaminationService` için kalemin kendi `id`'si |
 | `clinicId` | guid | |
 | `clientId` | guid | Hayvanın **güncel** sahibi (ücretin müşterisi) |
@@ -116,3 +116,11 @@ Yeni izin **yok**; seed gerekmez.
 5. **`ChargeDto` değişmedi.** Fiyatı `null` kalemde birim fiyat alanı boş ve zorunlu gelir.
 6. **Yeni hata kodları:** `ChargeSuggestions.*` (bölüm 3, 4), `Products.NotStockTracked`, `Products.KindChangeNotAllowed`, uygulama iptalinde `Administrations.ConcurrencyConflict`. 409'larda listeyi yenile.
 7. **Davranış:** ücret iptal edilirse kalem geri gelmez; uygulama iptalinde bekleyen kalem kaybolur; liste her zaman sunucudan okunur.
+
+## Fiyatlı tedavi paketi kalemi (EXAM-007, kullanıcı kararı 2026-10-30)
+
+- Muayene şablonunda `packagePrice` doluysa şablon uygulanınca **tek** kalem doğar: `sourceType = "ExaminationPackage"`, `sourceId` = kalemin kendi `id`'si, `productId = null`, `description` = paket adı, `quantity = 1`, `unit = "Paket"`, `suggestedUnitPrice` = paket fiyatı. Muayene ve vizite bağlıdır.
+- Paketin stoklu satırları **pakete dahil** uygulanır (`AdministrationDto.packageChargeSuggestionId` = bu kalem): stok düşer, **kendi kalemlerini doğurmaz**; hizmet satırları da ayrı kalem doğurmaz. Bu, "fiyatlı her uygulama kalem doğurur" kuralının (ADR-018) tek istisnasıdır; kural alan katmanında `ChargeSuggestion.IsChargeable(Administration, Product)` ve `IsChargeableServiceLine` içinde.
+- Çevirme ve ücretsiz sayma diğer kalemlerle aynıdır. Ürün olmadığından ücret satır türü varsayılan (hizmet) kalır.
+- Pakete dahil bir uygulama iptal edilirse paket kalemi değişmez (fiyat paketindir); gerekiyorsa resepsiyon kalemi düzeltir/ücretsiz sayar.
+- `ChargeSuggestionDto.productId` artık `guid?` (yalnız paket kaleminde `null`). Migration `AddExaminationPackagePrice`: `ChargeSuggestions.ProductId` boş olabilir.

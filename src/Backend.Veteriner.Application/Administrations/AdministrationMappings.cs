@@ -37,7 +37,8 @@ internal static class AdministrationMappings
             a.VaccinationId,
             a.Route?.ToString(),
             a.Site,
-            product.Manufacturer);
+            product.Manufacturer,
+            PackageChargeSuggestionId: a.PackageChargeSuggestionId);
 
     public static AdministrationStockDto ToDto(this ProductStock stock, decimal expiredQuantity)
     {
