@@ -2,7 +2,7 @@ namespace Backend.Veteriner.Application.Reports.Registers.Prescriptions;
 
 /// <summary>
 /// Reçete defteri kaydı (bir reçete). <c>PrescriptionClass</c>, <c>VolumeSequenceNumber</c> ve <c>EarTagNumber</c> eksik alanlardır, her zaman null.
-/// <c>VeterinarianAddress</c> kliniğin adresidir.
+/// <c>VeterinarianAddress</c> kliniğin adresidir. İptal edilen reçete (RECORD-008) <c>IsCancelled</c> ve gerekçesiyle defterde kalır.
 /// </summary>
 public sealed record PrescriptionRegisterEntryDto(
     int RowNumber,
@@ -17,7 +17,9 @@ public sealed record PrescriptionRegisterEntryDto(
     string Species,
     string? EarTagNumber,
     int AnimalCount,
-    IReadOnlyList<PrescriptionRegisterItemDto> Items);
+    IReadOnlyList<PrescriptionRegisterItemDto> Items,
+    bool IsCancelled = false,
+    string? CancelReason = null);
 
 /// <summary><c>PharmacologicalForm</c> ve <c>Packaging</c> eksik alanlardır, her zaman null.</summary>
 public sealed record PrescriptionRegisterItemDto(

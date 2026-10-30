@@ -25,7 +25,8 @@ public sealed record ExaminationRegisterItemDto(
     IReadOnlyList<RegisterAdministrationDto> Administrations,
     string? VeterinarianName);
 
-public sealed record RegisterPrescriptionDto(string Title, IReadOnlyList<RegisterPrescriptionLineDto> Items);
+/// <param name="IsCancelled">İptal edilmiş reçete (RECORD-008); defterden çıkarılmaz, hücrede ` (iptal)` ekiyle görünür.</param>
+public sealed record RegisterPrescriptionDto(string Title, IReadOnlyList<RegisterPrescriptionLineDto> Items, bool IsCancelled = false);
 
 public sealed record RegisterPrescriptionLineDto(string Name, decimal? Quantity, string? Instructions);
 

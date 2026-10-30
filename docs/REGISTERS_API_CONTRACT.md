@@ -99,7 +99,7 @@ Sıralama: `examinedAtUtc`, `createdAtUtc`, `id` artan.
 
 - **Sonradan eklenen uygulama** (`Administration.AddedAfterFinalization`): satırda `addedAfterFinalization = true`; dosyada ` (sonradan eklendi)` eki. Gerekçe (`LateEntryReason`) deftere yazılmaz (ayrıntı klinik kayıttadır).
 - **İptal edilen uygulama** (`Administration.VoidedAtUtc`): `includeVoided=false` (varsayılan) iken muayene satırına **hiç girmez**; `true` iken `isVoided = true` ile ve ` (iptal)` ekiyle görünür. Gerekçe deftere yazılmaz.
-- Muayene ve reçetede iptal kavramı yoktur (yanlış kayıt düzeltmesi ek notla yapılır); `includeVoided` bu iki varlığı etkilemez ve reçete defterinde yoktur.
+- **İptal edilen reçete** (RECORD-008, 2026-10-30): muayene defterinin reçete bölümünden **çıkarılmaz**, kaydın sonunda ` (iptal)` ekiyle görünür (`prescriptions[].isCancelled`); `includeVoided` reçeteyi etkilemez. Muayenede iptal kavramı yoktur (düzeltme ek notla). Reçete defteri için bölüm 5.
 
 ## 4) Hekim adı kuralı (tek yerde)
 
@@ -126,12 +126,16 @@ Her reçete bir `entry`, içindeki ilaç satırları `items` olur; sayfalama ve 
 | `earTagNumber` | string? | Hayvanın · Kulak/İşletme No | **Her zaman null** (eksik alan) |
 | `animalCount` | int | Hayvanın · Sayısı | Her zaman 1 (reçete tek hayvanadır) |
 | `items` | `PrescriptionRegisterItemDto[]` | İlacın Adı, Farmakolojik Şekli, Ambalajı, Adedi (tek sütun) | Aşağıda; satırsız reçetede tek öğe (`name = Content`) |
+| `isCancelled` | bool | Reçetenin · Durumu (`İptal` / `Geçerli`) | RECORD-008; dosyada "Cilt/Sıra No"dan sonraki sütun |
+| `cancelReason` | string? | | Yalnız ekranda ipucu; dosyada yok |
 
 `PrescriptionRegisterItemDto`: `name` (İlacın Adı), `pharmacologicalForm` (Farmakolojik Şekli; **her zaman null**), `packaging` (Ambalajı; **her zaman null**), `quantity` (Adedi, ondalık?).
 
 Gruplu sütunlarda (reçete defterinde Sıra No ve ilaç sütunu hariç tümü; muayene defterinde "Hasta") XLSX başlığı iki katmanlıdır: ilk satır grup başlığı (aynı gruptaki bitişik sütunlar birleştirilir, grupsuz sütun iki satırı kaplar), ikinci satır sütun başlığı; CSV iki satırlı başlığı güvenle taşımadığından tek başlık satırı `Grup · Sütun` biçimindedir. Reçete grupları: Reçetenin, Veteriner Hekimin, Hayvan Sahibinin, Hayvanın; ilaç sütunu grupsuzdur.
 
 Sıralama: `prescribedAtUtc`, `createdAtUtc`, `id` artan; reçete içinde `SortOrder`.
+
+**İptal edilen reçete (RECORD-008, 2026-10-30):** defterden çıkarılmaz; `isCancelled = true`, durum sütununda `İptal`, ekranda gerekçe ipucu. Dört uç da (`JSON`, `/export`, `/export-xlsx`, `/export-pdf`) opsiyonel `hideCancelled` (bool, varsayılan `false`) alır: `true` iken iptal edilen reçeteler sayım ve sayfalamaya hiç girmez (Sıra No buna göre). Gerekçe: rakip pratiği ve kayıt defterinde silme yerine işaretleme ilkesi.
 
 ---
 

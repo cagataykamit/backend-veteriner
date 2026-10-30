@@ -245,9 +245,27 @@ public sealed class RegisterReportTests
         var csv = Encoding.UTF8.GetString(RegisterCsvWriter.WriteUtf8Bom(PrescriptionRegisterColumns.All, [entry]))
             .TrimStart('﻿').Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
 
-        csv[0].Should().StartWith("Sıra No;Reçetenin · Tarihi;Reçetenin · Sınıfı;Reçetenin · Cilt/Sıra No;Veteriner Hekimin · Adı Soyadı;");
+        csv[0].Should().StartWith("Sıra No;Reçetenin · Tarihi;Reçetenin · Sınıfı;Reçetenin · Cilt/Sıra No;Reçetenin · Durumu;Veteriner Hekimin · Adı Soyadı;");
         csv.Should().HaveCount(2);
-        csv[1].Should().Be("3;13.10.2026;;;Dr. Veli;Klinik Adresi;Ayşe Yılmaz;;Köpek;;1;\"Amoksilin ×2; Probiyotik\"");
+        csv[1].Should().Be("3;13.10.2026;;;Geçerli;Dr. Veli;Klinik Adresi;Ayşe Yılmaz;;Köpek;;1;\"Amoksilin ×2; Probiyotik\"");
+    }
+
+
+    /// <summary>RECORD-008: iptal edilen reçete defterden çıkmaz; durum sütununda "İptal", muayene defteri hücresinde " (iptal)" eki.</summary>
+    [Fact]
+    public void Cancelled_Prescription_Should_Stay_In_Registers_With_Status()
+    {
+        var entry = new PrescriptionRegisterEntryDto(
+            1, Guid.NewGuid(), new DateTime(2026, 10, 12, 9, 0, 0, DateTimeKind.Utc),
+            null, null, null, null, "Ayşe Yılmaz", null, "Kedi", null, 1,
+            [new PrescriptionRegisterItemDto("Amoksilin", null, null, 2m)], IsCancelled: true, CancelReason: "Yanlış hasta");
+
+        var csv = Encoding.UTF8.GetString(RegisterCsvWriter.WriteUtf8Bom(PrescriptionRegisterColumns.All, [entry]))
+            .TrimStart('﻿').Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+
+        csv[1].Should().StartWith("1;12.10.2026;;;İptal;");
+        var status = PrescriptionRegisterColumns.All.Single(c => c.Header == "Durumu");
+        status.Group.Should().Be("Reçetenin");
     }
 
     [Fact]

@@ -742,6 +742,7 @@ public sealed class ReportsController : ControllerBase
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
         [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool hideCancelled = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
         CancellationToken ct = default)
@@ -749,7 +750,7 @@ public sealed class ReportsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new GetPrescriptionRegisterQuery(from, to, clinicId, page, pageSize), ct);
+        var result = await _mediator.Send(new GetPrescriptionRegisterQuery(from, to, clinicId, page, pageSize, hideCancelled), ct);
         return result.ToActionResult(this);
     }
 
@@ -763,12 +764,13 @@ public sealed class ReportsController : ControllerBase
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
         [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool hideCancelled = false,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new ExportPrescriptionRegisterQuery(from, to, clinicId), ct);
+        var result = await _mediator.Send(new ExportPrescriptionRegisterQuery(from, to, clinicId, hideCancelled), ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
@@ -786,12 +788,13 @@ public sealed class ReportsController : ControllerBase
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
         [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool hideCancelled = false,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new ExportPrescriptionRegisterXlsxQuery(from, to, clinicId), ct);
+        var result = await _mediator.Send(new ExportPrescriptionRegisterXlsxQuery(from, to, clinicId, hideCancelled), ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
@@ -809,12 +812,13 @@ public sealed class ReportsController : ControllerBase
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
         [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool hideCancelled = false,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new ExportPrescriptionRegisterPdfQuery(from, to, clinicId), ct);
+        var result = await _mediator.Send(new ExportPrescriptionRegisterPdfQuery(from, to, clinicId, hideCancelled), ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
