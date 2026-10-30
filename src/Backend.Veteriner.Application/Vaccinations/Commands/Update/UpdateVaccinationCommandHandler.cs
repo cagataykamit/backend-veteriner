@@ -203,6 +203,10 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
 
+        var routeSite = v.SetRouteAndSite(request.Route, request.Site);
+        if (!routeSite.IsSuccess)
+            return Result.Failure(routeSite.Error);
+
         await _vaccinationsWrite.UpdateAsync(v, ct);
         await _vaccinationsWrite.SaveChangesAsync(ct);
         return Result.Success();

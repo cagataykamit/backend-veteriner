@@ -1,5 +1,7 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -24,7 +26,9 @@ public sealed record CreateVaccinationCommand(
     Guid? ProductId = null,
     decimal? Quantity = null,
     Guid? BatchId = null,
-    Guid? RequestId = null)
+    Guid? RequestId = null,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] AdministrationRoute? Route = null,
+    string? Site = null)
     : IRequest<Result<VaccinationCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IActivationSignalRequest
 {
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.VaccinationCreated;

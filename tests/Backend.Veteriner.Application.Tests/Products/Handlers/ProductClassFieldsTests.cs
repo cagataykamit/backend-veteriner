@@ -50,7 +50,7 @@ public sealed class ProductClassFieldsTests
         var result = await handler.Handle(
             new CreateProductCommand(
                 null, "Ketamin", null, null, null, "Şişe", 10, "TRY",
-                ProductKind.Medicine, ControlledSubstanceClass.Narcotic, "Enjeksiyonluk çözelti", "Flakon", "10 ml"),
+                ProductKind.Medicine, ControlledSubstanceClass.Narcotic, "Enjeksiyonluk çözelti", "Flakon", "10 ml", "  Vetaş İlaç "),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -59,6 +59,7 @@ public sealed class ProductClassFieldsTests
         result.Value.PharmacologicalForm.Should().Be("Enjeksiyonluk çözelti");
         result.Value.PresentationForm.Should().Be("Flakon");
         result.Value.Packaging.Should().Be("10 ml");
+        result.Value.Manufacturer.Should().Be("Vetaş İlaç");
     }
 
     private UpdateProductCommandHandler UpdateHandlerFor(Product product)
@@ -75,7 +76,7 @@ public sealed class ProductClassFieldsTests
         var product = new Product(
             _tenantId, "Aşı", "Doz", 1, "TRY", DateTime.UtcNow, kind: ProductKind.Vaccine,
             controlledClass: ControlledSubstanceClass.Psychotropic, pharmacologicalForm: "Süspansiyon",
-            presentationForm: "Flakon", packaging: "Kutu");
+            presentationForm: "Flakon", packaging: "Kutu", manufacturer: "Üretici A");
 
         var result = await UpdateHandlerFor(product).Handle(
             new UpdateProductCommand(product.Id, null, "Yeni ad", null, null, null, "Doz", 2, "TRY"),
@@ -88,6 +89,7 @@ public sealed class ProductClassFieldsTests
         product.PharmacologicalForm.Should().Be("Süspansiyon");
         product.PresentationForm.Should().Be("Flakon");
         product.Packaging.Should().Be("Kutu");
+        product.Manufacturer.Should().Be("Üretici A");
     }
 
     [Fact]

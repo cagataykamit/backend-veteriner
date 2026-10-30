@@ -126,7 +126,8 @@ public sealed class GetVaccinationByIdQueryHandler
                 product?.Unit ?? string.Empty,
                 administration.BatchId,
                 batch?.LotNumber,
-                batch?.ExpiryDate);
+                batch?.ExpiryDate,
+                product?.Manufacturer);
         }
 
         var dto = new VaccinationDetailDto(
@@ -147,7 +148,9 @@ public sealed class GetVaccinationByIdQueryHandler
             v.CreatedAtUtc,
             v.UpdatedAtUtc,
             administrationDto,
-            await HbsEntryDtoFactory.ForVaccinationAsync(v, _names, ct));
+            await HbsEntryDtoFactory.ForVaccinationAsync(v, _names, ct),
+            v.Route?.ToString(),
+            v.Site);
         return Result<VaccinationDetailDto>.Success(dto);
     }
 }

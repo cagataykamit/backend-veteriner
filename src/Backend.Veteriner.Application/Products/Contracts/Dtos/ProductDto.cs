@@ -19,4 +19,5 @@ public sealed record ProductDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ControlledSubstanceClass ControlledClass,
     string? PharmacologicalForm,
     string? PresentationForm,
-    string? Packaging);
+    string? Packaging,
+    string? Manufacturer);

@@ -22,5 +22,6 @@ public sealed record UpdateProductCommand(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ControlledSubstanceClass? ControlledClass = null,
     string? PharmacologicalForm = null,
     string? PresentationForm = null,
-    string? Packaging = null)
+    string? Packaging = null,
+    string? Manufacturer = null)
     : IRequest<Result>;

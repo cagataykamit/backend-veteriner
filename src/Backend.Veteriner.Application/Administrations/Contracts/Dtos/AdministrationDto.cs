@@ -29,7 +29,10 @@ public sealed record AdministrationDto(
     Guid? BatchId = null,
     string? LotNumber = null,
     DateOnly? ExpiryDate = null,
-    Guid? VaccinationId = null);
+    Guid? VaccinationId = null,
+    string? Route = null,
+    string? Site = null,
+    string? ProductManufacturer = null);
 
 /// <summary>Düşümden sonraki stok durumu; düşük stok yalnız bilgidir, kaydı engellemez. <see cref="IsBelowMinimum"/> kullanılabilir miktara bakar.</summary>
 public sealed record AdministrationStockDto(

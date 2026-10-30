@@ -65,7 +65,9 @@ public sealed class AdministrationsController : ControllerBase
                 body.Notes,
                 body.LateEntryReason,
                 body.RequestId,
-                body.BatchId),
+                body.BatchId,
+                Route: body.Route,
+                Site: body.Site),
             ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);

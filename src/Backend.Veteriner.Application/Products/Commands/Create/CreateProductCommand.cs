@@ -21,7 +21,8 @@ public sealed record CreateProductCommand(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ControlledSubstanceClass? ControlledClass = null,
     string? PharmacologicalForm = null,
     string? PresentationForm = null,
-    string? Packaging = null)
+    string? Packaging = null,
+    string? Manufacturer = null)
     : IRequest<Result<ProductDto>>, IActivationSignalRequest
 {
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.ProductCreated;

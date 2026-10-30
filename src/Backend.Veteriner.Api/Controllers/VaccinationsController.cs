@@ -116,7 +116,9 @@ public sealed class VaccinationsController : ControllerBase
             body.Status,
             body.AppliedAtUtc,
             body.DueAtUtc,
-            body.Notes);
+            body.Notes,
+            body.Route,
+            body.Site);
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);

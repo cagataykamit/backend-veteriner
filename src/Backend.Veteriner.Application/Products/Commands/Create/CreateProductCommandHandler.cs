@@ -78,7 +78,8 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
             request.ControlledClass ?? ControlledSubstanceClass.None,
             request.PharmacologicalForm,
             request.PresentationForm,
-            request.Packaging);
+            request.Packaging,
+            request.Manufacturer);
 
         await _productsWrite.AddAsync(product, ct);
         await _productsWrite.SaveChangesAsync(ct);

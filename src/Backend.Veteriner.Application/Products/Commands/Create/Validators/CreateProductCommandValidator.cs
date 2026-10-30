@@ -23,5 +23,6 @@ public sealed class CreateProductCommandValidator : AbstractValidator<CreateProd
         RuleFor(x => x.PharmacologicalForm).MaximumLength(100);
         RuleFor(x => x.PresentationForm).MaximumLength(100);
         RuleFor(x => x.Packaging).MaximumLength(100);
+        RuleFor(x => x.Manufacturer).MaximumLength(Product.ManufacturerMaxLength);
     }
 }

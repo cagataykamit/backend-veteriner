@@ -9,4 +9,5 @@ public sealed record VaccinationAdministrationDto(
     string Unit,
     Guid? BatchId,
     string? LotNumber,
-    DateOnly? ExpiryDate);
+    DateOnly? ExpiryDate,
+    string? ProductManufacturer = null);
