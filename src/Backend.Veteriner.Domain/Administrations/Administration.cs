@@ -58,6 +58,13 @@ public sealed class Administration : AggregateRoot, IClinicScoped, ITenantOwned
     /// <summary>Bu uygulamayı aşı kaydıyla birlikte yazan <c>Vaccination</c>; <c>null</c> = bağımsız uygulama. Bağlı uygulama aşı olayının parçasıdır (çift sayım yok).</summary>
     public Guid? VaccinationId { get; private set; }
 
+    /// <summary>
+    /// Fiyatlı tedavi paketiyle uygulandıysa paketin "ücret bekliyor" kalemi (EXAM-007): uygulama "pakete dahil"dir, kendi kalemini doğurmaz,
+    /// stok normal düşer. <c>null</c> = bağımsız ücretlenen uygulama.
+    /// </summary>
+    public Guid? PackageChargeSuggestionId { get; private set; }
+    public bool IsIncludedInPackage => PackageChargeSuggestionId.HasValue;
+
     /// <summary>Eşzamanlı iptalleri ayırt eden belirteç (iptal stok iadesi yazmasa da tek kazanan olur).</summary>
     public byte[] RowVersion { get; private set; } = default!;
 
@@ -78,10 +85,13 @@ public sealed class Administration : AggregateRoot, IClinicScoped, ITenantOwned
         Guid createdByUserId,
         DateTime createdAtUtc,
         Guid? requestId,
-        Guid? vaccinationId = null)
+        Guid? vaccinationId = null,
+        Guid? packageChargeSuggestionId = null)
     {
         if (tenantId == Guid.Empty)
             return Invalid("TenantId geçersiz.");
+        if (packageChargeSuggestionId == Guid.Empty || (packageChargeSuggestionId.HasValue && vaccinationId.HasValue))
+            return Invalid("Paket kalemi geçerli bir kimlik olmalıdır; aşıya bağlı uygulama pakete dahil olamaz.");
         if (clinicId == Guid.Empty)
             return Invalid("ClinicId geçersiz.");
         if (petId == Guid.Empty)
@@ -128,6 +138,7 @@ public sealed class Administration : AggregateRoot, IClinicScoped, ITenantOwned
             CreatedAtUtc = NormalizeUtc(createdAtUtc),
             RequestId = requestId,
             VaccinationId = vaccinationId,
+            PackageChargeSuggestionId = packageChargeSuggestionId,
         });
     }
 

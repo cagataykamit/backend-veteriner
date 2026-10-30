@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 
@@ -37,6 +38,12 @@ public sealed class ExaminationTemplate : AggregateRoot
     /// <summary>Muayenenin plan alanına eklenecek metin.</summary>
     public string? Plan { get; private set; }
 
+    /// <summary>
+    /// Paket fiyatı (EXAM-007, kullanıcı kararı 2026-10-30): doluysa paket uygulanınca tek "ücret bekliyor" kalemi doğar ve stoklu satırlar
+    /// "pakete dahil" uygulanır (kendi kalemlerini doğurmaz, stok düşer); boşsa satırlar kalem kalem ücretlenir. Kural <c>ChargeSuggestion</c>'da.
+    /// </summary>
+    public decimal? PackagePrice { get; private set; }
+
     public bool IsActive { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
@@ -54,7 +61,7 @@ public sealed class ExaminationTemplate : AggregateRoot
     public static ExaminationTemplate CreateSystem(string name, string? visitReason, string? findings, string? plan, DateTime utcNow)
     {
         var template = new ExaminationTemplate();
-        var applied = template.Apply(name, visitReason, findings, plan, []);
+        var applied = template.Apply(name, visitReason, findings, plan, [], packagePrice: null);
         if (!applied.IsSuccess)
             throw new ArgumentException(applied.Error.Message, nameof(name));
 
@@ -70,13 +77,14 @@ public sealed class ExaminationTemplate : AggregateRoot
         string? findings,
         string? plan,
         IReadOnlyList<ExaminationTemplateLineDraft> lines,
-        DateTime utcNow)
+        DateTime utcNow,
+        decimal? packagePrice = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
 
         var template = new ExaminationTemplate { TenantId = tenantId };
-        var applied = template.Apply(name, visitReason, findings, plan, lines);
+        var applied = template.Apply(name, visitReason, findings, plan, lines, packagePrice);
         if (!applied.IsSuccess)
             return Result<ExaminationTemplate>.Failure(applied.Error);
 
@@ -92,12 +100,13 @@ public sealed class ExaminationTemplate : AggregateRoot
         string? findings,
         string? plan,
         IReadOnlyList<ExaminationTemplateLineDraft> lines,
-        DateTime utcNow)
+        DateTime utcNow,
+        decimal? packagePrice = null)
     {
         if (IsSystem)
             return SystemReadOnly();
 
-        var applied = Apply(name, visitReason, findings, plan, lines);
+        var applied = Apply(name, visitReason, findings, plan, lines, packagePrice);
         if (!applied.IsSuccess)
             return applied;
 
@@ -158,7 +167,8 @@ public sealed class ExaminationTemplate : AggregateRoot
         string? visitReason,
         string? findings,
         string? plan,
-        IReadOnlyList<ExaminationTemplateLineDraft> lines)
+        IReadOnlyList<ExaminationTemplateLineDraft> lines,
+        decimal? packagePrice)
     {
         var normalizedName = CollapseWhitespace(name);
         if (normalizedName.Length is < 1 or > MaxNameLength)
@@ -196,11 +206,21 @@ public sealed class ExaminationTemplate : AggregateRoot
         if (reason is null && findingsText is null && planText is null && lines.Count == 0)
             return Invalid("Şablonda en az bir metin veya işlem satırı olmalıdır.");
 
+        if (packagePrice is { } price
+            && (price <= 0 || price > Charge.MaxUnitPrice || decimal.Round(price, Charge.UnitPriceDecimals) != price))
+        {
+            return Invalid($"Paket fiyatı 0'dan büyük, en fazla {Charge.MaxUnitPrice:0} ve en fazla {Charge.UnitPriceDecimals} ondalıklı olmalıdır.");
+        }
+
+        if (packagePrice.HasValue && lines.Count == 0)
+            return Invalid("Paket fiyatı yalnız işlem satırı olan şablonda verilebilir.");
+
         Name = normalizedName;
         NormalizedName = TurkishTextKey.Normalize(normalizedName);
         VisitReason = reason;
         Findings = findingsText;
         Plan = planText;
+        PackagePrice = packagePrice;
 
         _lines.Clear();
         for (var i = 0; i < lines.Count; i++)
