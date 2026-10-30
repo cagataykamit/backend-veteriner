@@ -22,5 +22,6 @@ internal static class ProductMappings
             p.ControlledClass,
             p.PharmacologicalForm,
             p.PresentationForm,
-            p.Packaging);
+            p.Packaging,
+            p.Manufacturer);
 }

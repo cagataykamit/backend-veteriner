@@ -21,4 +21,6 @@ public sealed record VaccinationDetailDto(
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
     VaccinationAdministrationDto? Administration = null,
-    HbsEntryDto? Hbs = null);
+    HbsEntryDto? Hbs = null,
+    string? Route = null,
+    string? Site = null);

@@ -82,6 +82,46 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
     }
 
     [Fact]
+    public async Task RouteAndSite_Should_Live_On_Vaccination_Not_Linked_Administration_And_Update_Replaces()
+    {
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+
+        var response = await client.PostAsJsonAsync("/api/v1/vaccinations", new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, vaccineDefinitionId = ctx.VaccineDefinitionId,
+            status = VaccinationStatus.Applied, appliedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            productId = ctx.ProductId, route = "Subcutaneous", site = "Boyun arkası",
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var vaccinationId = json.GetProperty("id").GetGuid();
+        json.GetProperty("administration").GetProperty("route").ValueKind.Should().Be(JsonValueKind.Null);
+        var detail = await (await client.GetAsync($"/api/v1/vaccinations/{vaccinationId:D}")).Content.ReadFromJsonAsync<JsonElement>();
+        detail.GetProperty("route").GetString().Should().Be("Subcutaneous");
+        detail.GetProperty("site").GetString().Should().Be("Boyun arkası");
+
+        var appliedAt = DateTime.UtcNow.AddMinutes(-5);
+        var bare = await client.PostAsJsonAsync("/api/v1/vaccinations", new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, vaccineDefinitionId = ctx.VaccineDefinitionId,
+            status = VaccinationStatus.Applied, appliedAtUtc = appliedAt, route = "Subcutaneous", site = "Boyun arkası",
+        });
+        var bareId = await bare.Content.ReadFromJsonAsync<Guid>();
+        var update = await client.PutAsJsonAsync($"/api/v1/vaccinations/{bareId:D}", new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, vaccineDefinitionId = ctx.VaccineDefinitionId,
+            status = VaccinationStatus.Applied, appliedAtUtc = appliedAt, route = "Intramuscular",
+        });
+
+        update.IsSuccessStatusCode.Should().BeTrue();
+        var after = await (await client.GetAsync($"/api/v1/vaccinations/{bareId:D}")).Content.ReadFromJsonAsync<JsonElement>();
+        after.GetProperty("route").GetString().Should().Be("Intramuscular");
+        after.GetProperty("site").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Post_WithProduct_DefaultQuantity_Should_Be_One()
     {
         var ctx = await SeedAsync(stock: 10m);

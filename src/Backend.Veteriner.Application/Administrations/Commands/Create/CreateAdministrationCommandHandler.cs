@@ -211,7 +211,9 @@ public sealed class CreateAdministrationCommandHandler
             userId,
             nowUtc,
             request.RequestId,
-            request.VaccinationId);
+            request.VaccinationId,
+            request.Route,
+            request.Site);
         if (!created.IsSuccess)
             return Result<AdministrationCreateResultDto>.Failure(created.Error);
 

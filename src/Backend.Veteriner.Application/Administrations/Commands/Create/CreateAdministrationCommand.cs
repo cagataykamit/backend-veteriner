@@ -1,5 +1,7 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Administrations.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
 
@@ -14,6 +16,8 @@ namespace Backend.Veteriner.Application.Administrations.Commands.Create;
 /// <see cref="VaccinationId"/> yalnız aşı kaydı oluşturma akışı tarafından verilir (HTTP gövdesinde yoktur); uygulamayı o aşı kaydına bağlar.
 ///
 /// <see cref="LateEntryReason"/> bağlı muayene kesinleşmişse zorunludur (sonradan ekleme), aksi hâlde yok sayılır.
+///
+/// <see cref="Route"/> ve <see cref="Site"/> (RECORD-005) isteğe bağlıdır; aşıya bağlı uygulamada verilmez (aşı kaydında tutulur).
 /// </summary>
 public sealed record CreateAdministrationCommand(
     Guid? ClinicId,
@@ -27,7 +31,9 @@ public sealed record CreateAdministrationCommand(
     string? LateEntryReason,
     Guid? RequestId,
     Guid? BatchId = null,
-    Guid? VaccinationId = null)
+    Guid? VaccinationId = null,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] AdministrationRoute? Route = null,
+    string? Site = null)
     : IRequest<Result<AdministrationCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Administration.Create";

@@ -84,6 +84,34 @@ public sealed class AdministrationsEndpointTests : IClassFixture<CustomWebApplic
     }
 
     [Fact]
+    public async Task Post_Should_Store_Route_And_Site_And_Reject_Unknown_Route()
+    {
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+
+        var response = await client.PostAsJsonAsync("/api/v1/administrations", new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, productId = ctx.ProductId, quantity = 1m,
+            route = "Intramuscular", site = "  Sağ arka bacak  ",
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var admin = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("administration");
+        admin.GetProperty("route").GetString().Should().Be("Intramuscular");
+        admin.GetProperty("site").GetString().Should().Be("Sağ arka bacak");
+        var read = await (await client.GetAsync($"/api/v1/administrations/{admin.GetProperty("id").GetGuid():D}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        read.GetProperty("route").GetString().Should().Be("Intramuscular");
+
+        var invalid = await client.PostAsJsonAsync("/api/v1/administrations", new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, productId = ctx.ProductId, quantity = 1m, route = "Telepati",
+        });
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await GetStockAsync(ctx)).Should().Be(9m);
+    }
+
+    [Fact]
     public async Task Post_AboveMinimum_Should_Not_Flag_Low_Stock()
     {
         var ctx = await SeedAsync(stock: 10m, minimum: 2m);

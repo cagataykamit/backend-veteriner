@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using Backend.Veteriner.Domain.Administrations;
+
 namespace Backend.Veteriner.Api.Controllers;
 
 /// <summary>
@@ -16,6 +19,13 @@ public sealed class CreateAdministrationBody
     public string? LateEntryReason { get; init; }
     public Guid? RequestId { get; init; }
     public Guid? BatchId { get; init; }
+
+    /// <summary>Uygulama yolu (RECORD-005): <c>Oral</c>, <c>Subcutaneous</c>, <c>Intramuscular</c>, <c>Intravenous</c>, <c>Intranasal</c>, <c>Intradermal</c>, <c>Topical</c>, <c>Ophthalmic</c>, <c>Otic</c>, <c>Rectal</c>, <c>Other</c>.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public AdministrationRoute? Route { get; init; }
+
+    /// <summary>Uygulama bölgesi, serbest metin (en çok 100).</summary>
+    public string? Site { get; init; }
 }
 
 /// <summary>POST /administrations/{id}/void gövdesi. <c>StockOutcome</c> verilmezse <c>StockReturned</c>.</summary>

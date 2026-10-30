@@ -5,6 +5,8 @@ namespace Backend.Veteriner.Domain.Products;
 /// <summary>Kiracı katalog kartı (tenant-wide); stok miktarı <see cref="ProductStock"/> üzerinden klinik bazlı tutulur.</summary>
 public sealed class Product : AggregateRoot, ITenantOwned
 {
+    public const int ManufacturerMaxLength = 200;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
 
@@ -41,6 +43,9 @@ public sealed class Product : AggregateRoot, ITenantOwned
     /// <summary>Ambalaj (ör. 10 ml flakon).</summary>
     public string? Packaging { get; private set; }
 
+    /// <summary>Üretici firma (RECORD-005); tedarikçiden (parti girişindeki firma) ayrıdır.</summary>
+    public string? Manufacturer { get; private set; }
+
     /// <summary>Hizmet dışındaki ürünler stok takiplidir; stok düşen/giren her yüzey bu kuralı kullanır.</summary>
     public bool IsStockTracked => Kind != ProductKind.Service;
 
@@ -72,7 +77,8 @@ public sealed class Product : AggregateRoot, ITenantOwned
         ControlledSubstanceClass controlledClass = ControlledSubstanceClass.None,
         string? pharmacologicalForm = null,
         string? presentationForm = null,
-        string? packaging = null)
+        string? packaging = null,
+        string? manufacturer = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -102,6 +108,7 @@ public sealed class Product : AggregateRoot, ITenantOwned
         PharmacologicalForm = NormalizeOptional(pharmacologicalForm);
         PresentationForm = NormalizeOptional(presentationForm);
         Packaging = NormalizeOptional(packaging);
+        Manufacturer = NormalizeOptional(manufacturer);
         IsActive = true;
         CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
@@ -124,7 +131,8 @@ public sealed class Product : AggregateRoot, ITenantOwned
         ControlledSubstanceClass controlledClass = ControlledSubstanceClass.None,
         string? pharmacologicalForm = null,
         string? presentationForm = null,
-        string? packaging = null)
+        string? packaging = null,
+        string? manufacturer = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Ürün adı boş olamaz.", nameof(name));
@@ -150,6 +158,7 @@ public sealed class Product : AggregateRoot, ITenantOwned
         PharmacologicalForm = NormalizeOptional(pharmacologicalForm);
         PresentationForm = NormalizeOptional(presentationForm);
         Packaging = NormalizeOptional(packaging);
+        Manufacturer = NormalizeOptional(manufacturer);
         UpdatedAtUtc = utcNow;
     }
 

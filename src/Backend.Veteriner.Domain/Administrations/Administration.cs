@@ -31,6 +31,10 @@ public sealed class Administration : AggregateRoot, IClinicScoped, ITenantOwned
     public DateTime AdministeredAtUtc { get; private set; }
     public string? Notes { get; private set; }
 
+    /// <summary>Uygulama yolu ve bölgesi (RECORD-005). Aşıya bağlı uygulamada boştur: aşı olayının yolu/bölgesi aşı kaydındadır.</summary>
+    public AdministrationRoute? Route { get; private set; }
+    public string? Site { get; private set; }
+
     /// <summary>İptal edilmiş uygulama silinmez; stok ters hareketle geri verilmiştir.</summary>
     public DateTime? VoidedAtUtc { get; private set; }
     public Guid? VoidedByUserId { get; private set; }
@@ -78,7 +82,9 @@ public sealed class Administration : AggregateRoot, IClinicScoped, ITenantOwned
         Guid createdByUserId,
         DateTime createdAtUtc,
         Guid? requestId,
-        Guid? vaccinationId = null)
+        Guid? vaccinationId = null,
+        AdministrationRoute? route = null,
+        string? site = null)
     {
         if (tenantId == Guid.Empty)
             return Invalid("TenantId geçersiz.");
@@ -99,6 +105,12 @@ public sealed class Administration : AggregateRoot, IClinicScoped, ITenantOwned
         var text = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         if (text is not null && text.Length > MaxNotesLength)
             return Invalid($"Not en fazla {MaxNotesLength} karakter olabilir.");
+
+        if (vaccinationId.HasValue && (route.HasValue || !string.IsNullOrWhiteSpace(site)))
+            return Invalid("Aşıya bağlı uygulamada yol ve bölge aşı kaydına yazılır.");
+        var routeSite = AdministrationRouteSite.Normalize(route, site, "Administrations.Validation");
+        if (!routeSite.IsSuccess)
+            return Result<Administration>.Failure(routeSite.Error);
 
         // Gerekçe yalnız sonradan eklemede zorunlu ve saklanır; aksi hâlde yok sayılır.
         string? lateReason = null;
@@ -122,6 +134,8 @@ public sealed class Administration : AggregateRoot, IClinicScoped, ITenantOwned
             Quantity = quantity,
             AdministeredAtUtc = NormalizeUtc(administeredAtUtc),
             Notes = text,
+            Route = routeSite.Value.Route,
+            Site = routeSite.Value.Site,
             AddedAfterFinalization = addedAfterFinalization,
             LateEntryReason = lateReason,
             CreatedByUserId = createdByUserId,

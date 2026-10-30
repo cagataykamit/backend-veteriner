@@ -223,7 +223,7 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 | Yer | Değişiklik |
 |---|---|
 | `POST /vaccinations` | İstek: opsiyonel `productId`, `quantity`, `batchId`, `requestId`. Yanıt: `productId` yoksa **eskisi gibi çıplak guid, 201**. `productId` varsa `{ created, id, administration: AdministrationDto, stock: AdministrationStockDto }`, 201 (yeni) / 200 (`requestId` tekrarı) |
-| `GET /vaccinations/{id}` | `administrationId`, `productId`, `productName`, `quantity`, `unit`, `batchId`, `lotNumber`, `expiryDate` (bağlı değilse `null`) |
+| `GET /vaccinations/{id}` | İç içe `administration` nesnesi: `administrationId`, `productId`, `productName`, `quantity`, `unit`, `batchId`, `lotNumber`, `expiryDate`, `productManufacturer` (bağlı değilse `administration: null`). *Düzeltme (2026-10-30): bu satır önceden alanları düz (üst düzeyde) yazıyordu; uygulama baştan beri iç içe döndürüyor, sözleşme koda göre düzeltildi.* |
 | `GET /vaccinations` | Her satırda `administrationId` (bağlı değilse `null`) |
 | `GET /administrations` / detay | `vaccinationId` |
 | `PUT /vaccinations/{id}` | Bağlı kayıtta kilitli alanlar için `Vaccinations.LinkedToAdministration` (409); ekranda bu alanları pasif göster, iptal için "uygulamayı iptal et" akışı |
@@ -240,3 +240,12 @@ Hepsi geriye uyumludur: `productId` göndermeyen istemci değişmeden çalışı
 - Fiyatı > 0 olan üründe uygulama (aşı ucundan yazılan dahil) aynı transaction'da bir "ücret bekliyor" kalemi doğurur; ayrıntı `CHARGE_SUGGESTION_API_CONTRACT.md`. Uygulama yanıtı değişmez.
 - İptal: bekleyen kalem aynı transaction'da düşer; ücreti kesilmiş kalem değişmez. Eşzamanlı ücrete çevirme kazanırsa iptal `Administrations.ConcurrencyConflict` (409) döner; tekrar denenir.
 - Hizmet (`kind = Service`) ürünü uygulanamaz: `Products.NotStockTracked` (400).
+
+## 11) Uygulama yolu, bölgesi ve üretici (RECORD-005, 2026-10-30)
+
+- **Alanlar (isteğe bağlı):** `route` — uygulama yolu, enum adı: `Oral`, `Subcutaneous`, `Intramuscular`, `Intravenous`, `Intranasal`, `Intradermal`, `Topical`, `Ophthalmic`, `Otic`, `Rectal`, `Other` (tamsayı da kabul edilir; tanımsız değer `400`). `site` — uygulama bölgesi, serbest metin, kırpılır, en çok 100 (ör. "Sağ arka bacak").
+- **Tek yer kuralı:** aşı olayının yolu/bölgesi **aşı kaydında** tutulur. `POST /vaccinations` ve `PUT /vaccinations/{id}` gövdesine `route`, `site` eklendi; detay yanıtında `route`, `site` döner. Aşıya bağlı uygulama (`vaccinationId` dolu) bu alanları taşımaz (`null`); bağımsız uygulama `POST /administrations` gövdesinde alır.
+- **PUT /vaccinations:** iki alan da **tam değiştirme**dir (diğer alanlar gibi): gönderilmezse temizlenir. İstemci düzenleme formunda mevcut değeri geri göndermelidir.
+- **Üretici:** ürün kartına `manufacturer` (en çok 200) eklendi (`POST/PUT /products`, ürün DTO'su; PUT'ta `null` = dokunma, `""` = temizle — şekil alanlarıyla aynı). Tedarikçiden (parti girişindeki "firma") ayrıdır. `AdministrationDto.productManufacturer` ve aşı detayındaki bağlı uygulama özetinde `productManufacturer` döner (ürünün **güncel** üreticisi; anlık görüntü değildir).
+- Lot/son kullanma parti üzerinden zaten döner (`lotNumber`, `expiryDate`).
+- **Migration:** `AddAdministrationRouteSiteAndManufacturer` — `Administrations` ve `Vaccinations` tablolarına `Route` (int, null) ve `Site` (nvarchar(100), null), `Products` tablosuna `Manufacturer` (nvarchar(200), null). Mevcut satırlar boş kalır, backfill yok.

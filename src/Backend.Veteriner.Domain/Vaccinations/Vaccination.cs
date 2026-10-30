@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.Shared;
 
@@ -25,6 +26,11 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned
     public DateTime? DueAtUtc { get; private set; }
     public VaccinationStatus Status { get; private set; }
     public string? Notes { get; private set; }
+
+    /// <summary>Uygulama yolu ve bölgesi (RECORD-005); aşıya bağlı stok uygulaması bunları ayrıca taşımaz.</summary>
+    public AdministrationRoute? Route { get; private set; }
+    public string? Site { get; private set; }
+
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
@@ -144,6 +150,18 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned
         DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Uygulama yolu ve bölgesini yazar (oluşturma ve düzenlemede; ikisi de tam değiştirme, <c>null</c> temizler).</summary>
+    public Result SetRouteAndSite(AdministrationRoute? route, string? site)
+    {
+        var normalized = AdministrationRouteSite.Normalize(route, site, "Vaccinations.Validation");
+        if (!normalized.IsSuccess)
+            return Result.Failure(normalized.Error);
+
+        Route = normalized.Value.Route;
+        Site = normalized.Value.Site;
         return Result.Success();
     }
 

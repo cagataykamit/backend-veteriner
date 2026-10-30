@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
 using Mediator;
@@ -13,5 +14,7 @@ public sealed record UpdateVaccinationCommand(
     VaccinationStatus Status,
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,
-    string? Notes)
+    string? Notes,
+    AdministrationRoute? Route = null,
+    string? Site = null)
     : IRequest<Result>;

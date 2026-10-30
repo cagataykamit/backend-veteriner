@@ -31,6 +31,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(x => x.PharmacologicalForm).HasMaxLength(100);
         b.Property(x => x.PresentationForm).HasMaxLength(100);
         b.Property(x => x.Packaging).HasMaxLength(100);
+        b.Property(x => x.Manufacturer).HasMaxLength(Product.ManufacturerMaxLength);
 
         b.Property(x => x.IsActive).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
