@@ -19,6 +19,9 @@ internal static class TenantWideClaimNames
     /// <summary>Platform yöneticisi (cross-tenant; <c>AdminClaimSeeder.PlatformAdminClaimName</c> ile aynı).</summary>
     public const string PlatformAdmin = "PlatformAdmin";
 
+    /// <summary>Tüm kiracı geneli claim adları (sorgu tarafında aynı küme).</summary>
+    public static readonly IReadOnlyList<string> All = [TenantAdmin, TenantOwner, PlatformAdmin];
+
     /// <summary>
     /// Verilen OperationClaim ad kümesinde tenant-wide rollerden en az biri var mı?
     /// Karşılaştırma <see cref="StringComparison.OrdinalIgnoreCase"/>.
