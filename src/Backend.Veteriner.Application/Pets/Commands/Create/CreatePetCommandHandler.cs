@@ -29,6 +29,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
     private readonly TenantSubscriptionEffectiveWriteEvaluator _writeEvaluator;
     private readonly IPetIntegrationEventOutbox _eventOutbox;
     private readonly TimeProvider _timeProvider;
+    private readonly ITrialQuotaGuard _trialQuota;
 
     public CreatePetCommandHandler(
         ITenantContext tenantContext,
@@ -41,7 +42,8 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         IRepository<Pet> petsWrite,
         TenantSubscriptionEffectiveWriteEvaluator writeEvaluator,
         IPetIntegrationEventOutbox eventOutbox,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ITrialQuotaGuard trialQuota)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
@@ -54,6 +56,7 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         _writeEvaluator = writeEvaluator;
         _eventOutbox = eventOutbox;
         _timeProvider = timeProvider;
+        _trialQuota = trialQuota;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreatePetCommand request, CancellationToken ct)
@@ -77,6 +80,11 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         var writeGate = await _writeEvaluator.EnsureWriteAllowedAsync(tenantId, ct);
         if (!writeGate.IsSuccess)
             return Result<Guid>.Failure(writeGate.Error);
+
+        // Deneme kullanım kotası (TRIAL-006); hızlı kayıt ve içe aktarma da bu komuttan geçer.
+        var quota = await _trialQuota.EnsureCanAddPetAsync(tenantId, ct);
+        if (!quota.IsSuccess)
+            return Result<Guid>.Failure(quota.Error);
 
         var client = await _clients.FirstOrDefaultAsync(
             new ClientByIdSpec(tenantId, request.ClientId), ct);

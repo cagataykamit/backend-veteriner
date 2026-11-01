@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
@@ -18,6 +19,7 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
     private readonly IRepository<Client> _clientsWrite;
     private readonly IClientIntegrationEventOutbox _eventOutbox;
     private readonly TimeProvider _timeProvider;
+    private readonly ITrialQuotaGuard _trialQuota;
 
     public CreateClientCommandHandler(
         ITenantContext tenantContext,
@@ -25,7 +27,8 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
         IReadRepository<Client> clientsRead,
         IRepository<Client> clientsWrite,
         IClientIntegrationEventOutbox eventOutbox,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ITrialQuotaGuard trialQuota)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
@@ -33,6 +36,7 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
         _clientsWrite = clientsWrite;
         _eventOutbox = eventOutbox;
         _timeProvider = timeProvider;
+        _trialQuota = trialQuota;
     }
 
     public async ValueTask<Result<ClientCreatedDto>> Handle(CreateClientCommand request, CancellationToken ct)
@@ -52,6 +56,11 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
             return Result<ClientCreatedDto>.Failure(
                 "Tenants.TenantInactive",
                 "Pasif kiracı için müşteri oluşturulamaz.");
+
+        // Deneme kullanım kotası (TRIAL-006); hızlı kayıt ve içe aktarma da bu komuttan geçer.
+        var quota = await _trialQuota.EnsureCanAddClientAsync(tenantId, ct);
+        if (!quota.IsSuccess)
+            return Result<ClientCreatedDto>.Failure(quota.Error);
 
         var emailNorm = Client.NormalizeEmailForStorage(request.Email);
         string? phoneNorm = null;

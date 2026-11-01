@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -48,7 +49,8 @@ public sealed class CreatePetCommandHandlerTests
             _petsWrite.Object,
             writeEvaluator,
             _eventOutbox.Object,
-            TimeProvider.System);
+            TimeProvider.System,
+            TrialQuotaGuardStub.Open);
     }
 
     private static void AlignTenantId(Tenant tenant, Guid id)

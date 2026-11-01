@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Files;
 using Backend.Veteriner.Application.Files.Access;
 using Backend.Veteriner.Application.Files.Commands.Upload;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
 using AwesomeAssertions;
@@ -65,7 +66,8 @@ public sealed class UploadStoredFileCommandHandlerTests
             _scanner.Object,
             Options.Create(_options),
             TimeProvider.System,
-            NullLogger<UploadStoredFileCommandHandler>.Instance);
+            NullLogger<UploadStoredFileCommandHandler>.Instance,
+            TrialQuotaGuardStub.Open);
 
     private UploadStoredFileCommand Command(byte[] content, string fileName = "röntgen.jpg", long? length = null)
         => new(StoredFileOwnerType.ImagingRecord, _ownerId, fileName, length ?? content.Length, new MemoryStream(content));
