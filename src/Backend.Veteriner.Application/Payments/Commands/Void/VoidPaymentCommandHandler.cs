@@ -1,10 +1,12 @@
 using Backend.Veteriner.Application.Charges.Specs;
+using Backend.Veteriner.Application.ClientCredits;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Finance;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -25,6 +27,7 @@ public sealed class VoidPaymentCommandHandler : IRequestHandler<VoidPaymentComma
     private readonly IRepository<Charge> _charges;
     private readonly IPaymentIntegrationEventOutbox _eventOutbox;
     private readonly TimeProvider _timeProvider;
+    private readonly IRepository<ClientCredit> _credits;
 
     public VoidPaymentCommandHandler(
         ITenantContext tenantContext,
@@ -36,8 +39,10 @@ public sealed class VoidPaymentCommandHandler : IRequestHandler<VoidPaymentComma
         IRepository<PaymentAllocation> allocations,
         IRepository<Charge> charges,
         IPaymentIntegrationEventOutbox eventOutbox,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IRepository<ClientCredit> credits)
     {
+        _credits = credits;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clientContext = clientContext;
@@ -81,12 +86,18 @@ public sealed class VoidPaymentCommandHandler : IRequestHandler<VoidPaymentComma
             return Result.Failure("Payments.Validation", "Ödemenin tahsis edildiği ücret bulunamadı; iptal yapılamadı.");
         }
 
+        // Ödemeden doğan kredi ödemeyle birlikte kapanır; kullanılmış/iade edilmişse iptal reddedilir (FIN-005 K7).
+        var credit = payment.CreditedAmount > 0
+            ? await _credits.FirstOrDefaultAsync(new ClientCreditBySourcePaymentForUpdateSpec(tenantId, payment.Id), ct)
+            : null;
+
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var voided = payment.Void(
             allocations.Select(a => (a, chargesById[a.ChargeId])).ToList(),
             userId,
             request.Reason,
-            nowUtc);
+            nowUtc,
+            credit);
         if (!voided.IsSuccess)
             return voided;
 

@@ -86,7 +86,8 @@ public sealed record PortalBalanceDto(
     decimal TotalPaid,
     decimal Outstanding,
     decimal UnallocatedPaymentsAmount,
-    DateTime? LastPaymentAtUtc);
+    DateTime? LastPaymentAtUtc,
+    decimal CreditBalance = 0m);
 
 /// <summary>Ödeme geçmişi satırı: yalnız tarih, tutar, yöntem.</summary>
 public sealed record PortalPaymentDto(

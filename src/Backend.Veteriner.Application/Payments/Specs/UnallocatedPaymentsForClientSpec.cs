@@ -14,7 +14,7 @@ public sealed class UnallocatedPaymentsForClientSpec : Specification<Payment>
         IReadOnlyCollection<Guid>? accessibleClinicIds)
     {
         Query.AsNoTracking();
-        Query.Where(p => p.TenantId == tenantId && p.ClientId == clientId && p.AllocatedAmount < p.Amount);
+        Query.Where(p => p.TenantId == tenantId && p.ClientId == clientId && p.AllocatedAmount + p.CreditedAmount < p.Amount);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(p => p.PaidAtUtc).ThenByDescending(p => p.Id);
     }

@@ -434,7 +434,8 @@ public static class DevSampleDataSeeder
                 new EfRepository<Charge>(db),
                 new EfRepository<PaymentAllocation>(db),
                 TimeProvider.System,
-                new PaymentIntegrationEventOutbox(outboxBuffer, paymentProjection));
+                new PaymentIntegrationEventOutbox(outboxBuffer, paymentProjection),
+                new EfRepository<Domain.ClientCredits.ClientCredit>(db));
         }
     }
 

@@ -59,7 +59,8 @@ public sealed class CreatePaymentCommandHandlerTests
             _chargesWrite.Object,
             _allocationsWrite.Object,
             TimeProvider.System,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            new Mock<IRepository<Backend.Veteriner.Domain.ClientCredits.ClientCredit>>().Object);
 
     private static CreatePaymentCommand Cmd(
         Guid clinicId,

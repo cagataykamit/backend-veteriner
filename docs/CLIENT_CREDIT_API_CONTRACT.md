@@ -128,11 +128,11 @@ Denetim: `ClientCredit.Refund`, hedef `CreditId=…`, gerekçe ve iade tutarı y
 
 ### `GET /api/v1/clients/{clientId}/balance` (eklenen alanlar)
 
-`creditBalance` (decimal, kapsamdaki açık kredilerin kalan toplamı), `openCreditCount` (int). `outstandingAmount` değişmez (K9). `ClientBalanceChargeDto`'ya `creditAppliedAmount` eklenir (ücrete mahsup edilen aktif toplam; `allocatedAmount` zaten mahsubu içerir, bu alan kırılım içindir).
+`creditBalance` (decimal, kapsamdaki açık kredilerin kalan toplamı), `openCreditCount` (int). `outstandingAmount` değişmez (K9). Ücret satırı (`ClientBalanceChargeDto`) değişmez: `allocatedAmount` mahsubu da içerir; kırılım ücretin tahsis listesindedir.
 
 ### `GET /api/v1/charges/{id}/allocations` (eklenen satır türü)
 
-Mevcut ödeme tahsisi satırlarına ek olarak mahsup satırları `{ id, paymentId: null, creditId, paidAtUtc: null, method: null, amount, createdAtUtc, createdByUserId, kind: "Credit" }` döner; ödeme satırları `kind: "Payment"`, `creditId: null`. Geriye uyumlu alan eklemesidir.
+Mevcut ödeme tahsisi satırlarına ek olarak aktif mahsup satırları döner: `kind: "Credit"`, `creditId` dolu; bu satırda `paymentId`, `paidAtUtc` ve `method` kredinin **kaynak ödemesidir** (paranın geldiği tahsilat). Ödeme satırları `kind: "Payment"`, `creditId: null`. Liste oluşturma zamanına göre sıralıdır. Geriye uyumlu alan eklemesidir (mevcut alanların tipi değişmez).
 
 ### Portal `GET /api/portal/v1/links/{linkId}/balance` (eklenen alan)
 
@@ -156,8 +156,9 @@ Tüm mahsuplar geri alınmışsa (`UsedAmount` tekrar 0) ödeme iptal edilebilir
 
 ## 9) Gün sonu dökümü ve kasa özeti (`DAILY_TRANSACTIONS_REPORT_API_CONTRACT.md` eki)
 
-- Yeni olay türü **`CreditRefund`** ("Kredi iadesi"): zaman `refundedAtUtc`, tutar iade edilen kredi (pozitif sayı, `direction: "Out"` / kasadan çıkış), işlemi yapan `refundedByUserId`, ilişkili kayıt `creditId` ve `sourcePaymentId`, gerekçe. Satır biçimi mevcut döküm satırıyla aynıdır; `kind` yeni değer alır.
-- Kasa özeti: `netCollected = alınan − iptal edilen − iade edilen kredi`; kullanıcı kırılımında iade, iadeyi yapana yazılır. Kasa özeti DTO'suna `creditRefundedAmount` eklenir.
+- Yeni olay türü **`CreditRefund`** ("Kredi iadesi"): zaman `refundedAtUtc`, tutar iade edilen kredi (pozitif sayı; yön türden anlaşılır, kasadan çıkış), ödeme türü iade yöntemi, işlemi yapan `refundedByUserId`, `referenceId` kredi kimliği, gerekçe. Satır biçimi mevcut döküm satırıyla aynıdır; `kind` yeni değer alır.
+- Kasa özeti: `netAmount = alınan − iptal edilen − iade edilen kredi`; kullanıcı kırılımında iade, iadeyi yapana yazılır. Tüm tutar kümelerine (`totals`, `byMethod`, `byDay`, `byUser`) `refundedCreditAmount` ve `refundedCreditCount` eklenir; CSV/XLSX/PDF'de "Kredi İadesi" sütunu ("Net"ten önce). Döküm toplamlarına (`totals`) `refundedCreditAmount`, `refundedCreditCount` eklenir ve `netCollectedAmount` iadeyi düşer.
+- Tahsilatı alan (K-D6-5): tahsissiz avans ödemesinde krediyi oluşturan kullanıcıdır.
 - Ödeme satırında tutar değişmez (fazla ödeme de tahsilattır; kasa gerçek alınan parayı gösterir). Mahsup kasa olayı değildir, dökümde satır üretmez.
 - Ödeme raporu/export, dashboard finans, Query DB projeksiyonu değişmez.
 

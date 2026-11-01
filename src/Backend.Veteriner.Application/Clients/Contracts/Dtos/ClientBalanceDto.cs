@@ -5,6 +5,7 @@ namespace Backend.Veteriner.Application.Clients.Contracts.Dtos;
 /// <summary>
 /// GET /clients/{id}/balance. Ücret toplamı, tahsis edilen ve açık kalan ayrıdır; bağlanmamış (eski) ödemeler
 /// <see cref="UnallocatedPayments"/> altında ayrı satırdır ve açık tutardan düşülmez. Yalnızca TRY.
+/// <see cref="CreditBalance"/>: açık müşteri kredilerinin kalanı (FIN-005 K9); açık tutardan düşülmez, net alanı yoktur.
 /// </summary>
 public sealed record ClientBalanceDto(
     Guid ClientId,
@@ -16,7 +17,9 @@ public sealed record ClientBalanceDto(
     decimal OutstandingAmount,
     int OpenChargeCount,
     IReadOnlyList<ClientBalancePetDto> Pets,
-    ClientBalanceUnallocatedPaymentsDto UnallocatedPayments);
+    ClientBalanceUnallocatedPaymentsDto UnallocatedPayments,
+    decimal CreditBalance = 0m,
+    int OpenCreditCount = 0);
 
 public sealed record ClientBalancePetDto(
     Guid? PetId,
