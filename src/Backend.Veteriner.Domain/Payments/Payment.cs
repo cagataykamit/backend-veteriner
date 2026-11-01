@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Payments;
@@ -34,7 +35,11 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
     /// <summary>Ücretlere tahsis edilen toplam; <c>0 ≤ AllocatedAmount ≤ Amount</c>. Yalnızca <see cref="ApplyAllocation"/> değiştirir.</summary>
     public decimal AllocatedAmount { get; private set; }
 
-    public decimal UnallocatedAmount => Amount - AllocatedAmount;
+    /// <summary>Ödemeden müşteri kredisine yazılan tutar (FIN-005); oluşturmada bir kez yazılır, sonra değişmez.</summary>
+    public decimal CreditedAmount { get; private set; }
+
+    /// <summary>Ne ücrete ne krediye bağlı kısım; yalnız eski (tahsis öncesi) ödemelerde sıfırdan büyüktür.</summary>
+    public decimal UnallocatedAmount => Amount - AllocatedAmount - CreditedAmount;
 
     /// <summary>İstemci tekrar koruması anahtarı (eski kayıtlarda null); kiracıda benzersizdir.</summary>
     public Guid? RequestId { get; private set; }
@@ -146,7 +151,7 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
         if (c.Length != 3)
             return Result.Failure("Payments.Validation", "Para birimi ISO 4217 alpha-3 (3 harf) olmalidir.");
 
-        if (AllocatedAmount > 0 && IsCorrection(clinicId, clientId, amount, c))
+        if ((AllocatedAmount > 0 || CreditedAmount > 0) && IsCorrection(clinicId, clientId, amount, c))
         {
             return Result.Failure(
                 "Payments.UpdateBlockedByAllocation",
@@ -168,8 +173,7 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
     }
 
     /// <summary>
-    /// Yeni tahsilatı verilen ücretlere tam olarak tahsis eder: toplam tutara eşit olmalı, her tahsis ücretin açık
-    /// tutarını aşamaz, ücretler aynı kiracı/klinik/müşteri/para biriminde olmalı. Başarısızsa hiçbir şey değişmez.
+    /// Yeni tahsilatı verilen ücretlere tam olarak tahsis eder (kredisiz <see cref="Settle"/>): toplam tutara eşit olmalı.
     /// Dönen satırlar kalıcılaştırılmalıdır.
     /// </summary>
     public Result<IReadOnlyList<PaymentAllocation>> AllocateFully(
@@ -177,12 +181,63 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
         Guid createdByUserId,
         DateTime nowUtc)
     {
-        if (lines.Count == 0)
-            return Fail("Payments.AllocationsRequired", "Ödeme en az bir ücrete tahsis edilmelidir.");
+        var settled = Settle(lines, 0m, createdByUserId, nowUtc);
+        return settled.IsSuccess
+            ? Result<IReadOnlyList<PaymentAllocation>>.Success(settled.Value!.Allocations)
+            : Result<IReadOnlyList<PaymentAllocation>>.Failure(settled.Error);
+    }
 
-        if (AllocatedAmount != 0)
-            return Fail("Payments.Validation", "Ödeme zaten tahsis edilmiş.");
+    /// <summary>
+    /// Yeni tahsilatı bölüştürür (ADR-012, FIN-005 K1): ücretlere tahsis + müşteri kredisi = ödeme tutarı. Kredi yoksa en az bir
+    /// tahsis zorunludur; tahsis yoksa tamamı avanstır. Her tahsis ücretin açık tutarını aşamaz, ücretler aynı
+    /// kiracı/klinik/müşteri/para biriminde olmalı. Başarısızsa hiçbir şey değişmez. Dönen satırlar ve kredi kalıcılaştırılmalıdır.
+    /// </summary>
+    public Result<PaymentSettlement> Settle(
+        IReadOnlyList<(Charge Charge, decimal Amount)> lines,
+        decimal creditAmount,
+        Guid createdByUserId,
+        DateTime nowUtc)
+    {
+        if (creditAmount < 0 || decimal.Round(creditAmount, 2) != creditAmount)
+            return SettleFail("Payments.Validation", "Kredi tutarı negatif olamaz ve en fazla 2 ondalıklı olmalıdır.");
 
+        if (AllocatedAmount != 0 || CreditedAmount != 0)
+            return SettleFail("Payments.Validation", "Ödeme zaten tahsis edilmiş.");
+
+        if (lines.Count == 0 && creditAmount == 0)
+            return SettleFail("Payments.AllocationsRequired", "Ödeme en az bir ücrete tahsis edilmelidir.");
+
+        if (lines.Count == 0 && creditAmount != Amount)
+            return SettleFail("Payments.AllocationSumMismatch", "Tahsis tutarları ve kredi toplamı ödeme tutarına eşit olmalıdır.");
+
+        var allocations = lines.Count == 0
+            ? Result<IReadOnlyList<PaymentAllocation>>.Success([])
+            : AllocateLines(lines, Amount - creditAmount, createdByUserId, nowUtc);
+        if (!allocations.IsSuccess)
+            return Result<PaymentSettlement>.Failure(allocations.Error);
+
+        ClientCredit? credit = null;
+        if (creditAmount > 0)
+        {
+            CreditedAmount = creditAmount;
+            MutationSequence++;
+            credit = ClientCredit.FromPayment(
+                this,
+                creditAmount,
+                lines.Count == 0 ? ClientCreditSource.Prepayment : ClientCreditSource.Overpayment,
+                createdByUserId,
+                nowUtc);
+        }
+
+        return Result<PaymentSettlement>.Success(new PaymentSettlement(allocations.Value!, credit));
+    }
+
+    private Result<IReadOnlyList<PaymentAllocation>> AllocateLines(
+        IReadOnlyList<(Charge Charge, decimal Amount)> lines,
+        decimal expectedTotal,
+        Guid createdByUserId,
+        DateTime nowUtc)
+    {
         if (lines.Select(l => l.Charge.Id).Distinct().Count() != lines.Count)
             return Fail("Payments.Validation", "Aynı ücret birden fazla kez tahsis edilemez.");
 
@@ -201,11 +256,11 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
                 return Fail("Payments.Validation", "Ücret ve ödeme para birimi aynı olmalıdır.");
         }
 
-        if (lines.Sum(l => l.Amount) != Amount)
+        if (lines.Sum(l => l.Amount) != expectedTotal)
         {
             return Fail(
                 "Payments.AllocationSumMismatch",
-                "Tahsis tutarları toplamı ödeme tutarına eşit olmalıdır; ödeme açık tutar kadar kaydedilir.");
+                "Tahsis tutarları ve kredi toplamı ödeme tutarına eşit olmalıdır; fazlası krediye yazılabilir.");
         }
 
         foreach (var (charge, amount) in lines)
@@ -237,13 +292,15 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
     /// <summary>
     /// Ödemeyi iptal eder ("hiç alınmamış" sayılır): her aktif tahsis geri alınır, ücret sayaçları düşer, ödeme sayacı 0 olur.
     /// <paramref name="activeAllocations"/> ödemenin tüm aktif tahsislerini ve karşılık gelen ücretleri içermelidir.
-    /// Başarısızsa hiçbir şey değişmez.
+    /// Ödemeden doğan kredi (<paramref name="credit"/>) kullanılmamışsa ödemeyle birlikte kapanır; kullanılmış ya da iade
+    /// edilmişse iptal reddedilir (FIN-005 K7). Başarısızsa hiçbir şey değişmez.
     /// </summary>
     public Result Void(
         IReadOnlyList<(PaymentAllocation Allocation, Charge Charge)> activeAllocations,
         Guid voidedByUserId,
         string? reason,
-        DateTime nowUtc)
+        DateTime nowUtc,
+        ClientCredit? credit = null)
     {
         if (IsVoided)
             return Result.Failure("Payments.AlreadyVoided", "Ödeme zaten iptal edilmiş.");
@@ -254,6 +311,19 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
         var reasonCheck = ValidateCorrectionReason(reason);
         if (!reasonCheck.IsSuccess)
             return reasonCheck;
+
+        if (CreditedAmount > 0)
+        {
+            if (credit is null || credit.SourcePaymentId != Id || credit.Amount != CreditedAmount)
+                return Result.Failure("Payments.Validation", "Ödemenin kredi kaydı bulunamadı; iptal yapılamadı.");
+
+            if (!credit.IsVoided)
+            {
+                var creditCheck = credit.CanVoidWithPayment();
+                if (!creditCheck.IsSuccess)
+                    return creditCheck;
+            }
+        }
 
         if (activeAllocations.Sum(x => x.Allocation.Amount) != AllocatedAmount
             || activeAllocations.Any(x => x.Allocation.PaymentId != Id
@@ -271,6 +341,9 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
 
             allocation.Reverse(nowUtc);
         }
+
+        if (credit is { IsVoided: false })
+            credit.VoidWithPayment(nowUtc);
 
         AllocatedAmount = 0;
         VoidedAtUtc = NormalizeUtc(nowUtc);
@@ -300,6 +373,9 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
         MutationSequence++;
         return Result.Success();
     }
+
+    private static Result<PaymentSettlement> SettleFail(string code, string message)
+        => Result<PaymentSettlement>.Failure(code, message);
 
     private static Result<IReadOnlyList<PaymentAllocation>> Fail(string code, string message)
         => Result<IReadOnlyList<PaymentAllocation>>.Failure(code, message);
