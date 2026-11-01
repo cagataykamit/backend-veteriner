@@ -264,9 +264,10 @@ public sealed class ExaminationTemplateHandlersTests
         var result = await ApplyHandler().Handle(ApplyCmd(exam, template), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        exam.VisitReason.Should().Be("Kontrol, Kulak kaşıntısı");
+        exam.VisitReason.Should().Be("Kontrol");
         exam.Findings.Should().Be("Genel durum iyi\nOtoskopi:");
-        result.Value!.UpdatedFields.Should().Equal("visitReason", "findings");
+        result.Value!.UpdatedFields.Should().Equal("findings");
+        result.Value.Text.Should().Be(new AppliedTemplateTextDto("SkippedExisting", 1, 0));
         exam.RowVersion.Should().Equal(ExaminationTestSupport.SampleRowVersionBytes);
 
         var sent = _sentAdministrations.Should().ContainSingle().Subject;
