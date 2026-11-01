@@ -528,6 +528,63 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         (await ctx.GetTodayAsync()).Items.Should().ContainSingle(i => i.VisitId == visitId);
     }
 
+    // ---- Geliş hazırlığı (CHECKIN-001/002/003) ----
+
+    private async Task<Guid> SeedTemplateAsync(Guid tenantId, string name, bool active = true)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var template = Backend.Veteriner.Domain.Catalog.ExaminationTemplate
+            .CreateForTenant(tenantId, name, "Aşı", null, null, [], DateTime.UtcNow).Value!;
+        if (!active)
+            template.Deactivate(DateTime.UtcNow);
+        db.ExaminationTemplates.Add(template);
+        await db.SaveChangesAsync();
+        return template.Id;
+    }
+
+    [Fact]
+    public async Task Preparation_Should_Be_Stored_On_Create_Shown_On_Today_And_Updatable_Until_Completed()
+    {
+        var ctx = await SeedAsync();
+        var templateId = await SeedTemplateAsync(ctx.TenantId, "Karma aşı paketi");
+
+        var created = (await ctx.PostVisitAsync(new
+        {
+            clinicId = ctx.ClinicId,
+            petId = ctx.PetId,
+            arrivalReason = "  Aşı zamanı ",
+            preparedExaminationTemplateId = templateId,
+        })).Result!;
+        created.Visit.ArrivalReason.Should().Be("Aşı zamanı");
+        created.Visit.PreparedExaminationTemplateId.Should().Be(templateId);
+
+        var row = (await ctx.GetTodayAsync()).Items.Single(i => i.VisitId == created.Visit.Id);
+        row.ArrivalReason.Should().Be("Aşı zamanı");
+        row.PreparedExaminationTemplateId.Should().Be(templateId);
+        row.PreparedExaminationTemplateName.Should().Be("Karma aşı paketi");
+
+        var url = $"/api/v1/visits/{created.Visit.Id}/preparation";
+        var cleared = await ctx.Http.PutAsJsonAsync(url, new { arrivalReason = "Kontrol", preparedExaminationTemplateId = (Guid?)null });
+        cleared.StatusCode.Should().Be(HttpStatusCode.OK);
+        var after = await ctx.ReadVisitAsync(cleared);
+        after.ArrivalReason.Should().Be("Kontrol");
+        after.PreparedExaminationTemplateId.Should().BeNull();
+
+        var inactive = await SeedTemplateAsync(ctx.TenantId, "Eski paket", active: false);
+        var rejected = await ctx.Http.PutAsJsonAsync(url, new { arrivalReason = "Kontrol", preparedExaminationTemplateId = inactive });
+        rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var otherTenantTemplate = await SeedTemplateAsync(Guid.NewGuid(), "Başka kiracı");
+        (await ctx.Http.PutAsJsonAsync(url, new { preparedExaminationTemplateId = otherTenantTemplate }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await ctx.PostRawAsync($"/api/v1/visits/{created.Visit.Id}/start");
+        await ctx.PostRawAsync($"/api/v1/visits/{created.Visit.Id}/complete");
+        var closed = await ctx.Http.PutAsJsonAsync(url, new { arrivalReason = "Geç not" });
+        closed.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
     // ---- Acil işareti ----
 
     private static Task<HttpResponseMessage> PutUrgencyAsync(VisitTestContext ctx, Guid visitId, bool isUrgent)

@@ -31,6 +31,44 @@ public sealed class VisitTests
     }
 
     [Fact]
+    public void New_With_Preparation_Should_Trim_Reason_And_Keep_Zero_Sequence()
+    {
+        var templateId = Guid.NewGuid();
+
+        var visit = new Visit(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, Guid.NewGuid(), Now,
+            arrivalReason: "  Aşı  ", preparedExaminationTemplateId: templateId);
+
+        visit.ArrivalReason.Should().Be("Aşı");
+        visit.PreparedExaminationTemplateId.Should().Be(templateId);
+        visit.MutationSequence.Should().Be(0);
+    }
+
+    [Fact]
+    public void SetPreparation_Should_Advance_Once_And_Be_Idempotent()
+    {
+        var visit = CreateInProgress();
+        var before = visit.MutationSequence;
+
+        visit.SetPreparation("Kulak", null).IsSuccess.Should().BeTrue();
+        visit.SetPreparation(" Kulak ", null).IsSuccess.Should().BeTrue();
+        visit.MutationSequence.Should().Be(before + 1);
+
+        visit.SetPreparation("   ", null).IsSuccess.Should().BeTrue();
+        visit.ArrivalReason.Should().BeNull();
+    }
+
+    [Fact]
+    public void SetPreparation_Should_Reject_Completed_And_Too_Long_Reason()
+    {
+        var visit = CreateInProgress();
+        visit.SetPreparation(new string('a', Visit.MaxArrivalReasonLength + 1), null).Error.Code.Should().Be("Visits.Validation");
+
+        visit.Complete(Now.AddMinutes(30));
+        visit.SetPreparation("Geç not", null).Error.Code.Should().Be("Visits.NotOpen");
+        visit.SetPreparation(null, null).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
     public void New_Should_Normalize_Unspecified_Arrival_To_Utc()
     {
         var visit = new Visit(

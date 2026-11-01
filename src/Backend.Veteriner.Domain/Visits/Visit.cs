@@ -11,6 +11,7 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
 {
     public const int MinCorrectionReasonLength = 5;
     public const int MaxCorrectionReasonLength = 500;
+    public const int MaxArrivalReasonLength = 500;
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
@@ -27,6 +28,18 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
     public bool IsUrgent { get; private set; }
     public Guid CreatedByUserId { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
+
+    /// <summary>
+    /// Geliş hazırlığı (CHECKIN-001/002): resepsiyonun gelişte yazdığı şikâyet / geliş nedeni. Muayene açılırken geliş nedeni alanına
+    /// önerilir; muayene kaydına sunucuda kopyalanmaz.
+    /// </summary>
+    public string? ArrivalReason { get; private set; }
+
+    /// <summary>
+    /// Geliş hazırlığı (CHECKIN-002/003): gelişte seçilen muayene şablonu veya tedavi paketi (EXAM-006/007). Uygulanmaz; hekim muayenede
+    /// mevcut "şablon uygula" akışıyla onaylar (stok ve ücret kalemleri o anda doğar).
+    /// </summary>
+    public Guid? PreparedExaminationTemplateId { get; private set; }
 
     /// <summary>
     /// Başarılı domain mutasyon sayacı; optimistic concurrency token ve projeksiyon sıralama anahtarı.
@@ -46,7 +59,9 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
         Guid? responsibleVeterinarianUserId,
         Guid createdByUserId,
         DateTime arrivedAtUtc,
-        bool isUrgent = false)
+        bool isUrgent = false,
+        string? arrivalReason = null,
+        Guid? preparedExaminationTemplateId = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -61,6 +76,10 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
         if (createdByUserId == Guid.Empty)
             throw new ArgumentException("Oluşturan kullanıcı geçersiz.", nameof(createdByUserId));
 
+        var preparation = ValidatePreparation(arrivalReason, preparedExaminationTemplateId);
+        if (!preparation.IsSuccess)
+            throw new ArgumentException(preparation.Error.Message, nameof(arrivalReason));
+
         TenantId = tenantId;
         ClinicId = clinicId;
         PetId = petId;
@@ -71,7 +90,54 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
         CreatedAtUtc = ArrivedAtUtc;
         CareStatus = VisitCareStatus.Waiting;
         IsUrgent = isUrgent;
+        ArrivalReason = NormalizeArrivalReason(arrivalReason);
+        PreparedExaminationTemplateId = preparedExaminationTemplateId;
     }
+
+    /// <summary>
+    /// Geliş hazırlığını değiştirir (tam yazım: null alan temizler). Tamamlanmış gelişte değiştirilemez; aynı değerler idempotenttir.
+    /// Şablonun kiracıya görünür ve aktif olduğu uygulama katmanında denetlenir.
+    /// </summary>
+    public Result SetPreparation(string? arrivalReason, Guid? preparedExaminationTemplateId)
+    {
+        if (IsVoided)
+            return VoidedFailure();
+
+        var check = ValidatePreparation(arrivalReason, preparedExaminationTemplateId);
+        if (!check.IsSuccess)
+            return check;
+
+        var reason = NormalizeArrivalReason(arrivalReason);
+        if (reason == ArrivalReason && preparedExaminationTemplateId == PreparedExaminationTemplateId)
+            return Result.Success();
+
+        if (CareStatus == VisitCareStatus.Completed)
+        {
+            return Result.Failure(
+                "Visits.NotOpen",
+                "Tamamlanmış gelişin hazırlığı değiştirilemez.");
+        }
+
+        ArrivalReason = reason;
+        PreparedExaminationTemplateId = preparedExaminationTemplateId;
+        AdvanceMutationSequence();
+        return Result.Success();
+    }
+
+    /// <summary>Geliş hazırlığı için tek doğrulama kuralı (domain ve validator paylaşır).</summary>
+    public static Result ValidatePreparation(string? arrivalReason, Guid? preparedExaminationTemplateId)
+    {
+        if ((arrivalReason?.Trim().Length ?? 0) > MaxArrivalReasonLength)
+            return Result.Failure("Visits.Validation", $"Geliş nedeni en fazla {MaxArrivalReasonLength} karakter olabilir.");
+
+        if (preparedExaminationTemplateId == Guid.Empty)
+            return Result.Failure("Visits.Validation", "Şablon kimliği geçersiz.");
+
+        return Result.Success();
+    }
+
+    private static string? NormalizeArrivalReason(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     /// <summary>Bekliyor → Devam ediyor. Zaten devam ediyorsa değişiklik olmadan başarı (idempotent).</summary>
     public Result Start(DateTime nowUtc)

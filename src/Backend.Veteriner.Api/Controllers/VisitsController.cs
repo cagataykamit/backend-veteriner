@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Visits.Commands.Correct;
 using Backend.Veteriner.Application.Visits.Commands.Create;
 using Backend.Veteriner.Application.Visits.Commands.Restore;
+using Backend.Veteriner.Application.Visits.Commands.SetPreparation;
 using Backend.Veteriner.Application.Visits.Commands.SetUrgency;
 using Backend.Veteriner.Application.Visits.Commands.Transition;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
@@ -54,7 +55,14 @@ public sealed class VisitsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(
-            new CreateVisitCommand(body.ClinicId, body.PetId, body.AppointmentId, body.ResponsibleVeterinarianUserId, body.IsUrgent),
+            new CreateVisitCommand(
+                body.ClinicId,
+                body.PetId,
+                body.AppointmentId,
+                body.ResponsibleVeterinarianUserId,
+                body.IsUrgent,
+                body.ArrivalReason,
+                body.PreparedExaminationTemplateId),
             ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
@@ -142,6 +150,28 @@ public sealed class VisitsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new SetVisitUrgencyCommand(id, body.IsUrgent), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Geliş hazırlığı (CHECKIN-001/002/003): geliş nedeni ve hazırlanan şablon/paket. Tam yazım; tamamlanmış gelişte 409. Şablon
+    /// uygulanmaz, hekim muayenede onaylar.
+    /// </summary>
+    [HttpPut("{id:guid}/preparation")]
+    [Authorize(Policy = PermissionCatalog.Visits.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(VisitDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SetPreparation([FromRoute] Guid id, [FromBody] SetVisitPreparationBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new SetVisitPreparationCommand(id, body.ArrivalReason, body.PreparedExaminationTemplateId), ct);
         return result.ToActionResult(this);
     }
 

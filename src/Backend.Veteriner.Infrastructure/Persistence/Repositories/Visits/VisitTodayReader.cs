@@ -97,7 +97,15 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     v.VoidReason,
                     v.IsUrgent,
                     p.AlertFlags,
-                    p.AlertNote))
+                    p.AlertNote,
+                    a != null && a.ReasonId != null
+                        ? _db.AppointmentReasons.Where(r => r.Id == a.ReasonId).Select(r => r.Name).FirstOrDefault()
+                        : null,
+                    v.ArrivalReason,
+                    v.PreparedExaminationTemplateId,
+                    v.PreparedExaminationTemplateId != null
+                        ? _db.ExaminationTemplates.Where(t => t.Id == v.PreparedExaminationTemplateId).Select(t => t.Name).FirstOrDefault()
+                        : null))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -140,7 +148,13 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     null,
                     false,
                     p.AlertFlags,
-                    p.AlertNote))
+                    p.AlertNote,
+                    a.ReasonId != null
+                        ? _db.AppointmentReasons.Where(r => r.Id == a.ReasonId).Select(r => r.Name).FirstOrDefault()
+                        : null,
+                    null,
+                    null,
+                    null))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -229,7 +243,11 @@ public sealed class VisitTodayReader : IVisitTodayReader
         string? VoidReason,
         bool IsUrgent,
         PetAlertFlags AlertFlags,
-        string? AlertNote)
+        string? AlertNote,
+        string? AppointmentReasonName,
+        string? ArrivalReason,
+        Guid? PreparedExaminationTemplateId,
+        string? PreparedExaminationTemplateName)
     {
         /// <summary>Satırı tekil tanımlar: Visit satırı Visit kimliğiyle, planlı satır randevu kimliğiyle.</summary>
         public string Key => VisitId.HasValue ? $"v:{VisitId}" : $"a:{AppointmentId}";
@@ -257,6 +275,12 @@ public sealed class VisitTodayReader : IVisitTodayReader
                 IsVoided,
                 VoidReason,
                 IsUrgent,
-                PetAlertsDto.From(AlertFlags, AlertNote));
+                PetAlertsDto.From(AlertFlags, AlertNote))
+            {
+                AppointmentReasonName = AppointmentReasonName,
+                ArrivalReason = ArrivalReason,
+                PreparedExaminationTemplateId = PreparedExaminationTemplateId,
+                PreparedExaminationTemplateName = PreparedExaminationTemplateName,
+            };
     }
 }

@@ -18,4 +18,6 @@ public sealed record VisitDto(
     string? VoidReason,
     Guid CreatedByUserId,
     DateTime CreatedAtUtc,
-    bool IsUrgent);
+    bool IsUrgent,
+    string? ArrivalReason,
+    Guid? PreparedExaminationTemplateId);

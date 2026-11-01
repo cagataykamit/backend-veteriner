@@ -5082,6 +5082,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("AppointmentId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("ArrivalReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime>("ArrivedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -5112,6 +5116,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasDefaultValue(0L);
 
                     b.Property<Guid>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PreparedExaminationTemplateId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("ResponsibleVeterinarianUserId")

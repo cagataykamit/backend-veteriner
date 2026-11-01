@@ -10,6 +10,7 @@ using Backend.Veteriner.Application.Visits.Contracts;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
@@ -36,6 +37,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
     private readonly TimeProvider _timeProvider;
     private readonly IAppointmentProjectionSnapshotFactory _appointmentSnapshotFactory;
     private readonly IAppointmentIntegrationEventOutbox _appointmentEventOutbox;
+    private readonly IReadRepository<ExaminationTemplate> _templates;
 
     public CreateVisitCommandHandler(
         ITenantContext tenantContext,
@@ -51,7 +53,8 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         IRepository<Visit> visitsWrite,
         TimeProvider timeProvider,
         IAppointmentProjectionSnapshotFactory appointmentSnapshotFactory,
-        IAppointmentIntegrationEventOutbox appointmentEventOutbox)
+        IAppointmentIntegrationEventOutbox appointmentEventOutbox,
+        IReadRepository<ExaminationTemplate> templates)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -67,6 +70,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
         _timeProvider = timeProvider;
         _appointmentSnapshotFactory = appointmentSnapshotFactory;
         _appointmentEventOutbox = appointmentEventOutbox;
+        _templates = templates;
     }
 
     public async ValueTask<Result<VisitCreateResultDto>> Handle(CreateVisitCommand request, CancellationToken ct)
@@ -193,6 +197,15 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
                 "Sorumlu hekim bu kliniğe atanmış aktif bir hekim (Veteriner) olmalıdır.");
         }
 
+        var preparation = Visit.ValidatePreparation(request.ArrivalReason, request.PreparedExaminationTemplateId);
+        if (!preparation.IsSuccess)
+            return Result<VisitCreateResultDto>.Failure(preparation.Error);
+
+        var template = await VisitPreparationTemplateRule.EnsureSelectableAsync(
+            _templates, tenantId, request.PreparedExaminationTemplateId, ct);
+        if (!template.IsSuccess)
+            return Result<VisitCreateResultDto>.Failure(template.Error);
+
         if (appointment is { Status: AppointmentStatus.NoShow })
             await RevertNoShowOnArrivalAsync(appointment, ct);
 
@@ -204,7 +217,9 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
             request.ResponsibleVeterinarianUserId,
             userId,
             _timeProvider.GetUtcNow().UtcDateTime,
-            request.IsUrgent);
+            request.IsUrgent,
+            request.ArrivalReason,
+            request.PreparedExaminationTemplateId);
 
         try
         {
