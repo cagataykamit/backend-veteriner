@@ -31,6 +31,9 @@ public sealed class OwnerAccountClientLink : ITenantOwned
     /// <summary>Hasta sahibinin kliniğin aydınlatma metnini ilk onayladığı an (bilgilendirme kaydı; açık rıza değildir).</summary>
     public DateTime? DisclosureAcknowledgedAtUtc { get; private set; }
 
+    /// <summary>Ticari ileti onayı zamanı; boş = onay yok.</summary>
+    public DateTime? MarketingConsentAtUtc { get; private set; }
+
     private OwnerAccountClientLink() { }
 
     public static OwnerAccountClientLink Create(
@@ -93,6 +96,20 @@ public sealed class OwnerAccountClientLink : ITenantOwned
     /// <summary>İlk onay zamanı yazılır; tekrar çağrı değiştirmez.</summary>
     public void AcknowledgeDisclosure(DateTime utcNow)
         => DisclosureAcknowledgedAtUtc ??= ToUtc(utcNow);
+
+    /// <summary>
+    /// Ticari elektronik ileti onayı (ETK m.6; PORTAL-007): bağ başına, klinik veri sorumlusu. Onay zamanı yazılır, geri çekmede
+    /// boşalır (kanıt denetim kaydındadır). Gönderim politika sabitiyle kapalıdır (<c>OwnerNotificationChannelPolicy</c>).
+    /// Değer değişmediyse <c>false</c>.
+    /// </summary>
+    public bool SetMarketingConsent(bool consented, DateTime utcNow)
+    {
+        if (consented == MarketingConsentAtUtc.HasValue)
+            return false;
+
+        MarketingConsentAtUtc = consented ? ToUtc(utcNow) : null;
+        return true;
+    }
 
     private static DateTime ToUtc(DateTime value) => value.Kind == DateTimeKind.Utc ? value : value.ToUniversalTime();
 }
