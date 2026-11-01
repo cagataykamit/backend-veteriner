@@ -69,7 +69,8 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
         _f.Email.Object,
         Options.Create(new OwnerPortalOptions { PortalBaseUrl = "https://portal.example.com/" }),
         Options.Create(new AppOptions()),
-        _f.Clock);
+        _f.Clock,
+        new ClinicPortalGate(new Mock<IReadRepository<ClinicPortalSettings>>().Object));
 
     private void VerifyNoEmail() =>
         _f.Email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);

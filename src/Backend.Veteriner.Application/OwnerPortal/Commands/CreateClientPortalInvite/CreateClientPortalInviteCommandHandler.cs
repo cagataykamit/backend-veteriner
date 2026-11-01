@@ -27,6 +27,7 @@ public sealed class CreateClientPortalInviteCommandHandler
     private readonly OwnerPortalOptions _portalOptions;
     private readonly AppOptions _appOptions;
     private readonly TimeProvider _timeProvider;
+    private readonly ClinicPortalGate _clinicPortal;
 
     public CreateClientPortalInviteCommandHandler(
         OwnerPortalStaffAccess staffAccess,
@@ -39,8 +40,10 @@ public sealed class CreateClientPortalInviteCommandHandler
         IEmailSender email,
         IOptions<OwnerPortalOptions> portalOptions,
         IOptions<AppOptions> appOptions,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ClinicPortalGate clinicPortal)
     {
+        _clinicPortal = clinicPortal;
         _staffAccess = staffAccess;
         _clinicContext = clinicContext;
         _clinics = clinics;
@@ -92,6 +95,9 @@ public sealed class CreateClientPortalInviteCommandHandler
         var clinicAccess = await _staffAccess.EnsureClinicAssignedAsync(scope.UserId, clinic.Id, ct);
         if (!clinicAccess.IsSuccess)
             return Result<ClientPortalInviteDto>.Failure(clinicAccess.Error);
+
+        if (!await _clinicPortal.IsEnabledAsync(scope.TenantId, clinic.Id, ct))
+            return Result<ClientPortalInviteDto>.Failure(ClinicPortalGate.DisabledCode, "Bu klinikte hasta sahibi portalı kapalı; davet gönderilemez.");
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 

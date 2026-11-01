@@ -523,7 +523,7 @@ Durum geçişleri: `Open → InProgress | Completed | Rejected | Cancelled (sahi
 
 - Oluşturmada kliniğe erişen `OwnerPortal.Manage` izinli kullanıcılara bildirim merkezi kaydı gider: `UserNotificationType.PortalDataRequestCreated = 3`, `targetType = "PortalDataRequest"`.
 - `Completed`/`Rejected` olunca sahibe **işlemsel e-posta** (`OwnerNotificationType.DataRequestAnswered`, §13): klinik adı, talep türü, yanıt notu; hayvan/sağlık verisi yok. Hesabın e-postası yoksa (silinmiş) gönderilmez.
-- Denetim: `Portal.Read.DataRequests`, `Portal.DataRequests.Create`, `Portal.DataRequests.Cancel`; hedef `OwnerAccountId=…;LinkId=…`. Mesaj metni denetim yüküne yazılmaz.
+- Denetim: `Portal.Read.DataRequests`, `Portal.DataRequests.Create`, `Portal.DataRequests.Cancel`; hedef `OwnerAccountId=…;LinkId=…`. Talep metni ve yanıt notu denetim yükünde maskelenir (`AuditBehavior` hassas alanlar: `RequestText`, `ResponseNote`).
 
 ### 11.2 Klinik gelen kutusu (PORTAL-009) — `/api/v1/portal-inbox` (`OwnerPortal.Manage`)
 
@@ -559,7 +559,7 @@ Denetim: `PortalInbox.DataRequest.UpdateStatus`, hedef `DataRequestId=…;Status
 
 - Kayıt yoksa **açık** sayılır (bugünkü davranış korunur). Tablo `ClinicPortalSettings`: `Id`, `TenantId`, `ClinicId` (benzersiz), `IsEnabled`, `CreatedAtUtc`, `UpdatedAtUtc`, `UpdatedByUserId`.
 - `PUT { "isEnabled": false }` etkileri (hesaplar ve bağlar silinmez, erişim durur; tekrar açınca her şey geri gelir):
-  - Yeni davet 409 `OwnerPortal.ClinicPortalDisabled`; `GET portal-access` → `canInvite=false`, `inviteBlockedCode="OwnerPortal.ClinicPortalDisabled"`. Davet iptali ve bağ kapatma çalışır.
+  - Yeni davet 409 `OwnerPortal.ClinicPortalDisabled`; `GET portal-access` aktif klinik bağlamı varsa ve o klinikte portal kapalıysa `canInvite=false`, `inviteBlockedCode="OwnerPortal.ClinicPortalDisabled"` (bağlamsız istekte klinik bilinmediği için yalnız davet ucu reddeder). Davet iptali ve bağ kapatma çalışır.
   - Bekleyen davetin önizlemesi/kabulü 404 `Portal.Invites.NotFound` (sebep ayırt edilmez).
   - `GET /me` → o bağ `links[]`'te kalır, `"isClinicPortalEnabled": false` taşır. Bağ kapsamlı tüm uçlar 404 `Portal.Links.NotFound` (tek yer `OwnerPortalAccess.ResolveLinkAsync`; sahiplik kuralıyla aynı yanıt). İstemci kapalı bağ için kliniğe başvurma mesajı gösterir.
   - Hatırlatma e-postaları etkilenmez (portal değil, kliniğin kendi iletişimidir).
@@ -577,7 +577,7 @@ Tek yer: `Domain/Notifications/OwnerNotificationChannelPolicy`. Her tür bir **k
 
 Kanallar (`OwnerNotificationChannel`): `Email` (mevcut outbox/MailKit hattı), `Push` (`IPushNotificationSender` soyutlaması; bu sürümde `NotConfiguredPushNotificationSender`, `IsConfigured=false`, gönderim yok; FCM/APNs anahtarı dış bağımlılık), `WhatsAppLink` (yalnız personelin açtığı `wa.me` bağlantısı; sistem göndermez, teslim durumu yoktur — AK-6). `Preference` modlu push, sağlayıcı yokken `NotConfigured` raporlanır.
 
-- `IOwnerNotificationDispatcher.EnqueueAsync(type, email, subject, body, pushEnabled)`: politikayı sorar, e-postayı outbox'a yazar (çağıranın işlemiyle aynı commit), push'u soyutlamaya verir. Bu dalgada yeni gönderim (`DataRequestAnswered`) dispatcher'dan geçer. Mevcut gönderimler (davet, kod, hesap silme, randevu talebi e-postaları, hatırlatma işleyicisi) politika satırlarıyla **uyumludur**; dispatcher'a taşınmaları sonraki dalgaya bırakıldı (teknik borç).
+- `IOwnerNotificationDispatcher.DispatchAsync(OwnerNotificationMessage)` (tür, hesap, e-posta, push tercihi, kategori tercihi, metinler): politikayı sorar, e-postayı outbox'a yazar (çağıranın işlemiyle aynı commit), push'u soyutlamaya verir. Bu dalgada yeni gönderim (`DataRequestAnswered`) dispatcher'dan geçer. Mevcut gönderimler (davet, kod, hesap silme, randevu talebi e-postaları, hatırlatma işleyicisi) politika satırlarıyla **uyumludur**; dispatcher'a taşınmaları sonraki dalgaya bırakıldı (teknik borç).
 - `GET /api/v1/portal-notification-rules` (`Clinics.Read`) → matris, panelde salt okunur: `[ { "type": "AppointmentReminder", "category": "Reminder", "channels": [ { "channel": "Email", "mode": "Preference" }, { "channel": "Push", "mode": "NotConfigured" }, { "channel": "WhatsAppLink", "mode": "StaffManual" } ] } ]`. `mode`: `Always` · `Preference` · `StaffManual` · `NotConfigured` · `Disabled`.
 
 ### 13.2 WhatsApp bağlantısı — `GET /api/v1/clients/{clientId}/whatsapp-link?kind=&targetId=`

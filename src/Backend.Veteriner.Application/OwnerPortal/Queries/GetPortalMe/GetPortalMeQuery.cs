@@ -27,6 +27,6 @@ public sealed class GetPortalMeQueryHandler : IRequestHandler<GetPortalMeQuery, 
             account.Email!,
             account.DisplayName,
             account.HasPassword,
-            links.Select(l => new PortalLinkSummaryDto(l.Link.Id, l.Link.ClinicId, l.ClinicName, l.ClientFullName)).ToArray()));
+            links.Select(l => new PortalLinkSummaryDto(l.Link.Id, l.Link.ClinicId, l.ClinicName, l.ClientFullName, l.IsClinicPortalEnabled)).ToArray()));
     }
 }

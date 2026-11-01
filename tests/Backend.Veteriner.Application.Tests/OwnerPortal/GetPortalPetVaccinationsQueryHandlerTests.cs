@@ -54,7 +54,8 @@ public sealed class GetPortalPetVaccinationsQueryHandlerTests
 
         var access = new OwnerPortalAccess(
             accounts.Object, links.Object, tenants.Object,
-            new Mock<IReadRepository<Clinic>>().Object, Mock.Of<ITenantScope>(), new Mock<IReadRepository<Client>>().Object);
+            new Mock<IReadRepository<Clinic>>().Object, Mock.Of<ITenantScope>(), new Mock<IReadRepository<Client>>().Object,
+            new ClinicPortalGate(new Mock<IReadRepository<ClinicPortalSettings>>().Object));
         return new GetPortalPetVaccinationsQueryHandler(
             access, _pets.Object, _vaccinations.Object, new OwnerPortalTestFixture.FixedClock(utcNow));
     }

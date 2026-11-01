@@ -130,6 +130,8 @@ bildirim gider.
 | `POST /appointment-requests` | `{ petId? , petName?, petSpecies?, petBreed?, reasonId, requestedStartUtc, phone?, note? }` → 201. `petId` bağın müşterisinin hayvanı olmalı (değilse 404); yoksa `petName` zorunlu (klinik kaydı onayda oluşturur). Telefon boşsa müşteri kaydındaki. İletişim adı/e-posta müşteri kaydından ve hesaptan. |
 | `POST /appointment-requests/{id}/cancel` | Yalnız bekleyen; aksi 409 `AppointmentRequests.NotPending`. Kuyruk yetkisi olanlara bildirim. |
 
+`status` (liste ve 201 yanıtı; §5 bağlantı ucunun 201 yanıtı dahil) portal sözleşmesine uygun olarak **metindir**: `Pending` · `Approved` · `Rejected` · `Cancelled` · `Expired` (P1 Dalga 4b düzeltmesi; önce sayı dönüyordu, `PORTAL_API_CONTRACT.md` §13.4).
+
 ## 7. Talep e-posta şablonları — `/api/v1/clinics/{clinicId}/appointment-request-email-templates`
 
 | Uç | Yetki | Açıklama |
@@ -154,6 +156,9 @@ Metin düz yazıdır. Varsayılan metinler "talep ≠ kesin randevu" ayrımını
 `targetType`: `AppointmentRequest` (kuyruktaki talep) ya da `Appointment`. Alıcılar: yeni talep/iptal → kliniğe erişen
 (atanmış ya da kiracı geneli rol) ve `AppointmentRequests.Manage` izni rolünden gelen kullanıcılar; randevu hekime atanınca
 → hekim (işlemi yapan hekimin kendisiyse bildirim yok). Bildirim merkezi açık işler listesinin yerini almaz.
+
+Ek (P1 Dalga 4b, PORTAL-009): tür `PortalDataRequestCreated` (3), `targetType` `PortalDataRequest` — portaldan KVKK veri
+talebi gelince kliniğe erişen `OwnerPortal.Manage` izinli kullanıcılara (`PORTAL_API_CONTRACT.md` §11).
 
 ## 9. Arka plan
 

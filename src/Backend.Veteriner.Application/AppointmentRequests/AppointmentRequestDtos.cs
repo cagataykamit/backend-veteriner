@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.AppointmentRequests;
 
 namespace Backend.Veteriner.Application.AppointmentRequests;
@@ -17,12 +18,16 @@ public sealed record OnlineBookingPageDto(
     IReadOnlyList<OnlineBookingReasonDto> Reasons);
 
 /// <summary>Talep oluşturma yanıtı; talep kesin randevu değildir.</summary>
-public sealed record AppointmentRequestCreatedDto(Guid Id, AppointmentRequestStatus Status, DateTime RequestedStartUtc);
+/// <remarks>Portal ve bağlantı yüzeyinde <c>status</c> metindir (portal sözleşmesi §1, §13.4).</remarks>
+public sealed record AppointmentRequestCreatedDto(
+    Guid Id,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] AppointmentRequestStatus Status,
+    DateTime RequestedStartUtc);
 
 /// <summary>Portal "taleplerim" satırı.</summary>
 public sealed record PortalAppointmentRequestDto(
     Guid Id,
-    AppointmentRequestStatus Status,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] AppointmentRequestStatus Status,
     string ReasonName,
     DateTime RequestedStartUtc,
     int DurationMinutes,
