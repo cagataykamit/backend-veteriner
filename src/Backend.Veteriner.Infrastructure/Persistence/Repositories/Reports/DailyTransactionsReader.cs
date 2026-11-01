@@ -12,7 +12,8 @@ public sealed class DailyTransactionsReader : IDailyTransactionsReader, ICashEve
 {
     private static readonly DailyTransactionKind[] AllKinds = Enum.GetValues<DailyTransactionKind>();
 
-    private static readonly DailyTransactionKind[] CashKinds = [DailyTransactionKind.Payment, DailyTransactionKind.PaymentVoid];
+    private static readonly DailyTransactionKind[] CashKinds =
+        [DailyTransactionKind.Payment, DailyTransactionKind.PaymentVoid, DailyTransactionKind.CreditRefund];
 
     private readonly AppDbContext _db;
     private readonly ILogger<DailyTransactionsReader> _logger;
@@ -86,7 +87,8 @@ public sealed class DailyTransactionsReader : IDailyTransactionsReader, ICashEve
             names.User(e.CollectedByUserId),
             e.PerformedByUserId,
             names.User(e.PerformedByUserId),
-            e.Reason)).ToList();
+            e.Reason,
+            e.Kind == DailyTransactionKind.CreditRefund)).ToList();
     }
 
     private static DailyTransactionTotalsDto BuildTotals(IEnumerable<(DailyTransactionKind Kind, bool IsDirectSale, int Count, decimal Sum)> groups)
@@ -100,6 +102,7 @@ public sealed class DailyTransactionsReader : IDailyTransactionsReader, ICashEve
         var voidedCharge = Amount(DailyTransactionKind.ChargeVoid);
         var collected = Amount(DailyTransactionKind.Payment);
         var voidedCollection = Amount(DailyTransactionKind.PaymentVoid);
+        var refundedCredit = Amount(DailyTransactionKind.CreditRefund);
 
         return new DailyTransactionTotalsDto(
             grossCharge,
@@ -113,7 +116,9 @@ public sealed class DailyTransactionsReader : IDailyTransactionsReader, ICashEve
             Amount(DailyTransactionKind.Payment, sale: true),
             voidedCollection,
             Count(DailyTransactionKind.PaymentVoid),
-            collected - voidedCollection,
-            Count(DailyTransactionKind.ChargeCorrection) + Count(DailyTransactionKind.PaymentCorrection));
+            collected - voidedCollection - refundedCredit,
+            Count(DailyTransactionKind.ChargeCorrection) + Count(DailyTransactionKind.PaymentCorrection),
+            refundedCredit,
+            Count(DailyTransactionKind.CreditRefund));
     }
 }

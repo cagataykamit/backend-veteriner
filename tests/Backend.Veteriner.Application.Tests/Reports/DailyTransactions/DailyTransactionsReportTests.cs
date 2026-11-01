@@ -48,6 +48,26 @@ public sealed class DailyTransactionsReportTests
             performedBy, performedBy is null ? null : (performedBy == UserA ? "Ayşe" : "Bora"), reason);
 
     [Fact]
+    public void CashSummary_Should_Subtract_Credit_Refund_And_Assign_It_To_Refunder()
+    {
+        // FIN-005 K6: 500 tahsilat (Ayşe), 300 kredi iadesi (Bora) → net 200; iade iptal listesine girmez.
+        var refund = Cash(false, "2026-10-14T09:00:00Z", 300m, PaymentMethod.Cash, performedBy: UserB, reason: "İade") with { IsCreditRefund = true };
+        var report = CashSummaryBuilder.Build(
+            new DateOnly(2026, 10, 14), new DateOnly(2026, 10, 14),
+            [Cash(false, "2026-10-14T07:00:00Z", 500m, PaymentMethod.Cash, collectedBy: UserA), refund]);
+
+        report.Totals.CollectedAmount.Should().Be(500m);
+        report.Totals.CollectedCount.Should().Be(1);
+        report.Totals.RefundedCreditAmount.Should().Be(300m);
+        report.Totals.RefundedCreditCount.Should().Be(1);
+        report.Totals.NetAmount.Should().Be(200m);
+        report.ByMethod.Single(m => m.PaymentMethod == PaymentMethod.Cash).NetAmount.Should().Be(200m);
+        report.ByUser.Single(u => u.UserId == UserB).RefundedCreditAmount.Should().Be(300m);
+        report.ByUser.Single(u => u.UserId == UserB).NetAmount.Should().Be(-300m);
+        report.VoidedPayments.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Get_Should_Fail_For_Reversed_And_Too_Long_Ranges_Without_Reading()
     {
         var handler = new GetDailyTransactionsReportQueryHandler(_tenant.Object, _clinic.Object, _scope.Object, _reader.Object);
@@ -200,12 +220,12 @@ public sealed class DailyTransactionsReportTests
 
         export.FileDownloadName.Should().MatchRegex(@"^kasa-ozeti-\d{8}\.csv$");
         var lines = Encoding.UTF8.GetString(export.Content).TrimEnd().Split("\r\n");
-        lines[0].Should().Be("﻿Bölüm;Ad;Tahsilat Adedi;Tahsilat Tutarı;İptal Adedi;İptal Tutarı;Net");
-        lines[1].Should().Be("Toplam;Toplam;1;100,00;0;0,00;100,00");
-        lines.Should().Contain("Ödeme Türü;Kart;1;100,00;0;0,00;100,00");
-        lines.Should().Contain("Ödeme Türü;Nakit;0;0,00;0;0,00;0,00");
-        lines.Should().Contain("Gün;14.10.2026;1;100,00;0;0,00;100,00");
-        lines.Should().Contain("Kullanıcı;Ayşe;1;100,00;0;0,00;100,00");
+        lines[0].Should().Be("﻿Bölüm;Ad;Tahsilat Adedi;Tahsilat Tutarı;İptal Adedi;İptal Tutarı;Kredi İadesi;Net");
+        lines[1].Should().Be("Toplam;Toplam;1;100,00;0;0,00;0,00;100,00");
+        lines.Should().Contain("Ödeme Türü;Kart;1;100,00;0;0,00;0,00;100,00");
+        lines.Should().Contain("Ödeme Türü;Nakit;0;0,00;0;0,00;0,00;0,00");
+        lines.Should().Contain("Gün;14.10.2026;1;100,00;0;0,00;0,00;100,00");
+        lines.Should().Contain("Kullanıcı;Ayşe;1;100,00;0;0,00;0,00;100,00");
     }
 
     [Fact]

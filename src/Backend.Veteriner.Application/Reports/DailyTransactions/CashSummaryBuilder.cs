@@ -22,6 +22,7 @@ internal static class CashSummaryBuilder
         RegisterColumn<CashSummaryExportRow>.Money(null, "Tahsilat Tutarı", r => r.CollectedAmount),
         RegisterColumn<CashSummaryExportRow>.Number(null, "İptal Adedi", r => r.VoidedCount),
         RegisterColumn<CashSummaryExportRow>.Money(null, "İptal Tutarı", r => r.VoidedAmount),
+        RegisterColumn<CashSummaryExportRow>.Money(null, "Kredi İadesi", r => r.RefundedCreditAmount),
         RegisterColumn<CashSummaryExportRow>.Money(null, "Net", r => r.Net),
     ],
     "Kasa Ozeti",
@@ -34,7 +35,11 @@ internal static class CashSummaryBuilder
             .Select(m =>
             {
                 var a = Sum(rows.Where(r => r.PaymentMethod == m));
-                return new CashSummaryMethodDto(m, a.CollectedAmount, a.CollectedCount, a.VoidedAmount, a.VoidedCount, a.NetAmount, a.SalesCollectedAmount);
+                return new CashSummaryMethodDto(m, a.CollectedAmount, a.CollectedCount, a.VoidedAmount, a.VoidedCount, a.NetAmount, a.SalesCollectedAmount)
+                {
+                    RefundedCreditAmount = a.RefundedCreditAmount,
+                    RefundedCreditCount = a.RefundedCreditCount,
+                };
             })
             .ToList();
 
@@ -48,19 +53,27 @@ internal static class CashSummaryBuilder
                     g.Key, a.CollectedAmount, a.CollectedCount, a.VoidedAmount, a.VoidedCount, a.NetAmount, a.SalesCollectedAmount,
                     Sum(g.Where(r => r.PaymentMethod == PaymentMethod.Cash)).NetAmount,
                     Sum(g.Where(r => r.PaymentMethod == PaymentMethod.Card)).NetAmount,
-                    Sum(g.Where(r => r.PaymentMethod == PaymentMethod.Transfer)).NetAmount);
+                    Sum(g.Where(r => r.PaymentMethod == PaymentMethod.Transfer)).NetAmount)
+                {
+                    RefundedCreditAmount = a.RefundedCreditAmount,
+                    RefundedCreditCount = a.RefundedCreditCount,
+                };
             })
             .ToList();
 
-        // Tahsilat tahsilatı alana, iptal iptal edene yazılır (K-D6-7).
+        // Tahsilat tahsilatı alana, iptal iptal edene, kredi iadesi iadeyi yapana yazılır (K-D6-7, FIN-005 K6).
         var byUser = rows
-            .GroupBy(r => r.Voided ? r.PerformedByUserId : r.CollectedByUserId)
+            .GroupBy(r => r.Voided || r.IsCreditRefund ? r.PerformedByUserId : r.CollectedByUserId)
             .Select(g =>
             {
                 var a = Sum(g);
-                var name = g.Select(r => r.Voided ? r.PerformedByName : r.CollectedByName).FirstOrDefault(n => n is not null);
+                var name = g.Select(r => r.Voided || r.IsCreditRefund ? r.PerformedByName : r.CollectedByName).FirstOrDefault(n => n is not null);
                 return new CashSummaryUserDto(
-                    g.Key, name ?? "Bilinmiyor", a.CollectedAmount, a.CollectedCount, a.VoidedAmount, a.VoidedCount, a.NetAmount, a.SalesCollectedAmount);
+                    g.Key, name ?? "Bilinmiyor", a.CollectedAmount, a.CollectedCount, a.VoidedAmount, a.VoidedCount, a.NetAmount, a.SalesCollectedAmount)
+                {
+                    RefundedCreditAmount = a.RefundedCreditAmount,
+                    RefundedCreditCount = a.RefundedCreditCount,
+                };
             })
             .OrderByDescending(u => u.NetAmount)
             .ThenBy(u => u.UserName, StringComparer.CurrentCultureIgnoreCase)
@@ -87,23 +100,29 @@ internal static class CashSummaryBuilder
         return rows;
 
         static CashSummaryExportRow Row(string section, string name, CashSummaryAmountsDto a)
-            => new(section, name, a.CollectedCount, a.CollectedAmount, a.VoidedCount, a.VoidedAmount, a.NetAmount);
+            => new(section, name, a.CollectedCount, a.CollectedAmount, a.VoidedCount, a.VoidedAmount, a.NetAmount, a.RefundedCreditAmount);
     }
 
     private static CashSummaryAmountsDto Sum(IEnumerable<CashEventRow> rows)
     {
         var list = rows.ToList();
-        var collected = list.Where(r => !r.Voided).ToList();
+        var collected = list.Where(r => !r.Voided && !r.IsCreditRefund).ToList();
         var voided = list.Where(r => r.Voided).ToList();
+        var refunded = list.Where(r => r.IsCreditRefund).ToList();
         var collectedAmount = collected.Sum(r => r.Amount);
         var voidedAmount = voided.Sum(r => r.Amount);
+        var refundedAmount = refunded.Sum(r => r.Amount);
         return new CashSummaryAmountsDto(
             collectedAmount,
             collected.Count,
             voidedAmount,
             voided.Count,
-            collectedAmount - voidedAmount,
-            collected.Where(r => r.IsDirectSale).Sum(r => r.Amount));
+            collectedAmount - voidedAmount - refundedAmount,
+            collected.Where(r => r.IsDirectSale).Sum(r => r.Amount))
+        {
+            RefundedCreditAmount = refundedAmount,
+            RefundedCreditCount = refunded.Count,
+        };
     }
 }
 
@@ -114,4 +133,5 @@ public sealed record CashSummaryExportRow(
     decimal CollectedAmount,
     int VoidedCount,
     decimal VoidedAmount,
-    decimal Net);
+    decimal Net,
+    decimal RefundedCreditAmount = 0m);

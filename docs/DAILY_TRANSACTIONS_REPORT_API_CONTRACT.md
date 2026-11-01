@@ -186,3 +186,7 @@ Not: tarih ve klinik doğrulaması defterlerle **aynı bileşenden** geçtiği i
 
 - Application: tarih aralığı/klinik doğrulama (defter bileşeni), tavan, CSV/XLSX içerik ve biçim (saat, 2 ondalık tutar, durum/kaynak etiketleri), gün sonu klinik zorunluluğu ve pencere parametreleri (okuyucuya geçen değerler).
 - Entegrasyon (LocalDB, kendi kiracısıyla): olay sırası ve toplamlar (ücret, tahsilat, iptal, net), satışın ücret/ödemesinin `isDirectSale` işareti ve çift sayılmaması, dünkü ödemenin bugün iptali (iki günde doğru satır ve net), düzeltme olayı (denetim kaydından, tutarsız), ekran ≡ CSV ≡ XLSX, kasa özeti yöntem/gün/kullanıcı toplamlarının döküm toplamlarıyla eşitliği, başka kiracı (IDOR), klinik kapsamı, yetki (401/403), açık iş özetinin Bugün ile aynı arayüzden gelmesi.
+
+## Ek — FIN-005 kredi iadesi (P1 Dalga 4b)
+
+Yeni olay türü `CreditRefund` ("Kredi iadesi"): müşteri kredisinin iadesi kasadan çıkıştır (`CLIENT_CREDIT_API_CONTRACT.md` §6, §9). Döküm toplamlarına `refundedCreditAmount`/`refundedCreditCount` eklenir, `netCollectedAmount = alınan − iptal − kredi iadesi`. Kasa özetinin her tutar kümesine aynı iki alan eklenir, `netAmount` iadeyi düşer; iade, iadeyi yapan kullanıcının satırına yazılır. Dosyalarda "Kredi İadesi" sütunu "Net"ten önce gelir. Tahsissiz avans ödemesinde tahsilatı alan, krediyi oluşturan kullanıcıdır (K-D6-5 eki). Krediden mahsup kasa olayı değildir, satır üretmez.

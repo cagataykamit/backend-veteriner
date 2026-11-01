@@ -251,8 +251,8 @@ public sealed partial class DailyTransactionsReportIntegrationTests : IClassFixt
         cash.VoidedPayments.Should().ContainSingle().Which.Reason.Should().Be("Yanlis tahsilat girisi");
 
         var cashCsv = Encoding.UTF8.GetString(await env.GetBytesAsync($"{Cash}/export?{query}", "text/csv")).TrimEnd().Split(Environment.NewLine);
-        cashCsv[0].Should().Be("﻿Bölüm;Ad;Tahsilat Adedi;Tahsilat Tutarı;İptal Adedi;İptal Tutarı;Net");
-        cashCsv[1].Should().Be($"Toplam;Toplam;3;{cash.Totals.CollectedAmount.ToString("0.00", tr)};1;200,50;{cash.Totals.NetAmount.ToString("0.00", tr)}");
+        cashCsv[0].Should().Be("﻿Bölüm;Ad;Tahsilat Adedi;Tahsilat Tutarı;İptal Adedi;İptal Tutarı;Kredi İadesi;Net");
+        cashCsv[1].Should().Be($"Toplam;Toplam;3;{cash.Totals.CollectedAmount.ToString("0.00", tr)};1;200,50;0,00;{cash.Totals.NetAmount.ToString("0.00", tr)}");
         using var cashWb = new XLWorkbook(new MemoryStream(await env.GetBytesAsync($"{Cash}/export-xlsx?{query}", "spreadsheetml")));
         cashWb.Worksheet(1).LastRowUsed()!.RowNumber().Should().Be(cashCsv.Length);
     }

@@ -29,6 +29,7 @@ public interface IDailyTransactionsReader
 
 /// <summary>Kasa özetinin ham girdisi: aralıktaki tahsilat ve tahsilat iptali olayları (ad çözümlemesi yapılmış).</summary>
 /// <param name="Voided">True: tahsilat iptali olayı (<c>OccurredAtUtc</c> iptal zamanı); false: tahsilat olayı (ödeme zamanı).</param>
+/// <param name="IsCreditRefund">Müşteri kredisi iadesi (FIN-005 K6): kasadan çıkış; <c>PaymentId</c> kredi kimliği, <c>Voided</c> false.</param>
 public sealed record CashEventRow(
     bool Voided,
     DateTime OccurredAtUtc,
@@ -43,7 +44,8 @@ public sealed record CashEventRow(
     string? CollectedByName,
     Guid? PerformedByUserId,
     string? PerformedByName,
-    string? Reason);
+    string? Reason,
+    bool IsCreditRefund = false);
 
 /// <summary>Kasa özeti okuyucusu: dökümle aynı mali olay kaynağından en çok <c>maxRows + 1</c> tahsilat olayı döner (aşım tespiti için).</summary>
 public interface ICashEventsReader
