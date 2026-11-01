@@ -4,7 +4,7 @@ using AwesomeAssertions;
 
 namespace Backend.Veteriner.Domain.Tests.OwnerPortal;
 
-/// <summary>ADR-031 K3/K4: davet tek kullanımlık/süreli, uygunluk kuralı (KVKK Ret, RemindersOptedOut), bağ kapatma.</summary>
+/// <summary>ADR-031 K3/K4: davet tek kullanımlık/süreli, uygunluk kuralı (KVKK Ret; hatırlatma istememek engellemez), bağ kapatma.</summary>
 public sealed class OwnerPortalInviteTests
 {
     private static readonly DateTime Now = new(2026, 10, 16, 9, 0, 0, DateTimeKind.Utc);
@@ -78,12 +78,13 @@ public sealed class OwnerPortalInviteTests
     }
 
     [Fact]
-    public void Policy_Should_Reject_Client_With_Reminders_Opted_Out()
+    public void Policy_Should_Allow_Client_With_Reminders_Opted_Out()
     {
+        // ADR-031 K4 eki (2026-11-01): davet işlemsel e-postadır; hatırlatma istememek daveti engellemez.
         var client = new Client(TenantId, "Ayşe Yılmaz", Now, email: "a@b.com");
         client.ApplyContactPreferences(null, remindersOptedOut: true);
 
-        OwnerPortalInvitePolicy.CanInvite(client).Error.Code.Should().Be("OwnerPortal.ClientOptedOut");
+        OwnerPortalInvitePolicy.CanInvite(client).IsSuccess.Should().BeTrue();
     }
 
     [Fact]

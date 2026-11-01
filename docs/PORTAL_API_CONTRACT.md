@@ -36,7 +36,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-031-ha
 
 | Kural | Değer | Yer |
 |---|---|---|
-| Davet uygunluğu | Peşin müşteri değil, e-postası dolu, **KVKK Ret değil ve `RemindersOptedOut` kapalı** (ADR-025/031 K4) | `OwnerPortalInvitePolicy.CanInvite` |
+| Davet uygunluğu | Peşin müşteri değil, e-postası dolu, **KVKK Ret değil** (ADR-025/031 K4). `RemindersOptedOut` daveti engellemez (ADR-031 K4 eki, 2026-11-01: davet işlemsel e-postadır) | `OwnerPortalInvitePolicy.CanInvite` |
 | Davet | Tek kullanımlık, 7 gün; aynı müşteriye yeni davet önceki bekleyeni iptal eder; kabulde müşteri e-postası davet e-postasıyla hâlâ aynı ve müşteri hâlâ uygun olmalı (e-posta değişince eski davet geçersiz, K3) | `OwnerPortalInvite` |
 | Kod | 6 hane, 10 dk, en fazla 5 yanlış deneme (sonra geçersiz), tek kullanımlık; yeni kod aynı amaçtaki eskisini geçersiz kılar; 60 sn içinde ikinci kod üretilmez | `OwnerPortalCode` |
 | Kilit | Hesapta art arda **5** başarısız giriş (yanlış parola veya kod) → **15 dk** kilit; kilitliyken doğru bilgi de reddedilir; başarılı giriş sayacı sıfırlar | `OwnerAccount` |
@@ -89,7 +89,7 @@ Yanıt **200**: 4.1'deki `invites[]` öğesi şekli.
 |---|---|---|
 | `Clients.NotFound` | 404 | Müşteri bu kiracıda yok |
 | `OwnerPortal.ClientEmailMissing` | 409 | Müşteri kaydında e-posta yok |
-| `OwnerPortal.ClientOptedOut` | 409 | KVKK Ret veya hatırlatma istemiyor (ADR-025) — davet gitmez |
+| `OwnerPortal.ClientOptedOut` | 409 | KVKK Ret (ADR-025) — davet gitmez. Hatırlatma istememek engel değildir (K4 eki 2026-11-01) |
 | `OwnerPortal.ClientNotInvitable` | 409 | Peşin müşteri (sistem kaydı) |
 | `OwnerPortal.AlreadyLinked` | 409 | Müşterinin aktif portal bağı var |
 | `OwnerPortal.ClinicRequired` / `OwnerPortal.ClinicContextMismatch` | 400 | Klinik bağlamı yok / uyuşmuyor |
@@ -261,7 +261,7 @@ Hasta sahibi, bağın müşteri kaydı için otomatik aşı/randevu hatırlatmal
 - `canEnableReminders: false` = müşterinin klinikte KVKK açık rıza kaydı **Ret**; sahip hatırlatmayı portaldan açamaz (Ret hatırlatmayı kapatır; portal tercihi imzalı rıza kaydının yerine geçmez, bayrağı klinik açar). Kural tek yerde: `Client.SetRemindersOptedOutByOwner` / `Client.OwnerCanEnableReminders`.
 - Değer değişmezse kayıt güncellenmez (200 döner). Kiracı aboneliği salt okunur olsa da yazım kabul edilir (hatırlatmayı durdurmak sahibin hakkı).
 - Denetim: `Portal.Read.ReminderPreferences` (GET), `Portal.ReminderPreferences.Update` (PUT); hedef `OwnerAccountId=…;LinkId=…`, `ActorUserId` boş.
-- Davet kuralıyla ilişkisi (§3): `RemindersOptedOut` açık müşteriye **yeni** davet gitmez; mevcut aktif bağ etkilenmez, sahip portalı kullanmaya devam eder. Bağ kapatılıp yeniden davet gerekirse klinik önce bayrağı kapatmalıdır.
+- Davet kuralıyla ilişkisi (§3): `RemindersOptedOut` daveti **engellemez** (ADR-031 K4 eki, 2026-11-01; önceki sürümde engelliyordu). Hatırlatmayı kapatan sahip portalı kullanmaya devam eder; bağ kapatılırsa klinik bayrağa dokunmadan yeniden davet edebilir. KVKK Ret yine engeller.
 
 | Kod | HTTP | Durum |
 |---|---|---|
