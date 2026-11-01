@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Domain.AppointmentRequests;
 using Backend.Veteriner.Domain.Notifications;
+using Backend.Veteriner.Domain.OwnerPortal;
 
 namespace Backend.Veteriner.Application.Notifications;
 
@@ -37,12 +38,16 @@ public interface IUserNotificationPublisher
         DateTime startUtc,
         Guid? actorUserId,
         CancellationToken ct);
+
+    /// <summary>Portaldan KVKK veri talebi geldi (PORTAL-007/009): kliniğe erişen portal yönetim yetkisi olanlara.</summary>
+    Task PortalDataRequestCreatedAsync(OwnerDataRequest request, string clientName, CancellationToken ct);
 }
 
 public sealed class UserNotificationPublisher : IUserNotificationPublisher
 {
     public const string AppointmentRequestTarget = "AppointmentRequest";
     public const string AppointmentTarget = "Appointment";
+    public const string PortalDataRequestTarget = "PortalDataRequest";
 
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
@@ -96,6 +101,30 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
             AppointmentTarget,
             appointmentId,
             _timeProvider.GetUtcNow().UtcDateTime), ct);
+    }
+
+    public async Task PortalDataRequestCreatedAsync(OwnerDataRequest request, string clientName, CancellationToken ct)
+    {
+        var userIds = await _recipients.ListAsync(
+            request.TenantId,
+            request.ClinicId,
+            PermissionCatalog.OwnerPortal.Manage,
+            TenantWideClaimNames.All,
+            ct);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var userId in userIds)
+        {
+            await _notifications.AddAsync(UserNotification.Create(
+                request.TenantId,
+                request.ClinicId,
+                userId,
+                UserNotificationType.PortalDataRequestCreated,
+                $"Yeni KVKK veri talebi: {clientName}",
+                $"{OwnerPortal.OwnerPortalEmails.DataRequestTypeLabel(request.Type)} · son yanıt {FormatLocal(request.DueAtUtc)}",
+                PortalDataRequestTarget,
+                request.Id,
+                utcNow), ct);
+        }
     }
 
     private async Task ToQueueManagersAsync(
