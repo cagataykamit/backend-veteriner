@@ -294,6 +294,8 @@ public sealed class DashboardScopeIdorIntegrationTests : IClassFixture<CustomWeb
         using var scope = services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await db.Tenants.SingleAsync(t => t.Name == DataSeeder.DefaultTenantName);
+        await db.ClientCreditApplications.Where(a => a.TenantId == tenant.Id).ExecuteDeleteAsync();
+        await db.ClientCredits.Where(c => c.TenantId == tenant.Id).ExecuteDeleteAsync();
         await db.PaymentAllocations.Where(a => a.TenantId == tenant.Id).ExecuteDeleteAsync();
         await db.Payments.Where(p => p.TenantId == tenant.Id).ExecuteDeleteAsync();
     }

@@ -29,6 +29,8 @@ public sealed class PaymentFinanceParityIntegrationTests
 
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+        await commandDb.ClientCreditApplications.ExecuteDeleteAsync();
+        await commandDb.ClientCredits.ExecuteDeleteAsync();
         await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
 
@@ -60,6 +62,8 @@ public sealed class PaymentFinanceParityIntegrationTests
 
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+        await commandDb.ClientCreditApplications.ExecuteDeleteAsync();
+        await commandDb.ClientCredits.ExecuteDeleteAsync();
         await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
 
@@ -86,6 +90,8 @@ public sealed class PaymentFinanceParityIntegrationTests
 
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
+        await commandDb.ClientCreditApplications.ExecuteDeleteAsync();
+        await commandDb.ClientCredits.ExecuteDeleteAsync();
         await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
 
