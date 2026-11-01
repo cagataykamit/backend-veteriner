@@ -33,6 +33,8 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), b
 | `voidReason` | string? | `isVoided` ise dolu |
 | `createdByUserId` | guid | Geliş kaydını oluşturan kullanıcı |
 | `createdAtUtc` | datetime | |
+| `arrivalReason` | string? | Geliş hazırlığı (madde 4.5): resepsiyonun yazdığı geliş nedeni / şikâyet, en çok 500 |
+| `preparedExaminationTemplateId` | guid? | Geliş hazırlığı (madde 4.5): gelişte seçilen muayene şablonu / tedavi paketi; **uygulanmaz** |
 
 `tenantId` yanıtta döndürülmez (bağlamdan çözülür). Eşzamanlılık belirteci istemciye **açılmaz**; çakışma sunucuda çözülür (güncelleme çakışmasında durum yeniden okunur; hedef durum zaten sağlanmışsa başarı döner, aksi halde `Visits.ConcurrencyConflict`).
 
@@ -63,11 +65,15 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), b
   "petId": "guid?",
   "appointmentId": "guid?",
   "responsibleVeterinarianUserId": "guid?",
-  "isUrgent": false
+  "isUrgent": false,
+  "arrivalReason": "string?",
+  "preparedExaminationTemplateId": "guid?"
 }
 ```
 
 Kurallar:
+
+- **Hazırlık (opsiyonel, madde 4.5):** `arrivalReason` ve `preparedExaminationTemplateId` yalnızca **yeni** kayıtta uygulanır; idempotent tekrar mevcut kaydı döndürür ve hazırlığı değiştirmez (sonradan `PUT …/preparation`). Şablon kiracıya görünür (sistem veya kendi) ve aktif olmalı: yoksa `ExaminationTemplates.NotFound` (404), pasifse `Visits.Validation` (400).
 
 - **Acil (opsiyonel):** `isUrgent` verilmezse `false`. Yalnızca **yeni** kayıtta uygulanır; idempotent tekrar mevcut kaydı döndürür ve `isUrgent` değerini değiştirmez (sonradan işaretleme madde 4.4).
 - **Randevulu:** `appointmentId` dolu. `clinicId`/`petId` randevudan türetilir; gönderilirse randevu ile aynı olmalı, değilse `Visits.AppointmentPetClinicMismatch`. Randevu `Scheduled` olmalı: `NoShow` (gelmedi) randevu için geliş engellenmez, randevu aynı işlemde `Scheduled`'a döner ve normal akış sürer (`APPOINTMENT_NOSHOW_API_CONTRACT.md` madde 4); `Cancelled` → `Visits.AppointmentCancelled`; `Completed` ve o randevu için Visit yoksa → `Visits.AppointmentNotScheduled`.
@@ -136,6 +142,21 @@ Gelişte (`POST /visits` `isUrgent`) veya sonradan işaretlenir/kaldırılır. T
 - **Idempotent:** Değer zaten aynıysa `200` ve mevcut `VisitDto` (değişiklik yok). Eşzamanlı çift istekte kaybeden de başarı alır.
 - Yalnızca açık (`Waiting`/`InProgress`) kayıt için değiştirilebilir; `Completed` kayıtta değer değişecekse `Visits.NotOpen` (409). Yanlış geliş işaretli kayıt → `Visits.NotFound`.
 - `isUrgent` bakım durumunu değiştirmez; yalnızca Bugün sırasını etkiler (madde 9).
+- Yanıt: `200` + `VisitDto`.
+
+### 4.5 Geliş hazırlığı — `PUT /api/v1/visits/{id}/preparation` (`Visits.Update`) — CHECKIN-001/002/003
+
+Rakip check-in sihirbazının (şikâyet, muayene notu şablonu, paket, fatura) Vetinity karşılığı; ağır form yerine iki isteğe bağlı alan (ADR-009 eki 2026-11-01). Bakım durumu modeli **değişmez**.
+
+```json
+{ "arrivalReason": "Kulak kaşıntısı, 3 gündür", "preparedExaminationTemplateId": "guid?" }
+```
+
+- **Tam yazım:** iki alan birlikte yazılır; `null`/boş alan temizler. Geliş nedeni kırpılır, en çok 500 karakter.
+- **Şablon:** yeni seçilen şablon kiracıya görünür ve aktif olmalı (madde 3 ile aynı kural). Hazırlıkta zaten duran şablon sonradan pasifleşse de kalabilir (yalnız neden düzeltilirken engellenmez).
+- **Şablon uygulanmaz:** stok, uygulama kaydı veya "ücret bekliyor" kalemi doğmaz. Hekim muayeneyi açınca istemci hazırlanan şablonu önerir; uygulama mevcut `POST /examinations/{id}/apply-template` ile ve onun izinleriyle olur (`EXAMINATION_TEMPLATE_API_CONTRACT.md` madde 7). Fiyatlı paketin tutarı istemcide **tahmini ücret** olarak gösterilebilir (teklif önizlemesi; kayıt değildir).
+- **Geliş nedeni muayeneye sunucuda kopyalanmaz;** istemci yeni muayene formunda `visitReason` boşsa öneri olarak doldurur.
+- Yalnızca açık (`Waiting`/`InProgress`) gelişte değiştirilebilir; `Completed` gelişte değer değişecekse `Visits.NotOpen` (409). Aynı değerler idempotent `200`. Yanlış geliş işaretli → `Visits.NotFound`.
 - Yanıt: `200` + `VisitDto`.
 
 ---
@@ -271,6 +292,10 @@ Randevulu Visit **tek satırdır** (randevu ayrıca satır üretmez). Satır kay
 | `chargeIndicator` | enum? | **Açık iş:** `NoChargeableWork` \| `ChargeMissing` \| `PaymentPending` \| `PartiallyPaid` \| `Paid`; `Charges.Read` yoksa ve planlı satırda `null`. Ayrıntı: `OPEN_ITEMS_API_CONTRACT.md` |
 | `chargeableWorkCount` | int? | Açık iş: ziyaretteki ücretlendirilebilir işlem sayısı (yalnız görünür türler) |
 | `awaitingLabCount` | int? | Açık iş: ziyarete bağlı `Requested` lab sayısı; `LabResults.Read` yoksa `null` |
+| `appointmentReasonName` | string? | Randevu nedeni (APPT-005); randevusuz satırda veya nedensiz randevuda `null`. Geliş diyaloğunda geliş nedenine varsayılan önerilir |
+| `arrivalReason` | string? | Geliş hazırlığı (madde 4.5); planlı satırda `null` |
+| `preparedExaminationTemplateId` | guid? | Geliş hazırlığı: hazırlanan şablon/paket |
+| `preparedExaminationTemplateName` | string? | Hazırlanan şablonun adı (şablon sonradan pasifleşse de döner) |
 
 **Ödeme göstergesi dürüstlüğü:** Mevcut ödeme verisi yalnızca *alınan tahsilatı* tutar; borç/bakiye/fatura yoktur. Bu yüzden gösterge "ödendi/borçlu" **demez**: Visit'in randevusuna veya Visit'e bağlı muayenelerine bağlı ödeme kaydı varsa `PaymentRecorded`, yoksa `NoPaymentRecorded`. Bakiye göstergesi Aşama 3 (temel finans) sonrasıdır. Bu alan `careStatus`'u hiçbir koşulda etkilemez.
 
@@ -329,7 +354,8 @@ Satırdaki `chargeIndicator`, `chargeableWorkCount`, `awaitingLabCount` ve `Toda
 | `Visits.NotFound` | 404 | Visit yok / yabancı kiracı / yanlış geliş işaretli (geçiş uçlarında) |
 | `Visits.DuplicateActiveVisit` | 409 | Düzeltme veya geri almayla aynı hayvanda ikinci aktif Visit oluşacaktı |
 | `Visits.DuplicateAppointmentVisit` | 409 | Geri almayla aynı randevuda ikinci Visit oluşacaktı |
-| `Visits.NotOpen` | 409 | Tamamlanmış/yanlış geliş Visit'e muayene açılmaya çalışıldı |
+| `Visits.NotOpen` | 409 | Tamamlanmış/yanlış geliş Visit'e muayene açılmaya çalışıldı; tamamlanmış gelişin acil işareti veya hazırlığı değiştirilmek istendi |
+| `ExaminationTemplates.NotFound` | 404 | Hazırlıkta seçilen şablon yok veya başka kiracının |
 | `Visits.ConcurrencyConflict` | 409 | Eşzamanlı güncelleme çözülemedi; istek tekrarlanmalı |
 | `Examinations.VisitMismatch` | 400 | Muayene isteği Visit'in hayvanı/randevusuyla uyuşmuyor |
 | `Clinics.AccessDenied`, `Clinics.NotFound`, `Pets.NotFound`, `Appointments.NotFound`, `Tenants.ContextMissing`, `Tenants.TenantInactive` | mevcut eşleme | Ortak kodlar |
@@ -354,6 +380,7 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 - **S2 — Açık iş göstergesi:** Tedavi/reçete kayıtlarında açık-kapalı durumu yok, uydurulmaz. Lab istem/durum modeli (`Requested`) geldikten sonra Bugün'e **hesaplanan** açık iş göstergeleri eklendi (D2, `OPEN_ITEMS_API_CONTRACT.md`).
 - **S3 — Yanlış geliş modeli:** Bakım durumuna 4. durum eklenmez; ayrı `isVoided` işareti (ADR "bakım durumu sade 3 durum" ile uyumlu).
 - **S4 — Sorumlu hekim:** Opsiyonel; kiracıdaki aktif kliniğe atanmış `Veteriner` rolündeki kullanıcı. Görünen ad için `User.DisplayName` eklendi (boşsa e-posta türevi). Ayrıntı madde 3.1.
+- **S5 — Geliş yaşam döngüsü ve hazırlık (CHECKIN-001…005, ADR-009 eki 2026-11-01):** Rakip zinciri Booked → Checked In → In Room → Visit Complete → Check Out mevcut modele eşlenir: planlı randevu satırı → `Waiting` (geldi) → `InProgress` (muayenede; muayene açılınca otomatik) → `Completed`. Yeni bakım durumu **eklenmez**. "Muayene odası" verisi tutulmaz (oda modeli yok; sorumlu hekim yeter). Check Out = tahsilat orkestrasyonu, CHECKOUT-001 ayrı iştir; ödeme bakım durumunu değiştirmez (ADR-009 madde 2). Gelişte hazırlık iki isteğe bağlı alandır (madde 4.5); fatura/teklif belgesi yoktur (ADR-012: ücret satırı + bakiye), geliş sonrası "Ücret ekle" Visit'e bağlı ücret açar, fiyatlı paketin tutarı tahmini ücret olarak gösterilir.
 
 ---
 
@@ -361,7 +388,7 @@ Yetki yoksa mevcut politika yanıtı (`403`). Doğrulama (FluentValidation) hata
 
 - **İzinler (seed adımı gerekir):** Yeni `Visits.Read`, `Visits.Create`, `Visits.Update`, `Visits.Correct` izinleri **API açılışında gelmez**: API ne migration ne seed çalıştırır. İzinler yalnızca `dotnet run --project src/Backend.Veteriner.DbMigrator -- seed` (veya `all`) ile `Permissions` tablosuna yazılır ve `RolePermissionBindingSeeder` ile varsayılan rollere (Admin, Owner, ClinicAdmin, Veteriner, Sekreter; madde 2) bağlanır. Seed idempotenttir (mevcut kayıtları çoğaltmaz). Mevcut **özel roller** bu izinleri otomatik almaz; yöneticiler elle atamalıdır.
 - **Oturum:** İzinler JWT'ye giriş (login), token yenileme (refresh) ve klinik seçimi (select-clinic) anında DB'den okunarak `permission` claim'i olarak eklenir. Seed sonrası mevcut oturumlar yeni izni **görmez**; kullanıcı çıkış-giriş yapmalıdır (frontend `Visits.Read` claim'ini bu yüzden bulamaz).
-- **Migration:** `AddVisits` (`Visits` tablosu, filtreli benzersiz indeksler, `Examinations.VisitId`), `AddUserDisplayName` (`Users.DisplayName`, nullable) ve `AddVisitUrgency` (`Visits.IsUrgent`, `bit NOT NULL`, mevcut kayıtlar `false`) komut veritabanına uygulanmalıdır. Query DB şeması değişmez.
+- **Migration:** `AddVisits` (`Visits` tablosu, filtreli benzersiz indeksler, `Examinations.VisitId`), `AddUserDisplayName` (`Users.DisplayName`, nullable), `AddVisitUrgency` (`Visits.IsUrgent`, `bit NOT NULL`, mevcut kayıtlar `false`) ve `AddVisitPreparation` (`Visits.ArrivalReason nvarchar(500)` ve `Visits.PreparedExaminationTemplateId`, ikisi de nullable; mevcut kayıtlar boş) komut veritabanına uygulanmalıdır. Query DB şeması değişmez.
 - **Yapılandırma:** Yeni bayrak veya ayar yoktur.
 
 ---

@@ -163,6 +163,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.ClinicalTerms.Update,
                 PermissionCatalog.ClinicalTerms.Deactivate,
 
+                PermissionCatalog.ClinicalSnippets.Read,
+                PermissionCatalog.ClinicalSnippets.Create,
+                PermissionCatalog.ClinicalSnippets.Update,
+                PermissionCatalog.ClinicalSnippets.Deactivate,
+
                 PermissionCatalog.ExaminationTemplates.Read,
                 PermissionCatalog.ExaminationTemplates.Create,
                 PermissionCatalog.ExaminationTemplates.Update,
@@ -300,6 +305,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.ClinicalTerms.Update,
                 PermissionCatalog.ClinicalTerms.Deactivate,
 
+                PermissionCatalog.ClinicalSnippets.Read,
+                PermissionCatalog.ClinicalSnippets.Create,
+                PermissionCatalog.ClinicalSnippets.Update,
+                PermissionCatalog.ClinicalSnippets.Deactivate,
+
                 PermissionCatalog.ExaminationTemplates.Read,
                 PermissionCatalog.ExaminationTemplates.Create,
                 PermissionCatalog.ExaminationTemplates.Update,
@@ -430,6 +440,11 @@ public static class RolePermissionBindings
                 PermissionCatalog.ClinicalTerms.Update,
                 PermissionCatalog.ClinicalTerms.Deactivate,
 
+                PermissionCatalog.ClinicalSnippets.Read,
+                PermissionCatalog.ClinicalSnippets.Create,
+                PermissionCatalog.ClinicalSnippets.Update,
+                PermissionCatalog.ClinicalSnippets.Deactivate,
+
                 PermissionCatalog.ExaminationTemplates.Read,
                 PermissionCatalog.ExaminationTemplates.Create,
                 PermissionCatalog.ExaminationTemplates.Update,
@@ -532,6 +547,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.ClinicalTerms.Create,
                 PermissionCatalog.ClinicalTerms.Update,
 
+                PermissionCatalog.ClinicalSnippets.Read,
+                PermissionCatalog.ClinicalSnippets.Create,
+                PermissionCatalog.ClinicalSnippets.Update,
+
                 PermissionCatalog.ExaminationTemplates.Read,
                 PermissionCatalog.ExaminationTemplates.Create,
                 PermissionCatalog.ExaminationTemplates.Update,
@@ -598,6 +617,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.StockMovements.Create,
 
                 PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.ClinicalSnippets.Read,
                 PermissionCatalog.ExaminationTemplates.Read,
 
                 PermissionCatalog.Reminders.Read,

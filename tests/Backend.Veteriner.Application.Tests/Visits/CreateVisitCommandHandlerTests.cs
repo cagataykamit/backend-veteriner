@@ -4,12 +4,14 @@ using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.ExaminationTemplates.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Visits.Commands.Create;
 using Backend.Veteriner.Application.Visits.Specs;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
@@ -40,6 +42,7 @@ public sealed class CreateVisitCommandHandlerTests
     private readonly Mock<IRepository<Visit>> _visitsWrite = new();
     private readonly Mock<IAppointmentProjectionSnapshotFactory> _snapshotFactory = new();
     private readonly Mock<IAppointmentIntegrationEventOutbox> _eventOutbox = new();
+    private readonly Mock<IReadRepository<ExaminationTemplate>> _templates = new();
 
     public CreateVisitCommandHandlerTests()
     {
@@ -69,7 +72,8 @@ public sealed class CreateVisitCommandHandlerTests
             _visitsWrite.Object,
             VisitHandlerTestSupport.FixedClock,
             _snapshotFactory.Object,
-            _eventOutbox.Object);
+            _eventOutbox.Object,
+            _templates.Object);
 
     private Appointment ScheduledAppointment()
         => new(_tenantId, _clinicId, _petId, DateTime.UtcNow.AddHours(1), 30, AppointmentType.Other, null, null);
@@ -126,6 +130,50 @@ public sealed class CreateVisitCommandHandlerTests
         _appointments.Verify(
             r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Store_Preparation_With_Active_Template()
+    {
+        ReturnActiveVisitForPet(null);
+        var template = ReturnTemplate(active: true);
+
+        var result = await CreateHandler().Handle(
+            new CreateVisitCommand(_clinicId, _petId, null, null, ArrivalReason: "  Kusma, 2 gündür ", PreparedExaminationTemplateId: template.Id),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Visit.ArrivalReason.Should().Be("Kusma, 2 gündür");
+        result.Value.Visit.PreparedExaminationTemplateId.Should().Be(template.Id);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Reject_Inactive_Or_Unknown_Template()
+    {
+        ReturnActiveVisitForPet(null);
+        var inactive = ReturnTemplate(active: false);
+
+        var result = await CreateHandler().Handle(
+            new CreateVisitCommand(_clinicId, _petId, null, null, PreparedExaminationTemplateId: inactive.Id), CancellationToken.None);
+        result.Error.Code.Should().Be("Visits.Validation");
+
+        _templates.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationTemplateVisibleByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ExaminationTemplate?)null);
+        var unknown = await CreateHandler().Handle(
+            new CreateVisitCommand(_clinicId, _petId, null, null, PreparedExaminationTemplateId: Guid.NewGuid()), CancellationToken.None);
+        unknown.Error.Code.Should().Be("ExaminationTemplates.NotFound");
+
+        _visitsWrite.Verify(r => r.AddAsync(It.IsAny<Visit>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private ExaminationTemplate ReturnTemplate(bool active)
+    {
+        var template = ExaminationTemplate.CreateForTenant(_tenantId, "Aşı paketi", "Aşı", null, null, [], DateTime.UtcNow).Value!;
+        if (!active)
+            template.Deactivate(DateTime.UtcNow);
+        _templates.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationTemplateVisibleByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(template);
+        return template;
     }
 
     [Fact]

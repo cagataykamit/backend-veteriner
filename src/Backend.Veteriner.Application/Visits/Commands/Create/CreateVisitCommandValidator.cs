@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Visits;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Visits.Commands.Create;
@@ -21,5 +22,11 @@ public sealed class CreateVisitCommandValidator : AbstractValidator<CreateVisitC
         RuleFor(x => x.ResponsibleVeterinarianUserId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("ResponsibleVeterinarianUserId gecersiz.");
+
+        RuleFor(x => x.ArrivalReason).MaximumLength(Visit.MaxArrivalReasonLength);
+
+        RuleFor(x => x.PreparedExaminationTemplateId)
+            .Must(id => !id.HasValue || id.Value != Guid.Empty)
+            .WithMessage("PreparedExaminationTemplateId gecersiz.");
     }
 }

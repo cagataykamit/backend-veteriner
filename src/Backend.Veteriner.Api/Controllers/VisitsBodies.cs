@@ -11,6 +11,19 @@ public sealed class CreateVisitBody
     public Guid? AppointmentId { get; init; }
     public Guid? ResponsibleVeterinarianUserId { get; init; }
     public bool IsUrgent { get; init; }
+
+    /// <summary>Geliş nedeni / şikâyet (CHECKIN-001, en çok 500 karakter).</summary>
+    public string? ArrivalReason { get; init; }
+
+    /// <summary>Gelişte hazırlanan muayene şablonu veya tedavi paketi (CHECKIN-002/003); uygulanmaz.</summary>
+    public Guid? PreparedExaminationTemplateId { get; init; }
+}
+
+/// <summary>PUT /visits/{id}/preparation gövdesi (tam yazım: null alan temizler).</summary>
+public sealed class SetVisitPreparationBody
+{
+    public string? ArrivalReason { get; init; }
+    public Guid? PreparedExaminationTemplateId { get; init; }
 }
 
 /// <summary>

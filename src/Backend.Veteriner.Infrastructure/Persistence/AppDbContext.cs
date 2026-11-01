@@ -121,6 +121,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
     public DbSet<VaccineDefinition> VaccineDefinitions => Set<VaccineDefinition>();
     public DbSet<ClinicalTerm> ClinicalTerms => Set<ClinicalTerm>();
+    public DbSet<ClinicalSnippet> ClinicalSnippets => Set<ClinicalSnippet>();
     public DbSet<ExaminationTemplate> ExaminationTemplates => Set<ExaminationTemplate>();
     public DbSet<ExaminationTemplateLine> ExaminationTemplateLines => Set<ExaminationTemplateLine>();
     public DbSet<Payment> Payments => Set<Payment>();

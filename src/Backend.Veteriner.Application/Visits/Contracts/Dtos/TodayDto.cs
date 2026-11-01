@@ -51,7 +51,19 @@ public sealed record TodayItemDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] VisitChargeIndicator? ChargeIndicator = null,
     int? ChargeableWorkCount = null,
     int? AwaitingLabCount = null,
-    int? PendingChargeCount = null);
+    int? PendingChargeCount = null)
+{
+    /// <summary>Randevu nedeni (APPT-005); randevusuz satırda veya nedensiz randevuda null. Geliş nedenine varsayılan önerilir.</summary>
+    public string? AppointmentReasonName { get; init; }
+
+    /// <summary>Geliş hazırlığı (CHECKIN-001): resepsiyonun yazdığı geliş nedeni; planlı satırda null.</summary>
+    public string? ArrivalReason { get; init; }
+
+    /// <summary>Geliş hazırlığı (CHECKIN-002/003): hazırlanan şablon/paket; ad şablon pasifleşse de döner.</summary>
+    public Guid? PreparedExaminationTemplateId { get; init; }
+
+    public string? PreparedExaminationTemplateName { get; init; }
+}
 
 public sealed record TodayHospitalizationDto(
     Guid HospitalizationId,

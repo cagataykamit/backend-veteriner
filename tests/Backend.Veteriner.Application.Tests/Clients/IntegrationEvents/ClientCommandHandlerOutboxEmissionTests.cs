@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Tenants;
 using AwesomeAssertions;
@@ -20,7 +21,7 @@ public sealed class ClientCommandHandlerOutboxEmissionTests
     private readonly Mock<IClientIntegrationEventOutbox> _eventOutbox = new();
 
     private CreateClientCommandHandler CreateCreateHandler()
-        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object, TimeProvider.System);
+        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object, TimeProvider.System, TrialQuotaGuardStub.Open);
 
     private UpdateClientCommandHandler CreateUpdateHandler()
         => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object, TimeProvider.System);

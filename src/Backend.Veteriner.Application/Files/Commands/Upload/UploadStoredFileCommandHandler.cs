@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Files.Access;
 using Backend.Veteriner.Application.Files.Contracts.Dtos;
 using Backend.Veteriner.Application.Files.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
@@ -26,6 +27,7 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
     private readonly FileStorageOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<UploadStoredFileCommandHandler> _logger;
+    private readonly ITrialQuotaGuard _trialQuota;
 
     public UploadStoredFileCommandHandler(
         ITenantContext tenantContext,
@@ -36,7 +38,8 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
         IFileMalwareScanner scanner,
         IOptions<FileStorageOptions> options,
         TimeProvider timeProvider,
-        ILogger<UploadStoredFileCommandHandler> logger)
+        ILogger<UploadStoredFileCommandHandler> logger,
+        ITrialQuotaGuard trialQuota)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
@@ -47,6 +50,7 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
         _options = options.Value;
         _timeProvider = timeProvider;
         _logger = logger;
+        _trialQuota = trialQuota;
     }
 
     private DateTime Now => _timeProvider.GetUtcNow().UtcDateTime;
@@ -68,6 +72,11 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
             return Fail("Files.Validation", "Dosya boş olamaz.");
         if (request.Length > maxBytes)
             return TooLarge(maxBytes);
+
+        // Deneme kullanım kotası (TRIAL-006): kiracının toplam depolaması.
+        var quota = await _trialQuota.EnsureCanStoreAsync(tenantId, request.Length, ct);
+        if (!quota.IsSuccess)
+            return Result<StoredFileDto>.Failure(quota.Error);
 
         var openFiles = await _files.CountAsync(
             new StoredFilesOpenByOwnerSpec(tenantId, request.OwnerType, request.OwnerId), ct);

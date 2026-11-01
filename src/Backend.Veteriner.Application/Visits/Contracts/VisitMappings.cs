@@ -28,6 +28,8 @@ public static class VisitMappings
             v.VoidReason,
             v.CreatedByUserId,
             v.CreatedAtUtc,
-            v.IsUrgent);
+            v.IsUrgent,
+            v.ArrivalReason,
+            v.PreparedExaminationTemplateId);
     }
 }

@@ -224,6 +224,18 @@ public static class PermissionCatalog
     }
 
     /// <summary>
+    /// Klinik metin parçaları (EXAM-011/012): <c>#kısayol</c> ile muayene metin alanına eklenen hazır metinler. Etkinleştirme de
+    /// <see cref="Deactivate"/> ile yapılır. Ekleme istemci tarafındadır; <see cref="Read"/> seçici için yeter.
+    /// </summary>
+    public static class ClinicalSnippets
+    {
+        public const string Read = "ClinicalSnippets.Read";
+        public const string Create = "ClinicalSnippets.Create";
+        public const string Update = "ClinicalSnippets.Update";
+        public const string Deactivate = "ClinicalSnippets.Deactivate";
+    }
+
+    /// <summary>
     /// Muayene şablonu / tedavi paketi (ADR-020 S4). Etkinleştirme de <see cref="Deactivate"/> ile yapılır. <see cref="Apply"/> şablonu
     /// muayeneye uygular (metin + işlem satırları); uç ayrıca <c>Examinations.Update</c> ve <c>Administrations.Create</c> ister.
     /// </summary>
@@ -406,6 +418,11 @@ public static class PermissionCatalog
         new(ClinicalTerms.Create, "Kliniğe özel tanı/şikâyet sözlük kaydı ekleme yetkisi", "ClinicalTerms"),
         new(ClinicalTerms.Update, "Kliniğe özel tanı/şikâyet sözlük kaydının adını düzeltme yetkisi", "ClinicalTerms"),
         new(ClinicalTerms.Deactivate, "Kliniğe özel tanı/şikâyet sözlük kaydını pasifleştirme ve yeniden etkinleştirme yetkisi", "ClinicalTerms"),
+
+        new(ClinicalSnippets.Read, "Klinik metin parçalarını listeleme ve muayenede kullanma yetkisi", "ClinicalSnippets"),
+        new(ClinicalSnippets.Create, "Klinik metin parçası ekleme yetkisi", "ClinicalSnippets"),
+        new(ClinicalSnippets.Update, "Klinik metin parçasını düzenleme yetkisi", "ClinicalSnippets"),
+        new(ClinicalSnippets.Deactivate, "Klinik metin parçasını pasifleştirme ve yeniden etkinleştirme yetkisi", "ClinicalSnippets"),
 
         new(ExaminationTemplates.Read, "Muayene şablonlarını listeleme ve görüntüleme yetkisi", "ExaminationTemplates"),
         new(ExaminationTemplates.Create, "Kliniğe özel muayene şablonu ekleme yetkisi", "ExaminationTemplates"),

@@ -11,6 +11,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Common.Behaviors;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -59,7 +60,7 @@ public sealed class ClientInvoicingIdentityHandlerTests
         => new(_tenantContext.Object, _tenants.Object, _clientsRead.Object, _clientsWrite.Object, _outbox.Object, TimeProvider.System);
 
     private CreateClientCommandHandler CreateHandler()
-        => new(_tenantContext.Object, _tenants.Object, _clientsRead.Object, _clientsWrite.Object, _outbox.Object, TimeProvider.System);
+        => new(_tenantContext.Object, _tenants.Object, _clientsRead.Object, _clientsWrite.Object, _outbox.Object, TimeProvider.System, TrialQuotaGuardStub.Open);
 
     [Fact]
     public async Task Create_Should_Apply_Invoicing_Identity()

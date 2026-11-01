@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -47,7 +48,8 @@ public sealed class PetCommandHandlerOutboxEmissionTests
             _petsWrite.Object,
             writeEvaluator,
             _eventOutbox.Object,
-            TimeProvider.System);
+            TimeProvider.System,
+            TrialQuotaGuardStub.Open);
     }
 
     private UpdatePetCommandHandler CreateUpdateHandler()

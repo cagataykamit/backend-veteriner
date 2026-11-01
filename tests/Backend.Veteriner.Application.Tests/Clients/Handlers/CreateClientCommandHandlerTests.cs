@@ -2,7 +2,9 @@ using Backend.Veteriner.Application.Clients.Commands.Create;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -19,11 +21,28 @@ public sealed class CreateClientCommandHandlerTests
     private readonly Mock<IRepository<Client>> _clientsWrite = new();
     private readonly Mock<IClientIntegrationEventOutbox> _eventOutbox = new();
 
-    private CreateClientCommandHandler CreateHandler()
-        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object, TimeProvider.System);
+    private CreateClientCommandHandler CreateHandler(ITrialQuotaGuard? quota = null)
+        => new(_tenantContext.Object, _tenantsRead.Object, _clientsRead.Object, _clientsWrite.Object, _eventOutbox.Object, TimeProvider.System, quota ?? TrialQuotaGuardStub.Open);
 
     private static void AlignTenantId(Tenant tenant, Guid id)
         => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);
+
+    [Fact]
+    public async Task Handle_Should_ReturnTrialQuota_When_Trial_Client_Quota_Full()
+    {
+        var tid = Guid.NewGuid();
+        var tenant = new Tenant("A.Ş.", DateTime.UtcNow);
+        AlignTenantId(tenant, tid);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+
+        var result = await CreateHandler(TrialQuotaGuardStub.Full)
+            .Handle(new CreateClientCommand("Ali Veli", Phone: "05321111111"), CancellationToken.None);
+
+        result.Error.Code.Should().Be(TrialLimits.ClientQuotaExceededCode);
+        _clientsWrite.Verify(r => r.AddAsync(It.IsAny<Client>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_TenantContextMissing()
