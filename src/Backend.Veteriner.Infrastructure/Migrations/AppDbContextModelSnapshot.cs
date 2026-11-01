@@ -1773,6 +1773,40 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("ClinicOnlineBookingSettings", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicPortalSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicPortalSettings", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicTaxpayerSettings", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2924,6 +2958,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<bool>("PushEnabled")
+                        .HasColumnType("bit");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -2966,6 +3003,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime?>("DisclosureAcknowledgedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("MarketingConsentAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid>("OwnerAccountId")
                         .HasColumnType("uniqueidentifier");
 
@@ -2986,6 +3026,74 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasFilter("[Status] = 0");
 
                     b.ToTable("OwnerAccountClientLinks", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.OwnerDataRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DueAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("HandledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("HandledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LinkId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<long>("MutationSequence")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
+                    b.Property<Guid>("OwnerAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ResponseNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkId");
+
+                    b.HasIndex("TenantId", "LinkId");
+
+                    b.HasIndex("TenantId", "ClinicId", "Status");
+
+                    b.ToTable("OwnerDataRequests", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.OwnerPortalCode", b =>
@@ -5712,6 +5820,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicPortalSettings", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicTaxpayerSettings", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
@@ -5795,6 +5912,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasOne("Backend.Veteriner.Domain.OwnerPortal.OwnerAccount", null)
                         .WithMany()
                         .HasForeignKey("OwnerAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.OwnerDataRequest", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.OwnerPortal.OwnerAccountClientLink", null)
+                        .WithMany()
+                        .HasForeignKey("LinkId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

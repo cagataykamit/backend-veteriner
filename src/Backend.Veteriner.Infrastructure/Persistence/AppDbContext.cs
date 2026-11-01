@@ -96,12 +96,14 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<OwnerPortalInvite> OwnerPortalInvites => Set<OwnerPortalInvite>();
     public DbSet<OwnerPortalCode> OwnerPortalCodes => Set<OwnerPortalCode>();
     public DbSet<OwnerPortalRefreshToken> OwnerPortalRefreshTokens => Set<OwnerPortalRefreshToken>();
+    public DbSet<OwnerDataRequest> OwnerDataRequests => Set<OwnerDataRequest>();
 
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<UserClinic> UserClinics => Set<UserClinic>();
     public DbSet<ClinicWorkingHour> ClinicWorkingHours => Set<ClinicWorkingHour>();
     public DbSet<ClinicAppointmentSettings> ClinicAppointmentSettings => Set<ClinicAppointmentSettings>();
     public DbSet<ClinicOnlineBookingSettings> ClinicOnlineBookingSettings => Set<ClinicOnlineBookingSettings>();
+    public DbSet<ClinicPortalSettings> ClinicPortalSettings => Set<ClinicPortalSettings>();
     public DbSet<ClinicKvkkFormTemplate> ClinicKvkkFormTemplates => Set<ClinicKvkkFormTemplate>();
     public DbSet<ClinicTaxpayerSettings> ClinicTaxpayerSettings => Set<ClinicTaxpayerSettings>();
     public DbSet<Client> Clients => Set<Client>();
