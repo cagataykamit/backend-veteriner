@@ -214,10 +214,11 @@ public sealed partial class OwnerPortalIntegrationTests
         var mine = await (await SendAsync(HttpMethod.Get, url, portal.AccessToken)).Content.ReadFromJsonAsync<JsonElement>();
         mine.EnumerateArray().Select(r => r.GetProperty("petName").GetString()).Should().BeEquivalentTo("Boncuk", "Minnoş");
         mine.EnumerateArray().Should().OnlyContain(r => r.GetProperty("canCancel").GetBoolean());
+        mine.EnumerateArray().Should().OnlyContain(r => r.GetProperty("status").GetString() == "Pending", "portal enumları metindir (PORTAL_API_CONTRACT §13.4)");
 
         var cancel = await SendAsync(HttpMethod.Post, $"{url}/{newPetId}/cancel", portal.AccessToken);
         cancel.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await cancel.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetInt32().Should().Be((int)AppointmentRequestStatus.Cancelled);
+        (await cancel.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().Should().Be("Cancelled");
         (await SendAsync(HttpMethod.Post, $"{url}/{newPetId}/cancel", portal.AccessToken)).StatusCode.Should().Be(HttpStatusCode.Conflict);
 
         var cancelledNotice = await (await SendAsync(HttpMethod.Get, "/api/v1/notifications?type=AppointmentRequestCancelled&pageSize=100", b.Staff.Token))

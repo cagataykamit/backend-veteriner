@@ -18,6 +18,7 @@ public sealed class OwnerAccountConfiguration : IEntityTypeConfiguration<OwnerAc
         b.Property(x => x.Status).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.FailedSignInCount).IsRequired();
+        b.Property(x => x.PushEnabled).IsRequired();
 
         b.HasIndex(x => x.Email).IsUnique().HasFilter("[Email] IS NOT NULL");
     }

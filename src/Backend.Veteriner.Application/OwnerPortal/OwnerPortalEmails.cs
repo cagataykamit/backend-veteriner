@@ -79,4 +79,29 @@ public static class OwnerPortalEmails
             .AppendLine()
             .AppendLine("Vetinity")
             .ToString());
+
+    /// <summary>KVKK veri talebi yanıtlandı (PORTAL-007): klinik adı, talep türü ve kliniğin yanıt notu; hayvan/sağlık bilgisi yok.</summary>
+    public static Message DataRequestAnswered(string clinicName, OwnerDataRequestType type, bool completed, string responseNote) => new(
+        $"{clinicName}: veri talebiniz yanıtlandı",
+        new StringBuilder()
+            .AppendLine("Merhaba,")
+            .AppendLine()
+            .AppendLine($"{clinicName}, hasta sahibi portalından gönderdiğiniz \"{DataRequestTypeLabel(type)}\" talebinizi {(completed ? "tamamladı" : "reddetti")}.")
+            .AppendLine()
+            .AppendLine("Kliniğin yanıtı:")
+            .AppendLine(responseNote)
+            .AppendLine()
+            .AppendLine("Yanıtı yetersiz bulursanız kliniğinize yeniden başvurabilir ya da Kişisel Verileri Koruma Kurulu'na şikâyette bulunabilirsiniz.")
+            .AppendLine()
+            .AppendLine("Vetinity")
+            .ToString());
+
+    public static string DataRequestTypeLabel(OwnerDataRequestType type) => type switch
+    {
+        OwnerDataRequestType.Access => "Verilerime erişim",
+        OwnerDataRequestType.Rectification => "Düzeltme",
+        OwnerDataRequestType.Erasure => "Silme",
+        OwnerDataRequestType.Objection => "İtiraz",
+        _ => "Diğer",
+    };
 }

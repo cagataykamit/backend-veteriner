@@ -153,7 +153,8 @@ public sealed class GetPaymentByIdQueryHandler
             p.Notes,
             p.AllocatedAmount,
             p.UnallocatedAmount,
-            petCount);
+            petCount,
+            p.CreditedAmount);
         return Result<PaymentDetailDto>.Success(dto);
     }
 

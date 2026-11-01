@@ -17,7 +17,10 @@ public sealed record PaymentAllocationItemDto(
     DateTime CreatedAtUtc,
     Guid CreatedByUserId);
 
-/// <summary>GET /charges/{id}/allocations satırı.</summary>
+/// <summary>
+/// GET /charges/{id}/allocations satırı. <see cref="Kind"/> <c>Payment</c>: ödeme tahsisi; <c>Credit</c>: krediden mahsup (FIN-005),
+/// bu satırda ödeme alanları kredinin kaynak ödemesidir (paranın geldiği tahsilat).
+/// </summary>
 public sealed record ChargeAllocationItemDto(
     Guid Id,
     Guid PaymentId,
@@ -25,4 +28,12 @@ public sealed record ChargeAllocationItemDto(
     PaymentMethod Method,
     decimal Amount,
     DateTime CreatedAtUtc,
-    Guid CreatedByUserId);
+    Guid CreatedByUserId,
+    string Kind = ChargeAllocationKinds.Payment,
+    Guid? CreditId = null);
+
+public static class ChargeAllocationKinds
+{
+    public const string Payment = "Payment";
+    public const string Credit = "Credit";
+}

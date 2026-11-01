@@ -8,6 +8,7 @@ using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Sales;
@@ -95,12 +96,14 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<OwnerPortalInvite> OwnerPortalInvites => Set<OwnerPortalInvite>();
     public DbSet<OwnerPortalCode> OwnerPortalCodes => Set<OwnerPortalCode>();
     public DbSet<OwnerPortalRefreshToken> OwnerPortalRefreshTokens => Set<OwnerPortalRefreshToken>();
+    public DbSet<OwnerDataRequest> OwnerDataRequests => Set<OwnerDataRequest>();
 
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<UserClinic> UserClinics => Set<UserClinic>();
     public DbSet<ClinicWorkingHour> ClinicWorkingHours => Set<ClinicWorkingHour>();
     public DbSet<ClinicAppointmentSettings> ClinicAppointmentSettings => Set<ClinicAppointmentSettings>();
     public DbSet<ClinicOnlineBookingSettings> ClinicOnlineBookingSettings => Set<ClinicOnlineBookingSettings>();
+    public DbSet<ClinicPortalSettings> ClinicPortalSettings => Set<ClinicPortalSettings>();
     public DbSet<ClinicKvkkFormTemplate> ClinicKvkkFormTemplates => Set<ClinicKvkkFormTemplate>();
     public DbSet<ClinicTaxpayerSettings> ClinicTaxpayerSettings => Set<ClinicTaxpayerSettings>();
     public DbSet<Client> Clients => Set<Client>();
@@ -127,6 +130,8 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Charge> Charges => Set<Charge>();
     public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
+    public DbSet<ClientCredit> ClientCredits => Set<ClientCredit>();
+    public DbSet<ClientCreditApplication> ClientCreditApplications => Set<ClientCreditApplication>();
     public DbSet<Administration> Administrations => Set<Administration>();
     public DbSet<ChargeSuggestion> ChargeSuggestions => Set<ChargeSuggestion>();
     public DbSet<Sale> Sales => Set<Sale>();

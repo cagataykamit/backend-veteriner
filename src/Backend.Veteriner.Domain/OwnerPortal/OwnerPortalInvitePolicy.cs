@@ -5,8 +5,9 @@ namespace Backend.Veteriner.Domain.OwnerPortal;
 
 /// <summary>
 /// Bir müşteriye portal daveti gidebilir mi — tek kural (ADR-031 K4, ADR-025). Davet oluşturma, panel durumu ve davet
-/// kabulü aynı kuralı kullanır: KVKK "Ret" veya hatırlatma istemiyor (<see cref="Client.RemindersOptedOut"/>) olan müşteriye
-/// davet gitmez; davet müşteri kaydındaki e-postaya gider, e-posta yoksa davet edilemez.
+/// kabulü aynı kuralı kullanır: KVKK "Ret" olan müşteriye davet gitmez; davet müşteri kaydındaki e-postaya gider, e-posta
+/// yoksa davet edilemez. Hatırlatma istememek (<see cref="Client.RemindersOptedOut"/>) daveti engellemez: davet personelin
+/// başlattığı işlemsel e-postadır, hatırlatma değildir (ADR-031 K4 eki, 2026-11-01).
 /// </summary>
 public static class OwnerPortalInvitePolicy
 {
@@ -20,11 +21,11 @@ public static class OwnerPortalInvitePolicy
         if (string.IsNullOrWhiteSpace(client.Email))
             return Result.Failure("OwnerPortal.ClientEmailMissing", "Müşteri kaydında e-posta yok; davet gönderilemez.");
 
-        if (client.KvkkConsentStatus == KvkkConsentStatus.Declined || client.RemindersOptedOut)
+        if (client.KvkkConsentStatus == KvkkConsentStatus.Declined)
         {
             return Result.Failure(
                 "OwnerPortal.ClientOptedOut",
-                "Müşteri KVKK rızasını reddetmiş veya hatırlatma istemiyor; portal daveti gönderilemez.");
+                "Müşteri KVKK rızasını reddetmiş; portal daveti gönderilemez.");
         }
 
         return Result.Success();

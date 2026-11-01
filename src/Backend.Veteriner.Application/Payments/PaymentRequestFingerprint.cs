@@ -30,6 +30,10 @@ internal static class PaymentRequestFingerprint
             request.Notes?.Trim(),
             string.Join(',', allocations));
 
+        // Kredisiz istekte özet FIN-005 öncesiyle aynı kalır (eski kayıtların tekrar isteği bozulmaz).
+        if (request.CreditAmount > 0)
+            canonical += "|credit:" + request.CreditAmount.ToString("0.00", CultureInfo.InvariantCulture);
+
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
     }
 }

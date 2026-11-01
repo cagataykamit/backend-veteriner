@@ -51,7 +51,7 @@ public sealed class ClientPortalController : ControllerBase
     }
 
     /// <summary>
-    /// Portal daveti gönderir (müşteri kaydındaki e-postaya). KVKK Ret / hatırlatma istemiyor müşteriye 409
+    /// Portal daveti gönderir (müşteri kaydındaki e-postaya). KVKK Ret müşteriye 409
     /// <c>OwnerPortal.ClientOptedOut</c>; e-posta yoksa 409 <c>OwnerPortal.ClientEmailMissing</c>. Ham token yanıtta dönmez.
     /// </summary>
     [HttpPost("portal-invites")]

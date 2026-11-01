@@ -12,7 +12,7 @@ namespace Backend.Veteriner.Application.OwnerPortal.Access;
 public sealed record OwnerPortalLinkScope(Guid LinkId, Guid OwnerAccountId, Guid TenantId, Guid ClinicId, Guid ClientId);
 
 /// <summary>Hesabın kullanabildiği bağ ve görünen adları.</summary>
-public sealed record OwnerPortalActiveLink(OwnerAccountClientLink Link, string ClinicName, string ClientFullName);
+public sealed record OwnerPortalActiveLink(OwnerAccountClientLink Link, string ClinicName, string ClientFullName, bool IsClinicPortalEnabled = true);
 
 /// <summary>
 /// Portal sahiplik kontrolü — tek yer (ADR-031 K6). Bağ hesabın, aktif ve kiracısı aktif olmalıdır. Aksi her durum
@@ -29,6 +29,7 @@ public sealed class OwnerPortalAccess
     private readonly IReadRepository<Clinic> _clinics;
     private readonly ITenantScope _tenantScope;
     private readonly IReadRepository<Client> _clients;
+    private readonly ClinicPortalGate _clinicPortal;
 
     public OwnerPortalAccess(
         IReadRepository<OwnerAccount> accounts,
@@ -36,8 +37,10 @@ public sealed class OwnerPortalAccess
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinics,
         ITenantScope tenantScope,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        ClinicPortalGate clinicPortal)
     {
+        _clinicPortal = clinicPortal;
         _accounts = accounts;
         _links = links;
         _tenants = tenants;
@@ -74,6 +77,10 @@ public sealed class OwnerPortalAccess
         // İsteğin geri kalanı bağın kiracısına bağlanır; kapsam DI kapsamıyla (istekle) biter.
         _ = _tenantScope.UseTenant(link.TenantId);
 
+        // Klinik portalı kapattıysa (PORTAL-009) bağ kapsamlı uçlar kapanır; yanıt sahiplik kuralıyla aynıdır.
+        if (!await _clinicPortal.IsEnabledAsync(link.TenantId, link.ClinicId, ct))
+            return LinkNotFound();
+
         return Result<OwnerPortalLinkScope>.Success(
             new OwnerPortalLinkScope(link.Id, link.OwnerAccountId, link.TenantId, link.ClinicId, link.ClientId));
     }
@@ -99,12 +106,14 @@ public sealed class OwnerPortalAccess
             .ToDictionary(c => c.Id, c => c.Name);
         var clientNames = (await _clients.ListAsync(new PortalClientsByIdsSpec(usable.Select(l => l.ClientId).Distinct().ToArray()), ct))
             .ToDictionary(c => c.Id, c => c.FullName);
+        var disabledClinics = await _clinicPortal.DisabledClinicIdsAsync(usable.Select(l => l.ClinicId).Distinct().ToArray(), ct);
 
         return usable
             .Select(l => new OwnerPortalActiveLink(
                 l,
                 clinicNames.GetValueOrDefault(l.ClinicId, string.Empty),
-                clientNames.GetValueOrDefault(l.ClientId, string.Empty)))
+                clientNames.GetValueOrDefault(l.ClientId, string.Empty),
+                !disabledClinics.Contains(l.ClinicId)))
             .ToArray();
     }
 

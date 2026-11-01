@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<AppointmentAvailabilityService>();
         services.AddScoped<OnlineBookingClinicResolver>();
         services.AddScoped<IUserNotificationPublisher, UserNotificationPublisher>();
+        services.AddScoped<IOwnerNotificationDispatcher, OwnerNotificationDispatcher>();
         services.AddScoped<AppointmentRequestEmailComposer>();
         services.AddScoped<AppointmentRequestVerificationService>();
         services.AddScoped<AppointmentRequestIntake>();
@@ -74,6 +75,7 @@ public static class DependencyInjection
 
         // Hasta sahibi portalı (ADR-031): sahiplik kontrolü, davet çözümü, oturum ve kod.
         services.AddScoped<OwnerPortalAccess>();
+        services.AddScoped<ClinicPortalGate>();
         services.AddScoped<OwnerPortalStaffAccess>();
         services.AddScoped<OwnerPortalInviteResolver>();
         services.AddScoped<OwnerPortalSessionIssuer>();

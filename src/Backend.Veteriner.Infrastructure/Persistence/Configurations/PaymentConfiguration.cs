@@ -15,6 +15,7 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.ToTable("Payments", t =>
         {
             t.HasCheckConstraint("CK_Payments_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
+            t.HasCheckConstraint("CK_Payments_CreditedAmount_Range", "[CreditedAmount] >= 0 AND [AllocatedAmount] + [CreditedAmount] <= [Amount]");
             t.HasCheckConstraint("CK_Payments_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
             t.HasCheckConstraint("CK_Payments_Voided_Unallocated", "[VoidedAtUtc] IS NULL OR [AllocatedAmount] = 0");
         });
@@ -38,6 +39,7 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.Property(x => x.Notes).HasMaxLength(4000);
 
         b.Property(x => x.AllocatedAmount).HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
+        b.Property(x => x.CreditedAmount).HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
         b.Property(x => x.RequestId);
         b.Property(x => x.RequestHash).HasMaxLength(64);
         b.Property(x => x.MutationSequence).IsRequired().HasDefaultValue(0L).IsConcurrencyToken();

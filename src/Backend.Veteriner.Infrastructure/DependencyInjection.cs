@@ -194,6 +194,7 @@ public static class DependencyInjection
         services.AddScoped<IVisitOpenItemsReader, VisitOpenItemsReader>();
         services.AddScoped<IClinicVeterinarianReader, ClinicVeterinarianReader>();
         services.AddScoped<IUserNotificationRecipientReader, UserNotificationRecipientReader>();
+        services.AddSingleton<IPushNotificationSender, Notifications.NotConfiguredPushNotificationSender>();
         services.AddScoped<IDashboardFinancePaymentAggregatesReader, DashboardFinancePaymentAggregatesReader>();
         services.AddScoped<IPaymentPetCountReader, PaymentPetCountReader>();
         services.AddScoped<IAppointmentsReportStatusBreakdownReader, AppointmentsReportStatusBreakdownReader>();

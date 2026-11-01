@@ -36,7 +36,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-031-ha
 
 | Kural | Değer | Yer |
 |---|---|---|
-| Davet uygunluğu | Peşin müşteri değil, e-postası dolu, **KVKK Ret değil ve `RemindersOptedOut` kapalı** (ADR-025/031 K4) | `OwnerPortalInvitePolicy.CanInvite` |
+| Davet uygunluğu | Peşin müşteri değil, e-postası dolu, **KVKK Ret değil** (ADR-025/031 K4). `RemindersOptedOut` daveti engellemez (ADR-031 K4 eki, 2026-11-01: davet işlemsel e-postadır) | `OwnerPortalInvitePolicy.CanInvite` |
 | Davet | Tek kullanımlık, 7 gün; aynı müşteriye yeni davet önceki bekleyeni iptal eder; kabulde müşteri e-postası davet e-postasıyla hâlâ aynı ve müşteri hâlâ uygun olmalı (e-posta değişince eski davet geçersiz, K3) | `OwnerPortalInvite` |
 | Kod | 6 hane, 10 dk, en fazla 5 yanlış deneme (sonra geçersiz), tek kullanımlık; yeni kod aynı amaçtaki eskisini geçersiz kılar; 60 sn içinde ikinci kod üretilmez | `OwnerPortalCode` |
 | Kilit | Hesapta art arda **5** başarısız giriş (yanlış parola veya kod) → **15 dk** kilit; kilitliyken doğru bilgi de reddedilir; başarılı giriş sayacı sıfırlar | `OwnerAccount` |
@@ -89,7 +89,7 @@ Yanıt **200**: 4.1'deki `invites[]` öğesi şekli.
 |---|---|---|
 | `Clients.NotFound` | 404 | Müşteri bu kiracıda yok |
 | `OwnerPortal.ClientEmailMissing` | 409 | Müşteri kaydında e-posta yok |
-| `OwnerPortal.ClientOptedOut` | 409 | KVKK Ret veya hatırlatma istemiyor (ADR-025) — davet gitmez |
+| `OwnerPortal.ClientOptedOut` | 409 | KVKK Ret (ADR-025) — davet gitmez. Hatırlatma istememek engel değildir (K4 eki 2026-11-01) |
 | `OwnerPortal.ClientNotInvitable` | 409 | Peşin müşteri (sistem kaydı) |
 | `OwnerPortal.AlreadyLinked` | 409 | Müşterinin aktif portal bağı var |
 | `OwnerPortal.ClinicRequired` / `OwnerPortal.ClinicContextMismatch` | 400 | Klinik bağlamı yok / uyuşmuyor |
@@ -261,7 +261,7 @@ Hasta sahibi, bağın müşteri kaydı için otomatik aşı/randevu hatırlatmal
 - `canEnableReminders: false` = müşterinin klinikte KVKK açık rıza kaydı **Ret**; sahip hatırlatmayı portaldan açamaz (Ret hatırlatmayı kapatır; portal tercihi imzalı rıza kaydının yerine geçmez, bayrağı klinik açar). Kural tek yerde: `Client.SetRemindersOptedOutByOwner` / `Client.OwnerCanEnableReminders`.
 - Değer değişmezse kayıt güncellenmez (200 döner). Kiracı aboneliği salt okunur olsa da yazım kabul edilir (hatırlatmayı durdurmak sahibin hakkı).
 - Denetim: `Portal.Read.ReminderPreferences` (GET), `Portal.ReminderPreferences.Update` (PUT); hedef `OwnerAccountId=…;LinkId=…`, `ActorUserId` boş.
-- Davet kuralıyla ilişkisi (§3): `RemindersOptedOut` açık müşteriye **yeni** davet gitmez; mevcut aktif bağ etkilenmez, sahip portalı kullanmaya devam eder. Bağ kapatılıp yeniden davet gerekirse klinik önce bayrağı kapatmalıdır.
+- Davet kuralıyla ilişkisi (§3): `RemindersOptedOut` daveti **engellemez** (ADR-031 K4 eki, 2026-11-01; önceki sürümde engelliyordu). Hatırlatmayı kapatan sahip portalı kullanmaya devam eder; bağ kapatılırsa klinik bayrağa dokunmadan yeniden davet edebilir. KVKK Ret yine engeller.
 
 | Kod | HTTP | Durum |
 |---|---|---|
@@ -461,4 +461,155 @@ Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıd
 
 ## 9) Kapsam dışı (v0)
 
-SMS ve telefon doğrulaması (AK-6), push, klinikteki veriler için veri talebi ucu (K4, PORTAL-007), portal bayrağı ile klinik bazında kapatma (K8), personel tarafı kiracı geneli davet listesi ekranı, oturum listesi ekranı, access token kara listesi.
+SMS ve telefon doğrulaması (AK-6), push **gönderimi** (yalnız soyutlama ve tercih, §13), WhatsApp Business API (otomatik gönderim; yalnız personel bağlantısı, §13.2), personel tarafı kiracı geneli davet listesi ekranı, oturum listesi ekranı, access token kara listesi. Veri talebi (§11) ve klinik bazında kapatma (§12) P1 Dalga 4b ile eklendi.
+
+---
+
+# P1 Dalga 4b ekleri (PORTAL-007 / PORTAL-009 / PORTAL-010) — dal `feat/dalga-4b`
+
+Migration: **`AddPortalPreferencesDataRequestsAndSettings`** (`OwnerAccounts.PushEnabled`, `OwnerAccountClientLinks.MarketingConsentAtUtc`, `OwnerDataRequests`, `ClinicPortalSettings`). Yalnız yerel DB. Hukuki noktalar çalışma varsayımıyla (ADR-041 ÇV-1…7, HUKUKI-ONAY-LISTESI A4, C5/C6); taslak uyarıları kalır.
+
+## 10) Bildirim tercihleri (PORTAL-007; ADR-031 K4 madde 3)
+
+İşlemsel ileti (kod, davet, randevu talebi yanıtı, veri talebi yanıtı, hesap silme onayı) tercihle **kapatılamaz**; hatırlatma (aşı/randevu) ve ticari ileti ayrı tercihtir. Kural tek yerde: `OwnerNotificationChannelPolicy` (§13).
+
+### 10.1 Hesap düzeyi — `GET/PUT /api/portal/v1/me/notification-preferences`
+
+```json
+{ "push": { "enabled": false, "available": false } }
+```
+
+- `push.enabled`: hesabın push tercihi (`OwnerAccounts.PushEnabled`, varsayılan `false`). `available`: sunucuda push sağlayıcısı yapılandırılmış mı (`IPushNotificationSender.IsConfigured`); bu sürümde FCM/APNs anahtarı yok (dış bağımlılık, MOBILE-003), her zaman `false`. Tercih şimdiden saklanır, anahtar gelince yeniden sorulmaz.
+- `PUT` gövdesi `{ "pushEnabled": true }` → 200, GET şekli. Denetim `Portal.NotificationPreferences.Update`, hedef `OwnerAccountId=…`.
+
+### 10.2 Bağ düzeyi — `GET/PUT /api/portal/v1/links/{linkId}/notification-preferences`
+
+```json
+{ "remindersOptedOut": false, "canEnableReminders": true,
+  "marketingConsented": false, "marketingConsentedAtUtc": null, "marketingSendingEnabled": false }
+```
+
+- Hatırlatma alanları §5.11 ile **aynı alan ve kural** (`Client.RemindersOptedOut`, `Client.SetRemindersOptedOutByOwner`). `reminder-preferences` uçları aynen kalır.
+- `marketing…`: ticari elektronik ileti onayı (ETK m.6, İYS). Bağ başına (`OwnerAccountClientLinks.MarketingConsentAtUtc`; klinik veri sorumlusudur). Geri çekme sütunu boşaltır, kanıt denetim kaydındadır. **Gönderim bu sürümde kapalıdır:** `marketingSendingEnabled` her zaman `false` (sabit `OwnerNotificationChannelPolicy.MarketingSendingEnabled`; İYS kaydı ve hukuki görüş sonrası tek yerden açılır — HUKUKI C5/C6). Ticari ileti gönderen bir özellik yoktur; yalnız kod hazırlığıdır.
+- `PUT` gövdesi kısmi: `{ "remindersOptedOut": true|false|null, "marketingConsented": true|false|null }` — `null`/yok = dokunma; ikisi de yoksa 400. Hatırlatma açma KVKK Ret'te 409 `Clients.RemindersKvkkDeclined`. Yanıt 200, GET şekli. Denetim `Portal.NotificationPreferences.Update`, hedef `OwnerAccountId=…;LinkId=…`.
+
+| Kod | HTTP |
+|---|---|
+| `Clients.RemindersKvkkDeclined`, `Clients.ConcurrencyConflict` | 409 |
+| `Validation.FluentValidation` | 400 |
+| `Portal.Links.NotFound` | 404 |
+
+## 11) Veri talebi — KVKK başvurusu (PORTAL-007; ADR-031 K4 "silme/erişim talebi")
+
+Hasta sahibi, bağın kliniğindeki **klinik kayıtları** için KVKK m.11 başvurusunu portaldan yapar; klinik (veri sorumlusu) ürün deposu `operations/kvkk-talep-sureci.md` sürecine göre yanıtlar. Portal hesabının silinmesi bu akış değildir (§5.10, ADR-041 ÇV-3). Sistem talebi kaydeder, süreyi ve yanıtı izler; silme/anonimleştirme işlemini **kendisi yapmaz** (süreç belgesi: elle, yedekli, saklama yükümlülüğüne göre). Yanıt süresi **30 gün** (KVKK m.13; çalışma varsayımı, tek sabit `OwnerDataRequest.ResponseDueDays`).
+
+Tablo `OwnerDataRequests` (kiracı): `Id`, `TenantId`, `ClinicId`, `ClientId`, `OwnerAccountId`, `LinkId`, `Type` (`Access`, `Rectification`, `Erasure`, `Objection`, `Other`), `Message nvarchar(2000)`, `Status` (`Open`, `InProgress`, `Completed`, `Rejected`, `Cancelled`), `CreatedAtUtc`, `DueAtUtc`, `HandledByUserId`, `HandledAtUtc`, `ResponseNote nvarchar(2000)`, `CancelledAtUtc`, `MutationSequence` (concurrency). İndeks `(TenantId, ClinicId, Status)`, `(TenantId, LinkId)`.
+
+Durum geçişleri: `Open → InProgress | Completed | Rejected | Cancelled (sahip)`; `InProgress → Completed | Rejected`. `Completed`/`Rejected`'de `responseNote` zorunlu (sahibe gider). Kapanmış talep değişmez.
+
+### 11.1 Portal uçları (`PortalOwner`, `portal` hız sınırı)
+
+| Uç | Açıklama |
+|---|---|
+| `GET /api/portal/v1/links/{linkId}/data-requests` | Bağın talepleri, en yeni önce (son 50): `[PortalDataRequestDto]` |
+| `POST /api/portal/v1/links/{linkId}/data-requests` | `{ "type": "Access", "message": "…" }` → 201 `PortalDataRequestDto`. `message` 1–2000. Aynı bağda en fazla **3 açık** (`Open`/`InProgress`) talep → 409 `Portal.DataRequests.TooManyOpen` |
+| `POST /api/portal/v1/links/{linkId}/data-requests/{id}/cancel` | Yalnız `Open`; 204. Aksi 409 `Portal.DataRequests.NotOpen`; başka bağın talebi 404 `Portal.DataRequests.NotFound` |
+
+```json
+// PortalDataRequestDto
+{ "id": "…", "type": "Access", "status": "Open", "message": "…", "createdAtUtc": "…", "dueAtUtc": "…",
+  "respondedAtUtc": null, "responseNote": null, "canCancel": true }
+```
+
+- Oluşturmada kliniğe erişen `OwnerPortal.Manage` izinli kullanıcılara bildirim merkezi kaydı gider: `UserNotificationType.PortalDataRequestCreated = 3`, `targetType = "PortalDataRequest"`.
+- `Completed`/`Rejected` olunca sahibe **işlemsel e-posta** (`OwnerNotificationType.DataRequestAnswered`, §13): klinik adı, talep türü, yanıt notu; hayvan/sağlık verisi yok. Hesabın e-postası yoksa (silinmiş) gönderilmez.
+- Denetim: `Portal.Read.DataRequests`, `Portal.DataRequests.Create`, `Portal.DataRequests.Cancel`; hedef `OwnerAccountId=…;LinkId=…`. Talep metni ve yanıt notu denetim yükünde maskelenir (`AuditBehavior` hassas alanlar: `RequestText`, `ResponseNote`).
+
+### 11.2 Klinik gelen kutusu (PORTAL-009) — `/api/v1/portal-inbox` (`OwnerPortal.Manage`)
+
+| Uç | Açıklama |
+|---|---|
+| `GET /api/v1/portal-inbox/data-requests?clinicId&status&page&pageSize` | `PagedResult<StaffDataRequestDto>`; açık olanlar önce (vade yakın önce), sonra en yeni. `pageSize` 1–100. Klinik kapsamı: aktif bağlam ya da `clinicId`; yoksa erişilen klinikler |
+| `GET /api/v1/portal-inbox/summary?clinicId` | `{ "openDataRequestCount": 2, "overdueDataRequestCount": 0 }` (menü rozeti; açık = `Open`+`InProgress`) |
+| `POST /api/v1/portal-inbox/data-requests/{id}/status` | `{ "status": "InProgress" \| "Completed" \| "Rejected", "responseNote": "…" }` → 200 `StaffDataRequestDto` |
+
+```json
+// StaffDataRequestDto
+{ "id": "…", "clinicId": "…", "clinicName": "Merkez", "clientId": "…", "clientName": "Ayşe Yılmaz", "type": "Erasure", "status": "Open",
+  "message": "…", "createdAtUtc": "…", "dueAtUtc": "…", "isOverdue": false,
+  "handledByUserId": null, "handledAtUtc": null, "responseNote": null }
+```
+
+| Kod | HTTP |
+|---|---|
+| `PortalInbox.DataRequestNotFound` | 404 |
+| `PortalInbox.InvalidStatusTransition`, `PortalInbox.ConcurrencyConflict` | 409 |
+| `PortalInbox.ResponseNoteRequired` | 400 |
+| `Clinics.AccessDenied` | 403 |
+
+Denetim: `PortalInbox.DataRequest.UpdateStatus`, hedef `DataRequestId=…;Status=…`. Online randevu talepleri kendi kuyruğundadır (`/appointment-requests`, ADR-042); gelen kutusu yalnız portal kaynaklı KVKK taleplerini taşır, randevu talebi kuyruğunu kopyalamaz. Panel menüsünde "Portal gelen kutusu" girişi, bildirim merkezi türü `PortalDataRequestCreated` buraya açılır.
+
+## 12) Klinik düzeyinde portalı aç/kapat (PORTAL-009; ADR-031 K8)
+
+`GET/PUT /api/v1/clinics/{clinicId}/portal-settings` — `Clinics.Read` / `Clinics.Update` (online randevu ayarıyla aynı yetki deseni).
+
+```json
+{ "clinicId": "…", "isEnabled": true, "updatedAtUtc": null, "activeLinkCount": 12, "pendingInviteCount": 1 }
+```
+
+- Kayıt yoksa **açık** sayılır (bugünkü davranış korunur). Tablo `ClinicPortalSettings`: `Id`, `TenantId`, `ClinicId` (benzersiz), `IsEnabled`, `CreatedAtUtc`, `UpdatedAtUtc`, `UpdatedByUserId`.
+- `PUT { "isEnabled": false }` etkileri (hesaplar ve bağlar silinmez, erişim durur; tekrar açınca her şey geri gelir):
+  - Yeni davet 409 `OwnerPortal.ClinicPortalDisabled`; `GET portal-access` aktif klinik bağlamı varsa ve o klinikte portal kapalıysa `canInvite=false`, `inviteBlockedCode="OwnerPortal.ClinicPortalDisabled"` (bağlamsız istekte klinik bilinmediği için yalnız davet ucu reddeder). Davet iptali ve bağ kapatma çalışır.
+  - Bekleyen davetin önizlemesi/kabulü 404 `Portal.Invites.NotFound` (sebep ayırt edilmez).
+  - `GET /me` → o bağ `links[]`'te kalır, `"isClinicPortalEnabled": false` taşır. Bağ kapsamlı tüm uçlar 404 `Portal.Links.NotFound` (tek yer `OwnerPortalAccess.ResolveLinkAsync`; sahiplik kuralıyla aynı yanıt). İstemci kapalı bağ için kliniğe başvurma mesajı gösterir.
+  - Hatırlatma e-postaları etkilenmez (portal değil, kliniğin kendi iletişimidir).
+- Denetim: `OwnerPortal.ClinicSettings.Update`, hedef `ClinicId=…;IsEnabled=…`.
+
+## 13) Bildirim türü × kanal kuralı (PORTAL-010; ADR-031 K7)
+
+Tek yer: `Domain/Notifications/OwnerNotificationChannelPolicy`. Her tür bir **kategoriye** girer; kategori kanal kuralını belirler. Metin minimum veri taşır (hayvan adı ve tarih; teşhis/tedavi yok).
+
+| Kategori | Türler (`OwnerNotificationType`) | E-posta | Push | WhatsApp bağlantısı |
+|---|---|---|---|---|
+| `Transactional` | `PortalInvite`, `SignInCode`, `PasswordResetCode`, `AccountDeletionCode`, `AccountDeleted`, `AppointmentRequestReceived`, `AppointmentRequestApproved`, `AppointmentRequestRescheduled`, `AppointmentRequestRejected`, `DataRequestAnswered` | `Always` (tercihle kapanmaz) | Kodlar ve davet: `Disabled` (gizli bilgi push'a yazılmaz); diğerleri `Preference` | Davet: `StaffManual`; diğerleri `Disabled` |
+| `Reminder` | `AppointmentReminder`, `VaccinationReminder` | `Preference` (`Client.AcceptsReminders`) | `Preference` | `StaffManual` |
+| `Marketing` | `Marketing` | `Preference` + `MarketingSendingEnabled` (şimdilik `false` → `Disabled`) | `Disabled` | `Disabled` |
+
+Kanallar (`OwnerNotificationChannel`): `Email` (mevcut outbox/MailKit hattı), `Push` (`IPushNotificationSender` soyutlaması; bu sürümde `NotConfiguredPushNotificationSender`, `IsConfigured=false`, gönderim yok; FCM/APNs anahtarı dış bağımlılık), `WhatsAppLink` (yalnız personelin açtığı `wa.me` bağlantısı; sistem göndermez, teslim durumu yoktur — AK-6). `Preference` modlu push, sağlayıcı yokken `NotConfigured` raporlanır.
+
+- `IOwnerNotificationDispatcher.DispatchAsync(OwnerNotificationMessage)` (tür, hesap, e-posta, push tercihi, kategori tercihi, metinler): politikayı sorar, e-postayı outbox'a yazar (çağıranın işlemiyle aynı commit), push'u soyutlamaya verir. Bu dalgada yeni gönderim (`DataRequestAnswered`) dispatcher'dan geçer. Mevcut gönderimler (davet, kod, hesap silme, randevu talebi e-postaları, hatırlatma işleyicisi) politika satırlarıyla **uyumludur**; dispatcher'a taşınmaları sonraki dalgaya bırakıldı (teknik borç).
+- `GET /api/v1/portal-notification-rules` (`Clinics.Read`) → matris, panelde salt okunur: `[ { "type": "AppointmentReminder", "category": "Reminder", "channels": [ { "channel": "Email", "mode": "Preference" }, { "channel": "Push", "mode": "NotConfigured" }, { "channel": "WhatsAppLink", "mode": "StaffManual" } ] } ]`. `mode`: `Always` · `Preference` · `StaffManual` · `NotConfigured` · `Disabled`.
+
+### 13.2 WhatsApp bağlantısı — `GET /api/v1/clients/{clientId}/whatsapp-link?kind=&targetId=`
+
+`Clients.Read`. Personelin müşterinin WhatsApp sohbetini hazır metinle açması için `wa.me` bağlantısı üretir; **gönderim personelin kendi WhatsApp'ından** yapılır, sistem göndermez, teslim durumu tutmaz (ADR-031 K7, AK-6).
+
+| `kind` | `targetId` | Metin (klinik adı + asgari veri) |
+|---|---|---|
+| `PortalInvite` | — | "{klinik} sizi hasta sahibi portalına davet etti. Davet bağlantısı e-posta adresinize gönderildi." (ham davet bağlantısı yazılmaz; personel görmez) |
+| `AppointmentReminder` | randevu kimliği (müşterinin hayvanına ait, planlı) | "{hayvan} için {gün.ay.yıl saat} randevunuzu hatırlatırız. {klinik}" |
+| `VaccinationReminder` | planlı aşı kimliği (müşterinin hayvanı) | "{hayvan} için {aşı adı} aşısının zamanı yaklaşıyor ({gün.ay.yıl}). {klinik}" |
+
+```json
+{ "phoneE164": "+905321234567", "url": "https://wa.me/905321234567?text=…", "text": "…" }
+```
+
+- Telefon kuralı tek yerde (`WhatsAppPhone.ToDigits`): Türkiye cep telefonu `05xx…`/`5xx…`/`+905xx…`/`905xx…` → `905xx…`; başka biçim ya da boş 409 `Clients.WhatsAppPhoneInvalid`.
+- Hatırlatma türleri `Client.AcceptsReminders` değilse 409 `Clients.RemindersOptedOut`. Davet türü `OwnerPortalInvitePolicy.CanInvite` kuralına tabidir (ilgili 409 kodu). Hedef kayıt yoksa ya da müşterinin değilse 404 `Clients.WhatsAppTargetNotFound`. Klinik adı aktif klinik bağlamından, yoksa randevu/aşı kliniğinden; davet türünde bağlam zorunlu (400 `OwnerPortal.ClinicRequired`).
+- Denetim: `Clients.WhatsAppLink` (yük: `kind`, `targetId`; metin ve telefon yazılmaz).
+
+### 13.3 Uç tablosu eki
+
+| Yöntem | Yol | Kimlik |
+|---|---|---|
+| GET/PUT | `/api/portal/v1/me/notification-preferences` | Portal |
+| GET/PUT | `/api/portal/v1/links/{linkId}/notification-preferences` | Portal |
+| GET/POST | `/api/portal/v1/links/{linkId}/data-requests`; POST `…/{id}/cancel` | Portal |
+| GET | `/api/v1/portal-inbox/data-requests`, `/api/v1/portal-inbox/summary`; POST `…/data-requests/{id}/status` | Personel + `OwnerPortal.Manage` |
+| GET/PUT | `/api/v1/clinics/{clinicId}/portal-settings` | Personel + `Clinics.Read`/`Clinics.Update` |
+| GET | `/api/v1/portal-notification-rules` | Personel + `Clinics.Read` |
+| GET | `/api/v1/clients/{clientId}/whatsapp-link` | Personel + `Clients.Read` |
+
+### 13.4 Düzeltme: portal randevu talebi `status`
+
+`ONLINE_APPOINTMENT_API_CONTRACT.md` §6 portal talep listesinde ve oluşturma yanıtında `status` sayı dönüyordu; portal sözleşmesi (§1) enumları **metin** ister. `status` artık `Pending` / `Approved` / `Rejected` / `Cancelled` / `Expired` metnidir (kimliksiz bağlantı ucunun 201 yanıtı da). Personel kuyruğu (§4) değişmez.

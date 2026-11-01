@@ -33,7 +33,8 @@ public sealed record PortalLinkSummaryDto(
     Guid LinkId,
     Guid ClinicId,
     string ClinicName,
-    string ClientFullName);
+    string ClientFullName,
+    bool IsClinicPortalEnabled = true);
 
 public sealed record PortalMeDto(
     Guid Id,

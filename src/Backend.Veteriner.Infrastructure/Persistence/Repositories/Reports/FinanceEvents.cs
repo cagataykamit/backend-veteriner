@@ -28,7 +28,7 @@ internal sealed class FinanceEvent
 
     public Guid? PerformedByUserId { get; init; }
 
-    /// <summary>Ödeme kollarında tahsilatı alan (ilk tahsisi yapan); eski ödemede null.</summary>
+    /// <summary>Ödeme kollarında tahsilatı alan (ilk tahsisi yapan; tahsissiz avansta krediyi oluşturan, FIN-005); eski ödemede null.</summary>
     public Guid? CollectedByUserId { get; init; }
 
     public DateTime? PaidAtUtc { get; init; }
@@ -64,6 +64,7 @@ internal static class FinanceEvents
         Add(DailyTransactionKind.Payment, () => PaymentReceived(db, f));
         Add(DailyTransactionKind.PaymentVoid, () => PaymentVoided(db, f));
         Add(DailyTransactionKind.PaymentCorrection, () => PaymentCorrected(db, f));
+        Add(DailyTransactionKind.CreditRefund, () => CreditRefunded(db, f));
 
         var events = branches.Count == 0
             ? ChargeCreated(db, f).Where(_ => false)
@@ -212,9 +213,10 @@ internal static class FinanceEvents
         var fromUtc = f.FromUtc;
         var toUtc = f.ToUtcExclusive;
         var allocations = db.PaymentAllocations.IgnoreQueryFilters(QueryFilterNames.Ignorable);
+        var credits = db.ClientCredits.AsNoTracking();
         return Payments(db, f)
             .Where(p => p.PaidAtUtc >= fromUtc && p.PaidAtUtc < toUtc)
-            .Select(p => new { Payment = p, Collector = allocations.Where(a => a.PaymentId == p.Id).OrderBy(a => a.CreatedAtUtc).Select(a => (Guid?)a.CreatedByUserId).FirstOrDefault() })
+            .Select(p => new { Payment = p, Collector = allocations.Where(a => a.PaymentId == p.Id).OrderBy(a => a.CreatedAtUtc).Select(a => (Guid?)a.CreatedByUserId).FirstOrDefault() ?? credits.Where(c => c.SourcePaymentId == p.Id).Select(c => (Guid?)c.CreatedByUserId).FirstOrDefault() })
             .Select(x => new FinanceEvent
             {
                 Kind = DailyTransactionKind.Payment,
@@ -241,9 +243,10 @@ internal static class FinanceEvents
         var fromUtc = f.FromUtc;
         var toUtc = f.ToUtcExclusive;
         var allocations = db.PaymentAllocations.IgnoreQueryFilters(QueryFilterNames.Ignorable);
+        var credits = db.ClientCredits.AsNoTracking();
         return Payments(db, f)
             .Where(p => p.VoidedAtUtc != null && p.VoidedAtUtc >= fromUtc && p.VoidedAtUtc < toUtc)
-            .Select(p => new { Payment = p, Collector = allocations.Where(a => a.PaymentId == p.Id).OrderBy(a => a.CreatedAtUtc).Select(a => (Guid?)a.CreatedByUserId).FirstOrDefault() })
+            .Select(p => new { Payment = p, Collector = allocations.Where(a => a.PaymentId == p.Id).OrderBy(a => a.CreatedAtUtc).Select(a => (Guid?)a.CreatedByUserId).FirstOrDefault() ?? credits.Where(c => c.SourcePaymentId == p.Id).Select(c => (Guid?)c.CreatedByUserId).FirstOrDefault() })
             .Select(x => new FinanceEvent
             {
                 Kind = DailyTransactionKind.PaymentVoid,
@@ -261,6 +264,34 @@ internal static class FinanceEvents
                 CollectedByUserId = x.Collector,
                 PaidAtUtc = x.Payment.PaidAtUtc,
                 Reason = x.Payment.VoidReason,
+                Payload = null,
+            });
+    }
+
+    /// <summary>Müşteri kredisi iadesi (FIN-005 K6): kasadan çıkış olayı; tutar iade edilen kalan, yöntem iade yöntemi.</summary>
+    private static IQueryable<FinanceEvent> CreditRefunded(AppDbContext db, FinanceEventFilter f)
+    {
+        var fromUtc = f.FromUtc;
+        var toUtc = f.ToUtcExclusive;
+        return InScope(db.ClientCredits.AsNoTracking(), f)
+            .Where(c => c.RefundedAtUtc != null && c.RefundedAtUtc >= fromUtc && c.RefundedAtUtc < toUtc)
+            .Select(c => new FinanceEvent
+            {
+                Kind = DailyTransactionKind.CreditRefund,
+                AtUtc = c.RefundedAtUtc!.Value,
+                ReferenceId = c.Id,
+                ClinicId = c.ClinicId,
+                ClientId = c.ClientId,
+                PetId = null,
+                Amount = c.RefundedAmount,
+                Method = c.RefundMethod,
+                Description = null,
+                IsDirectSale = false,
+                IsVoided = false,
+                PerformedByUserId = c.RefundedByUserId,
+                CollectedByUserId = null,
+                PaidAtUtc = null,
+                Reason = c.RefundReason,
                 Payload = null,
             });
     }

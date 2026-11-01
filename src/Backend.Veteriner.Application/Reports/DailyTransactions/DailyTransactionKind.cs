@@ -8,5 +8,8 @@ public enum DailyTransactionKind
     ChargeCorrection = 2,
     Payment = 3,
     PaymentVoid = 4,
-    PaymentCorrection = 5
+    PaymentCorrection = 5,
+
+    /// <summary>Müşteri kredisinin iadesi (FIN-005 K6): kasadan çıkış; referans kredi kimliği.</summary>
+    CreditRefund = 6
 }

@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.ClientCredits;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Specs;
@@ -29,6 +31,7 @@ public sealed class GetClientBalanceQueryHandler
     private const int UnallocatedItemsTake = 50;
 
     private readonly IReadRepository<Visit> _visits;
+    private readonly IReadRepository<ClientCredit> _credits;
 
     public GetClientBalanceQueryHandler(
         ITenantContext tenantContext,
@@ -38,8 +41,10 @@ public sealed class GetClientBalanceQueryHandler
         IReadRepository<Charge> charges,
         IReadRepository<Payment> payments,
         IReadRepository<Pet> pets,
-        IReadRepository<Visit> visits)
+        IReadRepository<Visit> visits,
+        IReadRepository<ClientCredit> credits)
     {
+        _credits = credits;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
@@ -75,6 +80,9 @@ public sealed class GetClientBalanceQueryHandler
         var unallocated = await _payments.ListAsync(
             new UnallocatedPaymentsForClientSpec(tenantId, request.Id, singleClinicId, accessibleClinicIds), ct);
 
+        var credits = await _credits.ListAsync(
+            new ClientCreditsForClientSpec(tenantId, request.Id, singleClinicId, accessibleClinicIds, openOnly: true), ct);
+
         var open = charges.Where(c => c.OutstandingAmount > 0).ToList();
 
         var petIds = open.Where(c => c.PetId.HasValue).Select(c => c.PetId!.Value).Distinct().ToArray();
@@ -87,7 +95,11 @@ public sealed class GetClientBalanceQueryHandler
             ? new Dictionary<Guid, DateTime>()
             : (await _visits.ListAsync(new VisitsByIdsSpec(tenantId, visitIds), ct)).ToDictionary(v => v.Id, v => v.ArrivedAtUtc);
 
-        return Result<ClientBalanceDto>.Success(Build(client, singleClinicId, charges, open, unallocated, petNames, visitArrivals));
+        return Result<ClientBalanceDto>.Success(Build(client, singleClinicId, charges, open, unallocated, petNames, visitArrivals) with
+        {
+            CreditBalance = credits.Sum(c => c.RemainingAmount),
+            OpenCreditCount = credits.Count,
+        });
     }
 
     private static ClientBalanceDto Build(

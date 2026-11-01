@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.ClientCredits;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clients.Queries.GetBalance;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -27,12 +29,15 @@ public sealed class GetPortalBalanceQueryHandler : IRequestHandler<GetPortalBala
     private readonly OwnerPortalAccess _access;
     private readonly IReadRepository<Charge> _charges;
     private readonly IReadRepository<Payment> _payments;
+    private readonly IReadRepository<ClientCredit> _credits;
 
     public GetPortalBalanceQueryHandler(
         OwnerPortalAccess access,
         IReadRepository<Charge> charges,
-        IReadRepository<Payment> payments)
+        IReadRepository<Payment> payments,
+        IReadRepository<ClientCredit> credits)
     {
+        _credits = credits;
         _access = access;
         _charges = charges;
         _payments = payments;
@@ -52,6 +57,9 @@ public sealed class GetPortalBalanceQueryHandler : IRequestHandler<GetPortalBala
         var lastPayment = await _payments.FirstOrDefaultAsync(
             new PortalPaymentsSpec(scope.TenantId, scope.ClinicId, scope.ClientId, page: 1, pageSize: 1), ct);
 
+        var credits = await _credits.ListAsync(
+            new ClientCreditsForClientSpec(scope.TenantId, scope.ClientId, scope.ClinicId, accessibleClinicIds: null, openOnly: true), ct);
+
         var totals = ClientBalanceTotals.From(charges, unallocated);
         return Result<PortalBalanceDto>.Success(new PortalBalanceDto(
             scope.ClinicId,
@@ -60,6 +68,7 @@ public sealed class GetPortalBalanceQueryHandler : IRequestHandler<GetPortalBala
             totals.AllocatedAmount,
             totals.OutstandingAmount,
             totals.UnallocatedPaymentsAmount,
-            lastPayment?.PaidAtUtc));
+            lastPayment?.PaidAtUtc,
+            credits.Sum(c => c.RemainingAmount)));
     }
 }

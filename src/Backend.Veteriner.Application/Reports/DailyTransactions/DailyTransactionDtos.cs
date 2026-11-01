@@ -35,7 +35,9 @@ public sealed record DailyTransactionTotalsDto(
     decimal VoidedCollectionAmount,
     int VoidedCollectionCount,
     decimal NetCollectedAmount,
-    int CorrectionCount);
+    int CorrectionCount,
+    decimal RefundedCreditAmount = 0m,
+    int RefundedCreditCount = 0);
 
 public sealed record DailyTransactionsReportResultDto(
     string Currency,
@@ -45,14 +47,20 @@ public sealed record DailyTransactionsReportResultDto(
     int TotalCount,
     IReadOnlyList<DailyTransactionItemDto> Items);
 
-/// <summary>Kasa özeti tutar kümesi: tahsil, iptal, net (net = tahsil − iptal).</summary>
+/// <summary>Kasa özeti tutar kümesi: tahsil, iptal, kredi iadesi, net (net = tahsil − iptal − kredi iadesi; FIN-005 K6).</summary>
 public record CashSummaryAmountsDto(
     decimal CollectedAmount,
     int CollectedCount,
     decimal VoidedAmount,
     int VoidedCount,
     decimal NetAmount,
-    decimal SalesCollectedAmount);
+    decimal SalesCollectedAmount)
+{
+    /// <summary>Müşteriye iade edilen kredi (kasadan çıkış).</summary>
+    public decimal RefundedCreditAmount { get; init; }
+
+    public int RefundedCreditCount { get; init; }
+}
 
 public sealed record CashSummaryMethodDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] PaymentMethod PaymentMethod,

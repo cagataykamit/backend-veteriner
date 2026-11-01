@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.ClientCredits;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clients.Queries.GetBalance;
 using Backend.Veteriner.Application.Clients.Specs;
@@ -29,6 +31,7 @@ public sealed class GetClientBalanceQueryHandlerTests
     private readonly Mock<IReadRepository<Payment>> _payments = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Visit>> _visits = new();
+    private readonly Mock<IReadRepository<ClientCredit>> _credits = new();
     private readonly Client _client;
 
     public GetClientBalanceQueryHandlerTests()
@@ -42,11 +45,12 @@ public sealed class GetClientBalanceQueryHandlerTests
         SetupPayments();
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         _visits.Setup(r => r.ListAsync(It.IsAny<VisitsByIdsSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _credits.Setup(r => r.ListAsync(It.IsAny<ClientCreditsForClientSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
     }
 
     private GetClientBalanceQueryHandler CreateHandler()
         => new(_tenant.Object, _clinic.Object, _scopeResolver.Object, _clients.Object, _charges.Object,
-            _payments.Object, _pets.Object, _visits.Object);
+            _payments.Object, _pets.Object, _visits.Object, _credits.Object);
 
     private void SetupCharges(params Charge[] charges)
         => _charges.Setup(r => r.ListAsync(It.IsAny<ChargesForClientBalanceSpec>(), It.IsAny<CancellationToken>()))

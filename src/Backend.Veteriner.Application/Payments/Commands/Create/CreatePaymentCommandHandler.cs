@@ -13,6 +13,7 @@ using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
@@ -43,6 +44,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
     private readonly IRepository<PaymentAllocation> _allocationsWrite;
     private readonly TimeProvider _timeProvider;
     private readonly IPaymentIntegrationEventOutbox _eventOutbox;
+    private readonly IRepository<ClientCredit> _creditsWrite;
 
     public CreatePaymentCommandHandler(
         ITenantContext tenantContext,
@@ -60,8 +62,10 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         IRepository<Charge> chargesWrite,
         IRepository<PaymentAllocation> allocationsWrite,
         TimeProvider timeProvider,
-        IPaymentIntegrationEventOutbox eventOutbox)
+        IPaymentIntegrationEventOutbox eventOutbox,
+        IRepository<ClientCredit> creditsWrite)
     {
+        _creditsWrite = creditsWrite;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clientContext = clientContext;
@@ -233,7 +237,8 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         if (request.RequestId == Guid.Empty)
             return Fail("Payments.RequestIdRequired", "requestId zorunludur (çift istek koruması).");
 
-        if (request.Allocations is not { Count: > 0 } allocationLines)
+        var allocationLines = request.Allocations ?? [];
+        if (allocationLines.Count == 0 && request.CreditAmount <= 0)
             return Fail("Payments.AllocationsRequired", "Ödeme en az bir ücrete tahsis edilmelidir.");
 
         if (!Payment.IsSupportedCurrency(request.Currency))
@@ -244,7 +249,9 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
 
         // İzlenen ücretler: tahsis sayacı concurrency token ile güncellenir (iki kullanıcı çakışması 409).
         var chargeIds = allocationLines.Select(l => l.ChargeId).Distinct().ToArray();
-        var charges = await _chargesWrite.ListAsync(new ChargesByIdsForUpdateSpec(tenantId, chargeIds), ct);
+        var charges = chargeIds.Length == 0
+            ? []
+            : await _chargesWrite.ListAsync(new ChargesByIdsForUpdateSpec(tenantId, chargeIds), ct);
         if (charges.Count != chargeIds.Length)
             return Fail("Charges.NotFound", "Ücret kaydı bulunamadı veya kiracıya ait değil.");
 
@@ -291,10 +298,10 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
             return Replay(winner, fingerprint);
         }
 
-        // 2) Tahsis kuralları domain'de; hata dönerse işlem geri alınır (ITransactionalRollbackOnFailureRequest) ve ödeme kalmaz.
-        var allocated = payment.AllocateFully(lines, userId, utcNow);
-        if (!allocated.IsSuccess)
-            return Result<PaymentCreateResultDto>.Failure(allocated.Error);
+        // 2) Tahsis ve kredi kuralları domain'de; hata dönerse işlem geri alınır (ITransactionalRollbackOnFailureRequest) ve ödeme kalmaz.
+        var settled = payment.Settle(lines, request.CreditAmount, userId, utcNow);
+        if (!settled.IsSuccess)
+            return Result<PaymentCreateResultDto>.Failure(settled.Error);
 
         try
         {
@@ -308,7 +315,9 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
                 ct);
 
             // Tahsis satırları + ödeme/ücret sayaçları + outbox tek SaveChanges'te; sayaç token'ları iki kullanıcı çakışmasını yakalar.
-            await _allocationsWrite.AddRangeAsync(allocated.Value!, ct);
+            await _allocationsWrite.AddRangeAsync(settled.Value!.Allocations, ct);
+            if (settled.Value.Credit is { } credit)
+                await _creditsWrite.AddAsync(credit, ct);
             await _allocationsWrite.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)

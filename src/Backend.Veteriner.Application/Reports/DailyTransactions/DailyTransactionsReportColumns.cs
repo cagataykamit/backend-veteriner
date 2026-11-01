@@ -33,6 +33,7 @@ internal static class DailyTransactionsReportColumns
             DailyTransactionKind.Payment => "Tahsilat",
             DailyTransactionKind.PaymentVoid => "Tahsilat iptali",
             DailyTransactionKind.PaymentCorrection => "Tahsilat düzeltmesi",
+            DailyTransactionKind.CreditRefund => "Kredi iadesi",
             _ => kind.ToString(),
         };
 }

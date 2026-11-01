@@ -24,7 +24,10 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
     private static readonly HashSet<string> SensitivePayloadKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         "Password", "CurrentPassword", "NewPassword", "ConfirmPassword", "Token", "RefreshToken", "AccessToken",
-        "Secret", "ApiKey", "ClientSecret", "Hash", "PasswordHash", "OneTimeCode"
+        "Secret", "ApiKey", "ClientSecret", "Hash", "PasswordHash", "OneTimeCode",
+
+        // KVKK veri talebi metni ve kliniğin yanıtı kişisel/sağlık bilgisi taşıyabilir (PORTAL-007); denetimde yalnız tür ve durum kalır.
+        "RequestText", "ResponseNote"
     };
 
     /// <summary>

@@ -13,6 +13,9 @@ public enum UserNotificationType
 
     /// <summary>Kişiye atanan iş: randevu bir hekime atandı.</summary>
     AppointmentAssigned = 2,
+
+    /// <summary>Hasta sahibi portaldan KVKK veri talebi gönderdi (PORTAL-007/009; portal yönetim yetkisi olanlara).</summary>
+    PortalDataRequestCreated = 3,
 }
 
 /// <summary>

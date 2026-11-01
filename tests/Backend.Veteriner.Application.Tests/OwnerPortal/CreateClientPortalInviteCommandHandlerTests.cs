@@ -69,7 +69,8 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
         _f.Email.Object,
         Options.Create(new OwnerPortalOptions { PortalBaseUrl = "https://portal.example.com/" }),
         Options.Create(new AppOptions()),
-        _f.Clock);
+        _f.Clock,
+        new ClinicPortalGate(new Mock<IReadRepository<ClinicPortalSettings>>().Object));
 
     private void VerifyNoEmail() =>
         _f.Email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
@@ -111,14 +112,15 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
     }
 
     [Fact]
-    public async Task Should_Not_Invite_Client_Who_Opted_Out_Of_Reminders()
+    public async Task Should_Invite_Client_Who_Opted_Out_Of_Reminders()
     {
+        // ADR-031 K4 eki (2026-11-01): davet işlemsel e-postadır; hatırlatma istememek daveti engellemez.
         _client.ApplyContactPreferences(null, remindersOptedOut: true);
 
         var result = await Handler().Handle(new CreateClientPortalInviteCommand(_client.Id, null), CancellationToken.None);
 
-        result.Error.Code.Should().Be("OwnerPortal.ClientOptedOut");
-        VerifyNoEmail();
+        result.IsSuccess.Should().BeTrue();
+        _added.Should().ContainSingle();
     }
 
     [Fact]

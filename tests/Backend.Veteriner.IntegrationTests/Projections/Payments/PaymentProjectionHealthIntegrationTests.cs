@@ -281,6 +281,8 @@ public sealed class PaymentProjectionHealthIntegrationTests
         var queryDb = scope.ServiceProvider.GetRequiredService<QueryDbContext>();
         await PaymentProjectionTestSupport.ClearOutboxAsync(commandDb);
         await PaymentProjectionTestSupport.ResetQuerySideAsync(queryDb);
+        await commandDb.ClientCreditApplications.ExecuteDeleteAsync();
+        await commandDb.ClientCredits.ExecuteDeleteAsync();
         await commandDb.PaymentAllocations.ExecuteDeleteAsync();
         await commandDb.Payments.ExecuteDeleteAsync();
     }

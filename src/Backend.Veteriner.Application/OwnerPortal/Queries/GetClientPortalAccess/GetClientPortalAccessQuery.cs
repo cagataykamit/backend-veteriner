@@ -24,6 +24,8 @@ public sealed class GetClientPortalAccessQueryHandler : IRequestHandler<GetClien
     private readonly IReadRepository<OwnerAccount> _accounts;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly TimeProvider _timeProvider;
+    private readonly IClinicContext _clinicContext;
+    private readonly ClinicPortalGate _clinicPortal;
 
     public GetClientPortalAccessQueryHandler(
         OwnerPortalStaffAccess staffAccess,
@@ -31,8 +33,12 @@ public sealed class GetClientPortalAccessQueryHandler : IRequestHandler<GetClien
         IReadRepository<OwnerPortalInvite> invites,
         IReadRepository<OwnerAccount> accounts,
         IReadRepository<Clinic> clinics,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IClinicContext clinicContext,
+        ClinicPortalGate clinicPortal)
     {
+        _clinicContext = clinicContext;
+        _clinicPortal = clinicPortal;
         _staffAccess = staffAccess;
         _links = links;
         _invites = invites;
@@ -65,7 +71,10 @@ public sealed class GetClientPortalAccessQueryHandler : IRequestHandler<GetClien
         var eligibility = OwnerPortalInvitePolicy.CanInvite(scope.Client);
         var blockedCode = !eligibility.IsSuccess
             ? eligibility.Error.Code
-            : links.Any(l => l.IsActive) ? "OwnerPortal.AlreadyLinked" : null;
+            : links.Any(l => l.IsActive) ? "OwnerPortal.AlreadyLinked"
+            : _clinicContext.ClinicId is { } activeClinicId && !await _clinicPortal.IsEnabledAsync(scope.TenantId, activeClinicId, ct)
+                ? ClinicPortalGate.DisabledCode
+                : null;
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         return Result<ClientPortalAccessDto>.Success(new ClientPortalAccessDto(

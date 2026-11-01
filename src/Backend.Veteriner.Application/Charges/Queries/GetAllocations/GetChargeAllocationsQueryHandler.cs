@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.ClientCredits;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -19,6 +21,8 @@ public sealed class GetChargeAllocationsQueryHandler
     private readonly IReadRepository<Charge> _charges;
     private readonly IReadRepository<PaymentAllocation> _allocations;
     private readonly IReadRepository<Payment> _payments;
+    private readonly IReadRepository<ClientCredit> _credits;
+    private readonly IReadRepository<ClientCreditApplication> _creditApplications;
 
     public GetChargeAllocationsQueryHandler(
         ITenantContext tenantContext,
@@ -26,8 +30,12 @@ public sealed class GetChargeAllocationsQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<Charge> charges,
         IReadRepository<PaymentAllocation> allocations,
-        IReadRepository<Payment> payments)
+        IReadRepository<Payment> payments,
+        IReadRepository<ClientCredit> credits,
+        IReadRepository<ClientCreditApplication> creditApplications)
     {
+        _credits = credits;
+        _creditApplications = creditApplications;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
@@ -62,12 +70,34 @@ public sealed class GetChargeAllocationsQueryHandler
             : (await _payments.ListAsync(new PaymentsByIdsSpec(tenantId, paymentIds), ct))
                 .ToDictionary(p => p.Id);
 
-        IReadOnlyList<ChargeAllocationItemDto> items = rows
+        var items = rows
             .Where(r => payments.ContainsKey(r.PaymentId))
             .Select(r => new ChargeAllocationItemDto(
                 r.Id, r.PaymentId, payments[r.PaymentId].PaidAtUtc, payments[r.PaymentId].Method,
                 r.Amount, r.CreatedAtUtc, r.CreatedByUserId))
             .ToList();
-        return Result<IReadOnlyList<ChargeAllocationItemDto>>.Success(items);
+
+        // Krediden mahsuplar (FIN-005): ödeme alanları kredinin kaynak ödemesidir.
+        var applications = await _creditApplications.ListAsync(new ActiveClientCreditApplicationsByChargeSpec(tenantId, charge.Id), ct);
+        if (applications.Count > 0)
+        {
+            var credits = (await _credits.ListAsync(
+                    new ClientCreditsByIdsSpec(tenantId, applications.Select(a => a.CreditId).Distinct().ToArray()), ct))
+                .ToDictionary(c => c.Id);
+            var sourceIds = credits.Values.Select(c => c.SourcePaymentId).Distinct().ToArray();
+            var sources = (await _payments.ListAsync(new PaymentsByIdsSpec(tenantId, sourceIds), ct)).ToDictionary(p => p.Id);
+            items.AddRange(applications
+                .Where(a => credits.TryGetValue(a.CreditId, out var c) && sources.ContainsKey(c.SourcePaymentId))
+                .Select(a =>
+                {
+                    var source = sources[credits[a.CreditId].SourcePaymentId];
+                    return new ChargeAllocationItemDto(
+                        a.Id, source.Id, source.PaidAtUtc, source.Method, a.Amount, a.CreatedAtUtc, a.CreatedByUserId,
+                        ChargeAllocationKinds.Credit, a.CreditId);
+                }));
+        }
+
+        return Result<IReadOnlyList<ChargeAllocationItemDto>>.Success(
+            items.OrderBy(i => i.CreatedAtUtc).ThenBy(i => i.Id).ToList());
     }
 }

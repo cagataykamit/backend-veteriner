@@ -40,6 +40,9 @@ public sealed class OwnerAccount
 
     public DateTime? DeletedAtUtc { get; private set; }
 
+    /// <summary>Push bildirimi tercihi; hesap silinince kapanır (ADR-041).</summary>
+    public bool PushEnabled { get; private set; }
+
     private OwnerAccount() { }
 
     public static OwnerAccount Create(string email, string displayName, DateTime utcNow)
@@ -96,6 +99,19 @@ public sealed class OwnerAccount
     public void Disable() => Status = OwnerAccountStatus.Disabled;
 
     /// <summary>
+    /// Push bildirimi tercihi (PORTAL-007/010): hesap düzeyinde, varsayılan kapalı. Gönderim sağlayıcı yapılandırılınca başlar
+    /// (FCM/APNs dış bağımlılık); tercih şimdiden saklanır. Değer değişmediyse <c>false</c>.
+    /// </summary>
+    public bool SetPushEnabled(bool enabled)
+    {
+        if (PushEnabled == enabled)
+            return false;
+
+        PushEnabled = enabled;
+        return true;
+    }
+
+    /// <summary>
     /// Hasta sahibinin kendi isteğiyle silme (ADR-041 seçenek C): kişisel alanlar geri döndürülemez biçimde boşaltılır, satır
     /// kimliksiz iz olarak kalır (<see cref="Id"/>, <see cref="CreatedAtUtc"/>). Silinen hesap pasiftir; oturum, kod ve bağ
     /// kapatma çağıranın işidir.
@@ -111,6 +127,7 @@ public sealed class OwnerAccount
         LastLoginAtUtc = null;
         FailedSignInCount = 0;
         LockedUntilUtc = null;
+        PushEnabled = false;
         Status = OwnerAccountStatus.Deleted;
         DeletedAtUtc = ToUtc(utcNow);
         return Result.Success();

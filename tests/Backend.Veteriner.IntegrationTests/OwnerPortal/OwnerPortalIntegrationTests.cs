@@ -264,7 +264,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
     }
 
     [Fact]
-    public async Task Invite_Should_Not_Be_Sent_To_Kvkk_Declined_Or_Reminder_Opted_Out_Client()
+    public async Task Invite_Should_Not_Be_Sent_To_Kvkk_Declined_Or_Emailless_Client_But_Reminder_Opt_Out_Is_Invitable()
     {
         var staff = await SeedStaffAsync();
         var declined = await SeedClientAsync(staff.TenantId, configure: c =>
@@ -276,7 +276,6 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         foreach (var (client, code) in new[]
                  {
                      (declined, "OwnerPortal.ClientOptedOut"),
-                     (optedOut, "OwnerPortal.ClientOptedOut"),
                      (noEmail, "OwnerPortal.ClientEmailMissing"),
                  })
         {
@@ -290,9 +289,15 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         }
 
         _secrets.TokenCount.Should().Be(tokensBefore, "davet token'ı üretilmez");
+
+        // ADR-031 K4 eki (2026-11-01): hatırlatma istemeyen müşteri davet edilebilir (davet işlemsel e-postadır).
+        var optedOutAccess = await (await SendAsync(HttpMethod.Get, $"/api/v1/clients/{optedOut.Id}/portal-access", staff.Token)).Content.ReadFromJsonAsync<JsonElement>();
+        optedOutAccess.GetProperty("canInvite").GetBoolean().Should().BeTrue();
+        (await SendAsync(HttpMethod.Post, $"/api/v1/clients/{optedOut.Id}/portal-invites", staff.Token)).StatusCode.Should().Be(HttpStatusCode.OK);
+
         await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        (await db.OwnerPortalInvites.AnyAsync(i => i.ClientId == declined.Id || i.ClientId == optedOut.Id || i.ClientId == noEmail.Id))
+        (await db.OwnerPortalInvites.AnyAsync(i => i.ClientId == declined.Id || i.ClientId == noEmail.Id))
             .Should().BeFalse();
     }
 

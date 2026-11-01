@@ -7,7 +7,7 @@ namespace Backend.Veteriner.Application.OwnerPortal.Commands.CreateClientPortalI
 
 /// <summary>
 /// Klinik paneli: müşteriyi hasta sahibi portalına davet eder (ADR-031 K3). Davet müşteri kaydındaki e-postaya gider; KVKK Ret
-/// veya hatırlatma istemiyor müşteriye gitmez (<c>OwnerPortalInvitePolicy</c>). Klinik context-first; <see cref="ClinicId"/>
+/// müşteriye gitmez; hatırlatma istememek engel değildir (<c>OwnerPortalInvitePolicy</c>, ADR-031 K4 eki). Klinik context-first; <see cref="ClinicId"/>
 /// yalnız bağlam yoksa veya uyuşmazlık denetimi için. Aynı müşterinin bekleyen daveti iptal edilir.
 /// </summary>
 public sealed record CreateClientPortalInviteCommand(Guid ClientId, Guid? ClinicId)

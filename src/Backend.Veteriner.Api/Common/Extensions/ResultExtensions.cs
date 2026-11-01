@@ -175,6 +175,20 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Müşteri kredisi (FIN-005): kalan yetmiyor, kredi kapalı, iade edilecek tutar yok, kredisi kullanılmış ödeme iptal edilemez.
+        if (normalized is "clientcredits.insufficientbalance" or "clientcredits.creditclosed" or "clientcredits.nothingtorefund"
+            or "payments.voidblockedbycredit")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
+        // Portal veri talebi, gelen kutusu, klinik portal ayarı ve WhatsApp bağlantısı (PORTAL-007/009/010): durum çakışması.
+        if (normalized is "portal.datarequests.toomanyopen" or "portalinbox.invalidstatustransition"
+            or "ownerportal.clinicportaldisabled" or "clients.remindersoptedout" or "clients.whatsappphoneinvalid")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Sağlayıcıdan doğrulanması gereken checkout oturumu panel finalize ile elle tamamlanamaz (BILL-002).
         if (normalized is "billing.manualfinalizenotallowed")
         {
