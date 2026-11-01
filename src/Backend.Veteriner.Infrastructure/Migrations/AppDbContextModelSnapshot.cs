@@ -1308,6 +1308,155 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.ClientCredits.ClientCredit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<long>("MutationSequence")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
+                    b.Property<int?>("RefundMethod")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RefundReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal?>("RefundedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("RefundedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("RefundedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SourcePaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("UsedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<DateTime?>("VoidedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("SourcePaymentId");
+
+                    b.HasIndex("TenantId", "SourcePaymentId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "ClientId", "ClinicId");
+
+                    b.ToTable("ClientCredits", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ClientCredits_Amount_Positive", "[Amount] > 0");
+
+                            t.HasCheckConstraint("CK_ClientCredits_Refund_Consistent", "([RefundedAtUtc] IS NULL AND [RefundedAmount] IS NULL AND [RefundedByUserId] IS NULL) OR ([RefundedAtUtc] IS NOT NULL AND [RefundedAmount] > 0 AND [RefundedByUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ClientCredits_UsedAmount_Range", "[UsedAmount] >= 0 AND [UsedAmount] <= [Amount]");
+                        });
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.ClientCredits.ClientCreditApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ChargeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CreditId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReverseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ReversedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReversedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChargeId");
+
+                    b.HasIndex("CreditId");
+
+                    b.HasIndex("TenantId", "ChargeId");
+
+                    b.HasIndex("TenantId", "CreditId");
+
+                    b.HasIndex("TenantId", "RequestId")
+                        .HasFilter("[RequestId] IS NOT NULL");
+
+                    b.ToTable("ClientCreditApplications", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ClientCreditApplications_Amount_Positive", "[Amount] > 0");
+                        });
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Clients.Client", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3007,6 +3156,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal>("CreditedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -3081,6 +3236,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Payments", null, t =>
                         {
                             t.HasCheckConstraint("CK_Payments_AllocatedAmount_Range", "[AllocatedAmount] >= 0 AND [AllocatedAmount] <= [Amount]");
+
+                            t.HasCheckConstraint("CK_Payments_CreditedAmount_Range", "[CreditedAmount] >= 0 AND [AllocatedAmount] + [CreditedAmount] <= [Amount]");
 
                             t.HasCheckConstraint("CK_Payments_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
 
@@ -5496,6 +5653,36 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ChargeId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.ClientCredits.ClientCredit", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clients.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Payments.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("SourcePaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.ClientCredits.ClientCreditApplication", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Charges.Charge", null)
+                        .WithMany()
+                        .HasForeignKey("ChargeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.ClientCredits.ClientCredit", null)
+                        .WithMany()
+                        .HasForeignKey("CreditId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicAppointmentSettings", b =>
