@@ -173,42 +173,38 @@ public sealed class Examination : AggregateRoot, IClinicScoped, ITenantOwned
     /// <see cref="UpdatedAtUtc"/> yazılır; böylece satır sürümü (rowversion) her uygulamada ilerler ve aynı sürümle
     /// ikinci uygulama eşzamanlılık hatası alır (çift tıklama koruması).
     /// </summary>
-    /// <returns>Değişen alanların API adları (<c>visitReason</c>, <c>findings</c>, <c>plan</c>).</returns>
-    public Result<IReadOnlyList<string>> PrefillFromTemplate(string? visitReason, string? findings, string? plan, DateTime nowUtc)
+    /// <returns>Bölüm bazında ne eklendiği (<see cref="ExaminationTemplatePrefill"/>).</returns>
+    public Result<ExaminationTemplatePrefill> PrefillFromTemplate(string? visitReason, string? findings, string? plan, DateTime nowUtc)
     {
         if (IsFinalized)
         {
-            return Result<IReadOnlyList<string>>.Failure(
+            return Result<ExaminationTemplatePrefill>.Failure(
                 "Examinations.Finalized",
                 "Kesinleşmiş muayeneye şablon uygulanamaz.");
         }
 
-        var mergedReason = ExaminationTextMerge.Merge(VisitReason, visitReason, ExaminationTextMerge.InlineSeparator)!;
-        var mergedFindings = ExaminationTextMerge.Merge(Findings, findings, ExaminationTextMerge.BlockSeparator) ?? string.Empty;
-        var mergedPlan = ExaminationTextMerge.Merge(Plan, plan, ExaminationTextMerge.BlockSeparator);
+        var (mergedReason, reasonFilled) = ExaminationTextMerge.FillIfEmpty(VisitReason, visitReason);
+        var (mergedFindings, findingsAdded) = ExaminationTextMerge.MergeLines(Findings, findings);
+        var (mergedPlan, planAdded) = ExaminationTextMerge.MergeLines(Plan, plan);
 
-        if (mergedReason.Length > MaxVisitReasonLength
-            || mergedFindings.Length > MaxFindingsLength
+        if ((mergedReason?.Length ?? 0) > MaxVisitReasonLength
+            || (mergedFindings?.Length ?? 0) > MaxFindingsLength
             || (mergedPlan?.Length ?? 0) > MaxPlanLength)
         {
-            return Result<IReadOnlyList<string>>.Failure(
+            return Result<ExaminationTemplatePrefill>.Failure(
                 "Examinations.TemplateTextTooLong",
                 "Şablon metni eklenince muayene alanı izin verilen uzunluğu aşıyor; alanı kısaltıp tekrar deneyin.");
         }
 
-        var changed = new List<string>(3);
-        if (!string.Equals(mergedReason, VisitReason, StringComparison.Ordinal))
-            changed.Add("visitReason");
-        if (!string.Equals(mergedFindings, Findings, StringComparison.Ordinal))
-            changed.Add("findings");
-        if (!string.Equals(mergedPlan, Plan, StringComparison.Ordinal))
-            changed.Add("plan");
+        var reasonOutcome = string.IsNullOrWhiteSpace(visitReason) ? TemplateVisitReasonOutcome.NotInTemplate
+            : reasonFilled ? TemplateVisitReasonOutcome.Filled
+            : TemplateVisitReasonOutcome.SkippedExisting;
 
-        VisitReason = mergedReason;
-        Findings = mergedFindings;
+        VisitReason = mergedReason ?? VisitReason;
+        Findings = mergedFindings ?? string.Empty;
         Plan = mergedPlan;
         UpdatedAtUtc = NormalizeUtc(nowUtc);
-        return Result<IReadOnlyList<string>>.Success(changed);
+        return Result<ExaminationTemplatePrefill>.Success(new ExaminationTemplatePrefill(reasonOutcome, findingsAdded, planAdded));
     }
 
     /// <summary>Kesinleşmiş muayeneye bağlı tedavi/reçete/aşı eklenemez veya değiştirilemez; kilit kuralının tek yeri.</summary>

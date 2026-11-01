@@ -218,7 +218,12 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
 
         apply.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = await apply.Content.ReadFromJsonAsync<JsonElement>();
-        result.GetProperty("updatedFields").EnumerateArray().Select(f => f.GetString()).Should().Equal("visitReason", "findings", "plan");
+        result.GetProperty("updatedFields").EnumerateArray().Select(f => f.GetString()).Should().Equal("findings", "plan");
+        var text = result.GetProperty("text");
+        text.GetProperty("visitReason").GetString().Should().Be("SkippedExisting");
+        text.GetProperty("findingsLinesAdded").GetInt32().Should().Be(1);
+        text.GetProperty("planLinesAdded").GetInt32().Should().Be(1);
+        result.GetProperty("pendingChargeCount").GetInt32().Should().Be(2);
         result.GetProperty("administrations").EnumerateArray().Should().ContainSingle()
             .Which.GetProperty("productId").GetGuid().Should().Be(ctx.DrugId);
         var service = result.GetProperty("services").EnumerateArray().Should().ContainSingle().Subject;
@@ -228,7 +233,7 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
         secondVersion.Should().NotBe(firstVersion);
 
         var exam = await ExaminationAsync(ctx);
-        exam.VisitReason.Should().Be("Aşı, Kulak kaşıntısı");
+        exam.VisitReason.Should().Be("Aşı"); // Şikâyet doluydu: şablonun ziyaret sebebi eklenmez.
         exam.Findings.Should().Be("Bulgu yok\nOtoskopi:");
         exam.Plan.Should().Be("Kontrol: 7 gün");
         (await StockAsync(ctx)).Should().Be(18m);
@@ -250,8 +255,10 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
         var again = await vet.PostAsJsonAsync(
             $"/api/v1/examinations/{ctx.ExaminationId}/apply-template", new { templateId, rowVersion = secondVersion });
         again.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("updatedFields").GetArrayLength().Should().Be(0);
-        (await ExaminationAsync(ctx)).VisitReason.Should().Be("Aşı, Kulak kaşıntısı");
+        var againResult = await again.Content.ReadFromJsonAsync<JsonElement>();
+        againResult.GetProperty("updatedFields").GetArrayLength().Should().Be(0);
+        againResult.GetProperty("text").GetProperty("findingsLinesAdded").GetInt32().Should().Be(0);
+        (await ExaminationAsync(ctx)).Findings.Should().Be("Bulgu yok\nOtoskopi:");
         (await StockAsync(ctx)).Should().Be(16m);
     }
 

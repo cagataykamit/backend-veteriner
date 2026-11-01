@@ -116,12 +116,10 @@ Sıra: ada göre (sistem ve kendi şablonları karışık). `sort`/`order` uygul
 `rowVersion` **muayenenin** güncel sürümüdür (zorunlu). Tek transaction'da sırayla:
 
 1. **Metin birleştirme** (kural tek yerde, `ExaminationTextMerge`; mevcut içerik **asla silinmez/değiştirilmez**), alan bazında:
-   1. Şablon metni boşsa alan aynen kalır.
-   2. Alan boşsa şablon metni yazılır.
-   3. Alan şablon metnini **zaten içeriyorsa** (Türkçe harf, büyük/küçük, boşluk farkı yok sayılır) alan aynen kalır — aynı şablonu ikinci kez uygulamak metni çoğaltmaz.
-   4. Aksi hâlde metnin **sonuna** eklenir: şikâyete `", "` ile, bulgu ve plana yeni satırla (`"\n"`).
-   
-   Örnek: şikâyet `"Aşı"` + şablon `"Kulak kaşıntısı"` → `"Aşı, Kulak kaşıntısı"`; bulgu `"Bulgu yok"` + `"Otoskopi:"` → `"Bulgu yok\nOtoskopi:"`. Birleşen metin muayene sınırını (şikâyet 2000, bulgu 8000, plan 4000) aşarsa `400 Examinations.TemplateTextTooLong` (hiçbir şey yazılmaz). Diğer muayene alanları (değerlendirme/tanı, notlar, vitaller) değişmez.
+   - **Şikâyet (`visitReason`)**: muayenenin şikâyeti **boşsa** şablon metniyle doldurulur; **doluysa şablonun şikâyeti eklenmez** (ziyaret sebebi cümledir, sonuna virgülle başka sebep eklenince anlamsızlaşır; 2026-11-01 düzeltmesi, önceki `", "` ile ekleme kaldırıldı). Not: muayene oluşturma/güncelleme şikâyeti zorunlu kıldığı için bugün bu alan pratikte hep doludur; `Filled` yalnız şikâyeti boş muayene mümkün olursa görülür.
+   - **Bulgu ve plan (`findings`, `plan`)**: şablon metni **satır satır** alanın sonuna eklenir (`"\n"`). Muayenede **zaten bulunan satır tekrar eklenmez**; karşılaştırma `TurkishTextKey` ile yapılır (baş/son ve ardışık boşluk, büyük/küçük harf ve Türkçe harf farkı yok sayılır). Şablon satırı başlıksa (`:` ile biter) ve muayenede o başlıkla başlayan doldurulmuş bir satır varsa (`"Genel durum: iyi"`) başlık yine eklenmez. Şablon metni boşsa alan aynen kalır.
+
+   Örnek: şikâyet `"Aşı"` + şablon `"Kulak kaşıntısı"` → `"Aşı"` (eklenmez); bulgu `"Bulgu yok"` + `"Otoskopi:"` → `"Bulgu yok\nOtoskopi:"`; bulgu `"Önceki şikâyetin seyri: \nGenel durum: "` + `"Genel durum: \nVücut ısısı: "` → `"Önceki şikâyetin seyri: \nGenel durum:\nVücut ısısı:"` (1 satır eklendi). Aynı şablonu ikinci kez uygulamak satır eklemez. Birleşen metin muayene sınırını (şikâyet 2000, bulgu 8000, plan 4000) aşarsa `400 Examinations.TemplateTextTooLong` (hiçbir şey yazılmaz). Diğer muayene alanları (değerlendirme/tanı, notlar, vitaller) değişmez.
 2. **Stoklu ürün satırı** → mevcut **uygulama** kaydı (`POST /administrations` ile aynı handler ve kurallar: FEFO parti seçimi, süresi geçmiş parti yasağı, yetersiz bakiye, kontrollü ürün kuralları; muayeneye bağlı, uygulama zamanı = şimdi). Fiyatlıysa "ücret bekliyor" kalemi (`sourceType = "Administration"`) doğar.
 3. **Hizmet satırı** → stok yok; katalog fiyatı `> 0` ise "ücret bekliyor" kalemi (`sourceType = "ExaminationService"`, muayene ve vizite bağlı, fiyat kartın o anki fiyatı). Bedelsiz hizmet kalem doğurmaz.
 
@@ -137,9 +135,12 @@ Yanıt `200`:
 {
   "examinationId": "…",
   "rowVersion": "AAAAAAAAB9M=",
-  "updatedFields": ["visitReason", "findings", "plan"],
+  "updatedFields": ["findings", "plan"],
+  "text": { "visitReason": "SkippedExisting", "findingsLinesAdded": 1, "planLinesAdded": 1 },
+  "pendingChargeCount": 2,
   "administrations": [ { "id": "…", "productId": "…", "quantity": 1, "batchId": "…", "status": "Active", "…": "AdministrationDto" } ],
-  "services": [ { "productId": "…", "productName": "Kulak temizliği", "unit": "Adet", "quantity": 1, "chargeSuggestionId": "…" } ]
+  "services": [ { "productId": "…", "productName": "Kulak temizliği", "unit": "Adet", "quantity": 1, "chargeSuggestionId": "…" } ],
+  "packageChargeSuggestionId": null
 }
 ```
 
@@ -147,10 +148,13 @@ Yanıt `200`:
 |---|---|
 | `rowVersion` | Muayenenin **yeni** sürümü; sonraki muayene PUT/kesinleştirme bununla |
 | `updatedFields` | Metni değişen alanlar (`visitReason`, `findings`, `plan`); boş olabilir |
+| `text.visitReason` | `NotInTemplate` (şablonda şikâyet yok), `Filled` (muayenenin şikâyeti boştu, dolduruldu), `SkippedExisting` (şikâyet doluydu, eklenmedi) |
+| `text.findingsLinesAdded`, `text.planLinesAdded` | Alanın sonuna eklenen satır sayısı; muayenede zaten olan satırlar sayılmaz (0 = metin zaten vardı veya şablonda yok) |
+| `pendingChargeCount` | Bu uygulamada doğan "ücret bekliyor" kalemi sayısı: paket kalemi (varsa 1) + ücretli uygulama kayıtları + ücretli hizmet satırları |
 | `administrations` | Yazılan uygulama kayıtları (`AdministrationDto`, `ADMINISTRATIONS_API_CONTRACT.md`) |
 | `services` | Uygulanan hizmet satırları; `chargeSuggestionId` bedelsiz hizmette `null` |
 
-Arayüz uygulamadan sonra muayeneyi (`GET /examinations/{id}`) ve ilişkili özeti (`…/related-summary`) yeniden okur.
+Arayüz başarı mesajını `text`, `administrations`, `services` ve `pendingChargeCount` üzerinden bölüm bazında kurar (ör. "Bulguya 2 satır eklendi, plana 1 satır eklendi; 1 ürün stoktan düştü; 2 ücret bekleyen kalem") ve uygulamadan sonra muayeneyi (`GET /examinations/{id}`) ve ilişkili özeti (`…/related-summary`) yeniden okur. Ön izlemede şablonun şikâyeti, muayenenin şikâyeti doluysa "eklenmeyecek" olarak gösterilir.
 
 ---
 

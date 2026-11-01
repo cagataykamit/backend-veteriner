@@ -131,11 +131,16 @@ public sealed class ApplyExaminationTemplateCommandHandler
 
         var administrations = new List<AdministrationDto>();
         var services = new List<AppliedServiceLineDto>();
+        var pendingCharges = packageSuggestionId.HasValue ? 1 : 0;
         foreach (var line in lines)
         {
             var product = products.Value![line.ProductId];
             if (product.IsStockTracked)
             {
+                // Uygulama kaleminin doğduğu kural CreateAdministration'dadır (ChargeSuggestion.IsChargeable); burada yalnız sayılır.
+                if (!packageSuggestionId.HasValue && ChargeSuggestion.IsChargeable(product))
+                    pendingCharges++;
+
                 var administration = await _sender.Send(
                     new CreateAdministrationCommand(
                         examination.ClinicId,
@@ -166,18 +171,22 @@ public sealed class ApplyExaminationTemplateCommandHandler
 
                 await _chargeSuggestions.AddAsync(suggestion.Value!, ct);
                 suggestionId = suggestion.Value!.Id;
+                pendingCharges++;
             }
 
             services.Add(new AppliedServiceLineDto(product.Id, product.Name, product.Unit, line.Quantity, suggestionId, packageSuggestionId.HasValue));
         }
 
+        var text = prefill.Value!;
         return Result<ExaminationTemplateApplyResultDto>.Success(new ExaminationTemplateApplyResultDto(
             examination.Id,
             ExaminationRowVersion.Encode(examination.RowVersion),
-            prefill.Value!,
+            text.UpdatedFields,
             administrations,
             services,
-            packageSuggestionId));
+            packageSuggestionId,
+            new AppliedTemplateTextDto(text.VisitReason.ToString(), text.FindingsLinesAdded, text.PlanLinesAdded),
+            pendingCharges));
     }
 
     /// <summary>Reddedilen satırın ürünü ProblemDetails'te <c>productId</c> olarak döner (arayüz satırı işaretler).</summary>
