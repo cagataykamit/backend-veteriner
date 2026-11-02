@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.ComponentModel;
+using System.Data.Common;
 using AwesomeAssertions;
 using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -44,6 +46,21 @@ public sealed class ExceptionHandlingClientAbortTests
         host.Reporter.Reports.Should().ContainSingle().Which.StatusCode.Should().Be(StatusCodes.Status500InternalServerError);
         host.Logs.ErrorCategories.Should().Contain(c => c.Contains("ExceptionHandler"));
     }
+
+    [Fact]
+    public async Task Database_Command_Timeout_Should_Be_503_With_Error_Report()
+    {
+        // SqlClient komut zaman aşımı: iç istisnası Win32 258 olan DbException.
+        await using var host = await PipelineHost.StartAsync(_ =>
+            throw new FakeDbException("Execution Timeout Expired.", new Win32Exception(258)));
+
+        var status = await host.SendAndObserveStatusAsync();
+
+        status.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        host.Reporter.Reports.Should().ContainSingle().Which.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    private sealed class FakeDbException(string message, Exception inner) : DbException(message, inner);
 
     private sealed class PipelineHost : IAsyncDisposable
     {
