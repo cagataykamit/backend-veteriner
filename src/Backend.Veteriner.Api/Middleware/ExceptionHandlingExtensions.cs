@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Data.Common;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -140,6 +142,13 @@ public static class ExceptionHandlingExtensions
                         ex.Message
                     ),
 
+                    _ when IsDatabaseTimeout(ex) => (
+                        StatusCodes.Status503ServiceUnavailable,
+                        "Servis geçici olarak yanıt vermiyor",
+                        "https://httpstatuses.io/503",
+                        "Veritabanı zamanında yanıt vermedi. Biraz sonra tekrar deneyin."
+                    ),
+
                     _ => (
                         StatusCodes.Status500InternalServerError,
                         "Beklenmeyen hata",
@@ -180,6 +189,21 @@ public static class ExceptionHandlingExtensions
     private static bool IsClientAbort(HttpContext ctx, Exception? ex)
         => ex is not null && ctx.RequestAborted.IsCancellationRequested;
 
+    /// <summary>
+    /// Komut zaman aşımı (SQL Server yanıt vermedi): sunucu hatası değil geçici durum, 503 döner. SqlClient bunu iç istisnası
+    /// Win32 258 ("bekleme zaman aşımı") olan <see cref="DbException"/> olarak fırlatır; EF sarmalayabildiği için zincire bakılır.
+    /// </summary>
+    private static bool IsDatabaseTimeout(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            if (e is TimeoutException || (e is DbException && e.InnerException is Win32Exception { NativeErrorCode: 258 }))
+                return true;
+        }
+
+        return false;
+    }
+
     private static ProblemDetails CreateProblemDetails(
         int status,
         string title,
@@ -207,6 +231,7 @@ public static class ExceptionHandlingExtensions
             StatusCodes.Status401Unauthorized => "Errors.Unauthorized",
             StatusCodes.Status404NotFound => "Errors.NotFound",
             StatusCodes.Status500InternalServerError => "Errors.Unhandled",
+            StatusCodes.Status503ServiceUnavailable => "Errors.DatabaseTimeout",
             ClientClosedRequest => "Errors.RequestCancelled",
             _ => "Errors.Unhandled"
         };

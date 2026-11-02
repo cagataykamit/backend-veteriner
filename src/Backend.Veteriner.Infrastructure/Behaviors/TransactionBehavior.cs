@@ -73,9 +73,16 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
         catch
         {
             // İstek iptal edilmiş olabilir; geri alma iptal edilmiş token ile kesilmesin, özgün istisna maskelenmesin.
-            await tx.RollbackAsync(CancellationToken.None);
-
-            _logger.LogWarning("TRANSACTION ROLLBACK {RequestName}", requestName);
+            // Komut zaman aşımında SQL Server transaction'ı kendisi bitirir; geri alma da hata verirse özgün istisna korunur.
+            try
+            {
+                await tx.RollbackAsync(CancellationToken.None);
+                _logger.LogWarning("TRANSACTION ROLLBACK {RequestName}", requestName);
+            }
+            catch (Exception rollbackEx)
+            {
+                _logger.LogWarning(rollbackEx, "TRANSACTION ROLLBACK FAILED {RequestName}", requestName);
+            }
 
             throw;
         }
