@@ -214,7 +214,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("nvarchar(60)");
 
-                    b.Property<Guid>("ReasonId")
+                    b.Property<Guid?>("ReasonId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("ReasonName")
@@ -5623,8 +5623,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasOne("Backend.Veteriner.Domain.Appointments.AppointmentReason", null)
                         .WithMany()
                         .HasForeignKey("ReasonId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.OwnsMany("Backend.Veteriner.Domain.AppointmentRequests.AppointmentRequestStatusChange", "History", b1 =>
                         {

@@ -18,7 +18,8 @@ public sealed class AppointmentRequestConfiguration : IEntityTypeConfiguration<A
         b.Property(x => x.ClinicId).IsRequired();
         b.Property(x => x.Source).IsRequired().HasConversion<int>();
         b.Property(x => x.Status).IsRequired().HasConversion<int>();
-        b.Property(x => x.ReasonId).IsRequired();
+        // Boşsa "Diğer / emin değilim" talebi (ADR-042 ek md. 1); ad ReasonName'de saklanır.
+        b.Property(x => x.ReasonId);
         b.Property(x => x.ReasonName).IsRequired().HasMaxLength(AppointmentReason.NameMaxLength);
         b.Property(x => x.RequestedStartUtc).IsRequired();
         b.Property(x => x.DurationMinutes).IsRequired();
