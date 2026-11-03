@@ -25,6 +25,15 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
     /// <summary>Aynı e-posta + klinik için en fazla bekleyen talep (ADR-042 K6).</summary>
     public const int MaxPendingPerEmailAndClinic = 3;
 
+    /// <summary>
+    /// Sistemin her klinikte sunduğu "Diğer / emin değilim" seçeneği (ADR-042 ek md. 1): talep nedensiz kaydedilir, süre
+    /// sabittir, klinikteki tüm hekimler uygundur. Seçilince not zorunludur (ek md. 2).
+    /// </summary>
+    public const string OtherReasonName = "Diğer / emin değilim";
+    public const int OtherReasonDurationMinutes = 30;
+    public const int OtherReasonNoteMinLength = 3;
+    public const string NoteRequiredCode = "AppointmentRequests.NoteRequired";
+
     private readonly List<AppointmentRequestStatusChange> _history = new();
 
     public Guid Id { get; private set; } = Guid.NewGuid();
@@ -33,7 +42,8 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
     public AppointmentRequestSource Source { get; private set; }
     public AppointmentRequestStatus Status { get; private set; }
 
-    public Guid ReasonId { get; private set; }
+    /// <summary>Boşsa "Diğer / emin değilim" (<see cref="OtherReasonName"/>).</summary>
+    public Guid? ReasonId { get; private set; }
 
     /// <summary>Talep anındaki neden adı (neden sonradan değişse de talep okunur kalır).</summary>
     public string ReasonName { get; private set; } = default!;
@@ -80,7 +90,10 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
 
     private AppointmentRequest() { }
 
-    /// <summary>Portal talebi: bağın müşterisi; hayvan kayıtlıysa <paramref name="petId"/>, değilse serbest metin.</summary>
+    /// <summary>
+    /// Portal talebi: bağın müşterisi; hayvan kayıtlıysa <paramref name="petId"/>, değilse serbest metin. Neden boşsa
+    /// "Diğer / emin değilim" (not zorunlu).
+    /// </summary>
     public static Result<AppointmentRequest> CreateFromPortal(
         Guid tenantId,
         Guid clinicId,
@@ -88,7 +101,7 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
         Guid clientId,
         Guid? petId,
         PetText? petText,
-        AppointmentReason reason,
+        AppointmentReason? reason,
         DateTime requestedStartUtc,
         string contactName,
         string contactEmail,
@@ -104,12 +117,15 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
             requestedStartUtc, contactName, contactEmail, contactPhone, note, utcNow, AppointmentRequestActorKind.Owner);
     }
 
-    /// <summary>Bağlantı talebi: kimliksiz kişi, hayvan yalnız serbest metin; e-posta doğrulaması uygulama katmanında yapılmıştır.</summary>
+    /// <summary>
+    /// Bağlantı talebi: kimliksiz kişi, hayvan yalnız serbest metin; e-posta doğrulaması uygulama katmanında yapılmıştır. Neden
+    /// boşsa "Diğer / emin değilim" (not zorunlu).
+    /// </summary>
     public static Result<AppointmentRequest> CreateFromLink(
         Guid tenantId,
         Guid clinicId,
         PetText petText,
-        AppointmentReason reason,
+        AppointmentReason? reason,
         DateTime requestedStartUtc,
         string contactName,
         string contactEmail,
@@ -197,6 +213,9 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
         return true;
     }
 
+    /// <summary>Talep süresi: nedenin varsayılan süresi; "Diğer" için sabit süre (müsaitlik de bu süreyle hesaplanır).</summary>
+    public static int DurationFor(AppointmentReason? reason) => reason?.DefaultDurationMinutes ?? OtherReasonDurationMinutes;
+
     public Result EnsurePending()
         => IsPending
             ? Result.Success()
@@ -210,7 +229,7 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
         Guid? clientId,
         Guid? petId,
         PetText? petText,
-        AppointmentReason reason,
+        AppointmentReason? reason,
         DateTime requestedStartUtc,
         string contactName,
         string contactEmail,
@@ -221,7 +240,7 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
     {
         if (tenantId == Guid.Empty || clinicId == Guid.Empty)
             return Invalid("Kiracı ve klinik zorunludur.");
-        if (reason is null || reason.ClinicId != clinicId || reason.TenantId != tenantId)
+        if (reason is not null && (reason.ClinicId != clinicId || reason.TenantId != tenantId))
             return Invalid("Randevu nedeni bu kliniğe ait değil.");
         if (petId == Guid.Empty)
             return Invalid("Hayvan geçersiz.");
@@ -247,6 +266,10 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
         if (trimmedNote is { Length: > NoteMaxLength })
             return Invalid($"Not en fazla {NoteMaxLength} karakter olabilir.");
 
+        // "Diğer" seçilince klinik sahibin ne için geldiğini nottan öğrenir (ADR-042 ek md. 2).
+        if (reason is null && (trimmedNote?.Length ?? 0) < OtherReasonNoteMinLength)
+            return Result<AppointmentRequest>.Failure(NoteRequiredCode, "Ne için geldiğinizi kısaca yazın.");
+
         string? petName = null, petSpecies = null, petBreed = null;
         if (petId is null)
         {
@@ -265,10 +288,10 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
             ClinicId = clinicId,
             Source = source,
             Status = AppointmentRequestStatus.Pending,
-            ReasonId = reason.Id,
-            ReasonName = reason.Name,
+            ReasonId = reason?.Id,
+            ReasonName = reason?.Name ?? OtherReasonName,
             RequestedStartUtc = ToUtc(requestedStartUtc),
-            DurationMinutes = reason.DefaultDurationMinutes,
+            DurationMinutes = DurationFor(reason),
             OwnerAccountId = ownerAccountId,
             ClientId = clientId,
             PetId = petId,
