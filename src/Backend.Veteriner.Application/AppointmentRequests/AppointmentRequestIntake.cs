@@ -43,11 +43,18 @@ public sealed class AppointmentRequestIntake
         _timeProvider = timeProvider;
     }
 
-    /// <summary>Talep sayfası: klinik bilgisi, sınırlar ve online nedenler.</summary>
+    /// <summary>
+    /// Talep sayfası: klinik bilgisi, sınırlar ve online nedenler. Listenin sonunda her zaman sistemin "Diğer / emin değilim"
+    /// seçeneği durur; klinik hiç neden tanımlamamış olsa da (ADR-042 ek md. 1).
+    /// </summary>
     public async Task<OnlineBookingPageDto> GetPageAsync(OnlineBookingScope scope, CancellationToken ct)
     {
         var clinic = scope.Clinic;
-        var reasons = await _reasons.ListAsync(new AppointmentReasonsByClinicSpec(scope.TenantId, scope.ClinicId, onlineOnly: true), ct);
+        var reasons = (await _reasons.ListAsync(new AppointmentReasonsByClinicSpec(scope.TenantId, scope.ClinicId, onlineOnly: true), ct))
+            .Select(r => new OnlineBookingReasonDto(r.Id, r.Name, r.DefaultDurationMinutes, RequiresNote: false))
+            .Append(new OnlineBookingReasonDto(
+                null, AppointmentRequest.OtherReasonName, AppointmentRequest.OtherReasonDurationMinutes, RequiresNote: true))
+            .ToList();
         return new OnlineBookingPageDto(
             clinic.Name,
             clinic.City,
@@ -56,13 +63,13 @@ public sealed class AppointmentRequestIntake
             scope.Settings.MinLeadMinutes,
             scope.Settings.MaxAdvanceDays,
             AppointmentRequest.MaxPendingPerEmailAndClinic,
-            reasons.Select(r => new OnlineBookingReasonDto(r.Id, r.Name, r.DefaultDurationMinutes)).ToList());
+            reasons);
     }
 
-    /// <summary>Sahip görünümü müsaitlik (online sınırlar uygulanır).</summary>
+    /// <summary>Sahip görünümü müsaitlik (online sınırlar uygulanır). Neden boşsa "Diğer": sabit süre, tüm hekimler.</summary>
     public async Task<Result<IReadOnlyList<OnlineAvailabilityDayDto>>> GetAvailabilityAsync(
         OnlineBookingScope scope,
-        Guid reasonId,
+        Guid? reasonId,
         DateOnly? from,
         int days,
         CancellationToken ct)
@@ -74,22 +81,27 @@ public sealed class AppointmentRequestIntake
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var (earliest, latest) = scope.Settings.RequestWindow(utcNow);
         var start = from ?? Common.Time.OperationDayBounds.ToLocalDate(earliest);
-        var result = await _availability.GetDaysAsync(scope.TenantId, scope.ClinicId, reason.Value!, start, days, earliest, latest, ct);
+        var result = await _availability.GetDaysAsync(
+            scope.TenantId, scope.ClinicId, reason.Value, AppointmentRequest.DurationFor(reason.Value), start, days, earliest, latest, ct);
         return Result<IReadOnlyList<OnlineAvailabilityDayDto>>.Success(AvailabilityMapping.ToOnline(result));
     }
 
-    public async Task<Result<AppointmentReason>> ResolveOnlineReasonAsync(OnlineBookingScope scope, Guid reasonId, CancellationToken ct)
+    /// <summary>Seçilen neden aktif ve online'da görünür olmalı; kimlik yoksa "Diğer / emin değilim" (değer <c>null</c>).</summary>
+    public async Task<Result<AppointmentReason?>> ResolveOnlineReasonAsync(OnlineBookingScope scope, Guid? reasonId, CancellationToken ct)
     {
-        var reason = await _reasons.FirstOrDefaultAsync(new AppointmentReasonByIdSpec(scope.TenantId, scope.ClinicId, reasonId), ct);
+        if (reasonId is not { } id)
+            return Result<AppointmentReason?>.Success(null);
+
+        var reason = await _reasons.FirstOrDefaultAsync(new AppointmentReasonByIdSpec(scope.TenantId, scope.ClinicId, id), ct);
         return reason is { IsAvailableOnline: true }
-            ? Result<AppointmentReason>.Success(reason)
-            : Result<AppointmentReason>.Failure("AppointmentReasons.NotFound", "Randevu nedeni bulunamadı.");
+            ? Result<AppointmentReason?>.Success(reason)
+            : Result<AppointmentReason?>.Failure("AppointmentReasons.NotFound", "Randevu nedeni bulunamadı.");
     }
 
     /// <summary>Bekleyen talep sınırı ve saatin müsaitliği (talep kaydından önce).</summary>
     public async Task<Result> EnsureBookableAsync(
         OnlineBookingScope scope,
-        AppointmentReason reason,
+        AppointmentReason? reason,
         DateTime requestedStartUtc,
         string normalizedEmail,
         CancellationToken ct)
@@ -106,7 +118,7 @@ public sealed class AppointmentRequestIntake
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var (earliest, latest) = scope.Settings.RequestWindow(utcNow);
         var slot = await _availability.FindSlotAsync(
-            scope.TenantId, scope.ClinicId, reason, NormalizeUtc(requestedStartUtc), earliest, latest, ct);
+            scope.TenantId, scope.ClinicId, reason, AppointmentRequest.DurationFor(reason), NormalizeUtc(requestedStartUtc), earliest, latest, ct);
         return slot is null
             ? Result.Failure("AppointmentRequests.SlotUnavailable", "Seçilen saat artık müsait değil; lütfen başka bir saat seçin.")
             : Result.Success();

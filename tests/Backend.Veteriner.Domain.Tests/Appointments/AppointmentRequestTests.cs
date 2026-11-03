@@ -69,6 +69,38 @@ public sealed class AppointmentRequestTests
             .IsSuccess.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("  ab  ")]
+    public void Create_Without_Reason_Should_Require_Note(string? note)
+    {
+        var link = AppointmentRequest.CreateFromLink(
+            TenantId, ClinicId, new PetText("Pamuk", null, null), null, Start, "Ayşe", "a@example.com", "05551234567", note, Now);
+        link.IsSuccess.Should().BeFalse();
+        link.Error!.Code.Should().Be("AppointmentRequests.NoteRequired");
+
+        var portal = AppointmentRequest.CreateFromPortal(
+            TenantId, ClinicId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, Start, "Ayşe", "a@example.com", null, note, Now);
+        portal.Error!.Code.Should().Be("AppointmentRequests.NoteRequired");
+    }
+
+    [Fact]
+    public void Create_Without_Reason_Should_Use_Other_Reason_Name_And_Duration()
+    {
+        var result = AppointmentRequest.CreateFromLink(
+            TenantId, ClinicId, new PetText("Pamuk", null, null), null, Start, "Ayşe", "a@example.com", "05551234567", " Topallıyor ", Now);
+
+        result.IsSuccess.Should().BeTrue(result.Error.Message);
+        result.Value!.ReasonId.Should().BeNull();
+        result.Value.ReasonName.Should().Be(AppointmentRequest.OtherReasonName).And.Be("Diğer / emin değilim");
+        result.Value.DurationMinutes.Should().Be(AppointmentRequest.OtherReasonDurationMinutes).And.Be(30);
+        result.Value.OwnerNote.Should().Be("Topallıyor");
+    }
+
+    [Fact]
+    public void Create_With_Reason_Should_Keep_Note_Optional()
+        => NewLink().OwnerNote.Should().BeNull();
+
     [Fact]
     public void Approve_Should_Link_Appointment_And_Mark_Reschedule_When_Time_Differs()
     {

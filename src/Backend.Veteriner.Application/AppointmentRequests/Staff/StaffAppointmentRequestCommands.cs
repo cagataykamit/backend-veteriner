@@ -144,7 +144,10 @@ public sealed class ApproveAppointmentRequestCommandHandler
 
         var startUtc = AppointmentRequestIntake.NormalizeUtc(request.ScheduledAtUtc ?? r.RequestedStartUtc);
         var duration = request.DurationMinutes ?? r.DurationMinutes;
-        var reason = await _reasons.FirstOrDefaultAsync(new AppointmentReasonByIdSpec(r.TenantId, r.ClinicId, r.ReasonId), ct);
+        // "Diğer / emin değilim" talebi nedensizdir: randevu nedensiz oluşur, tüm hekimler uygundur (ADR-042 ek md. 1).
+        var reason = r.ReasonId is { } reasonId
+            ? await _reasons.FirstOrDefaultAsync(new AppointmentReasonByIdSpec(r.TenantId, r.ClinicId, reasonId), ct)
+            : null;
 
         var vetId = request.VeterinarianUserId;
         if (vetId is null)

@@ -61,6 +61,12 @@ public sealed partial class OwnerPortalIntegrationTests
             isOnlineBookable = false,
         })).StatusCode.Should().Be(HttpStatusCode.Created);
 
+        return new BookingSetup(staff, await EnableBookingAsync(staff), reasonId);
+    }
+
+    /// <summary>Online randevuyu açar ve bağlantı kodunu döner.</summary>
+    private async Task<string> EnableBookingAsync(StaffContext staff)
+    {
         var settings = await SendAsync(HttpMethod.Put, $"/api/v1/clinics/{staff.ClinicId}/online-booking", staff.Token, new
         {
             isEnabled = true,
@@ -71,7 +77,7 @@ public sealed partial class OwnerPortalIntegrationTests
         var json = await settings.Content.ReadFromJsonAsync<JsonElement>();
         var code = json.GetProperty("bookingCode").GetString()!;
         json.GetProperty("bookingUrl").GetString().Should().EndWith($"/randevu/{code}");
-        return new BookingSetup(staff, code, reasonId);
+        return code;
     }
 
     private async Task<List<DateTime>> SlotsAsync(string url, string? bearer = null)
@@ -159,7 +165,8 @@ public sealed partial class OwnerPortalIntegrationTests
         var b = await SetupBookingAsync();
 
         var page = await (await SendAsync(HttpMethod.Get, $"/api/portal/v1/booking/{b.Code}")).Content.ReadFromJsonAsync<JsonElement>();
-        page.GetProperty("reasons").EnumerateArray().Select(r => r.GetProperty("name").GetString()).Should().Equal("Aşı");
+        page.GetProperty("reasons").EnumerateArray().Select(r => r.GetProperty("name").GetString())
+            .Should().Equal("Aşı", AppointmentRequest.OtherReasonName);
         page.GetProperty("maxPendingRequests").GetInt32().Should().Be(3);
 
         var slots = await PublicSlotsAsync(b);
