@@ -137,11 +137,15 @@ public sealed class GetAppointmentRequestQueryHandler : IRequestHandler<GetAppoi
         IReadOnlyList<Guid> freeVets = [];
         if (r.IsPending)
         {
-            var reason = await _reasons.FirstOrDefaultAsync(new AppointmentReasonByIdSpec(r.TenantId, r.ClinicId, r.ReasonId), ct);
-            if (reason is not null)
+            // Nedensiz ("Diğer / emin değilim") talepte müsaitlik sabit süre ve tüm hekimlerle hesaplanır (ADR-042 ek md. 1).
+            var reason = r.ReasonId is { } reasonId
+                ? await _reasons.FirstOrDefaultAsync(new AppointmentReasonByIdSpec(r.TenantId, r.ClinicId, reasonId), ct)
+                : null;
+            if (r.ReasonId is null || reason is not null)
             {
                 var slot = await _availability.FindSlotAsync(
-                    r.TenantId, r.ClinicId, reason, r.RequestedStartUtc, _timeProvider.GetUtcNow().UtcDateTime, DateTime.MaxValue, ct);
+                    r.TenantId, r.ClinicId, reason, AppointmentRequest.DurationFor(reason), r.RequestedStartUtc,
+                    _timeProvider.GetUtcNow().UtcDateTime, DateTime.MaxValue, ct);
                 freeSlot = slot is not null;
                 freeVets = slot?.FreeVeterinarianIds ?? [];
             }

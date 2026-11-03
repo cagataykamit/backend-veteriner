@@ -12,7 +12,7 @@ namespace Backend.Veteriner.Application.AppointmentRequests.Public;
 public sealed record GetOnlineBookingPageQuery(string BookingCode) : IRequest<Result<OnlineBookingPageDto>>;
 
 /// <summary>Bağlantıdan müsait saatler (online sınırlar uygulanır; hekim bilgisi dönmez).</summary>
-public sealed record GetOnlineBookingAvailabilityQuery(string BookingCode, Guid ReasonId, DateOnly? From, int Days)
+public sealed record GetOnlineBookingAvailabilityQuery(string BookingCode, Guid? ReasonId, DateOnly? From, int Days)
     : IRequest<Result<IReadOnlyList<OnlineAvailabilityDayDto>>>;
 
 /// <summary>
@@ -28,7 +28,8 @@ public sealed record RequestOnlineBookingCodeCommand(string BookingCode, string 
 
 /// <summary>
 /// Bağlantıdan talep: e-posta koduyla doğrulanmadan talep oluşmaz (ADR-042 K1). Müşteri/hasta/hesap oluşmaz; talep iletişim
-/// anlığı taşır. Saat müsait listede olmalı; aynı e-posta + klinik için en fazla 3 bekleyen talep.
+/// anlığı taşır. Saat müsait listede olmalı; aynı e-posta + klinik için en fazla 3 bekleyen talep. Neden boşsa "Diğer / emin
+/// değilim": not zorunlu, kural domain'de (<see cref="AppointmentRequest.NoteRequiredCode"/>).
 /// </summary>
 public sealed record CreateOnlineBookingRequestCommand(
     string BookingCode,
@@ -39,7 +40,7 @@ public sealed record CreateOnlineBookingRequestCommand(
     string PetName,
     string? PetSpecies,
     string? PetBreed,
-    Guid ReasonId,
+    Guid? ReasonId,
     DateTime RequestedStartUtc,
     string? Note)
     : IRequest<Result<AppointmentRequestCreatedDto>>, IAuditableRequest
@@ -52,7 +53,7 @@ public sealed class GetOnlineBookingAvailabilityQueryValidator : AbstractValidat
 {
     public GetOnlineBookingAvailabilityQueryValidator()
     {
-        RuleFor(x => x.ReasonId).NotEmpty();
+        RuleFor(x => x.ReasonId).Must(id => id is null || id != Guid.Empty);
         RuleFor(x => x.Days).InclusiveBetween(1, AppointmentAvailabilityCalculator.MaxDays);
     }
 }
@@ -74,7 +75,7 @@ public sealed class CreateOnlineBookingRequestCommandValidator : AbstractValidat
         RuleFor(x => x.PetName).NotEmpty().MaximumLength(AppointmentRequest.PetNameMaxLength);
         RuleFor(x => x.PetSpecies).MaximumLength(AppointmentRequest.PetSpeciesMaxLength);
         RuleFor(x => x.PetBreed).MaximumLength(AppointmentRequest.PetBreedMaxLength);
-        RuleFor(x => x.ReasonId).NotEmpty();
+        RuleFor(x => x.ReasonId).Must(id => id is null || id != Guid.Empty);
         RuleFor(x => x.RequestedStartUtc).Must(d => d != default).WithMessage("Talep saati zorunludur.");
         RuleFor(x => x.Note).MaximumLength(AppointmentRequest.NoteMaxLength);
     }
@@ -189,7 +190,7 @@ public sealed class CreateOnlineBookingRequestCommandHandler
             return Result<AppointmentRequestCreatedDto>.Failure(reason.Error);
 
         var startUtc = AppointmentRequestIntake.NormalizeUtc(request.RequestedStartUtc);
-        var bookable = await _intake.EnsureBookableAsync(scope, reason.Value!, startUtc, email, ct);
+        var bookable = await _intake.EnsureBookableAsync(scope, reason.Value, startUtc, email, ct);
         if (!bookable.IsSuccess)
             return Result<AppointmentRequestCreatedDto>.Failure(bookable.Error);
 
@@ -198,7 +199,7 @@ public sealed class CreateOnlineBookingRequestCommandHandler
             scope.TenantId,
             scope.ClinicId,
             new PetText(request.PetName, request.PetSpecies, request.PetBreed),
-            reason.Value!,
+            reason.Value,
             startUtc,
             request.ContactName,
             email,

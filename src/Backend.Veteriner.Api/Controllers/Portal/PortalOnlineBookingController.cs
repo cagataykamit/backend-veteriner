@@ -37,14 +37,17 @@ public sealed class PortalOnlineBookingController : ControllerBase
     public async Task<IActionResult> GetPage([FromRoute] string bookingCode, CancellationToken ct)
         => (await _mediator.Send(new GetOnlineBookingPageQuery(bookingCode), ct)).ToActionResult(this);
 
-    /// <summary>Bir neden için müsait saatler (İstanbul günü <c>from</c>, en çok 14 gün).</summary>
+    /// <summary>
+    /// Bir neden için müsait saatler (İstanbul günü <c>from</c>, en çok 14 gün). <c>reasonId</c> boşsa "Diğer / emin değilim":
+    /// 30 dk, tüm hekimler.
+    /// </summary>
     [HttpGet("availability")]
     [ProducesResponseType(typeof(IReadOnlyList<OnlineAvailabilityDayDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAvailability(
         [FromRoute] string bookingCode,
-        [FromQuery] Guid reasonId,
+        [FromQuery] Guid? reasonId,
         [FromQuery] DateOnly? from,
         [FromQuery] int? days,
         CancellationToken ct)
@@ -116,7 +119,7 @@ public sealed class PortalAppointmentRequestsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAvailability(
         [FromRoute] Guid linkId,
-        [FromQuery] Guid reasonId,
+        [FromQuery] Guid? reasonId,
         [FromQuery] DateOnly? from,
         [FromQuery] int? days,
         CancellationToken ct)
@@ -188,7 +191,10 @@ public sealed class OnlineBookingRequestBody
     public string? PetName { get; init; }
     public string? PetSpecies { get; init; }
     public string? PetBreed { get; init; }
-    public Guid ReasonId { get; init; }
+
+    /// <summary>Boşsa "Diğer / emin değilim"; o zaman <see cref="Note"/> zorunlu (en az 3 karakter).</summary>
+    public Guid? ReasonId { get; init; }
+
     public DateTime RequestedStartUtc { get; init; }
     public string? Note { get; init; }
 }
@@ -201,7 +207,10 @@ public sealed class PortalAppointmentRequestBody
     public string? PetName { get; init; }
     public string? PetSpecies { get; init; }
     public string? PetBreed { get; init; }
-    public Guid ReasonId { get; init; }
+
+    /// <summary>Boşsa "Diğer / emin değilim"; o zaman <see cref="Note"/> zorunlu (en az 3 karakter).</summary>
+    public Guid? ReasonId { get; init; }
+
     public DateTime RequestedStartUtc { get; init; }
 
     /// <summary>Boşsa müşteri kaydındaki telefon.</summary>

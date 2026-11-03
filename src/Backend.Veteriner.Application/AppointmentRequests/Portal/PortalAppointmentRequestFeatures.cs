@@ -17,12 +17,13 @@ namespace Backend.Veteriner.Application.AppointmentRequests.Portal;
 /// <summary>Bağın kliniğinin talep sayfası (online randevu kapalıysa 404 <c>OnlineBooking.NotFound</c>).</summary>
 public sealed record GetPortalBookingQuery(Guid OwnerAccountId, Guid LinkId) : IRequest<Result<OnlineBookingPageDto>>;
 
-public sealed record GetPortalBookingAvailabilityQuery(Guid OwnerAccountId, Guid LinkId, Guid ReasonId, DateOnly? From, int Days)
+public sealed record GetPortalBookingAvailabilityQuery(Guid OwnerAccountId, Guid LinkId, Guid? ReasonId, DateOnly? From, int Days)
     : IRequest<Result<IReadOnlyList<OnlineAvailabilityDayDto>>>;
 
 /// <summary>
 /// Portal talebi (ADR-042 K1; APPT-003/004): sahip bağın müşterisinin hayvanını seçer ya da serbest metin hayvan yazar. Portal
-/// klinik kaydını değiştirmez (ADR-031); serbest metin hayvan onayda klinikçe oluşturulur.
+/// klinik kaydını değiştirmez (ADR-031); serbest metin hayvan onayda klinikçe oluşturulur. Neden boşsa "Diğer / emin değilim":
+/// not zorunlu, kural domain'de (<see cref="AppointmentRequest.NoteRequiredCode"/>).
 /// </summary>
 public sealed record CreatePortalAppointmentRequestCommand(
     Guid OwnerAccountId,
@@ -31,7 +32,7 @@ public sealed record CreatePortalAppointmentRequestCommand(
     string? PetName,
     string? PetSpecies,
     string? PetBreed,
-    Guid ReasonId,
+    Guid? ReasonId,
     DateTime RequestedStartUtc,
     string? Phone,
     string? Note)
@@ -57,7 +58,7 @@ public sealed class GetPortalBookingAvailabilityQueryValidator : AbstractValidat
 {
     public GetPortalBookingAvailabilityQueryValidator()
     {
-        RuleFor(x => x.ReasonId).NotEmpty();
+        RuleFor(x => x.ReasonId).Must(id => id is null || id != Guid.Empty);
         RuleFor(x => x.Days).InclusiveBetween(1, AppointmentAvailabilityCalculator.MaxDays);
     }
 }
@@ -67,7 +68,7 @@ public sealed class CreatePortalAppointmentRequestCommandValidator : AbstractVal
     public CreatePortalAppointmentRequestCommandValidator()
     {
         RuleFor(x => x.LinkId).NotEmpty();
-        RuleFor(x => x.ReasonId).NotEmpty();
+        RuleFor(x => x.ReasonId).Must(id => id is null || id != Guid.Empty);
         RuleFor(x => x).Must(x => x.PetId is not null || !string.IsNullOrWhiteSpace(x.PetName))
             .WithMessage("Hayvan seçilmeli ya da hayvan adı yazılmalıdır.");
         RuleFor(x => x.PetName).MaximumLength(AppointmentRequest.PetNameMaxLength);
@@ -208,7 +209,7 @@ public sealed class CreatePortalAppointmentRequestCommandHandler
             return Result<AppointmentRequestCreatedDto>.Failure(reason.Error);
 
         var startUtc = AppointmentRequestIntake.NormalizeUtc(request.RequestedStartUtc);
-        var bookable = await _intake.EnsureBookableAsync(scope, reason.Value!, startUtc, email, ct);
+        var bookable = await _intake.EnsureBookableAsync(scope, reason.Value, startUtc, email, ct);
         if (!bookable.IsSuccess)
             return Result<AppointmentRequestCreatedDto>.Failure(bookable.Error);
 
@@ -219,7 +220,7 @@ public sealed class CreatePortalAppointmentRequestCommandHandler
             link.ClientId,
             request.PetId,
             request.PetId is null ? new PetText(request.PetName, request.PetSpecies, request.PetBreed) : null,
-            reason.Value!,
+            reason.Value,
             startUtc,
             client.FullName,
             email,

@@ -3,8 +3,11 @@ using Backend.Veteriner.Domain.AppointmentRequests;
 
 namespace Backend.Veteriner.Application.AppointmentRequests;
 
-/// <summary>Online akışta seçilebilen neden (aktif + online'da görünür).</summary>
-public sealed record OnlineBookingReasonDto(Guid Id, string Name, int DurationMinutes);
+/// <summary>
+/// Online akışta seçilebilen neden (aktif + online'da görünür). <see cref="Id"/> boşsa sistemin "Diğer / emin değilim"
+/// seçeneği: not zorunlu (<see cref="RequiresNote"/>; ADR-042 ek md. 1-2).
+/// </summary>
+public sealed record OnlineBookingReasonDto(Guid? Id, string Name, int DurationMinutes, bool RequiresNote);
 
 /// <summary>Bağlantı/portal talep sayfası: klinik iletişim bilgisi, talep sınırları ve nedenler.</summary>
 public sealed record OnlineBookingPageDto(
@@ -39,13 +42,16 @@ public sealed record PortalAppointmentRequestDto(
     DateTime CreatedAtUtc,
     bool CanCancel);
 
-/// <summary>Personel kuyruğu satırı; <see cref="PetName"/> kayıtlı hayvanın adı ya da sahibin yazdığı ad.</summary>
+/// <summary>
+/// Personel kuyruğu satırı; <see cref="PetName"/> kayıtlı hayvanın adı ya da sahibin yazdığı ad. <see cref="ReasonId"/> boşsa
+/// "Diğer / emin değilim" talebi.
+/// </summary>
 public sealed record AppointmentRequestListItemDto(
     Guid Id,
     Guid ClinicId,
     AppointmentRequestStatus Status,
     AppointmentRequestSource Source,
-    Guid ReasonId,
+    Guid? ReasonId,
     string ReasonName,
     DateTime RequestedStartUtc,
     int DurationMinutes,

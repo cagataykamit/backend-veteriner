@@ -77,7 +77,10 @@ public sealed class ClinicOnlineBookingController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Bir neden için müsait saatler ve boş uygun hekimler (personel; talep onayında farklı saat seçimi).</summary>
+    /// <summary>
+    /// Bir neden için müsait saatler ve boş uygun hekimler (personel; talep onayında farklı saat seçimi). <c>reasonId</c> boşsa
+    /// "Diğer / emin değilim": 30 dk, tüm hekimler.
+    /// </summary>
     /// <remarks>Okuma yetkisi composite "any-of": <c>Clinics.Read</c>, <c>Clinics.Update</c>, <c>Appointments.Create</c>, <c>Appointments.Reschedule</c>.</remarks>
     [HttpGet("availability")]
     [Authorize(Policy = AuthorizationPolicyNames.ClinicsSchedulingRead)]
@@ -87,7 +90,7 @@ public sealed class ClinicOnlineBookingController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAvailability(
         [FromRoute] Guid clinicId,
-        [FromQuery] Guid reasonId,
+        [FromQuery] Guid? reasonId,
         [FromQuery] DateOnly? from,
         [FromQuery] int? days,
         CancellationToken ct)

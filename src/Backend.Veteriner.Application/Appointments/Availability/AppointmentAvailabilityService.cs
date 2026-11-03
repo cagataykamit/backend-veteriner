@@ -33,17 +33,19 @@ public sealed class AppointmentAvailabilityService
         _veterinarians = veterinarians;
     }
 
+    /// <summary>Neden boşsa klinikteki tüm hekimler uygundur (online "Diğer / emin değilim"; ADR-042 ek md. 1).</summary>
     public async Task<IReadOnlyList<AvailabilityDay>> GetDaysAsync(
         Guid tenantId,
         Guid clinicId,
-        AppointmentReason reason,
+        AppointmentReason? reason,
+        int durationMinutes,
         DateOnly fromLocalDate,
         int days,
         DateTime earliestUtc,
         DateTime latestUtc,
         CancellationToken ct)
     {
-        var input = await BuildInputAsync(tenantId, clinicId, reason, reason.DefaultDurationMinutes, fromLocalDate, days, earliestUtc, latestUtc, ct);
+        var input = await BuildInputAsync(tenantId, clinicId, reason, durationMinutes, fromLocalDate, days, earliestUtc, latestUtc, ct);
         return AppointmentAvailabilityCalculator.Compute(input);
     }
 
@@ -51,14 +53,15 @@ public sealed class AppointmentAvailabilityService
     public async Task<AvailableSlot?> FindSlotAsync(
         Guid tenantId,
         Guid clinicId,
-        AppointmentReason reason,
+        AppointmentReason? reason,
+        int durationMinutes,
         DateTime startUtc,
         DateTime earliestUtc,
         DateTime latestUtc,
         CancellationToken ct)
     {
         var day = await GetDaysAsync(
-            tenantId, clinicId, reason, OperationDayBounds.ToLocalDate(startUtc), 1, earliestUtc, latestUtc, ct);
+            tenantId, clinicId, reason, durationMinutes, OperationDayBounds.ToLocalDate(startUtc), 1, earliestUtc, latestUtc, ct);
         return day.SelectMany(d => d.Slots).FirstOrDefault(s => s.StartUtc == startUtc);
     }
 
