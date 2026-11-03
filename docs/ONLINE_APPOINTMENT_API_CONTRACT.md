@@ -44,7 +44,7 @@ Pasif neden yeni randevuda 400; mevcut randevuda korunur. Hekim kliniğin aktif 
 | `GET` | `Clinics.Read` | Kayıt yoksa `isEnabled=false`, `bookingCode=null`. |
 | `PUT` | `Clinics.Update` | `{ isEnabled, minLeadMinutes, maxAdvanceDays }`; ilk kayıtta kod üretilir. Geçersiz aralık 400 `OnlineBooking.Validation`. |
 | `POST /regenerate-code` | `Clinics.Update` | Yeni kod; eski bağlantı hemen 404. |
-| `GET /availability?reasonId&from&days` | §2 GET ile aynı | Personel görünümü: `[{ date, slots: [{ startUtc, endUtc, freeVeterinarianUserIds }] }]`. Online sınırlar uygulanmaz; geçmiş saat dönmez. `days` 1–14 (varsayılan 7). |
+| `GET /availability?reasonId&from&days` | §2 GET ile aynı | Personel görünümü: `[{ date, slots: [{ startUtc, endUtc, freeVeterinarianUserIds }] }]`. Online sınırlar uygulanmaz; geçmiş saat dönmez. `days` 1–14 (varsayılan 7). `reasonId` isteğe bağlı: boşsa "Diğer" (§11). |
 
 ```json
 // ClinicOnlineBookingSettingsDto
@@ -70,6 +70,7 @@ Klinikte hekim yoksa klinik tek kaynaktır. **Bekleyen talepler saati bloke etme
 
 ```json
 // AppointmentRequestListItemDto
+// reasonId null ise "Diğer / emin değilim" talebi (§11)
 { "id": "…", "clinicId": "…", "status": 0, "source": 1, "reasonId": "…", "reasonName": "Aşı",
   "requestedStartUtc": "…", "durationMinutes": 30, "contactName": "Ayşe Yılmaz", "contactEmail": "ayse@…",
   "contactPhone": "905551234567", "clientId": null, "clientName": null, "petId": null, "petName": "Pamuk",
@@ -104,14 +105,15 @@ salt okunur ise sebep ayırt edilmeden 404 `OnlineBooking.NotFound`.
 
 | Uç | Açıklama |
 |---|---|
-| `GET` | `OnlineBookingPageDto`: `{ clinicName, clinicCity, clinicPhone, clinicAddress, minLeadMinutes, maxAdvanceDays, maxPendingRequests, reasons: [{ id, name, durationMinutes }] }` (yalnız aktif + online nedenler). |
-| `GET /availability?reasonId&from&days` | `[{ date, slots: [{ startUtc, endUtc }] }]`; online sınırlar uygulanır, hekim bilgisi dönmez. |
+| `GET` | `OnlineBookingPageDto`: `{ clinicName, clinicCity, clinicPhone, clinicAddress, minLeadMinutes, maxAdvanceDays, maxPendingRequests, reasons: [{ id, name, durationMinutes, requiresNote }] }` (aktif + online nedenler; sonda her zaman "Diğer", §11). |
+| `GET /availability?reasonId&from&days` | `[{ date, slots: [{ startUtc, endUtc }] }]`; online sınırlar uygulanır, hekim bilgisi dönmez. `reasonId` isteğe bağlı: boşsa "Diğer" (§11). |
 | `POST /verification-code` | `{ email }` → 204. 6 haneli kod, 10 dk, 5 deneme, 60 sn yeniden gönderim beklemesi (portal kod kuralları). |
 | `POST /requests` | Gövde aşağıda → 201 `{ id, status, requestedStartUtc }`. |
 
 ```json
 { "email": "…", "verificationCode": "123456", "contactName": "…", "phone": "05551234567",
   "petName": "Pamuk", "petSpecies": "Kedi", "petBreed": "Tekir", "reasonId": "…", "requestedStartUtc": "…", "note": "…" }
+// reasonId null/yoksa "Diğer": note zorunlu (§11)
 ```
 
 Kurallar: saat müsait listede olmalı (409 `AppointmentRequests.SlotUnavailable`); aynı e-posta + klinik için en fazla 3
@@ -127,7 +129,7 @@ bildirim gider.
 | `GET /booking` | §5 sayfa DTO'su (bağın kliniği; kapalıysa 404 `OnlineBooking.NotFound`). |
 | `GET /booking/availability?reasonId&from&days` | §5 ile aynı. |
 | `GET /appointment-requests` | Bağın müşterisinin bu klinikteki portal talepleri (son 50): `[{ id, status, reasonName, requestedStartUtc, durationMinutes, petId, petName, approvedStartUtc, wasRescheduled, rejectionReason, createdAtUtc, canCancel }]`. |
-| `POST /appointment-requests` | `{ petId? , petName?, petSpecies?, petBreed?, reasonId, requestedStartUtc, phone?, note? }` → 201. `petId` bağın müşterisinin hayvanı olmalı (değilse 404); yoksa `petName` zorunlu (klinik kaydı onayda oluşturur). Telefon boşsa müşteri kaydındaki. İletişim adı/e-posta müşteri kaydından ve hesaptan. |
+| `POST /appointment-requests` | `{ petId? , petName?, petSpecies?, petBreed?, reasonId?, requestedStartUtc, phone?, note? }` → 201. `reasonId` boşsa "Diğer" ve `note` zorunlu (§11). `petId` bağın müşterisinin hayvanı olmalı (değilse 404); yoksa `petName` zorunlu (klinik kaydı onayda oluşturur). Telefon boşsa müşteri kaydındaki. İletişim adı/e-posta müşteri kaydından ve hesaptan. |
 | `POST /appointment-requests/{id}/cancel` | Yalnız bekleyen; aksi 409 `AppointmentRequests.NotPending`. Kuyruk yetkisi olanlara bildirim. |
 
 `status` (liste ve 201 yanıtı; §5 bağlantı ucunun 201 yanıtı dahil) portal sözleşmesine uygun olarak **metindir**: `Pending` · `Approved` · `Rejected` · `Cancelled` · `Expired` (P1 Dalga 4b düzeltmesi; önce sayı dönüyordu, `PORTAL_API_CONTRACT.md` §13.4).
@@ -171,3 +173,19 @@ talebi gelince kliniğe erişen `OwnerPortal.Manage` izinli kullanıcılara (`PO
 `AppointmentReasonVeterinarians`, `ClinicOnlineBookingSettings`, `AppointmentRequests`, `AppointmentRequestStatusChanges`,
 `AppointmentRequestEmailVerifications`, `ClinicAppointmentRequestEmailTemplates`, `UserNotifications`. Yerel/paylaşılan
 veritabanına uygulanmadı.
+
+`AppointmentRequestReasonOptional` (§11) — `AppointmentRequests.ReasonId` nullable (FK `AppointmentReasons`'a nullable kalır).
+Paylaşılan veritabanına uygulanmadı.
+
+## 11. Ek (2026-11-03): "Diğer / emin değilim" (ADR-042 ek md. 1-2)
+
+Sistem her klinikte sağlar; klinik tanımlamaz, kapatamaz. Ad ve süre tek yerde: `AppointmentRequest.OtherReasonName`,
+`AppointmentRequest.OtherReasonDurationMinutes` (30).
+
+| Yer | Sözleşme |
+|---|---|
+| Sayfa (§5, §6 `GET /booking`) | `reasons[]` öğesi `{ id: Guid \| null, name, durationMinutes, requiresNote }`. Kliniğin nedenleri `requiresNote=false`; listenin **sonunda her zaman** `{ id: null, name: "Diğer / emin değilim", durationMinutes: 30, requiresNote: true }` — klinik hiç neden tanımlamamış olsa da. |
+| Müsaitlik (§5, §6 ve §3 personel) | `reasonId` isteğe bağlı. Yoksa süre 30 dk, klinikteki tüm hekimler uygun. Doluysa önceki davranış (online uçlarda aktif + online görünür neden, personel ucunda kliniğin nedeni; yoksa 404 `AppointmentReasons.NotFound`). `00000000-…` kimliği 400 doğrulama hatası. |
+| Talep (§5 `POST /requests`, §6 `POST /appointment-requests`) | `reasonId` isteğe bağlı (yok ya da `null`). Yoksa `note` zorunlu: kırpılmış en az 3 karakter (üst sınır 500); değilse 400 `AppointmentRequests.NoteRequired`, mesaj "Ne için geldiğinizi kısaca yazın." Kural domain'dedir; saat/bekleyen talep sınırı denetiminden sonra çalışır (bağlantıda doğrulama kodu tüketilmez). |
+| Personel (§4) | `AppointmentRequestListItemDto.reasonId` `null` olabilir; `reasonName` "Diğer / emin değilim", `durationMinutes` 30. Detayda `requestedSlotFree`/`freeVeterinarianUserIds` 30 dk ve tüm hekimlerle hesaplanır. Onayda randevu nedensiz (`reasonId=null`) ve talebin süresiyle (ya da gövdedeki `durationMinutes`) oluşur; hekim verilmezse o saatte boş herhangi bir hekim atanır. |
+| Portal taleplerim (§6) | Değişmedi; `reasonName` "Diğer / emin değilim". |
