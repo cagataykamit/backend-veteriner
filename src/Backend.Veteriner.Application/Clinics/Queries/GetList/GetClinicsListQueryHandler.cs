@@ -16,19 +16,22 @@ public sealed class GetClinicsListQueryHandler
     private readonly IClinicAssignmentAccessGuard _assignmentGuard;
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IReadRepository<ClinicTaxpayerSettings> _taxpayerSettings;
 
     public GetClinicsListQueryHandler(
         ITenantContext tenantContext,
         IClientContext clientContext,
         IClinicAssignmentAccessGuard assignmentGuard,
         IUserClinicRepository userClinics,
-        IReadRepository<Clinic> clinics)
+        IReadRepository<Clinic> clinics,
+        IReadRepository<ClinicTaxpayerSettings> taxpayerSettings)
     {
         _tenantContext = tenantContext;
         _clientContext = clientContext;
         _assignmentGuard = assignmentGuard;
         _userClinics = userClinics;
         _clinics = clinics;
+        _taxpayerSettings = taxpayerSettings;
     }
 
     public async ValueTask<Result<PagedResult<ClinicListItemDto>>> Handle(GetClinicsListQuery request, CancellationToken ct)
@@ -68,9 +71,7 @@ public sealed class GetClinicsListQueryHandler
             rows = await _clinics.ListAsync(new ClinicsByTenantPagedSpec(tenantId, page, pageSize), ct);
         }
 
-        var items = rows
-            .Select(c => new ClinicListItemDto(c.Id, c.TenantId, c.Name, c.City, c.IsActive, c.Phone, c.Email))
-            .ToList();
+        var items = await rows.ToListItemDtosAsync(_taxpayerSettings, tenantId, ct);
 
         return Result<PagedResult<ClinicListItemDto>>.Success(
             PagedResult<ClinicListItemDto>.Create(items, total, page, pageSize));

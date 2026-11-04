@@ -7,4 +7,5 @@ public sealed record ClinicListItemDto(
     string City,
     bool IsActive,
     string? Phone,
-    string? Email);
+    string? Email,
+    string ShortAddress);

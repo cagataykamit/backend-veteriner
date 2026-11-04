@@ -18,6 +18,14 @@ public sealed class GetMyClinicsQueryHandlerTests
     private readonly Mock<IUserClinicRepository> _userClinics = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IUserOperationClaimRepository> _userOperationClaims = new();
+    private readonly Mock<IReadRepository<ClinicTaxpayerSettings>> _taxpayerSettings = new();
+
+    public GetMyClinicsQueryHandlerTests()
+    {
+        _taxpayerSettings
+            .Setup(r => r.ListAsync(It.IsAny<ClinicTaxpayerSettingsByClinicIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicTaxpayerSettings>());
+    }
 
     private GetMyClinicsQueryHandler CreateHandler()
         => new(
@@ -27,7 +35,8 @@ public sealed class GetMyClinicsQueryHandlerTests
             _userTenants.Object,
             _userClinics.Object,
             _clinicsRead.Object,
-            _userOperationClaims.Object);
+            _userOperationClaims.Object,
+            _taxpayerSettings.Object);
 
     private void ArrangeTenantAndMembership(Guid tenantId, Guid userId, bool isMember = true, bool tenantActive = true)
     {
@@ -163,6 +172,33 @@ public sealed class GetMyClinicsQueryHandlerTests
         _clinicsRead.Verify(
             r => r.ListAsync(It.IsAny<ClinicsByTenantFilteredSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ComposeShortAddress_FromTaxpayerDistrictAndClinicCity()
+    {
+        var tid = Guid.NewGuid();
+        var uid = Guid.NewGuid();
+        ArrangeTenantAndMembership(tid, uid);
+        ArrangeClaimNames(uid, "Admin");
+
+        var withDistrict = MakeClinic(tid, "A", "İstanbul");
+        var cityOnly = MakeClinic(tid, "B", "Ankara");
+        _clinicsRead
+            .Setup(r => r.ListAsync(It.IsAny<ClinicsByTenantFilteredSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Clinic> { withDistrict, cityOnly });
+        var taxpayer = ClinicTaxpayerSettings.Create(
+            tid, withDistrict.Id, null, null, null, null, "İstanbul", "Kadıköy", null,
+            20m, null, Guid.NewGuid(), DateTime.UtcNow).Value!;
+        _taxpayerSettings
+            .Setup(r => r.ListAsync(It.IsAny<ClinicTaxpayerSettingsByClinicIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicTaxpayerSettings> { taxpayer });
+
+        var result = await CreateHandler().Handle(new GetMyClinicsQuery(null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Single(x => x.Name == "A").ShortAddress.Should().Be("Kadıköy, İstanbul");
+        result.Value!.Single(x => x.Name == "B").ShortAddress.Should().Be("Ankara");
     }
 
     [Fact]

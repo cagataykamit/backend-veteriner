@@ -15,6 +15,7 @@ public sealed class GetClinicsListQueryHandlerTests
     private readonly Mock<IClinicAssignmentAccessGuard> _assignmentGuard = new();
     private readonly Mock<IUserClinicRepository> _userClinics = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
+    private readonly Mock<IReadRepository<ClinicTaxpayerSettings>> _taxpayerSettings = new();
 
     public GetClinicsListQueryHandlerTests()
     {
@@ -22,6 +23,9 @@ public sealed class GetClinicsListQueryHandlerTests
         _assignmentGuard
             .Setup(x => x.MustApplyAssignedClinicScopeAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
+        _taxpayerSettings
+            .Setup(x => x.ListAsync(It.IsAny<ClinicTaxpayerSettingsByClinicIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicTaxpayerSettings>());
     }
 
     private GetClinicsListQueryHandler CreateHandler()
@@ -30,7 +34,8 @@ public sealed class GetClinicsListQueryHandlerTests
             _clientContext.Object,
             _assignmentGuard.Object,
             _userClinics.Object,
-            _clinicsRead.Object);
+            _clinicsRead.Object,
+            _taxpayerSettings.Object);
 
     private static Clinic BuildClinic(Guid id, Guid tenantId, string name)
     {
@@ -57,6 +62,7 @@ public sealed class GetClinicsListQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.TotalItems.Should().Be(1);
         result.Value.Items.Should().HaveCount(1);
+        result.Value.Items[0].ShortAddress.Should().Be("İstanbul");
         _userClinics.Verify(
             x => x.ListAccessibleClinicsAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<bool?>(), It.IsAny<CancellationToken>()),
             Times.Never);
