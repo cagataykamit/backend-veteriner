@@ -1741,7 +1741,7 @@ Mevcut `POST /api/v1/clinics`, `GET /api/v1/clinics`, `GET /api/v1/clinics/{id}`
 ### 25.7 Out-of-scope (Faz 5A)
 
 - **Last-active-clinic protection**: Tenant'ta en az 1 aktif klinik kalsın kuralı bu fazda eklenmez. Deactivate akışı tenant'ın tüm kliniklerini pasife alabilir. Bu kural ileri bir fazda `Clinics.LastActiveForbidden` kodu ile gelecek.
-- **Clinic DTO zenginleştirme**: `ClinicDetailDto`/`ClinicListItemDto` şekli değiştirilmez; `address`, `phone` vb. yeni alanlar şema/migration gerektireceği için bu fazda yok.
+- **Clinic DTO zenginleştirme**: `ClinicDetailDto`/`ClinicListItemDto` şekli değiştirilmez; `address`, `phone` vb. yeni alanlar şema/migration gerektireceği için bu fazda yok. (Sonradan `ClinicListItemDto`'ya `phone`, `email` ve `shortAddress` eklendi; güncel şekil: `docs/AUTH_TENANT_CONTRACT.md` "Klinik listesi".)
 - **Bulk işlem**: Toplu activate/deactivate veya bulk update endpoint'i açılmaz.
 - **Clinic create response formatı**: `POST /api/v1/clinics` yanıtı çıplak `Guid` olarak kalır.
 - **Permission cache invalidation**: Klinik update/activate/deactivate kullanıcı permission setini etkilemez; refresh/session revocation tetiklenmez.
