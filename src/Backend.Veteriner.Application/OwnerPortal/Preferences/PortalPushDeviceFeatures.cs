@@ -4,6 +4,7 @@ using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
 using FluentValidation;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Preferences;
 
@@ -102,7 +103,17 @@ public sealed class RegisterPortalPushDeviceCommandHandler : IRequestHandler<Reg
         if (others.Count > 0)
             await _devices.DeleteRangeAsync(others, ct);
 
-        await _devices.SaveChangesAsync(ct);
+        try
+        {
+            await _devices.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Aynı jetonla eşzamanlı iki kayıt: benzersiz indeks ikinciyi reddeder; jeton kayıtlıysa sonuç yine "kayıtlı".
+            if (!await _devices.AnyAsync(new OwnerPushDeviceByTokenSpec(token), ct))
+                throw;
+        }
+
         return Result.Success();
     }
 }
