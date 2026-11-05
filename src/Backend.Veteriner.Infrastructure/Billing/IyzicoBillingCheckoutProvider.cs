@@ -72,11 +72,16 @@ public sealed class IyzicoBillingCheckoutProvider : IBillingCheckoutProvider
         {
             planAmount = chargeAmountMinor.Value / 100m;
         }
-        else if (!IyzicoCheckoutPrerequisites.TryGetPlanPrice(iyzico.PlanPricesTry, targetPlan, out planAmount))
+        else if (SubscriptionPlanPrices.TryGetMonthlyPriceMinor(_billingOptions, session.TargetPlanCode, out var planPriceMinor))
+        {
+            // Tutar verilmediyse liste fiyatı çekilir; sitede gösterilen fiyatla aynı kuraldan okunur (WEB-007).
+            planAmount = planPriceMinor / 100m;
+        }
+        else
         {
             return Result<CheckoutPrepareResult>.Failure(
                 "Billing.IyzicoPlanPriceNotConfigured",
-                $"Iyzico plan fiyatı bulunamadı: {targetPlan}. Billing:Iyzico:PlanPricesTry içine ekleyin.");
+                $"Iyzico plan fiyatı bulunamadı: {targetPlan}. Billing:PlanPricesMinor ya da Billing:Iyzico:PlanPricesTry içine ekleyin.");
         }
 
         var buyerEmailResult = await ResolveBuyerEmailAsync(session, ct);

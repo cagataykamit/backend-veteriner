@@ -191,21 +191,21 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         // hedef planın seçilen dönem fiyatı tam çekilir (BILL-003, BILL-001); oranlama yalnız etkin ücretli dönem içinde.
         if (isExpiredReadOnly)
         {
-            if (!TryGetPlanPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
+            if (!SubscriptionPlanPrices.TryGetMonthlyPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
             {
                 return Result<SubscriptionCheckoutSessionDto>.Failure(
                     "Billing.PlanPriceNotConfigured",
                     "Yenileme için hedef plan fiyatı (minor unit) yapılandırılmalı.");
             }
 
-            chargeCurrency = ResolvePlanPriceCurrency(prices);
+            chargeCurrency = SubscriptionPlanPrices.Currency(prices);
             proratedChargeMinor = Math.Max(1, SubscriptionPricing.PeriodPriceMinor(targetPriceMinor, requestedPeriod));
             prorationRatio = 1.0m;
         }
         else if (switchesToYearly)
         {
-            if (!TryGetPlanPriceMinor(prices, sub.PlanCode, out var currentPriceMinor)
-                || !TryGetPlanPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
+            if (!SubscriptionPlanPrices.TryGetMonthlyPriceMinor(prices, sub.PlanCode, out var currentPriceMinor)
+                || !SubscriptionPlanPrices.TryGetMonthlyPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
             {
                 return Result<SubscriptionCheckoutSessionDto>.Failure(
                     "Billing.PlanPriceNotConfigured",
@@ -220,14 +220,14 @@ public sealed class StartSubscriptionCheckoutCommandHandler
                 SubscriptionPricing.PeriodPriceMinor(currentPriceMinor, sub.BillingPeriod),
                 SubscriptionPricing.PeriodPriceMinor(targetPriceMinor, requestedPeriod));
 
-            chargeCurrency = ResolvePlanPriceCurrency(prices);
+            chargeCurrency = SubscriptionPlanPrices.Currency(prices);
             proratedChargeMinor = Math.Max(1, periodSwitch.ProratedChargeMinor);
             prorationRatio = periodSwitch.ProrationRatio;
         }
         else if (decision == SubscriptionPlanChangeDecision.Upgrade)
         {
-            if (!TryGetPlanPriceMinor(prices, sub.PlanCode, out var currentPriceMinor)
-                || !TryGetPlanPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
+            if (!SubscriptionPlanPrices.TryGetMonthlyPriceMinor(prices, sub.PlanCode, out var currentPriceMinor)
+                || !SubscriptionPlanPrices.TryGetMonthlyPriceMinor(prices, targetPlanCode, out var targetPriceMinor))
             {
                 return Result<SubscriptionCheckoutSessionDto>.Failure(
                     "Billing.PlanPriceNotConfigured",
@@ -250,7 +250,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
                     "Upgrade fiyat farkı hesaplanamadı.");
             }
 
-            chargeCurrency = ResolvePlanPriceCurrency(prices);
+            chargeCurrency = SubscriptionPlanPrices.Currency(prices);
             proratedChargeMinor = Math.Max(1, proration.ProratedChargeMinor);
             prorationRatio = proration.ProrationRatio;
         }
@@ -436,29 +436,6 @@ public sealed class StartSubscriptionCheckoutCommandHandler
             BillingPeriod: session.BillingPeriod.ToString());
     }
 
-    private static string ResolvePlanPriceCurrency(BillingOptions options)
-    {
-        var configured = options.PlanPriceCurrency?.Trim();
-        return string.IsNullOrWhiteSpace(configured) ? "TRY" : configured.ToUpperInvariant();
-    }
-
-    private static bool TryGetPlanPriceMinor(BillingOptions options, SubscriptionPlanCode code, out long minor)
-    {
-        var apiCode = SubscriptionPlanCatalog.ToApiCode(code);
-        if (TryGetDictionaryValue(options.PlanPricesMinor, apiCode, out minor))
-            return true;
-
-        if (options.Iyzico.PlanPricesTry is { Count: > 0 }
-            && TryGetDictionaryValue(options.Iyzico.PlanPricesTry, apiCode, out var amountTry))
-        {
-            minor = (long)Math.Round(amountTry * 100m, MidpointRounding.AwayFromZero);
-            return minor > 0;
-        }
-
-        minor = 0;
-        return false;
-    }
-
     /// <summary>Boş değer geçerlidir (<c>null</c>: varsayılan dönem). Ad büyük/küçük harf duyarsız; sayısal değer (<c>"1"</c>) geçersiz.</summary>
     private static bool TryParseBillingPeriod(string? value, out BillingPeriodKind? period)
     {
@@ -473,27 +450,6 @@ public sealed class StartSubscriptionCheckoutCommandHandler
 
         period = parsed;
         return true;
-    }
-
-    private static bool TryGetDictionaryValue<T>(IReadOnlyDictionary<string, T>? map, string key, out T value)
-    {
-        value = default!;
-        if (map is null || map.Count == 0)
-            return false;
-
-        if (map.TryGetValue(key, out value!))
-            return true;
-
-        foreach (var pair in map)
-        {
-            if (string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase))
-            {
-                value = pair.Value;
-                return true;
-            }
-        }
-
-        return false;
     }
 }
 
