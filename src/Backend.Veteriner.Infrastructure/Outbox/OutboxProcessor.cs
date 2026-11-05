@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Outbox;
+using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.Projections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,9 +13,9 @@ namespace Backend.Veteriner.Infrastructure.Outbox;
 /// <summary>
 /// Outbox tablosundaki mesajları periyodik olarak işler.
 ///
-/// Desteklenen mesaj tipleri: e-posta outbox mesajları. Projeksiyon entegrasyon olayları (appointment, client, pet,
-/// payment) bu işlemciye girmez; her birinin kendi claim tabanlı işlemcisi vardır. Domain event yayını park edilmiştir
-/// (foundation-rules §9); tanınmayan tip dead-letter'a düşer.
+/// Desteklenen mesaj tipleri: e-posta ve hasta sahibi push (<see cref="OwnerPushDelivery"/>) outbox mesajları. Projeksiyon
+/// entegrasyon olayları (appointment, client, pet, payment) bu işlemciye girmez; her birinin kendi claim tabanlı işlemcisi
+/// vardır. Domain event yayını park edilmiştir (foundation-rules §9); tanınmayan tip dead-letter'a düşer.
 ///
 /// Kurumsal davranış: retry / exponential backoff / jitter, dead-letter desteği.
 /// Mesajlar işlenmeden önce kısa süreli claim (lease) ile sahiplenilir (<see cref="SqlGenericOutboxClaimRepository"/>);
@@ -151,6 +152,15 @@ public sealed class OutboxProcessor : BackgroundService
 
                     var smtp = sp.GetRequiredService<IEmailSenderImmediate>();
                     await smtp.SendAsync(payload.To, payload.Subject, payload.Body, ct, payload.IsHtml);
+                    return;
+                }
+
+            case OutboxMessageTypes.OwnerPush:
+                {
+                    var payload = JsonSerializer.Deserialize<OwnerPushOutboxPayload>(msg.Payload, JsonOptions)
+                                  ?? throw new InvalidOperationException("Invalid push payload");
+
+                    await sp.GetRequiredService<OwnerPushDelivery>().DeliverAsync(payload, ct);
                     return;
                 }
 

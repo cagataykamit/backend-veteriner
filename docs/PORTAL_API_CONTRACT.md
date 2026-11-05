@@ -461,7 +461,7 @@ Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıd
 
 ## 9) Kapsam dışı (v0)
 
-SMS ve telefon doğrulaması (AK-6), push **gönderimi** (yalnız soyutlama ve tercih, §13), WhatsApp Business API (otomatik gönderim; yalnız personel bağlantısı, §13.2), personel tarafı kiracı geneli davet listesi ekranı, oturum listesi ekranı, access token kara listesi. Veri talebi (§11) ve klinik bazında kapatma (§12) P1 Dalga 4b ile eklendi.
+SMS ve telefon doğrulaması (AK-6), push **gönderimi** FCM anahtarı gelene dek (kod hazır, sağlayıcı arayüzü arkasında; §14), WhatsApp Business API (otomatik gönderim; yalnız personel bağlantısı, §13.2), personel tarafı kiracı geneli davet listesi ekranı, oturum listesi ekranı, access token kara listesi. Veri talebi (§11) ve klinik bazında kapatma (§12) P1 Dalga 4b ile eklendi.
 
 ---
 
@@ -479,7 +479,7 @@ Migration: **`AddPortalPreferencesDataRequestsAndSettings`** (`OwnerAccounts.Pus
 { "push": { "enabled": false, "available": false } }
 ```
 
-- `push.enabled`: hesabın push tercihi (`OwnerAccounts.PushEnabled`, varsayılan `false`). `available`: sunucuda push sağlayıcısı yapılandırılmış mı (`IPushNotificationSender.IsConfigured`); bu sürümde FCM/APNs anahtarı yok (dış bağımlılık, MOBILE-003), her zaman `false`. Tercih şimdiden saklanır, anahtar gelince yeniden sorulmaz.
+- `push.enabled`: hesabın push tercihi (`OwnerAccounts.PushEnabled`, varsayılan `false`). `available`: sunucuda push sağlayıcısı yapılandırılmış mı (`IPushNotificationSender.IsConfigured`); yalnız `Push:Fcm` anahtarı varken `true` (MOBILE-003, §14.6). Tercih şimdiden saklanır, anahtar gelince yeniden sorulmaz. `deviceCount` ve cihaz kaydı §14.
 - `PUT` gövdesi `{ "pushEnabled": true }` → 200, GET şekli. Denetim `Portal.NotificationPreferences.Update`, hedef `OwnerAccountId=…`.
 
 ### 10.2 Bağ düzeyi — `GET/PUT /api/portal/v1/links/{linkId}/notification-preferences`
@@ -575,9 +575,9 @@ Tek yer: `Domain/Notifications/OwnerNotificationChannelPolicy`. Her tür bir **k
 | `Reminder` | `AppointmentReminder`, `VaccinationReminder` | `Preference` (`Client.AcceptsReminders`) | `Preference` | `StaffManual` |
 | `Marketing` | `Marketing` | `Preference` + `MarketingSendingEnabled` (şimdilik `false` → `Disabled`) | `Disabled` | `Disabled` |
 
-Kanallar (`OwnerNotificationChannel`): `Email` (mevcut outbox/MailKit hattı), `Push` (`IPushNotificationSender` soyutlaması; bu sürümde `NotConfiguredPushNotificationSender`, `IsConfigured=false`, gönderim yok; FCM/APNs anahtarı dış bağımlılık), `WhatsAppLink` (yalnız personelin açtığı `wa.me` bağlantısı; sistem göndermez, teslim durumu yoktur — AK-6). `Preference` modlu push, sağlayıcı yokken `NotConfigured` raporlanır.
+Kanallar (`OwnerNotificationChannel`): `Email` (mevcut outbox/MailKit hattı), `Push` (`IPushNotificationSender` → outbox → `IPushNotificationProvider`; FCM anahtarı yokken `NotConfiguredPushNotificationProvider`, `IsConfigured=false`, gönderim yok; §14), `WhatsAppLink` (yalnız personelin açtığı `wa.me` bağlantısı; sistem göndermez, teslim durumu yoktur — AK-6). `Preference` modlu push, sağlayıcı yokken `NotConfigured` raporlanır.
 
-- `IOwnerNotificationDispatcher.DispatchAsync(OwnerNotificationMessage)` (tür, hesap, e-posta, push tercihi, kategori tercihi, metinler): politikayı sorar, e-postayı outbox'a yazar (çağıranın işlemiyle aynı commit), push'u soyutlamaya verir. Bu dalgada yeni gönderim (`DataRequestAnswered`) dispatcher'dan geçer. Mevcut gönderimler (davet, kod, hesap silme, randevu talebi e-postaları, hatırlatma işleyicisi) politika satırlarıyla **uyumludur**; dispatcher'a taşınmaları sonraki dalgaya bırakıldı (teknik borç).
+- `IOwnerNotificationDispatcher.DispatchAsync(OwnerNotificationMessage)` (tür, hesap, e-posta, push tercihi, kategori tercihi, metinler): politikayı sorar, e-postayı outbox'a yazar (çağıranın işlemiyle aynı commit), push'u da outbox'a yazar (§14.5). Bu dalgada yeni gönderim (`DataRequestAnswered`) dispatcher'dan geçer. Mevcut gönderimler (davet, kod, hesap silme, randevu talebi e-postaları, hatırlatma işleyicisi) politika satırlarıyla **uyumludur**; dispatcher'a taşınmaları sonraki dalgaya bırakıldı (teknik borç).
 - `GET /api/v1/portal-notification-rules` (`Clinics.Read`) → matris, panelde salt okunur: `[ { "type": "AppointmentReminder", "category": "Reminder", "channels": [ { "channel": "Email", "mode": "Preference" }, { "channel": "Push", "mode": "NotConfigured" }, { "channel": "WhatsAppLink", "mode": "StaffManual" } ] } ]`. `mode`: `Always` · `Preference` · `StaffManual` · `NotConfigured` · `Disabled`.
 
 ### 13.2 WhatsApp bağlantısı — `GET /api/v1/clients/{clientId}/whatsapp-link?kind=&targetId=`
@@ -613,3 +613,73 @@ Kanallar (`OwnerNotificationChannel`): `Email` (mevcut outbox/MailKit hattı), `
 ### 13.4 Düzeltme: portal randevu talebi `status`
 
 `ONLINE_APPOINTMENT_API_CONTRACT.md` §6 portal talep listesinde ve oluşturma yanıtında `status` sayı dönüyordu; portal sözleşmesi (§1) enumları **metin** ister. `status` artık `Pending` / `Approved` / `Rejected` / `Cancelled` / `Expired` metnidir (kimliksiz bağlantı ucunun 201 yanıtı da). Personel kuyruğu (§4) değişmez.
+
+---
+
+# MOBILE-003 eki — push altyapısı (dal `feat/push-altyapisi`)
+
+Migration: **`AddOwnerPushDevices`** (`OwnerPushDevices` tablosu). Yalnız yerel DB. Push **sağlayıcı arayüzü arkasındadır**: FCM anahtarı yoksa gönderim yapılmaz, yalnız log yazılır (`NotConfiguredPushNotificationProvider`, `available=false`); anahtar eklenince açılışta FCM HTTP v1 sağlayıcısı seçilir, çağıranlar değişmez (ADR-031 K8). Gerçek Firebase'e karşı denenmedi (anahtar yok); sağlayıcı sahte HTTP ile test edildi.
+
+## 14) Push cihazları ve gönderim (ADR-031 K4/K7)
+
+### 14.1 Model ve kurallar
+
+Tablo `OwnerPushDevices`: `Id`, `OwnerAccountId` (FK, hesap silinince cascade), `Platform` (`Android`/`Ios`/`Web`), `Token nvarchar(512)` (**sistem genelinde benzersiz**), `CreatedAtUtc`, `LastSeenAtUtc`. Cihaz adı, model, IP tutulmaz (veri azaltma).
+
+- **Hesap düzeyindedir, kiracıya bağlı değildir** (portal hesabı birden çok kliniğe bağlıdır, AK-3). Hangi kliniğin hangi bildirimi gönderebileceği bildirimi üreten taraftadır (bağ çözümü + `OwnerNotificationChannelPolicy` + tür kategorisinin tercihi: hatırlatmada `Client.RemindersOptedOut`, §5.11). Push tercihi hesap düzeyidir (`OwnerAccounts.PushEnabled`, §10.1).
+- Kayıt yalnız push tercihi **açıkken** yapılır; tercih kapanınca hesabın tüm jetonları silinir (yeniden açınca istemci kaydeder). Tüm cihazlardan çıkış (`auth/logout-all`) ve hesap silme (§5.10) de jetonları siler. Tek oturum çıkışında istemci önce `revoke` çağırır.
+- Aynı jeton başka hesapla kaydedilirse jeton o hesaba geçer (aynı cihazda oturum değişimi). Hesap başına en fazla **10** cihaz (`OwnerPushDevice.MaxDevicesPerAccount`); aşılınca en uzun süredir görülmeyen düşer.
+- Ham jeton denetim yüküne yazılmaz (`Token`, `PreviousToken` maskelenir) ve loglanmaz.
+
+### 14.2 `PUT /api/portal/v1/me/push-devices` — kayıt / yenileme (idempotent)
+
+```json
+{ "platform": "Android", "token": "<fcm-registration-token>", "previousToken": null }
+```
+
+- 204. `platform` zorunlu (`Android` · `Ios` · `Web`), `token` 1–512 karakter (trim). Aynı jeton yeniden gelirse yeni satır açılmaz; `platform`, hesap ve `LastSeenAtUtc` güncellenir; aynı jetonla eşzamanlı iki istek de 204 döner (benzersiz indeks, tek satır). İstemci uygulama her açılışta çağırabilir.
+- `previousToken`: sağlayıcı jetonu yenilediyse eski jeton; bu hesaba aitse silinir.
+- Hatalar: 409 `Portal.Push.Disabled` (push tercihi kapalı; önce §10.1 `PUT { "pushEnabled": true }`), 400 `Validation.FluentValidation`, 401.
+- Denetim `Portal.PushDevices.Register`, hedef `OwnerAccountId=…`.
+
+### 14.3 `POST /api/portal/v1/me/push-devices/revoke` — kaldırma
+
+`{ "token": "…" }` → 204. Bilinmeyen ya da başka hesabın jetonu da 204 (ayırt edilmez, silinmez). Denetim `Portal.PushDevices.Revoke`.
+
+### 14.4 §10.1 eki
+
+`GET/PUT /me/notification-preferences` yanıtındaki `push` nesnesine `deviceCount` (kayıtlı cihaz sayısı) eklendi:
+
+```json
+{ "push": { "enabled": true, "available": false, "deviceCount": 1 } }
+```
+
+`available=false` iken tercih ve cihaz kaydı saklanır, gönderim yapılmaz; istemci "henüz etkin değil" açıklaması gösterir.
+
+### 14.5 Gönderim hattı
+
+1. `IOwnerNotificationDispatcher` push'u kurala göre seçer (§13; kod/davet push'a yazılmaz, ticari kapalı) ve `IPushNotificationSender` (`OutboxPushNotificationSender`) ile **outbox'a** yazar: tip `OwnerPush`, yük `{ ownerAccountId, type, title, body }` — cihaz jetonu taşımaz; çağıranın işlemiyle aynı commit. Sağlayıcı yapılandırılmadıysa hiçbir şey yazılmaz.
+2. `OutboxProcessor` → `OwnerPushDelivery`: hesap aktif ve `PushEnabled` mi **teslim anında yeniden** okunur; hesabın her cihazına `IPushNotificationProvider.SendAsync`. Sonuç:
+   - `InvalidToken` (FCM `UNREGISTERED`, `SENDER_ID_MISMATCH`, `INVALID_ARGUMENT`, gövdesiz/`NOT_FOUND` 404) → cihaz satırı silinir.
+   - Hiçbir cihaza ulaşılamadı ve en az bir geçici hata (429, 5xx, ağ, 401/403 yapılandırma) → istisna, outbox yeniden dener (backoff, dead-letter). Kısmi başarıda yeniden denenmez (ulaşan cihaza ikinci kez gitmesin).
+3. FCM ileti gövdesi: `notification { title, body }` + `data { type }` (`OwnerNotificationType` metni; istemci yönlendirmesi için). iOS APNs anahtarı Firebase konsoluna yüklenir; Vetinity doğrudan APNs'e bağlanmaz. Web push da FCM jetonuyla gelir.
+4. Bu dalgada push'a giden tür yalnız dispatcher'dan geçenlerdir (`DataRequestAnswered`). Randevu/aşı hatırlatması ve randevu talebi e-postaları dispatcher'a henüz taşınmadı (PORTAL-010 teknik borcu); taşınınca push kendiliğinden açılır.
+
+### 14.6 Yapılandırma (`Push:Fcm`; değerler user-secrets/ortam değişkeni, **depoya yazılmaz**)
+
+| Anahtar | Not |
+|---|---|
+| `Push:Fcm:ServiceAccountJson` | Firebase hizmet hesabı JSON'unun içeriği (ortam değişkeni `Push__Fcm__ServiceAccountJson`) |
+| `Push:Fcm:ServiceAccountFile` | Ya da JSON dosyasının yolu (sunucuda yalnız uygulama kullanıcısı okuyabilmeli) |
+| `Push:Fcm:ProjectId` | İsteğe bağlı; yoksa JSON'daki `project_id` |
+
+- İkisi de yoksa push kapalıdır (no-op, `available=false`). Biri verilmiş ama okunamıyor/eksik alanlı/özel anahtar geçersizse **API açılmaz** (hata iletisi değer içermez; `FcmServiceAccount.Load`).
+- Hizmet hesabına yalnız "Firebase Cloud Messaging API" yetkisi verilir. OAuth erişim jetonu bellekte tutulur (1 sa, 5 dk önce yenilenir); HTTP zaman aşımı 10 sn.
+- Yerelde: `dotnet user-secrets set "Push:Fcm:ServiceAccountFile" "<yol>" --project src/Backend.Veteriner.Api`.
+
+### 14.7 Uç tablosu eki
+
+| Yöntem | Yol | Kimlik |
+|---|---|---|
+| PUT | `/api/portal/v1/me/push-devices` | Portal |
+| POST | `/api/portal/v1/me/push-devices/revoke` | Portal |

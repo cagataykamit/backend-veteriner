@@ -8,15 +8,16 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Application.Notifications;
 
 /// <summary>
-/// Push sağlayıcı soyutlaması (PORTAL-010; MOBILE-003). FCM/APNs anahtarları dış bağımlılıktır; anahtar gelene dek
-/// <see cref="IsConfigured"/> <c>false</c> döner ve gönderim yapılmaz. Sağlayıcı değiştirilebilir (ADR-031 K8).
+/// Hesap düzeyi push gönderimi (PORTAL-010; MOBILE-003): bildirimi outbox'a çağıranın işlemiyle aynı commit'te yazar, cihazlara
+/// teslim <see cref="OwnerPushDelivery"/> ile arka planda yapılır. Sağlayıcı (<see cref="IPushNotificationProvider"/>) yapılandırılmadıysa
+/// <see cref="IsConfigured"/> <c>false</c> döner ve hiçbir şey yazılmaz. Sağlayıcı değiştirilebilir (ADR-031 K8).
 /// </summary>
 public interface IPushNotificationSender
 {
     bool IsConfigured { get; }
 
-    /// <summary>Hesabın cihazlarına bildirim; gönderildiyse <c>true</c>. Metin asgari veri taşır (K7).</summary>
-    Task<bool> SendAsync(Guid ownerAccountId, string title, string body, CancellationToken ct);
+    /// <summary>Hesabın cihazlarına bildirim kuyruğa alındıysa <c>true</c>. Metin asgari veri taşır (K7).</summary>
+    Task<bool> SendAsync(OwnerNotificationType type, Guid ownerAccountId, string title, string body, CancellationToken ct);
 }
 
 /// <summary>Hasta sahibine giden tek bildirim; kanal tercihleri çağıran tarafından doldurulur.</summary>
@@ -34,11 +35,11 @@ public sealed record OwnerNotificationMessage(
     string PushBody);
 
 /// <summary>Hangi kanaldan gittiği (denetim ve test için).</summary>
-public sealed record OwnerNotificationDispatchResult(bool EmailQueued, bool PushSent);
+public sealed record OwnerNotificationDispatchResult(bool EmailQueued, bool PushQueued);
 
 /// <summary>
-/// Hasta sahibi bildirimini tür × kanal kuralına (<see cref="OwnerNotificationChannelPolicy"/>) göre gönderir: e-posta outbox'a
-/// çağıranın işlemiyle aynı commit'te yazılır, push soyutlamaya verilir. WhatsApp sistem kanalı değildir (personel bağlantısı).
+/// Hasta sahibi bildirimini tür × kanal kuralına (<see cref="OwnerNotificationChannelPolicy"/>) göre gönderir: e-posta ve push
+/// outbox'a çağıranın işlemiyle aynı commit'te yazılır. WhatsApp sistem kanalı değildir (personel bağlantısı).
 /// </summary>
 public interface IOwnerNotificationDispatcher
 {
@@ -68,7 +69,7 @@ public sealed class OwnerNotificationDispatcher : IOwnerNotificationDispatcher
             emailQueued = true;
         }
 
-        var pushSent = false;
+        var pushQueued = false;
         var pushOptIn = message.PushEnabled
                         && (OwnerNotificationChannelPolicy.CategoryOf(message.Type) == OwnerNotificationCategory.Transactional || message.RecipientOptedIn);
         if (OwnerNotificationChannelPolicy.ShouldSend(message.Type, OwnerNotificationChannel.Push, _push.IsConfigured, pushOptIn))
@@ -76,15 +77,15 @@ public sealed class OwnerNotificationDispatcher : IOwnerNotificationDispatcher
             // Push en iyi çabadır: başarısızlık işlemi bozmaz, e-posta asıl kanaldır.
             try
             {
-                pushSent = await _push.SendAsync(message.OwnerAccountId, message.PushTitle, message.PushBody, ct);
+                pushQueued = await _push.SendAsync(message.Type, message.OwnerAccountId, message.PushTitle, message.PushBody, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "Push bildirimi gönderilemedi. Type={Type} OwnerAccountId={OwnerAccountId}", message.Type, message.OwnerAccountId);
+                _logger.LogWarning(ex, "Push bildirimi kuyruğa alınamadı. Type={Type} OwnerAccountId={OwnerAccountId}", message.Type, message.OwnerAccountId);
             }
         }
 
-        return new OwnerNotificationDispatchResult(emailQueued, pushSent);
+        return new OwnerNotificationDispatchResult(emailQueued, pushQueued);
     }
 }
 

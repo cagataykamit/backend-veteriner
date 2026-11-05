@@ -14,8 +14,8 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Backend.Veteriner.Api.Controllers.Portal;
 
 /// <summary>
-/// Hasta sahibi bildirim tercihleri ve KVKK veri talebi (PORTAL-007; docs/PORTAL_API_CONTRACT.md §10–11). Bağ kapsamlı uçlar sahipliği
-/// ve klinik portal ayarını <c>OwnerPortalAccess</c> ile denetler.
+/// Hasta sahibi bildirim tercihleri, push cihazları ve KVKK veri talebi (PORTAL-007, MOBILE-003; docs/PORTAL_API_CONTRACT.md §10–11, §14).
+/// Bağ kapsamlı uçlar sahipliği ve klinik portal ayarını <c>OwnerPortalAccess</c> ile denetler.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -53,6 +53,37 @@ public sealed class PortalPreferencesController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new UpdatePortalAccountNotificationPreferencesCommand(ownerAccountId, body.PushEnabled), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Bu cihazın push jetonunu kaydeder ya da yeniler (§14.2; idempotent). Push tercihi kapalıysa 409 <c>Portal.Push.Disabled</c>.</summary>
+    [HttpPut("me/push-devices")]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RegisterPushDevice([FromBody] PortalPushDeviceBody body, CancellationToken ct)
+    {
+        if (!this.TryGetOwnerAccountId(out var ownerAccountId, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new RegisterPortalPushDeviceCommand(ownerAccountId, body.Platform, body.Token, body.PreviousToken), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Bu cihazın push jetonunu kaldırır (çıkış, izin geri alma); bilinmeyen jeton da 204 (§14.3).</summary>
+    [HttpPost("me/push-devices/revoke")]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RevokePushDevice([FromBody] PortalPushDeviceRevokeBody body, CancellationToken ct)
+    {
+        if (!this.TryGetOwnerAccountId(out var ownerAccountId, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new RevokePortalPushDeviceCommand(ownerAccountId, body.Token), ct);
         return result.ToActionResult(this);
     }
 
@@ -140,6 +171,13 @@ public sealed class PortalPreferencesController : ControllerBase
 public sealed record PortalAccountPreferencesBody(bool? PushEnabled);
 
 public sealed record PortalLinkPreferencesBody(bool? RemindersOptedOut, bool? MarketingConsented);
+
+public sealed record PortalPushDeviceBody(
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] OwnerPushPlatform? Platform,
+    string? Token,
+    string? PreviousToken);
+
+public sealed record PortalPushDeviceRevokeBody(string? Token);
 
 public sealed record PortalDataRequestBody(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] OwnerDataRequestType? Type,

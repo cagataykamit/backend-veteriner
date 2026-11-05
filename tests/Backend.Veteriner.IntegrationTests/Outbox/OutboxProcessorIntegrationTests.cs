@@ -4,8 +4,11 @@ using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Outbox;
+using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
+using Backend.Veteriner.Domain.Notifications;
+using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Infrastructure.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
@@ -255,6 +258,79 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         {
             await processor.StopAsync(CancellationToken.None);
         }
+    }
+
+    [Fact]
+    public async Task ProcessBatch_Should_DeliverOwnerPush_And_RemoveInvalidTokens()
+    {
+        await ClearOutboxAsync();
+        var (accountId, goodToken, badToken) = await SeedPushAccountAsync();
+        Push.OnSend(badToken, PushDeliveryOutcome.InvalidToken);
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var sender = scope.ServiceProvider.GetRequiredService<IPushNotificationSender>();
+            sender.IsConfigured.Should().BeTrue();
+            (await sender.SendAsync(OwnerNotificationType.DataRequestAnswered, accountId, "Merkez: veri talebiniz yanıtlandı", "Portalı açın.", CancellationToken.None))
+                .Should().BeTrue();
+            await scope.ServiceProvider.GetRequiredService<AppDbContext>().SaveChangesAsync();
+        }
+
+        var row = await SingleAsync(m => m.Type == OutboxMessageTypes.OwnerPush);
+        row.Payload.Should().NotContain(goodToken, "outbox yükü cihaz jetonu taşımaz");
+
+        (await NewProcessor().ProcessBatchAsync(CancellationToken.None)).Should().Be(1);
+
+        Push.Sent.Where(s => s.Token == goodToken).Should().ContainSingle()
+            .Which.Message.Type.Should().Be(OwnerNotificationType.DataRequestAnswered);
+        (await GetAsync(row.Id)).ProcessedAtUtc.Should().NotBeNull();
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.OwnerPushDevices.Where(d => d.OwnerAccountId == accountId).Select(d => d.Token).ToListAsync())
+                .Should().BeEquivalentTo([goodToken], "geçersiz jeton silinir");
+        }
+    }
+
+    [Fact]
+    public async Task ProcessBatch_Should_RetryOwnerPush_WhenNoDeviceIsReached()
+    {
+        await ClearOutboxAsync();
+        var (accountId, goodToken, badToken) = await SeedPushAccountAsync();
+        Push.OnSend(goodToken, PushDeliveryOutcome.Failed);
+        Push.OnSend(badToken, PushDeliveryOutcome.Failed);
+        var payload = JsonSerializer.Serialize(new OwnerPushOutboxPayload
+        {
+            OwnerAccountId = accountId,
+            Type = OwnerNotificationType.AppointmentRequestApproved,
+            Title = "Randevu talebiniz onaylandı",
+            Body = "Portalı açın.",
+        });
+        var id = await AddMessageAsync(OutboxMessageTypes.OwnerPush, payload, BaseTime);
+
+        (await NewProcessor().ProcessBatchAsync(CancellationToken.None)).Should().Be(0);
+
+        var row = await GetAsync(id);
+        row.ProcessedAtUtc.Should().BeNull();
+        row.RetryCount.Should().Be(1, "hiçbir cihaza ulaşılamazsa outbox yeniden dener");
+    }
+
+    private RecordingPushNotificationProvider Push => _factory.Services.GetRequiredService<RecordingPushNotificationProvider>();
+
+    private async Task<(Guid AccountId, string GoodToken, string BadToken)> SeedPushAccountAsync()
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var now = DateTime.UtcNow;
+        var account = OwnerAccount.Create($"push-{Guid.NewGuid():N}@example.com", "Push Sahip", now);
+        account.SetPushEnabled(true);
+        var good = $"good-{Guid.NewGuid():N}";
+        var bad = $"bad-{Guid.NewGuid():N}";
+        db.AddRange(account,
+            OwnerPushDevice.Create(account.Id, OwnerPushPlatform.Android, good, now),
+            OwnerPushDevice.Create(account.Id, OwnerPushPlatform.Ios, bad, now));
+        await db.SaveChangesAsync();
+        return (account.Id, good, bad);
     }
 
     private static DateTime BaseTime => DateTime.UtcNow.AddHours(-2);

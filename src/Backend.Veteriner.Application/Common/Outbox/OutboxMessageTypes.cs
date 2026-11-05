@@ -14,5 +14,9 @@ public static class OutboxMessageTypes
     /// Geçmişte üretilmiş legacy varyant (geriye dönük uyumluluk için).
     /// </summary>
     public const string EmailLegacy = "email";
-}
 
+    /// <summary>
+    /// Hasta sahibi hesabına push bildirimi (MOBILE-003; <c>OwnerPushOutboxPayload</c>).
+    /// </summary>
+    public const string OwnerPush = "OwnerPush";
+}

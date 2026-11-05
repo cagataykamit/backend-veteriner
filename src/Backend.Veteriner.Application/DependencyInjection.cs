@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<OnlineBookingClinicResolver>();
         services.AddScoped<IUserNotificationPublisher, UserNotificationPublisher>();
         services.AddScoped<IOwnerNotificationDispatcher, OwnerNotificationDispatcher>();
+        services.AddScoped<OwnerPushDelivery>();
         services.AddScoped<AppointmentRequestEmailComposer>();
         services.AddScoped<AppointmentRequestVerificationService>();
         services.AddScoped<AppointmentRequestIntake>();

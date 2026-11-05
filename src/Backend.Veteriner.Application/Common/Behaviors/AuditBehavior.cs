@@ -26,6 +26,9 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         "Password", "CurrentPassword", "NewPassword", "ConfirmPassword", "Token", "RefreshToken", "AccessToken",
         "Secret", "ApiKey", "ClientSecret", "Hash", "PasswordHash", "OneTimeCode",
 
+        // Push cihaz jetonu (MOBILE-003): "Token" yukarıda; sağlayıcının yenilediği eski jeton da maskelenir.
+        "PreviousToken",
+
         // KVKK veri talebi metni ve kliniğin yanıtı kişisel/sağlık bilgisi taşıyabilir (PORTAL-007); denetimde yalnız tür ve durum kalır.
         "RequestText", "ResponseNote"
     };

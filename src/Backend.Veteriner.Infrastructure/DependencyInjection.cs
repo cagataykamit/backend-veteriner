@@ -194,7 +194,7 @@ public static class DependencyInjection
         services.AddScoped<IVisitOpenItemsReader, VisitOpenItemsReader>();
         services.AddScoped<IClinicVeterinarianReader, ClinicVeterinarianReader>();
         services.AddScoped<IUserNotificationRecipientReader, UserNotificationRecipientReader>();
-        services.AddSingleton<IPushNotificationSender, Notifications.NotConfiguredPushNotificationSender>();
+        AddPushNotifications(services, configuration);
         services.AddScoped<IDashboardFinancePaymentAggregatesReader, DashboardFinancePaymentAggregatesReader>();
         services.AddScoped<IPaymentPetCountReader, PaymentPetCountReader>();
         services.AddScoped<IAppointmentsReportStatusBreakdownReader, AppointmentsReportStatusBreakdownReader>();
@@ -432,5 +432,26 @@ public static class DependencyInjection
 
 
         return services;
+    }
+
+    /// <summary>
+    /// Push (MOBILE-003): <c>Push:Fcm</c> hizmet hesabı varsa FCM HTTP v1, yoksa yalnız log yazan sağlayıcı. Anahtar var ama geçersizse
+    /// açılış durur. Gönderim her iki durumda outbox üzerindendir.
+    /// </summary>
+    private static void AddPushNotifications(IServiceCollection services, IConfiguration configuration)
+    {
+        var fcmAccount = Notifications.FcmServiceAccount.Load(configuration);
+        if (fcmAccount is null)
+        {
+            services.AddSingleton<IPushNotificationProvider, Notifications.NotConfiguredPushNotificationProvider>();
+        }
+        else
+        {
+            services.AddHttpClient(Notifications.FcmPushNotificationProvider.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(10));
+            services.AddSingleton(fcmAccount);
+            services.AddSingleton<IPushNotificationProvider, Notifications.FcmPushNotificationProvider>();
+        }
+
+        services.AddScoped<IPushNotificationSender, Notifications.OutboxPushNotificationSender>();
     }
 }

@@ -97,6 +97,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<OwnerPortalCode> OwnerPortalCodes => Set<OwnerPortalCode>();
     public DbSet<OwnerPortalRefreshToken> OwnerPortalRefreshTokens => Set<OwnerPortalRefreshToken>();
     public DbSet<OwnerDataRequest> OwnerDataRequests => Set<OwnerDataRequest>();
+    public DbSet<OwnerPushDevice> OwnerPushDevices => Set<OwnerPushDevice>();
 
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<UserClinic> UserClinics => Set<UserClinic>();
