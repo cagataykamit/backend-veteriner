@@ -593,7 +593,8 @@ public sealed class ClinicsController : ControllerBase
             body.Phone,
             body.Email,
             body.Address,
-            body.Description);
+            body.Description,
+            body.District);
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);
     }

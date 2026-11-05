@@ -60,7 +60,8 @@ public sealed class CreateClinicCommandHandler : IRequestHandler<CreateClinicCom
             request.Phone,
             request.Email,
             request.Address,
-            request.Description);
+            request.Description,
+            request.District);
         await _clinicsWrite.AddAsync(clinic, ct);
         await _clinicsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(clinic.Id);

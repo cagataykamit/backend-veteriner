@@ -8,44 +8,32 @@ public sealed class ClinicListItemMappingsTests
 {
     private static readonly Guid TenantId = Guid.NewGuid();
 
-    private static ClinicTaxpayerSettings Taxpayer(Clinic clinic, string? province, string? district)
-        => ClinicTaxpayerSettings.Create(
-            TenantId, clinic.Id, null, null, null, null, province, district, null,
-            20m, null, Guid.NewGuid(), DateTime.UtcNow).Value!;
-
     [Fact]
-    public void ShortAddress_Should_BeCity_When_NoTaxpayerSettings()
+    public void ShortAddress_Should_BeDistrictAndCity_When_DistrictSet()
     {
-        var clinic = new Clinic(TenantId, "A", "İstanbul");
+        var clinic = new Clinic(TenantId, "A", "İstanbul", district: "Kadıköy");
 
-        ClinicListItemMappings.ShortAddress(clinic, null).Should().Be("İstanbul");
-    }
-
-    [Fact]
-    public void ShortAddress_Should_BeCity_When_TaxpayerHasNoDistrict()
-    {
-        var clinic = new Clinic(TenantId, "A", "İstanbul");
-
-        ClinicListItemMappings.ShortAddress(clinic, Taxpayer(clinic, "İstanbul", "  ")).Should().Be("İstanbul");
+        ClinicListItemMappings.ShortAddress(clinic).Should().Be("Kadıköy, İstanbul");
     }
 
     [Theory]
-    [InlineData("İstanbul")]
-    [InlineData("istanbul")] // Türkçe büyük/küçük harf duyarsız
     [InlineData(null)]
-    public void ShortAddress_Should_BeDistrictAndCity_When_ProvinceMatchesOrMissing(string? province)
+    [InlineData("   ")]
+    public void ShortAddress_Should_BeCity_When_NoDistrict(string? district)
     {
-        var clinic = new Clinic(TenantId, "A", "İstanbul");
+        var clinic = new Clinic(TenantId, "A", "İstanbul", district: district);
 
-        ClinicListItemMappings.ShortAddress(clinic, Taxpayer(clinic, province, "Kadıköy"))
-            .Should().Be("Kadıköy, İstanbul");
+        ClinicListItemMappings.ShortAddress(clinic).Should().Be("İstanbul");
     }
 
     [Fact]
-    public void ShortAddress_Should_BeCity_When_TaxpayerProvinceDiffers()
+    public void ToListItemDto_Should_CarryDistrictAndShortAddress()
     {
-        var clinic = new Clinic(TenantId, "A", "Ankara");
+        var clinic = new Clinic(TenantId, "A", "Ankara", district: "Çankaya");
 
-        ClinicListItemMappings.ShortAddress(clinic, Taxpayer(clinic, "İstanbul", "Kadıköy")).Should().Be("Ankara");
+        var dto = clinic.ToListItemDto();
+
+        dto.District.Should().Be("Çankaya");
+        dto.ShortAddress.Should().Be("Çankaya, Ankara");
     }
 }

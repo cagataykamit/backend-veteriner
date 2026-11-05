@@ -11,6 +11,8 @@ public sealed class Clinic : AggregateRoot, ITenantOwned
     public Guid TenantId { get; private set; }
     public string Name { get; private set; } = default!;
     public string City { get; private set; } = default!;
+    /// <summary>İlçe (isteğe bağlı); kısa konum satırında şehirle birlikte gösterilir.</summary>
+    public string? District { get; private set; }
     public bool IsActive { get; private set; }
     public string? Phone { get; private set; }
     public string? Email { get; private set; }
@@ -26,7 +28,8 @@ public sealed class Clinic : AggregateRoot, ITenantOwned
         string? phone = null,
         string? email = null,
         string? address = null,
-        string? description = null)
+        string? description = null,
+        string? district = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -38,6 +41,7 @@ public sealed class Clinic : AggregateRoot, ITenantOwned
         TenantId = tenantId;
         Name = name.Trim();
         City = city.Trim();
+        District = NormalizeOptional(district);
         IsActive = true;
         Phone = NormalizeOptional(phone);
         Email = NormalizeOptional(email);
@@ -51,7 +55,8 @@ public sealed class Clinic : AggregateRoot, ITenantOwned
         string? phone,
         string? email,
         string? address,
-        string? description)
+        string? description,
+        string? district)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Klinik adı boş olamaz.", nameof(name));
@@ -59,6 +64,7 @@ public sealed class Clinic : AggregateRoot, ITenantOwned
             throw new ArgumentException("Şehir bilgisi boş olamaz.", nameof(city));
         Name = name.Trim();
         City = city.Trim();
+        District = NormalizeOptional(district);
         Phone = NormalizeOptional(phone);
         Email = NormalizeOptional(email);
         Address = NormalizeOptional(address);

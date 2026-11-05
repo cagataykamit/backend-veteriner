@@ -314,6 +314,16 @@ public sealed class ClinicSettingsHandlersTests
     }
 
     [Fact]
+    public void Update_Validator_Should_Fail_When_DistrictTooLong()
+    {
+        var validator = new UpdateClinicCommandValidator();
+        validator.Validate(new UpdateClinicCommand(Guid.NewGuid(), "Merkez", "Ankara", District: new string('a', 101)))
+            .IsValid.Should().BeFalse();
+        validator.Validate(new UpdateClinicCommand(Guid.NewGuid(), "Merkez", "Ankara", District: new string('a', 100)))
+            .IsValid.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Update_Should_PersistProfileFields_When_Valid()
     {
         var tenantId = Guid.NewGuid();
@@ -334,7 +344,8 @@ public sealed class ClinicSettingsHandlersTests
                 Phone: "+90 216",
                 Email: "merkez@test.com",
                 Address: "No 5",
-                Description: "Profil"),
+                Description: "Profil",
+                District: "Çankaya"),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -342,8 +353,10 @@ public sealed class ClinicSettingsHandlersTests
         result.Value.Email.Should().Be("merkez@test.com");
         result.Value.Address.Should().Be("No 5");
         result.Value.Description.Should().Be("Profil");
+        result.Value.District.Should().Be("Çankaya");
         existing.Phone.Should().Be("+90 216");
         existing.Email.Should().Be("merkez@test.com");
+        existing.District.Should().Be("Çankaya");
     }
 
     // =========================================================================

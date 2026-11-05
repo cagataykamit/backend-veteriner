@@ -49,26 +49,29 @@ public sealed class MeClinicsEndpointIntegrationTests : IClassFixture<CustomWebA
     }
 
     [Fact]
-    public async Task GetMyClinics_Should_ReturnShortAddress_FromTaxpayerDistrictAndClinicCity()
+    public async Task GetMyClinics_Should_ReturnDistrictAndShortAddress()
     {
         var client = _factory.CreateClient();
         var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
 
-        var (email, password, extraClinicId) =
+        var (email, password, _) =
             await IntegrationTestAuthHelper.SeedTenantAdminUserAsync(_factory.Services, hasher);
 
         var login = await IntegrationTestAuthHelper.LoginAsync(client, _factory.Services, email, password);
-        var cityOnlyClinicId = await ArrangeShortAddressClinicsAsync(login.TenantId, extraClinicId);
+        var (withDistrictId, cityOnlyId) = await AddShortAddressClinicsAsync(login.TenantId);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
 
         var response = await client.GetAsync("/api/v1/me/clinics");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var clinics = (await response.Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray().ToArray();
-        clinics.Single(c => c.GetProperty("id").GetGuid() == extraClinicId)
-            .GetProperty("shortAddress").GetString().Should().Be("Çankaya, Ankara");
-        clinics.Single(c => c.GetProperty("id").GetGuid() == cityOnlyClinicId)
-            .GetProperty("shortAddress").GetString().Should().Be("İzmir", "mükellef ilçesi yoksa yalnız şehir");
+        var withDistrict = clinics.Single(c => c.GetProperty("id").GetGuid() == withDistrictId);
+        withDistrict.GetProperty("district").GetString().Should().Be("Çankaya");
+        withDistrict.GetProperty("shortAddress").GetString().Should().Be("Çankaya, Ankara");
+
+        var cityOnly = clinics.Single(c => c.GetProperty("id").GetGuid() == cityOnlyId);
+        cityOnly.GetProperty("district").ValueKind.Should().Be(JsonValueKind.Null);
+        cityOnly.GetProperty("shortAddress").GetString().Should().Be("İzmir", "ilçe yoksa yalnız şehir");
     }
 
     [Fact]
@@ -96,18 +99,16 @@ public sealed class MeClinicsEndpointIntegrationTests : IClassFixture<CustomWebA
         clinicIds.Should().NotContain(unassignedClinicId);
     }
 
-    /// <summary>Ankara'daki ek kliniğe mükellef ilçesi yazar; ilçesiz İzmir kliniği ekler ve Id'sini döner.</summary>
-    private async Task<Guid> ArrangeShortAddressClinicsAsync(Guid tenantId, Guid ankaraClinicId)
+    /// <summary>İlçeli bir Ankara ve ilçesiz bir İzmir kliniği ekler.</summary>
+    private async Task<(Guid WithDistrictId, Guid CityOnlyId)> AddShortAddressClinicsAsync(Guid tenantId)
     {
         using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        db.ClinicTaxpayerSettings.Add(ClinicTaxpayerSettings.Create(
-            tenantId, ankaraClinicId, null, null, null, null, "Ankara", "Çankaya", null,
-            20m, null, Guid.NewGuid(), DateTime.UtcNow).Value!);
+        var withDistrict = new Clinic(tenantId, $"Ankara-{Guid.NewGuid():N}"[..14], "Ankara", district: "Çankaya");
         var cityOnly = new Clinic(tenantId, $"Izmir-{Guid.NewGuid():N}"[..14], "İzmir");
-        db.Clinics.Add(cityOnly);
+        db.Clinics.AddRange(withDistrict, cityOnly);
         await db.SaveChangesAsync();
-        return cityOnly.Id;
+        return (withDistrict.Id, cityOnly.Id);
     }
 
     private async Task<Guid> GetDefaultSeedClinicIdAsync(Guid tenantId)

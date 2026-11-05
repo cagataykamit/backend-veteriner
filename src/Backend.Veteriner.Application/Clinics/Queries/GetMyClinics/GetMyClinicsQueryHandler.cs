@@ -19,7 +19,6 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IUserOperationClaimRepository _userOperationClaims;
-    private readonly IReadRepository<ClinicTaxpayerSettings> _taxpayerSettings;
 
     public GetMyClinicsQueryHandler(
         ITenantContext tenantContext,
@@ -28,8 +27,7 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
         IUserTenantRepository userTenants,
         IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinicsRead,
-        IUserOperationClaimRepository userOperationClaims,
-        IReadRepository<ClinicTaxpayerSettings> taxpayerSettings)
+        IUserOperationClaimRepository userOperationClaims)
     {
         _tenantContext = tenantContext;
         _client = client;
@@ -38,7 +36,6 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
         _userClinics = userClinics;
         _clinicsRead = clinicsRead;
         _userOperationClaims = userOperationClaims;
-        _taxpayerSettings = taxpayerSettings;
     }
 
     public async ValueTask<Result<IReadOnlyList<ClinicListItemDto>>> Handle(GetMyClinicsQuery request, CancellationToken ct)
@@ -89,7 +86,9 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
             clinics = await _userClinics.ListAccessibleClinicsAsync(userId.Value, tenantId, request.IsActive, ct);
         }
 
-        var dtos = await clinics.ToListItemDtosAsync(_taxpayerSettings, tenantId, ct);
+        var dtos = clinics
+            .Select(c => c.ToListItemDto())
+            .ToArray();
 
         return Result<IReadOnlyList<ClinicListItemDto>>.Success(dtos);
     }

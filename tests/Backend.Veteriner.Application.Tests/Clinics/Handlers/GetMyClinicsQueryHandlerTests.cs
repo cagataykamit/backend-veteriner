@@ -18,14 +18,6 @@ public sealed class GetMyClinicsQueryHandlerTests
     private readonly Mock<IUserClinicRepository> _userClinics = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IUserOperationClaimRepository> _userOperationClaims = new();
-    private readonly Mock<IReadRepository<ClinicTaxpayerSettings>> _taxpayerSettings = new();
-
-    public GetMyClinicsQueryHandlerTests()
-    {
-        _taxpayerSettings
-            .Setup(r => r.ListAsync(It.IsAny<ClinicTaxpayerSettingsByClinicIdsSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<ClinicTaxpayerSettings>());
-    }
 
     private GetMyClinicsQueryHandler CreateHandler()
         => new(
@@ -35,8 +27,7 @@ public sealed class GetMyClinicsQueryHandlerTests
             _userTenants.Object,
             _userClinics.Object,
             _clinicsRead.Object,
-            _userOperationClaims.Object,
-            _taxpayerSettings.Object);
+            _userOperationClaims.Object);
 
     private void ArrangeTenantAndMembership(Guid tenantId, Guid userId, bool isMember = true, bool tenantActive = true)
     {
@@ -63,10 +54,10 @@ public sealed class GetMyClinicsQueryHandlerTests
             .ReturnsAsync(names);
     }
 
-    private static Clinic MakeClinic(Guid tenantId, string name, string city)
+    private static Clinic MakeClinic(Guid tenantId, string name, string city, string? district = null)
     {
         var clinic = new Clinic(tenantId, name, city);
-        clinic.UpdateDetails(name, city, $"+90 212 000 00 0{name.Length}", $"{name.ToLower()}@b.test", null, null);
+        clinic.UpdateDetails(name, city, $"+90 212 000 00 0{name.Length}", $"{name.ToLower()}@b.test", null, null, district);
         return clinic;
     }
 
@@ -78,7 +69,7 @@ public sealed class GetMyClinicsQueryHandlerTests
         ArrangeTenantAndMembership(tid, uid);
         ArrangeClaimNames(uid /* no tenant-wide claims */);
 
-        var c1 = MakeClinic(tid, "A", "X");
+        var c1 = MakeClinic(tid, "A", "İstanbul", "Kadıköy");
         _userClinics
             .Setup(r => r.ListAccessibleClinicsAsync(uid, tid, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Clinic> { c1 });
@@ -90,6 +81,8 @@ public sealed class GetMyClinicsQueryHandlerTests
         result.Value![0].Name.Should().Be("A");
         result.Value[0].Phone.Should().Be("+90 212 000 00 01");
         result.Value[0].Email.Should().Be("a@b.test");
+        result.Value[0].District.Should().Be("Kadıköy");
+        result.Value[0].ShortAddress.Should().Be("Kadıköy, İstanbul");
 
         _clinicsRead.Verify(
             r => r.ListAsync(It.IsAny<ClinicsByTenantFilteredSpec>(), It.IsAny<CancellationToken>()),
@@ -172,33 +165,6 @@ public sealed class GetMyClinicsQueryHandlerTests
         _clinicsRead.Verify(
             r => r.ListAsync(It.IsAny<ClinicsByTenantFilteredSpec>(), It.IsAny<CancellationToken>()),
             Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_Should_ComposeShortAddress_FromTaxpayerDistrictAndClinicCity()
-    {
-        var tid = Guid.NewGuid();
-        var uid = Guid.NewGuid();
-        ArrangeTenantAndMembership(tid, uid);
-        ArrangeClaimNames(uid, "Admin");
-
-        var withDistrict = MakeClinic(tid, "A", "İstanbul");
-        var cityOnly = MakeClinic(tid, "B", "Ankara");
-        _clinicsRead
-            .Setup(r => r.ListAsync(It.IsAny<ClinicsByTenantFilteredSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Clinic> { withDistrict, cityOnly });
-        var taxpayer = ClinicTaxpayerSettings.Create(
-            tid, withDistrict.Id, null, null, null, null, "İstanbul", "Kadıköy", null,
-            20m, null, Guid.NewGuid(), DateTime.UtcNow).Value!;
-        _taxpayerSettings
-            .Setup(r => r.ListAsync(It.IsAny<ClinicTaxpayerSettingsByClinicIdsSpec>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<ClinicTaxpayerSettings> { taxpayer });
-
-        var result = await CreateHandler().Handle(new GetMyClinicsQuery(null), CancellationToken.None);
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.Single(x => x.Name == "A").ShortAddress.Should().Be("Kadıköy, İstanbul");
-        result.Value!.Single(x => x.Name == "B").ShortAddress.Should().Be("Ankara");
     }
 
     [Fact]
