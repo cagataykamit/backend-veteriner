@@ -87,7 +87,7 @@ public sealed class GetMyClinicsQueryHandler : IRequestHandler<GetMyClinicsQuery
         }
 
         var dtos = clinics
-            .Select(c => new ClinicListItemDto(c.Id, c.TenantId, c.Name, c.City, c.IsActive, c.Phone, c.Email))
+            .Select(c => c.ToListItemDto())
             .ToArray();
 
         return Result<IReadOnlyList<ClinicListItemDto>>.Success(dtos);

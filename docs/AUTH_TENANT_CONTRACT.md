@@ -20,6 +20,22 @@ Başarılı yanıtta: `accessToken`, `refreshToken`, `expiresAt`, `resolvedTenan
 
 **Klinik ataması** yalnız `UserClinics` ile; seed otomatik olarak tenant’taki tüm klinikleri kullanıcıya **eklemez** (yalnızca `DataSeeder` içinde adlı varsayılan klinik + admin ataması).
 
+## Klinik listesi (`GET .../me/clinics`)
+
+Klinik seçici ve giriş sonrası klinik seçimi bu listeyi kullanır. Admin / Owner / PlatformAdmin kiracının tüm kliniklerini, diğer roller yalnız `UserClinics` ile atandıkları klinikleri görür. `isActive` sorgusu (isteğe bağlı) aktif/pasif filtreler.
+
+Yanıt: `ClinicListItemDto` dizisi (`GET /api/v1/clinics` sayfalı listesinin satırlarıyla aynı şekil).
+
+| Alan | Tip | Açıklama |
+|------|-----|----------|
+| `id`, `tenantId` | guid | |
+| `name` | string | |
+| `city` | string | Klinik şehri (zorunlu alan). |
+| `district` | string? | Klinik ilçesi (isteğe bağlı; klinik oluşturma/güncellemede girilir). |
+| `isActive` | bool | |
+| `phone`, `email` | string? | |
+| `shortAddress` | string | Kısa konum satırı: `"İlçe, İl"` (ör. `"Kadıköy, İstanbul"`), `district` boşsa yalnız `city`. Yalnız klinik alanlarından türetilir. Kural tek yerde: `ClinicListItemMappings.ShortAddress`. |
+
 ## Refresh (`POST .../auth/refresh`)
 
 İstek gövdesi yalnızca:

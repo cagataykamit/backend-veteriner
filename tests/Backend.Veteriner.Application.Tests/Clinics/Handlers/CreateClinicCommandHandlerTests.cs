@@ -133,7 +133,8 @@ public sealed class CreateClinicCommandHandlerTests
             Phone: "+90 555 000 00 00",
             Email: "info@vet.test",
             Address: "Cadde 1",
-            Description: "Açıklama");
+            Description: "Açıklama",
+            District: "  Kadıköy  ");
 
         var tenant = new Tenant("Aktif A.Ş.", DateTime.UtcNow);
         AlignTenantId(tenant, tenantId);
@@ -156,5 +157,6 @@ public sealed class CreateClinicCommandHandlerTests
         captured.Email.Should().Be("info@vet.test");
         captured.Address.Should().Be("Cadde 1");
         captured.Description.Should().Be("Açıklama");
+        captured.District.Should().Be("Kadıköy");
     }
 }

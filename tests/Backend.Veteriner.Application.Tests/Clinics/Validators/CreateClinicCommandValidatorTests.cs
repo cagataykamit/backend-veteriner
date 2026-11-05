@@ -23,9 +23,17 @@ public sealed class CreateClinicCommandValidatorTests
     }
 
     [Fact]
+    public void Should_Fail_When_DistrictTooLong()
+    {
+        var r = _validator.Validate(new CreateClinicCommand("Merkez", "İstanbul", District: new string('a', 101)));
+        r.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
     public void Should_Pass_When_OptionalFieldsNullOrValid()
     {
         _validator.Validate(new CreateClinicCommand("Merkez", "İstanbul")).IsValid.Should().BeTrue();
         _validator.Validate(new CreateClinicCommand("Merkez", "İstanbul", Email: "ok@example.com")).IsValid.Should().BeTrue();
+        _validator.Validate(new CreateClinicCommand("Merkez", "İstanbul", District: "Kadıköy")).IsValid.Should().BeTrue();
     }
 }

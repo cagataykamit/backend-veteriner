@@ -9,6 +9,7 @@ public sealed class CreateClinicCommandValidator : AbstractValidator<CreateClini
     {
         RuleFor(x => x.Name).NotEmpty().MinimumLength(2).MaximumLength(300);
         RuleFor(x => x.City).NotEmpty().MinimumLength(2).MaximumLength(200);
+        RuleFor(x => x.District).MaximumLength(100);
         RuleFor(x => x.Phone).MaximumLength(50);
         RuleFor(x => x.Email).MaximumLength(256).EmailAddress()
             .When(x => !string.IsNullOrWhiteSpace(x.Email));

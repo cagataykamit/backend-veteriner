@@ -233,7 +233,8 @@ public sealed class GetClinicByIdQueryHandlerTests
             "+90 212",
             "klinik@test.com",
             "Adres",
-            "Tanım");
+            "Tanım",
+            "Kadıköy");
         SetupTenant(tenantId);
         _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(clinic);
@@ -246,5 +247,6 @@ public sealed class GetClinicByIdQueryHandlerTests
         result.Value.Email.Should().Be("klinik@test.com");
         result.Value.Address.Should().Be("Adres");
         result.Value.Description.Should().Be("Tanım");
+        result.Value.District.Should().Be("Kadıköy");
     }
 }

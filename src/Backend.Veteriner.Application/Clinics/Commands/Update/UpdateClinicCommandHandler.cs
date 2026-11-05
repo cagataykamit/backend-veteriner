@@ -105,7 +105,8 @@ public sealed class UpdateClinicCommandHandler
             request.Phone,
             request.Email,
             request.Address,
-            request.Description);
+            request.Description,
+            request.District);
         await _clinicsWrite.SaveChangesAsync(ct);
 
         return Result<ClinicDetailDto>.Success(new ClinicDetailDto(
@@ -113,6 +114,7 @@ public sealed class UpdateClinicCommandHandler
             clinic.TenantId,
             clinic.Name,
             clinic.City,
+            clinic.District,
             clinic.IsActive,
             clinic.Phone,
             clinic.Email,

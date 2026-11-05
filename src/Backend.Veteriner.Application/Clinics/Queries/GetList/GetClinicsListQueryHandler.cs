@@ -69,7 +69,7 @@ public sealed class GetClinicsListQueryHandler
         }
 
         var items = rows
-            .Select(c => new ClinicListItemDto(c.Id, c.TenantId, c.Name, c.City, c.IsActive, c.Phone, c.Email))
+            .Select(c => c.ToListItemDto())
             .ToList();
 
         return Result<PagedResult<ClinicListItemDto>>.Success(

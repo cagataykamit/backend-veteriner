@@ -54,10 +54,10 @@ public sealed class GetMyClinicsQueryHandlerTests
             .ReturnsAsync(names);
     }
 
-    private static Clinic MakeClinic(Guid tenantId, string name, string city)
+    private static Clinic MakeClinic(Guid tenantId, string name, string city, string? district = null)
     {
         var clinic = new Clinic(tenantId, name, city);
-        clinic.UpdateDetails(name, city, $"+90 212 000 00 0{name.Length}", $"{name.ToLower()}@b.test", null, null);
+        clinic.UpdateDetails(name, city, $"+90 212 000 00 0{name.Length}", $"{name.ToLower()}@b.test", null, null, district);
         return clinic;
     }
 
@@ -69,7 +69,7 @@ public sealed class GetMyClinicsQueryHandlerTests
         ArrangeTenantAndMembership(tid, uid);
         ArrangeClaimNames(uid /* no tenant-wide claims */);
 
-        var c1 = MakeClinic(tid, "A", "X");
+        var c1 = MakeClinic(tid, "A", "İstanbul", "Kadıköy");
         _userClinics
             .Setup(r => r.ListAccessibleClinicsAsync(uid, tid, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Clinic> { c1 });
@@ -81,6 +81,8 @@ public sealed class GetMyClinicsQueryHandlerTests
         result.Value![0].Name.Should().Be("A");
         result.Value[0].Phone.Should().Be("+90 212 000 00 01");
         result.Value[0].Email.Should().Be("a@b.test");
+        result.Value[0].District.Should().Be("Kadıköy");
+        result.Value[0].ShortAddress.Should().Be("Kadıköy, İstanbul");
 
         _clinicsRead.Verify(
             r => r.ListAsync(It.IsAny<ClinicsByTenantFilteredSpec>(), It.IsAny<CancellationToken>()),

@@ -14,5 +14,6 @@ public sealed record UpdateClinicCommand(
     string? Phone = null,
     string? Email = null,
     string? Address = null,
-    string? Description = null)
+    string? Description = null,
+    string? District = null)
     : IRequest<Result<ClinicDetailDto>>;

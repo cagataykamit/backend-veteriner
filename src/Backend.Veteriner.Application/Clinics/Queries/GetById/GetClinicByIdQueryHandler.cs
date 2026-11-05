@@ -72,6 +72,7 @@ public sealed class GetClinicByIdQueryHandler : IRequestHandler<GetClinicByIdQue
             clinic.TenantId,
             clinic.Name,
             clinic.City,
+            clinic.District,
             clinic.IsActive,
             clinic.Phone,
             clinic.Email,

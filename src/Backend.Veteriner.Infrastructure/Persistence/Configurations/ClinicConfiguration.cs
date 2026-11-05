@@ -23,6 +23,8 @@ public sealed class ClinicConfiguration : IEntityTypeConfiguration<Clinic>
             .IsRequired()
             .HasMaxLength(200);
 
+        b.Property(x => x.District).HasMaxLength(100);
+
         b.Property(x => x.Phone).HasMaxLength(50);
         b.Property(x => x.Email).HasMaxLength(256);
         b.Property(x => x.Address).HasMaxLength(500);
