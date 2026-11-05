@@ -637,7 +637,7 @@ Tablo `OwnerPushDevices`: `Id`, `OwnerAccountId` (FK, hesap silinince cascade), 
 { "platform": "Android", "token": "<fcm-registration-token>", "previousToken": null }
 ```
 
-- 204. `platform` zorunlu (`Android` · `Ios` · `Web`), `token` 1–512 karakter (trim). Aynı jeton yeniden gelirse yeni satır açılmaz; `platform`, hesap ve `LastSeenAtUtc` güncellenir. İstemci uygulama her açılışta çağırabilir.
+- 204. `platform` zorunlu (`Android` · `Ios` · `Web`), `token` 1–512 karakter (trim). Aynı jeton yeniden gelirse yeni satır açılmaz; `platform`, hesap ve `LastSeenAtUtc` güncellenir; aynı jetonla eşzamanlı iki istek de 204 döner (benzersiz indeks, tek satır). İstemci uygulama her açılışta çağırabilir.
 - `previousToken`: sağlayıcı jetonu yenilediyse eski jeton; bu hesaba aitse silinir.
 - Hatalar: 409 `Portal.Push.Disabled` (push tercihi kapalı; önce §10.1 `PUT { "pushEnabled": true }`), 400 `Validation.FluentValidation`, 401.
 - Denetim `Portal.PushDevices.Register`, hedef `OwnerAccountId=…`.
