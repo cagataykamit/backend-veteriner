@@ -21,7 +21,14 @@ public sealed record TenantSubscriptionSummaryDto(
     IReadOnlyList<SubscriptionPlanOptionDto> AvailablePlans,
     string BillingPeriod = "Monthly");
 
-public sealed record SubscriptionPlanOptionDto(string Code, string Name, string? Description, int MaxUsers);
+/// <summary>Fiyatlar kuruş, KDV hariç; checkout'un okuduğu kuraldan (WEB-007). Yapılandırılmamışsa <c>null</c>.</summary>
+public sealed record SubscriptionPlanOptionDto(
+    string Code,
+    string Name,
+    string? Description,
+    int MaxUsers,
+    long? MonthlyPriceMinor = null,
+    long? YearlyPriceMinor = null);
 
 public sealed record PendingSubscriptionPlanChangeDto(
     Guid Id,
