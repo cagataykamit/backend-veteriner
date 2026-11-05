@@ -1145,7 +1145,7 @@ FluentValidation (validator’lar) → `400` `ValidationProblemDetails` (Mediato
 
 **Amaç:** Kiracıya bağlı plan kataloğu, abonelik durumu, trial tarihleri ve kalan gün bilgisini tek yanıtta sunmak (ödeme entegrasyonu yok; Faz 1 salt okunur özet).
 
-**Yanıt:** `TenantSubscriptionSummaryDto` — `tenantId`, `tenantName`, `planCode` (string API kodu: `Basic` / `Pro` / `Premium`), `planName`, `status` (**effective** `TenantSubscriptionStatus`; JSON **numeric**: `Trialing=0`, `Active=1`, `ReadOnly=2`, `Cancelled=3`), `trialStartsAtUtc`, `trialEndsAtUtc` (opsiyonel), `daysRemaining` (yalnız `Trialing` ve `trialEndsAtUtc` varken; aksi halde null), `isReadOnly`, `canManageSubscription` (**`Tenants.Create`** — **checkout yetkisi değil**; ayrıntı **§20.1**), `currentPeriodStartUtc`, `currentPeriodEndUtc`, `billingCycleAnchorUtc`, `nextBillingAtUtc`, `pendingPlanChange`, `availablePlans[]` (`code`, `name`, `description`, `maxUsers`).
+**Yanıt:** `TenantSubscriptionSummaryDto` — `tenantId`, `tenantName`, `planCode` (string API kodu: `Basic` / `Pro` / `Premium`), `planName`, `status` (**effective** `TenantSubscriptionStatus`; JSON **numeric**: `Trialing=0`, `Active=1`, `ReadOnly=2`, `Cancelled=3`), `trialStartsAtUtc`, `trialEndsAtUtc` (opsiyonel), `daysRemaining` (yalnız `Trialing` ve `trialEndsAtUtc` varken; aksi halde null), `isReadOnly`, `canManageSubscription` (**`Tenants.Create`** — **checkout yetkisi değil**; ayrıntı **§20.1**), `currentPeriodStartUtc`, `currentPeriodEndUtc`, `billingCycleAnchorUtc`, `nextBillingAtUtc`, `pendingPlanChange`, `availablePlans[]` (`code`, `name`, `description`, `maxUsers`, `monthlyPriceMinor`, `yearlyPriceMinor`; fiyatlar WEB-007, `SUBSCRIPTION_PLAN_CATALOG_API_CONTRACT.md`).
 
 **Veri:** `TenantSubscriptions` tablosu kiracı ile 1:1 (`TenantId` PK). Yeni kiracı oluşturma (`POST /tenants`) sonrası varsayılan olarak Basic plan + Trialing + 14 gün trial (`SubscriptionTrialDefaults.TrialDays`) yazılır. Eski kiracılar için migration ile backfill uygulanır.
 
@@ -1172,7 +1172,7 @@ FluentValidation (validator’lar) → `400` `ValidationProblemDetails` (Mediato
 - Durum: `status` (**effective** status: trial bitişi sonrası `Trialing` bile olsa effective `ReadOnly` olabilir), `trialStartsAtUtc`, `trialEndsAtUtc`, `daysRemaining`, `isReadOnly`.
 - Dönem: `currentPeriodStartUtc`, `currentPeriodEndUtc`, `billingCycleAnchorUtc`, `nextBillingAtUtc`.
 - UI bayrakları: `canManageSubscription` (**yukarıdaki tablo**).
-- `pendingPlanChange` (`PendingSubscriptionPlanChangeDto` veya null), `availablePlans[]` (`SubscriptionPlanOptionDto`: `code`, `name`, `description`, `maxUsers`).
+- `pendingPlanChange` (`PendingSubscriptionPlanChangeDto` veya null), `availablePlans[]` (`SubscriptionPlanOptionDto`: `code`, `name`, `description`, `maxUsers`, `monthlyPriceMinor`, `yearlyPriceMinor`).
 
 #### `SubscriptionCheckoutSessionDto` (checkout oturumu)
 
@@ -1268,7 +1268,7 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 
 ### 22.4 `subscription-summary` plan seçenekleri
 
-`SubscriptionPlanOptionDto` alanları: `code`, `name`, `description`, **`maxUsers`** (panelde kota gösterimi için).
+`SubscriptionPlanOptionDto` alanları: `code`, `name`, `description`, **`maxUsers`** (panelde kota gösterimi için), `monthlyPriceMinor` ve `yearlyPriceMinor` (kuruş, KDV hariç; yapılandırılmamışsa `null`; WEB-007). Aynı katalog ve fiyat anonim `GET /api/v1/public/subscription-plans` ile tanıtım sitesine açıktır (`SUBSCRIPTION_PLAN_CATALOG_API_CONTRACT.md`).
 
 ### 22.5 Davet — atanabilir operation claim (rol) listesi
 
@@ -1672,7 +1672,7 @@ Notlar:
 
 - Tüm tarih/zaman alanları UTC'dir.
 - Parasal hesaplar minor unit (TRY için kurus) ile yapılır.
-- Plan fiyatları `Billing:PlanPricesMinor` üzerinden okunur; yoksa Iyzico `PlanPricesTry` değerlerinden türetilir.
+- Plan fiyatları `Billing:PlanPricesMinor` üzerinden okunur (`appsettings.json`); yoksa Iyzico `PlanPricesTry` değerlerinden türetilir. Tek okuyan kod `SubscriptionPlanPrices` (checkout, panel özeti, public paket kataloğu; `SUBSCRIPTION_PLAN_CATALOG_API_CONTRACT.md`).
 
 ---
 
