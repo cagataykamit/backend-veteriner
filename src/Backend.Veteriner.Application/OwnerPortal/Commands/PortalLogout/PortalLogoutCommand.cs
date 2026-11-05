@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Application.OwnerPortal.Commands.PortalLogout;
 
 /// <summary>
 /// Portal çıkışı: <see cref="RefreshToken"/> verilirse yalnız o oturum, <see cref="AllSessions"/> ise hesabın tüm portal
-/// oturumları ("tüm cihazlardan çıkış", K3) kapanır. Başka hesabın jetonu veya boş jeton no-op'tur.
+/// oturumları ("tüm cihazlardan çıkış", K3) kapanır ve push cihazları silinir. Başka hesabın jetonu veya boş jeton no-op'tur.
 /// </summary>
 public sealed record PortalLogoutCommand(Guid OwnerAccountId, string? RefreshToken, bool AllSessions)
     : IRequest<Result>, IAuditableRequest, IIgnoreTenantWriteSubscriptionGuard
@@ -21,6 +21,7 @@ public sealed record PortalLogoutCommand(Guid OwnerAccountId, string? RefreshTok
 public sealed class PortalLogoutCommandHandler : IRequestHandler<PortalLogoutCommand, Result>
 {
     private readonly IReadRepository<OwnerPortalRefreshToken> _refreshTokens;
+    private readonly IRepository<OwnerPushDevice> _pushDevices;
     private readonly OwnerPortalSessionIssuer _sessions;
     private readonly ITokenHashService _hash;
     private readonly IUnitOfWork _uow;
@@ -28,12 +29,14 @@ public sealed class PortalLogoutCommandHandler : IRequestHandler<PortalLogoutCom
 
     public PortalLogoutCommandHandler(
         IReadRepository<OwnerPortalRefreshToken> refreshTokens,
+        IRepository<OwnerPushDevice> pushDevices,
         OwnerPortalSessionIssuer sessions,
         ITokenHashService hash,
         IUnitOfWork uow,
         TimeProvider timeProvider)
     {
         _refreshTokens = refreshTokens;
+        _pushDevices = pushDevices;
         _sessions = sessions;
         _hash = hash;
         _uow = uow;
@@ -47,6 +50,8 @@ public sealed class PortalLogoutCommandHandler : IRequestHandler<PortalLogoutCom
         if (request.AllSessions)
         {
             await _sessions.RevokeAllAsync(request.OwnerAccountId, "logout-all", utcNow, ct);
+            // Tüm cihazlardan çıkış push'u da keser (kaybolan telefon bildirim almaya devam etmesin).
+            await _pushDevices.DeleteRangeAsync(new OwnerPushDevicesByAccountSpec(request.OwnerAccountId), ct);
         }
         else if (!string.IsNullOrWhiteSpace(request.RefreshToken))
         {

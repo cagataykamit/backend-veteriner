@@ -99,8 +99,9 @@ public sealed class OwnerAccount
     public void Disable() => Status = OwnerAccountStatus.Disabled;
 
     /// <summary>
-    /// Push bildirimi tercihi (PORTAL-007/010): hesap düzeyinde, varsayılan kapalı. Gönderim sağlayıcı yapılandırılınca başlar
-    /// (FCM/APNs dış bağımlılık); tercih şimdiden saklanır. Değer değişmediyse <c>false</c>.
+    /// Push bildirimi tercihi (PORTAL-007/010, MOBILE-003): hesap düzeyinde, varsayılan kapalı. Gönderim sağlayıcı yapılandırılınca başlar
+    /// (FCM anahtarı dış bağımlılık); tercih şimdiden saklanır. Kapatınca cihaz jetonlarını silmek çağıranın işidir. Değer
+    /// değişmediyse <c>false</c>.
     /// </summary>
     public bool SetPushEnabled(bool enabled)
     {

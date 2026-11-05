@@ -13,8 +13,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Preferences;
 
-/// <summary>Hesap düzeyi tercih (docs/PORTAL_API_CONTRACT.md §10.1).</summary>
-public sealed record PortalPushPreferenceDto(bool Enabled, bool Available);
+/// <summary>Hesap düzeyi tercih (docs/PORTAL_API_CONTRACT.md §10.1, §14); <see cref="DeviceCount"/> kayıtlı push cihazı sayısı.</summary>
+public sealed record PortalPushPreferenceDto(bool Enabled, bool Available, int DeviceCount);
 
 public sealed record PortalAccountNotificationPreferencesDto(PortalPushPreferenceDto Push);
 
@@ -66,8 +66,8 @@ public sealed class UpdatePortalLinkNotificationPreferencesCommandValidator : Ab
 
 internal static class PortalNotificationPreferencesMapping
 {
-    public static PortalAccountNotificationPreferencesDto ToDto(OwnerAccount account, IPushNotificationSender push)
-        => new(new PortalPushPreferenceDto(account.PushEnabled, push.IsConfigured));
+    public static PortalAccountNotificationPreferencesDto ToDto(OwnerAccount account, IPushNotificationSender push, int deviceCount)
+        => new(new PortalPushPreferenceDto(account.PushEnabled, push.IsConfigured, deviceCount));
 
     public static PortalLinkNotificationPreferencesDto ToDto(Client client, OwnerAccountClientLink link)
         => new(
@@ -82,20 +82,27 @@ public sealed class GetPortalAccountNotificationPreferencesQueryHandler
     : IRequestHandler<GetPortalAccountNotificationPreferencesQuery, Result<PortalAccountNotificationPreferencesDto>>
 {
     private readonly OwnerPortalAccess _access;
+    private readonly IReadRepository<OwnerPushDevice> _devices;
     private readonly IPushNotificationSender _push;
 
-    public GetPortalAccountNotificationPreferencesQueryHandler(OwnerPortalAccess access, IPushNotificationSender push)
+    public GetPortalAccountNotificationPreferencesQueryHandler(
+        OwnerPortalAccess access,
+        IReadRepository<OwnerPushDevice> devices,
+        IPushNotificationSender push)
     {
         _access = access;
+        _devices = devices;
         _push = push;
     }
 
     public async ValueTask<Result<PortalAccountNotificationPreferencesDto>> Handle(GetPortalAccountNotificationPreferencesQuery request, CancellationToken ct)
     {
         var account = await _access.GetActiveAccountAsync(request.OwnerAccountId, ct);
-        return account.IsSuccess
-            ? Result<PortalAccountNotificationPreferencesDto>.Success(PortalNotificationPreferencesMapping.ToDto(account.Value!, _push))
-            : Result<PortalAccountNotificationPreferencesDto>.Failure(account.Error);
+        if (!account.IsSuccess)
+            return Result<PortalAccountNotificationPreferencesDto>.Failure(account.Error);
+
+        var deviceCount = await _devices.CountAsync(new OwnerPushDevicesByAccountSpec(request.OwnerAccountId), ct);
+        return Result<PortalAccountNotificationPreferencesDto>.Success(PortalNotificationPreferencesMapping.ToDto(account.Value!, _push, deviceCount));
     }
 }
 
@@ -103,11 +110,16 @@ public sealed class UpdatePortalAccountNotificationPreferencesCommandHandler
     : IRequestHandler<UpdatePortalAccountNotificationPreferencesCommand, Result<PortalAccountNotificationPreferencesDto>>
 {
     private readonly IRepository<OwnerAccount> _accounts;
+    private readonly IRepository<OwnerPushDevice> _devices;
     private readonly IPushNotificationSender _push;
 
-    public UpdatePortalAccountNotificationPreferencesCommandHandler(IRepository<OwnerAccount> accounts, IPushNotificationSender push)
+    public UpdatePortalAccountNotificationPreferencesCommandHandler(
+        IRepository<OwnerAccount> accounts,
+        IRepository<OwnerPushDevice> devices,
+        IPushNotificationSender push)
     {
         _accounts = accounts;
+        _devices = devices;
         _push = push;
     }
 
@@ -117,10 +129,17 @@ public sealed class UpdatePortalAccountNotificationPreferencesCommandHandler
         if (account is not { IsActive: true })
             return Result<PortalAccountNotificationPreferencesDto>.Failure(OwnerPortalErrors.AccountUnavailable);
 
+        var devicesSpec = new OwnerPushDevicesByAccountSpec(account.Id);
         if (account.SetPushEnabled(request.PushEnabled!.Value))
+        {
+            // Veri azaltma: tercih kapanınca cihaz jetonları tutulmaz; yeniden açılınca istemci cihazı yeniden kaydeder (§14).
+            if (!account.PushEnabled)
+                await _devices.DeleteRangeAsync(devicesSpec, ct);
             await _accounts.SaveChangesAsync(ct);
+        }
 
-        return Result<PortalAccountNotificationPreferencesDto>.Success(PortalNotificationPreferencesMapping.ToDto(account, _push));
+        var deviceCount = account.PushEnabled ? await _devices.CountAsync(devicesSpec, ct) : 0;
+        return Result<PortalAccountNotificationPreferencesDto>.Success(PortalNotificationPreferencesMapping.ToDto(account, _push, deviceCount));
     }
 }
 

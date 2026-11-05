@@ -3298,6 +3298,39 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("OwnerPortalRefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.OwnerPushDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("OwnerAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Platform")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerAccountId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.ToTable("OwnerPushDevices", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Payments.Payment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6009,6 +6042,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.OwnerPortalRefreshToken", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.OwnerPortal.OwnerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.OwnerPushDevice", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.OwnerPortal.OwnerAccount", null)
                         .WithMany()

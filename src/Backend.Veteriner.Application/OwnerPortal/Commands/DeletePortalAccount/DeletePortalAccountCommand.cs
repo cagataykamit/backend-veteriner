@@ -8,8 +8,8 @@ using Mediator;
 namespace Backend.Veteriner.Application.OwnerPortal.Commands.DeletePortalAccount;
 
 /// <summary>
-/// Hasta sahibi portal hesabını kodla onaylayıp siler (ADR-041 seçenek C). Tek kayıtta: hesap anonimleşir, tüm oturum ve
-/// kodlar silinir, tüm kiracılardaki aktif bağlar "hesap silindi" gerekçesiyle kapanır ve eski adrese onay e-postası
+/// Hasta sahibi portal hesabını kodla onaylayıp siler (ADR-041 seçenek C). Tek kayıtta: hesap anonimleşir, tüm oturum, kod ve push
+/// cihazları silinir (ADR-031 K4), tüm kiracılardaki aktif bağlar "hesap silindi" gerekçesiyle kapanır ve eski adrese onay e-postası
 /// outbox'a yazılır. Klinik kayıtları, hukuki kabul satırları, davetler ve denetim kayıtları kalır.
 /// </summary>
 public sealed record DeletePortalAccountCommand(Guid OwnerAccountId, string OneTimeCode)
@@ -24,6 +24,7 @@ public sealed class DeletePortalAccountCommandHandler : IRequestHandler<DeletePo
     private readonly IRepository<OwnerAccount> _accounts;
     private readonly IRepository<OwnerPortalCode> _codeRows;
     private readonly IRepository<OwnerPortalRefreshToken> _refreshTokens;
+    private readonly IRepository<OwnerPushDevice> _pushDevices;
     private readonly IRepository<OwnerAccountClientLink> _links;
     private readonly OwnerPortalCodeService _codes;
     private readonly ITenantScope _tenantScope;
@@ -35,6 +36,7 @@ public sealed class DeletePortalAccountCommandHandler : IRequestHandler<DeletePo
         IRepository<OwnerAccount> accounts,
         IRepository<OwnerPortalCode> codeRows,
         IRepository<OwnerPortalRefreshToken> refreshTokens,
+        IRepository<OwnerPushDevice> pushDevices,
         IRepository<OwnerAccountClientLink> links,
         OwnerPortalCodeService codes,
         ITenantScope tenantScope,
@@ -45,6 +47,7 @@ public sealed class DeletePortalAccountCommandHandler : IRequestHandler<DeletePo
         _accounts = accounts;
         _codeRows = codeRows;
         _refreshTokens = refreshTokens;
+        _pushDevices = pushDevices;
         _links = links;
         _codes = codes;
         _tenantScope = tenantScope;
@@ -74,6 +77,7 @@ public sealed class DeletePortalAccountCommandHandler : IRequestHandler<DeletePo
 
         await _codeRows.DeleteRangeAsync(new OwnerPortalCodesByAccountSpec(account.Id), ct);
         await _refreshTokens.DeleteRangeAsync(new OwnerPortalRefreshTokensByAccountSpec(account.Id), ct);
+        await _pushDevices.DeleteRangeAsync(new OwnerPushDevicesByAccountSpec(account.Id), ct);
 
         var message = OwnerPortalEmails.AccountDeleted();
         await _email.SendAsync(formerEmail, message.Subject, message.Body, ct);
