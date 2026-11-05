@@ -31,9 +31,10 @@ Yanıt: `ClinicListItemDto` dizisi (`GET /api/v1/clinics` sayfalı listesinin sa
 | `id`, `tenantId` | guid | |
 | `name` | string | |
 | `city` | string | Klinik şehri (zorunlu alan). |
+| `district` | string? | Klinik ilçesi (isteğe bağlı; klinik oluşturma/güncellemede girilir). |
 | `isActive` | bool | |
 | `phone`, `email` | string? | |
-| `shortAddress` | string | Kısa konum satırı: `"İlçe, İl"` (ör. `"Kadıköy, İstanbul"`), ilçe yoksa yalnız `city`. Klinikte ayrı ilçe alanı yoktur; ilçe klinik mükellef ayarlarından (`ClinicTaxpayerSettings.District`, ADR-036) alınır. Mükellef ili doluysa ve klinik şehrinden farklıysa (Türkçe büyük/küçük harf duyarsız) ilçe kullanılmaz. Kural tek yerde: `ClinicListItemMappings.ShortAddress`. |
+| `shortAddress` | string | Kısa konum satırı: `"İlçe, İl"` (ör. `"Kadıköy, İstanbul"`), `district` boşsa yalnız `city`. Yalnız klinik alanlarından türetilir. Kural tek yerde: `ClinicListItemMappings.ShortAddress`. |
 
 ## Refresh (`POST .../auth/refresh`)
 

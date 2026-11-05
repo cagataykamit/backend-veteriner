@@ -1698,6 +1698,7 @@ Mevcut `POST /api/v1/clinics`, `GET /api/v1/clinics`, `GET /api/v1/clinics/{id}`
 - Auth: `Clinics.Update`.
 - Request body: `UpdateClinicBody` (`{ id?, name, city }`); route id kaynak doğrudur. Body `id` doluysa route id ile eşleşmelidir (aksi halde `Clinics.RouteIdMismatch` / 400).
 - Validation: `name` 2–300 karakter, `city` 2–200 karakter (FluentValidation).
+- İlçe (sonradan eklendi): `district` isteğe bağlı, en çok 100 karakter, kırpılır, boşsa `null`. `POST /api/v1/clinics` gövdesinde de aynı kuralla alınır; `ClinicDetailDto` ve `ClinicListItemDto` `district` döner. Güncel liste şekli: `docs/AUTH_TENANT_CONTRACT.md` "Klinik listesi".
 - Tenant bağlamı zorunlu; `ClinicByIdSpec(tenantId, id)` ile çözümlenir. Başka kiracının kliniği 404 `Clinics.NotFound` olarak maskelenir.
 - Aynı kiracı altında **case-insensitive** aynı isim → 409 `Clinics.DuplicateName`. Kendi `Id`'si duplicate sayılmaz (sadece case değişikliği / aynı isim geçerli no-op).
 - Başarılı yanıt: **200 OK + `ClinicDetailDto`** (`{ id, tenantId, name, city, isActive }`). Yanıt şekli `GET /api/v1/clinics/{id}` ile hizalıdır — client round-trip gerektirmez.
@@ -1741,7 +1742,7 @@ Mevcut `POST /api/v1/clinics`, `GET /api/v1/clinics`, `GET /api/v1/clinics/{id}`
 ### 25.7 Out-of-scope (Faz 5A)
 
 - **Last-active-clinic protection**: Tenant'ta en az 1 aktif klinik kalsın kuralı bu fazda eklenmez. Deactivate akışı tenant'ın tüm kliniklerini pasife alabilir. Bu kural ileri bir fazda `Clinics.LastActiveForbidden` kodu ile gelecek.
-- **Clinic DTO zenginleştirme**: `ClinicDetailDto`/`ClinicListItemDto` şekli değiştirilmez; `address`, `phone` vb. yeni alanlar şema/migration gerektireceği için bu fazda yok. (Sonradan `ClinicListItemDto`'ya `phone`, `email` ve `shortAddress` eklendi; güncel şekil: `docs/AUTH_TENANT_CONTRACT.md` "Klinik listesi".)
+- **Clinic DTO zenginleştirme**: `ClinicDetailDto`/`ClinicListItemDto` şekli değiştirilmez; `address`, `phone` vb. yeni alanlar şema/migration gerektireceği için bu fazda yok. (Sonradan `ClinicListItemDto`'ya `phone`, `email`, `district` ve `shortAddress` eklendi; güncel şekil: `docs/AUTH_TENANT_CONTRACT.md` "Klinik listesi".)
 - **Bulk işlem**: Toplu activate/deactivate veya bulk update endpoint'i açılmaz.
 - **Clinic create response formatı**: `POST /api/v1/clinics` yanıtı çıplak `Guid` olarak kalır.
 - **Permission cache invalidation**: Klinik update/activate/deactivate kullanıcı permission setini etkilemez; refresh/session revocation tetiklenmez.
