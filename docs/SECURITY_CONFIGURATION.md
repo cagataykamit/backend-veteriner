@@ -18,6 +18,7 @@ Tüm yanıtlara `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Ref
 dotnet user-secrets set "Jwt:Key" "<değer>" --project src/Backend.Veteriner.Api
 dotnet user-secrets set "Billing:Iyzico:ApiKey" "<değer>" --project src/Backend.Veteriner.Api
 dotnet user-secrets set "Billing:Iyzico:SecretKey" "<değer>" --project src/Backend.Veteriner.Api
+dotnet user-secrets set "Push:Fcm:ServiceAccountFile" "<firebase-hizmet-hesabi.json yolu>" --project src/Backend.Veteriner.Api
 ```
 
 Testler ve CI bu yerel dosyaya bağımlı değildir: varsayılan/rollout bayrağı testleri `appsettings.Development.json` yerine izlenen `appsettings.Development.json.example` şablonunu okur (şablonda bayraklar production-safe `false` kalmalıdır).
@@ -25,6 +26,8 @@ Testler ve CI bu yerel dosyaya bağımlı değildir: varsayılan/rollout bayrağ
 ## Açılış doğrulaması
 
 Development, Production ve Staging ortamlarında şu ayarlar yoksa API başlamaz (hata iletisi yalnız ayar adını söyler, değer yazmaz): `Jwt:Key` (en az 32 karakter), `ConnectionStrings:DefaultConnection`, `ConnectionStrings:QueryConnection`, `Smtp:Pass`, `AllowedOrigins`, `AllowedHosts`. Production/Staging'de ayrıca `Smtp:Host` yer tutucu (`smtp.example.com`) kalamaz. Kural tek yerde: `StartupConfigurationValidator`, `HostSecurityConfiguration`. Test ortamları (`IntegrationTests`, `LoadTest`) kendi yapılandırmasını getirir ve bu denetimin dışındadır.
+
+Push (`Push:Fcm`, MOBILE-003) isteğe bağlıdır: yoksa push kapalı çalışır (yalnız log); verilmiş ama okunamıyor ya da özel anahtar geçersizse API başlamaz (`FcmServiceAccount.Load`, ayrıntı `PORTAL_API_CONTRACT.md` §14.6).
 
 ## İlk yönetici (üretim)
 
