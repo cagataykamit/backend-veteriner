@@ -43,7 +43,7 @@ public sealed class PublicSubscriptionPlansIntegrationTests : IClassFixture<Cust
 
         var billing = _factory.Services.GetRequiredService<IOptions<BillingOptions>>().Value;
         var plans = json.GetProperty("plans").EnumerateArray().ToList();
-        plans.Select(p => (p.GetProperty("planCode").GetString(), p.GetProperty("maxUsers").GetInt32()))
+        plans.Select(p => (p.GetProperty("planCode").GetString()!, p.GetProperty("maxUsers").GetInt32()))
             .Should().Equal(SubscriptionPlanCatalog.All.Select(p => (SubscriptionPlanCatalog.ToApiCode(p.Code), p.MaxUsers)));
 
         foreach (var (plan, entry) in plans.Zip(SubscriptionPlanCatalog.All))
