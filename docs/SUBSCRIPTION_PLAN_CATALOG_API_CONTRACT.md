@@ -13,7 +13,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `WEB-007`, AD
 | Fiyatın yeri | Yapılandırma `Billing:PlanPricesMinor` (aylık, kuruş, **KDV hariç**). Değer `appsettings.json`'dadır; ortam değişkeniyle (`Billing__PlanPricesMinor__Pro`) ezilebilir. Yoksa ya da `0` ise `Billing:Iyzico:PlanPricesTry` (TL) kuruşa çevrilerek okunur; o da yoksa "fiyat yapılandırılmamış". |
 | Okuyan kod | Yalnız `SubscriptionPlanPrices` (Application `Common/Billing`). Checkout tutarı (`StartSubscriptionCheckoutCommandHandler`, iyzico tutar verilmediğindeki geri dönüşü dahil), panel özeti ve bu uç aynı kuralı çağırır; sitede gösterilen fiyat ile çekilen tutar ayrışmaz. |
 | Yıllık | `SubscriptionPricing.PeriodPriceMinor` = aylık × `SubscriptionPricing.YearlyBilledMonths` (10). İkinci bir yıllık sayı tutulmaz. |
-| Kullanıcı sınırı | `SubscriptionPlanCatalog.MaxUsers` (Basic 1, Pro 5, Premium 15). |
+| Kullanıcı sınırı | `SubscriptionPlanCatalog.MaxUsers` (Basic 3, Pro 5, Premium 15). |
 | Klinik sınırı | Backend'de yok; uç döndürmez. |
 | Ödemenin açılması | Fiyat ödemeyi **açmaz**. iyzico ancak anahtarlar ve `Billing:Iyzico:PlanPricesTry` tüm planlar için dolu olduğunda etkindir (`IyzicoCheckoutPrerequisites`); canlıda `PlanPricesTry` `0` kaldığı sürece ücretli checkout başlamaz (`Billing.IyzicoConfigurationIncomplete`, 503). |
 
@@ -31,7 +31,7 @@ Yetki yok (`AllowAnonymous`), hız sınırı yok (statik okuma; genel sınır ge
   "vatIncluded": false,
   "yearlyBilledMonths": 10,
   "plans": [
-    { "planCode": "Basic", "name": "Basic", "maxUsers": 1, "monthlyPriceMinor": 89000, "yearlyPriceMinor": 890000 },
+    { "planCode": "Basic", "name": "Basic", "maxUsers": 3, "monthlyPriceMinor": 89000, "yearlyPriceMinor": 890000 },
     { "planCode": "Pro", "name": "Pro", "maxUsers": 5, "monthlyPriceMinor": 179000, "yearlyPriceMinor": 1790000 },
     { "planCode": "Premium", "name": "Premium", "maxUsers": 15, "monthlyPriceMinor": 379000, "yearlyPriceMinor": 3790000 }
   ]

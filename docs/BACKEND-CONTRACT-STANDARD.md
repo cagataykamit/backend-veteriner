@@ -1227,7 +1227,7 @@ FluentValidation (validator’lar) → `400` `ValidationProblemDetails` (Mediato
 
 ### 22.1 Kullanıcı limiti (ürün kararı)
 
-- **Kotanın kaynağı:** `SubscriptionPlanCatalog` içindeki `MaxUsers` (Basic **1**, Pro **5**, Premium **15**). Mevcut üye sayısı sınırın üstündeyse (eski kiracı, paket düşürme) üyeler kalır, yalnız yeni davet ve kabul reddedilir; paket düşürme planlanırken üye sayısı denetlenmez.
+- **Kotanın kaynağı:** `SubscriptionPlanCatalog` içindeki `MaxUsers` (Basic **3**, Pro **5**, Premium **15**). Mevcut üye sayısı sınırın üstündeyse (eski kiracı, paket düşürme) üyeler kalır, yalnız yeni davet ve kabul reddedilir; paket düşürme planlanırken üye sayısı denetlenmez.
 - **Sayım tanımı:** Belirli bir `tenantId` için **`UserTenants` satır sayısı** = o kiracıdaki aktif üyelik sayısı (slot).
 - **Bekleyen davetler:** Süresi dolmamış ve `Pending` durumundaki `TenantInvites` kayıtları da slot rezervasyonu sayılır (davet oluştururken `üye + bekleyen davet + 1 ≤ maxUsers` kuralı).
 - **İki noktada kontrol:** (1) `POST …/invites` oluşturma, (2) kabul (`accept` / `signup-and-accept`) — araya giren yeni üyeler için kabul anında tekrar `üye sayısı < maxUsers` doğrulanır.

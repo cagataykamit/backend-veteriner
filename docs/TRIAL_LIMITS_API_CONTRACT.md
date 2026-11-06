@@ -92,7 +92,7 @@ Arka plan işleyicisi; API yanıtı yoktur. Görünürlük `GET /reminders/logs`
 | Toplam müşteri | 1.000 | sınırsız | `Trial.ClientQuotaExceeded` | 422 |
 | Toplam hasta | 2.000 | sınırsız | `Trial.PetQuotaExceeded` | 422 |
 | Dosya depolama (silinmemiş) | 500 MB | sınırsız (dosya başına 15 MB her kiracıda) | `Trial.StorageQuotaExceeded` | 422 |
-| Kullanıcı | plan koltuğu (Basic 1) | plan koltuğu | `Subscriptions.UserLimitExceeded` | 403 |
+| Kullanıcı | plan koltuğu (Basic 3) | plan koltuğu | `Subscriptions.UserLimitExceeded` | 403 |
 
 ## 5) Frontend etkisi
 
