@@ -13,13 +13,13 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `WEB-007`, AD
 | Fiyatın yeri | Yapılandırma `Billing:PlanPricesMinor` (aylık, kuruş, **KDV hariç**). Değer `appsettings.json`'dadır; ortam değişkeniyle (`Billing__PlanPricesMinor__Pro`) ezilebilir. Yoksa ya da `0` ise `Billing:Iyzico:PlanPricesTry` (TL) kuruşa çevrilerek okunur; o da yoksa "fiyat yapılandırılmamış". |
 | Okuyan kod | Yalnız `SubscriptionPlanPrices` (Application `Common/Billing`). Checkout tutarı (`StartSubscriptionCheckoutCommandHandler`, iyzico tutar verilmediğindeki geri dönüşü dahil), panel özeti ve bu uç aynı kuralı çağırır; sitede gösterilen fiyat ile çekilen tutar ayrışmaz. |
 | Yıllık | `SubscriptionPricing.PeriodPriceMinor` = aylık × `SubscriptionPricing.YearlyBilledMonths` (10). İkinci bir yıllık sayı tutulmaz. |
-| Kullanıcı sınırı | `SubscriptionPlanCatalog.MaxUsers` (Basic 3, Pro 10, Premium 50). |
+| Kullanıcı sınırı | `SubscriptionPlanCatalog.MaxUsers` (Basic 1, Pro 5, Premium 15). |
 | Klinik sınırı | Backend'de yok; uç döndürmez. |
 | Ödemenin açılması | Fiyat ödemeyi **açmaz**. iyzico ancak anahtarlar ve `Billing:Iyzico:PlanPricesTry` tüm planlar için dolu olduğunda etkindir (`IyzicoCheckoutPrerequisites`); canlıda `PlanPricesTry` `0` kaldığı sürece ücretli checkout başlamaz (`Billing.IyzicoConfigurationIncomplete`, 503). |
 
 Fiyat değişince yalnız `appsettings.json` `Billing:PlanPricesMinor` (ya da ortam değişkeni) değişir; site, panel ve checkout yeniden başlatmadan sonra yeni değeri okur.
 
-Geçici fiyat (2026-11-05): Basic `149000` (1.490 TL), Pro `249000` (2.490 TL), Premium `399000` (3.990 TL) / ay, KDV hariç.
+Fiyat (2026-11-06, kullanıcı onayı; ilk geçici değerlerin yerine): Basic `89000` (890 TL), Pro `179000` (1.790 TL), Premium `379000` (3.790 TL) / ay, KDV hariç. Yıllık: 8.900 / 17.900 / 37.900 TL.
 
 ## 2) `GET /api/v1/public/subscription-plans` — anonim
 
@@ -31,9 +31,9 @@ Yetki yok (`AllowAnonymous`), hız sınırı yok (statik okuma; genel sınır ge
   "vatIncluded": false,
   "yearlyBilledMonths": 10,
   "plans": [
-    { "planCode": "Basic", "name": "Basic", "maxUsers": 3, "monthlyPriceMinor": 149000, "yearlyPriceMinor": 1490000 },
-    { "planCode": "Pro", "name": "Pro", "maxUsers": 10, "monthlyPriceMinor": 249000, "yearlyPriceMinor": 2490000 },
-    { "planCode": "Premium", "name": "Premium", "maxUsers": 50, "monthlyPriceMinor": 399000, "yearlyPriceMinor": 3990000 }
+    { "planCode": "Basic", "name": "Basic", "maxUsers": 1, "monthlyPriceMinor": 89000, "yearlyPriceMinor": 890000 },
+    { "planCode": "Pro", "name": "Pro", "maxUsers": 5, "monthlyPriceMinor": 179000, "yearlyPriceMinor": 1790000 },
+    { "planCode": "Premium", "name": "Premium", "maxUsers": 15, "monthlyPriceMinor": 379000, "yearlyPriceMinor": 3790000 }
   ]
 }
 ```
