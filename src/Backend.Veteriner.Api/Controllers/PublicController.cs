@@ -11,6 +11,7 @@ using Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Application.Public.Queries.InviteDetail;
+using Backend.Veteriner.Application.Public.Queries.SubscriptionPlans;
 using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.SalesPartners.Queries.ValidateCode;
 using Backend.Veteriner.Domain.DemoRequests;
@@ -124,6 +125,16 @@ public sealed class PublicController : ControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<LegalDocumentVersionDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetLegalDocumentVersions(CancellationToken ct)
         => Ok(await _mediator.Send(new GetCurrentLegalDocumentVersionsQuery(), ct));
+
+    /// <summary>
+    /// Paket kataloğu (WEB-007): kod, ad, kullanıcı sınırı, aylık ve yıllık liste fiyatı (kuruş, KDV hariç). Fiyat checkout ile
+    /// aynı kuraldan okunur; yapılandırılmamışsa fiyat alanları <c>null</c>.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("subscription-plans")]
+    [ProducesResponseType(typeof(PublicSubscriptionPlanCatalogDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSubscriptionPlans(CancellationToken ct)
+        => Ok(await _mediator.Send(new GetPublicSubscriptionPlansQuery(), ct));
 
     /// <summary>Public davet doğrulama (join ekranı).</summary>
     [AllowAnonymous]

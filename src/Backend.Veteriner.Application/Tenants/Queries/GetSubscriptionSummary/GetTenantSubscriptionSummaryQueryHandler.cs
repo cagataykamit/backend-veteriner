@@ -1,12 +1,16 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Billing;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 
 namespace Backend.Veteriner.Application.Tenants.Queries.GetSubscriptionSummary;
@@ -22,6 +26,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
     private readonly TenantSubscriptionEffectiveWriteEvaluator _effectiveWriteEvaluator;
     private readonly ILogger<GetTenantSubscriptionSummaryQueryHandler> _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly IOptions<BillingOptions> _billingOptions;
 
     public GetTenantSubscriptionSummaryQueryHandler(
         ITenantContext tenantContext,
@@ -31,6 +36,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         IReadRepository<ScheduledSubscriptionPlanChange> planChanges,
         TenantSubscriptionEffectiveWriteEvaluator effectiveWriteEvaluator,
         TimeProvider timeProvider,
+        IOptions<BillingOptions> billingOptions,
         ILogger<GetTenantSubscriptionSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -41,6 +47,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         _effectiveWriteEvaluator = effectiveWriteEvaluator;
         _logger = logger ?? NullLogger<GetTenantSubscriptionSummaryQueryHandler>.Instance;
         _timeProvider = timeProvider;
+        _billingOptions = billingOptions;
     }
 
     public async ValueTask<Result<TenantSubscriptionSummaryDto>> Handle(
@@ -124,7 +131,9 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
                 SubscriptionPlanCatalog.ToApiCode(p.Code),
                 p.Name,
                 p.Description,
-                p.MaxUsers))
+                p.MaxUsers,
+                SubscriptionPlanPrices.PeriodPriceMinorOrNull(_billingOptions.Value, p.Code, BillingPeriodKind.Monthly),
+                SubscriptionPlanPrices.PeriodPriceMinorOrNull(_billingOptions.Value, p.Code, BillingPeriodKind.Yearly)))
             .ToList();
 
         var pending = await _planChanges.FirstOrDefaultAsync(new OpenScheduledPlanChangeByTenantSpec(request.TenantId), ct);

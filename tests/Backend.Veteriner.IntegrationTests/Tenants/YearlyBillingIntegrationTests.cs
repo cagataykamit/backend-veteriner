@@ -31,7 +31,7 @@ public sealed class YearlyBillingIntegrationTests : IClassFixture<CustomWebAppli
     [Fact]
     public async Task Monthly_Paid_Tenant_Should_Switch_To_Yearly_And_Start_One_Year_Period()
     {
-        // Entegrasyon yapılandırmasında plan fiyatı yok; oranlama için test fiyatları verilir.
+        // Oranlama beklentisi sabit olsun diye test fiyatları verilir (varsayılan liste fiyatı appsettings.json).
         await using var priced = _factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) =>
             c.AddInMemoryCollection(new Dictionary<string, string?>
             {

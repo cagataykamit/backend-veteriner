@@ -5,6 +5,10 @@ namespace Backend.Veteriner.Application.Common.Billing;
 
 public static class IyzicoCheckoutPrerequisites
 {
+    /// <summary>
+    /// iyzico ödemesi açık mı: anahtarlar ve her plan için <see cref="IyzicoBillingOptions.PlanPricesTry"/> dolu olmalı. Bu sözlük
+    /// ücretli checkout'u açan anahtardır; çekilen ve gösterilen tutar <see cref="SubscriptionPlanPrices"/> kuralından okunur (WEB-007).
+    /// </summary>
     public static bool IsComplete(IyzicoBillingOptions iyzico)
     {
         if (string.IsNullOrWhiteSpace(iyzico.ApiKey))
