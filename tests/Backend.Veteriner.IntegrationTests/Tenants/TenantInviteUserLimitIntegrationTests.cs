@@ -16,7 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.Tenants;
 
 /// <summary>
-/// Paket kullanıcı sınırı (WEB-007: Basic 1, Pro 5, Premium 15): davet oluşturma üye + bekleyen daveti, kabul üye sayısını
+/// Paket kullanıcı sınırı (WEB-007: Basic 3, Pro 5, Premium 15): davet oluşturma üye + bekleyen daveti, kabul üye sayısını
 /// sayar. Sınırı aşan üyeler kalır; paket düşürme üye sayısına bakmaz (yeni kısıt yok, davranış burada sabitlenir).
 /// </summary>
 public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<CustomWebApplicationFactory>
@@ -84,9 +84,9 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
     }
 
     [Fact]
-    public async Task CreateInvite_Should_Reject_On_Basic_When_Owner_Is_The_Only_Member()
+    public async Task CreateInvite_Should_Reject_On_Basic_When_Limit_Is_Reached()
     {
-        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Basic, memberCount: 1);
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Basic, memberCount: 3);
 
         var response = await CreateInviteAsync(seeded);
 
@@ -110,6 +110,15 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
     }
 
     [Fact]
+    public async Task CreateInvite_Should_Allow_Up_To_Basic_Limit()
+    {
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Basic, memberCount: 2);
+
+        (await CreateInviteAsync(seeded)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await CreateInviteAsync(seeded)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task CreateInvite_Should_Allow_Up_To_Premium_Limit()
     {
         var seeded = await SeedTenantAsync(SubscriptionPlanCode.Premium, memberCount: 14);
@@ -121,7 +130,7 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
     [Fact]
     public async Task SignupAndAccept_Should_Reject_When_Tenant_Is_Full_And_Keep_Invite_Pending()
     {
-        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Basic, memberCount: 1);
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Basic, memberCount: 3);
         var rawToken = $"limit-invite-{Guid.NewGuid():N}";
         var email = $"limit-invitee-{Guid.NewGuid():N}@example.com";
 
@@ -147,7 +156,7 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
         await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            (await db.UserTenants.AsNoTracking().CountAsync(ut => ut.TenantId == seeded.TenantId)).Should().Be(1);
+            (await db.UserTenants.AsNoTracking().CountAsync(ut => ut.TenantId == seeded.TenantId)).Should().Be(3);
             (await db.Users.AsNoTracking().AnyAsync(u => u.Email == email)).Should().BeFalse();
             (await db.TenantInvites.AsNoTracking().SingleAsync(i => i.Email == email)).Status.Should().Be(TenantInviteStatus.Pending);
         }
@@ -156,7 +165,7 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
     [Fact]
     public async Task Members_Over_New_Limit_Should_Stay_And_Only_New_Invites_Are_Rejected()
     {
-        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Basic, memberCount: 3);
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Basic, memberCount: 5);
 
         var response = await CreateInviteAsync(seeded);
 
@@ -165,7 +174,7 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
 
         await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        (await db.UserTenants.AsNoTracking().CountAsync(ut => ut.TenantId == seeded.TenantId)).Should().Be(3);
+        (await db.UserTenants.AsNoTracking().CountAsync(ut => ut.TenantId == seeded.TenantId)).Should().Be(5);
     }
 
     [Fact]
