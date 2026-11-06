@@ -9,9 +9,9 @@ public static class SubscriptionPlanCatalog
 
     public static IReadOnlyList<PlanEntry> All { get; } =
     [
-        new(SubscriptionPlanCode.Basic, "Basic", "Temel özellikler.", 3),
-        new(SubscriptionPlanCode.Pro, "Pro", "Gelişmiş özellikler.", 10),
-        new(SubscriptionPlanCode.Premium, "Premium", "Kurumsal özellikler.", 50),
+        new(SubscriptionPlanCode.Basic, "Basic", "Temel özellikler.", 1),
+        new(SubscriptionPlanCode.Pro, "Pro", "Gelişmiş özellikler.", 5),
+        new(SubscriptionPlanCode.Premium, "Premium", "Kurumsal özellikler.", 15),
     ];
 
     public static string GetName(SubscriptionPlanCode code)
