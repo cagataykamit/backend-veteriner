@@ -6,6 +6,7 @@ namespace Backend.Veteriner.Domain.Products;
 public sealed class Product : AggregateRoot, ITenantOwned
 {
     public const int ManufacturerMaxLength = 200;
+    public const int BarcodeMaxLength = 100;
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
@@ -15,6 +16,8 @@ public sealed class Product : AggregateRoot, ITenantOwned
 
     public string Name { get; private set; } = default!;
     public string? Sku { get; private set; }
+
+    /// <summary>Kiracı içinde benzersiz (pasif ürün dahil), boş bırakılabilir; arama tam eşleşmeyle yapılır (TIER-006).</summary>
     public string? Barcode { get; private set; }
     public string? Description { get; private set; }
 
@@ -101,7 +104,7 @@ public sealed class Product : AggregateRoot, ITenantOwned
         UnitPrice = unitPrice;
         Currency = currency.Trim().ToUpperInvariant();
         Sku = NormalizeOptional(sku);
-        Barcode = NormalizeOptional(barcode);
+        Barcode = NormalizeBarcode(barcode);
         Description = NormalizeOptional(description);
         Kind = kind;
         ControlledClass = controlledClass;
@@ -116,6 +119,9 @@ public sealed class Product : AggregateRoot, ITenantOwned
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>Kayıt, benzersizlik denetimi ve barkodla arama aynı biçimi kullanır: kenar boşlukları atılır, boş değer yok sayılır.</summary>
+    public static string? NormalizeBarcode(string? value) => NormalizeOptional(value);
 
     public void Update(
         Guid? productCategoryId,
@@ -151,7 +157,7 @@ public sealed class Product : AggregateRoot, ITenantOwned
         UnitPrice = unitPrice;
         Currency = currency.Trim().ToUpperInvariant();
         Sku = NormalizeOptional(sku);
-        Barcode = NormalizeOptional(barcode);
+        Barcode = NormalizeBarcode(barcode);
         Description = NormalizeOptional(description);
         Kind = kind;
         ControlledClass = controlledClass;

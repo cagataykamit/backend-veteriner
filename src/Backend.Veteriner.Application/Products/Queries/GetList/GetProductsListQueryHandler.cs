@@ -38,13 +38,14 @@ public sealed class GetProductsListQueryHandler
         var pageSize = Math.Clamp(request.PageRequest.PageSize, 1, 200);
         var normalized = ListQueryTextSearch.Normalize(request.PageRequest.Search);
         var searchPattern = normalized is null ? null : ListQueryTextSearch.BuildContainsLikePattern(normalized);
+        var barcode = Product.NormalizeBarcode(request.Barcode);
 
         var total = await _products.CountAsync(
-            new ProductsFilteredCountSpec(tenantId, searchPattern, request.ProductCategoryId, request.IsActive),
+            new ProductsFilteredCountSpec(tenantId, searchPattern, request.ProductCategoryId, request.IsActive, barcode),
             ct);
 
         var rows = await _products.ListAsync(
-            new ProductsFilteredPagedSpec(tenantId, page, pageSize, searchPattern, request.ProductCategoryId, request.IsActive),
+            new ProductsFilteredPagedSpec(tenantId, page, pageSize, searchPattern, request.ProductCategoryId, request.IsActive, barcode),
             ct);
 
         var categoryIds = rows.Where(x => x.ProductCategoryId.HasValue).Select(x => x.ProductCategoryId!.Value).Distinct().ToArray();

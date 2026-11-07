@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Products.Commands.Update;
 
@@ -64,6 +65,10 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
                 return Result.Failure("Products.SkuAlreadyExists", "Bu kiracıda aynı SKU ile başka ürün var.");
         }
 
+        if (Product.NormalizeBarcode(request.Barcode) is { } barcode
+            && await _productsRead.FirstOrDefaultAsync(new ProductByTenantAndBarcodeSpec(tenantId, barcode, request.Id), ct) is { } barcodeOwner)
+            return Result.Failure(ProductErrors.DuplicateBarcode(barcodeOwner.Name));
+
         var kind = request.Kind ?? product.Kind;
         var controlledClass = request.ControlledClass ?? product.ControlledClass;
         if ((kind == ProductKind.Service) != (product.Kind == ProductKind.Service))
@@ -89,7 +94,15 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
             request.Packaging ?? product.Packaging,
             request.Manufacturer ?? product.Manufacturer);
 
-        await _productsWrite.SaveChangesAsync(ct);
+        try
+        {
+            await _productsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ProductErrors.IsDuplicateBarcodeViolation(ex))
+        {
+            return Result.Failure(ProductErrors.DuplicateBarcode(null));
+        }
+
         return Result.Success();
     }
 }

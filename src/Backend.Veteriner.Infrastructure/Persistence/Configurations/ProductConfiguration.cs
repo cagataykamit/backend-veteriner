@@ -16,7 +16,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(x => x.ProductCategoryId);
         b.Property(x => x.Name).IsRequired().HasMaxLength(300);
         b.Property(x => x.Sku).HasMaxLength(100);
-        b.Property(x => x.Barcode).HasMaxLength(100);
+        b.Property(x => x.Barcode).HasMaxLength(Product.BarcodeMaxLength);
         b.Property(x => x.Description).HasMaxLength(4000);
         b.Property(x => x.Unit).IsRequired().HasMaxLength(50);
 
@@ -45,6 +45,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.HasIndex(x => new { x.TenantId, x.Sku })
             .IsUnique()
             .HasFilter("[Sku] IS NOT NULL");
+
+        // TIER-006: barkod kiracı içinde benzersiz; adı ProductErrors.IsDuplicateBarcodeViolation ile eşleşir.
+        b.HasIndex(x => new { x.TenantId, x.Barcode })
+            .IsUnique()
+            .HasFilter("[Barcode] IS NOT NULL");
 
         b.HasOne(x => x.Category)
             .WithMany(c => c.Products)

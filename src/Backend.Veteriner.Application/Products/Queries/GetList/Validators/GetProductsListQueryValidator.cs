@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Products;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Products.Queries.GetList.Validators;
@@ -9,5 +10,6 @@ public sealed class GetProductsListQueryValidator : AbstractValidator<GetProduct
         RuleFor(x => x.PageRequest).NotNull();
         RuleFor(x => x.PageRequest.Page).GreaterThanOrEqualTo(1);
         RuleFor(x => x.PageRequest.PageSize).InclusiveBetween(1, 200);
+        RuleFor(x => x.Barcode).MaximumLength(Product.BarcodeMaxLength);
     }
 }

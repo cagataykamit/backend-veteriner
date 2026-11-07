@@ -22,13 +22,13 @@ public static class SubscriptionPlanCatalog
             new HashSet<PlanFeature>
             {
                 PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests, PlanFeature.AutomatedReminders, PlanFeature.AdvancedReports,
-                PlanFeature.VaccinationWizard,
+                PlanFeature.VaccinationWizard, PlanFeature.MobileBarcode,
             }),
         new(SubscriptionPlanCode.Premium, "Premium", "Kurumsal özellikler.", 15,
             new HashSet<PlanFeature>
             {
                 PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests, PlanFeature.MultiClinic, PlanFeature.AutomatedReminders,
-                PlanFeature.AdvancedReports, PlanFeature.VaccinationWizard,
+                PlanFeature.AdvancedReports, PlanFeature.VaccinationWizard, PlanFeature.MobileBarcode,
             }),
     ];
 

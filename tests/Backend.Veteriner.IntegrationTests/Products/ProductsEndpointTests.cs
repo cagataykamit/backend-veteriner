@@ -154,6 +154,59 @@ public sealed class ProductsEndpointTests : IClassFixture<CustomWebApplicationFa
     }
 
     [Fact]
+    public async Task Barcode_Should_Be_Unique_Per_Tenant_And_Searchable_By_Exact_Match()
+    {
+        var client = _factory.CreateClient();
+        var (_, token) = await SeedTenantAndIssueTokenAsync(new[] { "Products.Read", "Products.Create", "Products.Update", "Products.Deactivate" });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var barcode = $"869{Random.Shared.NextInt64(1_000_000_000, 9_999_999_999)}";
+
+        object Body(string name, string? code) => new
+        {
+            productCategoryId = (Guid?)null, name, sku = (string?)null, barcode = code, description = (string?)null,
+            unit = "Adet", unitPrice = 10, currency = "TRY"
+        };
+
+        var create = await client.PostAsJsonAsync("/api/v1/products", Body("Mama", $"  {barcode} "));
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>();
+        created.GetProperty("barcode").GetString().Should().Be(barcode);
+        var id = created.GetProperty("id").GetGuid();
+
+        var duplicate = await client.PostAsJsonAsync("/api/v1/products", Body("Mama 2", barcode));
+        duplicate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(duplicate)).Should().Be("Products.DuplicateBarcode");
+
+        (await client.PostAsync($"/api/v1/products/{id}/deactivate", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var duplicateOfInactive = await client.PostAsJsonAsync("/api/v1/products", Body("Mama 3", barcode));
+        duplicateOfInactive.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var second = await client.PostAsJsonAsync("/api/v1/products", Body("Kum", null));
+        second.StatusCode.Should().Be(HttpStatusCode.Created);
+        var secondId = (await second.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        (await client.PostAsJsonAsync("/api/v1/products", Body("Tasma", "  "))).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var updateDuplicate = await client.PutAsJsonAsync($"/api/v1/products/{secondId}", Body("Kum", barcode));
+        updateDuplicate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(updateDuplicate)).Should().Be("Products.DuplicateBarcode");
+        (await client.PutAsJsonAsync($"/api/v1/products/{id}", Body("Mama", barcode))).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var exact = await (await client.GetAsync($"/api/v1/products?page=1&pageSize=20&barcode={barcode}")).Content.ReadFromJsonAsync<JsonElement>();
+        exact.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).Should().Equal(id);
+        var partial = await (await client.GetAsync($"/api/v1/products?page=1&pageSize=20&barcode={barcode[..6]}")).Content.ReadFromJsonAsync<JsonElement>();
+        partial.GetProperty("items").GetArrayLength().Should().Be(0);
+        var activeOnly = await (await client.GetAsync($"/api/v1/products?page=1&pageSize=20&isActive=true&barcode={barcode}")).Content.ReadFromJsonAsync<JsonElement>();
+        activeOnly.GetProperty("items").GetArrayLength().Should().Be(0);
+
+        var otherClient = _factory.CreateClient();
+        var (_, otherToken) = await SeedTenantAndIssueTokenAsync(new[] { "Products.Read", "Products.Create" });
+        otherClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", otherToken);
+        (await otherClient.PostAsJsonAsync("/api/v1/products", Body("Mama", barcode))).StatusCode.Should().Be(HttpStatusCode.Created);
+        var otherList = await (await otherClient.GetAsync($"/api/v1/products?page=1&pageSize=20&barcode={barcode}")).Content.ReadFromJsonAsync<JsonElement>();
+        otherList.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).Should().NotContain(id);
+    }
+
+    [Fact]
     public async Task Detail_Should_ReturnNotFound_For_OtherTenant_Product()
     {
         var ownerClient = _factory.CreateClient();

@@ -41,6 +41,7 @@ public sealed class ProductsController : ControllerBase
         _tenantContext = tenantContext;
     }
 
+    /// <summary>Ürün listesi; <c>barcode</c> tam eşleşmedir (TIER-006, docs/MOBILE_BARCODE_API_CONTRACT.md), her pakette açık.</summary>
     [HttpGet]
     [Authorize(Policy = PermissionCatalog.Products.Read)]
     [ProducesResponseType(typeof(PagedResult<ProductDto>), StatusCodes.Status200OK)]
@@ -49,13 +50,14 @@ public sealed class ProductsController : ControllerBase
         [FromQuery] PageRequest page,
         [FromQuery] Guid? productCategoryId,
         [FromQuery] bool? isActive,
+        [FromQuery] string? barcode,
         CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
         var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
-        var result = await _mediator.Send(new GetProductsListQuery(paging, productCategoryId, isActive), ct);
+        var result = await _mediator.Send(new GetProductsListQuery(paging, productCategoryId, isActive, barcode), ct);
         return result.ToActionResult(this);
     }
 

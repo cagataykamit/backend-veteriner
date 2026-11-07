@@ -4039,6 +4039,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("TenantId", "Barcode")
+                        .IsUnique()
+                        .HasFilter("[Barcode] IS NOT NULL");
+
                     b.HasIndex("TenantId", "IsActive");
 
                     b.HasIndex("TenantId", "Name");

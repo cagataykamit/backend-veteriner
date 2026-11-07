@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Products.Commands.Create;
 
@@ -62,6 +63,10 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
                 return Result<ProductDto>.Failure("Products.SkuAlreadyExists", "Bu kiracıda aynı SKU ile başka ürün var.");
         }
 
+        if (Product.NormalizeBarcode(request.Barcode) is { } barcode
+            && await _productsRead.FirstOrDefaultAsync(new ProductByTenantAndBarcodeSpec(tenantId, barcode), ct) is { } barcodeOwner)
+            return Result<ProductDto>.Failure(ProductErrors.DuplicateBarcode(barcodeOwner.Name));
+
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var product = new Product(
             tenantId,
@@ -81,8 +86,15 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
             request.Packaging,
             request.Manufacturer);
 
-        await _productsWrite.AddAsync(product, ct);
-        await _productsWrite.SaveChangesAsync(ct);
+        try
+        {
+            await _productsWrite.AddAsync(product, ct);
+            await _productsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ProductErrors.IsDuplicateBarcodeViolation(ex))
+        {
+            return Result<ProductDto>.Failure(ProductErrors.DuplicateBarcode(null));
+        }
 
         return Result<ProductDto>.Success(product.ToDto(category?.Name));
     }

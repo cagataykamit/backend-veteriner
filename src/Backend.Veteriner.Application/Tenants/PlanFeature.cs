@@ -38,4 +38,11 @@ public enum PlanFeature
     /// Bugünkü aşı kaydı, planlı aşı ve aşı hatırlatması bu kuralın dışındadır; her pakette kalır.
     /// </summary>
     VaccinationWizard = 5,
+
+    /// <summary>
+    /// Telefon kamerasıyla barkod okutma (TIER-006; docs/MOBILE_BARCODE_API_CONTRACT.md). Okuma tarayıcıda yapılır, ayrı sunucu kapısı
+    /// yoktur; satır <c>access-state</c> ve paket tablosu içindir. Ürün kartındaki barkod alanı ve elle ya da okuyucuyla girilen
+    /// barkodla arama bu kuralın dışındadır; her pakette açık.
+    /// </summary>
+    MobileBarcode = 6,
 }
