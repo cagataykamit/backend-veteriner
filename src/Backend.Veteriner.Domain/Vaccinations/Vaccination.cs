@@ -8,7 +8,7 @@ namespace Backend.Veteriner.Domain.Vaccinations;
 /// Pet bazlı aşı kaydı; opsiyonel olarak bir muayene ile ilişkilendirilebilir.
 /// Aşı adı <see cref="VaccineName"/> alanında seçilen <c>VaccineDefinition</c> adının snapshot'ı olarak tutulur.
 /// </summary>
-public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned
+public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IChangeTracked
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
@@ -33,6 +33,7 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned
 
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
+    public DateTime ChangedAtUtc { get; private set; }
 
     /// <summary>
     /// Kaydı oluşturan içe aktarma partisi; günlük girişte boştur. Partinin hatırlatmaları serbest bırakılana kadar

@@ -362,6 +362,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int>("AppointmentType")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
@@ -409,6 +414,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "PetId");
 
                     b.HasIndex("TenantId", "ScheduledAtUtc");
+
+                    b.HasIndex("TenantId", "ChangedAtUtc", "Id");
 
                     b.HasIndex("TenantId", "ClinicId", "PetId");
 
@@ -1614,6 +1621,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -1712,6 +1724,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_Clients_TenantId_WalkIn")
                         .HasFilter("[IsWalkIn] = 1");
+
+                    b.HasIndex("TenantId", "ChangedAtUtc", "Id");
 
                     b.HasIndex("TenantId", "Email", "PhoneNormalized")
                         .IsUnique()
@@ -2487,6 +2501,67 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "ExaminationId", "CreatedAtUtc");
 
                     b.ToTable("ExaminationAddenda", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.ExternalApi.ApiKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("LastUsedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(12)");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Scopes")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<byte[]>("SecretHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varbinary(32)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Prefix")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "CreatedAtUtc");
+
+                    b.ToTable("ApiKeys", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ApiKeys_Revoke_Consistent", "([RevokedAtUtc] IS NULL AND [RevokedByUserId] IS NULL) OR ([RevokedAtUtc] IS NOT NULL AND [RevokedByUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ApiKeys_SecretHash_Length", "DATALENGTH([SecretHash]) = 32");
+                        });
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Files.StoredFile", b =>
@@ -3801,6 +3876,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("BreedId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uniqueidentifier");
 
@@ -3876,6 +3956,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "ClientId");
 
                     b.HasIndex("TenantId", "Status");
+
+                    b.HasIndex("TenantId", "ChangedAtUtc", "Id");
 
                     b.ToTable("Pets", (string)null);
                 });
@@ -5619,6 +5701,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime?>("AppliedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
@@ -5702,6 +5789,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "PetId");
 
                     b.HasIndex("TenantId", "Status");
+
+                    b.HasIndex("TenantId", "ChangedAtUtc", "Id");
 
                     b.HasIndex("TenantId", "ClinicId", "HbsStatus");
 

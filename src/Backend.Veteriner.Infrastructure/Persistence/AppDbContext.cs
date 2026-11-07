@@ -11,6 +11,7 @@ using Backend.Veteriner.Domain.ClinicSites;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.CashCounts;
+using Backend.Veteriner.Domain.ExternalApi;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Sales;
@@ -142,6 +143,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<ClientCredit> ClientCredits => Set<ClientCredit>();
     public DbSet<ClientCreditApplication> ClientCreditApplications => Set<ClientCreditApplication>();
     public DbSet<CashCount> CashCounts => Set<CashCount>();
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<Administration> Administrations => Set<Administration>();
     public DbSet<ChargeSuggestion> ChargeSuggestions => Set<ChargeSuggestion>();
     public DbSet<Sale> Sales => Set<Sale>();
@@ -294,6 +296,7 @@ public class AppDbContext : TenantIsolatedDbContext
             typeof(AppDbContext).Assembly,
             type => type.Namespace is null || !type.Namespace.Contains(".Persistence.Query.", StringComparison.Ordinal));
 
+        ChangeTrackedSaveChangesInterceptor.Configure(b);
         ApplyTenantFilters(b);
 
         base.OnModelCreating(b);

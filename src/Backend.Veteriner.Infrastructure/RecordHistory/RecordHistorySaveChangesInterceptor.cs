@@ -39,7 +39,7 @@ public sealed class RecordHistorySaveChangesInterceptor : SaveChangesInterceptor
     /// <summary>Kimlik, kiracı, eşzamanlılık ve zaman damgası gibi klinik anlamı olmayan alanlar.</summary>
     private static readonly HashSet<string> IgnoredProperties = new(StringComparer.Ordinal)
     {
-        "Id", "TenantId", "RowVersion", "CreatedAtUtc", "UpdatedAtUtc", "CreatedByUserId", "RequestId", "ImportBatchId",
+        "Id", "TenantId", "RowVersion", "CreatedAtUtc", "UpdatedAtUtc", "ChangedAtUtc", "CreatedByUserId", "RequestId", "ImportBatchId",
     };
 
     private readonly IClientContext _client;
