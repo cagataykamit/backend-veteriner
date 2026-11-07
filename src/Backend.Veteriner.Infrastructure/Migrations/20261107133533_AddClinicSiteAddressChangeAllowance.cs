@@ -1,24 +1,24 @@
-﻿using System;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace Backend.Veteriner.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddClinicSiteAddressChangeWindow : Migration
+    public partial class AddClinicSiteAddressChangeAllowance : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTime>(
-                name: "AddressChangeWindowStartedAtUtc",
+            migrationBuilder.AddColumn<int>(
+                name: "AddressChangesGranted",
                 table: "ClinicSites",
-                type: "datetime2",
-                nullable: true);
+                type: "int",
+                nullable: false,
+                defaultValue: 0);
 
             migrationBuilder.AddColumn<int>(
-                name: "AddressChangesInWindow",
+                name: "AddressChangesUsed",
                 table: "ClinicSites",
                 type: "int",
                 nullable: false,
@@ -29,11 +29,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "AddressChangeWindowStartedAtUtc",
+                name: "AddressChangesGranted",
                 table: "ClinicSites");
 
             migrationBuilder.DropColumn(
-                name: "AddressChangesInWindow",
+                name: "AddressChangesUsed",
                 table: "ClinicSites");
         }
     }

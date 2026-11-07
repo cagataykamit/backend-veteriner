@@ -13,10 +13,6 @@ public static class ClinicSiteErrors
     /// <summary>Çift tıklamada iki yayın aynı sürüm numarasını yazar; hangisi önce çalışırsa diğeri bu indekse takılır.</summary>
     private const string VersionNumberIndexName = "IX_ClinicSiteVersions_TenantId_SiteId_VersionNumber";
 
-    public static readonly Error AddressLimitReached = new(
-        "ClinicSites.AddressLimitReached",
-        $"Bir sitenin en çok {ClinicSite.MaxRetiredAddresses} eski adresi olabilir; yeni adres yerine eski adreslerinizden birine dönebilirsiniz.");
-
     public static readonly Error NotFound =
         new("ClinicSites.NotFound", "Bu klinik için site oluşturulmamış.");
 

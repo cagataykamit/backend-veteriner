@@ -13,8 +13,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Backend.Veteriner.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261107132135_AddClinicSiteAddressChangeWindow")]
-    partial class AddClinicSiteAddressChangeWindow
+    [Migration("20261107133533_AddClinicSiteAddressChangeAllowance")]
+    partial class AddClinicSiteAddressChangeAllowance
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1649,10 +1649,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime?>("AddressChangeWindowStartedAtUtc")
-                        .HasColumnType("datetime2");
+                    b.Property<int>("AddressChangesGranted")
+                        .HasColumnType("int");
 
-                    b.Property<int>("AddressChangesInWindow")
+                    b.Property<int>("AddressChangesUsed")
                         .HasColumnType("int");
 
                     b.Property<Guid>("ClinicId")

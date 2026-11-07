@@ -12,11 +12,11 @@ public sealed class ClinicSite : ITenantOwned
     /// <summary>Saklanan sürüm sayısı (K2); yayında en eskisi düşer, yayındaki sürüm hep en yenisidir.</summary>
     public const int MaxRetainedVersions = 30;
 
-    /// <summary>Site başına eski adres sınırı (K10): adres kapmayı önler; en eskisi serbest bırakılmaz, değişiklik reddedilir.</summary>
-    public const int MaxRetiredAddresses = 5;
-
-    /// <summary>Yayınlanmış sitede 24 saatte adres değişikliği sınırı (K10). Yayınlanmamış adres paylaşılmadığı için sayılmaz.</summary>
-    public const int MaxAddressChangesPerDay = 3;
+    /// <summary>
+    /// Yayınlanmış sitenin adres değiştirme hakkı (K10, kullanıcı kararı): adres kapmayı önler, eski adres hiç serbest kalmaz.
+    /// Yayınlanmamış adres paylaşılmadığı için sayılmaz. Hak bitince destek <see cref="GrantAddressChanges"/> ile artırır.
+    /// </summary>
+    public const int IncludedAddressChanges = 3;
 
     public const string AddressChangeLimitReachedCode = "ClinicSites.AddressChangeLimitReached";
 
@@ -41,10 +41,11 @@ public sealed class ClinicSite : ITenantOwned
     /// <summary>Kliniğin elle verdiği geçici kapatma (K9).</summary>
     public bool IsTemporarilyClosed { get; private set; }
 
-    /// <summary>Adres değişikliği sayacının 24 saatlik penceresinin başlangıcı.</summary>
-    public DateTime? AddressChangeWindowStartedAtUtc { get; private set; }
+    /// <summary>Yayınlandıktan sonra yapılan adres değişikliği sayısı.</summary>
+    public int AddressChangesUsed { get; private set; }
 
-    public int AddressChangesInWindow { get; private set; }
+    /// <summary>Destekçe tanınan ek adres değiştirme hakkı.</summary>
+    public int AddressChangesGranted { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
@@ -55,6 +56,8 @@ public sealed class ClinicSite : ITenantOwned
     private ClinicSite() { }
 
     public bool IsPublished => PublishedVersionNumber is not null;
+
+    public int AddressChangesRemaining => Math.Max(0, IncludedAddressChanges + AddressChangesGranted - AddressChangesUsed);
 
     public static ClinicSite Create(Guid tenantId, Guid clinicId, string slug, ClinicSiteConfig draft, DateTime utcNow)
     {
@@ -118,7 +121,7 @@ public sealed class ClinicSite : ITenantOwned
         return Result<ClinicSiteVersion>.Success(version);
     }
 
-    /// <summary>Adresi değiştirir; yayınlanmış sitede günlük sınır uygulanır.</summary>
+    /// <summary>Adresi değiştirir; yayınlanmış sitede bir hak harcanır, hak yoksa destek yönlendirmesiyle reddedilir.</summary>
     public Result ChangeSlug(string slug, DateTime utcNow)
     {
         if (ClinicSiteSlug.Check(slug) != ClinicSiteSlugCheck.Valid)
@@ -126,26 +129,30 @@ public sealed class ClinicSite : ITenantOwned
 
         if (IsPublished)
         {
-            var windowExpired = AddressChangeWindowStartedAtUtc is not { } started || utcNow - started >= TimeSpan.FromDays(1);
-            if (windowExpired)
+            if (AddressChangesRemaining == 0)
             {
-                AddressChangeWindowStartedAtUtc = utcNow;
-                AddressChangesInWindow = 0;
-            }
-
-            if (AddressChangesInWindow >= MaxAddressChangesPerDay)
-            {
-                return Result.Failure(
+                return Result.Failure(new Error(
                     AddressChangeLimitReachedCode,
-                    $"Adres bir günde en çok {MaxAddressChangesPerDay} kez değiştirilebilir; yarın tekrar deneyin.");
+                    "Adres değiştirme hakkınız doldu. Adresi yeniden değiştirmek için destekle iletişime geçin.",
+                    new Dictionary<string, object?> { ["addressChangesRemaining"] = 0 }));
             }
 
-            AddressChangesInWindow++;
+            AddressChangesUsed++;
         }
 
         Slug = slug;
         UpdatedAtUtc = utcNow;
         return Result.Success();
+    }
+
+    /// <summary>Destek ek adres değiştirme hakkı tanır (platform yöneticisi ucu).</summary>
+    public void GrantAddressChanges(int count, DateTime utcNow)
+    {
+        if (count <= 0)
+            throw new ArgumentOutOfRangeException(nameof(count));
+
+        AddressChangesGranted += count;
+        UpdatedAtUtc = utcNow;
     }
 
     public void Close(DateTime utcNow)

@@ -185,27 +185,49 @@ public sealed class ClinicSiteTests
     {
         var site = NewSite();
 
-        for (var i = 0; i < ClinicSite.MaxAddressChangesPerDay + 2; i++)
+        for (var i = 0; i < ClinicSite.IncludedAddressChanges + 2; i++)
             site.ChangeSlug($"adres-{i}", Now).IsSuccess.Should().BeTrue();
 
-        site.AddressChangesInWindow.Should().Be(0);
+        site.AddressChangesUsed.Should().Be(0);
+        site.AddressChangesRemaining.Should().Be(ClinicSite.IncludedAddressChanges);
     }
 
     [Fact]
-    public void ChangeSlug_Should_Enforce_Daily_Limit_On_Published_Site()
+    public void ChangeSlug_Should_Spend_Allowance_On_Published_Site_And_Refer_To_Support()
     {
         var site = NewSite();
         site.Publish(UserId, Now);
 
-        for (var i = 0; i < ClinicSite.MaxAddressChangesPerDay; i++)
+        for (var i = 0; i < ClinicSite.IncludedAddressChanges; i++)
+        {
+            site.AddressChangesRemaining.Should().Be(ClinicSite.IncludedAddressChanges - i);
             site.ChangeSlug($"adres-{i}", Now.AddMinutes(i)).IsSuccess.Should().BeTrue();
+        }
 
-        var blocked = site.ChangeSlug("adres-fazla", Now.AddHours(23));
+        var blocked = site.ChangeSlug("adres-fazla", Now.AddYears(1));
+
         blocked.Error.Code.Should().Be(ClinicSite.AddressChangeLimitReachedCode);
-        site.Slug.Should().Be($"adres-{ClinicSite.MaxAddressChangesPerDay - 1}");
+        blocked.Error.Message.Should().Contain("destek");
+        blocked.Error.Extensions!["addressChangesRemaining"].Should().Be(0);
+        site.Slug.Should().Be($"adres-{ClinicSite.IncludedAddressChanges - 1}");
+        site.AddressChangesRemaining.Should().Be(0, "süre geçmesi hakkı yenilemez");
+    }
 
-        site.ChangeSlug("adres-yarin", Now.AddDays(1)).IsSuccess.Should().BeTrue("pencere doldu");
-        site.AddressChangesInWindow.Should().Be(1);
+    [Fact]
+    public void GrantAddressChanges_Should_Add_To_Allowance()
+    {
+        var site = NewSite();
+        site.Publish(UserId, Now);
+        for (var i = 0; i < ClinicSite.IncludedAddressChanges; i++)
+            site.ChangeSlug($"adres-{i}", Now);
+
+        site.GrantAddressChanges(1, Now);
+
+        site.AddressChangesRemaining.Should().Be(1);
+        site.ChangeSlug("adres-destek", Now).IsSuccess.Should().BeTrue();
+        site.AddressChangesRemaining.Should().Be(0);
+        site.ChangeSlug("adres-fazla", Now).IsSuccess.Should().BeFalse();
+        FluentActions.Invoking(() => site.GrantAddressChanges(0, Now)).Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]

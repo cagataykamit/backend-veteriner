@@ -17,6 +17,7 @@ public sealed record ClinicSiteStateDto(
     DateTime? PublishedAtUtc,
     bool HasUnpublishedChanges,
     DateTime DraftUpdatedAtUtc,
+    int AddressChangesRemaining,
     string RowVersion);
 
 /// <summary>Panelin site ekranı. Site yoksa <see cref="Exists"/> yanlış ve <see cref="SuggestedSlug"/> dolu; ilk taslak kaydı siteyi oluşturur.</summary>
@@ -106,6 +107,7 @@ public static class ClinicSiteMapping
             site.PublishedAtUtc,
             site.HasUnpublishedChanges,
             site.DraftUpdatedAtUtc,
+            site.AddressChangesRemaining,
             ExaminationRowVersion.Encode(site.RowVersion));
 
     public static ClinicSiteImageDto ToImageDto(ClinicSiteImage image)

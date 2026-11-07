@@ -139,8 +139,8 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
-        // Klinik web sitesi (ADR-045): adres alınmış ya da adres sınırı dolu, yayın zorunlu listesi eksik, görsel kullanımda ya da klinik pasif (durum çakışması).
-        if (normalized is "clinicsites.slugtaken" or "clinicsites.addresslimitreached" or "clinicsites.addresschangelimitreached"
+        // Klinik web sitesi (ADR-045): adres alınmış ya da değiştirme hakkı bitmiş, yayın zorunlu listesi eksik, görsel kullanımda ya da klinik pasif (durum çakışması).
+        if (normalized is "clinicsites.slugtaken" or "clinicsites.addresschangelimitreached"
             or "clinicsites.publishrequirementsnotmet" or "clinicsites.imageinuse" or "clinicsites.clinicinactive")
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");

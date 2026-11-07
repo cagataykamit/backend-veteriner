@@ -24,8 +24,8 @@ public sealed class ClinicSiteConfiguration : IEntityTypeConfiguration<ClinicSit
         b.Property(x => x.PublishedVersionNumber);
         b.Property(x => x.PublishedAtUtc);
         b.Property(x => x.IsTemporarilyClosed).IsRequired();
-        b.Property(x => x.AddressChangeWindowStartedAtUtc);
-        b.Property(x => x.AddressChangesInWindow).IsRequired();
+        b.Property(x => x.AddressChangesUsed).IsRequired();
+        b.Property(x => x.AddressChangesGranted).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
 
@@ -34,6 +34,7 @@ public sealed class ClinicSiteConfiguration : IEntityTypeConfiguration<ClinicSit
             .IsConcurrencyToken();
 
         b.Ignore(x => x.IsPublished);
+        b.Ignore(x => x.AddressChangesRemaining);
 
         // Klinik başına tek site (ADR-045 K2).
         b.HasIndex(x => new { x.TenantId, x.ClinicId }).IsUnique();

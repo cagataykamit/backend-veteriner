@@ -82,17 +82,11 @@ public sealed class ClinicSiteAddressBook
         if (target is null && await FindAsync(slug, ct) is not null)
             return Result.Failure(ClinicSiteErrors.SlugTaken);
 
-        var current = own.FirstOrDefault(a => a.RetiredAtUtc is null);
-
-        // Sınır aşılınca en eskisi serbest bırakılmaz: adres yeniden kapılabilir olurdu, eski bağlantı da kırılırdı.
-        var retiredAfterChange = own.Count(a => a.RetiredAtUtc is not null && a != target) + (site.IsPublished && current is not null ? 1 : 0);
-        if (retiredAfterChange > ClinicSite.MaxRetiredAddresses)
-            return Result.Failure(ClinicSiteErrors.AddressLimitReached);
-
         var changed = site.ChangeSlug(slug, utcNow);
         if (!changed.IsSuccess)
             return changed;
 
+        var current = own.FirstOrDefault(a => a.RetiredAtUtc is null);
         if (current is not null)
         {
             if (site.IsPublished)
