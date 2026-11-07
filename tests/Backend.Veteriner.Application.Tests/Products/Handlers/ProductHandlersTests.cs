@@ -65,6 +65,78 @@ public sealed class ProductHandlersTests
     }
 
     [Fact]
+    public async Task Create_DuplicateBarcode_Should_Fail_With_Owner_Name()
+    {
+        var tenantId = Guid.NewGuid();
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _productsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductByTenantAndBarcodeSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Product(tenantId, "Mama", "Adet", 1, "TRY", DateTime.UtcNow, barcode: "8690000000001"));
+
+        var handler = new CreateProductCommandHandler(
+            _tenantContext.Object,
+            _productsRead.Object,
+            _productsWrite.Object,
+            _categoriesRead.Object,
+            TimeProvider.System);
+
+        var result = await handler.Handle(
+            new CreateProductCommand(null, "Yeni", null, " 8690000000001 ", null, "Adet", 10, "TRY"),
+            CancellationToken.None);
+
+        result.Error.Code.Should().Be("Products.DuplicateBarcode");
+        result.Error.Message.Should().Contain("Mama");
+        _productsWrite.Verify(x => x.AddAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Create_Without_Barcode_Should_Not_Check_Barcode()
+    {
+        _tenantContext.SetupGet(x => x.TenantId).Returns(Guid.NewGuid());
+
+        var handler = new CreateProductCommandHandler(
+            _tenantContext.Object,
+            _productsRead.Object,
+            _productsWrite.Object,
+            _categoriesRead.Object,
+            TimeProvider.System);
+
+        var result = await handler.Handle(
+            new CreateProductCommand(null, "Yeni", null, "   ", null, "Adet", 10, "TRY"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Barcode.Should().BeNull();
+        _productsRead.Verify(x => x.FirstOrDefaultAsync(It.IsAny<ProductByTenantAndBarcodeSpec>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_DuplicateBarcode_Should_Fail_And_Leave_Product_Unchanged()
+    {
+        var tenantId = Guid.NewGuid();
+        var product = new Product(tenantId, "Kum", "Adet", 1, "TRY", DateTime.UtcNow);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _productsWrite.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductByIdTrackedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(product);
+        _productsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ProductByTenantAndBarcodeSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Product(tenantId, "Mama", "Adet", 1, "TRY", DateTime.UtcNow, barcode: "123"));
+
+        var handler = new UpdateProductCommandHandler(
+            _tenantContext.Object,
+            _productsRead.Object,
+            _productsWrite.Object,
+            _categoriesRead.Object,
+            TimeProvider.System);
+
+        var result = await handler.Handle(
+            new UpdateProductCommand(product.Id, null, "Kum", null, "123", null, "Adet", 1, "TRY"),
+            CancellationToken.None);
+
+        result.Error.Code.Should().Be("Products.DuplicateBarcode");
+        product.Barcode.Should().BeNull();
+        _productsWrite.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Create_InvalidCategory_Should_Fail()
     {
         _tenantContext.SetupGet(x => x.TenantId).Returns(Guid.NewGuid());

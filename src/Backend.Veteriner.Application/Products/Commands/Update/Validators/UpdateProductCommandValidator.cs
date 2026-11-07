@@ -13,7 +13,7 @@ public sealed class UpdateProductCommandValidator : AbstractValidator<UpdateProd
         RuleFor(x => x.UnitPrice).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Currency).NotEmpty().MaximumLength(3);
         RuleFor(x => x.Sku).MaximumLength(100);
-        RuleFor(x => x.Barcode).MaximumLength(100);
+        RuleFor(x => x.Barcode).MaximumLength(Product.BarcodeMaxLength);
         RuleFor(x => x.Description).MaximumLength(4000);
         RuleFor(x => x.Kind).IsInEnum().When(x => x.Kind.HasValue);
         RuleFor(x => x.ControlledClass).IsInEnum().When(x => x.ControlledClass.HasValue);
