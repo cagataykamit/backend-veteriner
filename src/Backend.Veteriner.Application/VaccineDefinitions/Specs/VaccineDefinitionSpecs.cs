@@ -12,6 +12,25 @@ public sealed class VaccineDefinitionByIdSpec : Specification<VaccineDefinition>
     }
 }
 
+public sealed class VaccineDefinitionsByIdsSpec : Specification<VaccineDefinition>
+{
+    public VaccineDefinitionsByIdsSpec(IReadOnlyCollection<Guid> ids)
+    {
+        Query.AsNoTracking();
+        Query.Where(x => ids.Contains(x.Id));
+    }
+}
+
+/// <summary>Sistem (global) kataloğundan koda göre aktif tanımlar; aşı takvimi başlangıç şablonu bunu kullanır (TIER-005).</summary>
+public sealed class GlobalActiveVaccineDefinitionsByCodesSpec : Specification<VaccineDefinition>
+{
+    public GlobalActiveVaccineDefinitionsByCodesSpec(IReadOnlyCollection<string> normalizedCodes)
+    {
+        Query.AsNoTracking();
+        Query.Where(x => x.TenantId == null && x.IsActive && normalizedCodes.Contains(x.Code));
+    }
+}
+
 public sealed class VaccineDefinitionsVisibleFilteredCountSpec : Specification<VaccineDefinition>
 {
     public VaccineDefinitionsVisibleFilteredCountSpec(
