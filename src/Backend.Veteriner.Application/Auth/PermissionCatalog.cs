@@ -154,6 +154,14 @@ public static class PermissionCatalog
         public const string Correct = "Charges.Correct";
     }
 
+    /// <summary>Günlük kasa sayımı (TIER-008): okuma, kaydetme ve gerekçeli düzeltme/iptal ayrı.</summary>
+    public static class CashCounts
+    {
+        public const string Read = "CashCounts.Read";
+        public const string Create = "CashCounts.Create";
+        public const string Correct = "CashCounts.Correct";
+    }
+
     public static class Administrations
     {
         public const string Read = "Administrations.Read";
@@ -382,6 +390,10 @@ public static class PermissionCatalog
         new(Charges.Read, "Ücret kayıtlarını listeleme ve görüntüleme yetkisi", "Charges"),
         new(Charges.Create, "Ücret kaydı oluşturma yetkisi", "Charges"),
         new(Charges.Correct, "Ücret kaydını gerekçeyle düzeltme/iptal yetkisi", "Charges"),
+
+        new(CashCounts.Read, "Günlük kasa sayımını ve geçmiş sayımları görüntüleme yetkisi", "CashCounts"),
+        new(CashCounts.Create, "Günlük kasa sayımını kaydetme yetkisi", "CashCounts"),
+        new(CashCounts.Correct, "Kasa sayımını gerekçeyle düzeltme/iptal yetkisi", "CashCounts"),
 
         new(Administrations.Read, "Uygulama kayıtlarını listeleme ve görüntüleme yetkisi", "Administrations"),
         new(Administrations.Create, "Hastaya uygulanan ürünü kaydetme yetkisi (stok düşer)", "Administrations"),

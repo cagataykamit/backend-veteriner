@@ -51,4 +51,10 @@ public enum PlanFeature
     /// iş yükü tek tabloda, önceki dönemle. Şube başına işletme performansı özeti her pakette kalır.
     /// </summary>
     ClinicsOverview = 7,
+
+    /// <summary>
+    /// Kasa ve nakit yönetimi (TIER-008; docs/CASH_COUNT_API_CONTRACT.md). İlk dilim günlük kasa sayımını kaydetme, düzeltme ve iptal;
+    /// sayım okuma ve gün sonu kasa özeti bu kuralın dışındadır, her pakette açık.
+    /// </summary>
+    CashManagement = 8,
 }
