@@ -6,7 +6,7 @@ namespace Backend.Veteriner.Application.Products.Specs;
 
 public sealed class ProductsFilteredCountSpec : Specification<Product>
 {
-    public ProductsFilteredCountSpec(Guid tenantId, string? searchPattern, Guid? productCategoryId, bool? isActive)
+    public ProductsFilteredCountSpec(Guid tenantId, string? searchPattern, Guid? productCategoryId, bool? isActive, string? barcode = null)
     {
         Query.Where(x => x.TenantId == tenantId);
 
@@ -15,6 +15,9 @@ public sealed class ProductsFilteredCountSpec : Specification<Product>
 
         if (isActive.HasValue)
             Query.Where(x => x.IsActive == isActive.Value);
+
+        if (barcode is not null)
+            Query.Where(x => x.Barcode == barcode);
 
         if (!string.IsNullOrWhiteSpace(searchPattern))
             Query.Where(x =>

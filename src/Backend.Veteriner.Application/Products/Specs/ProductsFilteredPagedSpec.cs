@@ -12,7 +12,8 @@ public sealed class ProductsFilteredPagedSpec : Specification<Product>
         int pageSize,
         string? searchPattern,
         Guid? productCategoryId,
-        bool? isActive)
+        bool? isActive,
+        string? barcode = null)
     {
         Query.AsNoTracking().Where(x => x.TenantId == tenantId);
 
@@ -21,6 +22,9 @@ public sealed class ProductsFilteredPagedSpec : Specification<Product>
 
         if (isActive.HasValue)
             Query.Where(x => x.IsActive == isActive.Value);
+
+        if (barcode is not null)
+            Query.Where(x => x.Barcode == barcode);
 
         if (!string.IsNullOrWhiteSpace(searchPattern))
             Query.Where(x =>
