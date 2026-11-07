@@ -29,6 +29,9 @@ public sealed class TenantPlanFeatureEvaluatorTests
     [InlineData(SubscriptionPlanCode.Basic, PlanFeature.VaccinationWizard, false)]
     [InlineData(SubscriptionPlanCode.Pro, PlanFeature.VaccinationWizard, true)]
     [InlineData(SubscriptionPlanCode.Premium, PlanFeature.VaccinationWizard, true)]
+    [InlineData(SubscriptionPlanCode.Basic, PlanFeature.MobileBarcode, false)]
+    [InlineData(SubscriptionPlanCode.Pro, PlanFeature.MobileBarcode, true)]
+    [InlineData(SubscriptionPlanCode.Premium, PlanFeature.MobileBarcode, true)]
     public void Catalog_Should_Match_Adr035_Table(SubscriptionPlanCode plan, PlanFeature feature, bool expected)
         => SubscriptionPlanCatalog.Allows(plan, feature).Should().Be(expected);
 
