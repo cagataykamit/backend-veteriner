@@ -31,7 +31,7 @@ Push (`Push:Fcm`, MOBILE-003) isteğe bağlıdır: yoksa push kapalı çalışı
 
 ## İlk yönetici (üretim)
 
-`seed` ve `all` komutları **Development dışında** sabit parolalı `admin@example.com` hesabını, varsayılan kiracıyı, seed kliniği ve aboneliği OLUŞTURMAZ; yalnız izinler, tür/ırk kataloğu, aşı tanımları ve rol bağları kurulur. İlk PlatformAdmin hesabı için (önce `seed` çalıştırılmış olmalı):
+`seed` ve `all` komutları **hiçbir ortamda** sabit parolalı `admin@example.com` hesabını, varsayılan kiracıyı, seed kliniği ve aboneliği OLUŞTURMAZ (bu hesap yalnız otomatik test altyapısında vardır); yalnız izinler, tür/ırk kataloğu, aşı tanımları ve rol bağları kurulur. İlk PlatformAdmin hesabı için (önce `seed` çalıştırılmış olmalı):
 
 ```
 $env:DOTNET_ENVIRONMENT = "Production"
