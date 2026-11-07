@@ -139,6 +139,7 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Reminders.Read,
                 PermissionCatalog.Reminders.Manage,
+                PermissionCatalog.Reports.Performance,
 
                 PermissionCatalog.Tenants.Read,
                 PermissionCatalog.Tenants.InviteCreate,
@@ -281,6 +282,7 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Reminders.Read,
                 PermissionCatalog.Reminders.Manage,
+                PermissionCatalog.Reports.Performance,
 
                 PermissionCatalog.Tenants.Read,
                 PermissionCatalog.Tenants.InviteCreate,
@@ -462,6 +464,7 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Reminders.Read,
                 PermissionCatalog.Reminders.Manage,
+                PermissionCatalog.Reports.Performance,
 
                 PermissionCatalog.Subscriptions.Read,
 
