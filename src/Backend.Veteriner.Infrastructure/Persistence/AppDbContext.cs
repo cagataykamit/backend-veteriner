@@ -110,6 +110,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<ClinicSiteAddress> ClinicSiteAddresses => Set<ClinicSiteAddress>();
     public DbSet<ClinicSiteImage> ClinicSiteImages => Set<ClinicSiteImage>();
     public DbSet<ClinicPortalSettings> ClinicPortalSettings => Set<ClinicPortalSettings>();
+    public DbSet<ClinicReminderRule> ClinicReminderRules => Set<ClinicReminderRule>();
     public DbSet<ClinicKvkkFormTemplate> ClinicKvkkFormTemplates => Set<ClinicKvkkFormTemplate>();
     public DbSet<ClinicTaxpayerSettings> ClinicTaxpayerSettings => Set<ClinicTaxpayerSettings>();
     public DbSet<Client> Clients => Set<Client>();

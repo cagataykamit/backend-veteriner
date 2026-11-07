@@ -95,6 +95,11 @@ public sealed class OwnerPortalPreferencesAndDataRequestTests
     [InlineData(OwnerNotificationType.VaccinationReminder, OwnerNotificationChannel.WhatsAppLink, OwnerNotificationChannelMode.StaffManual)]
     [InlineData(OwnerNotificationType.Marketing, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Disabled)]
     [InlineData(OwnerNotificationType.Marketing, OwnerNotificationChannel.Push, OwnerNotificationChannelMode.Disabled)]
+    [InlineData(OwnerNotificationType.FollowUpReminder, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Preference)]
+    [InlineData(OwnerNotificationType.DebtReminder, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Preference)]
+    [InlineData(OwnerNotificationType.DebtReminder, OwnerNotificationChannel.Push, OwnerNotificationChannelMode.Disabled)]
+    [InlineData(OwnerNotificationType.DebtReminder, OwnerNotificationChannel.WhatsAppLink, OwnerNotificationChannelMode.Disabled)]
+    [InlineData(OwnerNotificationType.NoReturnReminder, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Disabled)]
     public void Channel_Policy_Matrix(OwnerNotificationType type, OwnerNotificationChannel channel, OwnerNotificationChannelMode expected)
         => OwnerNotificationChannelPolicy.ModeOf(type, channel, pushConfigured: false).Should().Be(expected);
 

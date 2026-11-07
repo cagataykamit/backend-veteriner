@@ -20,4 +20,10 @@ public enum PlanFeature
 
     /// <summary>Kiracıda birden fazla aktif klinik.</summary>
     MultiClinic = 2,
+
+    /// <summary>
+    /// Klinik başına otomatik hatırlatıcı kuralları (TIER-003; docs/AUTOMATED_REMINDERS_API_CONTRACT.md). Bugünkü aşı ve randevu
+    /// e-posta hatırlatması bu kuralın dışındadır; her pakette kalır.
+    /// </summary>
+    AutomatedReminders = 3,
 }
