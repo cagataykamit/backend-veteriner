@@ -7,14 +7,22 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Application.Vaccinations;
 
 /// <summary>
-/// Aşı kaydı için seçilen <see cref="VaccineDefinition"/> doğrulaması (aktiflik, kiracı kapsamı, tür uyumu).
+/// Aşı kaydı ve aşı takvimi (TIER-005) için seçilen <see cref="VaccineDefinition"/> doğrulaması (aktiflik, kiracı kapsamı, tür uyumu).
 /// </summary>
 public static class VaccinationCatalogResolver
 {
-    public static async Task<Result<VaccineDefinition>> ResolveActiveForPetAsync(
+    public static Task<Result<VaccineDefinition>> ResolveActiveForPetAsync(
         Guid tenantId,
         Guid vaccineDefinitionId,
         Pet pet,
+        IReadRepository<VaccineDefinition> definitions,
+        CancellationToken ct)
+        => ResolveActiveForSpeciesAsync(tenantId, vaccineDefinitionId, pet.SpeciesId, definitions, ct);
+
+    public static async Task<Result<VaccineDefinition>> ResolveActiveForSpeciesAsync(
+        Guid tenantId,
+        Guid vaccineDefinitionId,
+        Guid speciesId,
         IReadRepository<VaccineDefinition> definitions,
         CancellationToken ct)
     {
@@ -28,7 +36,7 @@ public static class VaccinationCatalogResolver
         if (def.TenantId is not null && def.TenantId != tenantId)
             return Result<VaccineDefinition>.Failure("VaccineDefinitions.NotFound", "Aşı tanımı bulunamadı.");
 
-        if (def.SpeciesId is { } sp && sp != pet.SpeciesId)
+        if (def.SpeciesId is { } sp && sp != speciesId)
         {
             return Result<VaccineDefinition>.Failure(
                 "VaccineDefinitions.InvalidSpecies",

@@ -1430,6 +1430,8 @@ internal static class IntegrationTestAuthHelper
             _ when permissionCode == PermissionCatalog.ExaminationTemplates.Update => EnsureIntegrationPermissionClaimAsync(db, "IntegrationExaminationTemplateUpdater", permissionCode, "ExaminationTemplates"),
             _ when permissionCode == PermissionCatalog.ExaminationTemplates.Deactivate => EnsureIntegrationPermissionClaimAsync(db, "IntegrationExaminationTemplateDeactivator", permissionCode, "ExaminationTemplates"),
             _ when permissionCode == PermissionCatalog.ExaminationTemplates.Apply => EnsureIntegrationPermissionClaimAsync(db, "IntegrationExaminationTemplateApplier", permissionCode, "ExaminationTemplates"),
+            _ when permissionCode == PermissionCatalog.VaccineDefinitions.Read => EnsureIntegrationPermissionClaimAsync(db, "IntegrationVaccineDefinitionReader", permissionCode, "VaccineDefinitions"),
+            _ when permissionCode == PermissionCatalog.VaccineDefinitions.Update => EnsureIntegrationPermissionClaimAsync(db, "IntegrationVaccineDefinitionUpdater", permissionCode, "VaccineDefinitions"),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(permissionCode),
                 permissionCode,

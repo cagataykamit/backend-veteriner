@@ -32,4 +32,10 @@ public enum PlanFeature
     /// Bugünkü raporlar ve işletme performansı özeti (önceki dönemle) bu kuralın dışındadır; her pakette kalır.
     /// </summary>
     AdvancedReports = 4,
+
+    /// <summary>
+    /// Otomatik aşı sihirbazı (TIER-005; docs/VACCINATION_SCHEDULE_API_CONTRACT.md): klinik aşı takvimi ve takvimden önerilen plan.
+    /// Bugünkü aşı kaydı, planlı aşı ve aşı hatırlatması bu kuralın dışındadır; her pakette kalır.
+    /// </summary>
+    VaccinationWizard = 5,
 }

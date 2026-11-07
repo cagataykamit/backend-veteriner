@@ -31,6 +31,7 @@ using Backend.Veteriner.Application.StockBatches;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Billing;
 using Backend.Veteriner.Application.Tenants.Invites;
+using Backend.Veteriner.Application.VaccinationSchedules;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -61,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<IClinicReadScopeResolver, ClinicReadScopeResolver>();
         services.AddScoped<IHospitalizationWardClinicAccess, HospitalizationWardClinicAccess>();
         services.AddScoped<ClinicDefinitionAccess>();
+        services.AddScoped<VaccinationScheduleReader>();
         services.AddScoped<AppointmentAssignment>();
         services.AddScoped<AppointmentAvailabilityService>();
         services.AddScoped<OnlineBookingClinicResolver>();
