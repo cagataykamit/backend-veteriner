@@ -75,6 +75,15 @@ public sealed class TenantPlanFeatureEvaluatorTests
     }
 
     [Fact]
+    public async Task Trial_Should_Not_Limit_Clinic_Count_But_Follow_Selected_Plan_For_Portal()
+    {
+        var evaluator = PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Basic, new Clinic(TenantId, "Merkez", "İzmir"), trialing: true);
+
+        (await evaluator.EnsureCanAddActiveClinicAsync(TenantId, CancellationToken.None)).IsSuccess.Should().BeTrue();
+        (await evaluator.IsAllowedAsync(TenantId, PlanFeature.OwnerPortal, CancellationToken.None)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task EnsureCanAddActiveClinic_Should_Allow_Second_Clinic_On_Premium()
     {
         var result = await PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Premium, new Clinic(TenantId, "Merkez", "İzmir"))

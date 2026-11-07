@@ -19,7 +19,7 @@ public static class TenantAccessStateHelper
             PlanFeatures = Enum.GetValues<PlanFeature>()
                 .Select(f => new TenantPlanFeatureDto(
                     f.ToString(),
-                    SubscriptionPlanCatalog.Allows(subscription.PlanCode, f),
+                    TenantPlanFeatureEvaluator.IsEnabled(subscription, f),
                     SubscriptionPlanCatalog.ToApiCode(SubscriptionPlanCatalog.MinimumPlanFor(f))))
                 .ToArray(),
         };

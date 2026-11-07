@@ -9,10 +9,13 @@ namespace Backend.Veteriner.Application.Tenants;
 [JsonConverter(typeof(JsonStringEnumConverter<PlanFeature>))]
 public enum PlanFeature
 {
-    /// <summary>Hasta sahibi portalı: davet ve bağ kapsamlı portal uçları.</summary>
+    /// <summary>Hasta sahibi portalı: yeni davet ve bekleyen davetin kabulü. Mevcut bağ paket düşünce açık kalır.</summary>
     OwnerPortal = 0,
 
-    /// <summary>Portaldan randevu talebi. Kliniğe özel kimliksiz bağlantı bu kuralın dışındadır; her pakette açık (ADR-042).</summary>
+    /// <summary>
+    /// Portaldan randevu talebi. Ayrı kapısı yoktur: bağ yoksa uç zaten kapalıdır, paket düşünce mevcut bağ açık kalır
+    /// (docs/PLAN_FEATURES_API_CONTRACT.md §4). Kliniğe özel kimliksiz bağlantı bu kuralın dışındadır; her pakette açık (ADR-042).
+    /// </summary>
     PortalAppointmentRequests = 1,
 
     /// <summary>Kiracıda birden fazla aktif klinik.</summary>
