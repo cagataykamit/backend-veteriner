@@ -100,6 +100,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Charges.Create,
                 PermissionCatalog.Charges.Correct,
 
+                PermissionCatalog.CashCounts.Read,
+                PermissionCatalog.CashCounts.Create,
+                PermissionCatalog.CashCounts.Correct,
+
                 PermissionCatalog.Administrations.Read,
                 PermissionCatalog.Administrations.Create,
                 PermissionCatalog.Administrations.Correct,
@@ -242,6 +246,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Charges.Read,
                 PermissionCatalog.Charges.Create,
                 PermissionCatalog.Charges.Correct,
+
+                PermissionCatalog.CashCounts.Read,
+                PermissionCatalog.CashCounts.Create,
+                PermissionCatalog.CashCounts.Correct,
 
                 PermissionCatalog.Administrations.Read,
                 PermissionCatalog.Administrations.Create,
@@ -391,6 +399,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.Charges.Read,
                 PermissionCatalog.Charges.Create,
                 PermissionCatalog.Charges.Correct,
+
+                PermissionCatalog.CashCounts.Read,
+                PermissionCatalog.CashCounts.Create,
+                PermissionCatalog.CashCounts.Correct,
 
                 PermissionCatalog.Prescriptions.Read,
                 PermissionCatalog.Prescriptions.Create,
@@ -607,6 +619,10 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Charges.Read,
                 PermissionCatalog.Charges.Create,
+
+                // Gün sonu kasayı sayan resepsiyondur; düzeltme ve iptal yönetici düzeyinde (ADR-012 K2).
+                PermissionCatalog.CashCounts.Read,
+                PermissionCatalog.CashCounts.Create,
 
                 PermissionCatalog.Sales.Read,
                 PermissionCatalog.Sales.Create,

@@ -10,6 +10,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.ClinicSites;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.ClientCredits;
+using Backend.Veteriner.Domain.CashCounts;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Sales;
@@ -140,6 +141,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
     public DbSet<ClientCredit> ClientCredits => Set<ClientCredit>();
     public DbSet<ClientCreditApplication> ClientCreditApplications => Set<ClientCreditApplication>();
+    public DbSet<CashCount> CashCounts => Set<CashCount>();
     public DbSet<Administration> Administrations => Set<Administration>();
     public DbSet<ChargeSuggestion> ChargeSuggestions => Set<ChargeSuggestion>();
     public DbSet<Sale> Sales => Set<Sale>();
