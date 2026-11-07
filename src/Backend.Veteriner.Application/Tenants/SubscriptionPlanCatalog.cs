@@ -28,7 +28,7 @@ public static class SubscriptionPlanCatalog
             new HashSet<PlanFeature>
             {
                 PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests, PlanFeature.MultiClinic, PlanFeature.AutomatedReminders,
-                PlanFeature.AdvancedReports, PlanFeature.VaccinationWizard, PlanFeature.MobileBarcode,
+                PlanFeature.AdvancedReports, PlanFeature.VaccinationWizard, PlanFeature.MobileBarcode, PlanFeature.ClinicsOverview,
             }),
     ];
 

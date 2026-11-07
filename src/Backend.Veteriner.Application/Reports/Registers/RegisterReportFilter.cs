@@ -48,26 +48,8 @@ internal sealed record RegisterReportFilter(
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
-        if (query.From == default || query.To == default)
-        {
-            return Result<RegisterReportFilter>.Failure(
-                "Registers.DateRangeInvalid",
-                "Defter için from ve to zorunludur (yyyy-MM-dd).");
-        }
-
-        if (query.From > query.To)
-        {
-            return Result<RegisterReportFilter>.Failure(
-                "Registers.DateRangeInvalid",
-                "from değeri to değerinden sonra olamaz.");
-        }
-
-        if (query.To.DayNumber - query.From.DayNumber > RegisterReportConstants.MaxRangeDays)
-        {
-            return Result<RegisterReportFilter>.Failure(
-                "Registers.RangeTooLong",
-                $"Tarih aralığı en fazla {RegisterReportConstants.MaxRangeDays} gün olabilir.");
-        }
+        if (RangeError(query.From, query.To) is { } rangeError)
+            return Result<RegisterReportFilter>.Failure(rangeError);
 
         if (ClinicContextRule.Conflicts(query.ClinicId, clinicContext.ClinicId))
         {
@@ -89,5 +71,20 @@ internal sealed record RegisterReportFilter(
             query.ProductId,
             query.VeterinarianUserId,
             query.HbsStatus));
+    }
+
+    /// <summary>Tarih aralığı kuralı (zorunlu, sıralı, en çok 366 gün); klinik kapsamını kendisi çözen raporlar da bunu kullanır.</summary>
+    public static Error? RangeError(DateOnly from, DateOnly to)
+    {
+        if (from == default || to == default)
+            return new Error("Registers.DateRangeInvalid", "Defter için from ve to zorunludur (yyyy-MM-dd).");
+
+        if (from > to)
+            return new Error("Registers.DateRangeInvalid", "from değeri to değerinden sonra olamaz.");
+
+        if (to.DayNumber - from.DayNumber > RegisterReportConstants.MaxRangeDays)
+            return new Error("Registers.RangeTooLong", $"Tarih aralığı en fazla {RegisterReportConstants.MaxRangeDays} gün olabilir.");
+
+        return null;
     }
 }

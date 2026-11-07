@@ -45,4 +45,10 @@ public enum PlanFeature
     /// barkodla arama bu kuralın dışındadır; her pakette açık.
     /// </summary>
     MobileBarcode = 6,
+
+    /// <summary>
+    /// Patron ekranı (TIER-007; docs/CLINICS_OVERVIEW_API_CONTRACT.md): erişilebilen tüm aktif şubelerin ciro, tahsilat, açık alacak ve
+    /// iş yükü tek tabloda, önceki dönemle. Şube başına işletme performansı özeti her pakette kalır.
+    /// </summary>
+    ClinicsOverview = 7,
 }

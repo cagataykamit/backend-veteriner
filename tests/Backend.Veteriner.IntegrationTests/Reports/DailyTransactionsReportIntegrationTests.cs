@@ -451,11 +451,11 @@ public sealed partial class DailyTransactionsReportIntegrationTests : IClassFixt
             response.StatusCode.Should().Be(expected, await response.Content.ReadAsStringAsync());
         }
 
-        public async Task<Guid> PayAsync(Guid clientId, Guid chargeId, decimal amount, PaymentMethod method, DateTime paidAtUtc)
+        public async Task<Guid> PayAsync(Guid clientId, Guid chargeId, decimal amount, PaymentMethod method, DateTime paidAtUtc, Guid? clinicId = null)
         {
             var response = await Http.PostAsJsonAsync("/api/v1/payments", new
             {
-                ClinicId,
+                ClinicId = clinicId ?? ClinicId,
                 ClientId = clientId,
                 Amount = amount,
                 Currency = "TRY",
@@ -514,12 +514,12 @@ public sealed partial class DailyTransactionsReportIntegrationTests : IClassFixt
             return visit.Id;
         }
 
-        public async Task<Guid> SeedChargeAsync(Guid clientId, decimal amount, DateTime createdAtUtc, Guid? visitId = null)
+        public async Task<Guid> SeedChargeAsync(Guid clientId, decimal amount, DateTime createdAtUtc, Guid? visitId = null, Guid? clinicId = null)
         {
             await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var charge = Charge.Create(
-                    TenantId, ClinicId, clientId, null, visitId, null,
+                    TenantId, clinicId ?? ClinicId, clientId, null, visitId, null,
                     "Seed ucret", 1m, amount, UserId, createdAtUtc, null)
                 .Value!;
             db.Charges.Add(charge);

@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
@@ -33,4 +34,14 @@ internal static class DailyTransactionsReportFilter
         return Result<FinanceEventFilter>.Success(new FinanceEventFilter(
             f.TenantId, f.ClinicId, f.AccessibleClinicIds, f.FromUtc, f.ToUtcExclusive, kind, paymentMethod, performedByUserId));
     }
+
+    /// <summary>
+    /// Klinik kapsamı çağıranca çözülmüş süzgeç (patron ekranında şube başına). Aralık önceden <see cref="RegisterReportFilter.RangeError"/>
+    /// ile doğrulanmış olmalı; gün sınırları <see cref="ResolveAsync"/> ile aynıdır.
+    /// </summary>
+    public static FinanceEventFilter ForScope(Guid tenantId, Guid? clinicId, IReadOnlyCollection<Guid>? accessibleClinicIds, DateOnly from, DateOnly to)
+        => new(
+            tenantId, clinicId, accessibleClinicIds,
+            OperationDayBounds.ForLocalDate(from).DayStartUtc, OperationDayBounds.ForLocalDate(to).DayEndUtc,
+            null, null, null);
 }

@@ -4,6 +4,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Performance;
 using Backend.Veteriner.Application.Reports.Performance.Breakdowns;
+using Backend.Veteriner.Application.Reports.Performance.ClinicsOverview;
 using Backend.Veteriner.Application.Reports.Performance.Queries;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
@@ -68,6 +69,27 @@ public sealed class PerformanceReportsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetPerformanceBreakdownsQuery(from, to, clinicId, compare), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Patron ekranı (TIER-007; <c>docs/CLINICS_OVERVIEW_API_CONTRACT.md</c>): erişilebilen tüm aktif şubeler, şube başına ve toplam, önceki dönemle.
+    /// Klinik filtresi yoktur; aktif klinik bağlamı kullanılmaz. 403 <c>Subscriptions.FeatureNotInPlan</c>: pakette yok.
+    /// </summary>
+    [HttpGet("clinics-overview")]
+    [ProducesResponseType(typeof(ClinicsOverviewDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetClinicsOverview(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] bool compare = true,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetClinicsOverviewQuery(from, to, compare), ct);
         return result.ToActionResult(this);
     }
 }
