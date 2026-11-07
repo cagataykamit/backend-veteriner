@@ -11,7 +11,7 @@ aynı biçimdedir.
 |---|---|
 | `ClinicSite` | Klinik başına bir site (K2): güncel adres, taslak yapılandırma, yayındaki sürüm numarası, geçici kapalı bayrağı, `rowVersion`. |
 | `ClinicSiteVersion` | Değişmez yayın sürümü: sıra numarası, yapılandırma, yayınlayan, zaman. Alan değişikliği EF'te hata verir. Site başına en çok **30** sürüm saklanır; yayında en eskisi düşer, yayındaki sürüm her zaman en yenisidir. |
-| `ClinicSiteAddress` | Güncel ve eski adresler. `slug` **tüm kiracılarda** benzersizdir (K10). Site başına en çok **5** eski adres. |
+| `ClinicSiteAddress` | Güncel ve eski adresler. `slug` **tüm kiracılarda** benzersizdir (K10). Yayınlanmış sitenin adresi en çok **3** kez değişir (§4). |
 | `ClinicSiteImage` | Herkese açık site görseli (K12): kiracı ve siteye bağlı; JPEG, PNG, WebP; en çok **5 MB**; site başına en çok **100**. `StoredFile`'dan ayrıdır, hasta dosyaları bu yoldan açılmaz. |
 
 Paket kilidi yoktur, tüm paketlerde çalışır (K13). Boyutlandırma bu aşamada yoktur (§9).
@@ -40,7 +40,7 @@ iptal kiracıda 403 `Subscriptions.TenantReadOnly` / `Subscriptions.TenantCancel
 // ClinicSiteStateDto
 { "siteId": "…", "clinicId": "…", "slug": "cagri-veteriner", "publicPath": "/k/cagri-veteriner",
   "isTemporarilyClosed": false, "publishedVersionNumber": 2, "publishedAtUtc": "…",
-  "hasUnpublishedChanges": true, "draftUpdatedAtUtc": "…", "rowVersion": "AAAAAAAAB9E=" }
+  "hasUnpublishedChanges": true, "draftUpdatedAtUtc": "…", "addressChangesRemaining": 3, "rowVersion": "AAAAAAAAB9E=" }
 
 // ClinicSiteDetailDto — site varken
 { "exists": true, "suggestedSlug": null, "site": { …ClinicSiteStateDto… }, "draft": { "schemaVersion": 1, "…": "…" },
@@ -114,12 +114,19 @@ Biçim: 3–60 karakter, yalnız `a-z`, `0-9` ve tek tire; başta ve sonda tire 
 verilmez; site kendi eski adresine dönebilir. Yönlendirme her zaman güncel adrese gider, zincir oluşmaz. Hiç yayınlanmamış sitenin
 adresi paylaşılmadığı için değişince serbest kalır.
 
-Adres kapmaya karşı iki sınır, yalnız yayınlanmış sitede:
+**Değiştirme hakkı:** yayınlanmış sitenin adresi en çok 3 kez değiştirilebilir (kullanıcı kararı); süreyle yenilenmez. Kendi eski
+adresine dönüş de bir hak harcar. Hiç yayınlanmamış sitedeki değişiklik sayılmaz. Kalan hak `ClinicSiteStateDto.addressChangesRemaining`
+alanındadır, panel gösterir. Hak bitince:
 
-| Sınır | Aşılınca |
-|---|---|
-| Site başına en çok 5 eski adres. En eskisi serbest bırakılmaz; kendi eski adresine dönmek sayıyı artırmaz, serbesttir. | 409 `ClinicSites.AddressLimitReached` |
-| 24 saatte en çok 3 adres değişikliği (kendi eski adresine dönüş dahil; pencere ilk değişiklikle başlar). | 409 `ClinicSites.AddressChangeLimitReached` |
+```json
+{ "code": "ClinicSites.AddressChangeLimitReached", "status": 409,
+  "detail": "Adres değiştirme hakkınız doldu. Adresi yeniden değiştirmek için destekle iletişime geçin.",
+  "addressChangesRemaining": 0 }
+```
+
+**Destek — `POST /api/v1/admin/clinic-sites/{slug}/address-change-grants`:** yalnız platform yöneticisi (`platform_admin` claim'i);
+klinik rolleri 403. `{slug}` sitenin güncel ya da eski adresidir. Gövde `{ "additionalChanges": 1 }` (1–3; dışı 400). Yanıt 200
+`ClinicSiteStateDto`; adres yoksa 404 `ClinicSites.NotFound`. Abonelik kapısına takılmaz. Denetim: `ClinicSite.AddressChanges.Grant`.
 
 ## 5. Görseller
 
@@ -216,7 +223,7 @@ Motor başvuruyu çözer: `site-image:{id}` → `/api/v1/public/sites/{slug}/ima
 | 404 | `PublicSites.NotFound` | Herkese açık uçlar |
 | 409 | `ClinicSites.ConcurrencyConflict` | Eski `rowVersion` ya da eşzamanlı ilk kayıt |
 | 409 | `ClinicSites.SlugTaken` | Adres başkasında |
-| 409 | `ClinicSites.AddressLimitReached`, `ClinicSites.AddressChangeLimitReached` | §4 |
+| 409 | `ClinicSites.AddressChangeLimitReached` | Değiştirme hakkı bitti, destek gerekir; `addressChangesRemaining` (§4) |
 | 409 | `ClinicSites.PublishRequirementsNotMet` | `missing`, `missingImageIds` |
 | 409 | `ClinicSites.ImageInUse` | `usedIn` |
 | 409 | `ClinicSites.ClinicInactive` | Pasif klinikte yayın |
@@ -227,7 +234,7 @@ Motor başvuruyu çözer: `site-image:{id}` → `/api/v1/public/sites/{slug}/ima
 
 `AddClinicSites` — `ClinicSites`, `ClinicSiteVersions`, `ClinicSiteAddresses`, `ClinicSiteImages`.
 
-`AddClinicSiteAddressChangeWindow` — `ClinicSites.AddressChangeWindowStartedAtUtc`, `ClinicSites.AddressChangesInWindow` (§4).
+`AddClinicSiteAddressChangeAllowance` — `ClinicSites.AddressChangesUsed`, `ClinicSites.AddressChangesGranted` (§4).
 
 Paylaşılan ya da üretim veritabanına uygulanmadı.
 

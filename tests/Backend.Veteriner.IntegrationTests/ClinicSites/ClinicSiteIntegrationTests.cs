@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Ardalis.Specification.EntityFrameworkCore;
@@ -12,6 +13,7 @@ using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.ClinicSites;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.ClinicSites;
@@ -680,56 +682,120 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
         (await _client.GetAsync(imageUrl)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
-    public async Task Retired_Address_Limit_Should_Block_New_Address_But_Keep_Oldest_Reserved()
+    /// <summary>Hakları harcayıp son adresi döner.</summary>
+    private async Task<string> SpendAddressChangesAsync(Ctx ctx)
     {
-        var ctx = await SeedAsync();
-        var first = await PublishNewSiteAsync(ctx);
-
-        Task ResetDailyWindowAsync() => WithDbAsync(db => db.ClinicSites.Where(s => s.ClinicId == ctx.ClinicId)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.AddressChangesInWindow, 0)));
-
-        var last = first;
-        for (var i = 0; i < ClinicSite.MaxRetiredAddresses; i++)
+        var last = string.Empty;
+        for (var i = 0; i < ClinicSite.IncludedAddressChanges; i++)
         {
-            await ResetDailyWindowAsync();
-            last = $"sinir-{i}-{Guid.NewGuid():N}"[..20];
-            await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = last }));
+            last = $"hak-{i}-{Guid.NewGuid():N}"[..20];
+            var state = await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = last }));
+            state.GetProperty("addressChangesRemaining").GetInt32().Should().Be(ClinicSite.IncludedAddressChanges - i - 1);
         }
 
-        await ResetDailyWindowAsync();
-        var overflow = await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = $"fazla-{Guid.NewGuid():N}"[..20] });
-        await ShouldFailAsync(overflow, HttpStatusCode.Conflict, "ClinicSites.AddressLimitReached");
-
-        // En eskisi serbest kalmadı: hâlâ yönlenir, başkası alamaz; site kendi eski adresine dönebilir.
-        (await PublicJsonAsync(first)).GetProperty("redirectToSlug").GetString().Should().Be(last);
-        var other = await SeedAsync();
-        (await OkJsonAsync(await SendAsync(HttpMethod.Get, $"{other.Url}/address-availability?slug={first}", other.Token)))
-            .GetProperty("reason").GetString().Should().Be("Taken");
-
-        await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = first }));
-        (await PublicJsonAsync(first)).GetProperty("status").GetString().Should().Be("Published");
+        return last;
     }
 
     [Fact]
-    public async Task Address_Change_Should_Be_Limited_Per_Day_Once_Published()
+    public async Task Address_Changes_Should_Stop_After_Allowance_And_Refer_To_Support()
     {
         var ctx = await SeedAsync();
-        await PublishNewSiteAsync(ctx);
+        var first = await PublishNewSiteAsync(ctx);
+        var detail = await OkJsonAsync(await SendAsync(HttpMethod.Get, ctx.Url, ctx.Token));
+        detail.GetProperty("site").GetProperty("addressChangesRemaining").GetInt32().Should().Be(ClinicSite.IncludedAddressChanges);
 
-        for (var i = 0; i < ClinicSite.MaxAddressChangesPerDay; i++)
-            await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = $"gun-{i}-{Guid.NewGuid():N}"[..20] }));
+        var last = await SpendAddressChangesAsync(ctx);
 
-        var blocked = $"gun-son-{Guid.NewGuid():N}"[..20];
+        var blocked = $"fazla-{Guid.NewGuid():N}"[..20];
+        var response = await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = blocked });
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().Should().Be(ClinicSite.AddressChangeLimitReachedCode);
+        problem.GetProperty("detail").GetString().Should().Contain("destek");
+        problem.GetProperty("addressChangesRemaining").GetInt32().Should().Be(0);
+
+        // Kendi eski adresine dönüş de bir değişikliktir.
         await ShouldFailAsync(
-            await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = blocked }),
+            await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = first }),
             HttpStatusCode.Conflict,
             ClinicSite.AddressChangeLimitReachedCode);
 
-        // Reddedilen değişiklik yarım kalmaz: adres alınmamıştır.
+        // Reddedilen değişiklik yarım kalmaz; eski adresler serbest kalmaz.
+        (await PublicJsonAsync(last)).GetProperty("status").GetString().Should().Be("Published");
+        (await PublicJsonAsync(first)).GetProperty("redirectToSlug").GetString().Should().Be(last);
         var other = await SeedAsync();
         (await OkJsonAsync(await SendAsync(HttpMethod.Get, $"{other.Url}/address-availability?slug={blocked}", other.Token)))
             .GetProperty("isAvailable").GetBoolean().Should().BeTrue();
+        (await OkJsonAsync(await SendAsync(HttpMethod.Get, $"{other.Url}/address-availability?slug={first}", other.Token)))
+            .GetProperty("reason").GetString().Should().Be("Taken");
+    }
+
+    [Fact]
+    public async Task Unpublished_Address_Changes_Should_Not_Spend_Allowance()
+    {
+        var ctx = await SeedAsync();
+        await SaveDraftAsync(ctx, Config());
+
+        for (var i = 0; i < ClinicSite.IncludedAddressChanges + 1; i++)
+        {
+            var state = await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = $"taslak-{i}-{Guid.NewGuid():N}"[..20] }));
+            state.GetProperty("addressChangesRemaining").GetInt32().Should().Be(ClinicSite.IncludedAddressChanges);
+        }
+    }
+
+    private async Task<string> PlatformAdminTokenAsync()
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var (token, _, _) = jwt.Create(
+            Guid.NewGuid(),
+            $"destek-{Guid.NewGuid():N}@example.com",
+            Array.Empty<string>(),
+            [new Claim(VeterinerClaims.PlatformAdmin, bool.TrueString)]);
+        return token;
+    }
+
+    [Fact]
+    public async Task Platform_Admin_Should_Grant_Address_Changes_By_Current_Or_Old_Address_And_Audit()
+    {
+        var ctx = await SeedAsync();
+        var first = await PublishNewSiteAsync(ctx);
+        await SpendAddressChangesAsync(ctx);
+        var admin = await PlatformAdminTokenAsync();
+
+        // Abonelik salt okunur olsa da destek işlemi kiracının yazma kapısına takılmaz.
+        await ExpireTrialAsync(ctx.TenantId);
+        var granted = await OkJsonAsync(await SendAsync(
+            HttpMethod.Post, $"/api/v1/admin/clinic-sites/{first}/address-change-grants", admin, new { additionalChanges = 1 }));
+        granted.GetProperty("addressChangesRemaining").GetInt32().Should().Be(1);
+        await PayAsync(ctx.TenantId);
+
+        var slug = $"destekle-{Guid.NewGuid():N}"[..20];
+        (await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug })))
+            .GetProperty("addressChangesRemaining").GetInt32().Should().Be(0);
+
+        await WithDbAsync(async db =>
+        {
+            var target = $"Slug={first};Additional=1";
+            (await db.AuditLogs.AsNoTracking().AnyAsync(a => a.Action == "ClinicSite.AddressChanges.Grant" && a.TargetId == target && a.Success))
+                .Should().BeTrue();
+        });
+    }
+
+    [Fact]
+    public async Task Address_Change_Grant_Should_Be_Platform_Admin_Only_And_Validated()
+    {
+        var ctx = await SeedAsync();
+        var slug = await PublishNewSiteAsync(ctx);
+        var url = $"/api/v1/admin/clinic-sites/{slug}/address-change-grants";
+        var admin = await PlatformAdminTokenAsync();
+
+        (await SendAsync(HttpMethod.Post, url, body: new { additionalChanges = 1 })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await SendAsync(HttpMethod.Post, url, ctx.Token, new { additionalChanges = 1 })).StatusCode.Should().Be(HttpStatusCode.Forbidden, "klinik yöneticisi kendine hak veremez");
+        (await SendAsync(HttpMethod.Post, url, admin, new { additionalChanges = 0 })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await SendAsync(HttpMethod.Post, url, admin, new { additionalChanges = 4 })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await SendAsync(HttpMethod.Post, "/api/v1/admin/clinic-sites/yok-boyle-adres/address-change-grants", admin, new { additionalChanges = 1 }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Theory]

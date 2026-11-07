@@ -20,6 +20,12 @@ public sealed class ClinicSiteByClinicUntrackedSpec : Specification<ClinicSite>
     }
 }
 
+/// <summary>Platform yönetimi: adres defterinden bulunan site, sistem kapsamında okunur.</summary>
+public sealed class ClinicSiteByIdForAdminSpec : Specification<ClinicSite>
+{
+    public ClinicSiteByIdForAdminSpec(Guid siteId) => Query.Where(x => x.Id == siteId);
+}
+
 /// <summary>Herkese açık yolun gördüğü site alanları; taslak bu yoldan hiç okunmaz (K14).</summary>
 public sealed record PublicSiteRecord(Guid Id, Guid TenantId, Guid ClinicId, string Slug, bool IsTemporarilyClosed, int? PublishedVersionNumber);
 
