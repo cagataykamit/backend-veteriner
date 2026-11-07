@@ -16,8 +16,8 @@ public static class DataSeeder
     public const string DefaultSeedClinicName = "Varsayılan Klinik";
 
     /// <param name="seedDefaultAdmin">
-    /// Yalnız geliştirme/test: varsayılan kiracı, sabit parolalı varsayılan yönetici, seed klinik ve abonelik. Üretimde false verilir;
-    /// ilk yönetici <c>create-platform-admin</c> komutuyla oluşturulur.
+    /// Yalnız otomatik test: varsayılan kiracı, sabit parolalı varsayılan yönetici, seed klinik ve abonelik. <c>DbMigrator</c> her ortamda
+    /// false verir; yönetici <c>create-platform-admin</c> komutuyla oluşturulur.
     /// </param>
     public static async Task SeedAsync(
         AppDbContext db,
