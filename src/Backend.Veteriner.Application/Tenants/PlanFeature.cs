@@ -26,4 +26,10 @@ public enum PlanFeature
     /// e-posta hatırlatması bu kuralın dışındadır; her pakette kalır.
     /// </summary>
     AutomatedReminders = 3,
+
+    /// <summary>
+    /// Gelişmiş raporlar (TIER-004; docs/PERFORMANCE_BREAKDOWNS_API_CONTRACT.md): hekim, kalem, tür kırılımı ve dönem karşılaştırması.
+    /// Bugünkü raporlar ve işletme performansı özeti (önceki dönemle) bu kuralın dışındadır; her pakette kalır.
+    /// </summary>
+    AdvancedReports = 4,
 }

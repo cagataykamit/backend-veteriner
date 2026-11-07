@@ -23,6 +23,9 @@ public sealed class TenantPlanFeatureEvaluatorTests
     [InlineData(SubscriptionPlanCode.Basic, PlanFeature.AutomatedReminders, false)]
     [InlineData(SubscriptionPlanCode.Pro, PlanFeature.AutomatedReminders, true)]
     [InlineData(SubscriptionPlanCode.Premium, PlanFeature.AutomatedReminders, true)]
+    [InlineData(SubscriptionPlanCode.Basic, PlanFeature.AdvancedReports, false)]
+    [InlineData(SubscriptionPlanCode.Pro, PlanFeature.AdvancedReports, true)]
+    [InlineData(SubscriptionPlanCode.Premium, PlanFeature.AdvancedReports, true)]
     public void Catalog_Should_Match_Adr035_Table(SubscriptionPlanCode plan, PlanFeature feature, bool expected)
         => SubscriptionPlanCatalog.Allows(plan, feature).Should().Be(expected);
 

@@ -19,9 +19,13 @@ public static class SubscriptionPlanCatalog
     [
         new(SubscriptionPlanCode.Basic, "Basic", "Temel özellikler.", 3, new HashSet<PlanFeature>()),
         new(SubscriptionPlanCode.Pro, "Pro", "Gelişmiş özellikler.", 5,
-            new HashSet<PlanFeature> { PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests, PlanFeature.AutomatedReminders }),
+            new HashSet<PlanFeature> { PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests, PlanFeature.AutomatedReminders, PlanFeature.AdvancedReports }),
         new(SubscriptionPlanCode.Premium, "Premium", "Kurumsal özellikler.", 15,
-            new HashSet<PlanFeature> { PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests, PlanFeature.MultiClinic, PlanFeature.AutomatedReminders }),
+            new HashSet<PlanFeature>
+            {
+                PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests, PlanFeature.MultiClinic, PlanFeature.AutomatedReminders,
+                PlanFeature.AdvancedReports,
+            }),
     ];
 
     public static string GetName(SubscriptionPlanCode code)

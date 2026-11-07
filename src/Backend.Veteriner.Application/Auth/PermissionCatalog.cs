@@ -96,6 +96,12 @@ public static class PermissionCatalog
         public const string Read = "Dashboard.Read";
     }
 
+    /// <summary>Kişi performansı raporları (TIER-004; UX taslağı S1): hekim bazlı muayene ve ciro.</summary>
+    public static class Reports
+    {
+        public const string Performance = "Reports.Performance";
+    }
+
     public static class Reminders
     {
         public const string Read = "Reminders.Read";
@@ -343,6 +349,8 @@ public static class PermissionCatalog
         new(Appointments.Reschedule, "Planlanmış randevuyu yeniden zamanlama yetkisi", "Appointments"),
 
         new(Dashboard.Read, "Klinik paneli özet dashboard verilerini görüntüleme yetkisi", "Dashboard"),
+
+        new(Reports.Performance, "Hekim bazlı muayene ve ciro raporunu görüntüleme yetkisi", "Reports"),
 
         new(Reminders.Read, "Reminder ayarlarını ve reminder loglarını görüntüleme yetkisi", "Reminders"),
         new(Reminders.Manage, "Reminder ayarlarını güncelleme yetkisi", "Reminders"),
