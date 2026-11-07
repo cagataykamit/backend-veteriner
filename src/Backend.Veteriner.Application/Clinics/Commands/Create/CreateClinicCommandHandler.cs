@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
@@ -14,17 +15,20 @@ public sealed class CreateClinicCommandHandler : IRequestHandler<CreateClinicCom
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<Clinic> _clinicsWrite;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public CreateClinicCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinicsRead,
-        IRepository<Clinic> clinicsWrite)
+        IRepository<Clinic> clinicsWrite,
+        TenantPlanFeatureEvaluator planFeatures)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
         _clinicsRead = clinicsRead;
         _clinicsWrite = clinicsWrite;
+        _planFeatures = planFeatures;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreateClinicCommand request, CancellationToken ct)
@@ -44,6 +48,10 @@ public sealed class CreateClinicCommandHandler : IRequestHandler<CreateClinicCom
             return Result<Guid>.Failure(
                 "Tenants.TenantInactive",
                 "Pasif kiracı için klinik oluşturulamaz.");
+
+        var planAllows = await _planFeatures.EnsureCanAddActiveClinicAsync(tenantId, ct);
+        if (!planAllows.IsSuccess)
+            return Result<Guid>.Failure(planAllows.Error);
 
         var nameKey = request.Name.Trim().ToLowerInvariant();
         var duplicate = await _clinicsRead.FirstOrDefaultAsync(

@@ -71,7 +71,7 @@ Müşteri kartındaki "Portal" bölümü: bağ durumu ve davet listesi (son 20 d
 }
 ```
 
-- `canInvite`: müşteri davet kuralına uyuyor **ve** aktif bağı yok. Değilse `inviteBlockedCode` (`OwnerPortal.ClientEmailMissing`, `OwnerPortal.ClientOptedOut`, `OwnerPortal.ClientNotInvitable`, `OwnerPortal.AlreadyLinked`).
+- `canInvite`: müşteri davet kuralına uyuyor **ve** aktif bağı yok. Değilse `inviteBlockedCode` (`OwnerPortal.ClientEmailMissing`, `OwnerPortal.ClientOptedOut`, `OwnerPortal.ClientNotInvitable`, `OwnerPortal.AlreadyLinked`). Paket portalı içermiyorsa önce `Subscriptions.FeatureNotInPlan`: yeni davet (§4.2) 403, bekleyen davetin önizleme ve kabulü (§5.2, §5.3) 404; mevcut bağ açık kalır (`PLAN_FEATURES_API_CONTRACT.md`).
 - Davet `status`: `Pending`, `Accepted`, `Revoked`, `Expired` (bekleyen ama süresi geçmiş; hesaplanır).
 - Bağ `closeReason`: kapalı bağda `ClinicClosed` (personel kapattı) ya da `OwnerAccountDeleted` (hasta sahibi hesabını sildi, §5.10); aktif bağda `null`. Silinen hesabın bağında `accountEmail` `null` döner; tarih `closedAtUtc`'dir.
 

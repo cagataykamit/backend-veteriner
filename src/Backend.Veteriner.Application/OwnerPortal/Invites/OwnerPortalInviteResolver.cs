@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -18,7 +19,8 @@ public sealed record ResolvedOwnerPortalInvite(OwnerPortalInvite Invite, Client 
 /// <summary>
 /// Ham davet token'ından kabul edilebilir daveti bulur (önizleme ve kabul aynı kural). Davet bekliyor ve süresi geçmemiş,
 /// müşteri hâlâ bu kiracıda, e-postası davet e-postasıyla aynı (K3: e-posta değişince eski davet kapanır) ve hâlâ davet
-/// kuralına uyuyor (<see cref="OwnerPortalInvitePolicy"/>), kiracı ve klinik aktif olmalı, kliniğin portalı açık olmalı (PORTAL-009). Aksi her durumda aynı yanıt:
+/// kuralına uyuyor (<see cref="OwnerPortalInvitePolicy"/>), kiracı ve klinik aktif olmalı, kliniğin portalı açık olmalı (PORTAL-009),
+/// paket portalı içermeli (TIER-001: düşmeden önce gönderilen davet yeni bağ açamaz). Aksi her durumda aynı yanıt:
 /// <c>Portal.Invites.NotFound</c>.
 /// Davet bağlantısı anonimdir; kiracı davetten çözülür (ADR-040). Token araması kiracılar arasıdır, sonraki sorgular
 /// davetin kiracısının kapsamında çalışır.
@@ -32,6 +34,7 @@ public sealed class OwnerPortalInviteResolver
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly ClinicPortalGate _clinicPortal;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public OwnerPortalInviteResolver(
         ITokenHashService hash,
@@ -40,9 +43,11 @@ public sealed class OwnerPortalInviteResolver
         IReadRepository<Client> clients,
         IReadRepository<Clinic> clinics,
         IReadRepository<Tenant> tenants,
-        ClinicPortalGate clinicPortal)
+        ClinicPortalGate clinicPortal,
+        TenantPlanFeatureEvaluator planFeatures)
     {
         _clinicPortal = clinicPortal;
+        _planFeatures = planFeatures;
         _hash = hash;
         _invites = invites;
         _tenantScope = tenantScope;
@@ -67,6 +72,9 @@ public sealed class OwnerPortalInviteResolver
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(invite.TenantId), ct);
         if (tenant is not { IsActive: true })
+            return NotFound();
+
+        if (!await _planFeatures.IsAllowedAsync(invite.TenantId, PlanFeature.OwnerPortal, ct))
             return NotFound();
 
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(invite.TenantId, invite.ClientId), ct);

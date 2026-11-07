@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
@@ -22,6 +23,7 @@ public sealed class ActivateClinicCommandHandler
     private readonly IUserClinicRepository _userClinics;
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<Clinic> _clinicsWrite;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public ActivateClinicCommandHandler(
         ITenantContext tenantContext,
@@ -30,8 +32,10 @@ public sealed class ActivateClinicCommandHandler
         IClinicAssignmentAccessGuard assignmentGuard,
         IUserClinicRepository userClinics,
         IReadRepository<Clinic> clinicsRead,
-        IRepository<Clinic> clinicsWrite)
+        IRepository<Clinic> clinicsWrite,
+        TenantPlanFeatureEvaluator planFeatures)
     {
+        _planFeatures = planFeatures;
         _tenantContext = tenantContext;
         _clientContext = clientContext;
         _permissions = permissions;
@@ -87,6 +91,10 @@ public sealed class ActivateClinicCommandHandler
             return Result<ActivateClinicResultDto>.Success(
                 new ActivateClinicResultDto(clinic.Id, AlreadyActive: true));
         }
+
+        var planAllows = await _planFeatures.EnsureCanAddActiveClinicAsync(tenantId, ct);
+        if (!planAllows.IsSuccess)
+            return Result<ActivateClinicResultDto>.Failure(planAllows.Error);
 
         clinic.Activate();
         await _clinicsWrite.SaveChangesAsync(ct);

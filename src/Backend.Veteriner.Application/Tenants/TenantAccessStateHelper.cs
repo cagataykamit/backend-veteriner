@@ -13,6 +13,21 @@ public static class TenantAccessStateHelper
         Guid tenantId,
         TenantSubscription subscription,
         DateTime utcNow)
+        => BuildWriteState(tenantId, subscription, utcNow) with
+        {
+            PlanCode = SubscriptionPlanCatalog.ToApiCode(subscription.PlanCode),
+            PlanFeatures = Enum.GetValues<PlanFeature>()
+                .Select(f => new TenantPlanFeatureDto(
+                    f.ToString(),
+                    TenantPlanFeatureEvaluator.IsEnabled(subscription, f),
+                    SubscriptionPlanCatalog.ToApiCode(SubscriptionPlanCatalog.MinimumPlanFor(f))))
+                .ToArray(),
+        };
+
+    private static TenantAccessStateDto BuildWriteState(
+        Guid tenantId,
+        TenantSubscription subscription,
+        DateTime utcNow)
     {
         var effective = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(subscription, utcNow);
         if (TenantSubscriptionEffectiveWriteEvaluator.WriteAllowed(effective))

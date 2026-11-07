@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Vaccinations.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
@@ -63,6 +64,7 @@ public sealed class GetClientWhatsAppLinkQueryHandler : IRequestHandler<GetClien
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Vaccination> _vaccinations;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public GetClientWhatsAppLinkQueryHandler(
         ITenantContext tenantContext,
@@ -71,8 +73,10 @@ public sealed class GetClientWhatsAppLinkQueryHandler : IRequestHandler<GetClien
         IReadRepository<Clinic> clinics,
         IReadRepository<Pet> pets,
         IReadRepository<Appointment> appointments,
-        IReadRepository<Vaccination> vaccinations)
+        IReadRepository<Vaccination> vaccinations,
+        TenantPlanFeatureEvaluator planFeatures)
     {
+        _planFeatures = planFeatures;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clients = clients;
@@ -109,6 +113,10 @@ public sealed class GetClientWhatsAppLinkQueryHandler : IRequestHandler<GetClien
 
     private async Task<Result<string>> InviteTextAsync(Guid tenantId, Client client, CancellationToken ct)
     {
+        var planAllows = await _planFeatures.EnsureAllowedAsync(tenantId, PlanFeature.OwnerPortal, ct);
+        if (!planAllows.IsSuccess)
+            return Result<string>.Failure(planAllows.Error);
+
         var eligibility = OwnerPortalInvitePolicy.CanInvite(client);
         if (!eligibility.IsSuccess)
             return Result<string>.Failure(eligibility.Error);

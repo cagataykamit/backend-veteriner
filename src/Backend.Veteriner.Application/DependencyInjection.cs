@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<ITrialLimitPolicy, TrialLimitPolicy>();
         services.AddScoped<ITrialQuotaGuard, TrialQuotaGuard>();
         services.AddScoped<TenantSubscriptionSeatEvaluator>();
+        services.AddScoped<TenantPlanFeatureEvaluator>();
         services.AddScoped<TenantInviteAcceptanceService>();
         services.AddScoped<ISubscriptionCheckoutActivationService, SubscriptionCheckoutActivationService>();
         services.AddScoped<ICheckoutPaymentReconciler, CheckoutPaymentReconciler>();
