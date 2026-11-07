@@ -2,12 +2,8 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Appointments;
-using Backend.Veteriner.Application.Reports.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.DailyTransactions;
-using Backend.Veteriner.Application.Reports.DailyTransactions.Queries;
-using Backend.Veteriner.Application.Reports.Examinations.Specs;
 using Backend.Veteriner.Application.Reports.OutstandingBalances;
-using Backend.Veteriner.Application.Reports.Vaccinations.Specs;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -22,22 +18,13 @@ namespace Backend.Veteriner.Application.Reports.Performance.Queries;
 public sealed record GetPerformanceSummaryQuery(DateOnly From, DateOnly To, Guid? ClinicId, bool Compare)
     : IRequest<Result<PerformanceSummaryDto>>;
 
-/// <summary>
-/// Hesap kopyalanmaz: ciro gün sonu dökümünün toplamı, tahsilat kasa özeti, alacak borç raporu, muayene/aşı sayısı raporların
-/// sayım spec'leri, randevu dağılımı randevu raporunun okuyucusudur. Bölüm, raporun istediği izin yoksa <c>null</c> kalır.
-/// </summary>
+/// <summary>Süzgeç gün sonu raporlarıyla aynı çözülür; dönem hesabı <see cref="PerformancePeriodLoader"/>'dadır.</summary>
 public sealed class GetPerformanceSummaryQueryHandler : IRequestHandler<GetPerformanceSummaryQuery, Result<PerformanceSummaryDto>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _scopeResolver;
-    private readonly ICurrentUserPermissionChecker _permissions;
-    private readonly IDailyTransactionsReader _transactions;
-    private readonly CashSummaryLoader _cash;
-    private readonly IOutstandingBalancesReportReader _outstanding;
-    private readonly IReadRepository<Examination> _examinations;
-    private readonly IReadRepository<Vaccination> _vaccinations;
-    private readonly IAppointmentsReportStatusBreakdownReader _appointments;
+    private readonly PerformancePeriodLoader _periods;
 
     public GetPerformanceSummaryQueryHandler(
         ITenantContext tenantContext,
@@ -54,13 +41,7 @@ public sealed class GetPerformanceSummaryQueryHandler : IRequestHandler<GetPerfo
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _scopeResolver = scopeResolver;
-        _permissions = permissions;
-        _transactions = transactions;
-        _cash = new CashSummaryLoader(tenantContext, clinicContext, scopeResolver, cashEvents);
-        _outstanding = outstanding;
-        _examinations = examinations;
-        _vaccinations = vaccinations;
-        _appointments = appointments;
+        _periods = new PerformancePeriodLoader(permissions, transactions, cashEvents, outstanding, examinations, vaccinations, appointments);
     }
 
     public async ValueTask<Result<PerformanceSummaryDto>> Handle(GetPerformanceSummaryQuery request, CancellationToken ct)
@@ -80,14 +61,14 @@ public sealed class GetPerformanceSummaryQueryHandler : IRequestHandler<GetPerfo
         }
 
         PerformanceOutstandingDto? outstanding = null;
-        if (_permissions.HasPermission(PermissionCatalog.Charges.Read))
+        if (_periods.CanSeeOutstanding)
         {
             var filter = await OutstandingBalancesReportFilter.ResolveAsync(
                 _tenantContext, _clinicContext, _scopeResolver, request.ClinicId, null, null, ct);
             if (!filter.IsSuccess)
                 return Result<PerformanceSummaryDto>.Failure(filter.Error);
-            var read = await _outstanding.ReadAsync(filter.Value!.ToReadRequest(0, 0), ct);
-            outstanding = new PerformanceOutstandingDto(read.TotalOutstandingAmount, read.TotalCount);
+            var f = filter.Value!;
+            outstanding = await _periods.LoadOutstandingAsync(f.TenantId, f.ClinicId, f.AccessibleClinicIds, ct);
         }
 
         return Result<PerformanceSummaryDto>.Success(new PerformanceSummaryDto("TRY", current.Value!, previous, outstanding));
@@ -107,56 +88,7 @@ public sealed class GetPerformanceSummaryQueryHandler : IRequestHandler<GetPerfo
             _tenantContext, _clinicContext, _scopeResolver, from, to, clinicId, null, null, null, ct);
         if (!resolved.IsSuccess)
             return Result<PerformancePeriodDto>.Failure(resolved.Error);
-        var filter = resolved.Value!;
 
-        // Aşı ve randevu sayımları kapalı aralık [from, to] ister; gün sonunun hemen öncesi.
-        var toUtcInclusive = filter.ToUtcExclusive.AddTicks(-1);
-
-        DailyTransactionTotalsDto? charges = null;
-        if (_permissions.HasPermission(PermissionCatalog.Payments.Read) && _permissions.HasPermission(PermissionCatalog.Charges.Read))
-            charges = (await _transactions.ReadAsync(filter, 0, 0, ct)).Totals;
-
-        PerformanceCashDto? cash = null;
-        if (_permissions.HasPermission(PermissionCatalog.Payments.Read))
-        {
-            var summary = await _cash.LoadAsync(from, to, clinicId, ct);
-            if (!summary.IsSuccess)
-                return Result<PerformancePeriodDto>.Failure(summary.Error);
-            cash = PerformanceCashDto.From(summary.Value!);
-        }
-
-        int? examinationCount = null;
-        if (_permissions.HasPermission(PermissionCatalog.Examinations.Read))
-        {
-            examinationCount = await _examinations.CountAsync(
-                new ExaminationsReportFilteredCountSpec(
-                    filter.TenantId, filter.ClinicId, null, null, null, filter.FromUtc, filter.ToUtcExclusive, null, [], filter.AccessibleClinicIds),
-                ct);
-        }
-
-        PerformanceVaccinationCountsDto? vaccinations = null;
-        if (_permissions.HasPermission(PermissionCatalog.Vaccinations.Read))
-        {
-            vaccinations = new PerformanceVaccinationCountsDto(
-                await CountVaccinationsAsync(filter, VaccinationStatus.Applied, toUtcInclusive, ct),
-                await CountVaccinationsAsync(filter, VaccinationStatus.Scheduled, toUtcInclusive, ct));
-        }
-
-        AppointmentReportStatusCountsDto? appointments = null;
-        if (_permissions.HasPermission(PermissionCatalog.Appointments.Read))
-        {
-            var rows = await _appointments.GetAsync(
-                filter.TenantId, filter.ClinicId, null, null, filter.FromUtc, toUtcInclusive, null, [], filter.AccessibleClinicIds, ct);
-            appointments = AppointmentStatusCounts.From(rows);
-        }
-
-        return Result<PerformancePeriodDto>.Success(
-            new PerformancePeriodDto(from, to, charges, cash, examinationCount, vaccinations, appointments));
+        return await _periods.LoadAsync(resolved.Value!, from, to, ct);
     }
-
-    private Task<int> CountVaccinationsAsync(FinanceEventFilter filter, VaccinationStatus status, DateTime toUtcInclusive, CancellationToken ct)
-        => _vaccinations.CountAsync(
-            new VaccinationsReportFilteredCountSpec(
-                filter.TenantId, filter.ClinicId, null, null, status, filter.FromUtc, toUtcInclusive, null, [], filter.AccessibleClinicIds),
-            ct);
 }

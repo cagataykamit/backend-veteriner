@@ -43,7 +43,14 @@ internal sealed class CashSummaryLoader
         if (!filter.IsSuccess)
             return Result<CashSummaryReportDto>.Failure(filter.Error);
 
-        var rows = await _reader.ReadAsync(filter.Value!, MaxEvents, ct);
+        return await LoadAsync(_reader, filter.Value!, from, to, ct);
+    }
+
+    /// <summary>Kapsamı çözülmüş süzgeçle aynı yükleme (işletme performansı, patron ekranı).</summary>
+    public static async Task<Result<CashSummaryReportDto>> LoadAsync(
+        ICashEventsReader reader, FinanceEventFilter filter, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        var rows = await reader.ReadAsync(filter, MaxEvents, ct);
         if (rows.Count > MaxEvents)
         {
             return Result<CashSummaryReportDto>.Failure(
