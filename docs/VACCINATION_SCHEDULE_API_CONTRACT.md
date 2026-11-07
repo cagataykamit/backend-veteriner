@@ -62,7 +62,7 @@ Denetim: `VaccinationSchedule.Item.Create|Update|Delete`, `VaccinationSchedule.S
 ## 3) Öneri — `GET /api/v1/vaccination-schedule/pets/{petId}/plan` (`Vaccinations.Read`, paket ister)
 
 ```json
-{ "petId": "…", "speciesId": "…", "speciesName": "Köpek", "birthDate": "2026-09-20", "scheduleItemCount": 6,
+{ "petId": "…", "petName": "Fındık", "speciesId": "…", "speciesName": "Köpek", "birthDate": "2026-09-20", "scheduleItemCount": 6,
   "suggestions": [
     { "scheduleItemId": "…", "vaccineDefinitionId": "…", "vaccineName": "Karma", "doseNumber": 1, "doseCount": 3,
       "appliedDoseCount": 0, "dueDate": "2026-11-09", "isLate": true },

@@ -57,6 +57,7 @@ public sealed record VaccinationPlanSkippedDto(
 
 public sealed record VaccinationPlanDto(
     Guid PetId,
+    string PetName,
     Guid SpeciesId,
     string? SpeciesName,
     DateOnly? BirthDate,
@@ -253,6 +254,7 @@ public sealed class GetVaccinationPlanQueryHandler : IRequestHandler<GetVaccinat
 
         return Result<VaccinationPlanDto>.Success(new VaccinationPlanDto(
             pet.Id,
+            pet.Name,
             pet.SpeciesId,
             pet.Species?.Name,
             pet.BirthDate,

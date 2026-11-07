@@ -95,6 +95,7 @@ public sealed class VaccinationScheduleEndpointTests : IClassFixture<CustomWebAp
         (await client.PostAsJsonAsync("/api/v1/vaccination-schedule/items", ItemBody(ctx))).EnsureSuccessStatusCode();
 
         var plan = await (await client.GetAsync($"/api/v1/vaccination-schedule/pets/{ctx.PetId}/plan")).Content.ReadFromJsonAsync<JsonElement>();
+        plan.GetProperty("petName").GetString().Should().StartWith("Yavru-");
         var suggestions = plan.GetProperty("suggestions").EnumerateArray().ToList();
         suggestions.Should().HaveCount(4);
         suggestions[0].GetProperty("doseNumber").GetInt32().Should().Be(1);
