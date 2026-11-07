@@ -29,7 +29,7 @@ public static class SubscriptionPlanCatalog
             {
                 PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests, PlanFeature.MultiClinic, PlanFeature.AutomatedReminders,
                 PlanFeature.AdvancedReports, PlanFeature.VaccinationWizard, PlanFeature.MobileBarcode, PlanFeature.ClinicsOverview,
-                PlanFeature.CashManagement,
+                PlanFeature.CashManagement, PlanFeature.ExternalApi,
             }),
     ];
 

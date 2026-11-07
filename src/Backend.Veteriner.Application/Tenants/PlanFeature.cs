@@ -57,4 +57,10 @@ public enum PlanFeature
     /// sayım okuma ve gün sonu kasa özeti bu kuralın dışındadır, her pakette açık.
     /// </summary>
     CashManagement = 8,
+
+    /// <summary>
+    /// Dış API (TIER-009; docs/EXTERNAL_API_CONTRACT.md): kiracıya özel anahtarla salt okunur uçlar ve yeni anahtar oluşturma. Paket
+    /// düşünce anahtarlar silinmez, istekleri 403 döner; anahtar listesi ve iptal her pakette açık.
+    /// </summary>
+    ExternalApi = 9,
 }

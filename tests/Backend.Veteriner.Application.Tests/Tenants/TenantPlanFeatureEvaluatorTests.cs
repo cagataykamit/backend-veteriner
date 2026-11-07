@@ -38,6 +38,9 @@ public sealed class TenantPlanFeatureEvaluatorTests
     [InlineData(SubscriptionPlanCode.Basic, PlanFeature.CashManagement, false)]
     [InlineData(SubscriptionPlanCode.Pro, PlanFeature.CashManagement, false)]
     [InlineData(SubscriptionPlanCode.Premium, PlanFeature.CashManagement, true)]
+    [InlineData(SubscriptionPlanCode.Basic, PlanFeature.ExternalApi, false)]
+    [InlineData(SubscriptionPlanCode.Pro, PlanFeature.ExternalApi, false)]
+    [InlineData(SubscriptionPlanCode.Premium, PlanFeature.ExternalApi, true)]
     public void Catalog_Should_Match_Adr035_Table(SubscriptionPlanCode plan, PlanFeature feature, bool expected)
         => SubscriptionPlanCatalog.Allows(plan, feature).Should().Be(expected);
 
@@ -47,6 +50,7 @@ public sealed class TenantPlanFeatureEvaluatorTests
     [InlineData(PlanFeature.MultiClinic, SubscriptionPlanCode.Premium)]
     [InlineData(PlanFeature.ClinicsOverview, SubscriptionPlanCode.Premium)]
     [InlineData(PlanFeature.CashManagement, SubscriptionPlanCode.Premium)]
+    [InlineData(PlanFeature.ExternalApi, SubscriptionPlanCode.Premium)]
     public void MinimumPlanFor_Should_Return_Smallest_Plan(PlanFeature feature, SubscriptionPlanCode expected)
         => SubscriptionPlanCatalog.MinimumPlanFor(feature).Should().Be(expected);
 

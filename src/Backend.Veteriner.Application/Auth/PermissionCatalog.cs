@@ -46,6 +46,12 @@ public static class PermissionCatalog
         public const string Manage = "Subscriptions.Manage";
     }
 
+    /// <summary>Dış API anahtarları (TIER-009): oluşturma, listeleme ve iptal tek izinde; anahtar kiracının tüm müşteri verisini okur.</summary>
+    public static class ApiKeys
+    {
+        public const string Manage = "ApiKeys.Manage";
+    }
+
     public static class Clinics
     {
         public const string Read = "Clinics.Read";
@@ -328,6 +334,8 @@ public static class PermissionCatalog
 
         new(Subscriptions.Read, "Kiracı abonelik özetini görüntüleme yetkisi", "Subscriptions"),
         new(Subscriptions.Manage, "Kiracı abonelik checkout/aktivasyon yönetimi yetkisi", "Subscriptions"),
+
+        new(ApiKeys.Manage, "Dış API anahtarı oluşturma, listeleme ve iptal etme yetkisi", "ApiKeys"),
 
         new(Clinics.Read, "Klinikleri listeleme ve görüntüleme yetkisi", "Clinics"),
         new(Clinics.Create, "Klinik oluşturma yetkisi", "Clinics"),
