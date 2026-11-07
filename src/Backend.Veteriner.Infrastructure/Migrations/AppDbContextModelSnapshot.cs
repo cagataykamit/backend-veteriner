@@ -4360,6 +4360,51 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("RecordChanges", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Reminders.ClinicReminderRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Days")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EnabledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("RuleType")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("IsEnabled");
+
+                    b.HasIndex("TenantId", "ClinicId", "RuleType")
+                        .IsUnique();
+
+                    b.ToTable("ClinicReminderRules", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Reminders.ReminderDispatchLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6419,6 +6464,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Batch");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Reminders.ClinicReminderRule", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Sales.Sale", b =>

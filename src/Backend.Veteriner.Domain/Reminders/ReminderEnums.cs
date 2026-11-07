@@ -3,13 +3,19 @@ namespace Backend.Veteriner.Domain.Reminders;
 public enum ReminderType
 {
     Appointment = 0,
-    Vaccination = 1
+    Vaccination = 1,
+    FollowUp = 2,
+    Debt = 3,
+    NoReturn = 4
 }
 
 public enum ReminderSourceEntityType
 {
     Appointment = 0,
-    Vaccination = 1
+    Vaccination = 1,
+    Treatment = 2,
+    Charge = 3,
+    Pet = 4
 }
 
 public enum ReminderDispatchStatus

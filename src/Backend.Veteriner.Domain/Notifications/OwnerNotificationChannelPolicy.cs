@@ -16,6 +16,15 @@ public enum OwnerNotificationType
     AppointmentReminder = 10,
     VaccinationReminder = 11,
     Marketing = 12,
+
+    /// <summary>Tedavideki kontrol tarihi yaklaştı (TIER-003).</summary>
+    FollowUpReminder = 13,
+
+    /// <summary>Ödenmemiş bakiye; tutar yazılmaz (TIER-003).</summary>
+    DebtReminder = 14,
+
+    /// <summary>Son gelişin üzerinden süre geçti (TIER-003); ticari ileti sayılır.</summary>
+    NoReturnReminder = 15,
 }
 
 /// <summary>Bildirim kategorisi: kanal kuralını belirler.</summary>
@@ -74,8 +83,9 @@ public static class OwnerNotificationChannelPolicy
 
     public static OwnerNotificationCategory CategoryOf(OwnerNotificationType type) => type switch
     {
-        OwnerNotificationType.AppointmentReminder or OwnerNotificationType.VaccinationReminder => OwnerNotificationCategory.Reminder,
-        OwnerNotificationType.Marketing => OwnerNotificationCategory.Marketing,
+        OwnerNotificationType.AppointmentReminder or OwnerNotificationType.VaccinationReminder
+            or OwnerNotificationType.FollowUpReminder or OwnerNotificationType.DebtReminder => OwnerNotificationCategory.Reminder,
+        OwnerNotificationType.Marketing or OwnerNotificationType.NoReturnReminder => OwnerNotificationCategory.Marketing,
         _ => OwnerNotificationCategory.Transactional,
     };
 
@@ -91,10 +101,10 @@ public static class OwnerNotificationChannelPolicy
                 OwnerNotificationCategory.Reminder => OwnerNotificationChannelMode.Preference,
                 _ => MarketingSendingEnabled ? OwnerNotificationChannelMode.Preference : OwnerNotificationChannelMode.Disabled,
             },
-            OwnerNotificationChannel.Push => category == OwnerNotificationCategory.Marketing || CarriesSecret(type)
+            OwnerNotificationChannel.Push => category == OwnerNotificationCategory.Marketing || CarriesSecret(type) || IsEmailOnly(type)
                 ? OwnerNotificationChannelMode.Disabled
                 : pushConfigured ? OwnerNotificationChannelMode.Preference : OwnerNotificationChannelMode.NotConfigured,
-            OwnerNotificationChannel.WhatsAppLink => category == OwnerNotificationCategory.Reminder || type == OwnerNotificationType.PortalInvite
+            OwnerNotificationChannel.WhatsAppLink => (category == OwnerNotificationCategory.Reminder && !IsEmailOnly(type)) || type == OwnerNotificationType.PortalInvite
                 ? OwnerNotificationChannelMode.StaffManual
                 : OwnerNotificationChannelMode.Disabled,
             _ => OwnerNotificationChannelMode.Disabled,
@@ -112,6 +122,10 @@ public static class OwnerNotificationChannelPolicy
             OwnerNotificationChannelMode.Preference => recipientOptedIn,
             _ => false,
         };
+
+    /// <summary>Otomatik hatırlatıcılar şimdilik yalnız e-posta (TIER-003); push ve WhatsApp entegrasyonla gelir.</summary>
+    private static bool IsEmailOnly(OwnerNotificationType type)
+        => type is OwnerNotificationType.FollowUpReminder or OwnerNotificationType.DebtReminder or OwnerNotificationType.NoReturnReminder;
 
     /// <summary>Tek kullanımlık kod ve davet bağlantısı kilit ekranında görünebilecek push'a yazılmaz.</summary>
     private static bool CarriesSecret(OwnerNotificationType type)
