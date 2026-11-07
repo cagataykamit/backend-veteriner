@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Commands.Create;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.Tenants;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -17,8 +18,26 @@ public sealed class CreateClinicCommandHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IRepository<Clinic>> _clinicsWrite = new();
 
-    private CreateClinicCommandHandler CreateHandler()
-        => new(_tenantContext.Object, _tenantsRead.Object, _clinicsRead.Object, _clinicsWrite.Object);
+    private CreateClinicCommandHandler CreateHandler(SubscriptionPlanCode plan = SubscriptionPlanCode.Premium, Clinic? activeClinic = null)
+        => new(_tenantContext.Object, _tenantsRead.Object, _clinicsRead.Object, _clinicsWrite.Object, PlanFeatureTestFactory.ForPlan(plan, activeClinic));
+
+    [Fact]
+    public async Task Handle_Should_Reject_Second_Clinic_When_Plan_Has_No_MultiClinic()
+    {
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant("Temel A.Ş.", DateTime.UtcNow);
+        AlignTenantId(tenant, tenantId);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+
+        var result = await CreateHandler(SubscriptionPlanCode.Basic, new Clinic(tenantId, "Merkez", "İzmir"))
+            .Handle(new CreateClinicCommand("Şube", "İstanbul"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.FeatureNotInPlan");
+        _clinicsWrite.Verify(r => r.AddAsync(It.IsAny<Clinic>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 
     private static void AlignTenantId(Tenant tenant, Guid id)
         => typeof(Tenant).GetProperty(nameof(Tenant.Id))!.SetValue(tenant, id);

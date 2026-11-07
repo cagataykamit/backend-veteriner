@@ -5,7 +5,9 @@ using Backend.Veteriner.Application.Clinics.Commands.Update;
 using Backend.Veteriner.Application.Clinics.Commands.Update.Validators;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Tests.Tenants;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Tenants;
 using AwesomeAssertions;
 using Moq;
 
@@ -57,7 +59,7 @@ public sealed class ClinicSettingsHandlersTests
             _clinicsRead.Object,
             _clinicsWrite.Object);
 
-    private ActivateClinicCommandHandler CreateActivateHandler()
+    private ActivateClinicCommandHandler CreateActivateHandler(SubscriptionPlanCode plan = SubscriptionPlanCode.Premium, Clinic? activeClinic = null)
         => new(
             _tenantContext.Object,
             _clientContext.Object,
@@ -65,7 +67,25 @@ public sealed class ClinicSettingsHandlersTests
             _assignmentGuard.Object,
             _userClinics.Object,
             _clinicsRead.Object,
-            _clinicsWrite.Object);
+            _clinicsWrite.Object,
+            PlanFeatureTestFactory.ForPlan(plan, activeClinic));
+
+    [Fact]
+    public async Task Activate_Should_Reject_When_Another_Active_Clinic_Exists_And_Plan_Has_No_MultiClinic()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinic = BuildClinic(Guid.NewGuid(), tenantId, active: false);
+        _permissions.Setup(x => x.HasPermission(It.IsAny<string>())).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(clinic);
+
+        var result = await CreateActivateHandler(SubscriptionPlanCode.Pro, BuildClinic(Guid.NewGuid(), tenantId, name: "Merkez 2"))
+            .Handle(new ActivateClinicCommand(clinic.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.FeatureNotInPlan");
+        clinic.IsActive.Should().BeFalse();
+    }
 
     private static Clinic BuildClinic(Guid id, Guid tenantId, string name = "Merkez", string city = "İstanbul", bool active = true)
     {
