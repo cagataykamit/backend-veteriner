@@ -220,6 +220,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Kasa sayımı (TIER-008): istemcinin gösterdiği beklenen nakit artık güncel değil; yeniden okuyup onaylamalı.
+        if (normalized is "cashcounts.expectedchanged")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Pasif oda/bölüm yeni yatışa atanamaz (HOSP-002): tanımın durumu ile çakışma.
         if (normalized is "hospitalizations.roominactive")
         {

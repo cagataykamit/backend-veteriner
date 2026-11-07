@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.CashCounts;
 using Backend.Veteriner.Domain.CashCounts;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
@@ -8,9 +9,6 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Configurations;
 
 public sealed class CashCountConfiguration : IEntityTypeConfiguration<CashCount>
 {
-    /// <summary>Klinik ve gün başına en çok bir geçerli sayım; iki kullanıcı aynı anda kaydederse ikincisi burada düşer.</summary>
-    public const string ActivePerDayIndexName = "UX_CashCounts_TenantId_ClinicId_BusinessDate_Active";
-
     public void Configure(EntityTypeBuilder<CashCount> b)
     {
         b.ToTable("CashCounts", t =>
@@ -37,10 +35,11 @@ public sealed class CashCountConfiguration : IEntityTypeConfiguration<CashCount>
         b.Property(x => x.VoidReason).HasMaxLength(CorrectionReason.MaxLength);
         b.Property(x => x.MutationSequence).IsRequired().HasDefaultValue(0L).IsConcurrencyToken();
 
+        // Klinik ve gün başına en çok bir geçerli sayım; iki kullanıcı aynı anda kaydederse ikincisi burada düşer.
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.BusinessDate })
             .IsUnique()
             .HasFilter("[VoidedAtUtc] IS NULL")
-            .HasDatabaseName(ActivePerDayIndexName);
+            .HasDatabaseName(CashCountErrors.ActivePerDayIndexName);
 
         // Geçmiş listesi ve günün düzeltme izi iptal edilenleri de okur.
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.BusinessDate, x.CreatedAtUtc });
