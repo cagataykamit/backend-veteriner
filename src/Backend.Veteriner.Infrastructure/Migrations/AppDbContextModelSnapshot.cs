@@ -657,6 +657,86 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("CareInstructions", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.CashCounts.CashCount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CorrectsCashCountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("CountedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<decimal>("ExpectedCashAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("MutationSequence")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("OpeningAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("VoidedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("VoidedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId", "BusinessDate")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CashCounts_TenantId_ClinicId_BusinessDate_Active")
+                        .HasFilter("[VoidedAtUtc] IS NULL");
+
+                    b.HasIndex("TenantId", "ClinicId", "BusinessDate", "CreatedAtUtc");
+
+                    b.ToTable("CashCounts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CashCounts_Amounts_NonNegative", "[OpeningAmount] >= 0 AND [CountedAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_CashCounts_Void_Consistent", "([VoidedAtUtc] IS NULL AND [VoidReason] IS NULL AND [VoidedByUserId] IS NULL) OR ([VoidedAtUtc] IS NOT NULL AND [VoidReason] IS NOT NULL AND [VoidedByUserId] IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.Breed", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6114,6 +6194,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.CashCounts.CashCount", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.Breed", b =>
