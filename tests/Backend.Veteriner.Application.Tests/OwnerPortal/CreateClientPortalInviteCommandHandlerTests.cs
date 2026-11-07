@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Commands.CreateClientPortalInvite;
+using Backend.Veteriner.Application.Tests.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.OwnerPortal;
@@ -35,6 +36,7 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
     private readonly List<OwnerPortalInvite> _pending = [];
     private readonly List<OwnerPortalInvite> _added = [];
     private OwnerAccountClientLink? _activeLink;
+    private SubscriptionPlanCode? _plan = SubscriptionPlanCode.Pro;
 
     public CreateClientPortalInviteCommandHandlerTests()
     {
@@ -70,10 +72,26 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
         Options.Create(new OwnerPortalOptions { PortalBaseUrl = "https://portal.example.com/" }),
         Options.Create(new AppOptions()),
         _f.Clock,
-        new ClinicPortalGate(new Mock<IReadRepository<ClinicPortalSettings>>().Object));
+        new ClinicPortalGate(new Mock<IReadRepository<ClinicPortalSettings>>().Object),
+        PlanFeatureTestFactory.ForPlan(_plan));
 
     private void VerifyNoEmail() =>
         _f.Email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
+
+    [Theory]
+    [InlineData(SubscriptionPlanCode.Basic)]
+    [InlineData(null)]
+    public async Task Should_Reject_When_Plan_Has_No_Portal_And_Send_Nothing(SubscriptionPlanCode? plan)
+    {
+        _plan = plan;
+
+        var result = await Handler().Handle(new CreateClientPortalInviteCommand(_client.Id, null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Subscriptions.FeatureNotInPlan");
+        _added.Should().BeEmpty();
+        VerifyNoEmail();
+    }
 
     [Fact]
     public async Task Should_Email_Link_To_Client_Email_And_Store_Only_Token_Hash()

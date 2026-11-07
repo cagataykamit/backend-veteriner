@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
@@ -26,6 +27,7 @@ public sealed class GetClientPortalAccessQueryHandler : IRequestHandler<GetClien
     private readonly TimeProvider _timeProvider;
     private readonly IClinicContext _clinicContext;
     private readonly ClinicPortalGate _clinicPortal;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public GetClientPortalAccessQueryHandler(
         OwnerPortalStaffAccess staffAccess,
@@ -35,8 +37,10 @@ public sealed class GetClientPortalAccessQueryHandler : IRequestHandler<GetClien
         IReadRepository<Clinic> clinics,
         TimeProvider timeProvider,
         IClinicContext clinicContext,
-        ClinicPortalGate clinicPortal)
+        ClinicPortalGate clinicPortal,
+        TenantPlanFeatureEvaluator planFeatures)
     {
+        _planFeatures = planFeatures;
         _clinicContext = clinicContext;
         _clinicPortal = clinicPortal;
         _staffAccess = staffAccess;
@@ -69,7 +73,9 @@ public sealed class GetClientPortalAccessQueryHandler : IRequestHandler<GetClien
             : (await _accounts.ListAsync(new OwnerAccountsByIdsSpec(accountIds), ct)).ToDictionary(a => a.Id, a => a.Email);
 
         var eligibility = OwnerPortalInvitePolicy.CanInvite(scope.Client);
-        var blockedCode = !eligibility.IsSuccess
+        var blockedCode = !await _planFeatures.IsAllowedAsync(scope.TenantId, PlanFeature.OwnerPortal, ct)
+            ? TenantPlanFeatureEvaluator.FeatureNotInPlanCode
+            : !eligibility.IsSuccess
             ? eligibility.Error.Code
             : links.Any(l => l.IsActive) ? "OwnerPortal.AlreadyLinked"
             : _clinicContext.ClinicId is { } activeClinicId && !await _clinicPortal.IsEnabledAsync(scope.TenantId, activeClinicId, ct)

@@ -2,6 +2,7 @@ using Ardalis.Specification;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.OwnerPortal.Access;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
@@ -116,6 +117,7 @@ public sealed class UpdateClinicPortalSettingsCommandHandler : IRequestHandler<U
     private readonly IRepository<ClinicPortalSettings> _settings;
     private readonly ClinicPortalSettingsReader _reader;
     private readonly TimeProvider _timeProvider;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public UpdateClinicPortalSettingsCommandHandler(
         ClinicDefinitionAccess access,
@@ -123,8 +125,10 @@ public sealed class UpdateClinicPortalSettingsCommandHandler : IRequestHandler<U
         IRepository<ClinicPortalSettings> settings,
         IReadRepository<OwnerAccountClientLink> links,
         IReadRepository<OwnerPortalInvite> invites,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        TenantPlanFeatureEvaluator planFeatures)
     {
+        _planFeatures = planFeatures;
         _access = access;
         _clientContext = clientContext;
         _settings = settings;
@@ -138,6 +142,10 @@ public sealed class UpdateClinicPortalSettingsCommandHandler : IRequestHandler<U
         if (!access.IsSuccess)
             return Result<ClinicPortalSettingsDto>.Failure(access.Error);
         var tenantId = access.Value;
+
+        var planAllows = await _planFeatures.EnsureAllowedAsync(tenantId, PlanFeature.OwnerPortal, ct);
+        if (!planAllows.IsSuccess)
+            return Result<ClinicPortalSettingsDto>.Failure(planAllows.Error);
 
         if (_clientContext.UserId is not { } userId)
             return Result<ClinicPortalSettingsDto>.Failure("Auth.Unauthorized.UserContextMissing", "Kullanıcı bağlamı yok.");

@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
@@ -28,6 +29,7 @@ public sealed class CreateClientPortalInviteCommandHandler
     private readonly AppOptions _appOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ClinicPortalGate _clinicPortal;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public CreateClientPortalInviteCommandHandler(
         OwnerPortalStaffAccess staffAccess,
@@ -41,9 +43,11 @@ public sealed class CreateClientPortalInviteCommandHandler
         IOptions<OwnerPortalOptions> portalOptions,
         IOptions<AppOptions> appOptions,
         TimeProvider timeProvider,
-        ClinicPortalGate clinicPortal)
+        ClinicPortalGate clinicPortal,
+        TenantPlanFeatureEvaluator planFeatures)
     {
         _clinicPortal = clinicPortal;
+        _planFeatures = planFeatures;
         _staffAccess = staffAccess;
         _clinicContext = clinicContext;
         _clinics = clinics;
@@ -63,6 +67,10 @@ public sealed class CreateClientPortalInviteCommandHandler
         if (!scopeResult.IsSuccess)
             return Result<ClientPortalInviteDto>.Failure(scopeResult.Error);
         var scope = scopeResult.Value!;
+
+        var planAllows = await _planFeatures.EnsureAllowedAsync(scope.TenantId, PlanFeature.OwnerPortal, ct);
+        if (!planAllows.IsSuccess)
+            return Result<ClientPortalInviteDto>.Failure(planAllows.Error);
 
         var eligibility = OwnerPortalInvitePolicy.CanInvite(scope.Client);
         if (!eligibility.IsSuccess)
