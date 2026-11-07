@@ -5624,6 +5624,55 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Vaccinations", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Vaccinations.VaccinationScheduleItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DoseCount")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DoseIntervalWeeks")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("RepeatIntervalMonths")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SpeciesId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("StartAgeWeeks")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("VaccineDefinitionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpeciesId");
+
+                    b.HasIndex("VaccineDefinitionId");
+
+                    b.HasIndex("TenantId", "SpeciesId", "VaccineDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("VaccinationScheduleItems", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Visits.Visit", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6669,6 +6718,21 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("VaccineDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Vaccinations.VaccinationScheduleItem", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Catalog.Species", null)
+                        .WithMany()
+                        .HasForeignKey("SpeciesId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Catalog.VaccineDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("VaccineDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.ExaminationTemplate", b =>

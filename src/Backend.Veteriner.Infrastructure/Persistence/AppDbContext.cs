@@ -130,6 +130,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Visit> Visits => Set<Visit>();
     public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
     public DbSet<VaccineDefinition> VaccineDefinitions => Set<VaccineDefinition>();
+    public DbSet<VaccinationScheduleItem> VaccinationScheduleItems => Set<VaccinationScheduleItem>();
     public DbSet<ClinicalTerm> ClinicalTerms => Set<ClinicalTerm>();
     public DbSet<ClinicalSnippet> ClinicalSnippets => Set<ClinicalSnippet>();
     public DbSet<ExaminationTemplate> ExaminationTemplates => Set<ExaminationTemplate>();
