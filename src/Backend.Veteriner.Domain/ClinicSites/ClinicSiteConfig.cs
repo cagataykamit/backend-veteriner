@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Backend.Veteriner.Domain.Shared;
@@ -12,18 +13,21 @@ public sealed record ClinicSiteConfigIssue(string Path, string Reason);
 /// yorumlamaz; yalnız güvenlik sınırlarını ağaç üzerinde genel kurallarla denetler, böylece yeni tasarım paketi backend
 /// değişikliği istemez:
 /// <list type="bullet">
-/// <item>Kök nesne, <c>schemaVersion</c> (≥ 1) taşır, boyutu <see cref="MaxBytes"/> ile sınırlıdır.</item>
+/// <item>Kök nesne, <c>schemaVersion</c> (≥ 1) taşır; boyut, derinlik, düğüm sayısı ve alan adı uzunluğu sınırlıdır.</item>
 /// <item>Her metin değerinde <c>javascript:</c>, <c>vbscript:</c>, <c>data:</c> başlangıcı ve izinsiz <c>şema://</c> reddedilir.</item>
-/// <item>Bağlantı alanında (ad kuralı: <see cref="IsLinkKey"/>) yalnız <c>http</c>, <c>https</c>, <c>tel</c>, <c>mailto</c> ya da şemasız değer.</item>
+/// <item>Bağlantı alanında (ad kuralı: <see cref="IsLinkKey"/>) yalnız <c>http</c>, <c>https</c>, <c>tel</c>, <c>mailto</c> ya da şemasız değer; biçim karakteri yok.</item>
 /// <item>Görsel alanında (ad kuralı: <see cref="IsImageKey"/>) yalnız <c>site-image:{kimlik}</c> ya da <c>stock:{anahtar}</c>; üçüncü taraf adresi yok (K7).</item>
 /// <item>Klinik kaydından okunan alanlar ve adres yapılandırmada bulunamaz (K8/K10).</item>
 /// </list>
-/// Görselin bu siteye ait olduğunu uygulama katmanı <see cref="ImageIds"/> üzerinden denetler.
+/// Görselin bu siteye ait olduğunu uygulama katmanı <see cref="ImageIds"/> üzerinden denetler. Denetim belgeden çok bellek
+/// üretmesin diye yol metni yalnız hata anında kurulur ve sorun sınırına gelince tarama durur.
 /// </summary>
 public sealed class ClinicSiteConfig
 {
     public const int MaxBytes = 1_000_000;
     public const int MaxDepth = 32;
+    public const int MaxNodes = 100_000;
+    public const int MaxPropertyNameLength = 200;
     public const int MaxReportedIssues = 20;
     public const string ValidationCode = "ClinicSites.Validation";
     public const string SchemaVersionKey = "schemaVersion";
@@ -34,12 +38,15 @@ public sealed class ClinicSiteConfig
     {
         public const string InvalidJson = "invalidJson";
         public const string TooLarge = "tooLarge";
+        public const string TooComplex = "tooComplex";
         public const string SchemaVersionRequired = "schemaVersionRequired";
         public const string LinkSchemeNotAllowed = "linkSchemeNotAllowed";
         public const string ImageReferenceNotAllowed = "imageReferenceNotAllowed";
         public const string ClinicRecordField = "clinicRecordField";
         public const string ImageNotInSite = "imageNotInSite";
     }
+
+    private const string RootPath = "$";
 
     private static readonly string[] AlwaysRejectedSchemes = ["javascript:", "vbscript:", "data:"];
     private static readonly string[] AllowedLinkSchemes = ["http", "https", "tel", "mailto"];
@@ -69,7 +76,7 @@ public sealed class ClinicSiteConfig
 
     public int SchemaVersion { get; }
 
-    /// <summary>Belgede geçen tüm <c>site-image:</c> başvuruları.</summary>
+    /// <summary>Belgede değeri <c>site-image:</c> ile başlayan tüm başvurular.</summary>
     public IReadOnlySet<Guid> ImageIds { get; }
 
     public static string ImageReference(Guid imageId) => $"{ImageReferencePrefix}{imageId:D}";
@@ -77,9 +84,9 @@ public sealed class ClinicSiteConfig
     public static Result<ClinicSiteConfig> Parse(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
-            return Fail([new ClinicSiteConfigIssue("$", Reasons.InvalidJson)]);
+            return Fail(RootPath, Reasons.InvalidJson);
         if (Encoding.UTF8.GetByteCount(json) > MaxBytes)
-            return Fail([new ClinicSiteConfigIssue("$", Reasons.TooLarge)]);
+            return Fail(RootPath, Reasons.TooLarge);
 
         JsonDocument document;
         try
@@ -88,28 +95,35 @@ public sealed class ClinicSiteConfig
         }
         catch (JsonException)
         {
-            return Fail([new ClinicSiteConfigIssue("$", Reasons.InvalidJson)]);
+            return Fail(RootPath, Reasons.InvalidJson);
         }
 
         using (document)
         {
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
-                return Fail([new ClinicSiteConfigIssue("$", Reasons.InvalidJson)]);
+                return Fail(RootPath, Reasons.InvalidJson);
 
-            var issues = new List<ClinicSiteConfigIssue>();
-            var imageIds = new HashSet<Guid>();
+            var walker = new Walker();
+            int schemaVersion;
+            try
+            {
+                schemaVersion = ReadSchemaVersion(root);
+                if (schemaVersion < 1)
+                    walker.Report(new ClinicSiteConfigIssue(SchemaVersionKey, Reasons.SchemaVersionRequired));
 
-            var schemaVersion = ReadSchemaVersion(root);
-            if (schemaVersion < 1)
-                issues.Add(new ClinicSiteConfigIssue(SchemaVersionKey, Reasons.SchemaVersionRequired));
+                CheckRecordOwnedFields(root, walker);
+                walker.Visit(root, null);
+            }
+            catch (InvalidOperationException)
+            {
+                // JSON sözdizimi geçerli ama metne çözülemeyen kaçış (ör. eşsiz vekil "\uD800").
+                return Fail(RootPath, Reasons.InvalidJson);
+            }
 
-            CheckRecordOwnedFields(root, issues);
-            Visit(root, "$", null, issues, imageIds);
-
-            return issues.Count == 0
-                ? Result<ClinicSiteConfig>.Success(new ClinicSiteConfig(json, schemaVersion, imageIds))
-                : Fail(issues);
+            return walker.Issues.Count == 0
+                ? Result<ClinicSiteConfig>.Success(new ClinicSiteConfig(json, schemaVersion, walker.ImageIds))
+                : Result<ClinicSiteConfig>.Failure(ValidationError(walker.Issues));
         }
     }
 
@@ -124,13 +138,14 @@ public sealed class ClinicSiteConfig
             new Dictionary<string, object?> { ["issues"] = reported });
     }
 
-    private static Result<ClinicSiteConfig> Fail(IReadOnlyCollection<ClinicSiteConfigIssue> issues)
-        => Result<ClinicSiteConfig>.Failure(ValidationError(issues));
+    private static Result<ClinicSiteConfig> Fail(string path, string reason)
+        => Result<ClinicSiteConfig>.Failure(ValidationError([new ClinicSiteConfigIssue(path, reason)]));
 
     private static string Describe(string reason) => reason switch
     {
         Reasons.InvalidJson => "geçerli bir JSON nesnesi değil",
         Reasons.TooLarge => $"boyut sınırı aşıldı (en çok {MaxBytes / 1000} KB)",
+        Reasons.TooComplex => "belge çok karmaşık (alan sayısı ya da alan adı uzunluğu sınırı aşıldı)",
         Reasons.SchemaVersionRequired => "schemaVersion zorunludur ve 1 ya da üstü olmalıdır",
         Reasons.LinkSchemeNotAllowed => "bağlantı yalnız http, https, tel ya da mailto olabilir",
         Reasons.ImageReferenceNotAllowed => "görsel yalnız bu sitenin görseli ya da hazır fotoğraf olabilir",
@@ -146,14 +161,14 @@ public sealed class ClinicSiteConfig
             ? version
             : 0;
 
-    private static void CheckRecordOwnedFields(JsonElement root, List<ClinicSiteConfigIssue> issues)
+    private static void CheckRecordOwnedFields(JsonElement root, Walker walker)
     {
         foreach (var (section, child, keys) in RecordOwnedFields)
         {
             if (!root.TryGetProperty(section, out var parent) || parent.ValueKind != JsonValueKind.Object)
                 continue;
 
-            var path = $"$.{section}";
+            var path = $"{RootPath}.{section}";
             if (child is not null)
             {
                 if (!parent.TryGetProperty(child, out parent) || parent.ValueKind != JsonValueKind.Object)
@@ -164,62 +179,8 @@ public sealed class ClinicSiteConfig
             foreach (var key in keys)
             {
                 if (parent.TryGetProperty(key, out _))
-                    issues.Add(new ClinicSiteConfigIssue($"{path}.{key}", Reasons.ClinicRecordField));
+                    walker.Report(new ClinicSiteConfigIssue($"{path}.{key}", Reasons.ClinicRecordField));
             }
-        }
-    }
-
-    private static void Visit(JsonElement element, string path, string? key, List<ClinicSiteConfigIssue> issues, HashSet<Guid> imageIds)
-    {
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Object:
-                foreach (var property in element.EnumerateObject())
-                    Visit(property.Value, $"{path}.{property.Name}", property.Name, issues, imageIds);
-                break;
-            case JsonValueKind.Array:
-                var index = 0;
-                foreach (var item in element.EnumerateArray())
-                    Visit(item, $"{path}[{index++}]", key, issues, imageIds);
-                break;
-            case JsonValueKind.String:
-                CheckText(element.GetString()!, path, key, issues, imageIds);
-                break;
-        }
-    }
-
-    private static void CheckText(string value, string path, string? key, List<ClinicSiteConfigIssue> issues, HashSet<Guid> imageIds)
-    {
-        var compact = Compact(value);
-        if (compact.Length == 0)
-            return;
-
-        if (compact.StartsWith(ImageReferencePrefix, StringComparison.Ordinal))
-        {
-            if (Guid.TryParse(compact[ImageReferencePrefix.Length..], out var imageId) && imageId != Guid.Empty)
-                imageIds.Add(imageId);
-            else
-                issues.Add(new ClinicSiteConfigIssue(path, Reasons.ImageReferenceNotAllowed));
-            return;
-        }
-
-        if (AlwaysRejectedSchemes.Any(s => compact.StartsWith(s, StringComparison.Ordinal)) || HasDisallowedAbsoluteScheme(compact))
-        {
-            issues.Add(new ClinicSiteConfigIssue(path, Reasons.LinkSchemeNotAllowed));
-            return;
-        }
-
-        if (key is null)
-            return;
-
-        if (IsImageKey(key))
-        {
-            if (!IsStockReference(compact))
-                issues.Add(new ClinicSiteConfigIssue(path, Reasons.ImageReferenceNotAllowed));
-        }
-        else if (IsLinkKey(key) && ReadScheme(compact) is { } scheme && !AllowedLinkSchemes.Contains(scheme))
-        {
-            issues.Add(new ClinicSiteConfigIssue(path, Reasons.LinkSchemeNotAllowed));
         }
     }
 
@@ -231,18 +192,25 @@ public sealed class ClinicSiteConfig
         => ImageKeys.Contains(key, StringComparer.OrdinalIgnoreCase)
            || key.EndsWith(ImageKeySuffix, StringComparison.Ordinal);
 
-    /// <summary>Kaçış ve gizleme denemelerine karşı: tarayıcının yok saydığı boşluk ve denetim karakterleri atılır, küçük harfe iner.</summary>
+    /// <summary>
+    /// Kaçış ve gizleme denemelerine karşı karşılaştırma biçimi: boşluk, denetim ve biçim (Unicode Cf, ör. U+FEFF, U+200B)
+    /// karakterleri atılır, küçük harfe iner.
+    /// </summary>
     private static string Compact(string value)
     {
         var result = new StringBuilder(value.Length);
-        foreach (var ch in value)
+        foreach (var rune in value.EnumerateRunes())
         {
-            if (!char.IsWhiteSpace(ch) && !char.IsControl(ch))
-                result.Append(char.ToLowerInvariant(ch));
+            if (!Rune.IsWhiteSpace(rune) && !Rune.IsControl(rune) && !IsFormat(rune))
+                result.Append(Rune.ToLowerInvariant(rune).ToString());
         }
 
         return result.ToString();
     }
+
+    private static bool IsFormat(Rune rune) => Rune.GetUnicodeCategory(rune) == UnicodeCategory.Format;
+
+    private static bool HasFormatCharacter(string value) => value.EnumerateRunes().Any(IsFormat);
 
     private static bool HasDisallowedAbsoluteScheme(string compact)
         => compact.Contains("://", StringComparison.Ordinal)
@@ -274,5 +242,141 @@ public sealed class ClinicSiteConfig
         return stockKey.Length > 0
                && !stockKey.Contains("..", StringComparison.Ordinal)
                && stockKey.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-' or '_' or '/' or '.');
+    }
+
+    /// <summary>Ağaç taraması: yol parçaları yığında tutulur, metne yalnız sorun anında çevrilir.</summary>
+    private sealed class Walker
+    {
+        private readonly List<(string? Name, int Index)> _path = [];
+        private int _nodes;
+        private bool _stopped;
+
+        public List<ClinicSiteConfigIssue> Issues { get; } = [];
+
+        public HashSet<Guid> ImageIds { get; } = [];
+
+        public void Report(ClinicSiteConfigIssue issue)
+        {
+            Issues.Add(issue);
+            if (Issues.Count >= MaxReportedIssues)
+                _stopped = true;
+        }
+
+        public void Visit(JsonElement element, string? key)
+        {
+            if (_stopped)
+                return;
+
+            if (++_nodes > MaxNodes)
+            {
+                StopAsTooComplex();
+                return;
+            }
+
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    VisitObject(element);
+                    break;
+                case JsonValueKind.Array:
+                    VisitArray(element, key);
+                    break;
+                case JsonValueKind.String:
+                    CheckText(element.GetString()!, key);
+                    break;
+            }
+        }
+
+        private void VisitObject(JsonElement element)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (_stopped)
+                    return;
+
+                var name = property.Name;
+                if (name.Length > MaxPropertyNameLength)
+                {
+                    StopAsTooComplex();
+                    return;
+                }
+
+                _path.Add((name, 0));
+                Visit(property.Value, name);
+                _path.RemoveAt(_path.Count - 1);
+            }
+        }
+
+        private void VisitArray(JsonElement element, string? key)
+        {
+            var index = 0;
+            foreach (var item in element.EnumerateArray())
+            {
+                if (_stopped)
+                    return;
+
+                _path.Add((null, index++));
+                Visit(item, key);
+                _path.RemoveAt(_path.Count - 1);
+            }
+        }
+
+        private void CheckText(string value, string? key)
+        {
+            var compact = Compact(value);
+            if (compact.Length == 0)
+                return;
+
+            if (compact.StartsWith(ImageReferencePrefix, StringComparison.Ordinal))
+            {
+                if (Guid.TryParse(compact[ImageReferencePrefix.Length..], out var imageId) && imageId != Guid.Empty)
+                    ImageIds.Add(imageId);
+                else
+                    ReportHere(Reasons.ImageReferenceNotAllowed);
+                return;
+            }
+
+            if (AlwaysRejectedSchemes.Any(s => compact.StartsWith(s, StringComparison.Ordinal)) || HasDisallowedAbsoluteScheme(compact))
+            {
+                ReportHere(Reasons.LinkSchemeNotAllowed);
+                return;
+            }
+
+            if (key is null)
+                return;
+
+            if (IsImageKey(key))
+            {
+                if (!IsStockReference(compact) || HasFormatCharacter(value))
+                    ReportHere(Reasons.ImageReferenceNotAllowed);
+            }
+            else if (IsLinkKey(key)
+                     && (HasFormatCharacter(value) || (ReadScheme(compact) is { } scheme && !AllowedLinkSchemes.Contains(scheme))))
+            {
+                ReportHere(Reasons.LinkSchemeNotAllowed);
+            }
+        }
+
+        private void ReportHere(string reason) => Report(new ClinicSiteConfigIssue(BuildPath(), reason));
+
+        private void StopAsTooComplex()
+        {
+            Issues.Add(new ClinicSiteConfigIssue(RootPath, Reasons.TooComplex));
+            _stopped = true;
+        }
+
+        private string BuildPath()
+        {
+            var path = new StringBuilder(RootPath);
+            foreach (var (name, index) in _path)
+            {
+                if (name is null)
+                    path.Append('[').Append(index).Append(']');
+                else
+                    path.Append('.').Append(name);
+            }
+
+            return path.ToString();
+        }
     }
 }

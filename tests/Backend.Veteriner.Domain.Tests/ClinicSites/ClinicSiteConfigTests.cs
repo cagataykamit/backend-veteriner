@@ -188,6 +188,67 @@ public sealed class ClinicSiteConfigTests
             "seo":{"slug":"baska-adres"}
             """), "$.seo.slug", ClinicSiteConfig.Reasons.ClinicRecordField);
 
+    [Theory]
+    [InlineData("""{"schemaVersion":1,"a":"\uD800"}""")]
+    [InlineData("""{"schemaVersion":1,"\uD800":"a"}""")]
+    [InlineData("""{"schemaVersion":1,"a":["\uDC00x"]}""")]
+    public void Parse_Should_Reject_Unpaired_Surrogate_As_Validation_Error(string json)
+        => ShouldFail(json, "$", ClinicSiteConfig.Reasons.InvalidJson);
+
+    [Theory]
+    [InlineData("\\uFEFFjavascript:alert(1)")]
+    [InlineData("java\\u200Bscript:alert(1)")]
+    [InlineData("\\u00ADjavascript:alert(1)")]
+    [InlineData("\\u202Ejavascript:alert(1)")]
+    [InlineData("\\uDB40\\uDC01javascript:alert(1)")]
+    public void Parse_Should_Not_Be_Fooled_By_Format_Characters(string value)
+        => ShouldFail(Config($"\"design\":{{\"x\":\"{value}\"}}"), "$.design.x", ClinicSiteConfig.Reasons.LinkSchemeNotAllowed);
+
+    [Theory]
+    [InlineData("mapUrl", "https://orn\\u200Bek.example.com", ClinicSiteConfig.Reasons.LinkSchemeNotAllowed)]
+    [InlineData("website", "\\uFEFFornek.example.com", ClinicSiteConfig.Reasons.LinkSchemeNotAllowed)]
+    [InlineData("logo", "stock:ke\\u200Bdi", ClinicSiteConfig.Reasons.ImageReferenceNotAllowed)]
+    public void Parse_Should_Reject_Format_Characters_In_Link_And_Image_Fields(string key, string value, string reason)
+        => ShouldFail(Config($"\"{key}\":\"{value}\""), $"$.{key}", reason);
+
+    [Fact]
+    public void Parse_Should_Allow_Format_Characters_In_Free_Text()
+        => ClinicSiteConfig.Parse(Config("\"content\":{\"body\":\"Aile \\uD83D\\uDC68\\u200D\\uD83D\\uDC69 dostları\"}")).IsSuccess.Should().BeTrue();
+
+    [Fact]
+    public void Parse_Should_Reject_Too_Many_Nodes()
+    {
+        var items = string.Join(',', Enumerable.Repeat("1", ClinicSiteConfig.MaxNodes + 1));
+        ShouldFail(Config($"\"x\":[{items}]"), "$", ClinicSiteConfig.Reasons.TooComplex);
+    }
+
+    [Fact]
+    public void Parse_Should_Reject_Long_Property_Name()
+    {
+        var name = new string('a', ClinicSiteConfig.MaxPropertyNameLength + 1);
+        ShouldFail(Config($"\"{name}\":1"), "$", ClinicSiteConfig.Reasons.TooComplex);
+        ClinicSiteConfig.Parse(Config($"\"{new string('a', ClinicSiteConfig.MaxPropertyNameLength)}\":1")).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Parse_Should_Build_Path_Only_For_The_Offending_Value()
+        => ShouldFail(
+            Config("""
+                "content":{"a":[{"b":"x"},{"mapUrl":"ftp://y"}]}
+                """),
+            "$.content.a[1].mapUrl",
+            ClinicSiteConfig.Reasons.LinkSchemeNotAllowed);
+
+    [Fact]
+    public void Parse_Should_Stop_At_Issue_Limit()
+    {
+        var items = string.Join(',', Enumerable.Repeat("\"javascript:x\"", 1000));
+
+        var result = ClinicSiteConfig.Parse(Config($"\"x\":[{items}]"));
+
+        ((IReadOnlyCollection<ClinicSiteConfigIssue>)result.Error.Extensions!["issues"]!).Should().HaveCount(ClinicSiteConfig.MaxReportedIssues);
+    }
+
     [Fact]
     public void ValidationError_Should_Cap_Reported_Issues()
     {
