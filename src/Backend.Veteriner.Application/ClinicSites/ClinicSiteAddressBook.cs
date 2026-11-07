@@ -83,6 +83,16 @@ public sealed class ClinicSiteAddressBook
             return Result.Failure(ClinicSiteErrors.SlugTaken);
 
         var current = own.FirstOrDefault(a => a.RetiredAtUtc is null);
+
+        // Sınır aşılınca en eskisi serbest bırakılmaz: adres yeniden kapılabilir olurdu, eski bağlantı da kırılırdı.
+        var retiredAfterChange = own.Count(a => a.RetiredAtUtc is not null && a != target) + (site.IsPublished && current is not null ? 1 : 0);
+        if (retiredAfterChange > ClinicSite.MaxRetiredAddresses)
+            return Result.Failure(ClinicSiteErrors.AddressLimitReached);
+
+        var changed = site.ChangeSlug(slug, utcNow);
+        if (!changed.IsSuccess)
+            return changed;
+
         if (current is not null)
         {
             if (site.IsPublished)
@@ -96,7 +106,6 @@ public sealed class ClinicSiteAddressBook
         else
             target.Reactivate();
 
-        site.ChangeSlug(slug, utcNow);
         return Result.Success();
     }
 }

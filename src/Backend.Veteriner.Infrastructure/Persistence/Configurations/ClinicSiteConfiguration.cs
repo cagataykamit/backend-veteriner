@@ -24,6 +24,8 @@ public sealed class ClinicSiteConfiguration : IEntityTypeConfiguration<ClinicSit
         b.Property(x => x.PublishedVersionNumber);
         b.Property(x => x.PublishedAtUtc);
         b.Property(x => x.IsTemporarilyClosed).IsRequired();
+        b.Property(x => x.AddressChangeWindowStartedAtUtc);
+        b.Property(x => x.AddressChangesInWindow).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
 

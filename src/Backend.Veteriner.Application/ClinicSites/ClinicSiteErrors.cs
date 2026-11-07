@@ -10,6 +10,13 @@ public static class ClinicSiteErrors
     /// <summary>Adres benzersizliği: <c>IX_ClinicSiteAddresses_Slug</c> ve <c>IX_ClinicSites_Slug</c>; yarışta ikisinden biri yakalar.</summary>
     private static readonly string[] SlugIndexNames = ["IX_ClinicSiteAddresses_Slug", "IX_ClinicSites_Slug"];
 
+    /// <summary>Çift tıklamada iki yayın aynı sürüm numarasını yazar; hangisi önce çalışırsa diğeri bu indekse takılır.</summary>
+    private const string VersionNumberIndexName = "IX_ClinicSiteVersions_TenantId_SiteId_VersionNumber";
+
+    public static readonly Error AddressLimitReached = new(
+        "ClinicSites.AddressLimitReached",
+        $"Bir sitenin en çok {ClinicSite.MaxRetiredAddresses} eski adresi olabilir; yeni adres yerine eski adreslerinizden birine dönebilirsiniz.");
+
     public static readonly Error NotFound =
         new("ClinicSites.NotFound", "Bu klinik için site oluşturulmamış.");
 
@@ -61,11 +68,15 @@ public static class ClinicSiteErrors
         "Görsel taslakta ya da yayındaki sürümde kullanılıyor; önce oradan kaldırın.",
         new Dictionary<string, object?> { ["usedIn"] = usedIn });
 
-    public static bool IsSlugViolation(DbUpdateException ex)
+    public static bool IsSlugViolation(DbUpdateException ex) => MentionsAny(ex, SlugIndexNames);
+
+    public static bool IsVersionNumberViolation(DbUpdateException ex) => MentionsAny(ex, VersionNumberIndexName);
+
+    private static bool MentionsAny(DbUpdateException ex, params string[] indexNames)
     {
         for (var e = ex.InnerException; e is not null; e = e.InnerException)
         {
-            if (SlugIndexNames.Any(name => e.Message.Contains(name, StringComparison.OrdinalIgnoreCase)))
+            if (indexNames.Any(name => e.Message.Contains(name, StringComparison.OrdinalIgnoreCase)))
                 return true;
         }
 

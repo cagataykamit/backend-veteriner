@@ -169,6 +169,46 @@ public sealed class ClinicSiteTests
     }
 
     [Fact]
+    public void Version_List_Search_Should_Match_Whole_Ids_Only()
+    {
+        var referenced = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var list = $"{other:N},{referenced:N}";
+
+        ClinicSiteVersion.ListContainsImage(list, referenced).Should().BeTrue();
+        ClinicSiteVersion.ListContainsImage(list, Guid.NewGuid()).Should().BeFalse();
+        ClinicSiteVersion.ListContainsImage(string.Empty, referenced).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ChangeSlug_Should_Not_Limit_Unpublished_Site()
+    {
+        var site = NewSite();
+
+        for (var i = 0; i < ClinicSite.MaxAddressChangesPerDay + 2; i++)
+            site.ChangeSlug($"adres-{i}", Now).IsSuccess.Should().BeTrue();
+
+        site.AddressChangesInWindow.Should().Be(0);
+    }
+
+    [Fact]
+    public void ChangeSlug_Should_Enforce_Daily_Limit_On_Published_Site()
+    {
+        var site = NewSite();
+        site.Publish(UserId, Now);
+
+        for (var i = 0; i < ClinicSite.MaxAddressChangesPerDay; i++)
+            site.ChangeSlug($"adres-{i}", Now.AddMinutes(i)).IsSuccess.Should().BeTrue();
+
+        var blocked = site.ChangeSlug("adres-fazla", Now.AddHours(23));
+        blocked.Error.Code.Should().Be(ClinicSite.AddressChangeLimitReachedCode);
+        site.Slug.Should().Be($"adres-{ClinicSite.MaxAddressChangesPerDay - 1}");
+
+        site.ChangeSlug("adres-yarin", Now.AddDays(1)).IsSuccess.Should().BeTrue("pencere doldu");
+        site.AddressChangesInWindow.Should().Be(1);
+    }
+
+    [Fact]
     public void PublishRequirements_Should_List_What_Is_Missing()
     {
         var clinic = new Clinic(TenantId, "Merkez", "İstanbul");

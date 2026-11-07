@@ -215,10 +215,10 @@ public sealed class ClinicSiteController : ControllerBase
         return (await _mediator.Send(new GetClinicSiteImageContentQuery(clinicId, imageId), ct)).ToPrivateImage(this);
     }
 
-    /// <summary>Görseli siler; taslakta ya da yayındaki sürümde kullanılıyorsa 409.</summary>
+    /// <summary>Görseli siler; taslakta ya da yayındaki sürümde kullanılıyorsa 409. Yanıttaki <c>rowVersion</c> sonraki yazmada kullanılır.</summary>
     [HttpDelete("images/{imageId:guid}")]
     [Authorize(Policy = PermissionCatalog.Clinics.Update)]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ClinicSiteStateDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]

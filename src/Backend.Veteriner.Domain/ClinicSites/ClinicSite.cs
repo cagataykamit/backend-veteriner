@@ -12,6 +12,14 @@ public sealed class ClinicSite : ITenantOwned
     /// <summary>Saklanan sürüm sayısı (K2); yayında en eskisi düşer, yayındaki sürüm hep en yenisidir.</summary>
     public const int MaxRetainedVersions = 30;
 
+    /// <summary>Site başına eski adres sınırı (K10): adres kapmayı önler; en eskisi serbest bırakılmaz, değişiklik reddedilir.</summary>
+    public const int MaxRetiredAddresses = 5;
+
+    /// <summary>Yayınlanmış sitede 24 saatte adres değişikliği sınırı (K10). Yayınlanmamış adres paylaşılmadığı için sayılmaz.</summary>
+    public const int MaxAddressChangesPerDay = 3;
+
+    public const string AddressChangeLimitReachedCode = "ClinicSites.AddressChangeLimitReached";
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
@@ -32,6 +40,11 @@ public sealed class ClinicSite : ITenantOwned
 
     /// <summary>Kliniğin elle verdiği geçici kapatma (K9).</summary>
     public bool IsTemporarilyClosed { get; private set; }
+
+    /// <summary>Adres değişikliği sayacının 24 saatlik penceresinin başlangıcı.</summary>
+    public DateTime? AddressChangeWindowStartedAtUtc { get; private set; }
+
+    public int AddressChangesInWindow { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
@@ -105,13 +118,34 @@ public sealed class ClinicSite : ITenantOwned
         return Result<ClinicSiteVersion>.Success(version);
     }
 
-    public void ChangeSlug(string slug, DateTime utcNow)
+    /// <summary>Adresi değiştirir; yayınlanmış sitede günlük sınır uygulanır.</summary>
+    public Result ChangeSlug(string slug, DateTime utcNow)
     {
         if (ClinicSiteSlug.Check(slug) != ClinicSiteSlugCheck.Valid)
             throw new ArgumentException("Adres geçersiz.", nameof(slug));
 
+        if (IsPublished)
+        {
+            var windowExpired = AddressChangeWindowStartedAtUtc is not { } started || utcNow - started >= TimeSpan.FromDays(1);
+            if (windowExpired)
+            {
+                AddressChangeWindowStartedAtUtc = utcNow;
+                AddressChangesInWindow = 0;
+            }
+
+            if (AddressChangesInWindow >= MaxAddressChangesPerDay)
+            {
+                return Result.Failure(
+                    AddressChangeLimitReachedCode,
+                    $"Adres bir günde en çok {MaxAddressChangesPerDay} kez değiştirilebilir; yarın tekrar deneyin.");
+            }
+
+            AddressChangesInWindow++;
+        }
+
         Slug = slug;
         UpdatedAtUtc = utcNow;
+        return Result.Success();
     }
 
     public void Close(DateTime utcNow)

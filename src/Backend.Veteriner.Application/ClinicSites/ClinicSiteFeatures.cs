@@ -616,6 +616,10 @@ internal static class ClinicSiteWrites
         {
             return Result<ClinicSiteStateDto>.Failure(ClinicSiteErrors.ConcurrencyConflict);
         }
+        catch (DbUpdateException ex) when (ClinicSiteErrors.IsVersionNumberViolation(ex))
+        {
+            return Result<ClinicSiteStateDto>.Failure(ClinicSiteErrors.ConcurrencyConflict);
+        }
 
         return Result<ClinicSiteStateDto>.Success(ClinicSiteMapping.ToState(site));
     }

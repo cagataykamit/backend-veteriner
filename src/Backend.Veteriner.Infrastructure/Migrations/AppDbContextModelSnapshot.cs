@@ -1646,6 +1646,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("AddressChangeWindowStartedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("AddressChangesInWindow")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 

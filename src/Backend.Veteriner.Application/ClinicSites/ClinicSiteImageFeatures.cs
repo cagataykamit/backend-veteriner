@@ -22,9 +22,12 @@ public sealed record UploadClinicSiteImageCommand(Guid ClinicId, long Length, St
     public string? AuditTarget => $"ClinicId={ClinicId}";
 }
 
-/// <summary>Görseli siler; taslakta ya da yayındaki sürümde kullanılıyorsa 409. Eski sürümlerdeki başvuru silmeyi engellemez.</summary>
+/// <summary>
+/// Görseli siler; taslakta ya da yayındaki sürümde kullanılıyorsa 409. Eski sürümlerdeki başvuru silmeyi engellemez. Site satırı
+/// da yazılır: arada kaydedilen taslak ya da yayın <c>rowVersion</c>'a çarpar, canlı görsel kırılmaz. Yanıt güncel durumdur.
+/// </summary>
 public sealed record DeleteClinicSiteImageCommand(Guid ClinicId, Guid ImageId)
-    : IRequest<Result>, IAuditableRequest
+    : IRequest<Result<ClinicSiteStateDto>>, IAuditableRequest
 {
     public string AuditAction => "ClinicSite.Image.Delete";
     public string? AuditTarget => $"ClinicId={ClinicId};ImageId={ImageId}";
@@ -192,14 +195,14 @@ public sealed class UploadClinicSiteImageCommandHandler : IRequestHandler<Upload
         => Result<ClinicSiteImageDto>.Failure(code, message);
 }
 
-public sealed class DeleteClinicSiteImageCommandHandler : IRequestHandler<DeleteClinicSiteImageCommand, Result>
+public sealed class DeleteClinicSiteImageCommandHandler : IRequestHandler<DeleteClinicSiteImageCommand, Result<ClinicSiteStateDto>>
 {
     private const string UsedInDraft = "draft";
     private const string UsedInPublished = "published";
 
     private readonly ClinicDefinitionAccess _access;
     private readonly IClientContext _clientContext;
-    private readonly IReadRepository<ClinicSite> _sites;
+    private readonly IRepository<ClinicSite> _sites;
     private readonly IReadRepository<ClinicSiteVersion> _versions;
     private readonly IRepository<ClinicSiteImage> _images;
     private readonly IFileStorage _storage;
@@ -209,7 +212,7 @@ public sealed class DeleteClinicSiteImageCommandHandler : IRequestHandler<Delete
     public DeleteClinicSiteImageCommandHandler(
         ClinicDefinitionAccess access,
         IClientContext clientContext,
-        IReadRepository<ClinicSite> sites,
+        IRepository<ClinicSite> sites,
         IReadRepository<ClinicSiteVersion> versions,
         IRepository<ClinicSiteImage> images,
         IFileStorage storage,
@@ -226,27 +229,31 @@ public sealed class DeleteClinicSiteImageCommandHandler : IRequestHandler<Delete
         _logger = logger;
     }
 
-    public async ValueTask<Result> Handle(DeleteClinicSiteImageCommand request, CancellationToken ct)
+    public async ValueTask<Result<ClinicSiteStateDto>> Handle(DeleteClinicSiteImageCommand request, CancellationToken ct)
     {
         var access = await _access.EnsureWriteAccessAsync(request.ClinicId, ct);
         if (!access.IsSuccess)
-            return Result.Failure(access.Error);
+            return Result<ClinicSiteStateDto>.Failure(access.Error);
         var tenantId = access.Value;
 
         var site = await _sites.FirstOrDefaultAsync(new ClinicSiteByClinicUntrackedSpec(tenantId, request.ClinicId), ct);
         if (site is null)
-            return Result.Failure(ClinicSiteErrors.NotFound);
+            return Result<ClinicSiteStateDto>.Failure(ClinicSiteErrors.NotFound);
 
         var image = await _images.FirstOrDefaultAsync(new ClinicSiteImageByIdSpec(tenantId, site.Id, request.ImageId), ct);
         if (image is null)
-            return Result.Failure(ClinicSiteErrors.ImageNotFound);
+            return Result<ClinicSiteStateDto>.Failure(ClinicSiteErrors.ImageNotFound);
 
         var usedIn = await FindUsageAsync(tenantId, site, request.ImageId, ct);
         if (usedIn.Count > 0)
-            return Result.Failure(ClinicSiteErrors.ImageInUse(usedIn));
+            return Result<ClinicSiteStateDto>.Failure(ClinicSiteErrors.ImageInUse(usedIn));
 
         image.MarkDeleted(_clientContext.UserId!.Value, _timeProvider.GetUtcNow().UtcDateTime);
-        await _images.SaveChangesAsync(ct);
+
+        // Yarış: kullanım denetiminden sonra taslak ya da yayın başvuru eklediyse site satırının sürümü değişmiştir, kayıt 409 olur.
+        var saved = await ClinicSiteWrites.SaveAsync(_sites, site, ct);
+        if (!saved.IsSuccess)
+            return saved;
 
         // Kayıt kapandı, görsel artık sunulmaz; içerik silinemezse yalnız disk artığı kalır.
         try
@@ -258,7 +265,7 @@ public sealed class DeleteClinicSiteImageCommandHandler : IRequestHandler<Delete
             _logger.LogWarning("Site image content delete failed. ImageId={ImageId} Exception={ExceptionType}", image.Id, ex.GetType().FullName);
         }
 
-        return Result.Success();
+        return saved;
     }
 
     private async Task<IReadOnlyList<string>> FindUsageAsync(Guid tenantId, ClinicSite site, Guid imageId, CancellationToken ct)
