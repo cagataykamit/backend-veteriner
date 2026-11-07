@@ -9,11 +9,13 @@ using Backend.Veteriner.Application;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.ExternalApi;
 using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Application.OwnerPortal;
 using Backend.Veteriner.Infrastructure;
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Security;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -213,7 +215,9 @@ public static class WebApplicationBuilderExtensions
 
                     NameClaimType = JwtRegisteredClaimNames.Sub,
                 };
-            });
+            })
+            // Dış API (TIER-009): kiracıya özel anahtar, ayrı şema. Yalnız dış API politikası bu şemayı kullanır.
+            .AddScheme<AuthenticationSchemeOptions, ExternalApiKeyAuthenticationHandler>(ExternalApiAuth.Scheme, null);
 
         builder.Services.AddPermissionAuthorization();
 

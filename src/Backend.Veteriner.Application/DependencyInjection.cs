@@ -20,6 +20,7 @@ using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Application.LabResults.Access;
+using Backend.Veteriner.Application.ExternalApi;
 using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Invites;
 using Backend.Veteriner.Application.OwnerPortal.Sessions;
@@ -89,6 +90,9 @@ public static class DependencyInjection
         services.AddScoped<OwnerPortalInviteResolver>();
         services.AddScoped<OwnerPortalSessionIssuer>();
         services.AddScoped<OwnerPortalCodeService>();
+
+        // Dış API (TIER-009): anahtar doğrulama, kiracı bağlama ve paket kapısı.
+        services.AddScoped<ExternalApiAccess>();
 
         // Veri içe aktarma (ADR-019): dosya okuma, katalog çözümü, parti yanıtı sütun bilgisi.
         services.AddOptions<ImportFileLimits>();

@@ -226,6 +226,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // API anahtarı (TIER-009): etkin anahtar sınırı dolu ya da anahtar zaten iptal edilmiş.
+        if (normalized is "apikeys.limitreached" or "apikeys.alreadyrevoked")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Pasif oda/bölüm yeni yatışa atanamaz (HOSP-002): tanımın durumu ile çakışma.
         if (normalized is "hospitalizations.roominactive")
         {
