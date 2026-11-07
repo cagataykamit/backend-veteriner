@@ -14,7 +14,7 @@ using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Infrastructure.Reminders;
 
-public sealed class ReminderProcessorService
+public sealed partial class ReminderProcessorService
 {
     private readonly AppDbContext _db;
     private readonly ITenantScope _tenantScope;
@@ -50,7 +50,10 @@ public sealed class ReminderProcessorService
 
         // Hatırlatması açık kiracıları bulmak kiracılar arasıdır (ADR-040); her kiracının işi kendi kapsamında döner.
         List<TenantReminderSettings> settingsRows;
+        List<ClinicReminderRule> ruleRows;
+        HashSet<Guid> emailDisabledTenantIds;
         List<Guid> activeTenantIds;
+        Guid[] tenantIds;
         Dictionary<Guid, TenantSubscription> subscriptionsByTenant;
         using (_tenantScope.AsSystem())
         {
@@ -59,7 +62,16 @@ public sealed class ReminderProcessorService
                 .Where(x => x.EmailChannelEnabled && (x.AppointmentRemindersEnabled || x.VaccinationRemindersEnabled))
                 .ToListAsync(ct);
 
-            var tenantIds = settingsRows.Select(x => x.TenantId).Distinct().ToArray();
+            // Otomatik hatırlatıcı (TIER-003): kural kliniğe bağlıdır, randevu/aşı anahtarından bağımsızdır; e-posta kanalı kiracı ayarıdır (kayıt yoksa açık).
+            ruleRows = await _db.ClinicReminderRules.AsNoTracking().Where(r => r.IsEnabled).ToListAsync(ct);
+            emailDisabledTenantIds = (await _db.TenantReminderSettings
+                    .AsNoTracking()
+                    .Where(x => !x.EmailChannelEnabled)
+                    .Select(x => x.TenantId)
+                    .ToListAsync(ct))
+                .ToHashSet();
+
+            tenantIds = settingsRows.Select(x => x.TenantId).Concat(ruleRows.Select(r => r.TenantId)).Distinct().ToArray();
             activeTenantIds = await _db.Tenants
                 .AsNoTracking()
                 .Where(t => tenantIds.Contains(t.Id) && t.IsActive)
@@ -73,23 +85,24 @@ public sealed class ReminderProcessorService
             subscriptionsByTenant = subscriptions.ToDictionary(x => x.TenantId);
         }
 
-        foreach (var settings in settingsRows)
+        foreach (var tenantId in tenantIds)
         {
-            using var tenant = _tenantScope.UseTenant(settings.TenantId);
-            if (!activeTenantIds.Contains(settings.TenantId))
+            using var tenant = _tenantScope.UseTenant(tenantId);
+            if (!activeTenantIds.Contains(tenantId))
                 continue;
 
-            if (!subscriptionsByTenant.TryGetValue(settings.TenantId, out var sub))
+            if (!subscriptionsByTenant.TryGetValue(tenantId, out var sub))
                 continue;
 
             var effective = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, nowUtc);
             if (!TenantSubscriptionEffectiveWriteEvaluator.WriteAllowed(effective))
                 continue;
 
-            // Deneme kiracısında günlük e-posta tavanı (TRIAL-004); randevu ve aşı hatırlatmaları aynı bütçeyi paylaşır.
-            var dailyBudget = await LoadDailyEmailBudgetAsync(settings.TenantId, sub, nowUtc, ct);
+            // Deneme kiracısında günlük e-posta tavanı (TRIAL-004); randevu, aşı ve otomatik hatırlatıcı aynı bütçeyi paylaşır.
+            var dailyBudget = await LoadDailyEmailBudgetAsync(tenantId, sub, nowUtc, ct);
 
-            if (settings.AppointmentRemindersEnabled)
+            var settings = settingsRows.FirstOrDefault(x => x.TenantId == tenantId);
+            if (settings is { AppointmentRemindersEnabled: true })
             {
                 await ProcessAppointmentRemindersAsync(
                     settings.TenantId,
@@ -100,7 +113,7 @@ public sealed class ReminderProcessorService
                     ct);
             }
 
-            if (settings.VaccinationRemindersEnabled)
+            if (settings is { VaccinationRemindersEnabled: true })
             {
                 await ProcessVaccinationRemindersAsync(
                     settings.TenantId,
@@ -109,6 +122,13 @@ public sealed class ReminderProcessorService
                     batchSize,
                     dailyBudget,
                     ct);
+            }
+
+            // Paket düşünce kurallar silinmez, yalnız çalışmaz (PLAN_FEATURES_API_CONTRACT.md §4).
+            if (!emailDisabledTenantIds.Contains(tenantId) && TenantPlanFeatureEvaluator.IsEnabled(sub, PlanFeature.AutomatedReminders))
+            {
+                foreach (var rule in ruleRows.Where(r => r.TenantId == tenantId))
+                    await ProcessAutomatedRuleAsync(rule, nowUtc, batchSize, dailyBudget, ct);
             }
         }
 

@@ -331,7 +331,10 @@ public sealed class ExampleClinicDataCleaner : IExampleClinicCleaner
                 || (x.OwnerType == StoredFileOwnerType.LabResult && LabResults.Select(l => l.Id).Contains(x.OwnerId))));
         public IQueryable<ReminderDispatchLog> ReminderLogs => db.ReminderDispatchLogs.Where(x => x.TenantId == TenantId
             && ((x.SourceEntityType == ReminderSourceEntityType.Appointment && Appointments.Select(a => a.Id).Contains(x.SourceEntityId))
-                || (x.SourceEntityType == ReminderSourceEntityType.Vaccination && Vaccinations.Select(v => v.Id).Contains(x.SourceEntityId))));
+                || (x.SourceEntityType == ReminderSourceEntityType.Vaccination && Vaccinations.Select(v => v.Id).Contains(x.SourceEntityId))
+                || (x.SourceEntityType == ReminderSourceEntityType.Treatment && Treatments.Select(t => t.Id).Contains(x.SourceEntityId))
+                || (x.SourceEntityType == ReminderSourceEntityType.Charge && Charges.Select(c => c.Id).Contains(x.SourceEntityId))
+                || (x.SourceEntityType == ReminderSourceEntityType.Pet && PetIds.Contains(x.SourceEntityId))));
 
         public IQueryable<Product> DeletableProducts => db.Products.Where(x => x.TenantId == TenantId && DeletableProductIds.Contains(x.Id));
         public IQueryable<StockMovement> ProductStockMovements => db.StockMovements.Where(x => x.TenantId == TenantId && DeletableProductIds.Contains(x.ProductId));
