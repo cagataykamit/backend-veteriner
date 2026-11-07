@@ -4,10 +4,13 @@ using System.Net.Http.Json;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using Ardalis.Specification.EntityFrameworkCore;
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Api.Configuration;
 using Backend.Veteriner.Api.Controllers;
 using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.ClinicSites;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clinics;
@@ -17,6 +20,7 @@ using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -345,6 +349,46 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task Double_Publish_Should_Never_Return_500()
+    {
+        var ctx = await SeedAsync();
+        await SaveDraftAsync(ctx, Config());
+
+        for (var round = 0; round < 5; round++)
+        {
+            var rowVersion = await RowVersionAsync(ctx);
+            var responses = await Task.WhenAll(
+                SendAsync(HttpMethod.Post, $"{ctx.Url}/publish", ctx.Token, new { rowVersion }),
+                SendAsync(HttpMethod.Post, $"{ctx.Url}/publish", ctx.Token, new { rowVersion }));
+
+            responses.Select(r => r.StatusCode).Should().OnlyContain(s => s == HttpStatusCode.OK || s == HttpStatusCode.Conflict);
+            responses.Should().ContainSingle(r => r.StatusCode == HttpStatusCode.OK, "aynı sürümden yalnız bir yayın geçer");
+            var conflict = responses.Single(r => r.StatusCode == HttpStatusCode.Conflict);
+            (await IntegrationTestProblemDetails.ReadCodeAsync(conflict)).Should().Be("ClinicSites.ConcurrencyConflict");
+        }
+    }
+
+    [Fact]
+    public async Task Public_Queries_Should_Not_Select_Draft_Or_Config_Json()
+    {
+        await WithDbAsync(db =>
+        {
+            var tenantId = Guid.NewGuid();
+            var siteQuery = SpecificationEvaluator.Default
+                .GetQuery(db.ClinicSites, new PublicSiteRecordByIdSpec(tenantId, Guid.NewGuid()))
+                .ToQueryString();
+            siteQuery.Should().NotContain(nameof(ClinicSite.DraftConfigJson));
+
+            var imageQuery = SpecificationEvaluator.Default
+                .GetQuery(db.ClinicSiteVersions, new ClinicSiteVersionReferencedImagesSpec(tenantId, Guid.NewGuid(), 1))
+                .ToQueryString();
+            imageQuery.Should().NotContain(nameof(ClinicSiteVersion.ConfigJson));
+            imageQuery.Should().Contain(nameof(ClinicSiteVersion.ReferencedImageIds));
+            return Task.CompletedTask;
+        });
+    }
+
+    [Fact]
     public async Task Publish_Should_Reject_Inactive_Clinic()
     {
         var ctx = await SeedAsync();
@@ -394,6 +438,19 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
             await SendAsync(HttpMethod.Put, $"{ctx.Url}/draft", ctx.Token, new { }),
             HttpStatusCode.BadRequest,
             "ClinicSites.Validation");
+    }
+
+    [Fact]
+    public async Task Draft_Should_Return_400_For_Unpaired_Surrogate()
+    {
+        var ctx = await SeedAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"{ctx.Url}/draft")
+        {
+            Content = new StringContent("""{"config":{"schemaVersion":1,"a":"\uD800"}}""", Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        await ShouldFailAsync(await _client.SendAsync(request), HttpStatusCode.BadRequest, "ClinicSites.Validation");
     }
 
     [Fact]
@@ -583,6 +640,96 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
             db.ClinicSiteAddresses.Add(ClinicSiteAddress.Create(b.TenantId, siteId, slug, DateTime.UtcNow));
             await FluentActions.Awaiting(() => db.SaveChangesAsync()).Should().ThrowAsync<DbUpdateException>();
         });
+    }
+
+    [Fact]
+    public async Task Old_Address_Of_Closed_Site_Should_Look_Closed_And_Serve_No_Image()
+    {
+        var ctx = await SeedAsync();
+        await SaveDraftAsync(ctx, Config());
+        var image = await UploadOkAsync(ctx);
+        await UpdateDraftAsync(ctx, Config(imageId: image));
+        var oldSlug = (await PublishAsync(ctx)).GetProperty("slug").GetString()!;
+        var newSlug = $"yeni-yer-{Guid.NewGuid():N}"[..24];
+        await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = newSlug }));
+        var imageUrl = $"/api/v1/public/sites/{oldSlug}/images/{image}";
+
+        (await PublicJsonAsync(oldSlug)).GetProperty("status").GetString().Should().Be("Redirect");
+        (await _client.GetAsync(imageUrl)).StatusCode.Should().Be(HttpStatusCode.OK, "açık sitede eski adres görsel sunar");
+
+        async Task ShouldLookClosedAsync()
+        {
+            var body = await (await PublicAsync(oldSlug)).Content.ReadAsStringAsync();
+            var json = JsonDocument.Parse(body).RootElement;
+            json.GetProperty("status").GetString().Should().Be("Closed");
+            json.GetProperty("redirectToSlug").ValueKind.Should().Be(JsonValueKind.Null);
+            body.Should().NotContain(newSlug, "kapalı site yeni adresini açıklamaz");
+            (await _client.GetAsync(imageUrl)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        }
+
+        await OkJsonAsync(await SendAsync(HttpMethod.Post, $"{ctx.Url}/close", ctx.Token));
+        await ShouldLookClosedAsync();
+        await OkJsonAsync(await SendAsync(HttpMethod.Post, $"{ctx.Url}/reopen", ctx.Token));
+        (await PublicJsonAsync(oldSlug)).GetProperty("redirectToSlug").GetString().Should().Be(newSlug);
+
+        await ExpireTrialAsync(ctx.TenantId);
+        await ShouldLookClosedAsync();
+
+        await PayAsync(ctx.TenantId);
+        (await PublicJsonAsync(oldSlug)).GetProperty("redirectToSlug").GetString().Should().Be(newSlug);
+        (await _client.GetAsync(imageUrl)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Retired_Address_Limit_Should_Block_New_Address_But_Keep_Oldest_Reserved()
+    {
+        var ctx = await SeedAsync();
+        var first = await PublishNewSiteAsync(ctx);
+
+        Task ResetDailyWindowAsync() => WithDbAsync(db => db.ClinicSites.Where(s => s.ClinicId == ctx.ClinicId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.AddressChangesInWindow, 0)));
+
+        var last = first;
+        for (var i = 0; i < ClinicSite.MaxRetiredAddresses; i++)
+        {
+            await ResetDailyWindowAsync();
+            last = $"sinir-{i}-{Guid.NewGuid():N}"[..20];
+            await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = last }));
+        }
+
+        await ResetDailyWindowAsync();
+        var overflow = await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = $"fazla-{Guid.NewGuid():N}"[..20] });
+        await ShouldFailAsync(overflow, HttpStatusCode.Conflict, "ClinicSites.AddressLimitReached");
+
+        // En eskisi serbest kalmadı: hâlâ yönlenir, başkası alamaz; site kendi eski adresine dönebilir.
+        (await PublicJsonAsync(first)).GetProperty("redirectToSlug").GetString().Should().Be(last);
+        var other = await SeedAsync();
+        (await OkJsonAsync(await SendAsync(HttpMethod.Get, $"{other.Url}/address-availability?slug={first}", other.Token)))
+            .GetProperty("reason").GetString().Should().Be("Taken");
+
+        await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = first }));
+        (await PublicJsonAsync(first)).GetProperty("status").GetString().Should().Be("Published");
+    }
+
+    [Fact]
+    public async Task Address_Change_Should_Be_Limited_Per_Day_Once_Published()
+    {
+        var ctx = await SeedAsync();
+        await PublishNewSiteAsync(ctx);
+
+        for (var i = 0; i < ClinicSite.MaxAddressChangesPerDay; i++)
+            await OkJsonAsync(await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = $"gun-{i}-{Guid.NewGuid():N}"[..20] }));
+
+        var blocked = $"gun-son-{Guid.NewGuid():N}"[..20];
+        await ShouldFailAsync(
+            await SendAsync(HttpMethod.Put, $"{ctx.Url}/address", ctx.Token, new { slug = blocked }),
+            HttpStatusCode.Conflict,
+            ClinicSite.AddressChangeLimitReachedCode);
+
+        // Reddedilen değişiklik yarım kalmaz: adres alınmamıştır.
+        var other = await SeedAsync();
+        (await OkJsonAsync(await SendAsync(HttpMethod.Get, $"{other.Url}/address-availability?slug={blocked}", other.Token)))
+            .GetProperty("isAvailable").GetBoolean().Should().BeTrue();
     }
 
     [Theory]
@@ -830,6 +977,28 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task Delete_Image_Should_Change_RowVersion_So_Racing_Writes_Conflict()
+    {
+        var ctx = await SeedAsync();
+        await SaveDraftAsync(ctx, Config());
+        var image = await UploadOkAsync(ctx);
+        var before = await RowVersionAsync(ctx);
+
+        var state = await OkJsonAsync(await SendAsync(HttpMethod.Delete, $"{ctx.Url}/images/{image}", ctx.Token));
+
+        // Görsel silinmeden önce okunmuş sürümle yapılan yayın ya da taslak kaydı silinen görseli canlıya taşıyamaz.
+        state.GetProperty("rowVersion").GetString().Should().NotBe(before);
+        await ShouldFailAsync(
+            await SendAsync(HttpMethod.Post, $"{ctx.Url}/publish", ctx.Token, new { rowVersion = before }),
+            HttpStatusCode.Conflict,
+            "ClinicSites.ConcurrencyConflict");
+        await ShouldFailAsync(
+            await SendAsync(HttpMethod.Put, $"{ctx.Url}/draft", ctx.Token, new { config = Config(imageId: image), rowVersion = before }),
+            HttpStatusCode.Conflict,
+            "ClinicSites.ConcurrencyConflict");
+    }
+
+    [Fact]
     public async Task Restored_Draft_With_Deleted_Image_Should_Save_But_Not_Publish()
     {
         var ctx = await SeedAsync();
@@ -840,7 +1009,7 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
         await UpdateDraftAsync(ctx, Config("gorselsiz"));
         await PublishAsync(ctx);
 
-        (await SendAsync(HttpMethod.Delete, $"{ctx.Url}/images/{image}", ctx.Token)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        await OkJsonAsync(await SendAsync(HttpMethod.Delete, $"{ctx.Url}/images/{image}", ctx.Token));
         (await SendAsync(HttpMethod.Get, $"{ctx.Url}/images/{image}/content", ctx.Token)).StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         await OkJsonAsync(await SendAsync(HttpMethod.Post, $"{ctx.Url}/versions/1/restore", ctx.Token, new { rowVersion = await RowVersionAsync(ctx) }));
@@ -1042,6 +1211,45 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
         type.GetCustomAttribute<AllowAnonymousAttribute>().Should().NotBeNull();
         type.GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName.Should().Be(RateLimitingExtensions.PublicSitePolicy);
         type.GetCustomAttribute<DisableRateLimitingAttribute>().Should().BeNull();
+
+        type.GetMethod(nameof(PublicSitesController.GetImage))!.GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName
+            .Should().Be(RateLimitingExtensions.PublicSiteImagePolicy);
+    }
+
+    [Fact]
+    public async Task Public_Image_Endpoint_Should_Have_Own_Higher_Limit_Outside_Global_Limiter()
+    {
+        await using var limited = _factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) =>
+            c.AddInMemoryCollection(new Dictionary<string, string?> { ["RateLimiting:Enabled"] = "true" })));
+        var client = limited.CreateClient();
+        var url = $"/api/v1/public/sites/ab/images/{Guid.NewGuid()}";
+
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 605; i++)
+            statuses.Add((await client.GetAsync(url)).StatusCode);
+
+        statuses.Take(600).Should().OnlyContain(s => s == HttpStatusCode.NotFound, "genel 200/dk tavanı görsele uygulanmaz");
+        statuses.Skip(600).Should().Contain(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public void Known_Proxies_Should_Be_Empty_By_Default_And_Configurable()
+    {
+        ForwardedHeadersOptions Apply(params string[] proxies)
+        {
+            var options = new ForwardedHeadersOptions();
+            options.KnownProxies.Clear();
+            var values = proxies.Select((p, i) => new KeyValuePair<string, string?>($"{ForwardedHeadersConfiguration.KnownProxiesKey}:{i}", p));
+            ForwardedHeadersConfiguration.Apply(options, new ConfigurationBuilder().AddInMemoryCollection(values).Build());
+            return options;
+        }
+
+        Apply().KnownProxies.Should().BeEmpty("ayar yoksa çerçevenin loopback varsayılanına bir şey eklenmez");
+        new ForwardedHeadersOptions().KnownProxies.Should().OnlyContain(ip => IPAddress.IsLoopback(ip));
+
+        Apply("10.0.0.5", "2001:db8::1").KnownProxies.Should().BeEquivalentTo([IPAddress.Parse("10.0.0.5"), IPAddress.Parse("2001:db8::1")]);
+
+        FluentActions.Invoking(() => Apply("vekil.example.com")).Should().Throw<InvalidOperationException>();
     }
 
     [Fact]

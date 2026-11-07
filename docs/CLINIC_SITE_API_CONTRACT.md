@@ -11,7 +11,7 @@ aynı biçimdedir.
 |---|---|
 | `ClinicSite` | Klinik başına bir site (K2): güncel adres, taslak yapılandırma, yayındaki sürüm numarası, geçici kapalı bayrağı, `rowVersion`. |
 | `ClinicSiteVersion` | Değişmez yayın sürümü: sıra numarası, yapılandırma, yayınlayan, zaman. Alan değişikliği EF'te hata verir. Site başına en çok **30** sürüm saklanır; yayında en eskisi düşer, yayındaki sürüm her zaman en yenisidir. |
-| `ClinicSiteAddress` | Güncel ve eski adresler. `slug` **tüm kiracılarda** benzersizdir (K10). |
+| `ClinicSiteAddress` | Güncel ve eski adresler. `slug` **tüm kiracılarda** benzersizdir (K10). Site başına en çok **5** eski adres. |
 | `ClinicSiteImage` | Herkese açık site görseli (K12): kiracı ve siteye bağlı; JPEG, PNG, WebP; en çok **5 MB**; site başına en çok **100**. `StoredFile`'dan ayrıdır, hasta dosyaları bu yoldan açılmaz. |
 
 Paket kilidi yoktur, tüm paketlerde çalışır (K13). Boyutlandırma bu aşamada yoktur (§9).
@@ -34,7 +34,7 @@ iptal kiracıda 403 `Subscriptions.TenantReadOnly` / `Subscriptions.TenantCancel
 | `POST /close` \| `POST /reopen` | `Clinics.Update` | Geçici kapatma (K9); idempotent, gövde yok. Denetim: `ClinicSite.Close` / `ClinicSite.Reopen`. |
 | `POST /images` | `Clinics.Update` | §5. Denetim: `ClinicSite.Image.Upload`. |
 | `GET /images/{imageId}/content` | `Clinics.Read` | §5. Panel önizlemesi. |
-| `DELETE /images/{imageId}` | `Clinics.Update` | §5. 204. Denetim: `ClinicSite.Image.Delete`. |
+| `DELETE /images/{imageId}` | `Clinics.Update` | §5. 200 `ClinicSiteStateDto`: `rowVersion` değişir. Denetim: `ClinicSite.Image.Delete`. |
 
 ```json
 // ClinicSiteStateDto
@@ -69,11 +69,11 @@ Backend'in zorladığı sınırlar (ihlal 400 `ClinicSites.Validation`):
 | Kural | Ayrıntı |
 |---|---|
 | Sürüm anahtarı | Kök nesnede `schemaVersion`: 1 ya da üstü tam sayı. Değeri motor yorumlar. |
-| Boyut ve derinlik | En çok 1.000.000 bayt (UTF-8), en çok 32 düzey. |
-| Her metin değeri | `javascript:`, `vbscript:`, `data:` ile başlayamaz; boşluk ve denetim karakterleri ile büyük/küçük harf bu denetimi atlatmaz. `şema://` biçiminde yalnız `http`, `https`. Cümle içinde geçmesi engellenmez. |
-| Bağlantı alanı | Ad `href`, `url`, `link`, `website`, `instagram`, `facebook`, `twitter`, `youtube`, `linkedin`, `tiktok` ya da `Url`, `Href`, `Link` ile biten: yalnız `http`, `https`, `tel`, `mailto` ya da şemasız değer (`ornek.example.com`, `kullaniciadi`, `/hizmetler`). |
-| Görsel alanı | Ad `src`, `logo`, `favicon`, `image` ya da `Image` ile biten: boş, `site-image:{id}` ya da `stock:{anahtar}` (`a-z 0-9 - _ / .`, `..` yok). Üçüncü taraf adresi kabul edilmez (K7); taslaktaki Unsplash adresleri `stock:` anahtarına çevrilmelidir. |
-| Görsel başvurusu | Metnin neresinde olursa olsun `site-image:{id}` bu sitenin görseli olmalı. |
+| Boyut ve karmaşıklık | En çok 1.000.000 bayt (UTF-8), 32 düzey, 100.000 düğüm; alan adı en çok 200 karakter. Metne çözülemeyen kaçış (eşsiz vekil, ör. `\uD800`) geçersiz JSON sayılır. |
+| Her metin değeri | `javascript:`, `vbscript:`, `data:` ile başlayamaz; boşluk, denetim ve biçim karakterleri (Unicode Cf, ör. U+FEFF, U+200B) ile büyük/küçük harf bu denetimi atlatmaz. `şema://` biçiminde yalnız `http`, `https`. Cümle içinde geçmesi engellenmez. |
+| Bağlantı alanı | Ad `href`, `url`, `link`, `website`, `instagram`, `facebook`, `twitter`, `youtube`, `linkedin`, `tiktok` ya da `Url`, `Href`, `Link` ile biten: yalnız `http`, `https`, `tel`, `mailto` ya da şemasız değer (`ornek.example.com`, `kullaniciadi`, `/hizmetler`). Biçim karakteri içeremez. |
+| Görsel alanı | Ad `src`, `logo`, `favicon`, `image` ya da `Image` ile biten: boş, `site-image:{id}` ya da `stock:{anahtar}` (`a-z 0-9 - _ / .`, `..` yok). Üçüncü taraf adresi kabul edilmez (K7); taslaktaki Unsplash adresleri `stock:` anahtarına çevrilmelidir. Biçim karakteri içeremez. |
+| Görsel başvurusu | Hangi alanda olursa olsun değeri `site-image:` ile **başlayan** metin başvurudur: kimlik geçerli ve görsel bu sitenin olmalı. Metin içinde geçen `site-image:` başvuru sayılmaz; motor da yalnız değerin tamamı başvuruysa çözer. |
 | Klinik kaydı alanları (K8) | `content.clinic` içinde `name`, `phone`, `email`, `address`, `district`, `city`, `workingDays`, `workingHours` ve `seo.slug` bulunamaz. Klinik kaydı mevcut `/api/v1/clinics/{id}` ve `/working-hours` uçlarıyla değişir; yeni yazma yolu yoktur. Taslaktaki `SiteClinic`'in bu alanları yapılandırmadan çıkarılmalıdır. |
 
 ```json
@@ -82,8 +82,8 @@ Backend'in zorladığı sınırlar (ihlal 400 `ClinicSites.Validation`):
   "issues": [{ "path": "$.content.clinic.mapUrl", "reason": "linkSchemeNotAllowed" }] }
 ```
 
-`reason` değerleri: `invalidJson`, `tooLarge`, `schemaVersionRequired`, `linkSchemeNotAllowed`, `imageReferenceNotAllowed`,
-`clinicRecordField`, `imageNotInSite`. En çok 20 sorun raporlanır. Yeni alan adı kurala uymazsa (ör. `cta` metin alanına bağlantı)
+`reason` değerleri: `invalidJson`, `tooLarge`, `tooComplex`, `schemaVersionRequired`, `linkSchemeNotAllowed`,
+`imageReferenceNotAllowed`, `clinicRecordField`, `imageNotInSite`. En çok 20 sorun raporlanır, sonra tarama durur. Yeni alan adı kurala uymazsa (ör. `cta` metin alanına bağlantı)
 yalnız "her metin değeri" denetiminden geçer; bağlantı ve görsel alanlarını bu ad kurallarıyla adlandırın.
 
 **Yayın zorunlu listesi (K9, tek yer `ClinicSitePublishRequirements`):** klinik adı, telefon, adres ve en az bir açık çalışma
@@ -114,6 +114,13 @@ Biçim: 3–60 karakter, yalnız `a-z`, `0-9` ve tek tire; başta ve sonda tire 
 verilmez; site kendi eski adresine dönebilir. Yönlendirme her zaman güncel adrese gider, zincir oluşmaz. Hiç yayınlanmamış sitenin
 adresi paylaşılmadığı için değişince serbest kalır.
 
+Adres kapmaya karşı iki sınır, yalnız yayınlanmış sitede:
+
+| Sınır | Aşılınca |
+|---|---|
+| Site başına en çok 5 eski adres. En eskisi serbest bırakılmaz; kendi eski adresine dönmek sayıyı artırmaz, serbesttir. | 409 `ClinicSites.AddressLimitReached` |
+| 24 saatte en çok 3 adres değişikliği (kendi eski adresine dönüş dahil; pencere ilk değişiklikle başlar). | 409 `ClinicSites.AddressChangeLimitReached` |
+
 ## 5. Görseller
 
 `POST /images`: `multipart/form-data`, alan `file`. Site önce `PUT /draft` ile oluşmuş olmalı (yoksa 404 `ClinicSites.NotFound`).
@@ -134,12 +141,20 @@ motor `site-image:` başvurusunu bu uçtan okur.
 
 `DELETE /images/{imageId}`: taslakta ya da yayındaki sürümde kullanılıyorsa 409 `ClinicSites.ImageInUse`
 (`usedIn: ["draft", "published"]`). Yalnız eski sürümdeki başvuru silmeyi engellemez; o sürüm taslağa kopyalanırsa taslak
-kaydedilebilir ama yayın `missingImageIds` ile durur.
+kaydedilebilir ama yayın `missingImageIds` ile durur. Yanıt 200 `ClinicSiteStateDto`'dur: silme site satırını da yazar, böylece
+arada kaydedilen taslak ya da yayın canlı görseli kıramaz (eşzamanlı olan 409 `ClinicSites.ConcurrencyConflict` alır). **Panel
+yanıttaki `rowVersion`'ı sonraki yazmada kullanmalıdır.** Yükleme `rowVersion`'ı değiştirmez.
+
+**Küçültme ve EXIF (K12):** görsel backend'de yeniden kodlanmaz, olduğu gibi saklanır ve sunulur. Küçültme ve EXIF temizliği
+tarayıcıda, panelde yapılır. Doğrudan API yüklemesinde bunun garantisi yoktur: konum gibi EXIF verisi ve büyük boyut (5 MB'a kadar)
+korunur.
 
 ## 6. Herkese açık uçlar — `/api/v1/public/sites/{slug}`
 
-Kimliksizdir; IP başına hız sınırı `public-site` (dakikada 120, aşımda 429 `RateLimit.Exceeded`). Yanıt yalnız yayınlanmış sürümü
-ve K8'deki klinik alanlarını taşır; taslak, kiracı, klinik, site ve kullanıcı kimliği ile hasta verisi dönmez.
+Kimliksizdir; IP başına hız sınırı: site `public-site` (dakikada 120), görsel `public-site-image` (dakikada 600, genel 200/dk
+tavanının dışında); aşımda 429 `RateLimit.Exceeded`. Yanıt yalnız yayınlanmış sürümü ve K8'deki klinik alanlarını taşır; taslak,
+kiracı, klinik, site ve kullanıcı kimliği ile hasta verisi dönmez. Bu uçlar taslak sütununu hiç okumaz; görsel ucu sürüm
+yapılandırmasını da yüklemez.
 
 ### `GET /api/v1/public/sites/{slug}`
 
@@ -165,9 +180,9 @@ Yanıtta her alan bulunur, duruma uymayanlar `null` olur. `slug` istekteki adres
 | Durum | Yanıt |
 |---|---|
 | Adres yok, biçimi geçersiz; kiracı ya da klinik pasif; site hiç yayınlanmamış | 404 `PublicSites.NotFound` (ayrım yapılmaz) |
-| Eski adres | 200 `Redirect` (site kapalıysa da; yeni adres `Closed` döner) |
-| Klinik "geçici kapat" dedi | 200 `Closed` |
-| Abonelik salt okunur (deneme ya da dönem bitti) veya iptal | 200 `Closed` |
+| Klinik "geçici kapat" dedi (güncel ya da eski adresten) | 200 `Closed`; yeni adres açıklanmaz |
+| Abonelik salt okunur (deneme ya da dönem bitti) veya iptal (güncel ya da eski adresten) | 200 `Closed`; yeni adres açıklanmaz |
+| Açık sitenin eski adresi | 200 `Redirect` |
 | Diğer | 200 `Published` |
 
 **Randevu (K11):** kapalıysa `isEnabled=false` ve kod boş; düğme `clinic.phone`'a döner. Açıksa düğme ADR-042 talep akışına gider
@@ -182,7 +197,8 @@ kendiliğinden döner; klinik elle kapattıysa kapalı kalır. Kapanma nedeni, a
 ### `GET /api/v1/public/sites/{slug}/images/{imageId}`
 
 Yalnız **yayındaki sürümün başvurduğu** görseli sunar. Taslak görseli, başvurulmayan görsel, başka sitenin görseli, kapalı site,
-hasta dosyası kimliği: 404 `PublicSites.NotFound`. Eski adresten gelen istek yeni adresteki gibi yanıtlanır.
+hasta dosyası kimliği: 404 `PublicSites.NotFound`. Kapalı sitede eski adres de 404'tür; açık sitede eski adresten gelen istek yeni
+adresteki gibi yanıtlanır.
 
 Yanıt: görselin türü, `Content-Disposition: inline`, `ETag` (içerik özeti, `If-None-Match` ile 304), `Cache-Control: public,
 max-age=300`, `X-Content-Type-Options: nosniff`. Önbellek süresi yüzünden kapanan sitenin görseli istemci önbelleğinde en çok
@@ -200,22 +216,28 @@ Motor başvuruyu çözer: `site-image:{id}` → `/api/v1/public/sites/{slug}/ima
 | 404 | `PublicSites.NotFound` | Herkese açık uçlar |
 | 409 | `ClinicSites.ConcurrencyConflict` | Eski `rowVersion` ya da eşzamanlı ilk kayıt |
 | 409 | `ClinicSites.SlugTaken` | Adres başkasında |
+| 409 | `ClinicSites.AddressLimitReached`, `ClinicSites.AddressChangeLimitReached` | §4 |
 | 409 | `ClinicSites.PublishRequirementsNotMet` | `missing`, `missingImageIds` |
 | 409 | `ClinicSites.ImageInUse` | `usedIn` |
 | 409 | `ClinicSites.ClinicInactive` | Pasif klinikte yayın |
 | 413, 415, 409, 503 | `Files.*` | §5 |
-| 429 | `RateLimit.Exceeded` | `public-site` |
+| 429 | `RateLimit.Exceeded` | `public-site`, `public-site-image` |
 
 ## 8. Migration
 
-`AddClinicSites` — `ClinicSites`, `ClinicSiteVersions`, `ClinicSiteAddresses`, `ClinicSiteImages`. Paylaşılan ya da üretim
-veritabanına uygulanmadı.
+`AddClinicSites` — `ClinicSites`, `ClinicSiteVersions`, `ClinicSiteAddresses`, `ClinicSiteImages`.
+
+`AddClinicSiteAddressChangeWindow` — `ClinicSites.AddressChangeWindowStartedAtUtc`, `ClinicSites.AddressChangesInWindow` (§4).
+
+Paylaşılan ya da üretim veritabanına uygulanmadı.
 
 ## 9. Bu aşamada olmayanlar
 
-- **Görsel boyutlandırma (K12):** yeni bağımlılık eklenmedi; görsel yüklendiği gibi sunulur. Karar bekliyor.
+- **Sunucuda görsel işleme (K12):** bilinçli olarak yok, küçültme ve EXIF temizliği tarayıcıdadır (§5). Backend'de kütüphane yoktur.
 - **Hazır fotoğraf seti (K7):** backend yalnız `stock:{anahtar}` biçimini kabul eder, dosyaları sunmaz.
 - **SSR ve hız sınırı:** sınır istemci IP'sine bağlıdır. Site uygulaması sunucuda çalışınca istekler tek IP'den gelir; 3. aşamada
-  gerçek istemci IP'si iletilmeli ya da politika gözden geçirilmelidir.
+  SSR gerçek istemci IP'sini `X-Forwarded-For` ile iletmelidir. Backend bu başlığa yalnız güvendiği vekilden inanır: varsayılan
+  loopback'tir, davranış değişmedi. SSR ya da ters vekil başka makinedeyse adresi `ForwardedHeaders:KnownProxies` listesine yazılır
+  (IP dizisi; geçersiz değer açılışta hata verir). Hiçbir adrese kendiliğinden güvenilmez.
 - **CORS:** herkese açık JSON tarayıcıdan okunacaksa site adresi `AllowedOrigins`'e eklenmelidir (ADR-033 geçişi).
 - **Tam adres:** `publicPath` yol verir; alan adı yayın işidir (K12).
