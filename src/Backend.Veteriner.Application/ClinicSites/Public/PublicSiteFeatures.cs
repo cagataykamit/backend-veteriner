@@ -126,14 +126,14 @@ public sealed class GetPublicSiteImageQueryHandler : IRequestHandler<GetPublicSi
             return Result<ClinicSiteImageContent>.Failure(resolved.Error);
         var scope = resolved.Value!;
 
-        // Kapalı site görsel sunmaz; eski adresten gelen istek yeni adresteki gibi yanıtlanır (önbellekteki sayfalar kırılmasın).
+        // Kapalı site görsel sunmaz; açık sitede eski adresten gelen istek yeni adresteki gibi yanıtlanır (önbellekteki sayfalar kırılmasın).
         if (scope.Status == PublicSiteStatus.Closed)
             return NotFound();
         var site = scope.Site;
 
-        var version = await _versions.FirstOrDefaultAsync(
-            new ClinicSiteVersionByNumberSpec(site.TenantId, site.Id, site.PublishedVersionNumber!.Value), ct);
-        if (version is null || !version.ReferencesImage(request.ImageId))
+        var referenced = await _versions.FirstOrDefaultAsync(
+            new ClinicSiteVersionReferencedImagesSpec(site.TenantId, site.Id, site.PublishedVersionNumber!.Value), ct);
+        if (referenced is null || !ClinicSiteVersion.ListContainsImage(referenced, request.ImageId))
             return NotFound();
 
         var image = await _images.FirstOrDefaultAsync(new ClinicSiteImageByIdSpec(site.TenantId, site.Id, request.ImageId), ct);

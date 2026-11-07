@@ -20,12 +20,27 @@ public sealed class ClinicSiteByClinicUntrackedSpec : Specification<ClinicSite>
     }
 }
 
-public sealed class ClinicSiteByIdSpec : Specification<ClinicSite>
+/// <summary>Herkese açık yolun gördüğü site alanları; taslak bu yoldan hiç okunmaz (K14).</summary>
+public sealed record PublicSiteRecord(Guid Id, Guid TenantId, Guid ClinicId, string Slug, bool IsTemporarilyClosed, int? PublishedVersionNumber);
+
+public sealed class PublicSiteRecordByIdSpec : Specification<ClinicSite, PublicSiteRecord>
 {
-    public ClinicSiteByIdSpec(Guid tenantId, Guid id)
+    public PublicSiteRecordByIdSpec(Guid tenantId, Guid id)
     {
         Query.AsNoTracking();
         Query.Where(x => x.TenantId == tenantId && x.Id == id);
+        Query.Select(x => new PublicSiteRecord(x.Id, x.TenantId, x.ClinicId, x.Slug, x.IsTemporarilyClosed, x.PublishedVersionNumber));
+    }
+}
+
+/// <summary>Herkese açık görsel ucu: yalnız başvuru listesi okunur, yapılandırma yüklenmez.</summary>
+public sealed class ClinicSiteVersionReferencedImagesSpec : Specification<ClinicSiteVersion, string>
+{
+    public ClinicSiteVersionReferencedImagesSpec(Guid tenantId, Guid siteId, int versionNumber)
+    {
+        Query.AsNoTracking();
+        Query.Where(x => x.TenantId == tenantId && x.SiteId == siteId && x.VersionNumber == versionNumber);
+        Query.Select(x => x.ReferencedImageIds);
     }
 }
 

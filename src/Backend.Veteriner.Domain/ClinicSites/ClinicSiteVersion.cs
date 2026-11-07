@@ -41,6 +41,12 @@ public sealed class ClinicSiteVersion : ITenantOwned
         PublishedAtUtc = utcNow;
     }
 
-    public bool ReferencesImage(Guid imageId)
-        => ReferencedImageIds.Split(ImageIdSeparator).Contains(imageId.ToString("N"));
+    public bool ReferencesImage(Guid imageId) => ListContainsImage(ReferencedImageIds, imageId);
+
+    /// <summary>
+    /// Saklanan listede arama; kimlikler eşit uzunlukta ve ayraçlı olduğundan alt dize araması tam eşleşmedir. Herkese açık görsel
+    /// ucu yalnız bu sütunu okur, yapılandırma yüklenmez.
+    /// </summary>
+    public static bool ListContainsImage(string referencedImageIds, Guid imageId)
+        => referencedImageIds.Contains(imageId.ToString("N"), StringComparison.Ordinal);
 }

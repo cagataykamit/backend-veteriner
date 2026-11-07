@@ -10,13 +10,14 @@ using Backend.Veteriner.Domain.Tenants;
 namespace Backend.Veteriner.Application.ClinicSites.Public;
 
 /// <summary>Adresin çözüldüğü site; sorgular bu kiracının kapsamında çalışır.</summary>
-public sealed record PublicSiteScope(string Slug, PublicSiteStatus Status, ClinicSite Site, Clinic Clinic);
+public sealed record PublicSiteScope(string Slug, PublicSiteStatus Status, PublicSiteRecord Site, Clinic Clinic);
 
 /// <summary>
 /// Herkese açık sitenin kapısı — tek yer (ADR-045 K10/K13/K14). Adres kiracılar arası çözülür, isteğin geri kalanı o kiracıya
 /// bağlanır (ADR-040). Adres bilinmiyor, kiracı ya da klinik pasif, site hiç yayınlanmamışsa sebep ayırt edilmeden 404.
-/// Eski adres yeni adrese yönlenir. Kapalılık okuma anında türer: kliniğin geçici kapatması ya da yazmaya izin vermeyen abonelik
-/// (salt okunur, iptal); arka plan işi yoktur, ödeme yapılınca site kendiliğinden döner. Dışarıya iki kapanma nedeni aynı görünür.
+/// Kapalılık okuma anında türer: kliniğin geçici kapatması ya da yazmaya izin vermeyen abonelik (salt okunur, iptal); arka plan işi
+/// yoktur, ödeme yapılınca site kendiliğinden döner. Dışarıya iki kapanma nedeni aynı görünür. Kapalılık yönlendirmeden önce gelir:
+/// kapalı sitenin eski adresi de kapalıdır, yeni adres ve görsel dışarı çıkmaz. Yalnız açık sitenin eski adresi yönlenir.
 /// </summary>
 public sealed class PublicSiteResolver
 {
@@ -60,8 +61,8 @@ public sealed class PublicSiteResolver
         // İsteğin geri kalanı sitenin kiracısına bağlanır; kapsam DI kapsamıyla (istekle) biter.
         _ = _tenantScope.UseTenant(address.TenantId);
 
-        var site = await _sites.FirstOrDefaultAsync(new ClinicSiteByIdSpec(address.TenantId, address.SiteId), ct);
-        if (site is not { IsPublished: true })
+        var site = await _sites.FirstOrDefaultAsync(new PublicSiteRecordByIdSpec(address.TenantId, address.SiteId), ct);
+        if (site is not { PublishedVersionNumber: not null })
             return NotFound();
 
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(address.TenantId, site.ClinicId), ct);
@@ -72,15 +73,16 @@ public sealed class PublicSiteResolver
         return Result<PublicSiteScope>.Success(new PublicSiteScope(slug, status, site, clinic));
     }
 
-    private async Task<PublicSiteStatus> ResolveStatusAsync(string slug, ClinicSite site, CancellationToken ct)
+    private async Task<PublicSiteStatus> ResolveStatusAsync(string slug, PublicSiteRecord site, CancellationToken ct)
     {
-        if (slug != site.Slug)
-            return PublicSiteStatus.Redirect;
         if (site.IsTemporarilyClosed)
             return PublicSiteStatus.Closed;
 
         var subscription = await _subscription.EnsureWriteAllowedAsync(site.TenantId, ct);
-        return subscription.IsSuccess ? PublicSiteStatus.Published : PublicSiteStatus.Closed;
+        if (!subscription.IsSuccess)
+            return PublicSiteStatus.Closed;
+
+        return slug == site.Slug ? PublicSiteStatus.Published : PublicSiteStatus.Redirect;
     }
 
     private static Result<PublicSiteScope> NotFound() => Result<PublicSiteScope>.Failure(ClinicSiteErrors.PublicNotFound);
