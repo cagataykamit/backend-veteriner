@@ -7,6 +7,7 @@ Ayarlar `appsettings.{Environment}.json` veya ortam değişkeniyle verilir (iç 
 | `AllowedOrigins` (dizi) | CORS için izinli frontend origin'leri. **Production/Staging'de boşsa uygulama başlamaz.** Development/test ortamında boşsa `http://localhost:4200`. |
 | `AllowedHosts` (`;` ile ayrılmış) | Host süzmesi. **Production/Staging'de `*` veya boşsa uygulama başlamaz.** Taban değer yalnız loopback adresleridir; `appsettings.Production.json` içinde boştur, ortam değişkeniyle (`AllowedHosts`) doldurulmalıdır. |
 | `Swagger:Enabled` (bool) | Swagger yalnız Development'ta açıktır; başka ortamda gerekiyorsa `true` verilir (varsayılan kapalı). |
+| `ExternalApi:PermitLimitPerMinute` (int) | Dış API (TIER-009) anahtar başına dakikalık istek sınırı; 1–600 dışı ya da boşsa 60. Kimlik, kapsam ve hatalar: `EXTERNAL_API_CONTRACT.md`. |
 
 Tüm yanıtlara `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` ve `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` (Swagger yolu hariç) eklenir. HSTS Development dışında açıktır (`UseHsts`).
 
