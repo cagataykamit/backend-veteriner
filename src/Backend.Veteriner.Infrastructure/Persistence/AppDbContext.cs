@@ -7,6 +7,7 @@ using Backend.Veteriner.Domain.Visits;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.ClinicSites;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Payments;
@@ -104,6 +105,10 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<ClinicWorkingHour> ClinicWorkingHours => Set<ClinicWorkingHour>();
     public DbSet<ClinicAppointmentSettings> ClinicAppointmentSettings => Set<ClinicAppointmentSettings>();
     public DbSet<ClinicOnlineBookingSettings> ClinicOnlineBookingSettings => Set<ClinicOnlineBookingSettings>();
+    public DbSet<ClinicSite> ClinicSites => Set<ClinicSite>();
+    public DbSet<ClinicSiteVersion> ClinicSiteVersions => Set<ClinicSiteVersion>();
+    public DbSet<ClinicSiteAddress> ClinicSiteAddresses => Set<ClinicSiteAddress>();
+    public DbSet<ClinicSiteImage> ClinicSiteImages => Set<ClinicSiteImage>();
     public DbSet<ClinicPortalSettings> ClinicPortalSettings => Set<ClinicPortalSettings>();
     public DbSet<ClinicKvkkFormTemplate> ClinicKvkkFormTemplates => Set<ClinicKvkkFormTemplate>();
     public DbSet<ClinicTaxpayerSettings> ClinicTaxpayerSettings => Set<ClinicTaxpayerSettings>();

@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.ClinicSites;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
@@ -28,17 +29,20 @@ public sealed class TrialQuotaGuard : ITrialQuotaGuard
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<StoredFile> _files;
+    private readonly IReadRepository<ClinicSiteImage> _siteImages;
 
     public TrialQuotaGuard(
         ITrialLimitPolicy policy,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
-        IReadRepository<StoredFile> files)
+        IReadRepository<StoredFile> files,
+        IReadRepository<ClinicSiteImage> siteImages)
     {
         _policy = policy;
         _clients = clients;
         _pets = pets;
         _files = files;
+        _siteImages = siteImages;
     }
 
     public async Task<Result> EnsureCanAddClientAsync(Guid tenantId, CancellationToken ct)
@@ -66,7 +70,8 @@ public sealed class TrialQuotaGuard : ITrialQuotaGuard
 
         // Deneme kiracısında dosya sayısı küçüktür (tavan bunu garanti eder); toplam bellekte alınır.
         var sizes = await _files.ListAsync(new TenantStoredFileSizesSpec(tenantId), ct);
-        return sizes.Sum() + Math.Max(0, incomingBytes) <= TrialLimits.MaxStorageBytes
+        var siteImageSizes = await _siteImages.ListAsync(new TenantSiteImageSizesSpec(tenantId), ct);
+        return sizes.Sum() + siteImageSizes.Sum() + Math.Max(0, incomingBytes) <= TrialLimits.MaxStorageBytes
             ? Result.Success()
             : Result.Failure(TrialLimits.StorageQuotaExceeded());
     }
@@ -90,6 +95,17 @@ public sealed class TrialQuotaGuard : ITrialQuotaGuard
             Query.AsNoTracking();
             Query.Where(f => f.TenantId == tenantId && f.Status != StoredFileStatus.Deleted);
             Query.Select(f => f.SizeBytes);
+        }
+    }
+
+    /// <summary>Silinmemiş site görsellerinin boyutu: kota kiracının toplam depolamasıdır.</summary>
+    private sealed class TenantSiteImageSizesSpec : Specification<ClinicSiteImage, long>
+    {
+        public TenantSiteImageSizesSpec(Guid tenantId)
+        {
+            Query.AsNoTracking();
+            Query.Where(i => i.TenantId == tenantId && i.DeletedAtUtc == null);
+            Query.Select(i => i.SizeBytes);
         }
     }
 }

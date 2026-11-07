@@ -139,6 +139,13 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Klinik web sitesi (ADR-045): adres alınmış ya da değiştirme hakkı bitmiş, yayın zorunlu listesi eksik, görsel kullanımda ya da klinik pasif (durum çakışması).
+        if (normalized is "clinicsites.slugtaken" or "clinicsites.addresschangelimitreached"
+            or "clinicsites.publishrequirementsnotmet" or "clinicsites.imageinuse" or "clinicsites.clinicinactive")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Örnek klinik (ADR-002): kiracıda zaten veri var, abonelik deneme sürecinde değil ya da temizlenecek örnek veri yok (durum çakışması).
         if (normalized is "tenants.exampleclinicalreadyloaded" or "tenants.exampleclinictrialrequired" or "tenants.exampleclinicnotloaded")
         {

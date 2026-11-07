@@ -35,9 +35,11 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Application/Tenants/Commands/Billing/ConfirmCheckoutReturnCommandHandler.cs"] = "Sağlayıcı dönüşü: oturum kimlik ya da token ile aranır",
         ["Backend.Veteriner.Application/SalesPartners/DiscountCodeRedemptionService.cs"] = "Kod kullanım limiti tüm kiracılarda sayılır",
         ["Backend.Veteriner.Application/Clinics/OnlineBooking/OnlineBookingClinicResolver.cs"] = "Online randevu bağlantısı kodla aranır; kod tüm kiracılarda benzersiz",
+        ["Backend.Veteriner.Application/ClinicSites/ClinicSiteAddressBook.cs"] = "Site adresi tüm kiracılarda benzersiz; adres kiracılar arası aranır",
         // Platform yönetimi
         ["Backend.Veteriner.Api/Controllers/SalesPartnersAdminController.cs"] = "Satış ortakları (platform yöneticisi)",
         ["Backend.Veteriner.Api/Controllers/BillingAdminController.cs"] = "Çift ödemeler ve iadeler (platform yöneticisi)",
+        ["Backend.Veteriner.Api/Controllers/ClinicSitesAdminController.cs"] = "Adres değiştirme hakkı desteği (platform yöneticisi)",
         ["Backend.Veteriner.Infrastructure/Tenants/TrialActivationMetricsReader.cs"] = "Deneme metrikleri (platform yöneticisi)",
         // Arka plan ve bakım
         ["Backend.Veteriner.Infrastructure/Imports/ImportValidationProcessor.cs"] = "Kuyruk taraması",

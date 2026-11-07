@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.ClinicSites;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Pets;
 using AwesomeAssertions;
@@ -16,10 +17,13 @@ public sealed class TrialQuotaGuardTests
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<StoredFile>> _files = new();
+    private readonly Mock<IReadRepository<ClinicSiteImage>> _siteImages = new();
     private readonly Guid _tenantId = Guid.NewGuid();
 
+    public TrialQuotaGuardTests() => SiteImageSizes();
+
     private TrialQuotaGuard Guard(bool trial)
-        => new(trial ? TrialLimitPolicyStub.Trial : TrialLimitPolicyStub.Paid, _clients.Object, _pets.Object, _files.Object);
+        => new(trial ? TrialLimitPolicyStub.Trial : TrialLimitPolicyStub.Paid, _clients.Object, _pets.Object, _files.Object, _siteImages.Object);
 
     private void ClientCount(int count)
         => _clients.Setup(r => r.CountAsync(It.IsAny<ISpecification<Client>>(), It.IsAny<CancellationToken>())).ReturnsAsync(count);
@@ -29,6 +33,10 @@ public sealed class TrialQuotaGuardTests
 
     private void FileSizes(params long[] sizes)
         => _files.Setup(r => r.ListAsync(It.IsAny<ISpecification<StoredFile, long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sizes.ToList());
+
+    private void SiteImageSizes(params long[] sizes)
+        => _siteImages.Setup(r => r.ListAsync(It.IsAny<ISpecification<ClinicSiteImage, long>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(sizes.ToList());
 
     [Fact]
@@ -71,6 +79,18 @@ public sealed class TrialQuotaGuardTests
     {
         var used = TrialLimits.MaxStorageBytes - 1_000;
         FileSizes(used / 2, used - used / 2);
+
+        (await Guard(trial: true).EnsureCanStoreAsync(_tenantId, 1_000, CancellationToken.None)).IsSuccess.Should().BeTrue();
+
+        var over = await Guard(trial: true).EnsureCanStoreAsync(_tenantId, 1_001, CancellationToken.None);
+        over.Error.Code.Should().Be(TrialLimits.StorageQuotaExceededCode);
+    }
+
+    [Fact]
+    public async Task Trial_Storage_Quota_Should_Count_Site_Images()
+    {
+        FileSizes(TrialLimits.MaxStorageBytes - 2_000);
+        SiteImageSizes(1_000);
 
         (await Guard(trial: true).EnsureCanStoreAsync(_tenantId, 1_000, CancellationToken.None)).IsSuccess.Should().BeTrue();
 

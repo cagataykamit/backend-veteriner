@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using System.Threading.RateLimiting;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Common.Constants;
@@ -12,10 +13,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.Veteriner.Api.Middleware;
 
-public static class RateLimitingExtensions
+public static partial class RateLimitingExtensions
 {
     public const string DiscountCodeValidatePolicy = "discount-code-validate";
     public const string DemoRequestPolicy = "demo-request";
+    public const string PublicSitePolicy = "public-site";
+    public const string PublicSiteImagePolicy = "public-site-image";
 
     public static IServiceCollection AddAppRateLimiting(
         this IServiceCollection services,
@@ -67,6 +70,10 @@ public static class RateLimitingExtensions
             // -- Global limiter (iste�e ba�l�; geni� tutuldu)
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
             {
+                // Herkese açık site görseli kendi politikasıyla sınırlı; görselli sayfa genel tavanı boşuna tüketmesin.
+                if (IsPublicSiteImageRequest(ctx.Request.Path))
+                    return RateLimitPartition.GetNoLimiter(PublicSiteImagePolicy);
+
                 var key = GetClientIp(ctx);
                 return RateLimitPartition.GetSlidingWindowLimiter(
                     key,
@@ -304,6 +311,38 @@ public static class RateLimitingExtensions
                     });
             });
 
+            // -- HERKESE AÇIK SİTE (ADR-045 K14): anonim okuma; görselli sayfa bir istekte bitmediği için kimlik uçlarından geniş.
+            options.AddPolicy(PublicSitePolicy, httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 120,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- HERKESE AÇIK SİTE GÖRSELİ (ADR-045): tek sayfa onlarca görsel ister ve klinikler NAT arkasındadır; JSON ucundan yüksek.
+            options.AddPolicy(PublicSiteImagePolicy, httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 600,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
             // -- DEMO TALEBİ (TRIAL-005): anonim form; spam'e karşı IP başına 10 dakikada 3.
             options.AddPolicy(DemoRequestPolicy, httpContext =>
             {
@@ -333,6 +372,12 @@ public static class RateLimitingExtensions
 
         return app.UseRateLimiter();
     }
+
+    private static bool IsPublicSiteImageRequest(PathString path)
+        => PublicSiteImagePath().IsMatch(path.Value ?? string.Empty);
+
+    [GeneratedRegex("^/api/v[^/]+/public/sites/[^/]+/images/[^/]+$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex PublicSiteImagePath();
 
     private static string GetClientIp(HttpContext ctx)
         => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
