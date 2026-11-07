@@ -258,6 +258,12 @@ public static class ResultExtensions
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }
 
+        // Özellik kiracının paketinde yok (PLAN_FEATURES_API_CONTRACT.md); kullanıcı sınırıyla aynı statü.
+        if (normalized is "subscriptions.featurenotinplan")
+        {
+            return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+        }
+
         if (normalized.Contains("userlimitexceeded"))
         {
             return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
