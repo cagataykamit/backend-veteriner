@@ -16,6 +16,7 @@ public static class RateLimitingExtensions
 {
     public const string DiscountCodeValidatePolicy = "discount-code-validate";
     public const string DemoRequestPolicy = "demo-request";
+    public const string PublicSitePolicy = "public-site";
 
     public static IServiceCollection AddAppRateLimiting(
         this IServiceCollection services,
@@ -297,6 +298,22 @@ public static class RateLimitingExtensions
                     _ => new SlidingWindowRateLimiterOptions
                     {
                         PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- HERKESE AÇIK SİTE (ADR-045 K14): anonim okuma; görselli sayfa bir istekte bitmediği için kimlik uçlarından geniş.
+            options.AddPolicy(PublicSitePolicy, httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 120,
                         Window = TimeSpan.FromMinutes(1),
                         SegmentsPerWindow = 6,
                         QueueLimit = 0,
