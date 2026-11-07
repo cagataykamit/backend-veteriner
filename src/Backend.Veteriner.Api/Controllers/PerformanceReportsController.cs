@@ -3,6 +3,7 @@ using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.Performance;
+using Backend.Veteriner.Application.Reports.Performance.Breakdowns;
 using Backend.Veteriner.Application.Reports.Performance.Queries;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
@@ -45,6 +46,28 @@ public sealed class PerformanceReportsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetPerformanceSummaryQuery(from, to, clinicId, compare), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Gelişmiş raporlar (TIER-004; <c>docs/PERFORMANCE_BREAKDOWNS_API_CONTRACT.md</c>): hekim, satır türü, kalem, tür ve geliş, önceki dönemle.
+    /// 403 <c>Subscriptions.FeatureNotInPlan</c>: pakette yok. Bölümler özetle aynı izin kuralıyla dolar.
+    /// </summary>
+    [HttpGet("performance-breakdowns")]
+    [ProducesResponseType(typeof(PerformanceBreakdownsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetPerformanceBreakdowns(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] bool compare = true,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetPerformanceBreakdownsQuery(from, to, clinicId, compare), ct);
         return result.ToActionResult(this);
     }
 }
