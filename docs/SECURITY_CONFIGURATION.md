@@ -77,5 +77,5 @@ Uygulama iptalinin yazdığı otomatik ters hareket `StockMovements.Correct` ist
 
 ## Gözden geçirme notları
 
-- Rate limit Production'da açık (`RateLimiting:Enabled` varsayılan true; genel 200/dk/IP; login/refresh için ayrı politikalar). Ters vekil arkasında istemci IP'si için `KnownProxies/KnownNetworks` hâlâ tanımsız (güvenlik raporu D6).
+- Rate limit Production'da açık (`RateLimiting:Enabled` varsayılan true; genel 200/dk/IP; login/refresh için ayrı politikalar). Ters vekil arkasında istemci IP'si için `ForwardedHeaders:KnownProxies` (IP dizisi) ayarlanabilir; boşken yalnız loopback'e güvenilir, canlı değeri henüz tanımlanmadı (güvenlik raporu D6). `KnownNetworks` yok.
 - SMTP: hata ayıklama günlüğünden kullanıcı adı, gönderen adresi ve parola uzunluğu çıkarıldı; yalnız "var/yok" bilgisi yazılır.

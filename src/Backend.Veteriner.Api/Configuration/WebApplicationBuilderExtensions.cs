@@ -134,12 +134,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSwaggerGen();
         builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
 
-        builder.Services.Configure<ForwardedHeadersOptions>(opt =>
-        {
-            opt.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            opt.RequireHeaderSymmetry = false;
-            opt.ForwardLimit = null;
-        });
+        builder.Services.Configure<ForwardedHeadersOptions>(opt => ForwardedHeadersConfiguration.Apply(opt, builder.Configuration));
 
         var allowedOrigins = HostSecurityConfiguration.ResolveAllowedOrigins(builder.Configuration, builder.Environment);
         HostSecurityConfiguration.EnsureAllowedHostsRestricted(builder.Configuration, builder.Environment);

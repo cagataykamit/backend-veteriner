@@ -36,6 +36,7 @@ public sealed class PublicSitesController : ControllerBase
 
     /// <summary>Yayındaki sürümün başvurduğu görsel; taslak görseli ve kapalı sitenin görseli 404.</summary>
     [HttpGet("images/{imageId:guid}")]
+    [EnableRateLimiting(RateLimitingExtensions.PublicSiteImagePolicy)]
     [Produces("application/octet-stream", "application/problem+json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
