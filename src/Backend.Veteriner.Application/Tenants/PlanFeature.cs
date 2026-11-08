@@ -53,8 +53,9 @@ public enum PlanFeature
     ClinicsOverview = 7,
 
     /// <summary>
-    /// Kasa ve nakit yönetimi (TIER-008; docs/CASH_COUNT_API_CONTRACT.md). İlk dilim günlük kasa sayımını kaydetme, düzeltme ve iptal;
-    /// sayım okuma ve gün sonu kasa özeti bu kuralın dışındadır, her pakette açık.
+    /// Kasa ve nakit yönetimi (TIER-008; docs/CASH_REGISTERS_API_CONTRACT.md, CASH_COUNT_API_CONTRACT.md), Profesyonel ve Kurumsal: kasa ve tür
+    /// tanımı, Ana kasa dışında kasa seçimi, giriş/çıkış, aktarım, sayım kaydı/düzeltme/iptal. Okumalar, gün sonu raporu ve Ana kasaya nakit tahsilat
+    /// her pakette açık; paket düşünce kayıtlar silinmez, yeni işlem yalnız Ana kasaya.
     /// </summary>
     CashManagement = 8,
 

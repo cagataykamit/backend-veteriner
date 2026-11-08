@@ -49,6 +49,7 @@ Gövdeye **opsiyonel** `creditAmount` (decimal, varsayılan 0, en fazla 2 ondal�
 | `creditAmount` < 0 ya da 2 ondalıktan fazla | `Payments.Validation` (400) |
 
 - Ödeme, tahsisler, kredi ve sayaçlar **tek işlemde** yazılır; `requestId` parmak izine `creditAmount` da girer (aynı `requestId` farklı `creditAmount` → `Payments.DuplicateRequestMismatch`).
+- 2026-11-09 (TIER-008): gövdeye opsiyonel `cashRegisterId` (yalnız nakit; verilmezse Ana kasa). Kurallar `CASH_REGISTERS_API_CONTRACT.md` §4.
 - Kredi kaydı: `ClinicId`/`ClientId` ödemeyle aynı, `Amount = creditAmount`, `CreatedByUserId` ödemeyi alan, `CreatedAtUtc` ödeme anı (`paidAtUtc` değil, işlem anı).
 - Yanıt değişmez (201, `Guid`). `payment.created.v1` olayı değişmez (kredi olaya girmez; Query DB kredi bilmez).
 - `GET /payments/{id}`: `PaymentDetailDto`'ya `creditedAmount` eklenir; `unallocatedAmount` artık `amount − allocatedAmount − creditedAmount`.
@@ -100,7 +101,7 @@ Denetim: `ClientCredit.ReverseApplication`, hedef `ApplicationId=…;ChargeId=�
 
 ## 6) Kredi iadesi — `POST /api/v1/clients/{clientId}/credits/{creditId}/refund`
 
-`Payments.Correct`. Gövde `{ "reason": "…", "method": "Cash|Card|Transfer" }`. Kalan kredinin tamamı iade edilir; kredi kapanır. Yanıt **200** `ClientCreditDto`.
+`Payments.Correct`. Gövde `{ "reason": "…", "method": "Cash|Card|Transfer", "cashRegisterId": null }`. Kalan kredinin tamamı iade edilir; kredi kapanır. Yanıt **200** `ClientCreditDto`. `cashRegisterId` (TIER-008, `CASH_REGISTERS_API_CONTRACT.md` §4) yalnız nakit iadede; verilmezse Ana kasa.
 
 | Kod | HTTP |
 |---|---|

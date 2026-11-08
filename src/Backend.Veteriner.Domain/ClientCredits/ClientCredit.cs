@@ -50,6 +50,10 @@ public sealed class ClientCredit : AggregateRoot, IClinicScoped, ITenantOwned
     public Guid? RefundedByUserId { get; private set; }
     public decimal? RefundedAmount { get; private set; }
     public PaymentMethod? RefundMethod { get; private set; }
+
+    /// <summary>Nakit iadede nakdin çıktığı kasa (TIER-008); nakitte boşsa kliniğin Ana kasasıdır.</summary>
+    public Guid? RefundCashRegisterId { get; private set; }
+
     public string? RefundReason { get; private set; }
 
     /// <summary>Kaynak ödeme iptal edildi (kullanılmamış kredi ödemeyle birlikte kapanır).</summary>
@@ -160,13 +164,16 @@ public sealed class ClientCredit : AggregateRoot, IClinicScoped, ITenantOwned
     }
 
     /// <summary>Kalan kredinin tamamını müşteriye iade eder (kasa çıkışı); kredi kapanır. Kısmi iade yoktur.</summary>
-    public Result Refund(Guid userId, string? reason, PaymentMethod method, DateTime nowUtc)
+    public Result Refund(Guid userId, string? reason, PaymentMethod method, DateTime nowUtc, Guid? cashRegisterId = null)
     {
         if (userId == Guid.Empty)
             return Result.Failure("ClientCredits.Validation", "İade eden kullanıcı geçersiz.");
 
         if (!Enum.IsDefined(method))
             return Result.Failure("ClientCredits.Validation", "İade yöntemi geçersiz.");
+
+        if (cashRegisterId is not null && method != PaymentMethod.Cash)
+            return Result.Failure("ClientCredits.Validation", "Kasa yalnız nakit iadede seçilir.");
 
         var reasonCheck = CorrectionReason.Validate(reason, "ClientCredits.Validation");
         if (!reasonCheck.IsSuccess)
@@ -179,6 +186,7 @@ public sealed class ClientCredit : AggregateRoot, IClinicScoped, ITenantOwned
         RefundedAtUtc = DateTime.SpecifyKind(nowUtc, DateTimeKind.Utc);
         RefundedByUserId = userId;
         RefundMethod = method;
+        RefundCashRegisterId = cashRegisterId;
         RefundReason = reason!.Trim();
         MutationSequence++;
         return Result.Success();

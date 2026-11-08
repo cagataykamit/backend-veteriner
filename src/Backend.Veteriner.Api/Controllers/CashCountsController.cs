@@ -18,7 +18,8 @@ public sealed record CreateCashCountBody(
     decimal OpeningAmount,
     decimal CountedAmount,
     decimal ExpectedCashAmount,
-    string? Note);
+    string? Note,
+    Guid? CashRegisterId = null);
 
 public sealed record CorrectCashCountBody(
     decimal OpeningAmount,
@@ -30,8 +31,8 @@ public sealed record CorrectCashCountBody(
 public sealed record VoidCashCountBody(string? Reason);
 
 /// <summary>
-/// Günlük kasa kontrolü (TIER-008 ilk dilimi; docs/CASH_COUNT_API_CONTRACT.md). Beklenen nakit gün sonu kasa özetinin nakit satırıdır.
-/// Okuma her pakette; kaydetme, düzeltme ve iptal Kurumsal ister (403 <c>Subscriptions.FeatureNotInPlan</c>).
+/// Günlük kasa kontrolü (TIER-008 ilk dilimi; docs/CASH_COUNT_API_CONTRACT.md). Kasa bazında; beklenen nakit kasanın nakit
+/// tahsilat neti ve giriş/çıkış ile aktarımlardır. Okuma her pakette; kaydetme, düzeltme ve iptal Profesyonel ve Kurumsal ister (403 <c>Subscriptions.FeatureNotInPlan</c>).
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -55,12 +56,13 @@ public sealed class CashCountsController : ControllerBase
     [ProducesResponseType(typeof(CashCountDayDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetDay([FromQuery] DateOnly date, [FromQuery] Guid? clinicId = null, CancellationToken ct = default)
+    public async Task<IActionResult> GetDay(
+        [FromQuery] DateOnly date, [FromQuery] Guid? clinicId = null, [FromQuery] Guid? cashRegisterId = null, CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        return (await _mediator.Send(new GetCashCountDayQuery(date, clinicId), ct)).ToActionResult(this);
+        return (await _mediator.Send(new GetCashCountDayQuery(date, clinicId, cashRegisterId), ct)).ToActionResult(this);
     }
 
     /// <summary>Geçmiş sayımlar (tek klinik, en çok 366 gün). Varsayılan yalnız geçerli sayımlar; <c>includeVoided</c> düzeltilenleri de verir.</summary>
@@ -73,6 +75,7 @@ public sealed class CashCountsController : ControllerBase
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
         [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? cashRegisterId = null,
         [FromQuery] bool includeVoided = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = RegisterReportConstants.DefaultPageSize,
@@ -81,7 +84,7 @@ public sealed class CashCountsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        return (await _mediator.Send(new GetCashCountsQuery(from, to, clinicId, includeVoided, page, pageSize), ct)).ToActionResult(this);
+        return (await _mediator.Send(new GetCashCountsQuery(from, to, clinicId, includeVoided, page, pageSize, cashRegisterId), ct)).ToActionResult(this);
     }
 
     [HttpPost]
@@ -97,7 +100,7 @@ public sealed class CashCountsController : ControllerBase
             return problem!;
 
         var command = new CreateCashCountCommand(
-            body.ClinicId, body.BusinessDate, body.OpeningAmount, body.CountedAmount, body.ExpectedCashAmount, body.Note);
+            body.ClinicId, body.BusinessDate, body.OpeningAmount, body.CountedAmount, body.ExpectedCashAmount, body.Note, body.CashRegisterId);
         return (await _mediator.Send(command, ct)).ToActionResult(this);
     }
 

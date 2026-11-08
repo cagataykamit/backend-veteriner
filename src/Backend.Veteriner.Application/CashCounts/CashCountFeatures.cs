@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.CashRegisters;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Finance;
@@ -10,6 +11,7 @@ using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Users.Common;
 using Backend.Veteriner.Domain.CashCounts;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -24,6 +26,7 @@ namespace Backend.Veteriner.Application.CashCounts;
 public sealed record CashCountDto(
     Guid Id,
     Guid ClinicId,
+    Guid CashRegisterId,
     DateOnly BusinessDate,
     string Currency,
     decimal OpeningAmount,
@@ -45,9 +48,10 @@ public sealed record CashCountDto(
 public sealed record CashCountPreviousDto(DateOnly BusinessDate, decimal CountedAmount);
 
 /// <summary>
-/// Günün kasa kontrolü. <c>Cash</c> gün sonu kasa özetinin nakit satırıdır (şu anki değer); <c>Current</c> günün geçerli sayımıdır ve
-/// beklenen nakdi kayıt anındaki değerle taşır. İkisi farklıysa (<c>ExpectedChangedSinceCount</c>) sayımdan sonra nakit hareketi
-/// değişmiştir. <c>History</c> günün tüm kayıtları (iptal ve düzeltilenler dahil), yeniden eskiye.
+/// Günün kasa kontrolü (tek kasa). <c>Cash</c> kasanın nakit tahsilat satırıdır (gün sonu kasa özetinin nakit satırı, kasa filtreli;
+/// tek kasalı klinikte aynısı); <c>Movements</c> kasa giriş/çıkışı ve aktarımlarla birlikte günün toplamıdır, beklenen nakit
+/// <c>ExpectedCashAmount</c> = <c>Movements.NetAmount</c>. <c>Current</c> günün geçerli sayımıdır ve beklenen nakdi kayıt anındaki
+/// değerle taşır; farklıysa (<c>ExpectedChangedSinceCount</c>) sayımdan sonra hareket değişmiştir. <c>History</c> günün tüm kayıtları.
 /// </summary>
 public sealed record CashCountDayDto(
     Guid ClinicId,
@@ -57,18 +61,27 @@ public sealed record CashCountDayDto(
     CashCountDto? Current,
     bool ExpectedChangedSinceCount,
     CashCountPreviousDto? Previous,
-    IReadOnlyList<CashCountDto> History);
+    IReadOnlyList<CashCountDto> History)
+{
+    /// <summary>Sayılan kasa; klinikte henüz kasa kaydı yoksa boş (Ana kasa).</summary>
+    public Guid? CashRegisterId { get; init; }
 
-/// <summary>GET /api/v1/cash-counts/day. Tek klinik: <c>clinicId</c> ya da aktif klinik bağlamı.</summary>
-public sealed record GetCashCountDayQuery(DateOnly Date, Guid? ClinicId) : IRequest<Result<CashCountDayDto>>;
+    public string CashRegisterName { get; init; } = Domain.CashRegisters.CashRegister.MainName;
+    public CashRegisterTotalsDto Movements { get; init; } = default!;
+    public decimal ExpectedCashAmount => Movements.NetAmount;
+}
 
-/// <summary>GET /api/v1/cash-counts. Gün azalan, sonra kayıt zamanı azalan; varsayılan yalnız geçerli sayımlar.</summary>
-public sealed record GetCashCountsQuery(DateOnly From, DateOnly To, Guid? ClinicId, bool IncludeVoided, int Page, int PageSize)
+/// <summary>GET /api/v1/cash-counts/day. Tek klinik: <c>clinicId</c> ya da aktif klinik bağlamı; kasa verilmezse Ana kasa.</summary>
+public sealed record GetCashCountDayQuery(DateOnly Date, Guid? ClinicId, Guid? CashRegisterId = null) : IRequest<Result<CashCountDayDto>>;
+
+/// <summary>GET /api/v1/cash-counts. Gün azalan, sonra kayıt zamanı azalan; varsayılan yalnız geçerli sayımlar, kasa verilmezse tüm kasalar.</summary>
+public sealed record GetCashCountsQuery(
+    DateOnly From, DateOnly To, Guid? ClinicId, bool IncludeVoided, int Page, int PageSize, Guid? CashRegisterId = null)
     : IRequest<Result<PagedResult<CashCountDto>>>;
 
 /// <summary>
 /// POST /api/v1/cash-counts. <see cref="ExpectedCashAmount"/> istemcinin gösterdiği beklenen nakittir; sunucunun hesabıyla aynı değilse
-/// kayıt yazılmaz (<c>CashCounts.ExpectedChanged</c>), personel güncel rakamı görüp yeniden onaylar.
+/// kayıt yazılmaz (<c>CashCounts.ExpectedChanged</c>), personel güncel rakamı görüp yeniden onaylar. Kasa verilmezse Ana kasa.
 /// </summary>
 public sealed record CreateCashCountCommand(
     Guid? ClinicId,
@@ -76,7 +89,8 @@ public sealed record CreateCashCountCommand(
     decimal OpeningAmount,
     decimal CountedAmount,
     decimal ExpectedCashAmount,
-    string? Note)
+    string? Note,
+    Guid? CashRegisterId = null)
     : IRequest<Result<CashCountDto>>, IAuditableRequest
 {
     public string AuditAction => "CashCount.Create";
@@ -124,20 +138,21 @@ public sealed class VoidCashCountCommandValidator : AbstractValidator<VoidCashCo
 
 public sealed class CashCountsForDaySpec : Specification<CashCount>
 {
-    public CashCountsForDaySpec(Guid tenantId, Guid clinicId, DateOnly date)
+    public CashCountsForDaySpec(Guid tenantId, Guid clinicId, Guid cashRegisterId, DateOnly date)
     {
         Query.AsNoTracking();
-        Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.BusinessDate == date);
+        Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.CashRegisterId == cashRegisterId && c.BusinessDate == date);
         Query.OrderByDescending(c => c.CreatedAtUtc);
     }
 }
 
 public sealed class CashCountPreviousSpec : Specification<CashCount, CashCountPreviousDto>
 {
-    public CashCountPreviousSpec(Guid tenantId, Guid clinicId, DateOnly before)
+    public CashCountPreviousSpec(Guid tenantId, Guid clinicId, Guid cashRegisterId, DateOnly before)
     {
         Query.AsNoTracking();
-        Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.BusinessDate < before && c.VoidedAtUtc == null);
+        Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.CashRegisterId == cashRegisterId
+                         && c.BusinessDate < before && c.VoidedAtUtc == null);
         Query.OrderByDescending(c => c.BusinessDate);
         Query.Select(c => new CashCountPreviousDto(c.BusinessDate, c.CountedAmount));
     }
@@ -145,10 +160,13 @@ public sealed class CashCountPreviousSpec : Specification<CashCount, CashCountPr
 
 public sealed class CashCountsFilteredSpec : Specification<CashCount>
 {
-    public CashCountsFilteredSpec(Guid tenantId, Guid clinicId, DateOnly from, DateOnly to, bool includeVoided, int? skip = null, int? take = null)
+    public CashCountsFilteredSpec(
+        Guid tenantId, Guid clinicId, Guid? cashRegisterId, DateOnly from, DateOnly to, bool includeVoided, int? skip = null, int? take = null)
     {
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.BusinessDate >= from && c.BusinessDate <= to);
+        if (cashRegisterId is { } registerId)
+            Query.Where(c => c.CashRegisterId == registerId);
         if (!includeVoided)
             Query.Where(c => c.VoidedAtUtc == null);
         Query.OrderByDescending(c => c.BusinessDate).ThenByDescending(c => c.CreatedAtUtc).ThenBy(c => c.Id);
@@ -174,15 +192,19 @@ public sealed class CashCountUsersSpec : Specification<User, CashCountUser>
     }
 }
 
+/// <summary>Kasanın günü: nakit tahsilat satırı (kasa özetinden) ve beklenen nakdin dökümü.</summary>
+internal sealed record CashCountExpected(CashSummaryMethodDto Cash, CashRegisterTotalsDto Totals);
+
 /// <summary>
-/// Sayımın ortak kuralları tek yerde: klinik-gün kapsamı (gün sonu raporlarıyla aynı çözümleyici) ve beklenen nakit. Beklenen nakit
-/// gün sonu kasa özetinin nakit satırının netidir (<see cref="CashSummaryLoader"/>); ayrı hesap yoktur.
+/// Sayımın ortak kuralları tek yerde: klinik-gün kapsamı (gün sonu raporlarıyla aynı çözümleyici) ve beklenen nakit. Beklenen nakdin
+/// tahsilat kısmı gün sonu kasa özetinin nakit satırıdır (<see cref="CashSummaryLoader"/>, kasa filtreli); giriş/çıkış ve aktarımlar
+/// <see cref="CashRegisterTotalsDto"/> ile eklenir. Ayrı hesap yoktur; kasa hareketi olmayan Ana kasada sonuç kasa özetiyle aynıdır.
 /// </summary>
 internal static class CashCountRules
 {
     public const string ExpectedChangedCode = "CashCounts.ExpectedChanged";
 
-    public static async Task<Result<FinanceEventFilter>> ResolveClinicAsync(
+    public static Task<Result<FinanceEventFilter>> ResolveClinicAsync(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver scopeResolver,
@@ -190,26 +212,25 @@ internal static class CashCountRules
         DateOnly to,
         Guid? clinicId,
         CancellationToken ct)
-    {
-        var filter = await DailyTransactionsReportFilter.ResolveAsync(
-            tenantContext, clinicContext, scopeResolver, from, to, clinicId, null, null, null, ct);
-        if (!filter.IsSuccess)
-            return filter;
+        => CashRegisterRules.ResolveClinicAsync(tenantContext, clinicContext, scopeResolver, from, to, clinicId, "CashCounts", ct);
 
-        return filter.Value!.ClinicId is null
-            ? Result<FinanceEventFilter>.Failure(
-                "CashCounts.ClinicScopeRequired",
-                "Kasa sayımı için klinik belirlenemedi (clinicId veya aktif klinik bağlamı gerekir).")
-            : filter;
-    }
-
-    public static async Task<Result<CashSummaryMethodDto>> LoadCashAsync(
-        ICashEventsReader reader, FinanceEventFilter dayFilter, DateOnly date, CancellationToken ct)
+    public static async Task<Result<CashCountExpected>> LoadExpectedAsync(
+        ICashEventsReader reader,
+        IReadRepositoryBase<CashMovement> movements,
+        FinanceEventFilter dayFilter,
+        ResolvedCashRegister register,
+        DateOnly date,
+        CancellationToken ct)
     {
-        var summary = await CashSummaryLoader.LoadAsync(reader, dayFilter, date, date, ct);
-        return summary.IsSuccess
-            ? Result<CashSummaryMethodDto>.Success(summary.Value!.ByMethod.Single(m => m.PaymentMethod == PaymentMethod.Cash))
-            : Result<CashSummaryMethodDto>.Failure(summary.Error);
+        var summary = await CashSummaryLoader.LoadAsync(reader, dayFilter with { CashRegister = register.Scope }, date, date, ct);
+        if (!summary.IsSuccess)
+            return Result<CashCountExpected>.Failure(summary.Error);
+
+        var cash = summary.Value!.ByMethod.Single(m => m.PaymentMethod == PaymentMethod.Cash);
+        var amounts = register.Id is { } registerId
+            ? await movements.ListAsync(new CashMovementAmountsSpec(dayFilter.TenantId, dayFilter.ClinicId!.Value, registerId, date, date), ct)
+            : [];
+        return Result<CashCountExpected>.Success(new CashCountExpected(cash, CashRegisterTotalsDto.From(cash.NetAmount, amounts)));
     }
 
     public static Result EnsureExpectedUnchanged(decimal shown, decimal current)
@@ -237,7 +258,7 @@ internal static class CashCountRules
 
     private static CashCountDto ToDto(CashCount c, IReadOnlyDictionary<Guid, string?> names)
         => new(
-            c.Id, c.ClinicId, c.BusinessDate, c.Currency,
+            c.Id, c.ClinicId, c.CashRegisterId, c.BusinessDate, c.Currency,
             c.OpeningAmount, c.ExpectedCashAmount, c.ExpectedClosingAmount, c.CountedAmount, c.DifferenceAmount,
             c.Note, c.CorrectsCashCountId,
             c.CreatedByUserId, names.GetValueOrDefault(c.CreatedByUserId), c.CreatedAtUtc,
@@ -251,6 +272,8 @@ public sealed class GetCashCountDayQueryHandler : IRequestHandler<GetCashCountDa
     private readonly IClinicReadScopeResolver _scopeResolver;
     private readonly ICashEventsReader _cashEvents;
     private readonly IReadRepository<CashCount> _counts;
+    private readonly IReadRepository<CashRegister> _registers;
+    private readonly IReadRepository<CashMovement> _movements;
     private readonly IReadRepository<User> _users;
 
     public GetCashCountDayQueryHandler(
@@ -259,6 +282,8 @@ public sealed class GetCashCountDayQueryHandler : IRequestHandler<GetCashCountDa
         IClinicReadScopeResolver scopeResolver,
         ICashEventsReader cashEvents,
         IReadRepository<CashCount> counts,
+        IReadRepository<CashRegister> registers,
+        IReadRepository<CashMovement> movements,
         IReadRepository<User> users)
     {
         _tenantContext = tenantContext;
@@ -266,6 +291,8 @@ public sealed class GetCashCountDayQueryHandler : IRequestHandler<GetCashCountDa
         _scopeResolver = scopeResolver;
         _cashEvents = cashEvents;
         _counts = counts;
+        _registers = registers;
+        _movements = movements;
         _users = users;
     }
 
@@ -278,24 +305,40 @@ public sealed class GetCashCountDayQueryHandler : IRequestHandler<GetCashCountDa
         var f = filter.Value!;
         var clinicId = f.ClinicId!.Value;
 
-        var cash = await CashCountRules.LoadCashAsync(_cashEvents, f, request.Date, ct);
-        if (!cash.IsSuccess)
-            return Result<CashCountDayDto>.Failure(cash.Error);
+        var register = await CashRegisterRules.ResolveAsync(_registers, f.TenantId, clinicId, request.CashRegisterId, ct);
+        if (!register.IsSuccess)
+            return Result<CashCountDayDto>.Failure(register.Error);
+        var r = register.Value!;
 
-        var dayCounts = await _counts.ListAsync(new CashCountsForDaySpec(f.TenantId, clinicId, request.Date), ct);
-        var history = await CashCountRules.ToDtosAsync(_users, dayCounts, ct);
+        var expected = await CashCountRules.LoadExpectedAsync(_cashEvents, _movements, f, r, request.Date, ct);
+        if (!expected.IsSuccess)
+            return Result<CashCountDayDto>.Failure(expected.Error);
+        var e = expected.Value!;
+
+        IReadOnlyList<CashCountDto> history = [];
+        CashCountPreviousDto? previous = null;
+        if (r.Id is { } registerId)
+        {
+            var dayCounts = await _counts.ListAsync(new CashCountsForDaySpec(f.TenantId, clinicId, registerId, request.Date), ct);
+            history = await CashCountRules.ToDtosAsync(_users, dayCounts, ct);
+            previous = await _counts.FirstOrDefaultAsync(new CashCountPreviousSpec(f.TenantId, clinicId, registerId, request.Date), ct);
+        }
+
         var current = history.FirstOrDefault(c => !c.IsVoided);
-        var previous = await _counts.FirstOrDefaultAsync(new CashCountPreviousSpec(f.TenantId, clinicId, request.Date), ct);
-
         return Result<CashCountDayDto>.Success(new CashCountDayDto(
             clinicId,
             request.Date,
             CashCount.DefaultCurrency,
-            cash.Value!,
+            e.Cash,
             current,
-            current is not null && current.ExpectedCashAmount != cash.Value!.NetAmount,
+            current is not null && current.ExpectedCashAmount != e.Totals.NetAmount,
             previous,
-            history));
+            history)
+        {
+            CashRegisterId = r.Id,
+            CashRegisterName = r.Name,
+            Movements = e.Totals,
+        });
     }
 }
 
@@ -332,10 +375,11 @@ public sealed class GetCashCountsQueryHandler : IRequestHandler<GetCashCountsQue
 
         var pageSize = Math.Clamp(request.PageSize, 1, RegisterReportConstants.MaxPageSize);
         var total = await _counts.CountAsync(
-            new CashCountsFilteredSpec(f.TenantId, clinicId, request.From, request.To, request.IncludeVoided), ct);
+            new CashCountsFilteredSpec(f.TenantId, clinicId, request.CashRegisterId, request.From, request.To, request.IncludeVoided), ct);
         var rows = await _counts.ListAsync(
             new CashCountsFilteredSpec(
-                f.TenantId, clinicId, request.From, request.To, request.IncludeVoided, (request.Page - 1) * pageSize, pageSize),
+                f.TenantId, clinicId, request.CashRegisterId, request.From, request.To, request.IncludeVoided,
+                (request.Page - 1) * pageSize, pageSize),
             ct);
 
         var items = await CashCountRules.ToDtosAsync(_users, rows, ct);
@@ -353,6 +397,8 @@ public sealed class CreateCashCountCommandHandler : IRequestHandler<CreateCashCo
     private readonly TenantPlanFeatureEvaluator _planFeatures;
     private readonly ICashEventsReader _cashEvents;
     private readonly IRepository<CashCount> _counts;
+    private readonly IRepository<CashRegister> _registers;
+    private readonly IReadRepository<CashMovement> _movements;
     private readonly IReadRepository<User> _users;
     private readonly TimeProvider _timeProvider;
 
@@ -365,6 +411,8 @@ public sealed class CreateCashCountCommandHandler : IRequestHandler<CreateCashCo
         TenantPlanFeatureEvaluator planFeatures,
         ICashEventsReader cashEvents,
         IRepository<CashCount> counts,
+        IRepository<CashRegister> registers,
+        IReadRepository<CashMovement> movements,
         IReadRepository<User> users,
         TimeProvider timeProvider)
     {
@@ -376,6 +424,8 @@ public sealed class CreateCashCountCommandHandler : IRequestHandler<CreateCashCo
         _planFeatures = planFeatures;
         _cashEvents = cashEvents;
         _counts = counts;
+        _registers = registers;
+        _movements = movements;
         _users = users;
         _timeProvider = timeProvider;
     }
@@ -396,18 +446,38 @@ public sealed class CreateCashCountCommandHandler : IRequestHandler<CreateCashCo
         if (!filter.IsSuccess)
             return Result<CashCountDto>.Failure(filter.Error);
         var clinicId = filter.Value!.ClinicId!.Value;
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
 
-        var cash = await CashCountRules.LoadCashAsync(_cashEvents, filter.Value!, request.BusinessDate, ct);
-        if (!cash.IsSuccess)
-            return Result<CashCountDto>.Failure(cash.Error);
-        var unchanged = CashCountRules.EnsureExpectedUnchanged(request.ExpectedCashAmount, cash.Value!.NetAmount);
+        CashRegister register;
+        if (request.CashRegisterId is null)
+        {
+            register = await CashRegisterRules.EnsureMainAsync(_registers, tenantId, clinicId, nowUtc, ct);
+        }
+        else
+        {
+            var resolved = await CashRegisterRules.ResolveAsync(_registers, tenantId, clinicId, request.CashRegisterId, ct);
+            if (!resolved.IsSuccess)
+                return Result<CashCountDto>.Failure(resolved.Error);
+            register = resolved.Value!.Register!;
+        }
+
+        var accepts = register.EnsureAcceptsMovements();
+        if (!accepts.IsSuccess)
+            return Result<CashCountDto>.Failure(accepts.Error);
+
+        var expected = await CashCountRules.LoadExpectedAsync(
+            _cashEvents, _movements, filter.Value!, CashRegisterRules.ToResolved(register), request.BusinessDate, ct);
+        if (!expected.IsSuccess)
+            return Result<CashCountDto>.Failure(expected.Error);
+        var expectedAmount = expected.Value!.Totals.NetAmount;
+        var unchanged = CashCountRules.EnsureExpectedUnchanged(request.ExpectedCashAmount, expectedAmount);
         if (!unchanged.IsSuccess)
             return Result<CashCountDto>.Failure(unchanged.Error);
 
         var created = CashCount.Create(
-            tenantId, clinicId, request.BusinessDate, CashCountRules.Today(_timeProvider),
-            request.OpeningAmount, cash.Value!.NetAmount, request.CountedAmount, request.Note,
-            userId, _timeProvider.GetUtcNow().UtcDateTime);
+            tenantId, clinicId, register.Id, request.BusinessDate, CashCountRules.Today(_timeProvider),
+            request.OpeningAmount, expectedAmount, request.CountedAmount, request.Note,
+            userId, nowUtc);
         if (!created.IsSuccess)
             return Result<CashCountDto>.Failure(created.Error);
 
@@ -435,6 +505,8 @@ public sealed class CorrectCashCountCommandHandler : IRequestHandler<CorrectCash
     private readonly TenantPlanFeatureEvaluator _planFeatures;
     private readonly ICashEventsReader _cashEvents;
     private readonly IRepository<CashCount> _counts;
+    private readonly IReadRepository<CashRegister> _registers;
+    private readonly IReadRepository<CashMovement> _movements;
     private readonly IReadRepository<User> _users;
     private readonly TimeProvider _timeProvider;
 
@@ -447,6 +519,8 @@ public sealed class CorrectCashCountCommandHandler : IRequestHandler<CorrectCash
         TenantPlanFeatureEvaluator planFeatures,
         ICashEventsReader cashEvents,
         IRepository<CashCount> counts,
+        IReadRepository<CashRegister> registers,
+        IReadRepository<CashMovement> movements,
         IReadRepository<User> users,
         TimeProvider timeProvider)
     {
@@ -458,6 +532,8 @@ public sealed class CorrectCashCountCommandHandler : IRequestHandler<CorrectCash
         _planFeatures = planFeatures;
         _cashEvents = cashEvents;
         _counts = counts;
+        _registers = registers;
+        _movements = movements;
         _users = users;
         _timeProvider = timeProvider;
     }
@@ -478,16 +554,21 @@ public sealed class CorrectCashCountCommandHandler : IRequestHandler<CorrectCash
             return Result<CashCountDto>.Failure(count.Error);
         var original = count.Value!;
 
+        var register = await CashRegisterRules.ResolveAsync(_registers, tenantId, original.ClinicId, original.CashRegisterId, ct);
+        if (!register.IsSuccess)
+            return Result<CashCountDto>.Failure(register.Error);
+
         var dayFilter = DailyTransactionsReportFilter.ForScope(tenantId, original.ClinicId, null, original.BusinessDate, original.BusinessDate);
-        var cash = await CashCountRules.LoadCashAsync(_cashEvents, dayFilter, original.BusinessDate, ct);
-        if (!cash.IsSuccess)
-            return Result<CashCountDto>.Failure(cash.Error);
-        var unchanged = CashCountRules.EnsureExpectedUnchanged(request.ExpectedCashAmount, cash.Value!.NetAmount);
+        var expected = await CashCountRules.LoadExpectedAsync(_cashEvents, _movements, dayFilter, register.Value!, original.BusinessDate, ct);
+        if (!expected.IsSuccess)
+            return Result<CashCountDto>.Failure(expected.Error);
+        var expectedAmount = expected.Value!.Totals.NetAmount;
+        var unchanged = CashCountRules.EnsureExpectedUnchanged(request.ExpectedCashAmount, expectedAmount);
         if (!unchanged.IsSuccess)
             return Result<CashCountDto>.Failure(unchanged.Error);
 
         var replacement = original.Correct(
-            request.OpeningAmount, cash.Value!.NetAmount, request.CountedAmount, request.Note, request.Reason,
+            request.OpeningAmount, expectedAmount, request.CountedAmount, request.Note, request.Reason,
             userId, CashCountRules.Today(_timeProvider), _timeProvider.GetUtcNow().UtcDateTime);
         if (!replacement.IsSuccess)
             return Result<CashCountDto>.Failure(replacement.Error);
@@ -577,11 +658,11 @@ public sealed class VoidCashCountCommandHandler : IRequestHandler<VoidCashCountC
 
 public static class CashCountErrors
 {
-    /// <summary>Klinik ve gün başına tek geçerli sayım indeksi (EF yapılandırması bu adı kullanır).</summary>
-    public const string ActivePerDayIndexName = "UX_CashCounts_TenantId_ClinicId_BusinessDate_Active";
+    /// <summary>Kasa ve gün başına tek geçerli sayım indeksi (EF yapılandırması bu adı kullanır).</summary>
+    public const string ActivePerDayIndexName = "UX_CashCounts_TenantId_ClinicId_CashRegisterId_BusinessDate_Active";
 
     internal static readonly Error DuplicateForDay = new(
-        "CashCounts.DuplicateForDay", "Bu klinik ve gün için kasa sayımı zaten kaydedilmiş; değiştirmek için düzeltme yapın.");
+        "CashCounts.DuplicateForDay", "Bu kasa ve gün için sayım zaten kaydedilmiş; değiştirmek için düzeltme yapın.");
 
     internal static readonly Error ConcurrencyConflict = new(
         "CashCounts.ConcurrencyConflict", "Kasa sayımı eşzamanlı olarak değişti; yeniden okunup işlem tekrarlanmalı.");

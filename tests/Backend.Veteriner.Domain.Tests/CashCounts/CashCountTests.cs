@@ -11,12 +11,12 @@ public sealed class CashCountTests
     private static readonly Guid UserId = Guid.NewGuid();
 
     private static CashCount New(decimal opening = 500m, decimal expected = 1_250.50m, decimal counted = 1_750.50m, string? note = null)
-        => CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Today, Today, opening, expected, counted, note, UserId, Now).Value!;
+        => CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Today, Today, opening, expected, counted, note, UserId, Now).Value!;
 
     [Fact]
     public void Create_Should_Compute_Expected_Closing_And_Difference()
     {
-        var count = CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Today, Today, 500m, 1_250.50m, 1_740.25m, "  Para üstü eksik  ", UserId, Now).Value!;
+        var count = CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Today, Today, 500m, 1_250.50m, 1_740.25m, "  Para üstü eksik  ", UserId, Now).Value!;
 
         count.ExpectedClosingAmount.Should().Be(1_750.50m);
         count.DifferenceAmount.Should().Be(-10.25m);
@@ -44,7 +44,7 @@ public sealed class CashCountTests
     [InlineData(100, 10_000_000.01)]
     public void Create_Should_Reject_Invalid_Amounts(double opening, double counted)
     {
-        var result = CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Today, Today, (decimal)opening, 0m, (decimal)counted, "not", UserId, Now);
+        var result = CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Today, Today, (decimal)opening, 0m, (decimal)counted, "not", UserId, Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be(CashCount.ValidationCode);
@@ -53,7 +53,7 @@ public sealed class CashCountTests
     [Fact]
     public void Create_Should_Require_Note_When_There_Is_A_Difference()
     {
-        var result = CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Today, Today, 0m, 100m, 90m, "   ", UserId, Now);
+        var result = CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Today, Today, 0m, 100m, 90m, "   ", UserId, Now);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be(CashCount.ValidationCode);
@@ -62,11 +62,11 @@ public sealed class CashCountTests
     [Fact]
     public void Create_Should_Reject_Future_Day_And_Long_Note()
     {
-        CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Today.AddDays(1), Today, 0m, 0m, 0m, null, UserId, Now)
+        CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Today.AddDays(1), Today, 0m, 0m, 0m, null, UserId, Now)
             .IsSuccess.Should().BeFalse();
-        CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Today, Today, 0m, 0m, 0m, new string('a', CashCount.MaxNoteLength + 1), UserId, Now)
+        CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Today, Today, 0m, 0m, 0m, new string('a', CashCount.MaxNoteLength + 1), UserId, Now)
             .IsSuccess.Should().BeFalse();
-        CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Today.AddDays(-30), Today, 0m, 0m, 0m, null, UserId, Now)
+        CashCount.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Today.AddDays(-30), Today, 0m, 0m, 0m, null, UserId, Now)
             .IsSuccess.Should().BeTrue("geçmiş gün sayımı sonradan girilebilir");
     }
 
@@ -85,6 +85,7 @@ public sealed class CashCountTests
         replacement.CorrectsCashCountId.Should().Be(original.Id);
         replacement.TenantId.Should().Be(original.TenantId);
         replacement.ClinicId.Should().Be(original.ClinicId);
+        replacement.CashRegisterId.Should().Be(original.CashRegisterId, "düzeltmede kasa değişmez");
         replacement.BusinessDate.Should().Be(original.BusinessDate);
         replacement.CreatedByUserId.Should().Be(corrector);
         replacement.DifferenceAmount.Should().Be(0m);

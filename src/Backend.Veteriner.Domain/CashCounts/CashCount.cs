@@ -3,9 +3,9 @@ using Backend.Veteriner.Domain.Shared;
 namespace Backend.Veteriner.Domain.CashCounts;
 
 /// <summary>
-/// Günlük kasa kontrolü (sayım; TIER-008 ilk dilimi, docs/CASH_COUNT_API_CONTRACT.md). Klinik ve İstanbul günü başına en çok bir geçerli
-/// kayıt. Beklenen nakit kayıt anındaki gün sonu kasa özetinin nakit neti olarak saklanır; tutarlar sonradan değişmez. Düzeltme kaydı
-/// ezmez: eski kayıt gerekçeyle iptal edilir, yerine yenisi yazılır (<see cref="Correct"/>).
+/// Günlük kasa kontrolü (sayım; TIER-008, docs/CASH_COUNT_API_CONTRACT.md). Kasa ve İstanbul günü başına en çok bir geçerli kayıt.
+/// Beklenen nakit kayıt anındaki kasanın gün neti olarak saklanır (nakit tahsilat neti, kasa giriş/çıkışı ve aktarımlar); tutarlar
+/// sonradan değişmez. Düzeltme kaydı ezmez: eski kayıt gerekçeyle iptal edilir, yerine yenisi yazılır (<see cref="Correct"/>).
 /// </summary>
 public sealed class CashCount : ITenantOwned, IClinicScoped
 {
@@ -19,13 +19,16 @@ public sealed class CashCount : ITenantOwned, IClinicScoped
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
 
+    /// <summary>Sayılan kasa; çoklu kasa öncesi sayımlar Ana kasaya bağlanmıştır.</summary>
+    public Guid CashRegisterId { get; private set; }
+
     /// <summary>Sayılan gün (İstanbul takvim günü).</summary>
     public DateOnly BusinessDate { get; private set; }
 
     /// <summary>Gün başında kasada olan nakit (personel girer).</summary>
     public decimal OpeningAmount { get; private set; }
 
-    /// <summary>Kayıt anında günün nakit tahsilat neti (tahsilat − iptal − kredi iadesi); kasa özetinden gelir.</summary>
+    /// <summary>Kayıt anında kasanın gün neti: nakit tahsilat − iptal − kredi iadesi + giriş − çıkış ± aktarım.</summary>
     public decimal ExpectedCashAmount { get; private set; }
 
     /// <summary>Gün sonunda sayılan nakit (personel girer).</summary>
@@ -60,6 +63,7 @@ public sealed class CashCount : ITenantOwned, IClinicScoped
     public static Result<CashCount> Create(
         Guid tenantId,
         Guid clinicId,
+        Guid cashRegisterId,
         DateOnly businessDate,
         DateOnly today,
         decimal openingAmount,
@@ -74,6 +78,8 @@ public sealed class CashCount : ITenantOwned, IClinicScoped
             return Invalid("TenantId geçersiz.");
         if (clinicId == Guid.Empty)
             return Invalid("ClinicId geçersiz.");
+        if (cashRegisterId == Guid.Empty)
+            return Invalid("Kasa geçersiz.");
         if (createdByUserId == Guid.Empty)
             return Invalid("Kaydeden kullanıcı geçersiz.");
         if (businessDate > today)
@@ -92,6 +98,7 @@ public sealed class CashCount : ITenantOwned, IClinicScoped
         {
             TenantId = tenantId,
             ClinicId = clinicId,
+            CashRegisterId = cashRegisterId,
             BusinessDate = businessDate,
             OpeningAmount = openingAmount,
             ExpectedCashAmount = expectedCashAmount,
@@ -111,8 +118,8 @@ public sealed class CashCount : ITenantOwned, IClinicScoped
     }
 
     /// <summary>
-    /// Yerine geçecek kaydı üretir ve bu kaydı gerekçeyle iptal eder; ikisi aynı işlemde kaydedilir. Gün ve klinik değişmez (yanlışsa
-    /// iptal edilip doğru güne yeni kayıt girilir). Yeni kayıt geçersizse bu kayıt değişmez.
+    /// Yerine geçecek kaydı üretir ve bu kaydı gerekçeyle iptal eder; ikisi aynı işlemde kaydedilir. Gün, klinik ve kasa değişmez
+    /// (yanlışsa iptal edilip doğru güne ya da kasaya yeni kayıt girilir). Yeni kayıt geçersizse bu kayıt değişmez.
     /// </summary>
     public Result<CashCount> Correct(
         decimal openingAmount,
@@ -132,7 +139,7 @@ public sealed class CashCount : ITenantOwned, IClinicScoped
             return Result<CashCount>.Failure(reasonCheck.Error);
 
         var replacement = Create(
-            TenantId, ClinicId, BusinessDate, today, openingAmount, expectedCashAmount, countedAmount, note, userId, nowUtc, Id);
+            TenantId, ClinicId, CashRegisterId, BusinessDate, today, openingAmount, expectedCashAmount, countedAmount, note, userId, nowUtc, Id);
         if (!replacement.IsSuccess)
             return replacement;
 

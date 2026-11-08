@@ -14,7 +14,17 @@ public sealed record FinanceEventFilter(
     DateTime ToUtcExclusive,
     DailyTransactionKind? Kind,
     PaymentMethod? PaymentMethod,
-    Guid? PerformedByUserId);
+    Guid? PerformedByUserId)
+{
+    /// <summary>Doluysa yalnız bu kasanın nakit olayları (TIER-008); boşsa kasaya göre filtrelenmez.</summary>
+    public CashRegisterScope? CashRegister { get; init; }
+}
+
+/// <summary>
+/// Kasa filtresi: yalnız nakit olaylar. <c>CashRegisterId</c> kasası olanlar; <c>IncludesUnassigned</c> ise kasası boş nakit olaylar da
+/// (kasası boş nakit Ana kasanındır; tek kural). Ana kasası henüz olmayan klinikte <c>CashRegisterId</c> boş, yalnız kasasızlar gelir.
+/// </summary>
+public sealed record CashRegisterScope(Guid? CashRegisterId, bool IncludesUnassigned);
 
 public sealed record DailyTransactionsReadResult(
     int TotalCount,
@@ -45,10 +55,21 @@ public sealed record CashEventRow(
     Guid? PerformedByUserId,
     string? PerformedByName,
     string? Reason,
-    bool IsCreditRefund = false);
+    bool IsCreditRefund = false,
+    Guid? CashRegisterId = null);
+
+/// <summary>Tahsilat olaylarının toplamları (kasa devreden bakiyesi; satır yüklemeden SQL'de toplanır).</summary>
+public sealed record CashEventTotals(decimal CollectedAmount, decimal VoidedAmount, decimal RefundedCreditAmount)
+{
+    /// <summary>Kasa özetiyle aynı net: tahsilat − iptal − kredi iadesi.</summary>
+    public decimal NetAmount => CollectedAmount - VoidedAmount - RefundedCreditAmount;
+}
 
 /// <summary>Kasa özeti okuyucusu: dökümle aynı mali olay kaynağından en çok <c>maxRows + 1</c> tahsilat olayı döner (aşım tespiti için).</summary>
 public interface ICashEventsReader
 {
     Task<IReadOnlyList<CashEventRow>> ReadAsync(FinanceEventFilter filter, int maxRows, CancellationToken ct = default);
+
+    /// <summary>Süzgeçteki tahsilat, iptal ve kredi iadesi toplamları (satır sınırı yok).</summary>
+    Task<CashEventTotals> SumAsync(FinanceEventFilter filter, CancellationToken ct = default);
 }

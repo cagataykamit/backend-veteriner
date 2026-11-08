@@ -435,7 +435,14 @@ public static class DevSampleDataSeeder
                 new EfRepository<PaymentAllocation>(db),
                 TimeProvider.System,
                 new PaymentIntegrationEventOutbox(outboxBuffer, paymentProjection),
-                new EfRepository<Domain.ClientCredits.ClientCredit>(db));
+                new EfRepository<Domain.ClientCredits.ClientCredit>(db),
+                new EfReadRepository<Domain.CashRegisters.CashRegister>(db),
+                new Application.Tenants.TenantPlanFeatureEvaluator(
+                    new EfReadRepository<Domain.Tenants.TenantSubscription>(db),
+                    clinics,
+                    new EfReadRepository<Domain.Tenants.UserTenant>(db),
+                    new EfReadRepository<Domain.Tenants.TenantInvite>(db),
+                    TimeProvider.System));
         }
     }
 

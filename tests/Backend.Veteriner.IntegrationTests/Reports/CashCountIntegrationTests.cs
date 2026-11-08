@@ -54,6 +54,7 @@ public sealed partial class DailyTransactionsReportIntegrationTests
 
         var cashRow = cashSummary.ByMethod.Single(m => m.PaymentMethod == PaymentMethod.Cash);
         day.Cash.Should().Be(cashRow, "beklenen nakit gün sonu kasa özetinin nakit satırıdır");
+        day.ExpectedCashAmount.Should().Be(cashRow.NetAmount, "tek kasalı klinikte kasa hareketi yoksa beklenen nakit = nakit satırı");
         day.Cash.NetAmount.Should().Be(620m);
         day.Current.Should().BeNull();
         day.Previous.Should().BeNull();
@@ -145,7 +146,7 @@ public sealed partial class DailyTransactionsReportIntegrationTests
         locked.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var json = await locked.Content.ReadFromJsonAsync<JsonElement>();
         json.GetProperty("code").GetString().Should().Be("Subscriptions.FeatureNotInPlan");
-        json.GetProperty("requiredPlanCode").GetString().Should().Be("Premium");
+        json.GetProperty("requiredPlanCode").GetString().Should().Be("Pro");
         (await counter.GetAsync($"{CashCounts}/day?date={Today:yyyy-MM-dd}&clinicId={env.ClinicId}")).StatusCode.Should().Be(HttpStatusCode.OK);
 
         await SetPlanAsync(env.TenantId, SubscriptionPlanCode.Premium);

@@ -34,6 +34,10 @@ internal static class PaymentRequestFingerprint
         if (request.CreditAmount > 0)
             canonical += "|credit:" + request.CreditAmount.ToString("0.00", CultureInfo.InvariantCulture);
 
+        // Kasası seçilmemiş istekte özet çoklu kasa öncesiyle aynı kalır (TIER-008).
+        if (request.CashRegisterId is { } cashRegisterId)
+            canonical += "|register:" + cashRegisterId.ToString("N");
+
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
     }
 }

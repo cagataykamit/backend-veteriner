@@ -36,6 +36,8 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     private readonly Mock<IPasswordHasher> _hasher = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<ILogger<PublicOwnerSignupCommandHandler>> _logger = new();
+    private readonly Mock<IRepository<Backend.Veteriner.Domain.CashRegisters.CashRegister>> _cashRegistersWrite = new();
+    private readonly Mock<IRepository<Backend.Veteriner.Domain.CashRegisters.CashMovementCategory>> _cashCategoriesWrite = new();
     private readonly Mock<IReadRepository<DiscountCode>> _codes = new();
     private readonly Mock<IReadRepository<SalesPartner>> _partners = new();
     private readonly Mock<IReadRepository<DiscountRedemption>> _redemptionsRead = new();
@@ -62,6 +64,8 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             _uow.Object,
             _exampleClinic.Object,
             TimeProvider.System,
+            _cashRegistersWrite.Object,
+            _cashCategoriesWrite.Object,
             _logger.Object);
 
     [Fact]

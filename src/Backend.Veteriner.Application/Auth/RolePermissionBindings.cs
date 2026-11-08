@@ -103,6 +103,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.CashCounts.Read,
                 PermissionCatalog.CashCounts.Create,
                 PermissionCatalog.CashCounts.Correct,
+                PermissionCatalog.CashRegisters.Read,
+                PermissionCatalog.CashRegisters.Manage,
+                PermissionCatalog.CashMovements.Create,
+                PermissionCatalog.CashMovements.Void,
 
                 PermissionCatalog.Administrations.Read,
                 PermissionCatalog.Administrations.Create,
@@ -256,6 +260,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.CashCounts.Read,
                 PermissionCatalog.CashCounts.Create,
                 PermissionCatalog.CashCounts.Correct,
+                PermissionCatalog.CashRegisters.Read,
+                PermissionCatalog.CashRegisters.Manage,
+                PermissionCatalog.CashMovements.Create,
+                PermissionCatalog.CashMovements.Void,
 
                 PermissionCatalog.Administrations.Read,
                 PermissionCatalog.Administrations.Create,
@@ -415,6 +423,10 @@ public static class RolePermissionBindings
                 PermissionCatalog.CashCounts.Read,
                 PermissionCatalog.CashCounts.Create,
                 PermissionCatalog.CashCounts.Correct,
+                PermissionCatalog.CashRegisters.Read,
+                PermissionCatalog.CashRegisters.Manage,
+                PermissionCatalog.CashMovements.Create,
+                PermissionCatalog.CashMovements.Void,
 
                 PermissionCatalog.Prescriptions.Read,
                 PermissionCatalog.Prescriptions.Create,
@@ -635,6 +647,9 @@ public static class RolePermissionBindings
                 // Gün sonu kasayı sayan resepsiyondur; düzeltme ve iptal yönetici düzeyinde (ADR-012 K2).
                 PermissionCatalog.CashCounts.Read,
                 PermissionCatalog.CashCounts.Create,
+                // Resepsiyon kasaya giriş/çıkış ve aktarım girer; kasa tanımı ve iptal yönetici düzeyinde (ADR-012 K2).
+                PermissionCatalog.CashRegisters.Read,
+                PermissionCatalog.CashMovements.Create,
 
                 PermissionCatalog.Sales.Read,
                 PermissionCatalog.Sales.Create,

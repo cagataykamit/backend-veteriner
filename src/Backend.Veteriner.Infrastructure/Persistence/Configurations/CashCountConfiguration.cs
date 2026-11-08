@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.CashCounts;
 using Backend.Veteriner.Domain.CashCounts;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,7 @@ public sealed class CashCountConfiguration : IEntityTypeConfiguration<CashCount>
 
         b.Property(x => x.TenantId).IsRequired();
         b.Property(x => x.ClinicId).IsRequired();
+        b.Property(x => x.CashRegisterId).IsRequired();
         b.Property(x => x.BusinessDate).IsRequired();
         b.Property(x => x.OpeningAmount).HasPrecision(18, CashCount.AmountDecimals).IsRequired();
         b.Property(x => x.ExpectedCashAmount).HasPrecision(18, CashCount.AmountDecimals).IsRequired();
@@ -35,8 +37,8 @@ public sealed class CashCountConfiguration : IEntityTypeConfiguration<CashCount>
         b.Property(x => x.VoidReason).HasMaxLength(CorrectionReason.MaxLength);
         b.Property(x => x.MutationSequence).IsRequired().HasDefaultValue(0L).IsConcurrencyToken();
 
-        // Klinik ve gün başına en çok bir geçerli sayım; iki kullanıcı aynı anda kaydederse ikincisi burada düşer.
-        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.BusinessDate })
+        // Kasa ve gün başına en çok bir geçerli sayım; iki kullanıcı aynı anda kaydederse ikincisi burada düşer.
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.CashRegisterId, x.BusinessDate })
             .IsUnique()
             .HasFilter("[VoidedAtUtc] IS NULL")
             .HasDatabaseName(CashCountErrors.ActivePerDayIndexName);
@@ -45,5 +47,6 @@ public sealed class CashCountConfiguration : IEntityTypeConfiguration<CashCount>
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.BusinessDate, x.CreatedAtUtc });
 
         b.HasOne<Clinic>().WithMany().HasForeignKey(x => x.ClinicId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<CashRegister>().WithMany().HasForeignKey(x => x.CashRegisterId).OnDelete(DeleteBehavior.Restrict);
     }
 }

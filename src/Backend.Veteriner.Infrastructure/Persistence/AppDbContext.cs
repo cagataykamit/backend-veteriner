@@ -13,6 +13,7 @@ using Backend.Veteriner.Domain.VetFinder;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.CashCounts;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.CustomDevelopment;
 using Backend.Veteriner.Domain.ExternalApi;
 using Backend.Veteriner.Domain.Payments;
@@ -154,6 +155,9 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<ClientCredit> ClientCredits => Set<ClientCredit>();
     public DbSet<ClientCreditApplication> ClientCreditApplications => Set<ClientCreditApplication>();
     public DbSet<CashCount> CashCounts => Set<CashCount>();
+    public DbSet<CashRegister> CashRegisters => Set<CashRegister>();
+    public DbSet<CashMovement> CashMovements => Set<CashMovement>();
+    public DbSet<CashMovementCategory> CashMovementCategories => Set<CashMovementCategory>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<CustomDevelopmentRequest> CustomDevelopmentRequests => Set<CustomDevelopmentRequest>();
     public DbSet<Administration> Administrations => Set<Administration>();

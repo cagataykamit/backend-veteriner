@@ -7,4 +7,4 @@ public sealed record CreateSaleLineDto(Guid ProductId, decimal Quantity, decimal
 /// Satış anı ödemesi. <see cref="Method"/> <c>Cash|Card|Transfer</c>; <see cref="Amount"/> yoksa satış toplamı;
 /// <see cref="PaidAtUtc"/> yoksa şimdi.
 /// </summary>
-public sealed record CreateSalePaymentDto(string? Method, decimal? Amount, DateTime? PaidAtUtc, string? Notes);
+public sealed record CreateSalePaymentDto(string? Method, decimal? Amount, DateTime? PaidAtUtc, string? Notes, Guid? CashRegisterId = null);

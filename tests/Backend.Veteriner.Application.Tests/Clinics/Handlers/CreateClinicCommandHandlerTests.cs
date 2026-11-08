@@ -17,9 +17,11 @@ public sealed class CreateClinicCommandHandlerTests
     private readonly Mock<IReadRepository<Tenant>> _tenantsRead = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IRepository<Clinic>> _clinicsWrite = new();
+    private readonly Mock<IRepository<Backend.Veteriner.Domain.CashRegisters.CashRegister>> _cashRegisters = new();
 
     private CreateClinicCommandHandler CreateHandler(SubscriptionPlanCode plan = SubscriptionPlanCode.Premium, Clinic? activeClinic = null)
-        => new(_tenantContext.Object, _tenantsRead.Object, _clinicsRead.Object, _clinicsWrite.Object, PlanFeatureTestFactory.ForPlan(plan, activeClinic));
+        => new(_tenantContext.Object, _tenantsRead.Object, _clinicsRead.Object, _clinicsWrite.Object, PlanFeatureTestFactory.ForPlan(plan, activeClinic),
+            _cashRegisters.Object, TimeProvider.System);
 
     [Fact]
     public async Task Handle_Should_Reject_Second_Clinic_When_Plan_Has_No_MultiClinic()
