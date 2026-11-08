@@ -153,6 +153,7 @@ public static class DependencyInjection
         services.AddScoped<IPetIntegrationEventOutbox, PetIntegrationEventOutbox>();
         services.AddScoped<IPaymentIntegrationEventOutbox, PaymentIntegrationEventOutbox>();
         services.AddScoped<OutboxSaveChangesInterceptor>();
+        services.AddScoped<ChangeTrackedSaveChangesInterceptor>();
         services.AddScoped<RecordHistorySaveChangesInterceptor>();
         services.AddScoped<SlowQueryLoggingInterceptor>();
         services.AddScoped<DbConnectionSlowOpenInterceptor>();
@@ -162,6 +163,7 @@ public static class DependencyInjection
         {
             opt.UseSqlServer(connStr);
             opt.AddInterceptors(
+                sp.GetRequiredService<ChangeTrackedSaveChangesInterceptor>(),
                 sp.GetRequiredService<OutboxSaveChangesInterceptor>(),
                 sp.GetRequiredService<RecordHistorySaveChangesInterceptor>(),
                 sp.GetRequiredService<SlowQueryLoggingInterceptor>(),

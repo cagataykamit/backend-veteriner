@@ -5,7 +5,7 @@ namespace Backend.Veteriner.Domain.Appointments;
 /// <summary>
 /// Klinik ve hayvana bağlı randevu kaydı.
 /// </summary>
-public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
+public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IChangeTracked
 {
     public const int MinDurationMinutes = 5;
     public const int MaxDurationMinutes = 240;
@@ -17,6 +17,7 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
     public Guid PetId { get; private set; }
+    public DateTime ChangedAtUtc { get; private set; }
     public DateTime ScheduledAtUtc { get; private set; }
     /// <summary>Randevu süresi (dakika). Kalıcı alan; bitiş <see cref="ScheduledEndUtc"/> ile türetilir.</summary>
     public int DurationMinutes { get; private set; }

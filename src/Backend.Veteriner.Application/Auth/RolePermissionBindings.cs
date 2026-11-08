@@ -151,6 +151,8 @@ public static class RolePermissionBindings
                 PermissionCatalog.Subscriptions.Read,
                 PermissionCatalog.Subscriptions.Manage,
 
+                PermissionCatalog.ApiKeys.Manage,
+
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Species.Create,
                 PermissionCatalog.Species.Update,
@@ -297,6 +299,8 @@ public static class RolePermissionBindings
 
                 PermissionCatalog.Subscriptions.Read,
                 PermissionCatalog.Subscriptions.Manage,
+
+                PermissionCatalog.ApiKeys.Manage,
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Species.Create,

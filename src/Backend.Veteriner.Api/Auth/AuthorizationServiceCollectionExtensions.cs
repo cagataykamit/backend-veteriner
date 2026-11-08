@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.ExternalApi;
 using Backend.Veteriner.Application.OwnerPortal;
+using Backend.Veteriner.Domain.ExternalApi;
 
 namespace Backend.Veteriner.Api.Auth
 {
@@ -66,6 +68,20 @@ namespace Backend.Veteriner.Api.Auth
                     .AddAuthenticationSchemes(OwnerPortalAuth.Scheme)
                     .RequireAuthenticatedUser()
                     .RequireClaim(OwnerPortalAuth.PrincipalTypeClaim, OwnerPortalAuth.OwnerPrincipalType));
+
+                // Dış API (TIER-009): yalnız anahtar şeması; panel JWT'si bu politikada doğrulanmaz. Kapsam politikası uç başınadır.
+                options.AddPolicy(ExternalApiAuth.Policy, p => p
+                    .AddAuthenticationSchemes(ExternalApiAuth.Scheme)
+                    .RequireAuthenticatedUser()
+                    .RequireClaim(ExternalApiAuth.PrincipalTypeClaim, ExternalApiAuth.ApiKeyPrincipalType));
+                foreach (var scope in ApiKeyScopes.All)
+                {
+                    options.AddPolicy(ExternalApiAuth.ScopePolicy(scope), p => p
+                        .AddAuthenticationSchemes(ExternalApiAuth.Scheme)
+                        .RequireAuthenticatedUser()
+                        .RequireClaim(ExternalApiAuth.PrincipalTypeClaim, ExternalApiAuth.ApiKeyPrincipalType)
+                        .RequireClaim(ExternalApiAuth.ScopeClaim, scope));
+                }
             });
 
             return services;

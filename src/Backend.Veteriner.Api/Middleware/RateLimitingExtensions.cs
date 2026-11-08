@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Common.Constants;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.ExternalApi;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,11 @@ public static partial class RateLimitingExtensions
     public const string DemoRequestPolicy = "demo-request";
     public const string PublicSitePolicy = "public-site";
     public const string PublicSiteImagePolicy = "public-site-image";
+    public const string ExternalApiPolicy = "external-api";
+
+    /// <summary>Dış API'de anahtar başına dakikalık istek sınırı (TIER-009); yapılandırmada 1–600 arası, varsayılan 60.</summary>
+    public const string ExternalApiPermitLimitKey = "ExternalApi:PermitLimitPerMinute";
+    public const int ExternalApiDefaultPermitLimit = 60;
 
     public static IServiceCollection AddAppRateLimiting(
         this IServiceCollection services,
@@ -336,6 +342,26 @@ public static partial class RateLimitingExtensions
                     _ => new SlidingWindowRateLimiterOptions
                     {
                         PermitLimit = 600,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- DIŞ API (TIER-009): hız sınırı kimlik doğrulamadan önce çalışır; anahtar ön eki başlıktan okunur (gizli kısım bölüm
+            //    anahtarına girmez). Biçimsiz ya da eksik anahtar IP bölümüne düşer. Genel IP tavanı ayrıca geçerlidir.
+            options.AddPolicy(ExternalApiPolicy, httpContext =>
+            {
+                var presented = httpContext.Request.Headers[ExternalApiAuth.HeaderName].ToString();
+                var key = ApiKeySecret.TryGetPrefix(presented, out var prefix) ? $"key:{prefix}" : $"ip:{GetClientIp(httpContext)}";
+                var configured = httpContext.RequestServices.GetRequiredService<IConfiguration>().GetValue<int?>(ExternalApiPermitLimitKey);
+                var permitLimit = configured is >= 1 and <= 600 ? configured.Value : ExternalApiDefaultPermitLimit;
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = permitLimit,
                         Window = TimeSpan.FromMinutes(1),
                         SegmentsPerWindow = 6,
                         QueueLimit = 0,

@@ -29,6 +29,7 @@ internal static class IntegrationTestDbContextOverride
         {
             opt.UseSqlServer(connectionString);
             opt.AddInterceptors(
+                sp.GetRequiredService<ChangeTrackedSaveChangesInterceptor>(),
                 sp.GetRequiredService<OutboxSaveChangesInterceptor>(),
                 sp.GetRequiredService<RecordHistorySaveChangesInterceptor>(),
                 sp.GetRequiredService<SlowQueryLoggingInterceptor>(),
