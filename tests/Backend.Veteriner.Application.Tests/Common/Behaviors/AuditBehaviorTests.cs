@@ -81,4 +81,32 @@ public sealed class AuditBehaviorTests
         entry.FailureReason.Should().Contain("X.Y");
         VerifyErrorLogged(Times.Never());
     }
+
+    public sealed record SampleCustomDevelopmentCommand(
+        string RequestTitle, string RequestText, string RequestTarget, string DecisionReason, string ResponseNote, int Priority)
+        : IRequest<Result>, IAuditableRequest
+    {
+        public string AuditAction => "Sample.CustomDevelopment";
+        public string? AuditTarget => null;
+    }
+
+    [Fact]
+    public async Task Handle_Should_Mask_Custom_Development_Texts_In_Payload()
+    {
+        AuditLogEntry? entry = null;
+        _writer.Setup(w => w.WriteAsync(It.IsAny<AuditLogEntry>(), It.IsAny<CancellationToken>()))
+            .Callback<AuditLogEntry, CancellationToken>((e, _) => entry = e)
+            .Returns(Task.CompletedTask);
+        var behavior = new AuditBehavior<SampleCustomDevelopmentCommand, Result>(
+            new Mock<IClientContext>().Object, _writer.Object,
+            new Mock<ILogger<AuditBehavior<SampleCustomDevelopmentCommand, Result>>>().Object, TimeProvider.System);
+
+        await behavior.Handle(
+            new SampleCustomDevelopmentCommand("Başlık Ayşe", "Hasta Pamuk", "Ekran Ali", "Gerekçe Veli", "Not Can", 2),
+            (_, _) => ValueTask.FromResult(Result.Success()),
+            CancellationToken.None);
+
+        entry!.RequestPayload.Should().NotContainAny("Ayşe", "Pamuk", "Ali", "Veli", "Can");
+        entry.RequestPayload.Should().Contain("\"priority\":2");
+    }
 }

@@ -232,6 +232,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Özel geliştirme talebi (TIER-010): açık talep sınırı dolu ya da durum akışı dışı geçiş.
+        if (normalized is "customdevelopment.toomanyopen" or "customdevelopment.invalidstatustransition")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Pasif oda/bölüm yeni yatışa atanamaz (HOSP-002): tanımın durumu ile çakışma.
         if (normalized is "hospitalizations.roominactive")
         {
