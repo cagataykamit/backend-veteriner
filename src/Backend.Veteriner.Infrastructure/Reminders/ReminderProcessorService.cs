@@ -165,6 +165,8 @@ public sealed partial class ReminderProcessorService
 
         // Günlüğü yazılmış aday tur sınırına (batchSize) sayılmaz: aksi halde pencerede batchSize'dan fazla aday varken
         // aynı ilk adaylar her turda yeniden seçilir ve kalanlar hiç değerlendirilmez.
+        // Tekrar engeli randevu saatine de bağlıdır: yeniden zamanlanan randevuya yeni saat için bir hatırlatma (yeni bağlantılarla)
+        // gider; eski saatin günlüğü kalır. Saat anahtara eklenmeden önce yazılmış günlükler ScheduledForUtc ile eşleşir.
         var candidates = await _db.Appointments
             .AsNoTracking()
             .Where(a => a.TenantId == tenantId
@@ -175,6 +177,7 @@ public sealed partial class ReminderProcessorService
                 && !_db.ReminderDispatchLogs.Any(l => l.TenantId == tenantId
                     && l.SourceEntityType == ReminderSourceEntityType.Appointment
                     && l.SourceEntityId == a.Id
+                    && l.ScheduledForUtc == a.ScheduledAtUtc
                     && l.DedupeKey.EndsWith(dedupeSuffix)))
             .OrderBy(a => a.ScheduledAtUtc)
             .Select(a => new AppointmentReminderCandidateRow(a.Id, a.ClinicId, a.PetId, a.ScheduledAtUtc, a.DurationMinutes, a.AppointmentType))
@@ -217,7 +220,7 @@ public sealed partial class ReminderProcessorService
             .ToHashSet();
 
         var dedupeKeys = candidates
-            .Select(c => BuildAppointmentDedupeKey(c.AppointmentId, hoursBefore))
+            .Select(c => BuildAppointmentDedupeKey(c.AppointmentId, c.ScheduledAtUtc, hoursBefore))
             .Distinct()
             .ToArray();
         var existingDedupe = await _db.ReminderDispatchLogs
@@ -229,7 +232,7 @@ public sealed partial class ReminderProcessorService
 
         foreach (var candidate in candidates)
         {
-            var dedupeKey = BuildAppointmentDedupeKey(candidate.AppointmentId, hoursBefore);
+            var dedupeKey = BuildAppointmentDedupeKey(candidate.AppointmentId, candidate.ScheduledAtUtc, hoursBefore);
             if (dedupeSet.Contains(dedupeKey))
                 continue;
 
@@ -648,8 +651,8 @@ public sealed partial class ReminderProcessorService
         => ex.InnerException?.Message.Contains("IX_ReminderDispatchLogs_TenantId_DedupeKey", StringComparison.OrdinalIgnoreCase) == true
            || ex.Message.Contains("IX_ReminderDispatchLogs_TenantId_DedupeKey", StringComparison.OrdinalIgnoreCase);
 
-    private static string BuildAppointmentDedupeKey(Guid appointmentId, int hoursBefore)
-        => $"appointment:{appointmentId:D}{AppointmentDedupeSuffix(hoursBefore)}";
+    private static string BuildAppointmentDedupeKey(Guid appointmentId, DateTime scheduledAtUtc, int hoursBefore)
+        => $"appointment:{appointmentId:D}:at:{scheduledAtUtc:yyyyMMddHHmmssfffffff}{AppointmentDedupeSuffix(hoursBefore)}";
 
     private static string AppointmentDedupeSuffix(int hoursBefore) => $":hours-before:{hoursBefore}";
 

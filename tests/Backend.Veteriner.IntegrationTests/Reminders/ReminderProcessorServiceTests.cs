@@ -173,6 +173,53 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ProcessOnce_Should_Send_Reminder_Once_For_New_Time_When_Appointment_Rescheduled()
+    {
+        // Eski saatin bağlantıları yeniden zamanlamada geçersizdir; yeni saat için yeni bağlantılı hatırlatma bir kez gider.
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A", now);
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", now, "905555555555", "ali@example.com");
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", await GetAnySpeciesIdAsync(db));
+        var oldTime = now.AddHours(20);
+        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, oldTime, 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, now);
+        settings.Update(true, 24, false, 3, true, now);
+        db.AddRange(tenant, clinic, client, pet, appt, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+        email.Enqueued.Should().HaveCount(1);
+
+        // Yeni saat yakın: hatırlatma anı geçmiş ama randevu gelecekte (mevcut "kaçan pencere" kuralı).
+        var newTime = now.AddHours(2);
+        appt.RescheduleTo(newTime).IsSuccess.Should().BeTrue();
+        await db.SaveChangesAsync();
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Should().HaveCount(2, "yeni saat için bir kez gider");
+        var body = email.Enqueued[1].Body;
+        body.Should().Contain($"&dates={appt.ScheduledAtUtc:yyyyMMdd'T'HHmmss'Z'}");
+        var token = System.Text.RegularExpressions.Regex.Match(body, "token=([^&\\s]+)").Groups[1].Value;
+        var respond = await db.AppointmentOwnerLinks.AsNoTracking()
+            .SingleAsync(l => l.Purpose == AppointmentOwnerLinkPurpose.Respond && l.ExpiresAtUtc == appt.ScheduledAtUtc);
+        respond.TokenHash.Should().Be(new Sha256TokenHashService().ComputeSha256(Uri.UnescapeDataString(token)));
+        (await db.AppointmentOwnerLinks.AsNoTracking()
+                .CountAsync(l => l.Purpose == AppointmentOwnerLinkPurpose.Calendar && l.ExpiresAtUtc == appt.ScheduledAtUtc))
+            .Should().Be(1);
+
+        // Eski saatin günlüğü silinmez.
+        var logs = await db.ReminderDispatchLogs.AsNoTracking().OrderBy(l => l.CreatedAtUtc).ToListAsync();
+        logs.Should().HaveCount(2);
+        logs[0].ScheduledForUtc.Should().BeCloseTo(oldTime, TimeSpan.FromMilliseconds(1));
+        logs[1].ScheduledForUtc.Should().Be(appt.ScheduledAtUtc);
+        logs.Select(l => l.DedupeKey).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
     public async Task ProcessOnce_Should_Enqueue_VaccinationReminder()
     {
         await using var db = await CreateDbContextAsync();

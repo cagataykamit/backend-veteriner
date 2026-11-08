@@ -6,7 +6,9 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.LegalAcceptances;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.Billing;
@@ -319,8 +321,46 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             (await db.ScheduledSubscriptionPlanChanges.AsNoTracking().SingleAsync(c => c.TenantId == seeded.TenantId)).Status
                 .Should().Be(SubscriptionPlanChangeStatus.Applied);
-            (await db.TenantSubscriptions.AsNoTracking().SingleAsync(s => s.TenantId == seeded.TenantId)).PlanCode
-                .Should().Be(SubscriptionPlanCode.Basic);
+            var sub = await db.TenantSubscriptions.AsNoTracking().SingleAsync(s => s.TenantId == seeded.TenantId);
+            sub.PlanCode.Should().Be(SubscriptionPlanCode.Basic);
+            sub.Status.Should().Be(TenantSubscriptionStatus.Trialing, "düşürme denemeyi ücretli döneme çevirmez");
+            sub.ActivatedAtUtc.Should().BeNull();
+        }
+    }
+
+    /// <summary>
+    /// Otomatik yenileme yok (BILL-001): dönem sonunda düşürme yalnız paketi değiştirir. Yeni dönem ödemeyle başlar; ödeme yoksa
+    /// abonelik salt okunur kalır.
+    /// </summary>
+    [Fact]
+    public async Task Due_Downgrade_At_Paid_Period_End_Should_Not_Start_Unpaid_Period()
+    {
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Pro, memberCount: 2);
+        var paidAt = DateTime.UtcNow.AddMonths(-1).AddMinutes(-5);
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var sub = await db.TenantSubscriptions.SingleAsync(s => s.TenantId == seeded.TenantId);
+            sub.ActivatePaidPlan(SubscriptionPlanCode.Pro, BillingPeriodKind.Monthly, paidAt);
+            db.ScheduledSubscriptionPlanChanges.Add(ScheduledSubscriptionPlanChange.CreateScheduledDowngrade(
+                seeded.TenantId, SubscriptionPlanCode.Pro, SubscriptionPlanCode.Basic, Guid.NewGuid(),
+                paidAt.AddDays(10), sub.PaidPeriodEndUtc!.Value, reason: null));
+            await db.SaveChangesAsync();
+        }
+
+        await ProcessDuePlanChangesAsync();
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.ScheduledSubscriptionPlanChanges.AsNoTracking().SingleAsync(c => c.TenantId == seeded.TenantId)).Status
+                .Should().Be(SubscriptionPlanChangeStatus.Applied);
+            var sub = await db.TenantSubscriptions.AsNoTracking().SingleAsync(s => s.TenantId == seeded.TenantId);
+            sub.PlanCode.Should().Be(SubscriptionPlanCode.Basic);
+            sub.ActivatedAtUtc.Should().BeCloseTo(paidAt, TimeSpan.FromMilliseconds(10), "ödeme alınmadan yeni dönem başlamaz");
+            sub.PaidPeriodEndUtc.Should().BeBefore(DateTime.UtcNow);
+            TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, DateTime.UtcNow).Should().Be(TenantSubscriptionStatus.ReadOnly);
+            (await db.BillingCheckoutSessions.AsNoTracking().AnyAsync(c => c.TenantId == seeded.TenantId)).Should().BeFalse();
         }
     }
 

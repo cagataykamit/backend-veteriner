@@ -99,8 +99,8 @@ public sealed class ScheduledPlanChangeProcessorHostedService : BackgroundServic
                 continue;
             }
 
-            // Idempotent apply: abonelik zaten hedefte aktifse yalnız change kaydını applied yaparız.
-            sub.ActivatePaidPlan(item.TargetPlanCode, now);
+            // Yalnız paket değişir; dönem ödemeyle yenilenir (TenantSubscription.ApplyScheduledDowngrade).
+            sub.ApplyScheduledDowngrade(item.TargetPlanCode, now);
             item.MarkApplied(now);
 
             await subsWrite.UpdateAsync(sub, stoppingToken);

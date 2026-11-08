@@ -12,7 +12,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `BILL-001`, A
 | Dönem | Yıllık dönem ödeme anından itibaren 1 yıl (`ActivatedAtUtc + 1 yıl`). Otomatik yenileme yok: dönem bitince abonelik salt okunura düşer, kiracı yeniden ödeme başlatır (aylıktaki gibi). |
 | Aylıktan yıllığa | Etkin aylık dönemde **hemen** geçilir: çekilen = yıllık fiyat − mevcut aylık dönemin kullanılmamış kısmı (aylık fiyat × kalan oran). Yeni yıllık dönem ödeme anında başlar. Aynı anda plan yükseltmesi de seçilebilir (hedef planın yıllık fiyatı). |
 | Yıllıktan aylığa | Etkin yıllık dönemde **yapılamaz** (`409`/`400`, aşağıda); dönem bitince yenilemede aylık seçilir. |
-| Yıllık dönemde yükseltme | Mevcut yıllık dönem içinde, yıllık fiyat farkı × kalan oran çekilir; dönem başlangıcı değişmez. Düşürme aylıktaki gibi dönem sonuna planlanır. |
+| Yıllık dönemde yükseltme | Mevcut yıllık dönem içinde, yıllık fiyat farkı × kalan oran çekilir; dönem başlangıcı değişmez. Düşürme aylıktaki gibi dönem sonuna planlanır; dönem sonunda yalnız paket değişir, yeni dönem yenileme ödemesiyle başlar. |
 | Deneme | Deneme sırasında plan değişimi ücretsizdir (Model A); dönem seçimi ilk ücretli ödemede yapılır. |
 | Sağlayıcı | iyzico (tek seferlik Checkout Form, hesaplanan tutar çekilir) ve Manual. **Stripe yıllık desteklemez** (tekrarlayan fiyat kimliği aylık). |
 
@@ -50,7 +50,7 @@ Yanıtta `billingPeriod` (`"Monthly"` | `"Yearly"`; hiç ödeme yoksa `"Monthly"
 
 ## 3. Testler
 
-- Domain: `TenantSubscriptionBillingPeriodTests` (dönem sonu, aylıktan yıllığa yeniden başlatma, yıllıkta yükseltme anchor'ı, dönem bitince aylığa dönüş, oturum dönemi, 10 ay fiyatı).
+- Domain: `TenantSubscriptionBillingPeriodTests` (dönem sonu, aylıktan yıllığa yeniden başlatma, yıllıkta yükseltme anchor'ı, dönem bitince aylığa dönüş, planlı düşürmede yalnız paket değişir, oturum dönemi, 10 ay fiyatı).
 - Application: `StartSubscriptionCheckoutCommandHandlerTests` (yıllık yenileme, dönem verilmeden yıllık yenileme, aylıktan yıllığa oranlama, yıllıkta yükseltme, yıllıktan aylığa red, Stripe red, dönem farkında oturum yeniden kullanılmaz), `TenantSubscriptionEffectiveWriteEvaluatorTests`, `TenantSubscriptionPeriodCalculatorTests`.
 - Entegrasyon: `YearlyBillingIntegrationTests` (aylık ücretli kiracı → yıllık ödeme → sonuçlandırma → özet 1 yıllık dönem; geçersiz dönem 400).
 
