@@ -182,7 +182,8 @@ public sealed class ClinicsController : ControllerBase
             id,
             body.DefaultAppointmentDurationMinutes,
             body.SlotIntervalMinutes,
-            body.AllowOverlappingAppointments), ct);
+            body.AllowOverlappingAppointments,
+            body.OwnerCancelLinkEnabled), ct);
         return result.ToActionResult(this);
     }
 

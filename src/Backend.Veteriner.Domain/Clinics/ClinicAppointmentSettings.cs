@@ -8,12 +8,22 @@ namespace Backend.Veteriner.Domain.Clinics;
 /// </summary>
 public sealed class ClinicAppointmentSettings : ITenantOwned
 {
+    /// <summary>Hatırlatmadaki "iptal et" bağlantısı varsayılan açık (TIER-019; çalışma varsayımı). Kayıt yoksa da açıktır.</summary>
+    public const bool DefaultOwnerCancelLinkEnabled = true;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
     public int DefaultAppointmentDurationMinutes { get; private set; }
     public int SlotIntervalMinutes { get; private set; }
     public bool AllowOverlappingAppointments { get; private set; }
+
+    /// <summary>
+    /// Randevu hatırlatmasında sahibe "iptal et" bağlantısı gider (TIER-019). Kapalıysa e-postada "iptal için kliniği arayın"
+    /// satırı çıkar ve bağlantıdan iptal reddedilir; "onayla" her durumda açıktır.
+    /// </summary>
+    public bool OwnerCancelLinkEnabled { get; private set; } = DefaultOwnerCancelLinkEnabled;
+
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
@@ -25,7 +35,8 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
         int defaultAppointmentDurationMinutes,
         int slotIntervalMinutes,
         bool allowOverlappingAppointments,
-        DateTime utcNow)
+        DateTime utcNow,
+        bool ownerCancelLinkEnabled = DefaultOwnerCancelLinkEnabled)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -41,6 +52,7 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
             DefaultAppointmentDurationMinutes = defaultAppointmentDurationMinutes,
             SlotIntervalMinutes = slotIntervalMinutes,
             AllowOverlappingAppointments = allowOverlappingAppointments,
+            OwnerCancelLinkEnabled = ownerCancelLinkEnabled,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = null,
         };
@@ -50,12 +62,14 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
         int defaultAppointmentDurationMinutes,
         int slotIntervalMinutes,
         bool allowOverlappingAppointments,
+        bool ownerCancelLinkEnabled,
         DateTime utcNow)
     {
         Validate(defaultAppointmentDurationMinutes, slotIntervalMinutes);
         DefaultAppointmentDurationMinutes = defaultAppointmentDurationMinutes;
         SlotIntervalMinutes = slotIntervalMinutes;
         AllowOverlappingAppointments = allowOverlappingAppointments;
+        OwnerCancelLinkEnabled = ownerCancelLinkEnabled;
         UpdatedAtUtc = utcNow;
     }
 
