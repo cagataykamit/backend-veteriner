@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9_READINESS.md` Dilim 7. Tasarım gerekçesi, akış, riskler ve kullanıcı kararları: `ASAMA9_IMPORT_DESIGN.md`. Tüm uçlar `api/v1` altında, JSON (dosya yükleme ve indirme hariç), standart `ProblemDetails` + `extensions.code` hata zarfı, sayfalama mevcut liste uçlarındaki biçimde.
 
-> **Durum:** Kararlar kesinleşti: ADR-019 (ürün deposu, K1–K12 önerilen seçeneklerle kabul). `[K#]` işaretleri o karara bağlıdır. **Uygulanan dilimler: B1 (temel)** — parti kaydı, durum makinesi, izinler, migration `AddDataImportBatches`; **B2 (okuma ve eşleme)** — XLSX/CSV okuyucu, dosya yükleme, sütun/değer eşleme, şablon (yeni migration yok); **B3 (doğrulama / kuru çalıştırma)** — satır kuralları, mükerrer ve çip denetimi, hatırlatma etkisi, preview/rows/errors uçları (yeni migration yok); **B4 (uygulama)** — commit, arka plan işi (kira/devralma, geri basınç), progress, hatırlatma dışlaması ve serbest bırakma (yeni migration yok); **B5 (geri alma ve temizlik)** — rollback-preview, rollback (arka plan, sahip bazlı), silme olayları (`client.deleted.v1`, `pet.deleted.v1`) ve projeksiyon desteği, 30 gün satır verisi temizliği, 7 gün `Expired` işi (yeni migration yok); **K13 (doğrulama arka planda)** — `POST .../validate` işi kuyruğa alır (`202`), doğrulama işçisi (kira/devralma) satırları işler, `progress` doğrulama fazını verir (yeni migration yok).
+> **Durum:** Kararlar kesinleşti: ADR-019 (ürün deposu, K1–K12 önerilen seçeneklerle kabul). `[K#]` işaretleri o karara bağlıdır. **Uygulanan dilimler: B1 (temel)** — parti kaydı, durum makinesi, izinler, migration `AddDataImportBatches`; **B2 (okuma ve eşleme)** — XLSX/CSV okuyucu, dosya yükleme, sütun/değer eşleme, şablon (yeni migration yok); **B3 (doğrulama / kuru çalıştırma)** — satır kuralları, mükerrer ve çip denetimi, hatırlatma etkisi, preview/rows/errors uçları (yeni migration yok); **B4 (uygulama)** — commit, arka plan işi (kira/devralma, geri basınç), progress, hatırlatma dışlaması ve serbest bırakma (yeni migration yok); **B5 (geri alma ve temizlik)** — rollback-preview, rollback (arka plan, sahip bazlı), silme olayları (`client.deleted.v1`, `pet.deleted.v1`) ve projeksiyon desteği, 30 gün satır verisi temizliği, 7 gün `Expired` işi (yeni migration yok); **K13 (doğrulama arka planda)** — `POST .../validate` işi kuyruğa alır (`202`), doğrulama işçisi (kira/devralma) satırları işler, `progress` doğrulama fazını verir (yeni migration yok); **TIER-021 (kaynak program profilleri)** — `GET /imports/source-profiles`, yüklemede `sourceProfile`, öneri güveni `Profile`, migration `AddDataMigrationSupport` (bölüm 4.5).
 
 ## 0) Dilim durumu ve frontend için değişenler
 
@@ -14,6 +14,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | B4 | `POST .../commit`, `GET .../progress`, `POST .../release-reminders`, hatırlatma dışlaması, arka plan işi | **Uygulandı** |
 | B5 | `GET .../rollback-preview`, `POST .../rollback`, silme olayları + projeksiyon, 30 gün temizlik, `Expired` işi | **Uygulandı** |
 | K13 | `POST .../validate` arka plan işi (`202`/`200` tekrar), `GET .../progress` doğrulama fazı (ADR-019 K13) | **Uygulandı** (backend; frontend sihirbazı henüz senkron yanıta göre — aşağıda geçiş) |
+| TIER-021 | `GET /imports/source-profiles`, `POST /imports/batches` alanı `sourceProfile`, parti nesnesinde `sourceProfile`, öneri güveni `Profile` (bölüm 4.5, 7.15) | **Uygulandı** (migration `AddDataMigrationSupport`) |
 
 **Frontend için değişenler (B1):**
 - Yeni izinler `Imports.Read`, `Imports.Manage`, `Imports.Commit` yalnız yönetici düzeyine (Admin, Owner, ClinicAdmin) bağlanır. Seed çalışıp kullanıcı çıkış-giriş yapana kadar bu uçlar `403` döner; menü öğesi izinle gizlenmelidir.
@@ -66,6 +67,13 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - `Validating` iken: `preview`/`rows`/`errors` `409 Imports.InvalidState` (sonuç hazır değil; değişmedi), `PUT mapping`, `DELETE` ve `commit` `409 Imports.InvalidState`. Doğrulama **iptal edilemez** (iptal ucu yok); bitmesi beklenir veya eşleme bittikten sonra değiştirilip yeniden doğrulanır. Kiracıda tek aktif iş kuralı aynıdır (`409 Imports.AnotherJobRunning`).
 - Sonuç kümesi **değişmedi**: satır kuralları, mükerrer/çip/bağlantı, Türkçe duyarlı ad anahtarları, `reminderImpact`, sorun kodları, sayaçlar ve değişmezler B3 ile birebir aynıdır (kural kodu tek yerde: `ImportValidationRunner` + `ImportValidationEngine`; yalnız çalışma biçimi değişti). Bugün/tarih kuralları işin çalıştığı ana göre hesaplanır (eskiden istek anı; fark saniyelerdir).
 - K13'te yeni migration **yoktur** (`Validating` durumu, kira sütunları ve tek-aktif-iş indeksi B1'den beri vardır).
+
+**Frontend için değişenler (TIER-021 — kaynak program profilleri; geriye uyumlu ekleme):**
+- Yükleme öncesi "Hangi programdan geliyorsunuz?" seçenekleri `GET /imports/source-profiles` ile okunur (bölüm 7.15; `Imports.Read`, her pakette). Liste: `Generic` (Genel Excel / CSV), `Kolayvet`, `EVet`. Seçenek adları ve not metni sunucudan gelir; istemci kopyalamaz.
+- Seçilen profil `POST /imports/batches` gövdesinde `sourceProfile` alanıyla gönderilir (isteğe bağlı; yoksa `Generic`). Geçersiz değer `400 Validation.FluentValidation`. Aynı `requestId` ile farklı `sourceProfile` gelirse `409 Imports.RequestIdConflict`.
+- Parti nesnesine (ayrıntı, liste, yükleme ve eşleme yanıtı) `sourceProfile` eklendi. Profil yüklemeden sonra değişmez; başka profil için dosya yeniden yüklenir (taslak silinebilir).
+- `tables[].columns[].confidence` yeni değer alabilir: **`Profile`** (seçilen programın hazır eşlemesi). Sıra: `Exact` → `Profile` → `Alias`. Profil eşlemelerinin hepsi şu an **doğrulanmamıştır** (`verified = false`); ekran bunu kullanıcıya söylemeli ve eşlemeyi her zaman düzeltilebilir bırakmalıdır.
+- Profil seçimi içe aktarmayı hiçbir pakette kilitlemez; yeni izin yoktur.
 
 ## 1) Kapsam ve sınırlar
 
@@ -203,6 +211,17 @@ Kabul edilen yalnız-tarih biçimleri (gün öncelikli, belirsizlik yok): `gg.aa
 
 Saklama: tarih-saat alanları (`Vaccination.AppliedAtUtc`, `DueAtUtc`) için yalnız-tarih değeri **Europe/Istanbul 12:00** olarak yorumlanıp UTC'ye çevrilir (UTC kayması günü değiştirmesin diye öğlen seçilir; `Turkey Standard Time` yedek kimliği mevcut randevu kodundaki gibi). `Pet.BirthDate` zaten `DateOnly`'dir.
 
+### 4.5 Kaynak program profilleri (TIER-021)
+
+Klinik yükleme öncesi eski programını seçer: **Genel Excel / CSV** (`Generic`), **Kolayvet** (`Kolayvet`), **E-vet** (`EVet`). Seçim sütun önerisini genişletir; ikinci bir eşleme mekanizması yoktur. Kural tek yerdedir: `ImportSourceProfiles` (kod; başlık → kanonik alan, kaynak notu, `Verified`). Öneri sırası (bölüm 7.2): kanonik/şablon başlığı (`Exact`) → seçilen profilin başlığı (`Profile`) → genel takma adlar (`Alias`). Katlama bölüm 5'teki gibidir (büyük/küçük harf ve Türkçe harf farkı yok). Kullanıcı öneriyi `PUT .../mapping` ile her zaman düzeltir (ADR-019 K1).
+
+- **Gerçek dışa aktarma dosyası görülmedi.** Her profil satırı kamuya açık bilgiden ya da rakip incelemesinde görülen sütun adından gelir ve `verified = false`'tur. Kaynağı bulunamayan başlık profile yazılmaz; genel takma ad listesinde kalır. Gerçek dosya görülünce yalnız `ImportSourceProfiles` düzeltilir ve ilgili satır `Verified = true` yapılır.
+- **Kolayvet:** kamuya açık sütun adı bulunamadı; profil eşlemesizdir, genel takma adlar kullanılır. Dayanak: Kolayvet sitesi hasta ve müşteri verisinin Excel/PDF olarak dışa alınabildiğini yazıyor (`kolayvet.com/ozellikler/ozellikler/gelismis-ice-disa-aktarma`).
+- **E-vet:** rakip incelemesinde görülen ekran ve rapor sütunları (ürün deposu `competitors/e-vet.md`). Müşteri: `Adı`, `Müşteri` → `AdSoyad`; `Protokol No` → `MusteriNo`; `Gsm` → `Telefon`; `Email` → `Eposta`. Hasta: `Hasta Adı`, `Hasta` → `HayvanAdi`; `Protokol` → `HayvanNo`; `Tür` → `Tur`; `Hasta Irkı`, `Irk` → `Irk`; `Cinsiyet`; `Doğum Tarihi` → `DogumTarihi`; `Sahip` → `SahipAdSoyad`; `Gsm` → `SahipTelefon`; `Çip No` → `Mikrocip` (HBS listesinden). Aşı geçmişi için E-vet dışa aktarması görülmedi; aşı sayfasında genel takma adlar kullanılır. E-vet'in "Yedek Al" ekranı Müşteri ve Hasta listesini Excel olarak veriyor; dosyanın başlıkları görülmedi.
+- Genel takma adlara bu dilimde eklenenler: `Hasta Irkı`, `Hayvan Irkı` (`Irk`), `Çip Numarası` (`Mikrocip`), `Kilo (kg)` (`Agirlik`), `Aşı Uygulama Tarihi` (`UygulamaTarihi`).
+- Seçilen profil partide saklanır (`ImportBatches.SourceProfile`, istatistik ve destek için) ve parti nesnesinde `sourceProfile` olarak döner. Kişisel veri değildir.
+- Depoda örnek rakip dosyası **yoktur** (kişisel veri riski); testler yalnız başlık satırıyla çalışır.
+
 ## 5) Tür / ırk / aşı / renk eşleme
 
 Eşleme anahtarı katlanmış metindir: küçük harf, Türkçe harf farkı yok (`ş=s ğ=g ü=u ö=o ç=c ı=i İ=i`), baştaki/sondaki/art arda boşluk yok. Aynı katlama `DailySearchTerm.Fold` kuralından türetilir (kural tek yerde yaşar).
@@ -329,12 +348,13 @@ Hata zarfı için bölüm 8. `{id}` = parti kimliği.
 | `clinicId` | Aşı varsa evet | Bölüm 4.3. |
 | `name` | Hayır | Listede görünen etiket (≤ 100); kişisel veri içermemeli. |
 | `encoding`, `delimiter` | Hayır | CSV zorlaması. |
+| `sourceProfile` | Hayır | Kaynak program: `Generic` (varsayılan), `Kolayvet`, `EVet` (bölüm 4.5; TIER-021). Partide saklanır, sütun önerisini seçer. |
 
 İşlem: dosya boyut/biçim denetimi, **içerik özeti (SHA-256)** hesabı, başlıkların okunması, kanonik başlıklarla otomatik eşleme önerisi. Satırlar bu aşamada saklanır (`Uploaded`) ama doğrulanmamıştır.
 
 **B2 davranışı (uygulandı):** Dosya alanları işlenir (bölüm 4.1 "B2 okuyucu ayrıntıları"). Sıra: kiracı/klinik denetimi → dosya imza/boyut denetimi → içerik özeti → aynı `requestId` tekrarı (`200` aynı parti; `name`, `clinicId` **ve içerik özeti** aynı olmalı, aksi `409 Imports.RequestIdConflict`) → aynı özetli aktif parti (`409 Imports.DuplicateFile`; `extensions.batchId` yalnız çağıranın görebildiği partiyse) → açık taslak sınırı → okuma (bölüm 4.1 hataları) → aşı tablosu var ve `clinicId` yok (`400 Imports.ClinicRequired`) → kayıt. Parti ve hazırlık satırları **tek veritabanı işleminde** yazılır; okuma hatasında hiçbir şey kalmaz. Satırlar `ImportBatchRow` olarak saklanır (`SourceJson` = başlık → metin sözlüğü, `NormalizedJson` boş, doğrulama durumu `Pending`); `summary.<tablo>.total` satır sayısı olur. Dosya yoksa `400 Imports.EmptyFile`. Aşı için `clinicId` erişimi B1'deki gibi okuma kapsamıyla denetlenir; aşı yazma erişimi ve `Vaccinations.Create` denetimi uygulama (B4) adımındadır. `encoding` ve `delimiter` değerleri izinli kümede değilse `400 Validation.FluentValidation`. Audit payload'ı dosya içeriği ve satır verisi taşımaz (yalnız `requestId`, `name`, `clinicId`, `encoding`, `delimiter`).
 
-Yanıt gövdesi (B1 alanlarına ek): `tables[]` ve yalnız yükleme yanıtında `warnings[]` (`{ code, table?, message }`: `Imports.EncodingSuspect`, `Imports.TableEmpty`). `tables[].table` = `customers|pets|vaccinations`; `rowCount` = veri satırı sayısı; `columns[]` = dosyadaki başlıklar sırasıyla `{ source, suggested, confidence, mapped }`: `suggested` kanonik başlık veya `null`, `confidence` `Exact` (kanonik adla katlanmış eşit) | `Alias` (takma adla eşit) | `None`, `mapped` kayıtlı eşlemedeki kanonik ad (eşleme kaydedilmemişse `null`). Öneri kuralı: önce `Exact`, sonra `Alias`; bir kanonik alan en çok bir sütuna, bir sütun en çok bir kanonik alana önerilir (ilk gelen kazanır). Sütun başlığı karşılaştırması bölüm 4.1/5 katlamasıyladır. Takma ad tablosu koddadır (`ImportCanonicalSchema`); yönetilen veri değildir.
+Yanıt gövdesi (B1 alanlarına ek): `tables[]` ve yalnız yükleme yanıtında `warnings[]` (`{ code, table?, message }`: `Imports.EncodingSuspect`, `Imports.TableEmpty`). `tables[].table` = `customers|pets|vaccinations`; `rowCount` = veri satırı sayısı; `columns[]` = dosyadaki başlıklar sırasıyla `{ source, suggested, confidence, mapped }`: `suggested` kanonik başlık veya `null`, `confidence` `Exact` (kanonik adla katlanmış eşit) | `Profile` (seçilen kaynak programın hazır eşlemesi, bölüm 4.5) | `Alias` (takma adla eşit) | `None`, `mapped` kayıtlı eşlemedeki kanonik ad (eşleme kaydedilmemişse `null`). Öneri kuralı: önce `Exact`, sonra `Profile`, sonra `Alias`; bir kanonik alan en çok bir sütuna, bir sütun en çok bir kanonik alana önerilir (ilk gelen kazanır). Sütun başlığı karşılaştırması bölüm 4.1/5 katlamasıyladır. Takma ad tablosu koddadır (`ImportCanonicalSchema`); yönetilen veri değildir.
 
 **B1 davranışı (uygulandı):** Dosya alanları henüz yoktur; yalnız `requestId` (zorunlu), `name` (≤ 100, boşluk kırpılır, boşsa null) ve `clinicId` (opsiyonel) okunur. `clinicId` verilirse kiracıya ait ve çağıranın erişebildiği klinik olmalı (`404 Clinics.NotFound` / `403 Clinics.AccessDenied`) ve aktif klinik bağlamıyla çelişmemeli (`400 Imports.ClinicContextMismatch`). Pasif kiracı `403 Tenants.TenantInactive`; abonelik yazma koruması mevcut kodlarla. Aynı `requestId` + aynı `name`/`clinicId` → `200` aynı parti; farklı `name` veya `clinicId` → `409 Imports.RequestIdConflict` (B2'de içerik özeti de karşılaştırmaya girer). Kiracıda 5 açık taslak varsa `409 Imports.TooManyOpenDrafts`. Yanıt gövdesi bölüm 7.5'teki parti nesnesidir (`tables[]` B2'de eklenir).
 
@@ -344,10 +364,10 @@ Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBac
 
 ```json
 {
-  "id": "guid", "status": "Uploaded", "name": "string?", "clinicId": "guid?",
+  "id": "guid", "status": "Uploaded", "name": "string?", "clinicId": "guid?", "sourceProfile": "Generic|Kolayvet|EVet",
   "tables": [
     { "table": "customers", "rowCount": 1200,
-      "columns": [ { "source": "Ad Soyad", "suggested": "AdSoyad", "confidence": "Exact|Alias|None", "mapped": null } ] }
+      "columns": [ { "source": "Ad Soyad", "suggested": "AdSoyad", "confidence": "Exact|Profile|Alias|None", "mapped": null } ] }
   ],
   "warnings": [ { "code": "Imports.EncodingSuspect", "table": "customers", "message": "..." } ],
   "createdAtUtc": "...", "createdBy": "guid"
@@ -396,7 +416,7 @@ Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `M
 
 ```json
 {
-  "id": "guid", "status": "Validated", "name": "string?", "clinicId": "guid?",
+  "id": "guid", "status": "Validated", "name": "string?", "clinicId": "guid?", "sourceProfile": "EVet",
   "validationId": "guid?", "validatedAtUtc": "...", "committedAtUtc": "...", "rolledBackAtUtc": "...",
   "remindersReleasedAtUtc": null,
   "progress": { "phase": "Validating|Committing|RollingBack", "processed": 4300, "total": 12000 },
@@ -546,6 +566,20 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 **Geri alma (B5):** durum `RollingBack` iken `phase = "RollingBack"`, `total` = geri alma hedefi satırlar (uygulama durumu `Created|RolledBack|Kept`), `processed` = sonucu yazılmış olanlar (`RolledBack|Kept`; yeniden denemede önceki `Kept` satırlar baştan sayılır). `leaseActive` uygulama veya geri alma kirası için aynı anlamdadır. Geri alma bitince (`RolledBack|PartiallyRolledBack|RollbackFailed`) aynı sayım döner.
 `total` = partinin tüm satırları (üç tablo); `processed` = uygulama sonucu yazılmış (`ApplyStatus` ≠ `Pending`) satırlar — hatalı satırlar işin başında `Skipped` yazıldığından sayı başta sıçrayabilir. `phase` `Validating` / `Committing` / `RollingBack` iken aynı adla dolu, aksi `null`. Uygulama bitmiş partide (`Committed|CommitFailed` ve sonrası) `processed` yazılmış satır sayısıdır (`Committed`'da `total`'e eşittir). `leaseActive`: bir işçi şu an partiyi tutuyor mu (kira süresi dolmamış); `Committing` + `leaseActive = false` "işçi bekleniyor / devralınacak" anlamındadır. Önerilen yoklama aralığı 2 sn; durum `Committing` dışına çıkınca yoklama bırakılır ve parti/önizleme yeniden okunur.
 
+### 7.15 `GET /imports/source-profiles` (TIER-021, uygulandı)
+`Imports.Read`; her pakette. Yanıt `200`:
+
+```json
+[
+  { "code": "Generic", "displayName": "Genel Excel / CSV", "note": "…", "verified": false, "mappings": [] },
+  { "code": "Kolayvet", "displayName": "Kolayvet", "note": "…", "verified": false, "mappings": [] },
+  { "code": "EVet", "displayName": "E-vet", "note": "…", "verified": false,
+    "mappings": [ { "table": "pets", "header": "Hasta Irkı", "field": "Irk", "source": "Rakip incelemesi: …", "verified": false } ] }
+]
+```
+
+`verified` profil düzeyinde yalnız tüm eşlemeler doğrulandıysa `true`'dur (eşlemesiz profil doğrulanmış sayılmaz). Sıra sabittir. İçerik bölüm 4.5.
+
 ## 8) Hata kodları
 
 | HTTP | Kod | Durum |
@@ -615,6 +649,7 @@ Silinmeyen kayıt `Kept` ve nedeni (kodlar aşağıdaki B5 tablosunda; taslaktak
 - **B5 (uygulandı) bakım işi** (`ImportMaintenanceHostedService`, `Imports:Maintenance`): her turda (varsayılan 60 dk; uygulama açılışından 1 dk sonra ilk tur) (1) **süresi dolan taslaklar**: `Uploaded|Mapped|Validated|ValidationFailed` ve son hareketten (`updatedAtUtc`, yoksa `createdAtUtc`) ≥ 7 gün → `Expired`; hazırlık satırları aynı işlemde **silinir** ve `payloadPurgedAtUtc` dolar (`Discarded` ile aynı; `Expired` partinin satırları hiçbir uçtan okunamadığı için 30 gün tutulmaz). `Validating` (iş sürüyor) süresi dolmaz. (2) **satır verisi temizliği**: saklanan son durumlar `Committed`, `RolledBack`, `PartiallyRolledBack` ve (B5 ile eklenen) `CommitFailed`, `RollbackFailed` — "işlem bitti" durumları; son durum değişikliğinden ≥ 30 gün geçmiş partilerin satırlarında `SourceJson`, `NormalizedJson`, `IssuesJson` boşaltılır (`ImportBatchRow.PurgePayload`, 500'lük parçalar), sonra `payloadPurgedAtUtc` yazılır (`ImportBatch.PurgePayload`). Satır kimliği, durumları ve hedef kayıt kimliği **kalır** (geri alma temizlenmiş partide de çalışır); sayaçlar ve özet kalır. `Expired` artık bu kümede değildir (süre dolarken temizlenir). Yarıda kesilen temizlik sonraki turda kaldığı yerden sürer (parti işaretlenmeden önce satırlar boşaltılır). Tur başına en çok `BatchSize` (varsayılan 20) parti / tür. Çok örnekli kurulumda iki örnek aynı partiyi işlerse rowversion ikinciyi reddeder; satır boşaltma tekrar zararsızdır. Audit: `ImportBatch.Expired` ve `ImportBatch.PayloadPurged` (aktör yok, hedef parti; payload yalnız satır sayısı). Günlüklere yalnız parti kimliği ve sayılar yazılır.
 - Günlüklere (Serilog) satır verisi, telefon, e-posta, ad yazılmaz; yalnız parti kimliği, tablo, satır numarası, kod.
 - Ham dosya sunucuda **saklanmaz** (dosya deposu kodu yok); yükleme sırasında bellekte okunur, satırlar normalize edilmiş biçimde saklanır.
+- **Geçiş desteği ve KVKK (TIER-021):** klinik eski programın dosyasını Vetinity personeline e-postayla **göndermez**; dosyayı kendisi bu sihirbazla panele yükler. Destek ekibi gerekirse kliniğin izniyle ekran paylaşımında yardım eder; dosyayı devralmaz. Yüklenen satır verisi bu bölümdeki saklama kuralına (30 gün, `[K9]`) tabidir. Geçiş desteği talebi dosya ya da kişisel veri almaz (`CUSTOM_DEVELOPMENT_REQUESTS_API_CONTRACT.md` §11).
 
 ## 11) Geriye uyumluluk / etkilenen mevcut kodlar
 
@@ -629,4 +664,5 @@ Silinmeyen kayıt `Kept` ve nedeni (kodlar aşağıdaki B5 tablosunda; taslaktak
 - B5 audit eylemleri: `ImportBatch.Rollback` (payload: `id`, `requestId`, `reason`, `blockedPolicy`), `ImportBatch.RollbackCompleted` (arka plan; payload durum, politika, tablo başına `deleted`/`kept`), `ImportBatch.Expired`, `ImportBatch.PayloadPurged` (bakım işi; payload satır sayısı). Geri alma birim komutu audit'lenmez. B5 migration gerektirmez: geri alma isteği (`requestId`, `blockedPolicy`) parti `OptionsJson` belgesinde (`rollback` alanı) saklanır; satır sonucu mevcut `ApplyStatus` (`RolledBack`/`Kept`) ve `IssuesJson` sütunlarına yazılır. Yeni outbox olay tipleri `client.deleted.v1`, `pet.deleted.v1` (mevcut `Type` sütununa sığar; tüketici filtreleri tip listelerinden türediği için kendiliğinden kapsanır). Değişen mevcut kod: `ImportBatch` (geri alma kirası, `Expire` satır temizliği, `PayloadRetained` kümesi), `ImportBatchRow` (geri alma sonucu), müşteri/hasta projeksiyon işleyicileri (silme), `ImportOptionsDocument` (`rollback`), `GET .../progress` (geri alma fazı). Yapılandırma: geri alma işi `Imports:Commit` ayarlarını kullanır (`WorkerEnabled`, `PollIntervalSeconds`, `OwnersPerChunk`, `Backpressure:*`); bakım işi `Imports:Maintenance`: `Enabled` (true), `IntervalMinutes` (60), `BatchSize` (20).
 - K13 (doğrulama arka planda): audit `ImportBatch.Validate` (istek; değişmedi) + `ImportBatch.ValidationCompleted` (arka plan; aktör yok, payload durum ve tablo başına `total/valid/warning/error`). **Migration gerektirmez:** `Validating` durumu (enum değeri 3), `LeaseOwner`/`LeaseUntilUtc` ve `UX_ImportBatches_TenantId_ActiveJob` B1'den beri vardır (`dotnet ef migrations has-pending-model-changes`: değişiklik yok). Değişen mevcut kod: `ImportBatch` (`StartValidation` kirasız kuyruğa alır; `ClaimValidationLease`/`RenewValidationLease`; `CanStartValidation` özellik oldu, sabit `ValidationLeaseOwner` ve `IsValidationLeaseExpired` kaldırıldı; `IsJobLeaseActive` doğrulamayı da kapsar), `ValidateImportBatchCommandHandler` (yalnız kuyruğa alır), yeni `ImportValidationRunner` (Application; kurallar), `ImportValidationProcessor` + `ImportValidationHostedService` (Infrastructure; iş), `GET .../progress` (doğrulama fazı). Yapılandırma: doğrulama işi `Imports:Commit:WorkerEnabled` ve `PollIntervalSeconds` ayarlarını kullanır (geri basınç yok).
 - Ortak hata zarfı: `Error` değeri isteğe bağlı `Extensions` taşır; `ProblemDetails.extensions` alanına (örn. `batchId`) kopyalanır.
+- **TIER-021 migration `AddDataMigrationSupport`:** `ImportBatches.SourceProfile int NOT NULL DEFAULT 0` (`Generic`); aynı migration `CustomDevelopmentRequests` geçiş desteği sütunlarını ekler. Yalnız yerel dev DB'ye uygulandı. Audit: `ImportBatch.Create` payload'ı `sourceProfile` alanını da taşır.
 - Mevcut müşteri/hasta/aşı uçlarının sözleşmesi **değişmez**.

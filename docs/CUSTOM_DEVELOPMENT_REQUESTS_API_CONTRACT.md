@@ -138,3 +138,86 @@ Tablo `CustomDevelopmentRequests`: `Id`, `TenantId`, `RequestTitle nvarchar(120)
 2. Form: başlık, konu (ekran/rapor/çıktı), hangi ekran/rapor/çıktı, ne istendiği, öncelik; kişisel ya da hasta verisi yazılmaması uyarısı. `openCount >= maxOpen` ise form kapalı ve sınır açıklaması; 409 `CustomDevelopment.TooManyOpen` gelirse liste yenilenir.
 3. Liste: durum etiketi, kapsam dışında gerekçe, varsa Vetinity notu.
 4. Platform yöneticisi: menüde "Klinik adresleri" ile aynı yetkide (`platform_admin`) ayrı sayfa; durum ve "yalnız açıklar" filtresi, satırda kiracı adı; geçerli sonraki durumlar, kapsam dışında gerekçe zorunlu, not alanı.
+
+## 11) Geçiş desteği ve kurulum görüşmesi — TIER-021
+
+Kaynak: ürün deposu backlog `TIER-021`, ADR-035 (2026-11-09 notu: geçiş desteği Kurumsal'da ücretsiz, diğer paketlerde ücretli; kurulum görüşmesi 1 saat), ADR-014 K8 ve ADR-019 (içe aktarma kapsamı ve 30 gün saklama). İçe aktarmadaki hazır eşleme profilleri: `IMPORT_API_CONTRACT.md` §4.5.
+
+> **Durum:** Uygulandı (kod + test), dal `feat/tier-021-veri-aktarimi`. Migration `AddDataMigrationSupport` (yalnız yerel DB). Yeni izin yok (`CustomDevelopmentRequests.Manage`). Yeni paket özelliği `FreeMigrationSupport` (yalnız Kurumsal; yalnız ücreti belirler). §11.6 maddeleri **çalışma varsayımıdır**. E-posta bildirimi yok.
+
+### 11.1 Neden aynı kayıt
+
+Geçiş desteği talebi ayrı tablo değil, bu sözleşmedeki talebin yeni konusudur: `targetKind = "Migration"`. Durum akışı (§2), platform yöneticisi listesi ve durum ucu (§4), denetim maskelemesi (§5) ve eşzamanlılık aynen kullanılır; ikinci bir yönetim ekranı ve ikinci bir durum akışı yoktur. Farklar: her pakette açılır, özel geliştirmenin 3'lük sınırına ve listesine (`GET /`) karışmaz, kendi uçları ve sınırı vardır. `POST /` ile `targetKind = "Migration"` gönderilemez (400 `Validation.FluentValidation`).
+
+Durumların anlamı: Alındı → İnceleniyor → **Planlandı** (görüşme günü ve saati `responseNote` ile kliniğe yazılır) → Tamamlandı; uygun değilse Kapsam dışı (gerekçe zorunlu).
+
+### 11.2 Alanlar
+
+| Alan | Kural |
+|---|---|
+| `sourceProgram` | `Kolayvet` \| `EVet` \| `Generic` (Genel Excel / CSV ya da listede olmayan program; zorunlu). Liste `IMPORT_API_CONTRACT.md` §4.5 ile aynı enum |
+| `otherProgramName` | İsteğe bağlı, yalnız `Generic` iken kullanılır; kırpılmış en çok 120 karakter. Boşsa "Genel Excel / CSV" yazılır |
+| `recordVolume` | Yaklaşık kayıt (müşteri + hasta) sayısı: `Unknown` \| `UpTo1000` \| `UpTo5000` \| `UpTo10000` \| `Over10000` (zorunlu) |
+| `meetingDays` | Kurulum görüşmesi için uygun günler, bayrak listesi `"Monday, Thursday"` (`Monday` … `Sunday`); en az biri |
+| `meetingTimes` | Uygun saat aralıkları (İstanbul saati), bayrak listesi: `Morning` (09.00–12.00), `Midday` (12.00–15.00), `Afternoon` (15.00–18.00); en az biri |
+| `note` | İsteğe bağlı not, kırpılmış en çok 2000 karakter. Kişisel ya da hasta verisi için değildir; denetimde maskelenir |
+
+Kayıtta: `requestTitle` sabit "Geçiş desteği ve kurulum görüşmesi", `requestTarget` programın adı ("Kolayvet", "E-vet" ya da kliniğin yazdığı ad), `requestText` not (boş olabilir), `priority = Normal`. Ayrıntılar `migration` nesnesinde döner.
+
+### 11.3 Ücret kuralı (tek yer)
+
+| Paket | `fee` | Ekranda |
+|---|---|---|
+| Kurumsal (`Premium`) | `Free` | Ücretsiz |
+| Temel, Profesyonel | `Quoted` | Ücretli; fiyat size bildirilecek |
+
+Kural `PlanFeature.FreeMigrationSupport` ve `SubscriptionPlanCatalog` tablosundadır; uygulamada tek okuyan `MigrationSupportRules.FeeForAsync`. Denemede seçilen pakete göre. **Tutar tutulmaz ve kodda yazılmaz** (fiyat ürün kararı değil). Ücret bilgisi talep anında kayda yazılır (`migration.fee`); sonradan paket değişse de değişmez.
+
+### 11.4 Uçlar — `api/v1/custom-development-requests/migration-support`
+
+İzin `CustomDevelopmentRequests.Manage`; kiracı bağlamı zorunlu; her pakette.
+
+| Uç | Yanıt |
+|---|---|
+| `GET` | 200 `{ "items": CustomDevelopmentRequestDto[], "openCount": 0, "maxOpen": 1, "fee": "Free\|Quoted", "meetingDurationMinutes": 60 }`; yalnız kiracının geçiş talepleri, yeniden eskiye |
+| `POST` | 200 `CustomDevelopmentRequestDto` (`targetKind = "Migration"`, `migration` dolu) |
+
+```json
+{ "sourceProgram": "Kolayvet", "otherProgramName": null, "recordVolume": "UpTo5000",
+  "meetingDays": "Monday, Thursday", "meetingTimes": "Morning, Afternoon", "note": "3 yıllık kayıt var" }
+```
+
+`CustomDevelopmentRequestDto.migration` (diğer konularda `null`): `{ "sourceProgram", "recordVolume", "meetingDays", "meetingTimes", "fee", "meetingDurationMinutes": 60 }`.
+
+| Hata | Statü | Koşul |
+|---|---|---|
+| `CustomDevelopment.MigrationAlreadyOpen` | 409 | Kiracıda açık (`Received`, `InReview`, `Planned`) geçiş talebi var (`MaxOpenMigrationPerTenant` = 1) |
+| `CustomDevelopment.Validation` | 400 | Gün ya da saat seçilmemiş / geçersiz bayrak, program adı ya da not uzunluğu |
+| FluentValidation | 400 | `sourceProgram`, `recordVolume`, `meetingDays`, `meetingTimes` yok ya da geçersiz |
+| `Subscriptions.TenantReadOnly` | 403 | Salt okunur abonelik (genel yazma kapısı) |
+
+Platform yöneticisi: §4 listesi geçiş taleplerini de gösterir; yeni sorgu parametresi `targetKind` (ör. `?targetKind=Migration`) yalnız o konuyu listeler. Satırdaki `request.migration` ayrıntıları ve kiracı adı panel ekranında görünür.
+
+Denetim: `CustomDevelopmentRequest.CreateMigrationSupport`, `TargetId = SourceProgram=…;RecordVolume=…`; not (`requestText`) maskelenir.
+
+### 11.5 Kapsam ve KVKK (ekranda açıkça yazılır)
+
+- Kurulum görüşmesi **1 saattir** (`meetingDurationMinutes`; `CustomDevelopmentRequest.MeetingDurationMinutes`).
+- Geçiş desteğinin kapsamı **müşteri, hasta ve aşı geçmişidir** (ADR-014 K8). **Muayene ve ödeme geçmişi bu kapsamda yoktur.**
+- Klinik dosyayı Vetinity personeline **e-postayla göndermez**. Dosyayı kendisi panele (içe aktarma sihirbazı) yükler. Destek ekibi gerekirse kliniğin izniyle **ekran paylaşımında** yardım eder; dosyayı devralmaz, kopyalamaz.
+- Yüklenen satır verisi içe aktarmanın saklama kuralına tabidir: işlem bittikten 30 gün sonra silinir (ADR-019 K9; `IMPORT_API_CONTRACT.md` §10).
+- Talep dosya eki ve kişisel veri almaz; not alanı denetimde maskelenir.
+
+### 11.6 Çalışma varsayımları
+
+1. Aynı anda en çok **1 açık** geçiş talebi.
+2. Talep ve görüş yalnız Admin ve Owner'da (`CustomDevelopmentRequests.Manage`); içe aktarma izni olan ClinicAdmin talep açamaz.
+3. Uygunluk gün + saat aralığı tercihi olarak alınır (kesin tarih değil); kesin görüşme saatini platform yöneticisi "Planlandı" notunda yazar. Saat aralıkları 09.00–18.00 arası üç parça.
+4. Kayıt sayısı aralıklarla alınır (tam sayı değil).
+5. Talep geri çekilemez, düzenlenemez (§7 madde 4 ile aynı).
+
+### 11.7 Testler
+
+- Domain: `MigrationSupportRequestTests` (alanlar, gün ve saat zorunluluğu, not isteğe bağlı, `Create` ile Migration konusu açılamaz, aynı durum akışı).
+- Application: `MigrationSupportHandlerTests` (her pakette açılır ve pakete göre ücret, denemede seçilen paket, açık talep sınırı, program adı, özel geliştirme listesi ve sınırına karışmama, kiracı filtresi), `TenantPlanFeatureEvaluatorTests` (`FreeMigrationSupport` satırı).
+- Entegrasyon: `MigrationSupportIntegrationTests` (Temel/Profesyonel `Quoted`, Kurumsal `Free`; kiracılar arası görünmezlik; özel geliştirme listesinde yok; ikinci açık talep 409, tamamlanınca yer açılır; platform listesinde `targetKind` filtresiyle görünür; maskeli denetim; izin ve doğrulama).

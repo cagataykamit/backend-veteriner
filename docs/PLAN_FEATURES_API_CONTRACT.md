@@ -14,6 +14,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `TIER-001`, A
 | `PortalAppointmentRequests` | yok | var | var |
 | `MultiClinic` | yok | yok | var |
 | `Waitlist` (TIER-018, `WAITLIST_API_CONTRACT.md`) | yok | var | var |
+| `FreeMigrationSupport` (TIER-021, `CUSTOM_DEVELOPMENT_REQUESTS_API_CONTRACT.md` §11; yalnız ücreti belirler, talep ve içe aktarma her pakette açık) | yok | yok | var |
 
 | Konu | Kural |
 |---|---|
