@@ -230,3 +230,9 @@ değilse kişi başka saat seçer (talep yine §5 kurallarıyla, `requestedStart
 **Veteriner bul kartı (TIER-015, yazılmadı):** kart klinik kimliğinden aynı yolu kullanmalıdır: `OnlineBookingClinicResolver.ResolveByClinicAsync`
 → `AppointmentRequestIntake.GetNextSlotsAsync`, aynı `NextAvailableSlotDto` biçimi. Kart çok sayıda kliniği tek istekte döneceği için
 ayrı bir liste ucu ve önbellek kararı orada verilir; bu uç kart için çağrılmamalıdır.
+
+## 13. Ek (2026-11-08): hatırlatmada onayla / iptal et (TIER-019)
+
+Randevu hatırlatma e-postasındaki tek kullanımlık "onayla / iptal et" bağlantısı ve portalın kimliksiz `/randevu-yanit` sayfası
+ayrı sözleşmededir: `APPOINTMENT_OWNER_LINK_API_CONTRACT.md` (uçlar `/api/portal/v1/appointment-link/*`, hız sınırı `portal-auth`).
+Bildirim merkezine yeni tür: `AppointmentCancelledByOwner` (sayısal `4`; hedef `Appointment`).
