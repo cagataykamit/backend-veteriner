@@ -201,6 +201,9 @@ public static class RolePermissionBindings
 
                 // Online randevu talep kuyruğu (ADR-042 K4).
                 PermissionCatalog.AppointmentRequests.Manage,
+
+                // Tüm veri dışa aktarma yalnız kiracı yönetimi (Admin, Owner); veri taşınabilirliği pakete bağlı değildir.
+                PermissionCatalog.DataExport.Manage,
             ],
 
             // Tenant sahibi: Admin ile aynı operasyonel paket (ürün kararı: Owner ≈ Admin).
@@ -350,6 +353,9 @@ public static class RolePermissionBindings
 
                 // Online randevu talep kuyruğu (ADR-042 K4).
                 PermissionCatalog.AppointmentRequests.Manage,
+
+                // Tüm veri dışa aktarma yalnız kiracı yönetimi (Admin, Owner); veri taşınabilirliği pakete bağlı değildir.
+                PermissionCatalog.DataExport.Manage,
             ],
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini

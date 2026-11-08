@@ -22,6 +22,12 @@ public enum UserNotificationType
 
     /// <summary>Sahip bekleme listesi teklifini kabul etti, randevu oluştu (TIER-018; randevu oluşturma yetkisi olanlara).</summary>
     WaitlistOfferAccepted = 5,
+
+    /// <summary>Tüm veri dışa aktarma paketi hazır (talep edene; DATA_EXPORT_API_CONTRACT.md).</summary>
+    DataExportReady = 6,
+
+    /// <summary>Tüm veri dışa aktarma paketi hazırlanamadı (talep edene).</summary>
+    DataExportFailed = 7,
 }
 
 /// <summary>

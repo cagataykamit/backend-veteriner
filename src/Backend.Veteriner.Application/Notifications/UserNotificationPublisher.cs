@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Domain.AppointmentRequests;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.DataExports;
 using Backend.Veteriner.Domain.Notifications;
 using Backend.Veteriner.Domain.OwnerPortal;
 
@@ -48,6 +49,9 @@ public interface IUserNotificationPublisher
 
     /// <summary>Sahip bekleme listesi teklifini kabul etti, randevu oluştu (TIER-018): kliniğe erişen randevu oluşturma yetkililere.</summary>
     Task WaitlistOfferAcceptedAsync(Appointment appointment, string petName, CancellationToken ct);
+
+    /// <summary>Tüm veri dışa aktarma işi hazır ya da başarısız sonlandı: yalnız talep edene.</summary>
+    Task DataExportFinishedAsync(DataExportJob job, CancellationToken ct);
 }
 
 public sealed class UserNotificationPublisher : IUserNotificationPublisher
@@ -55,6 +59,7 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
     public const string AppointmentRequestTarget = "AppointmentRequest";
     public const string AppointmentTarget = "Appointment";
     public const string PortalDataRequestTarget = "PortalDataRequest";
+    public const string DataExportTarget = "DataExport";
 
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
@@ -180,6 +185,26 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
                 appointment.Id,
                 utcNow), ct);
         }
+    }
+
+    public async Task DataExportFinishedAsync(DataExportJob job, CancellationToken ct)
+    {
+        var ready = job.Status == DataExportJobStatus.Ready;
+        if (!ready && job.Status != DataExportJobStatus.Failed)
+            return;
+
+        await _notifications.AddAsync(UserNotification.Create(
+            job.TenantId,
+            null,
+            job.RequestedByUserId,
+            ready ? UserNotificationType.DataExportReady : UserNotificationType.DataExportFailed,
+            ready ? "Veri dışa aktarma paketi hazır" : "Veri dışa aktarma paketi hazırlanamadı",
+            ready && job.ExpiresAtUtc is { } expires
+                ? $"Ayarlar › Verimi dışa aktar sayfasından indirin · son gün {FormatLocal(expires)}"
+                : "Yeniden deneyebilirsiniz; sorun sürerse destekle iletişime geçin.",
+            DataExportTarget,
+            job.Id,
+            _timeProvider.GetUtcNow().UtcDateTime), ct);
     }
 
     private async Task ToQueueManagersAsync(

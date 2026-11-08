@@ -101,7 +101,10 @@ public sealed partial class LocalDiskFileStorage : IFileStorage
         }
     }
 
-    /// <summary>Sunucu anahtar biçimi: <c>{tenant}/{clinic}/{yyyy}/{MM}/{fileId}</c>, yalnız onaltılık parçalar.</summary>
-    [GeneratedRegex("^[0-9a-f]{32}/[0-9a-f]{32}/[0-9]{4}/[0-9]{2}/[0-9a-f]{32}$", RegexOptions.CultureInvariant)]
+    /// <summary>
+    /// Sunucu anahtar biçimi: <c>{tenant}/{clinic}/{yyyy}/{MM}/{fileId}</c> (<c>StoredFile</c>) ya da kiracı düzeyi paket için
+    /// <c>{tenant}/exports/{yyyy}/{MM}/{jobId}</c> (<c>DataExportJob</c>); sabit ön ek dışında yalnız onaltılık parçalar.
+    /// </summary>
+    [GeneratedRegex("^[0-9a-f]{32}/([0-9a-f]{32}|exports)/[0-9]{4}/[0-9]{2}/[0-9a-f]{32}$", RegexOptions.CultureInvariant)]
     private static partial Regex StorageKeyPattern();
 }

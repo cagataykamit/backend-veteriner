@@ -2506,6 +2506,71 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.DataExports.DataExportJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("LeaseUntilUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("RequestedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StorageKey")
+                        .HasMaxLength(200)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DataExportJobs_TenantId_OpenJob")
+                        .HasFilter("[Status] IN (0, 1)");
+
+                    b.HasIndex("Status", "ExpiresAtUtc");
+
+                    b.HasIndex("TenantId", "RequestedAtUtc");
+
+                    b.ToTable("DataExportJobs", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.DemoRequests.DemoRequest", b =>
                 {
                     b.Property<Guid>("Id")

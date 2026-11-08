@@ -228,6 +228,18 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Tüm veri dışa aktarma (DATA_EXPORT_API_CONTRACT.md §5): açık iş var, talep sınırı dolu ya da paket hazır değil;
+        // süresi dolan paket 410.
+        if (normalized is "dataexports.anotherjobrunning" or "dataexports.limitreached" or "dataexports.notready")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
+        if (normalized is "dataexports.expired")
+        {
+            return (StatusCodes.Status410Gone, "https://httpstatuses.io/410");
+        }
+
         // API anahtarı (TIER-009): etkin anahtar sınırı dolu ya da anahtar zaten iptal edilmiş.
         if (normalized is "apikeys.limitreached" or "apikeys.alreadyrevoked")
         {
