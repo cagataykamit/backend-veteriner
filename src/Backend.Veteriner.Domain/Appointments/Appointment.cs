@@ -13,6 +13,9 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
     public const int MinNoShowRevertReasonLength = 5;
     public const int MaxNoShowReasonLength = 500;
 
+    /// <summary>Sahip hatırlatma bağlantısıyla iptal ettiğinde iptal nedeni (TIER-019).</summary>
+    public const string OwnerLinkCancellationReason = "sahip e-postadan iptal etti";
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
@@ -30,6 +33,12 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
 
     /// <summary>Randevunun hekimi (ADR-042 K3); isteğe bağlı. Hekim bazlı çakışma ve müsaitlik bu alana göre hesaplanır.</summary>
     public Guid? VeterinarianUserId { get; private set; }
+
+    /// <summary>
+    /// Sahip hatırlatma bağlantısıyla geleceğini onayladı (TIER-019). Durumu değiştirmez; randevu saati değişince temizlenir
+    /// (onay eski saat içindir).
+    /// </summary>
+    public DateTime? OwnerConfirmedAtUtc { get; private set; }
 
     /// <summary>
     /// Başarılı domain mutasyon sayacı; optimistic concurrency token.
@@ -117,6 +126,28 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
             Notes = string.IsNullOrWhiteSpace(Notes) ? line : $"{Notes}\n{line}";
         }
 
+        AdvanceMutationSequence();
+        return Result.Success();
+    }
+
+    /// <summary>Sahip bağlantıyla yanıt verebilir: randevu planlı ve saati gelmemiş (TIER-019; kural tek yer).</summary>
+    public bool CanOwnerRespond(DateTime nowUtc)
+        => Status == AppointmentStatus.Scheduled && ScheduledAtUtc > NormalizeUtc(nowUtc);
+
+    /// <summary>Sahip geleceğini onayladı (TIER-019). Durum değişmez. Zaten onaylıysa değişiklik olmadan başarı (idempotent).</summary>
+    public Result ConfirmByOwner(DateTime nowUtc)
+    {
+        if (!CanOwnerRespond(nowUtc))
+        {
+            return Result.Failure(
+                "Appointments.InvalidStatusTransition",
+                "Yalnızca saati gelmemiş planlanmış randevu onaylanabilir.");
+        }
+
+        if (OwnerConfirmedAtUtc is not null)
+            return Result.Success();
+
+        OwnerConfirmedAtUtc = NormalizeUtc(nowUtc);
         AdvanceMutationSequence();
         return Result.Success();
     }
@@ -224,7 +255,7 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
                 "Yalnızca planlanmış randevu yeniden zamanlanabilir.");
         }
 
-        ScheduledAtUtc = NormalizeUtc(scheduledAtUtc);
+        SetScheduledAt(scheduledAtUtc);
         AdvanceMutationSequence();
         return Result.Success();
     }
@@ -266,7 +297,7 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
 
         ClinicId = clinicId;
         PetId = petId;
-        ScheduledAtUtc = NormalizeUtc(scheduledAtUtc);
+        SetScheduledAt(scheduledAtUtc);
         DurationMinutes = durationMinutes;
         AppointmentType = appointmentType;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
@@ -330,6 +361,15 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
             return Result.Success();
 
         return UpdateDetails(clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, notes, reasonId, veterinarianUserId);
+    }
+
+    /// <summary>Saat değişirse sahibin onayı eski saat içindir ve kalkar.</summary>
+    private void SetScheduledAt(DateTime scheduledAtUtc)
+    {
+        var normalized = NormalizeUtc(scheduledAtUtc);
+        if (normalized != ScheduledAtUtc)
+            OwnerConfirmedAtUtc = null;
+        ScheduledAtUtc = normalized;
     }
 
     private static DateTime NormalizeUtc(DateTime value)

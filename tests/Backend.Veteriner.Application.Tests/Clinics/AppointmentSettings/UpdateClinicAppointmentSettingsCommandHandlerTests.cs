@@ -87,7 +87,30 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandlerTests
         result.Value!.DefaultAppointmentDurationMinutes.Should().Be(60);
         result.Value.SlotIntervalMinutes.Should().Be(30);
         result.Value.AllowOverlappingAppointments.Should().BeTrue();
+        result.Value.OwnerCancelLinkEnabled.Should().BeTrue("varsayılan açık (TIER-019)");
         _settingsWrite.Verify(x => x.AddAsync(It.IsAny<ClinicAppointmentSettings>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_Should_Keep_OwnerCancelLink_When_Field_Omitted()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BuildClinic(cid, tid));
+        var existing = ClinicAppointmentSettings.Create(tid, cid, 30, 15, false, DateTime.UtcNow);
+        _settingsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var disabled = await CreateHandler().Handle(
+            new UpdateClinicAppointmentSettingsCommand(cid, 30, 15, false, OwnerCancelLinkEnabled: false), CancellationToken.None);
+        var omitted = await CreateHandler().Handle(
+            new UpdateClinicAppointmentSettingsCommand(cid, 45, 15, false), CancellationToken.None);
+
+        disabled.Value!.OwnerCancelLinkEnabled.Should().BeFalse();
+        omitted.Value!.OwnerCancelLinkEnabled.Should().BeFalse("alan gönderilmezse mevcut değer korunur");
+        existing.DefaultAppointmentDurationMinutes.Should().Be(45);
     }
 
     [Fact]

@@ -17,6 +17,9 @@ public sealed class ClinicAppointmentSettingsConfiguration : IEntityTypeConfigur
         b.Property(x => x.DefaultAppointmentDurationMinutes).IsRequired();
         b.Property(x => x.SlotIntervalMinutes).IsRequired();
         b.Property(x => x.AllowOverlappingAppointments).IsRequired();
+        // Varsayılan açık (TIER-019) domain'dedir; mevcut satırlar migration'da açık doldurulur. Veritabanı varsayılanı
+        // tanımlanmaz: "false" değeri EF sentinel'i sayılıp yok sayılmasın.
+        b.Property(x => x.OwnerCancelLinkEnabled).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
 

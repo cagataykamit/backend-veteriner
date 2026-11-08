@@ -385,6 +385,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<DateTime?>("OwnerConfirmedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid>("PetId")
                         .HasColumnType("uniqueidentifier");
 
@@ -426,6 +429,50 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "ClinicId", "ScheduledAtUtc", "Status");
 
                     b.ToTable("Appointments", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.AppointmentOwnerLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("UsedAction")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "AppointmentId");
+
+                    b.ToTable("AppointmentOwnerLinks", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.AppointmentReason", b =>
@@ -2006,6 +2053,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<int>("DefaultAppointmentDurationMinutes")
                         .HasColumnType("int");
+
+                    b.Property<bool>("OwnerCancelLinkEnabled")
+                        .HasColumnType("bit");
 
                     b.Property<int>("SlotIntervalMinutes")
                         .HasColumnType("int");
@@ -6274,6 +6324,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ReasonId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.AppointmentOwnerLink", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.AppointmentReason", b =>

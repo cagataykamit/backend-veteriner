@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.Clinics.AppointmentSettings;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -98,7 +99,8 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
                     request.DefaultAppointmentDurationMinutes,
                     request.SlotIntervalMinutes,
                     request.AllowOverlappingAppointments,
-                    utcNow);
+                    utcNow,
+                    request.OwnerCancelLinkEnabled ?? ClinicAppointmentSettings.DefaultOwnerCancelLinkEnabled);
 
             if (existing is not null)
             {
@@ -106,6 +108,7 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
                     request.DefaultAppointmentDurationMinutes,
                     request.SlotIntervalMinutes,
                     request.AllowOverlappingAppointments,
+                    request.OwnerCancelLinkEnabled ?? existing.OwnerCancelLinkEnabled,
                     utcNow);
             }
         }
@@ -121,9 +124,6 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
 
         await _settingsWrite.SaveChangesAsync(ct);
 
-        return Result<ClinicAppointmentSettingsDto>.Success(new ClinicAppointmentSettingsDto(
-            row.DefaultAppointmentDurationMinutes,
-            row.SlotIntervalMinutes,
-            row.AllowOverlappingAppointments));
+        return Result<ClinicAppointmentSettingsDto>.Success(ClinicAppointmentSettingsDefaults.ToDto(row));
     }
 }

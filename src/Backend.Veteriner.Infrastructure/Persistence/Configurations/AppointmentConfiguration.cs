@@ -41,6 +41,7 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
 
         b.Property(x => x.ReasonId);
         b.Property(x => x.VeterinarianUserId);
+        b.Property(x => x.OwnerConfirmedAtUtc);
 
         b.Property(x => x.MutationSequence)
             .IsRequired()

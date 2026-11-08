@@ -123,6 +123,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<PetColor> PetColors => Set<PetColor>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<AppointmentReason> AppointmentReasons => Set<AppointmentReason>();
+    public DbSet<AppointmentOwnerLink> AppointmentOwnerLinks => Set<AppointmentOwnerLink>();
     public DbSet<AppointmentRequest> AppointmentRequests => Set<AppointmentRequest>();
     public DbSet<AppointmentRequestEmailVerification> AppointmentRequestEmailVerifications => Set<AppointmentRequestEmailVerification>();
     public DbSet<ClinicAppointmentRequestEmailTemplate> ClinicAppointmentRequestEmailTemplates => Set<ClinicAppointmentRequestEmailTemplate>();

@@ -114,6 +114,52 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         (await db.OutboxMessages.CountAsync()).Should().Be(1);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ProcessOnce_Should_Add_OneTime_Owner_Link_To_AppointmentReminder(bool cancelLinkEnabled)
+    {
+        // TIER-019: tek bağlantı iki eylemi taşır; depoda yalnız özet, süre randevu saatinde dolar. İptal kapalıysa "kliniği arayın".
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A", now);
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", now, "905555555555", "ali@example.com");
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", await GetAnySpeciesIdAsync(db));
+        var appt = new Appointment(tenant.Id, clinic.Id, pet.Id, now.AddHours(24), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, now);
+        settings.Update(true, 24, false, 3, true, now);
+
+        db.AddRange(tenant, clinic, client, pet, appt, settings);
+        if (!cancelLinkEnabled)
+            db.ClinicAppointmentSettings.Add(ClinicAppointmentSettings.Create(tenant.Id, clinic.Id, 30, 15, false, now, ownerCancelLinkEnabled: false));
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+
+        var body = email.Enqueued.Single().Body;
+        body.Should().Contain("Pamuk").And.Contain($"{TestAppointmentOwnerLinks.PortalBaseUrl}/randevu-yanit?token=").And.Contain("islem=onayla");
+        if (cancelLinkEnabled)
+            body.Should().Contain("islem=iptal").And.NotContain("kliniği arayın");
+        else
+            body.Should().NotContain("islem=iptal").And.Contain("iptal için lütfen kliniği arayın");
+
+        var link = await db.AppointmentOwnerLinks.AsNoTracking().SingleAsync();
+        link.AppointmentId.Should().Be(appt.Id);
+        link.ExpiresAtUtc.Should().Be(appt.ScheduledAtUtc);
+        link.ClosedAtUtc.Should().BeNull();
+        var rawToken = System.Text.RegularExpressions.Regex.Match(body, "token=([^&\\s]+)").Groups[1].Value;
+        rawToken.Length.Should().BeGreaterThanOrEqualTo(43, "256 bit");
+        body.Should().NotContain(link.TokenHash);
+        link.TokenHash.Should().Be(new Sha256TokenHashService().ComputeSha256(Uri.UnescapeDataString(rawToken)));
+
+        // Aynı hatırlatma ikinci turda gitmez; yeni bağlantı da oluşmaz.
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+        (await db.AppointmentOwnerLinks.CountAsync()).Should().Be(1);
+    }
+
     [Fact]
     public async Task ProcessOnce_Should_Enqueue_VaccinationReminder()
     {
@@ -1260,6 +1306,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             db,
             IntegrationTestDbContexts.TenantScopeOf(db),
             enqueuer,
+            TestAppointmentOwnerLinks.Issuer(),
             Options.Create(new ReminderProcessorOptions
             {
                 Enabled = enabled,

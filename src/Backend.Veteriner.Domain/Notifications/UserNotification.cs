@@ -16,6 +16,9 @@ public enum UserNotificationType
 
     /// <summary>Hasta sahibi portaldan KVKK veri talebi gönderdi (PORTAL-007/009; portal yönetim yetkisi olanlara).</summary>
     PortalDataRequestCreated = 3,
+
+    /// <summary>Sahip randevuyu hatırlatma e-postasındaki bağlantıdan iptal etti (TIER-019; randevu iptal yetkisi olanlara).</summary>
+    AppointmentCancelledByOwner = 4,
 }
 
 /// <summary>

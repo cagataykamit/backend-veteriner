@@ -74,9 +74,6 @@ public sealed class GetClinicAppointmentSettingsQueryHandler
         if (row is null)
             return Result<ClinicAppointmentSettingsDto>.Success(ClinicAppointmentSettingsDefaults.Build());
 
-        return Result<ClinicAppointmentSettingsDto>.Success(new ClinicAppointmentSettingsDto(
-            row.DefaultAppointmentDurationMinutes,
-            row.SlotIntervalMinutes,
-            row.AllowOverlappingAppointments));
+        return Result<ClinicAppointmentSettingsDto>.Success(ClinicAppointmentSettingsDefaults.ToDto(row));
     }
 }
