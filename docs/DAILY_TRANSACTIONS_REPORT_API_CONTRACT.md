@@ -190,3 +190,9 @@ Not: tarih ve klinik doğrulaması defterlerle **aynı bileşenden** geçtiği i
 ## Ek — FIN-005 kredi iadesi (P1 Dalga 4b)
 
 Yeni olay türü `CreditRefund` ("Kredi iadesi"): müşteri kredisinin iadesi kasadan çıkıştır (`CLIENT_CREDIT_API_CONTRACT.md` §6, §9). Döküm toplamlarına `refundedCreditAmount`/`refundedCreditCount` eklenir, `netCollectedAmount = alınan − iptal − kredi iadesi`. Kasa özetinin her tutar kümesine aynı iki alan eklenir, `netAmount` iadeyi düşer; iade, iadeyi yapan kullanıcının satırına yazılır. Dosyalarda "Kredi İadesi" sütunu "Net"ten önce gelir. Tahsissiz avans ödemesinde tahsilatı alan, krediyi oluşturan kullanıcıdır (K-D6-5 eki). Krediden mahsup kasa olayı değildir, satır üretmez.
+
+## Ek — TIER-008 çoklu kasa (2026-11-09)
+
+- Döküm ve kasa özeti **değişmedi**: tüm kasaların nakdini birlikte verir; kasa hareketleri (giriş/çıkış, aktarım) bu raporlara girmez.
+- `FinanceEventFilter.CashRegister` (kasa filtresi) yalnız kasa sayımı ve kasa hareketleri raporu içindir: yalnız nakit, kasası boş nakit
+  Ana kasanındır. Bütün kasaların nakit neti kasa özetinin nakit satırına eşittir (entegrasyon testi). Kurallar `CASH_REGISTERS_API_CONTRACT.md`.

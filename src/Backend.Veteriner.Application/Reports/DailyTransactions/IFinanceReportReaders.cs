@@ -16,12 +16,12 @@ public sealed record FinanceEventFilter(
     PaymentMethod? PaymentMethod,
     Guid? PerformedByUserId)
 {
-    /// <summary>Doluysa yalnız bu kasanın nakit olayları (TIER-008); boşsa kasa süzülmez.</summary>
+    /// <summary>Doluysa yalnız bu kasanın nakit olayları (TIER-008); boşsa kasaya göre filtrelenmez.</summary>
     public CashRegisterScope? CashRegister { get; init; }
 }
 
 /// <summary>
-/// Kasa süzgeci: yalnız nakit olaylar. <c>CashRegisterId</c> kasası olanlar; <c>IncludesUnassigned</c> ise kasası boş nakit olaylar da
+/// Kasa filtresi: yalnız nakit olaylar. <c>CashRegisterId</c> kasası olanlar; <c>IncludesUnassigned</c> ise kasası boş nakit olaylar da
 /// (kasası boş nakit Ana kasanındır; tek kural). Ana kasası henüz olmayan klinikte <c>CashRegisterId</c> boş, yalnız kasasızlar gelir.
 /// </summary>
 public sealed record CashRegisterScope(Guid? CashRegisterId, bool IncludesUnassigned);

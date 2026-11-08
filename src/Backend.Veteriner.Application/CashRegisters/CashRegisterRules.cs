@@ -205,7 +205,7 @@ internal static class CashRegisterRules
     public static readonly DateOnly LedgerStart = new(2000, 1, 1);
 
     /// <summary>
-    /// Kasanın dönem toplamları (<paramref name="from"/> boşsa başlangıçtan): kasa süzgeçli nakit tahsilat neti ve iptal edilmemiş
+    /// Kasanın dönem toplamları (<paramref name="from"/> boşsa başlangıçtan): kasa filtreli nakit tahsilat neti ve iptal edilmemiş
     /// kasa hareketleri. <paramref name="register"/> boşsa klinikteki tüm kasalar (aktarımlar birbirini götürür). Sanal Ana kasada
     /// (klinikte kasa kaydı yok) hareket de yoktur.
     /// </summary>

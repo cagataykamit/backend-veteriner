@@ -48,7 +48,7 @@ public sealed record CashCountDto(
 public sealed record CashCountPreviousDto(DateOnly BusinessDate, decimal CountedAmount);
 
 /// <summary>
-/// Günün kasa kontrolü (tek kasa). <c>Cash</c> kasanın nakit tahsilat satırıdır (gün sonu kasa özetinin nakit satırı, kasa süzgeçli;
+/// Günün kasa kontrolü (tek kasa). <c>Cash</c> kasanın nakit tahsilat satırıdır (gün sonu kasa özetinin nakit satırı, kasa filtreli;
 /// tek kasalı klinikte aynısı); <c>Movements</c> kasa giriş/çıkışı ve aktarımlarla birlikte günün toplamıdır, beklenen nakit
 /// <c>ExpectedCashAmount</c> = <c>Movements.NetAmount</c>. <c>Current</c> günün geçerli sayımıdır ve beklenen nakdi kayıt anındaki
 /// değerle taşır; farklıysa (<c>ExpectedChangedSinceCount</c>) sayımdan sonra hareket değişmiştir. <c>History</c> günün tüm kayıtları.
@@ -197,7 +197,7 @@ internal sealed record CashCountExpected(CashSummaryMethodDto Cash, CashRegister
 
 /// <summary>
 /// Sayımın ortak kuralları tek yerde: klinik-gün kapsamı (gün sonu raporlarıyla aynı çözümleyici) ve beklenen nakit. Beklenen nakdin
-/// tahsilat kısmı gün sonu kasa özetinin nakit satırıdır (<see cref="CashSummaryLoader"/>, kasa süzgeçli); giriş/çıkış ve aktarımlar
+/// tahsilat kısmı gün sonu kasa özetinin nakit satırıdır (<see cref="CashSummaryLoader"/>, kasa filtreli); giriş/çıkış ve aktarımlar
 /// <see cref="CashRegisterTotalsDto"/> ile eklenir. Ayrı hesap yoktur; kasa hareketi olmayan Ana kasada sonuç kasa özetiyle aynıdır.
 /// </summary>
 internal static class CashCountRules

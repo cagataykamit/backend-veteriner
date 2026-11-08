@@ -142,10 +142,14 @@ dosyanın sütun açıklamaları. CRLF, UTF-8 BOM'lu.
 | `yatislar.csv` | Yatışlar: zamanlar, neden, konum, not, taburcu notu | Oda kimliği |
 | `bakim_talimatlari.csv` | Bakım talimatları | — |
 | `ucretler.csv` | Ücretler: açıklama, tür, miktar, birim fiyat, tutar, KDV, para birimi, kapanan tutar, iptal | İstek anahtarı, değişiklik sayacı |
-| `odemeler.csv` | Ödemeler: tutar, yöntem, zaman, dağıtılan ve krediye kalan, not, iptal | İstek anahtarı ve özeti, değişiklik sayacı |
+| `odemeler.csv` | Ödemeler: tutar, yöntem, nakdin kasası (`KasaId`; nakitte boşsa Ana kasa), zaman, dağıtılan ve krediye kalan, not, iptal | İstek anahtarı ve özeti, değişiklik sayacı |
 | `odeme_dagitimlari.csv` | Ödemenin ücretlere dağıtımı | — |
-| `krediler.csv` | Müşteri kredileri ve **iadeleri** (iade zamanı, tutarı, yöntemi, gerekçesi, iade eden) | Değişiklik sayacı |
+| `krediler.csv` | Müşteri kredileri ve **iadeleri** (iade zamanı, tutarı, yöntemi, nakit iadede kasası, gerekçesi, iade eden) | Değişiklik sayacı |
 | `kredi_kullanimlari.csv` | Kredinin ücretlere uygulanması | İstek anahtarı |
+| `kasalar.csv` | Kasalar (TIER-008): klinik, kod, ad, Ana kasa mı, etkin | — |
+| `kasa_hareket_turleri.csv` | Kasa giriş/çıkışının gelir/gider türleri | — |
+| `kasa_hareketleri.csv` | Kasa giriş/çıkışları ve kasalar arası aktarım bacakları: kasa, tür, gün, tutar, gelir/gider türü, açıklama, aktarım bağı ve karşı kasa, kaydeden, iptal | Değişiklik sayacı |
+| `kasa_sayimlari.csv` | Günlük kasa sayımları: kasa, gün, açılış, beklenen, sayılan, fark, açıklama, düzeltme bağı, kaydeden, iptal | Değişiklik sayacı |
 | `urunler.csv` | Ürünler: ad, kategori, tür, SKU, barkod, birim, fiyat, kontrollü madde sınıfı, form, üretici | — |
 | `stok_durumu.csv` | Klinik bazında eldeki miktar ve asgari stok | — |
 | `stok_partileri.csv` | Stok partileri: seri, son kullanma, miktarlar, tedarikçi, fatura, teslim/sevk, taşıma, soğuk zincir | — |

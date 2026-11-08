@@ -109,7 +109,7 @@ internal static class FinanceEvents
         return null;
     }
 
-    /// <summary>Kasa süzgecinin tek yeri: yalnız nakit; kasası boş nakit Ana kasanındır (<see cref="CashRegisterScope"/>).</summary>
+    /// <summary>Kasa filtresinin tek yeri: yalnız nakit; kasası boş nakit Ana kasanındır (<see cref="CashRegisterScope"/>).</summary>
     private static IQueryable<FinanceEvent> InCashRegister(IQueryable<FinanceEvent> events, CashRegisterScope register)
     {
         var cash = PaymentMethod.Cash;
