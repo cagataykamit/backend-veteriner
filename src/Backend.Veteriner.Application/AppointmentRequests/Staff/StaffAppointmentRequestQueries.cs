@@ -224,6 +224,7 @@ public sealed class StaffAppointmentRequestMapper
                 r.ClinicId,
                 r.Status,
                 r.Source,
+                r.Channel,
                 r.ReasonId,
                 r.ReasonName,
                 r.RequestedStartUtc,

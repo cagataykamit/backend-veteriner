@@ -24,6 +24,45 @@ public enum AppointmentRequestSource
     Link = 1,
 }
 
+/// <summary>
+/// Talebin kaynağı (TIER-016): klinik talebin nereden geldiğini istatistik olarak görür. Sunucu belirler, istemci serbest
+/// değer yazamaz (<see cref="AppointmentRequestChannels"/>). Eski taleplerde boştur ("bilinmiyor"). Kişisel veri değildir;
+/// yönlendiren adres, IP ya da tarayıcı bilgisi tutulmaz. Sayısal değerler stabildir.
+/// </summary>
+public enum AppointmentRequestChannel
+{
+    /// <summary>Kliniğe özel bağlantı doğrudan açıldı (ya da bağlantıya bilinmeyen kaynak değeriyle gelindi).</summary>
+    ClinicLink = 0,
+
+    /// <summary>Kliniğin kendi sitesi; site bağlantıya <c>?kaynak=site</c> ekler.</summary>
+    ClinicSite = 1,
+
+    /// <summary>Oturum açmış hasta sahibi (portal).</summary>
+    OwnerPortal = 2,
+
+    /// <summary>Telefon ya da elle, klinik personelinin girdiği talep. Personel talep girme yolu yok; henüz üretilmez.</summary>
+    Phone = 3,
+
+    /// <summary>Veteriner bul (TIER-015). Sayfa yok; henüz üretilmez.</summary>
+    VetFinder = 4,
+}
+
+/// <summary>
+/// Bağlantı formunun taşıdığı kaynak değeri → kaynak; izinli değerler tek yer burası. Bilinmeyen, boş ya da başka kapıya
+/// ait değer klinik bağlantısı sayılır. Değer kimliksiz istemciden geldiği için kötüye kullanılabilir; yalnız istatistiği
+/// etkiler (talep kuralları kaynağa bakmaz).
+/// </summary>
+public static class AppointmentRequestChannels
+{
+    /// <summary>Kliniğin sitesinden gelen bağlantının değeri.</summary>
+    public const string ClinicSiteToken = "site";
+
+    public static AppointmentRequestChannel ForLink(string? token)
+        => string.Equals(token?.Trim(), ClinicSiteToken, StringComparison.OrdinalIgnoreCase)
+            ? AppointmentRequestChannel.ClinicSite
+            : AppointmentRequestChannel.ClinicLink;
+}
+
 /// <summary>Durum geçişini yapan.</summary>
 public enum AppointmentRequestActorKind
 {

@@ -18,6 +18,8 @@ public sealed class AppointmentRequestConfiguration : IEntityTypeConfiguration<A
         b.Property(x => x.ClinicId).IsRequired();
         b.Property(x => x.Source).IsRequired().HasConversion<int>();
         b.Property(x => x.Status).IsRequired().HasConversion<int>();
+        // TIER-016 öncesi taleplerde boş ("bilinmiyor").
+        b.Property(x => x.Channel).HasConversion<int?>();
         // Boşsa "Diğer / emin değilim" talebi (ADR-042 ek md. 1); ad ReasonName'de saklanır.
         b.Property(x => x.ReasonId);
         b.Property(x => x.ReasonName).IsRequired().HasMaxLength(AppointmentReason.NameMaxLength);
@@ -34,8 +36,9 @@ public sealed class AppointmentRequestConfiguration : IEntityTypeConfiguration<A
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.RowVersion).IsRowVersion();
 
-        // Kuyruk (durum + klinik + saat), bekleyen talep sınırı (e-posta) ve süresi dolan tarama.
+        // Kuyruk (durum + klinik + saat), bekleyen talep sınırı (e-posta), süresi dolan tarama ve kaynak özeti (talep tarihi).
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.Status, x.RequestedStartUtc });
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.CreatedAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.ContactEmail, x.Status });
         b.HasIndex(x => new { x.Status, x.RequestedStartUtc });
         b.HasIndex(x => new { x.TenantId, x.OwnerAccountId });

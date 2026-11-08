@@ -284,7 +284,7 @@ public sealed partial class OwnerPortalIntegrationTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var reason = await db.AppointmentReasons.SingleAsync(r => r.Id == b.ReasonId);
             var request = AppointmentRequest.CreateFromLink(
-                b.Staff.TenantId, b.Staff.ClinicId, new PetText("Pamuk", null, null), reason,
+                b.Staff.TenantId, b.Staff.ClinicId, null, new PetText("Pamuk", null, null), reason,
                 DateTime.UtcNow.AddHours(-1), "Geçmiş Sahip", UniqueEmail(), "05551234567", null, DateTime.UtcNow.AddDays(-1)).Value!;
             db.AppointmentRequests.Add(request);
             await db.SaveChangesAsync();

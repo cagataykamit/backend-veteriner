@@ -160,6 +160,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ApprovedVeterinarianUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int?>("Channel")
+                        .HasColumnType("int");
+
                     b.Property<Guid?>("ClientId")
                         .HasColumnType("uniqueidentifier");
 
@@ -258,6 +261,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("Status", "RequestedStartUtc");
 
                     b.HasIndex("TenantId", "OwnerAccountId");
+
+                    b.HasIndex("TenantId", "ClinicId", "CreatedAtUtc");
 
                     b.HasIndex("TenantId", "ClinicId", "ContactEmail", "Status");
 
