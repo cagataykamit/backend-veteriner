@@ -76,7 +76,18 @@ public sealed class TenantSubscription : AggregateRoot, ITenantOwned
     public DateTime? PaidPeriodEndUtc
         => ActivatedAtUtc is { } start ? BillingPeriods.EndOf(start, BillingPeriod) : null;
 
-    /// <summary>Mevcut dönem türünü koruyarak planı etkinleştirir (yükseltme, planlı düşürme).</summary>
+    /// <summary>
+    /// Planlı düşürmeyi dönem sonunda uygular: yalnız paket değişir; durum, dönem türü ve tarihler değişmez. Otomatik yenileme
+    /// yoktur (BILL-001): yeni dönem ödemeyle (<see cref="ActivatePaidPlan(SubscriptionPlanCode, BillingPeriodKind, DateTime)"/>)
+    /// başlar, ödeme yoksa abonelik salt okunur kalır.
+    /// </summary>
+    public void ApplyScheduledDowngrade(SubscriptionPlanCode targetPlanCode, DateTime utcNow)
+    {
+        PlanCode = targetPlanCode;
+        UpdatedAtUtc = NormalizeUtc(utcNow);
+    }
+
+    /// <summary>Mevcut dönem türünü koruyarak planı etkinleştirir (ödemeyle yükseltme ve yenileme).</summary>
     public void ActivatePaidPlan(SubscriptionPlanCode targetPlanCode, DateTime utcNow)
         => ActivatePaidPlan(targetPlanCode, BillingPeriod, utcNow);
 

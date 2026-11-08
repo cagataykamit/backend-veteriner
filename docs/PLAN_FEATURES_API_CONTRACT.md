@@ -72,7 +72,7 @@ Kayıt (`owner-signup`) ilk kliniği her pakette oluşturur. Pasif klinik sayıl
 |---|---|
 | `POST /api/v1/tenants/{id}/subscription-plan-change/downgrade` (`ScheduleSubscriptionDowngradeCommandHandler`) | Sığmıyorsa 409 `Subscriptions.PlanLimitsExceeded`, kayıt oluşmaz, açık eski kayıt iptal edilmez |
 | `POST …/subscription-checkout` (`StartSubscriptionCheckoutCommandHandler`): denemede paket değişimi (`ApplyTrialPlanChangeAsync`), ücretli yükseltme, aylıktan yıllığa, süresi dolmuş abonelikte yenileme | Aynı kontrol, aynı 409; oturum açılmaz, plan değişmez |
-| Dönem sonu (`ScheduledPlanChangeProcessorHostedService.ProcessDueOnceAsync`) | **Çalışma varsayımı:** planlandıktan sonra sınır aşıldıysa düşürme uygulanmaz, kayıt `Rejected` (4) olur, abonelik mevcut pakette kalır. Panel nedeni abonelik özetinden okur (aşağıda). E-posta gönderilmez: abonelik olaylarında kiracıya e-posta deseni yok |
+| Dönem sonu (`ScheduledPlanChangeProcessorHostedService.ProcessDueOnceAsync`) | **Çalışma varsayımı:** planlandıktan sonra sınır aşıldıysa düşürme uygulanmaz, kayıt `Rejected` (4) olur, abonelik mevcut pakette kalır. Panel nedeni abonelik özetinden okur (aşağıda). E-posta gönderilmez: abonelik olaylarında kiracıya e-posta deseni yok. Sığarsa **yalnız paket değişir** (`TenantSubscription.ApplyScheduledDowngrade`): durum, dönem türü ve `ActivatedAtUtc` değişmez, ödemesiz yeni dönem açılmaz. Otomatik yenileme yok (BILL-001): dönem bittiği için abonelik salt okunurdur, kiracı yeni paketle yenileme ödemesi başlatır. Denemede uygulanan düşürme denemeyi ücretli döneme çevirmez |
 
 Hata gövdesi (standart `ProblemDetails`, alanlar üst düzeyde):
 
@@ -102,7 +102,7 @@ Hata gövdesi (standart `ProblemDetails`, alanlar üst düzeyde):
 ## 5) Testler
 
 - Application: `TenantPlanFeatureEvaluatorTests` (paket tablosu, gereken paket, kayıtsız kiracı, ilk ve ikinci klinik, deneme, sığma kuralı ve bekleyen davet), `StartSubscriptionCheckoutCommandHandlerTests` (denemede değişimde ve yenilemede sığma), `CreateClinicCommandHandlerTests`, `ClinicSettingsHandlersTests`, `CreateClientPortalInviteCommandHandlerTests`.
-- Entegrasyon: `OwnerPortalPlanFeatureIntegrationTests` (Temel red, deneme dahil; Profesyonel davet ve kabul; portalsız pakette okuma kapalı, veri talebi, tercihler ve hesap silme açık, yükseltince geri gelir; bekleyen davet ve fazla klinik; Temel ve Profesyonel denemede ikinci klinik reddi, Kurumsal denemede kabul; denemede eski iki klinik kalır; `access-state`), `TenantInviteUserLimitIntegrationTests` (sığmayan düşürmede 409 ve sayılar, bekleyen davet ve fazla klinik, sığan düşürmede kabul, dönem sonu ret ve uygulama, özetteki `rejectedPlanChange`).
+- Entegrasyon: `OwnerPortalPlanFeatureIntegrationTests` (Temel red, deneme dahil; Profesyonel davet ve kabul; portalsız pakette okuma kapalı, veri talebi, tercihler ve hesap silme açık, yükseltince geri gelir; bekleyen davet ve fazla klinik; Temel ve Profesyonel denemede ikinci klinik reddi, Kurumsal denemede kabul; denemede eski iki klinik kalır; `access-state`), `TenantInviteUserLimitIntegrationTests` (sığmayan düşürmede 409 ve sayılar, bekleyen davet ve fazla klinik, sığan düşürmede kabul, dönem sonu ret ve uygulama, dönem sonunda ödemesiz dönem açılmaz ve abonelik salt okunur kalır, denemede düşürme denemeyi korur, özetteki `rejectedPlanChange`).
 
 ## 6) Bilinen sınırlar
 

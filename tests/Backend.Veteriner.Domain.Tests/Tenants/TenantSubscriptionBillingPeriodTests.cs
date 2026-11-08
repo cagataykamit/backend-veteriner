@@ -80,6 +80,36 @@ public sealed class TenantSubscriptionBillingPeriodTests
     }
 
     [Fact]
+    public void ApplyScheduledDowngrade_Should_Change_Plan_Only_When_Paid_Period_Ended()
+    {
+        var sub = Trial();
+        var paidAt = TrialStart.AddDays(14);
+        sub.ActivatePaidPlan(SubscriptionPlanCode.Pro, BillingPeriodKind.Yearly, paidAt);
+        var periodEnd = sub.PaidPeriodEndUtc!.Value;
+
+        sub.ApplyScheduledDowngrade(SubscriptionPlanCode.Basic, periodEnd.AddMinutes(1));
+
+        sub.PlanCode.Should().Be(SubscriptionPlanCode.Basic);
+        sub.Status.Should().Be(TenantSubscriptionStatus.Active);
+        sub.BillingPeriod.Should().Be(BillingPeriodKind.Yearly);
+        sub.ActivatedAtUtc.Should().Be(paidAt, "ödeme olmadan yeni dönem başlamaz");
+        sub.PaidPeriodEndUtc.Should().Be(periodEnd);
+    }
+
+    [Fact]
+    public void ApplyScheduledDowngrade_Should_Keep_Trial()
+    {
+        var sub = TenantSubscription.StartTrial(Guid.NewGuid(), SubscriptionPlanCode.Pro, TrialStart, 14);
+
+        sub.ApplyScheduledDowngrade(SubscriptionPlanCode.Basic, TrialStart.AddDays(14));
+
+        sub.PlanCode.Should().Be(SubscriptionPlanCode.Basic);
+        sub.Status.Should().Be(TenantSubscriptionStatus.Trialing);
+        sub.ActivatedAtUtc.Should().BeNull();
+        sub.TrialEndsAtUtc.Should().Be(TrialStart.AddDays(14));
+    }
+
+    [Fact]
     public void BillingCheckoutSession_Should_Carry_Requested_Period()
     {
         var now = TrialStart;
