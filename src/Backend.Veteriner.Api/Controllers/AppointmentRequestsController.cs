@@ -57,6 +57,25 @@ public sealed class AppointmentRequestsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>
+    /// Kaynağa göre özet (TIER-016): <c>from</c>–<c>to</c> (İstanbul günleri, dahil; talep tarihi) kaynak başına talep ve onaylanan
+    /// sayısı. Kapsam kuyrukla aynı.
+    /// </summary>
+    [HttpGet("channel-summary")]
+    [ProducesResponseType(typeof(AppointmentRequestChannelSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ChannelSummary(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? clinicId,
+        CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        return (await _mediator.Send(new GetAppointmentRequestChannelSummaryQuery(clinicId, from, to), ct)).ToActionResult(this);
+    }
+
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(AppointmentRequestDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
