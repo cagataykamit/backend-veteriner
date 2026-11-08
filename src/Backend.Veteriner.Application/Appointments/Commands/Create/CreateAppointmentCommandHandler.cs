@@ -154,51 +154,23 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
                 "Randevu süresi 5-240 dakika arasında olmalıdır.");
         }
 
-        var slotIntervalMinutes = appointmentSettingsRow?.SlotIntervalMinutes
-            ?? ClinicAppointmentSettingsDefaults.Build().SlotIntervalMinutes;
-        var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
-            ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
-        var endUtc = scheduledUtc.AddMinutes(durationMinutes);
-
         if (effectiveStatus == AppointmentStatus.Scheduled)
         {
-            var slotAlignment = AppointmentSlotIntervalValidation.Validate(scheduledUtc, slotIntervalMinutes);
-            if (!slotAlignment.IsSuccess)
-                return Result<Guid>.Failure(slotAlignment.Error);
-
-            // Faz 4B-7: conflict kontrolleri working-hours kontrolünden önce çalışmalı.
-            // Aksi halde working-hours, asıl conflict hatasını gölgeleyebilir (ör. ClinicClosed → ClinicTimeConflict).
-            if (!allowClinicOverlap)
-            {
-                var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
-                    new AppointmentOverlappingAtClinicSpec(tenantId, clinicId, scheduledUtc, endUtc), ct);
-                if (clinicBusy is not null)
-                {
-                    return Result<Guid>.Failure(
-                        "Appointments.ClinicTimeConflict",
-                        "Bu zaman aralığında klinikte başka bir planlı randevu var.");
-                }
-            }
-
-            var petBusy = await _appointmentsRead.FirstOrDefaultAsync(
-                new AppointmentOverlappingForPetSpec(tenantId, request.PetId, scheduledUtc, endUtc), ct);
-            if (petBusy is not null)
-            {
-                return Result<Guid>.Failure(
-                    "Appointments.PetTimeConflict",
-                    "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
-            }
-
-            var vetCheck = await _assignment.EnsureVeterinarianAsync(
-                tenantId, clinicId, request.VeterinarianUserId, null, scheduledUtc, endUtc, null, ct);
-            if (!vetCheck.IsSuccess)
-                return Result<Guid>.Failure(vetCheck.Error);
-
-            var hoursRows = await _clinicWorkingHoursRead.ListAsync(
-                new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
-            var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);
-            if (!workingHours.IsSuccess)
-                return Result<Guid>.Failure(workingHours.Error);
+            // Slot, çakışma ve çalışma saati kuralları tek yerde (bekleme listesi kabulü de kullanır).
+            var bookable = await AppointmentSlotRules.EnsureBookableAsync(
+                _appointmentsRead,
+                _clinicWorkingHoursRead,
+                _assignment,
+                appointmentSettingsRow,
+                tenantId,
+                clinicId,
+                request.PetId,
+                request.VeterinarianUserId,
+                scheduledUtc,
+                durationMinutes,
+                ct);
+            if (!bookable.IsSuccess)
+                return Result<Guid>.Failure(bookable.Error);
         }
 
         var appointment = new Appointment(
