@@ -75,4 +75,11 @@ public enum PlanFeature
     /// Paket düşünce kayıtlar silinmez; liste ve kayıt geçmişi her pakette okunur, açık teklifin kabul bağlantısı kapanır.
     /// </summary>
     Waitlist = 11,
+
+    /// <summary>
+    /// Ücretsiz geçiş desteği ve kurulum görüşmesi (TIER-021; docs/CUSTOM_DEVELOPMENT_REQUESTS_API_CONTRACT.md §11). Talep her pakette açılır,
+    /// hazır eşleme profilleri ve içe aktarma kilitlenmez; bu özellik yalnız ücreti belirler: pakette varsa ücretsiz, yoksa ücretli
+    /// (fiyat kliniğe bildirilir). Ücret kuralının tek yeri bu satır ve <see cref="SubscriptionPlanCatalog"/> tablosudur.
+    /// </summary>
+    FreeMigrationSupport = 12,
 }

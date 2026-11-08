@@ -234,8 +234,9 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
-        // Özel geliştirme talebi (TIER-010): açık talep sınırı dolu ya da durum akışı dışı geçiş.
-        if (normalized is "customdevelopment.toomanyopen" or "customdevelopment.invalidstatustransition")
+        // Özel geliştirme talebi (TIER-010): açık talep sınırı dolu ya da durum akışı dışı geçiş; açık geçiş desteği talebi var (TIER-021).
+        if (normalized is "customdevelopment.toomanyopen" or "customdevelopment.invalidstatustransition"
+            or "customdevelopment.migrationalreadyopen")
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }

@@ -42,8 +42,9 @@ public sealed class CustomDevelopmentRequestsAdminController : ControllerBase
         [FromQuery] bool openOnly = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = GetAdminCustomDevelopmentRequestsQuery.DefaultPageSize,
+        [FromQuery] CustomDevelopmentTargetKind? targetKind = null,
         CancellationToken ct = default)
-        => (await _mediator.Send(new GetAdminCustomDevelopmentRequestsQuery(status, openOnly, page, pageSize), ct)).ToActionResult(this);
+        => (await _mediator.Send(new GetAdminCustomDevelopmentRequestsQuery(status, openOnly, page, pageSize, targetKind), ct)).ToActionResult(this);
 
     /// <summary>Durumu ilerletir; kapsam dışında gerekçe zorunlu. Denetim kaydına yazılır.</summary>
     [HttpPost("{id:guid}/status")]
