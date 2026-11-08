@@ -45,7 +45,9 @@ public sealed class AppointmentRequestTests
     [InlineData("", AppointmentRequestChannel.ClinicLink)]
     [InlineData("portal", AppointmentRequestChannel.ClinicLink)]
     [InlineData("telefon", AppointmentRequestChannel.ClinicLink)]
-    [InlineData("veteriner-bul", AppointmentRequestChannel.ClinicLink)]
+    [InlineData("veteriner-bul", AppointmentRequestChannel.VetFinder)]
+    [InlineData(" Veteriner-Bul ", AppointmentRequestChannel.VetFinder)]
+    [InlineData("veteriner bul", AppointmentRequestChannel.ClinicLink)]
     [InlineData("2", AppointmentRequestChannel.ClinicLink)]
     [InlineData("https://example.com/kampanya", AppointmentRequestChannel.ClinicLink)]
     public void CreateFromLink_Should_Accept_Only_Allowed_Channel_Token_Else_Clinic_Link(string? token, AppointmentRequestChannel expected)

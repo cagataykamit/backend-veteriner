@@ -55,6 +55,19 @@ public sealed partial class OwnerPortalIntegrationTests
     private static DateOnly TodayUtc => DateOnly.FromDateTime(DateTime.UtcNow);
 
     [Fact]
+    public async Task VetFinder_Token_Should_Be_Counted_As_Vet_Finder()
+    {
+        var b = await SetupBookingAsync();
+        var slots = await PublicSlotsAsync(b);
+
+        // TIER-015: Veteriner bul kartı randevu bağlantısına ?kaynak=veteriner-bul ekler; form değeri olduğu gibi taşır.
+        var id = await CreateLinkRequestWithChannelAsync(b, slots[0], UniqueEmail(), "veteriner-bul");
+
+        (await GetRequestAsync(b.Staff, id)).GetProperty("summary").GetProperty("channel").GetInt32()
+            .Should().Be((int)AppointmentRequestChannel.VetFinder);
+    }
+
+    [Fact]
     public async Task Channel_Should_Be_Decided_By_Server_Old_Request_Unknown_And_Summary_Counted_By_Channel()
     {
         var b = await SetupBookingAsync();
@@ -62,7 +75,7 @@ public sealed partial class OwnerPortalIntegrationTests
         var siteEmail = UniqueEmail();
 
         var site = await CreateLinkRequestWithChannelAsync(b, slots[0], siteEmail, "site");
-        var unknown = await CreateLinkRequestWithChannelAsync(b, slots[1], UniqueEmail(), "veteriner-bul");
+        var unknown = await CreateLinkRequestWithChannelAsync(b, slots[1], UniqueEmail(), "telefon");
         var direct = await CreateLinkRequestWithChannelAsync(b, slots[2], UniqueEmail(), null);
 
         // Portal gövdesinde kaynak alanı yok; gönderilse de yok sayılır, kaynak her zaman portal.

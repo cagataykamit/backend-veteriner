@@ -43,7 +43,7 @@ public enum AppointmentRequestChannel
     /// <summary>Telefon ya da elle, klinik personelinin girdiği talep. Personel talep girme yolu yok; henüz üretilmez.</summary>
     Phone = 3,
 
-    /// <summary>Veteriner bul (TIER-015). Sayfa yok; henüz üretilmez.</summary>
+    /// <summary>Veteriner bul (TIER-015); sayfa randevu bağlantısına <c>?kaynak=veteriner-bul</c> ekler.</summary>
     VetFinder = 4,
 }
 
@@ -57,10 +57,16 @@ public static class AppointmentRequestChannels
     /// <summary>Kliniğin sitesinden gelen bağlantının değeri.</summary>
     public const string ClinicSiteToken = "site";
 
+    /// <summary>Veteriner bul kartından gelen bağlantının değeri (TIER-015).</summary>
+    public const string VetFinderToken = "veteriner-bul";
+
     public static AppointmentRequestChannel ForLink(string? token)
-        => string.Equals(token?.Trim(), ClinicSiteToken, StringComparison.OrdinalIgnoreCase)
-            ? AppointmentRequestChannel.ClinicSite
-            : AppointmentRequestChannel.ClinicLink;
+        => token?.Trim().ToLowerInvariant() switch
+        {
+            ClinicSiteToken => AppointmentRequestChannel.ClinicSite,
+            VetFinderToken => AppointmentRequestChannel.VetFinder,
+            _ => AppointmentRequestChannel.ClinicLink,
+        };
 }
 
 /// <summary>Durum geçişini yapan.</summary>
