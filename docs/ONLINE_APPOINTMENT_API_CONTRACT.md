@@ -42,13 +42,13 @@ Pasif neden yeni randevuda 400; mevcut randevuda korunur. Hekim kliniğin aktif 
 | Uç | Yetki | Açıklama |
 |---|---|---|
 | `GET` | `Clinics.Read` | Kayıt yoksa `isEnabled=false`, `bookingCode=null`. |
-| `PUT` | `Clinics.Update` | `{ isEnabled, minLeadMinutes, maxAdvanceDays }`; ilk kayıtta kod üretilir. Geçersiz aralık 400 `OnlineBooking.Validation`. |
+| `PUT` | `Clinics.Update` | `{ isEnabled, minLeadMinutes, maxAdvanceDays, showNextAvailableSlots? }`; ilk kayıtta kod üretilir. Geçersiz aralık 400 `OnlineBooking.Validation`. `showNextAvailableSlots` yoksa mevcut değer korunur (§12). |
 | `POST /regenerate-code` | `Clinics.Update` | Yeni kod; eski bağlantı hemen 404. |
 | `GET /availability?reasonId&from&days` | §2 GET ile aynı | Personel görünümü: `[{ date, slots: [{ startUtc, endUtc, freeVeterinarianUserIds }] }]`. Online sınırlar uygulanmaz; geçmiş saat dönmez. `days` 1–14 (varsayılan 7). `reasonId` isteğe bağlı: boşsa "Diğer" (§11). |
 
 ```json
 // ClinicOnlineBookingSettingsDto
-{ "clinicId": "…", "isEnabled": true, "minLeadMinutes": 120, "maxAdvanceDays": 30,
+{ "clinicId": "…", "isEnabled": true, "minLeadMinutes": 120, "maxAdvanceDays": 30, "showNextAvailableSlots": true,
   "bookingCode": "k7m2p9xq4r8t", "bookingUrl": "https://portal…/randevu/k7m2p9xq4r8t", "bookingCodeGeneratedAtUtc": "…" }
 ```
 
@@ -177,6 +177,9 @@ veritabanına uygulanmadı.
 `AppointmentRequestReasonOptional` (§11) — `AppointmentRequests.ReasonId` nullable (FK `AppointmentReasons`'a nullable kalır).
 Paylaşılan veritabanına uygulanmadı.
 
+`AddOnlineBookingShowNextAvailableSlots` (§12) — `ClinicOnlineBookingSettings.ShowNextAvailableSlots` (`bit`, mevcut satırlar
+`1`). Yalnız yerel geliştirme veritabanına uygulandı; paylaşılan ya da üretim veritabanına uygulanmadı.
+
 ## 11. Ek (2026-11-03): "Diğer / emin değilim" (ADR-042 ek md. 1-2)
 
 Sistem her klinikte sağlar; klinik tanımlamaz, kapatamaz. Ad ve süre tek yerde: `AppointmentRequest.OtherReasonName`,
@@ -189,3 +192,41 @@ Sistem her klinikte sağlar; klinik tanımlamaz, kapatamaz. Ad ve süre tek yerd
 | Talep (§5 `POST /requests`, §6 `POST /appointment-requests`) | `reasonId` isteğe bağlı (yok ya da `null`). Yoksa `note` zorunlu: kırpılmış en az 3 karakter (üst sınır 500); değilse 400 `AppointmentRequests.NoteRequired`, mesaj "Ne için geldiğinizi kısaca yazın." Kural domain'dedir; saat/bekleyen talep sınırı denetiminden sonra çalışır (bağlantıda doğrulama kodu tüketilmez). |
 | Personel (§4) | `AppointmentRequestListItemDto.reasonId` `null` olabilir; `reasonName` "Diğer / emin değilim", `durationMinutes` 30. Detayda `requestedSlotFree`/`freeVeterinarianUserIds` 30 dk ve tüm hekimlerle hesaplanır. Onayda randevu nedensiz (`reasonId=null`) ve talebin süresiyle (ya da gövdedeki `durationMinutes`) oluşur; hekim verilmezse o saatte boş herhangi bir hekim atanır. |
 | Portal taleplerim (§6) | Değişmedi; `reasonName` "Diğer / emin değilim". |
+
+## 12. Ek (2026-11-08): herkese açık en yakın müsait saat (TIER-017)
+
+Kliniğin online randevuya açtığı en yakın boş saatler kimliksiz yüzeylerde görünür; saat seçilen kişi §5 bağlantı formuna gider,
+talep klinik onaylayınca kesinleşir (§4). Yeni onay akışı ve ikinci bir müsaitlik hesabı **yoktur**.
+
+**Kural (tek yer: `AppointmentRequestIntake.GetNextSlotsAsync`):** §5 `GET /availability` ucunun "Diğer / emin değilim" hesabı
+(§11: 30 dk, klinikteki tüm hekimler; §3 müsaitlik kuralı, online en erken/en geç sınırlar dahil). En erken talep anının İstanbul
+takvim gününden başlar, en çok 14 gün; ilk `count` saat (varsayılan 6, en çok 12) zaman sırasıyla. Bekleyen talepler saati bloke etmez
+(§3), dolu saat dönmez. Görünürlük `ClinicOnlineBookingSettings.PublishesNextAvailableSlots`: online randevu açık **ve**
+`showNextAvailableSlots` (varsayılan açık; §3 `PUT` ile kapatılır). Paket kilidi yoktur.
+
+### `GET /api/v1/public/sites/{slug}/next-available-slots?count=6`
+
+Klinik sitesi ucu (CLINIC_SITE_API_CONTRACT.md §6). Kimliksiz; hız sınırı sitenin `public-site` politikası (IP başına dakikada 120).
+Site JSON'u gibi önbellek başlığı taşımaz: dolan saat ve kapanan site gecikmesiz düşer.
+
+```json
+{ "slots": [ { "date": "2026-11-09", "startUtc": "2026-11-09T06:00:00Z" }, { "date": "2026-11-09", "startUtc": "2026-11-09T06:30:00Z" } ] }
+```
+
+Yalnız `date` (İstanbul takvim günü, `yyyy-MM-dd`) ve `startUtc` döner. Bitiş, süre, hekim, dolu saat, randevu, talep, kiracı ve
+klinik kimliği dönmez.
+
+| Durum | Yanıt |
+|---|---|
+| Adres yok ya da biçimsiz, kiracı/klinik pasif, site hiç yayınlanmamış | 404 `PublicSites.NotFound` (site JSON'uyla aynı kapı) |
+| Site geçici kapalı ya da abonelikten kapalı | 200 `{ "slots": [] }` (neden ayırt edilmez) |
+| Online randevu kapalı, klinik gösterimi kapattı | 200 `{ "slots": [] }` |
+| Açık sitenin eski adresi | Güncel adresteki gibi yanıtlanır |
+| `count` 1–12 dışı | 400 doğrulama hatası |
+
+Site saat seçilince bağlantıya `?saat={startUtc}` ekler; form neden seçilince o saat o nedenin müsait listesindeyse seçili gelir,
+değilse kişi başka saat seçer (talep yine §5 kurallarıyla, `requestedStartUtc` müsait listede olmalı).
+
+**Veteriner bul kartı (TIER-015, yazılmadı):** kart klinik kimliğinden aynı yolu kullanmalıdır: `OnlineBookingClinicResolver.ResolveByClinicAsync`
+→ `AppointmentRequestIntake.GetNextSlotsAsync`, aynı `NextAvailableSlotDto` biçimi. Kart çok sayıda kliniği tek istekte döneceği için
+ayrı bir liste ucu ve önbellek kararı orada verilir; bu uç kart için çağrılmamalıdır.

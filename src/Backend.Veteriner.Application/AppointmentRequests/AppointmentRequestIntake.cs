@@ -17,6 +17,10 @@ namespace Backend.Veteriner.Application.AppointmentRequests;
 /// </summary>
 public sealed class AppointmentRequestIntake
 {
+    /// <summary>Herkese açık en yakın saat sayısı (TIER-017).</summary>
+    public const int DefaultNextSlotCount = 6;
+    public const int MaxNextSlotCount = 12;
+
     private readonly IReadRepository<AppointmentReason> _reasons;
     private readonly IReadRepository<AppointmentRequest> _requestsRead;
     private readonly IRepository<AppointmentRequest> _requestsWrite;
@@ -84,6 +88,23 @@ public sealed class AppointmentRequestIntake
         var result = await _availability.GetDaysAsync(
             scope.TenantId, scope.ClinicId, reason.Value, AppointmentRequest.DurationFor(reason.Value), start, days, earliest, latest, ct);
         return Result<IReadOnlyList<OnlineAvailabilityDayDto>>.Success(AvailabilityMapping.ToOnline(result));
+    }
+
+    /// <summary>
+    /// Herkese açık en yakın müsait saatler (TIER-017): sahip görünümü müsaitliğinin (online sınırlar dahil) "Diğer / emin değilim"
+    /// hesabından ilk <paramref name="count"/> saat, en erken talep gününden itibaren en çok
+    /// <see cref="AppointmentAvailabilityCalculator.MaxDays"/> gün. İkinci bir müsaitlik hesabı yoktur. Klinik gösterimi kapattıysa boş.
+    /// </summary>
+    public async Task<IReadOnlyList<NextAvailableSlotDto>> GetNextSlotsAsync(OnlineBookingScope scope, int count, CancellationToken ct)
+    {
+        if (!scope.Settings.PublishesNextAvailableSlots)
+            return [];
+
+        var days = await GetAvailabilityAsync(scope, reasonId: null, from: null, AppointmentAvailabilityCalculator.MaxDays, ct);
+        return days.Value!
+            .SelectMany(d => d.Slots.Select(s => new NextAvailableSlotDto(d.Date, s.StartUtc)))
+            .Take(Math.Clamp(count, 1, MaxNextSlotCount))
+            .ToList();
     }
 
     /// <summary>Seçilen neden aktif ve online'da görünür olmalı; kimlik yoksa "Diğer / emin değilim" (değer <c>null</c>).</summary>

@@ -10,14 +10,19 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Api.Configuration;
 using Backend.Veteriner.Api.Controllers;
 using Backend.Veteriner.Api.Middleware;
+using Backend.Veteriner.Application.AppointmentRequests;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.ClinicSites;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.ClinicSites;
 using Backend.Veteriner.Domain.Files;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
 using AwesomeAssertions;
@@ -34,7 +39,7 @@ namespace Backend.IntegrationTests.ClinicSites;
 /// <summary>
 /// Klinik web sitesi (ADR-045): kiracılar arası erişim reddi, taslağın herkese açık uçtan görünmemesi, yayın zorunlu listesi,
 /// eski adres çözümü ve yeniden kullanılamaması, sürümün değişmezliği, yanıtta kiracı kimliği olmaması, güvenli olmayan bağlantı
-/// reddi, görsel türü denetimi, abonelikten doğan kapanma ve hız sınırı politikası.
+/// reddi, görsel türü denetimi, abonelikten doğan kapanma, hız sınırı politikası ve en yakın müsait saat (TIER-017).
 /// </summary>
 [Collection("pilot-smoke-api")]
 public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicationFactory>
@@ -1267,6 +1272,125 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
         on.GetProperty("bookingUrl").GetString().Should().EndWith($"/randevu/{code}");
     }
 
+    // ---------- en yakın müsait saat (TIER-017) ----------
+
+    private Task<HttpResponseMessage> NextSlotsAsync(string slug, string query = "")
+        => _client.GetAsync($"/api/v1/public/sites/{slug}/next-available-slots{query}");
+
+    private async Task<List<DateTime>> NextSlotStartsAsync(string slug)
+        => (await OkJsonAsync(await NextSlotsAsync(slug))).GetProperty("slots").EnumerateArray()
+            .Select(s => s.GetProperty("startUtc").GetDateTime().ToUniversalTime())
+            .ToList();
+
+    private Task<HttpResponseMessage> PutBookingAsync(Ctx ctx, bool? showNextAvailableSlots)
+        => SendAsync(HttpMethod.Put, $"/api/v1/clinics/{ctx.ClinicId}/online-booking", ctx.Token, new
+        {
+            isEnabled = true,
+            minLeadMinutes = 60,
+            maxAdvanceDays = 30,
+            showNextAvailableSlots,
+        });
+
+    [Fact]
+    public async Task Next_Slots_Should_Carry_Only_Date_And_Start_From_Link_Availability()
+    {
+        var ctx = await SeedAsync();
+        var slug = await PublishNewSiteAsync(ctx);
+        var code = await EnableBookingAsync(ctx);
+
+        var response = await NextSlotsAsync(slug);
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        var json = JsonDocument.Parse(body).RootElement;
+
+        json.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("slots");
+        var slots = json.GetProperty("slots").EnumerateArray().ToList();
+        slots.Should().HaveCount(AppointmentRequestIntake.DefaultNextSlotCount);
+        foreach (var slot in slots)
+        {
+            slot.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("date", "startUtc");
+            var start = slot.GetProperty("startUtc").GetDateTime().ToUniversalTime();
+            DateOnly.Parse(slot.GetProperty("date").GetString()!).Should().Be(OperationDayBounds.ToLocalDate(start), "gün İstanbul takvimidir");
+            OperationDayBounds.ToLocal(start).DayOfWeek.Should().Be(DayOfWeek.Monday, "klinik yalnız pazartesi açık");
+            start.Should().BeAfter(DateTime.UtcNow.AddMinutes(59), "en erken talep sınırı 60 dk");
+        }
+
+        foreach (var secret in new[] { ctx.TenantId, ctx.ClinicId })
+            body.Should().NotContain(secret.ToString());
+        body.Should().NotContainEquivalentOf("veterinarian").And.NotContainEquivalentOf("endUtc");
+        response.Headers.CacheControl?.Public.Should().NotBe(true, "dolan saat gecikmesiz düşsün");
+
+        // Kural tek yerde: bağlantı formunun "Diğer" müsaitliğinin ilk saatleri.
+        var link = await OkJsonAsync(await _client.GetAsync($"/api/portal/v1/booking/{code}/availability?days=14"));
+        var linkStarts = link.EnumerateArray()
+            .SelectMany(d => d.GetProperty("slots").EnumerateArray())
+            .Select(s => s.GetProperty("startUtc").GetDateTime().ToUniversalTime())
+            .Take(AppointmentRequestIntake.DefaultNextSlotCount);
+        (await NextSlotStartsAsync(slug)).Should().Equal(linkStarts);
+
+        (await OkJsonAsync(await NextSlotsAsync(slug, "?count=2"))).GetProperty("slots").GetArrayLength().Should().Be(2);
+        (await NextSlotsAsync(slug, "?count=13")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Next_Slots_Should_Not_Show_Booked_Slot()
+    {
+        var ctx = await SeedAsync();
+        var slug = await PublishNewSiteAsync(ctx);
+        await EnableBookingAsync(ctx);
+        var first = (await NextSlotStartsAsync(slug))[0];
+
+        await WithDbAsync(async db =>
+        {
+            var speciesId = await db.Species.Select(s => s.Id).FirstAsync();
+            var client = new Client(ctx.TenantId, "Saat Dolduran Müşteri", DateTime.UtcNow, "905551110091");
+            db.Add(client);
+            await db.SaveChangesAsync();
+            var pet = new Pet(ctx.TenantId, client.Id, "Pamuk", speciesId);
+            db.Add(pet);
+            await db.SaveChangesAsync();
+            db.Appointments.Add(new Appointment(ctx.TenantId, ctx.ClinicId, pet.Id, first, 30));
+            await db.SaveChangesAsync();
+        });
+
+        var after = await NextSlotStartsAsync(slug);
+        after.Should().NotContain(first, "randevusu olan saat herkese açık listede görünmez");
+        after[0].Should().BeAfter(first);
+    }
+
+    [Fact]
+    public async Task Next_Slots_Should_Be_Empty_When_Booking_Off_Hidden_Or_Site_Closed()
+    {
+        var ctx = await SeedAsync();
+        var slug = await PublishNewSiteAsync(ctx);
+        var defaults = await OkJsonAsync(await SendAsync(HttpMethod.Get, $"/api/v1/clinics/{ctx.ClinicId}/online-booking", ctx.Token));
+        defaults.GetProperty("showNextAvailableSlots").GetBoolean().Should().BeTrue("varsayılan açık");
+
+        (await NextSlotStartsAsync(slug)).Should().BeEmpty("online randevu kapalı (varsayılan)");
+
+        var code = await EnableBookingAsync(ctx);
+        (await NextSlotStartsAsync(slug)).Should().NotBeEmpty();
+
+        // Klinik gösterimi kapatır; talep bağlantısı çalışmaya devam eder.
+        (await OkJsonAsync(await PutBookingAsync(ctx, false))).GetProperty("showNextAvailableSlots").GetBoolean().Should().BeFalse();
+        (await NextSlotStartsAsync(slug)).Should().BeEmpty();
+        (await _client.GetAsync($"/api/portal/v1/booking/{code}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await OkJsonAsync(await PutBookingAsync(ctx, null))).GetProperty("showNextAvailableSlots").GetBoolean()
+            .Should().BeFalse("alan gönderilmezse değer korunur");
+
+        await OkJsonAsync(await PutBookingAsync(ctx, true));
+        (await NextSlotStartsAsync(slug)).Should().NotBeEmpty();
+
+        await OkJsonAsync(await SendAsync(HttpMethod.Post, $"{ctx.Url}/close", ctx.Token));
+        (await NextSlotStartsAsync(slug)).Should().BeEmpty("geçici kapatılmış site");
+        await OkJsonAsync(await SendAsync(HttpMethod.Post, $"{ctx.Url}/reopen", ctx.Token));
+
+        await ExpireTrialAsync(ctx.TenantId);
+        (await NextSlotStartsAsync(slug)).Should().BeEmpty("abonelikten kapanan site");
+
+        await ShouldFailAsync(await NextSlotsAsync("olmayan-adres-tier17"), HttpStatusCode.NotFound, "PublicSites.NotFound");
+    }
+
     // ---------- hız sınırı ----------
 
     [Fact]
@@ -1280,6 +1404,8 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
 
         type.GetMethod(nameof(PublicSitesController.GetImage))!.GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName
             .Should().Be(RateLimitingExtensions.PublicSiteImagePolicy);
+        type.GetMethod(nameof(PublicSitesController.GetNextAvailableSlots))!.GetCustomAttribute<EnableRateLimitingAttribute>()
+            .Should().BeNull("en yakın saat ucu sitenin public-site sınırını paylaşır");
     }
 
     [Fact]

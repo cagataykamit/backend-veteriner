@@ -2111,6 +2111,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int>("MinLeadMinutes")
                         .HasColumnType("int");
 
+                    b.Property<bool>("ShowNextAvailableSlots")
+                        .HasColumnType("bit");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 

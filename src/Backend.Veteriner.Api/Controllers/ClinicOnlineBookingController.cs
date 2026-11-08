@@ -59,7 +59,8 @@ public sealed class ClinicOnlineBookingController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
         var result = await _mediator.Send(
-            new UpdateClinicOnlineBookingSettingsCommand(clinicId, body.IsEnabled, body.MinLeadMinutes, body.MaxAdvanceDays), ct);
+            new UpdateClinicOnlineBookingSettingsCommand(
+                clinicId, body.IsEnabled, body.MinLeadMinutes, body.MaxAdvanceDays, body.ShowNextAvailableSlots), ct);
         return result.ToActionResult(this);
     }
 
@@ -108,4 +109,7 @@ public sealed class OnlineBookingSettingsBody
     public bool IsEnabled { get; init; }
     public int MinLeadMinutes { get; init; }
     public int MaxAdvanceDays { get; init; }
+
+    /// <summary>En yakın müsait saatlerin herkese açık gösterimi (TIER-017); yoksa mevcut değer korunur.</summary>
+    public bool? ShowNextAvailableSlots { get; init; }
 }

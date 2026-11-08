@@ -12,12 +12,20 @@ namespace Backend.Veteriner.Application.Clinics.OnlineBooking;
 /// <summary>Kliniğin online randevu ayarları; kayıt yoksa varsayılan (kapalı) döner.</summary>
 public sealed record GetClinicOnlineBookingSettingsQuery(Guid ClinicId) : IRequest<Result<ClinicOnlineBookingSettingsDto>>;
 
-/// <summary>Ayarları kaydeder; ilk kayıtta bağlantı kodu üretilir. Ayarlar mevcut klinik ayar yetkisiyle (ADR-042 K4).</summary>
-public sealed record UpdateClinicOnlineBookingSettingsCommand(Guid ClinicId, bool IsEnabled, int MinLeadMinutes, int MaxAdvanceDays)
+/// <summary>
+/// Ayarları kaydeder; ilk kayıtta bağlantı kodu üretilir. Ayarlar mevcut klinik ayar yetkisiyle (ADR-042 K4).
+/// <paramref name="ShowNextAvailableSlots"/> verilmezse mevcut değer (yeni kayıtta açık) korunur (TIER-017).
+/// </summary>
+public sealed record UpdateClinicOnlineBookingSettingsCommand(
+    Guid ClinicId,
+    bool IsEnabled,
+    int MinLeadMinutes,
+    int MaxAdvanceDays,
+    bool? ShowNextAvailableSlots = null)
     : IRequest<Result<ClinicOnlineBookingSettingsDto>>, IAuditableRequest
 {
     public string AuditAction => "OnlineBooking.Settings.Update";
-    public string? AuditTarget => $"ClinicId={ClinicId};IsEnabled={IsEnabled}";
+    public string? AuditTarget => $"ClinicId={ClinicId};IsEnabled={IsEnabled};ShowNextAvailableSlots={ShowNextAvailableSlots}";
 }
 
 /// <summary>Bağlantı kodunu yeniden üretir; eski bağlantı kapanır (ADR-042 K1/K6).</summary>
@@ -127,6 +135,8 @@ public sealed class UpdateClinicOnlineBookingSettingsCommandHandler
         var updated = row.Update(request.IsEnabled, request.MinLeadMinutes, request.MaxAdvanceDays, utcNow);
         if (!updated.IsSuccess)
             return Result<ClinicOnlineBookingSettingsDto>.Failure(updated.Error);
+        if (request.ShowNextAvailableSlots is { } show)
+            row.SetShowNextAvailableSlots(show, utcNow);
 
         await _settings.SaveChangesAsync(ct);
         return Result<ClinicOnlineBookingSettingsDto>.Success(ClinicOnlineBookingMapping.ToDto(request.ClinicId, row, _portal, _app));

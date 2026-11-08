@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Backend.Veteriner.Application.Appointments.Availability;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Domain.ClinicSites;
@@ -90,6 +91,11 @@ public sealed record PublicSiteClinicDto(
 
 /// <summary>K11: online randevu açıksa kod ve bağlantı; kapalıysa ikisi de boş, düğme telefona döner.</summary>
 public sealed record PublicSiteOnlineBookingDto(bool IsEnabled, string? BookingCode, string? BookingUrl);
+
+/// <summary>
+/// En yakın müsait saatler (TIER-017): yalnız gün ve başlangıç. Online randevu ya da gösterim kapalı, site kapalıysa liste boştur.
+/// </summary>
+public sealed record PublicSiteNextSlotsDto(IReadOnlyList<NextAvailableSlotDto> Slots);
 
 public static class ClinicSiteMapping
 {

@@ -20,6 +20,9 @@ public sealed record OnlineAvailabilitySlotDto(DateTime StartUtc, DateTime EndUt
 
 public sealed record OnlineAvailabilityDayDto(DateOnly Date, IReadOnlyList<OnlineAvailabilitySlotDto> Slots);
 
+/// <summary>Herkese açık en yakın müsait saat (TIER-017): yalnız İstanbul takvim günü ve başlangıç; süre, hekim ve dolu saat yok.</summary>
+public sealed record NextAvailableSlotDto(DateOnly Date, DateTime StartUtc);
+
 public static class AvailabilityMapping
 {
     public static IReadOnlyList<OnlineAvailabilityDayDto> ToOnline(IReadOnlyList<AvailabilityDay> days)
