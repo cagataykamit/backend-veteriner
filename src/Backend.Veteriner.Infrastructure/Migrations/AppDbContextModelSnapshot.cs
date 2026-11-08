@@ -471,12 +471,18 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int?>("UsedAction")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("WaitlistOfferId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AppointmentId");
 
                     b.HasIndex("TokenHash")
                         .IsUnique();
+
+                    b.HasIndex("WaitlistOfferId")
+                        .HasFilter("[WaitlistOfferId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "AppointmentId");
 
@@ -2073,6 +2079,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("WaitlistAutoOfferEnabled")
+                        .HasColumnType("bit");
 
                     b.HasKey("Id");
 
@@ -6205,6 +6214,209 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Visits", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Waitlist.WaitlistEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AppointmentType")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("BookedAppointmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CloseReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ClosedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("EarliestDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("LatestDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("PreferredDays")
+                        .HasColumnType("int");
+
+                    b.Property<TimeOnly?>("PreferredFromTime")
+                        .HasColumnType("time");
+
+                    b.Property<TimeOnly?>("PreferredToTime")
+                        .HasColumnType("time");
+
+                    b.Property<Guid?>("PreferredVeterinarianUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReasonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<long>("SortKey")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("PetId");
+
+                    b.HasIndex("TenantId", "PetId");
+
+                    b.HasIndex("TenantId", "ClinicId", "Status", "SortKey");
+
+                    b.ToTable("WaitlistEntries", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Waitlist.WaitlistEntryEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("OfferId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("WaitlistEntryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WaitlistEntryId");
+
+                    b.HasIndex("TenantId", "WaitlistEntryId", "OccurredAtUtc");
+
+                    b.ToTable("WaitlistEntryEvents", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Waitlist.WaitlistOffer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AppointmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsAutomatic")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("SlotStartUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("SourceAppointmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("VeterinarianUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("WaitlistEntryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SourceAppointmentId");
+
+                    b.HasIndex("TenantId", "Status", "ExpiresAtUtc");
+
+                    b.HasIndex(new[] { "WaitlistEntryId" }, "UX_WaitlistOffers_Entry_Open")
+                        .IsUnique()
+                        .HasFilter("[Status] = 0");
+
+                    b.HasIndex(new[] { "SourceAppointmentId" }, "UX_WaitlistOffers_Slot_Accepted")
+                        .IsUnique()
+                        .HasFilter("[Status] = 1");
+
+                    b.HasIndex(new[] { "SourceAppointmentId" }, "UX_WaitlistOffers_Slot_Open")
+                        .IsUnique()
+                        .HasFilter("[Status] = 0");
+
+                    b.ToTable("WaitlistOffers", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Infrastructure.Persistence.Entities.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6482,6 +6694,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasForeignKey("AppointmentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Waitlist.WaitlistOffer", null)
+                        .WithMany()
+                        .HasForeignKey("WaitlistOfferId")
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.AppointmentReason", b =>
@@ -7223,6 +7440,51 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ClinicId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Waitlist.WaitlistEntry", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clients.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Pets.Pet", null)
+                        .WithMany()
+                        .HasForeignKey("PetId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Waitlist.WaitlistEntryEvent", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Waitlist.WaitlistEntry", null)
+                        .WithMany()
+                        .HasForeignKey("WaitlistEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Waitlist.WaitlistOffer", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("SourceAppointmentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Waitlist.WaitlistEntry", null)
+                        .WithMany()
+                        .HasForeignKey("WaitlistEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

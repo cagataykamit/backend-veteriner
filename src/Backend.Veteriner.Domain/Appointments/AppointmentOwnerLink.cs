@@ -13,7 +13,14 @@ public enum AppointmentOwnerLinkAction
 public enum AppointmentOwnerLinkPurpose
 {
     Respond = 0,
-    Calendar = 1
+    Calendar = 1,
+
+    /// <summary>
+    /// Bekleme listesi teklifi (TIER-018): boşalan saati kabul bağlantısı. <see cref="AppointmentOwnerLink.AppointmentId"/> saati
+    /// boşaltan (iptal edilmiş) randevudur; teklif <see cref="AppointmentOwnerLink.WaitlistOfferId"/>'dedir. Randevu eylemi ve takvim
+    /// dosyası vermez.
+    /// </summary>
+    WaitlistOffer = 2
 }
 
 /// <summary>
@@ -34,6 +41,9 @@ public sealed class AppointmentOwnerLink : ITenantOwned
 
     /// <summary>Takvim bağlantısı adreste (GET) taşındığı için eylem yapamaz; eylem yalnız yanıt bağlantısıyladır.</summary>
     public AppointmentOwnerLinkPurpose Purpose { get; private set; }
+
+    /// <summary>Bekleme listesi teklifi (yalnız <see cref="AppointmentOwnerLinkPurpose.WaitlistOffer"/>).</summary>
+    public Guid? WaitlistOfferId { get; private set; }
 
     /// <summary>Gönderim anındaki randevu saati; bağlantı bu ana kadar ve randevu bu saatte kaldıkça geçerlidir.</summary>
     public DateTime ExpiresAtUtc { get; private set; }
@@ -84,6 +94,30 @@ public sealed class AppointmentOwnerLink : ITenantOwned
     }
 
     /// <summary>
+    /// Bekleme listesi teklifinin kabul bağlantısı (TIER-018). Süre teklifin bitişidir; saati boşaltan randevuya bağlanır.
+    /// </summary>
+    public static AppointmentOwnerLink CreateForWaitlistOffer(
+        Guid tenantId,
+        Guid clinicId,
+        Guid sourceAppointmentId,
+        Guid waitlistOfferId,
+        string tokenHash,
+        DateTime offerExpiresAtUtc,
+        DateTime utcNow)
+    {
+        if (waitlistOfferId == Guid.Empty)
+            throw new ArgumentException("WaitlistOfferId geçersiz.", nameof(waitlistOfferId));
+
+        var link = Create(tenantId, clinicId, sourceAppointmentId, tokenHash, offerExpiresAtUtc, utcNow, AppointmentOwnerLinkPurpose.WaitlistOffer);
+        link.WaitlistOfferId = waitlistOfferId;
+        return link;
+    }
+
+    /// <summary>Teklif bağlantısı açık ve süresi dolmamış (TIER-018); teklifin kendi durumu ayrıca denetlenir.</summary>
+    public bool IsUsableForWaitlistOffer(DateTime utcNow)
+        => Purpose == AppointmentOwnerLinkPurpose.WaitlistOffer && ClosedAtUtc is null && ToUtc(utcNow) < ExpiresAtUtc;
+
+    /// <summary>
     /// Eylem (onayla / iptal et) için kullanılabilir: yanıt bağlantısı, kapanmamış ve <see cref="IsCalendarUsableFor"/>.
     /// </summary>
     public bool IsUsableFor(Appointment appointment, DateTime utcNow)
@@ -97,7 +131,8 @@ public sealed class AppointmentOwnerLink : ITenantOwned
     /// takvim dosyasını vermeye devam eder; iptal edilen ya da yeniden zamanlanan randevuda geçersizdir.
     /// </summary>
     public bool IsCalendarUsableFor(Appointment appointment, DateTime utcNow)
-        => appointment.Id == AppointmentId
+        => Purpose != AppointmentOwnerLinkPurpose.WaitlistOffer
+           && appointment.Id == AppointmentId
            && appointment.TenantId == TenantId
            && appointment.ScheduledAtUtc == ExpiresAtUtc
            && appointment.CanOwnerRespond(utcNow);

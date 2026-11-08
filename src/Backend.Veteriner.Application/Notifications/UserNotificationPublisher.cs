@@ -45,6 +45,9 @@ public interface IUserNotificationPublisher
 
     /// <summary>Sahip randevuyu hatırlatma bağlantısından iptal etti (TIER-019): kliniğe erişen randevu iptal yetkisi olanlara.</summary>
     Task AppointmentCancelledByOwnerAsync(Appointment appointment, string petName, CancellationToken ct);
+
+    /// <summary>Sahip bekleme listesi teklifini kabul etti, randevu oluştu (TIER-018): kliniğe erişen randevu oluşturma yetkililere.</summary>
+    Task WaitlistOfferAcceptedAsync(Appointment appointment, string petName, CancellationToken ct);
 }
 
 public sealed class UserNotificationPublisher : IUserNotificationPublisher
@@ -149,6 +152,30 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
                 UserNotificationType.AppointmentCancelledByOwner,
                 $"Sahip randevuyu iptal etti: {petName}",
                 $"{FormatLocal(appointment.ScheduledAtUtc)} · e-postadaki bağlantıdan",
+                AppointmentTarget,
+                appointment.Id,
+                utcNow), ct);
+        }
+    }
+
+    public async Task WaitlistOfferAcceptedAsync(Appointment appointment, string petName, CancellationToken ct)
+    {
+        var userIds = await _recipients.ListAsync(
+            appointment.TenantId,
+            appointment.ClinicId,
+            PermissionCatalog.Appointments.Create,
+            TenantWideClaimNames.All,
+            ct);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var userId in userIds)
+        {
+            await _notifications.AddAsync(UserNotification.Create(
+                appointment.TenantId,
+                appointment.ClinicId,
+                userId,
+                UserNotificationType.WaitlistOfferAccepted,
+                $"Bekleme listesinden randevu: {petName}",
+                $"{FormatLocal(appointment.ScheduledAtUtc)} · sahip teklifi kabul etti",
                 AppointmentTarget,
                 appointment.Id,
                 utcNow), ct);

@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.Appointments.Availability;
 using Backend.Veteriner.Application.Appointments.OwnerLinks;
+using Backend.Veteriner.Application.Waitlist;
 using Backend.Veteriner.Application.Clinics.OnlineBooking;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.ClinicSites;
@@ -74,6 +75,22 @@ public static class DependencyInjection
         services.AddScoped<AppointmentOwnerLinkIssuer>();
         services.AddScoped<AppointmentOwnerLinkResolver>();
         services.AddScoped<AppointmentOwnerLinkActions>();
+
+        // Bekleme listesi (TIER-018): teklif gönderimi, panel erişimi, kabul bağlantısı ve işleyici.
+        services.AddScoped<Waitlist.WaitlistOfferService>();
+        services.AddScoped<Waitlist.WaitlistAccess>();
+        services.AddScoped<Waitlist.WaitlistSlotReader>();
+        services.AddScoped<Waitlist.WaitlistOfferLinkResolver>();
+        services.AddScoped<Waitlist.WaitlistOfferLinkActions>();
+        services.AddScoped<Waitlist.WaitlistOfferProcessor>();
+
+        // Bekleme listesi (TIER-018): teklif gönderimi, kabul bağlantısı ve işleyici.
+        services.AddScoped<WaitlistOfferService>();
+        services.AddScoped<WaitlistAccess>();
+        services.AddScoped<WaitlistSlotReader>();
+        services.AddScoped<WaitlistOfferLinkResolver>();
+        services.AddScoped<WaitlistOfferLinkActions>();
+        services.AddScoped<WaitlistOfferProcessor>();
 
         // Ticari ileti (ADR-046): klinik kapısı ve iletideki ret bağlantısı.
         services.AddScoped<ClinicMarketingGate>();

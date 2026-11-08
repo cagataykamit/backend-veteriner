@@ -1,8 +1,12 @@
 namespace Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 
-/// <summary><see cref="OwnerCancelLinkEnabled"/>: randevu hatırlatmasında "iptal et" bağlantısı (TIER-019).</summary>
+/// <summary>
+/// <see cref="OwnerCancelLinkEnabled"/>: randevu hatırlatmasında "iptal et" bağlantısı (TIER-019). <see cref="WaitlistAutoOfferEnabled"/>:
+/// iptalde bekleme listesine otomatik teklif (TIER-018).
+/// </summary>
 public sealed record ClinicAppointmentSettingsDto(
     int DefaultAppointmentDurationMinutes,
     int SlotIntervalMinutes,
     bool AllowOverlappingAppointments,
-    bool OwnerCancelLinkEnabled);
+    bool OwnerCancelLinkEnabled,
+    bool WaitlistAutoOfferEnabled);

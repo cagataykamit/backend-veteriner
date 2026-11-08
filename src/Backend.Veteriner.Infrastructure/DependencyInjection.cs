@@ -71,6 +71,7 @@ using Backend.Veteriner.Infrastructure.Persistence.Repositories.Outbox;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.UserOperationClaims;
 using Backend.Veteriner.Infrastructure.Reminders;
+using Backend.Veteriner.Infrastructure.Waitlist;
 using Backend.Veteriner.Application.Imports.Commit;
 using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Infrastructure.Imports;
@@ -377,6 +378,10 @@ public static class DependencyInjection
         services.AddScoped<IReminderEmailOutboxEnqueuer, ReminderEmailOutboxEnqueuer>();
         services.AddScoped<ReminderProcessorService>();
         services.AddHostedService<ReminderProcessorHostedService>();
+
+        // Bekleme listesi (TIER-018): süresi dolan teklif ve boşalan saate otomatik teklif.
+        services.Configure<WaitlistOfferProcessorOptions>(configuration.GetSection("Waitlist:Processor"));
+        services.AddHostedService<WaitlistOfferProcessorHostedService>();
 
         // ===== Veri içe aktarma uygulama işi (ADR-019 K11; iş kuyruğu = ImportBatches, kira + geri basınç) =====
         services.Configure<ImportCommitOptions>(configuration.GetSection(ImportCommitOptions.SectionName));

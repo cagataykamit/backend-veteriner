@@ -19,6 +19,9 @@ public enum UserNotificationType
 
     /// <summary>Sahip randevuyu hatırlatma e-postasındaki bağlantıdan iptal etti (TIER-019; randevu iptal yetkisi olanlara).</summary>
     AppointmentCancelledByOwner = 4,
+
+    /// <summary>Sahip bekleme listesi teklifini kabul etti, randevu oluştu (TIER-018; randevu oluşturma yetkisi olanlara).</summary>
+    WaitlistOfferAccepted = 5,
 }
 
 /// <summary>

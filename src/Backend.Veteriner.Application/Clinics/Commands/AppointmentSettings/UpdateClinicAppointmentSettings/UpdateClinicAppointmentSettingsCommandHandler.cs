@@ -100,7 +100,8 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
                     request.SlotIntervalMinutes,
                     request.AllowOverlappingAppointments,
                     utcNow,
-                    request.OwnerCancelLinkEnabled ?? ClinicAppointmentSettings.DefaultOwnerCancelLinkEnabled);
+                    request.OwnerCancelLinkEnabled ?? ClinicAppointmentSettings.DefaultOwnerCancelLinkEnabled,
+                    request.WaitlistAutoOfferEnabled ?? ClinicAppointmentSettings.DefaultWaitlistAutoOfferEnabled);
 
             if (existing is not null)
             {
@@ -109,7 +110,8 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandler
                     request.SlotIntervalMinutes,
                     request.AllowOverlappingAppointments,
                     request.OwnerCancelLinkEnabled ?? existing.OwnerCancelLinkEnabled,
-                    utcNow);
+                    utcNow,
+                    request.WaitlistAutoOfferEnabled);
             }
         }
         catch (ArgumentException ex)

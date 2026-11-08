@@ -240,6 +240,14 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Bekleme listesi teklifi (TIER-018): alıcıya ulaşılamıyor, saat boşalmamış ya da doldu, açık teklif var, randevuya çok az
+        // kaldı ya da kayıt saate uymuyor (durum çakışması).
+        if (normalized is "waitlistoffers.recipientunreachable" or "waitlistoffers.slotnotreleased" or "waitlistoffers.slottaken"
+            or "waitlistoffers.offeralreadyopen" or "waitlistoffers.toolate" or "waitlistoffers.entrynotmatching")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Pasif oda/bölüm yeni yatışa atanamaz (HOSP-002): tanımın durumu ile çakışma.
         if (normalized is "hospitalizations.roominactive")
         {

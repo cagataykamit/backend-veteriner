@@ -25,6 +25,11 @@ public enum OwnerNotificationType
 
     /// <summary>Son gelişin üzerinden süre geçti (TIER-003); ticari ileti sayılır.</summary>
     NoReturnReminder = 15,
+
+    /// <summary>
+    /// Bekleme listesi teklifi: boşalan saat (TIER-018). Hizmet iletisidir, ticari değildir (ADR-046); hatırlatma tercihine uyar.
+    /// </summary>
+    WaitlistOffer = 16,
 }
 
 /// <summary>Bildirim kategorisi: kanal kuralını belirler.</summary>
@@ -82,7 +87,8 @@ public static class OwnerNotificationChannelPolicy
     public static OwnerNotificationCategory CategoryOf(OwnerNotificationType type) => type switch
     {
         OwnerNotificationType.AppointmentReminder or OwnerNotificationType.VaccinationReminder
-            or OwnerNotificationType.FollowUpReminder or OwnerNotificationType.DebtReminder => OwnerNotificationCategory.Reminder,
+            or OwnerNotificationType.FollowUpReminder or OwnerNotificationType.DebtReminder
+            or OwnerNotificationType.WaitlistOffer => OwnerNotificationCategory.Reminder,
         OwnerNotificationType.Marketing or OwnerNotificationType.NoReturnReminder => OwnerNotificationCategory.Marketing,
         _ => OwnerNotificationCategory.Transactional,
     };
@@ -122,9 +128,13 @@ public static class OwnerNotificationChannelPolicy
             _ => false,
         };
 
-    /// <summary>Otomatik hatırlatıcılar şimdilik yalnız e-posta (TIER-003); push ve WhatsApp entegrasyonla gelir.</summary>
+    /// <summary>
+    /// Otomatik hatırlatıcılar şimdilik yalnız e-posta (TIER-003); push ve WhatsApp entegrasyonla gelir. Bekleme listesi teklifi
+    /// (TIER-018) tek kullanımlık kabul bağlantısı taşıdığı için yalnız e-postadır.
+    /// </summary>
     private static bool IsEmailOnly(OwnerNotificationType type)
-        => type is OwnerNotificationType.FollowUpReminder or OwnerNotificationType.DebtReminder or OwnerNotificationType.NoReturnReminder;
+        => type is OwnerNotificationType.FollowUpReminder or OwnerNotificationType.DebtReminder or OwnerNotificationType.NoReturnReminder
+            or OwnerNotificationType.WaitlistOffer;
 
     /// <summary>Tek kullanımlık kod ve davet bağlantısı kilit ekranında görünebilecek push'a yazılmaz.</summary>
     private static bool CarriesSecret(OwnerNotificationType type)

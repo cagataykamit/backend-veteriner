@@ -114,6 +114,29 @@ public sealed class UpdateClinicAppointmentSettingsCommandHandlerTests
     }
 
     [Fact]
+    public async Task Update_Should_Keep_WaitlistAutoOffer_When_Field_Omitted()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BuildClinic(cid, tid));
+        var existing = ClinicAppointmentSettings.Create(tid, cid, 30, 15, false, DateTime.UtcNow);
+        existing.WaitlistAutoOfferEnabled.Should().BeTrue("varsayılan açık (TIER-018)");
+        _settingsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var disabled = await CreateHandler().Handle(
+            new UpdateClinicAppointmentSettingsCommand(cid, 30, 15, false, WaitlistAutoOfferEnabled: false), CancellationToken.None);
+        var omitted = await CreateHandler().Handle(
+            new UpdateClinicAppointmentSettingsCommand(cid, 30, 15, false), CancellationToken.None);
+
+        disabled.Value!.WaitlistAutoOfferEnabled.Should().BeFalse();
+        omitted.Value!.WaitlistAutoOfferEnabled.Should().BeFalse("alan gönderilmezse mevcut değer korunur");
+        omitted.Value.OwnerCancelLinkEnabled.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Update_Should_Deny_When_ClinicAdminUnassigned()
     {
         var tid = Guid.NewGuid();
