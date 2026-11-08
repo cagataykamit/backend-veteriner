@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.CashCounts;
+using Backend.Veteriner.Application.CashRegisters;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Reports.DailyTransactions;
@@ -8,6 +9,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Tests.Tenants;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.CashCounts;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
@@ -17,8 +19,9 @@ using Moq;
 namespace Backend.Veteriner.Application.Tests.CashCounts;
 
 /// <summary>
-/// TIER-008 ilk dilimi: beklenen nakit kasa özetinin nakit satırından gelir (Kart/Havale sayılmaz, iptal ve kredi iadesi düşer), tek klinik
-/// zorunlu, kaydetme Kurumsal ister, istemcinin gördüğü beklenen nakit eskiyse kayıt yazılmaz.
+/// TIER-008: beklenen nakit kasa özetinin nakit satırından gelir (Kart/Havale sayılmaz, iptal ve kredi iadesi düşer), kasanın giriş/çıkış
+/// ve aktarımları eklenir; tek klinik zorunlu, kaydetme Profesyonel ve Kurumsal ister, pasif kasa sayılmaz, istemcinin gördüğü beklenen
+/// nakit eskiyse kayıt yazılmaz.
 /// </summary>
 public sealed class CashCountHandlerTests
 {
@@ -34,6 +37,10 @@ public sealed class CashCountHandlerTests
     private readonly Mock<ICashEventsReader> _cashEvents = new();
     private readonly Mock<IReadRepository<CashCount>> _countsRead = new();
     private readonly Mock<IRepository<CashCount>> _counts = new();
+    private readonly Mock<IRepository<CashRegister>> _registers = new();
+    private readonly Mock<IReadRepository<CashRegister>> _registersRead = new();
+    private readonly Mock<IReadRepository<CashMovement>> _movements = new();
+    private readonly CashRegister _main = CashRegister.CreateMain(TenantId, ClinicId, DateTime.UtcNow);
     private readonly Mock<IReadRepository<User>> _users = new();
     private readonly Mock<IReadRepository<Tenant>> _tenants = new();
     private FinanceEventFilter? _seenFilter;
@@ -48,6 +55,10 @@ public sealed class CashCountHandlerTests
         _users.Setup(r => r.ListAsync(It.IsAny<ISpecification<User, CashCountUser>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new CashCountUser(UserId, "Selin", "selin@example.com")]);
         _countsRead.Setup(r => r.ListAsync(It.IsAny<ISpecification<CashCount>>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _registers.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<CashRegister>>(), It.IsAny<CancellationToken>())).ReturnsAsync(_main);
+        _registersRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<CashRegister>>(), It.IsAny<CancellationToken>())).ReturnsAsync(_main);
+        _movements.Setup(r => r.ListAsync(It.IsAny<ISpecification<CashMovement, CashMovementAmount>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
 
         // Nakit: 1000 tahsilat, 200 iptal, 50 kredi iadesi → net 750. Kart 400 sayılmaz.
         _cashEvents
@@ -67,11 +78,11 @@ public sealed class CashCountHandlerTests
             amount, method, false, UserId, "Selin", UserId, "Selin", null);
 
     private GetCashCountDayQueryHandler DayHandler()
-        => new(_tenant.Object, _clinic.Object, _scope.Object, _cashEvents.Object, _countsRead.Object, _users.Object);
+        => new(_tenant.Object, _clinic.Object, _scope.Object, _cashEvents.Object, _countsRead.Object, _registersRead.Object, _movements.Object, _users.Object);
 
     private CreateCashCountCommandHandler CreateHandler(SubscriptionPlanCode plan)
         => new(_tenant.Object, _clinic.Object, _client.Object, _scope.Object, _tenants.Object, PlanFeatureTestFactory.ForPlan(plan),
-            _cashEvents.Object, _counts.Object, _users.Object, TimeProvider.System);
+            _cashEvents.Object, _counts.Object, _registers.Object, _movements.Object, _users.Object, TimeProvider.System);
 
     [Fact]
     public async Task Day_Should_Take_Expected_Cash_From_Cash_Summary_Cash_Row_For_One_Istanbul_Day()
@@ -96,7 +107,7 @@ public sealed class CashCountHandlerTests
     [Fact]
     public async Task Day_Should_Flag_Cash_Movement_After_The_Count()
     {
-        var count = CashCount.Create(TenantId, ClinicId, Day, Day, 100m, 700m, 800m, null, UserId, DateTime.UtcNow).Value!;
+        var count = CashCount.Create(TenantId, ClinicId, _main.Id, Day, Day, 100m, 700m, 800m, null, UserId, DateTime.UtcNow).Value!;
         _countsRead.Setup(r => r.ListAsync(It.IsAny<ISpecification<CashCount>>(), It.IsAny<CancellationToken>())).ReturnsAsync([count]);
 
         var day = (await DayHandler().Handle(new GetCashCountDayQuery(Day, ClinicId), CancellationToken.None)).Value!;
@@ -116,12 +127,46 @@ public sealed class CashCountHandlerTests
         _cashEvents.Verify(r => r.ReadAsync(It.IsAny<FinanceEventFilter>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [Theory]
-    [InlineData(SubscriptionPlanCode.Basic)]
-    [InlineData(SubscriptionPlanCode.Pro)]
-    public async Task Create_Should_Need_Premium(SubscriptionPlanCode plan)
+    [Fact]
+    public async Task Day_Should_Add_Register_Movements_To_The_Cash_Row_Of_That_Register()
     {
-        var result = await CreateHandler(plan).Handle(
+        _movements.Setup(r => r.ListAsync(It.IsAny<ISpecification<CashMovement, CashMovementAmount>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new CashMovementAmount(CashMovementKind.In, 100m),
+                new CashMovementAmount(CashMovementKind.Out, 30m),
+                new CashMovementAmount(CashMovementKind.TransferIn, 50m),
+                new CashMovementAmount(CashMovementKind.TransferOut, 20m),
+            ]);
+
+        var day = (await DayHandler().Handle(new GetCashCountDayQuery(Day, ClinicId), CancellationToken.None)).Value!;
+
+        day.Cash.NetAmount.Should().Be(750m, "tahsilat satırı kasa özetinin nakit satırıdır");
+        day.Movements.InAmount.Should().Be(100m);
+        day.Movements.OutAmount.Should().Be(30m);
+        day.ExpectedCashAmount.Should().Be(850m, "750 + 100 − 30 + 50 − 20");
+        day.CashRegisterId.Should().Be(_main.Id);
+        _seenFilter!.CashRegister.Should().Be(new CashRegisterScope(_main.Id, true), "Ana kasa kasası boş nakdi de kapsar");
+    }
+
+    [Fact]
+    public async Task Create_Should_Refuse_An_Inactive_Register()
+    {
+        var other = CashRegister.Create(TenantId, ClinicId, "K2", "Kasa 2", DateTime.UtcNow).Value!;
+        other.Update("K2", "Kasa 2", false, DateTime.UtcNow);
+        _registers.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<CashRegister>>(), It.IsAny<CancellationToken>())).ReturnsAsync(other);
+
+        var result = await CreateHandler(SubscriptionPlanCode.Pro).Handle(
+            new CreateCashCountCommand(ClinicId, Day, 100m, 850m, 750m, null, other.Id), CancellationToken.None);
+
+        result.Error.Code.Should().Be(CashRegister.InactiveCode);
+        _counts.Verify(r => r.AddAsync(It.IsAny<CashCount>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Create_Should_Need_Cash_Management_Plan()
+    {
+        var result = await CreateHandler(SubscriptionPlanCode.Basic).Handle(
             new CreateCashCountCommand(ClinicId, Day, 100m, 850m, 750m, null), CancellationToken.None);
 
         result.Error.Code.Should().Be(TenantPlanFeatureEvaluator.FeatureNotInPlanCode);
@@ -138,20 +183,23 @@ public sealed class CashCountHandlerTests
         _counts.Verify(r => r.AddAsync(It.IsAny<CashCount>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [Fact]
-    public async Task Create_Should_Store_Server_Expected_Cash_And_Difference()
+    [Theory]
+    [InlineData(SubscriptionPlanCode.Pro)]
+    [InlineData(SubscriptionPlanCode.Premium)]
+    public async Task Create_Should_Store_Server_Expected_Cash_And_Difference(SubscriptionPlanCode plan)
     {
         CashCount? added = null;
         _counts.Setup(r => r.AddAsync(It.IsAny<CashCount>(), It.IsAny<CancellationToken>()))
             .Callback((CashCount c, CancellationToken _) => added = c)
             .ReturnsAsync((CashCount c, CancellationToken _) => c);
 
-        var result = await CreateHandler(SubscriptionPlanCode.Premium).Handle(
+        var result = await CreateHandler(plan).Handle(
             new CreateCashCountCommand(ClinicId, Day, 100m, 845m, 750m, "5 TL para üstü eksik"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue(result.Error.Message);
         added!.ExpectedCashAmount.Should().Be(750m);
         added.ClinicId.Should().Be(ClinicId);
+        added.CashRegisterId.Should().Be(_main.Id, "kasa verilmezse Ana kasa");
         result.Value!.ExpectedClosingAmount.Should().Be(850m);
         result.Value.DifferenceAmount.Should().Be(-5m);
         result.Value.CreatedByName.Should().Be("Selin");
