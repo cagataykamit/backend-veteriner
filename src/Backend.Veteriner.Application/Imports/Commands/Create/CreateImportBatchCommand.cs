@@ -10,7 +10,7 @@ namespace Backend.Veteriner.Application.Imports.Commands.Create;
 /// <summary>
 /// POST /api/v1/imports/batches: dosyayı okur, parti ve hazırlık satırlarını tek işlemde yazar (<c>Uploaded</c>).
 /// Audit payload'ı yalnız <see cref="RequestId"/>, <see cref="Name"/>, <see cref="ClinicId"/>, <see cref="Encoding"/>,
-/// <see cref="Delimiter"/> taşır; dosya içeriği (<see cref="Files"/>) kişisel veri olduğundan serileştirilmez.
+/// <see cref="Delimiter"/>, <see cref="SourceProfile"/> taşır; dosya içeriği (<see cref="Files"/>) kişisel veri olduğundan serileştirilmez.
 /// </summary>
 public sealed record CreateImportBatchCommand(
     Guid RequestId,
@@ -18,7 +18,8 @@ public sealed record CreateImportBatchCommand(
     Guid? ClinicId,
     [property: JsonIgnore] ImportFileSet Files,
     string? Encoding,
-    string? Delimiter)
+    string? Delimiter,
+    string? SourceProfile = null)
     : IRequest<Result<ImportBatchCreateResultDto>>, IAuditableRequest, ITransactionalRequest
 {
     public string AuditAction => "ImportBatch.Create";

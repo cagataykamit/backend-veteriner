@@ -37,4 +37,7 @@ public sealed class CreateImportBatchForm
     public IFormFile? VaccinationsFile { get; init; }
     public string? Encoding { get; init; }
     public string? Delimiter { get; init; }
+
+    /// <summary>Kliniğin geldiği program: <c>Generic</c> (varsayılan), <c>Kolayvet</c>, <c>EVet</c> (TIER-021).</summary>
+    public string? SourceProfile { get; init; }
 }

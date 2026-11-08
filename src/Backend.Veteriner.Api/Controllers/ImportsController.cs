@@ -19,6 +19,7 @@ using Backend.Veteriner.Application.Imports.Queries.GetPreview;
 using Backend.Veteriner.Application.Imports.Queries.GetProgress;
 using Backend.Veteriner.Application.Imports.Queries.GetRollbackPreview;
 using Backend.Veteriner.Application.Imports.Queries.GetRows;
+using Backend.Veteriner.Application.Imports.Queries.GetSourceProfiles;
 using Backend.Veteriner.Application.Imports.Queries.GetTemplate;
 using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Domain.Imports;
@@ -91,7 +92,7 @@ public sealed class ImportsController : ControllerBase
 
         var result = await _mediator.Send(
             new CreateImportBatchCommand(
-                form.RequestId ?? Guid.Empty, form.Name, form.ClinicId, files, form.Encoding, form.Delimiter),
+                form.RequestId ?? Guid.Empty, form.Name, form.ClinicId, files, form.Encoding, form.Delimiter, form.SourceProfile),
             ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
@@ -152,6 +153,21 @@ public sealed class ImportsController : ControllerBase
         Response.Headers.CacheControl = "no-store";
         var file = result.Value!;
         return File(file.Content, file.ContentType, file.FileName);
+    }
+
+    /// <summary>
+    /// "Hangi programdan geliyorsunuz?" seçenekleri ve hazır sütun eşlemeleri (TIER-021). Eşlemeler doğrulanmamış olabilir
+    /// (<c>verified</c>); seçilen profil <c>POST batches</c> alanı <c>sourceProfile</c> ile gönderilir.
+    /// </summary>
+    [HttpGet("source-profiles")]
+    [Authorize(Policy = PermissionCatalog.Imports.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<ImportSourceProfileDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSourceProfiles(CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        return (await _mediator.Send(new GetImportSourceProfilesQuery(), ct)).ToActionResult(this);
     }
 
     /// <summary>Kiracının partileri; sıralama oluşturulma zamanı azalan. <c>pageSize</c> 1–100.</summary>

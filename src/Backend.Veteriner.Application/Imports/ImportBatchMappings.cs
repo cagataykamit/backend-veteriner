@@ -26,7 +26,8 @@ internal static class ImportBatchMappings
             b.PayloadPurgedAtUtc,
             new ImportBatchSummaryDto(b.CustomerCounts.ToDto(), b.PetCounts.ToDto(), b.VaccinationCounts.ToDto()),
             tables,
-            warnings);
+            warnings,
+            b.SourceProfile);
 
     public static ImportIssueDto ToDto(this ImportIssue i)
         => new(i.Severity.ToString(), i.Code, i.Field, i.Message, i.Value);

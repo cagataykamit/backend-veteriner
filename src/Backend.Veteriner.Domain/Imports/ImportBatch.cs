@@ -55,6 +55,9 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     /// <summary>Listede görünen etiket; kişisel veri içermemelidir.</summary>
     public string? Name { get; private set; }
 
+    /// <summary>Kliniğin geldiği program (TIER-021); sütun önerisini seçer, istatistik ve destek için saklanır.</summary>
+    public ImportSourceProfile SourceProfile { get; private set; }
+
     public ImportBatchStatus Status { get; private set; }
     public string? MappingJson { get; private set; }
     public string? OptionsJson { get; private set; }
@@ -116,7 +119,8 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
         Guid requestId,
         string? name,
         Guid createdByUserId,
-        DateTime createdAtUtc)
+        DateTime createdAtUtc,
+        ImportSourceProfile sourceProfile = ImportSourceProfile.Generic)
     {
         if (tenantId == Guid.Empty)
             return Invalid("TenantId geçersiz.");
@@ -126,6 +130,8 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
             return Invalid("RequestId zorunludur.");
         if (createdByUserId == Guid.Empty)
             return Invalid("Oluşturan kullanıcı geçersiz.");
+        if (!Enum.IsDefined(sourceProfile))
+            return Invalid("Kaynak program geçersiz.");
 
         var normalizedName = NormalizeName(name);
         if (normalizedName is { Length: > MaxNameLength })
@@ -137,6 +143,7 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
             ClinicId = clinicId,
             RequestId = requestId,
             Name = normalizedName,
+            SourceProfile = sourceProfile,
             Status = ImportBatchStatus.Uploaded,
             CreatedByUserId = createdByUserId,
             CreatedAtUtc = NormalizeUtc(createdAtUtc),
@@ -144,9 +151,11 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     }
 
     /// <summary>Aynı <see cref="RequestId"/> ile gelen istek bu partiyi mi tarif ediyor (tekrar) yoksa başka içerik mi.</summary>
-    public bool MatchesRequest(Guid? clinicId, string? name, string? contentHash)
+    public bool MatchesRequest(
+        Guid? clinicId, string? name, string? contentHash, ImportSourceProfile sourceProfile = ImportSourceProfile.Generic)
         => ClinicId == clinicId
            && Name == NormalizeName(name)
+           && SourceProfile == sourceProfile
            && string.Equals(ContentHash, contentHash, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
