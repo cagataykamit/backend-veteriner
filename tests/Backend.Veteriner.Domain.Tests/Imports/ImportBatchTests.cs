@@ -162,6 +162,19 @@ public sealed class ImportBatchTests
         b.CustomerCounts.Should().Be(ImportTableCounts.Empty);
         b.PetCounts.Should().Be(ImportTableCounts.Empty);
         b.VaccinationCounts.Should().Be(ImportTableCounts.Empty);
+        b.SourceProfile.Should().Be(ImportSourceProfile.Generic);
+    }
+
+    [Fact]
+    public void Create_Should_Store_Source_Profile_And_Treat_It_As_Part_Of_Request()
+    {
+        var b = ImportBatch.Create(TenantId, null, Guid.NewGuid(), "x", UserId, Now, ImportSourceProfile.EVet).Value!;
+
+        b.SourceProfile.Should().Be(ImportSourceProfile.EVet);
+        b.MatchesRequest(null, "x", null, ImportSourceProfile.EVet).Should().BeTrue();
+        b.MatchesRequest(null, "x", null, ImportSourceProfile.Kolayvet).Should().BeFalse();
+        ImportBatch.Create(TenantId, null, Guid.NewGuid(), null, UserId, Now, (ImportSourceProfile)99)
+            .Error.Code.Should().Be("Imports.Validation");
     }
 
     [Theory]

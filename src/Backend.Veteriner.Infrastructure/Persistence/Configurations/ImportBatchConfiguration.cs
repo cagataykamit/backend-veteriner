@@ -25,6 +25,7 @@ public sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBa
         b.Property(x => x.RequestId).IsRequired();
         b.Property(x => x.ContentHash).HasMaxLength(ImportBatch.ContentHashLength).IsUnicode(false);
         b.Property(x => x.Name).HasMaxLength(ImportBatch.MaxNameLength);
+        b.Property(x => x.SourceProfile).IsRequired();
         b.Property(x => x.Status).IsRequired();
         b.Property(x => x.MappingJson);
         b.Property(x => x.OptionsJson);

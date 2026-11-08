@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Users.Common;
 using Backend.Veteriner.Domain.CustomDevelopment;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Users;
 using FluentValidation;
@@ -26,12 +27,23 @@ public sealed record CustomDevelopmentRequestDto(
     DateTime CreatedAtUtc,
     DateTime? StatusChangedAtUtc,
     string? DecisionReason,
-    string? ResponseNote);
+    string? ResponseNote,
+    MigrationSupportDetailsDto? Migration = null);
+
+/// <summary>Geçiş desteği ayrıntıları (TIER-021); yalnız <c>targetKind = Migration</c> talepte dolu.</summary>
+public sealed record MigrationSupportDetailsDto(
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] ImportSourceProfile SourceProgram,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] MigrationRecordVolume RecordVolume,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] MigrationMeetingDays MeetingDays,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] MigrationMeetingTimes MeetingTimes,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] MigrationSupportFee Fee,
+    int MeetingDurationMinutes);
 
 /// <summary>Kiracının talepleri (yeniden eskiye) ve açık talep sınırı; sınır doluysa yeni talep açılamaz.</summary>
 public sealed record CustomDevelopmentRequestListDto(IReadOnlyList<CustomDevelopmentRequestDto> Items, int OpenCount, int MaxOpen);
 
-/// <summary>GET /api/v1/custom-development-requests. Her pakette açık (paket düşünce talepler görünür kalır).</summary>
+/// <summary>GET /api/v1/custom-development-requests. Her pakette açık (paket düşünce talepler görünür kalır). Geçiş desteği talepleri
+/// (TIER-021) bu listede yoktur, kendi ucundadır.</summary>
 public sealed record GetCustomDevelopmentRequestsQuery : IRequest<Result<CustomDevelopmentRequestListDto>>;
 
 /// <summary>
@@ -55,7 +67,8 @@ public sealed class CreateCustomDevelopmentRequestCommandValidator : AbstractVal
     // Metin kuralları domain'de (CustomDevelopmentRequest.Create); burada yalnız zorunlu seçimler.
     public CreateCustomDevelopmentRequestCommandValidator()
     {
-        RuleFor(x => x.TargetKind).NotNull().IsInEnum();
+        RuleFor(x => x.TargetKind).NotNull().IsInEnum()
+            .NotEqual(CustomDevelopmentTargetKind.Migration).WithMessage("Geçiş desteği talebi kendi ucundan açılır.");
         RuleFor(x => x.Priority).NotNull().IsInEnum();
     }
 }
@@ -65,14 +78,17 @@ public sealed class CustomDevelopmentRequestsByTenantSpec : Specification<Custom
     public CustomDevelopmentRequestsByTenantSpec(Guid tenantId)
     {
         Query.AsNoTracking();
-        Query.Where(r => r.TenantId == tenantId).OrderByDescending(r => r.CreatedAtUtc).ThenBy(r => r.Id);
+        Query.Where(r => r.TenantId == tenantId && r.TargetKind != CustomDevelopmentTargetKind.Migration)
+            .OrderByDescending(r => r.CreatedAtUtc).ThenBy(r => r.Id);
     }
 }
 
 public sealed class OpenCustomDevelopmentRequestsByTenantSpec : Specification<CustomDevelopmentRequest>
 {
     public OpenCustomDevelopmentRequestsByTenantSpec(Guid tenantId)
-        => Query.Where(r => r.TenantId == tenantId && CustomDevelopmentRequest.OpenStatuses.Contains(r.Status));
+        => Query.Where(r => r.TenantId == tenantId
+                            && r.TargetKind != CustomDevelopmentTargetKind.Migration
+                            && CustomDevelopmentRequest.OpenStatuses.Contains(r.Status));
 }
 
 public sealed record CustomDevelopmentUser(Guid Id, string? DisplayName, string Email);
@@ -100,8 +116,18 @@ internal static class CustomDevelopmentRequestRules
         return requests.Select(r => new CustomDevelopmentRequestDto(
                 r.Id, r.RequestTitle, r.RequestText, r.TargetKind, r.RequestTarget, r.Priority, r.Status, r.IsOpen,
                 r.CreatedByUserId, names.GetValueOrDefault(r.CreatedByUserId), r.CreatedAtUtc, r.StatusChangedAtUtc,
-                r.DecisionReason, r.ResponseNote))
+                r.DecisionReason, r.ResponseNote, MigrationDetailsOf(r)))
             .ToList();
+    }
+
+    private static MigrationSupportDetailsDto? MigrationDetailsOf(CustomDevelopmentRequest r)
+    {
+        if (r.TargetKind != CustomDevelopmentTargetKind.Migration)
+            return null;
+
+        return new MigrationSupportDetailsDto(
+            r.MigrationSourceProgram!.Value, r.MigrationVolume!.Value, r.MigrationDays!.Value, r.MigrationTimes!.Value,
+            r.MigrationFee!.Value, CustomDevelopmentRequest.MeetingDurationMinutes);
     }
 }
 

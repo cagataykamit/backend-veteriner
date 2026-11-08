@@ -20,9 +20,10 @@ public sealed record AdminCustomDevelopmentRequestDto(
 
 /// <summary>
 /// GET /api/v1/admin/custom-development-requests (yalnız platform yöneticisi, kiracılar arası). Yeniden eskiye; <c>status</c> verilirse
-/// yalnız o durum, <c>openOnly</c> ise yalnız sonuçlanmamışlar.
+/// yalnız o durum, <c>openOnly</c> ise yalnız sonuçlanmamışlar, <c>targetKind</c> verilirse yalnız o konu (ör. <c>Migration</c>, TIER-021).
 /// </summary>
-public sealed record GetAdminCustomDevelopmentRequestsQuery(CustomDevelopmentRequestStatus? Status, bool OpenOnly, int Page, int PageSize)
+public sealed record GetAdminCustomDevelopmentRequestsQuery(
+    CustomDevelopmentRequestStatus? Status, bool OpenOnly, int Page, int PageSize, CustomDevelopmentTargetKind? TargetKind = null)
     : IRequest<Result<PagedResult<AdminCustomDevelopmentRequestDto>>>
 {
     public const int DefaultPageSize = 50;
@@ -47,6 +48,7 @@ public sealed class GetAdminCustomDevelopmentRequestsQueryValidator : AbstractVa
     {
         RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
         RuleFor(x => x.Status).IsInEnum();
+        RuleFor(x => x.TargetKind).IsInEnum();
     }
 }
 
@@ -61,9 +63,12 @@ public sealed class ChangeCustomDevelopmentRequestStatusCommandValidator : Abstr
 
 public sealed class AdminCustomDevelopmentRequestsSpec : Specification<CustomDevelopmentRequest>
 {
-    public AdminCustomDevelopmentRequestsSpec(CustomDevelopmentRequestStatus? status, bool openOnly, int? skip = null, int? take = null)
+    public AdminCustomDevelopmentRequestsSpec(
+        CustomDevelopmentRequestStatus? status, bool openOnly, CustomDevelopmentTargetKind? targetKind = null, int? skip = null, int? take = null)
     {
         Query.AsNoTracking();
+        if (targetKind is { } kind)
+            Query.Where(r => r.TargetKind == kind);
         if (status is { } s)
             Query.Where(r => r.Status == s);
         if (openOnly)
@@ -129,9 +134,9 @@ public sealed class GetAdminCustomDevelopmentRequestsQueryHandler
         GetAdminCustomDevelopmentRequestsQuery request, CancellationToken ct)
     {
         var pageSize = Math.Clamp(request.PageSize, 1, GetAdminCustomDevelopmentRequestsQuery.MaxPageSize);
-        var total = await _requests.CountAsync(new AdminCustomDevelopmentRequestsSpec(request.Status, request.OpenOnly), ct);
+        var total = await _requests.CountAsync(new AdminCustomDevelopmentRequestsSpec(request.Status, request.OpenOnly, request.TargetKind), ct);
         var rows = await _requests.ListAsync(
-            new AdminCustomDevelopmentRequestsSpec(request.Status, request.OpenOnly, (request.Page - 1) * pageSize, pageSize), ct);
+            new AdminCustomDevelopmentRequestsSpec(request.Status, request.OpenOnly, request.TargetKind, (request.Page - 1) * pageSize, pageSize), ct);
 
         var items = await CustomDevelopmentAdminRules.ToAdminDtosAsync(_tenants, _users, rows, ct);
         return Result<PagedResult<AdminCustomDevelopmentRequestDto>>.Success(

@@ -5,7 +5,8 @@ namespace Backend.Veteriner.Application.Imports.Contracts.Dtos;
 
 /// <summary>
 /// İçe aktarma partisi (ayrıntı ve liste öğesi). Satır verisi içermez. <see cref="Tables"/> ayrıntı, yükleme ve eşleme
-/// yanıtında, <see cref="Warnings"/> yalnız yükleme yanıtında dolar (listede ikisi de null).
+/// yanıtında, <see cref="Warnings"/> yalnız yükleme yanıtında dolar (listede ikisi de null). <see cref="SourceProfile"/> kliniğin
+/// seçtiği kaynak programdır (TIER-021).
 /// </summary>
 public sealed record ImportBatchDto(
     Guid Id,
@@ -23,7 +24,8 @@ public sealed record ImportBatchDto(
     DateTime? PayloadPurgedAtUtc,
     ImportBatchSummaryDto Summary,
     IReadOnlyList<ImportTableInfoDto>? Tables = null,
-    IReadOnlyList<ImportWarningDto>? Warnings = null);
+    IReadOnlyList<ImportWarningDto>? Warnings = null,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] ImportSourceProfile SourceProfile = ImportSourceProfile.Generic);
 
 /// <summary>Tablo başına sayaçlar.</summary>
 public sealed record ImportBatchSummaryDto(

@@ -133,7 +133,8 @@ public sealed class CreateImportBatchCommandHandler
             request.RequestId,
             request.Name,
             userId,
-            _timeProvider.GetUtcNow().UtcDateTime);
+            _timeProvider.GetUtcNow().UtcDateTime,
+            SourceProfileOf(request));
         if (!created.IsSuccess)
             return Result<ImportBatchCreateResultDto>.Failure(created.Error);
 
@@ -195,7 +196,7 @@ public sealed class CreateImportBatchCommandHandler
         string contentHash,
         CancellationToken ct)
     {
-        if (!existing.MatchesRequest(request.ClinicId, request.Name, contentHash))
+        if (!existing.MatchesRequest(request.ClinicId, request.Name, contentHash, SourceProfileOf(request)))
             return Fail("Imports.RequestIdConflict", "Bu requestId başka içerikli bir parti için kullanılmış.");
 
         var tables = await _tableInfo.LoadAsync(existing, ct);
@@ -225,6 +226,10 @@ public sealed class CreateImportBatchCommandHandler
             "Bu dosya zaten yüklenmiş ve henüz geri alınmamış/silinmemiş bir partide duruyor.",
             extensions));
     }
+
+    /// <summary>Biçim doğrulayıcıda denetlenir; burada yalnız çevrilir.</summary>
+    private static ImportSourceProfile SourceProfileOf(CreateImportBatchCommand request)
+        => ImportSourceProfiles.TryParse(request.SourceProfile, out var profile) ? profile : ImportSourceProfile.Generic;
 
     private static int RowCount(IReadOnlyList<ImportSourceTable> tables, ImportTable table)
         => tables.FirstOrDefault(t => t.Table == table)?.Rows.Count ?? 0;

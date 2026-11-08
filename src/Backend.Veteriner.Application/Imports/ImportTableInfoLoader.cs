@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Application.Imports;
 
 /// <summary>
 /// Parti yanıtındaki <c>tables[]</c>: satır sayısı partiden, sütunlar dosya başlıklarından (hazırlık satırlarının ilki),
-/// öneri kanonik şemadan, <c>mapped</c> kayıtlı eşlemeden gelir. Satırlar temizlenmişse (taslak silindi) sütun listesi boştur.
+/// öneri kanonik şemadan ve partinin kaynak programından (TIER-021), <c>mapped</c> kayıtlı eşlemeden gelir. Satırlar temizlenmişse (taslak silindi) sütun listesi boştur.
 /// </summary>
 public sealed class ImportTableInfoLoader
 {
@@ -47,7 +47,7 @@ public sealed class ImportTableInfoLoader
                 continue;
 
             var tableHeaders = headers.TryGetValue(table, out var h) ? h : [];
-            var suggestions = ImportCanonicalSchema.Suggest(table, tableHeaders);
+            var suggestions = ImportCanonicalSchema.Suggest(table, tableHeaders, batch.SourceProfile);
             var hasMapping = mapping.Columns.ContainsKey(ImportCanonicalNames.Key(table));
             var mappedBySource = mapping.ColumnsOf(table)
                 .GroupBy(kv => kv.Value, StringComparer.Ordinal)

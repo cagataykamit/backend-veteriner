@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Reading;
 using FluentValidation;
 
@@ -16,5 +17,8 @@ public sealed class CreateImportBatchCommandValidator : AbstractValidator<Create
         RuleFor(x => x.Delimiter)
             .Must(d => CsvTableReader.TryParseDelimiter(d, out _))
             .WithMessage("delimiter ';', ',' veya sekme (tab) olmalıdır.");
+        RuleFor(x => x.SourceProfile)
+            .Must(p => ImportSourceProfiles.TryParse(p, out _))
+            .WithMessage("sourceProfile Generic, Kolayvet veya EVet olmalıdır.");
     }
 }

@@ -29,6 +29,9 @@ public enum ImportSuggestionConfidence
     None = 0,
     Exact = 1,
     Alias = 2,
+
+    /// <summary>Seçilen kaynak programın hazır eşlemesi (<see cref="ImportSourceProfiles"/>; TIER-021, doğrulanmamış olabilir).</summary>
+    Profile = 3,
 }
 
 public sealed record ImportColumnSuggestion(string Source, string? Suggested, ImportSuggestionConfidence Confidence);
@@ -69,7 +72,7 @@ public static class ImportCanonicalSchema
         new("Tur", "Evet", "Katalogdaki hayvan türü (Köpek, Kedi, ...).", "Kedi", false,
             "Tür", "Hayvan Türü", "Hayvan Tür"),
         new("Irk", "Hayır", "Türe ait ırk; katalogda yoksa serbest metin olarak saklanır.", "Tekir", false,
-            "Cins", "Irkı"),
+            "Cins", "Irkı", "Hasta Irkı", "Hayvan Irkı"),
         new("Cinsiyet", "Hayır", "Erkek / Dişi.", "Dişi", false,
             "Cinsiyeti", "Sex", "Gender"),
         new("DogumTarihi", "Hayır", "gg.aa.yyyy veya yyyy-aa-gg; gelecekte olamaz.", "15.03.2021", true,
@@ -77,11 +80,11 @@ public static class ImportCanonicalSchema
         new("Kisir", "Hayır", "Evet / Hayır.", "Evet", false,
             "Kısır", "Kısırlaştırılmış", "Kısırlaştırma", "Kısırlık"),
         new("Mikrocip", "Hayır", "Yalnız rakam (genelde 15 hane); hücreyi METİN biçiminde tutun.", "985112345678901", true,
-            "Mikroçip", "Mikroçip No", "Mikrocip No", "Çip", "Çip No", "Chip", "Microchip"),
+            "Mikroçip", "Mikroçip No", "Mikrocip No", "Çip", "Çip No", "Çip Numarası", "Chip", "Microchip"),
         new("Renk", "Hayır", "Katalogda yoksa nota eklenir.", "Sarı", false,
             "Tüy Rengi", "Renkler"),
         new("Agirlik", "Hayır", "Kilogram; ondalık virgül veya nokta.", "4,5", false,
-            "Ağırlık", "Kilo", "Kg", "Ağırlık (kg)"),
+            "Ağırlık", "Kilo", "Kg", "Ağırlık (kg)", "Kilo (kg)"),
         new("KarneNo", "Hayır", "Pasaport / karne numarası (en çok 50 karakter).", "K-77", true,
             "Karne No", "Karne", "Pasaport No", "Pasaport"),
         new("Not", "Hayır", "Serbest not (en çok 2000 karakter).", "Sakin", false,
@@ -103,7 +106,7 @@ public static class ImportCanonicalSchema
         new("AsiAdi", "Evet", "Katalogdaki aşı tanımı (Kuduz, Karma, ...).", "Kuduz", false,
             "Aşı Adı", "Aşı", "Aşı Türü", "Uygulanan Aşı", "Vaccine"),
         new("UygulamaTarihi", "Evet", "gg.aa.yyyy veya yyyy-aa-gg; gelecekte olamaz, 1990'dan eski olamaz.", "10.04.2024", true,
-            "Uygulama Tarihi", "Aşı Tarihi", "Tarih", "Uygulanma Tarihi", "Yapılış Tarihi"),
+            "Uygulama Tarihi", "Aşı Tarihi", "Tarih", "Uygulanma Tarihi", "Yapılış Tarihi", "Aşı Uygulama Tarihi"),
         new("SonrakiAsiTarihi", "Hayır", "Uygulama tarihinden sonra olmalı.", "10.04.2025", true,
             "Sonraki Aşı Tarihi", "Sonraki Aşı", "Bir Sonraki Aşı", "Tekrar Tarihi", "Rapel Tarihi", "Sonraki Tarih", "Vade"),
         new("Seri", "Hayır", "Seri / lot numarası (Not alanına eklenir).", "L-5521", true,
@@ -163,10 +166,12 @@ public static class ImportCanonicalSchema
         => Fields(table).Any(f => string.Equals(f.Name, name, StringComparison.Ordinal));
 
     /// <summary>
-    /// Başlıklar için eşleme önerisi: önce şablon başlığı veya kanonik adla (eski şablon), sonra takma adla eşit olanlar;
+    /// Başlıklar için eşleme önerisi: önce şablon başlığı veya kanonik adla (eski şablon), sonra seçilen kaynak programın hazır
+    /// eşlemesiyle (<see cref="ImportSourceProfiles"/>), en son genel takma adla eşit olanlar;
     /// bir kanonik alan en çok bir sütuna, bir sütun en çok bir alana önerilir (başlık sırasında ilk gelen kazanır).
     /// </summary>
-    public static IReadOnlyList<ImportColumnSuggestion> Suggest(ImportTable table, IReadOnlyList<string> headers)
+    public static IReadOnlyList<ImportColumnSuggestion> Suggest(
+        ImportTable table, IReadOnlyList<string> headers, ImportSourceProfile profile = ImportSourceProfile.Generic)
     {
         var fields = Fields(table);
         var folded = headers.Select(ImportTextFolding.Fold).ToArray();
@@ -174,6 +179,8 @@ public static class ImportCanonicalSchema
         var claimed = new HashSet<string>(StringComparer.Ordinal);
 
         AssignPass(ImportSuggestionConfidence.Exact, f => [f.Header, f.Name]);
+        var profileHeaders = ImportSourceProfiles.MappingsFor(profile, table).ToLookup(m => m.Field, m => m.Header, StringComparer.Ordinal);
+        AssignPass(ImportSuggestionConfidence.Profile, f => profileHeaders[f.Name]);
         AssignPass(ImportSuggestionConfidence.Alias, f => f.Aliases);
 
         return headers
