@@ -10,12 +10,14 @@ public static class ClinicAppointmentSettingsDefaults
             DefaultAppointmentDurationMinutes: 30,
             SlotIntervalMinutes: 15,
             AllowOverlappingAppointments: false,
-            OwnerCancelLinkEnabled: ClinicAppointmentSettings.DefaultOwnerCancelLinkEnabled);
+            OwnerCancelLinkEnabled: ClinicAppointmentSettings.DefaultOwnerCancelLinkEnabled,
+            WaitlistAutoOfferEnabled: ClinicAppointmentSettings.DefaultWaitlistAutoOfferEnabled);
 
     public static ClinicAppointmentSettingsDto ToDto(ClinicAppointmentSettings row)
         => new(
             row.DefaultAppointmentDurationMinutes,
             row.SlotIntervalMinutes,
             row.AllowOverlappingAppointments,
-            row.OwnerCancelLinkEnabled);
+            row.OwnerCancelLinkEnabled,
+            row.WaitlistAutoOfferEnabled);
 }
