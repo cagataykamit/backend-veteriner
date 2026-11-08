@@ -228,7 +228,7 @@ Doküman, yeni endpoint geliştirmelerinde ve mevcut endpoint refactorlarında z
 | Endpoint | Başarı gövdesi | Not |
 |----------|----------------|-----|
 | `POST .../auth/login` | `LoginResultDto` | FluentValidation / boş JSON → `ValidationProblemDetails` veya controller `Auth.Validation.*` + `Result` |
-| `POST .../auth/refresh` | `LoginResultDto` | Eksik `refreshToken` → `Auth.Validation.RefreshTokenRequired` |
+| `POST .../auth/refresh` | `LoginResultDto` | Eksik `refreshToken` → `Auth.Validation.RefreshTokenRequired`. Oturumdaki klinik pasifse ya da kullanıcının o kliniğe ataması kalktıysa (tenant-wide roller hariç; `select-clinic` ile aynı kural) → `400 Auth.ClinicSelectionRequired`, token üretilmez |
 | `POST .../auth/select-clinic` | `LoginResultDto` | Geçersiz gövde → `Auth.Validation.SelectClinicRequestInvalid` |
 | `POST .../auth/logout` | `AuthActionResultDto` (`success`, isteğe bağlı `message`) | Boş/eksik refresh → idempotent başarı + açıklayıcı `message` |
 | `POST .../auth/logout-all` | `AuthActionResultDto` | |
@@ -1424,8 +1424,8 @@ Davet **oluşturma ve kabul** için: kiracı **aktif** olmalı; abonelik **Trial
 - **Member tenant doğrulaması:** `IUserTenantRepository.ExistsAsync(memberId, tenantId)`. Üye bu kiracıda değilse **404 `Members.NotFound`** (§22.8/§22.9 ile aynı maskeleme çizgisi; farklı kiracının kullanıcısı bu koda düşer, sızma yok).
 - **Klinik doğrulaması:** Klinik `ClinicByIdSpec(tenantId, clinicId)` ile çözülür; kiracıya ait değilse `Clinics.NotFound` (404 envelope).
 - **Subscription guard:** Command olduğundan §23.2 merkezi `TenantSubscriptionWriteGuardBehavior` bu istekleri önce değerlendirir; `ReadOnly`/`Cancelled` tenantta `Subscriptions.TenantReadOnly` / `Subscriptions.TenantCancelled` (**403**). Namespace `Tenants.Commands.*` (Auth dışı) — guard çizgisine uyar.
-- **Permission cache:** Bu uçta **çağrılmaz**. Klinik üyeliği permission setini değiştirmez; `IPermissionCacheInvalidator` kullanılmaz.
-- **Session / refresh revoke:** Bu fazda **kapsam dışı**. Remove sonrası mevcut access token TTL'ine kadar geçerli kalır; yeni `select-clinic` akışı `Auth.UserClinicNotAssigned` ile doğrular.
+- **Permission cache:** Remove sonrası `IPermissionCacheInvalidator` çağrılır (SEC-002): üyenin eldeki erişim token'ı geçersiz sayılır.
+- **Session / refresh:** Yenileme, oturumdaki klinik için atamayı yeniden denetler; ataması kalkan üye `Auth.ClinicSelectionRequired` alır (yeniden giriş, sonra klinik seçimi). Yeni `select-clinic` akışı `Auth.UserClinicNotAssigned` ile doğrular.
 - **Son-klinik koruması:** Bu fazda **kapsam dışı**. Son kliniği kaldırılan üye `select-clinic` yapamaz; UI uyarı / yönetici aksiyonu sorumluluğundadır.
 - **Şema etkisi:** yok (migration / model değişikliği açılmadı). `UserClinic(UserId, ClinicId)` tekil kayıt modeli korunur.
 - **Repository yazım çizgisi:** `IUserClinicRepository.AddAsync/RemoveAsync` eklenmiştir; implementasyon **SaveChanges çağırmaz**, commit sınırı handler'da `IUnitOfWork.SaveChangesAsync` ile yönetilir (§ `IUserOperationClaimRepository` ile aynı kurumsal çizgi).

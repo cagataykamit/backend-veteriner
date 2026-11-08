@@ -28,6 +28,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
     private readonly IUserTenantRepository _userTenants;
     private readonly ITenantScope _tenantScope;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IUserClinicRepository _userClinics;
     private readonly ILogger<RefreshCommandHandler> _logger;
     private readonly TimeProvider _timeProvider;
 
@@ -42,6 +43,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         IUserTenantRepository userTenants,
         ITenantScope tenantScope,
         IReadRepository<Clinic> clinics,
+        IUserClinicRepository userClinics,
         TimeProvider timeProvider,
         ILogger<RefreshCommandHandler>? logger = null)
     {
@@ -55,6 +57,7 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         _userTenants = userTenants;
         _tenantScope = tenantScope;
         _clinics = clinics;
+        _userClinics = userClinics;
         _logger = logger ?? NullLogger<RefreshCommandHandler>.Instance;
         _timeProvider = timeProvider;
     }
@@ -173,16 +176,28 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
 
         extraClaims.Add(new Claim(VeterinerClaims.TenantId, sessionTenantId.ToString("D")));
 
-        // Clinic seçildiyse token'a taşınır; geçersizse yeniden seçim zorunlu.
+        // Clinic seçildiyse token'a taşınır; geçersizse ya da atama kaldırıldıysa yeniden seçim zorunlu.
+        // Atama kuralı select-clinic ile aynı: tenant-wide roller UserClinic atamasını bypass eder.
         if (stored.ClinicId is { } sessionClinicId)
         {
-            var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(sessionTenantId, sessionClinicId), ct);
-            MarkStep("clinicLookup");
-            if (clinic is null || !clinic.IsActive)
+            bool clinicUsable;
+            if (TenantWideClaimNames.IsTenantWide(operationClaimNames))
+            {
+                var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(sessionTenantId, sessionClinicId), ct);
+                MarkStep("clinicLookup");
+                clinicUsable = clinic is { IsActive: true };
+            }
+            else
+            {
+                clinicUsable = await _userClinics.ExistsActiveInTenantAsync(user.Id, sessionTenantId, sessionClinicId, ct);
+                MarkStep("clinicAssignmentAndActive");
+            }
+
+            if (!clinicUsable)
             {
                 return Result<LoginResultDto>.Failure(
                     "Auth.ClinicSelectionRequired",
-                    "Aktif klinik bulunamadı; lütfen klinik seçimi yapın.");
+                    "Seçili klinik artık kullanılamıyor (pasif ya da atama kaldırıldı); lütfen klinik seçimi yapın.");
             }
 
             extraClaims.Add(new Claim(VeterinerClaims.ClinicId, sessionClinicId.ToString("D")));
