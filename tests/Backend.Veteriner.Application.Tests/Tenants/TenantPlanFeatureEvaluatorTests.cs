@@ -102,12 +102,24 @@ public sealed class TenantPlanFeatureEvaluatorTests
         result.Error.Extensions!["requiredPlanCode"].Should().Be("Premium");
     }
 
-    [Fact]
-    public async Task Trial_Should_Not_Limit_Clinic_Count_But_Follow_Selected_Plan_For_Portal()
+    /// <summary>ADR-035 2026-11-08: deneme seçilen pakete göre davranır, çok klinik dahil (K7 istisnası kalktı).</summary>
+    [Theory]
+    [InlineData(SubscriptionPlanCode.Basic, false)]
+    [InlineData(SubscriptionPlanCode.Pro, false)]
+    [InlineData(SubscriptionPlanCode.Premium, true)]
+    public async Task Trial_Should_Follow_Selected_Plan_For_Second_Clinic(SubscriptionPlanCode plan, bool allowed)
     {
-        var evaluator = PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Basic, new Clinic(TenantId, "Merkez", "İzmir"), trialing: true);
+        var evaluator = PlanFeatureTestFactory.ForPlan(plan, new Clinic(TenantId, "Merkez", "İzmir"), trialing: true);
 
-        (await evaluator.EnsureCanAddActiveClinicAsync(TenantId, CancellationToken.None)).IsSuccess.Should().BeTrue();
+        (await evaluator.EnsureCanAddActiveClinicAsync(TenantId, CancellationToken.None)).IsSuccess.Should().Be(allowed);
+        (await evaluator.IsAllowedAsync(TenantId, PlanFeature.MultiClinic, CancellationToken.None)).Should().Be(allowed);
+    }
+
+    [Fact]
+    public async Task Trial_Should_Follow_Selected_Plan_For_Portal()
+    {
+        var evaluator = PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Basic, trialing: true);
+
         (await evaluator.IsAllowedAsync(TenantId, PlanFeature.OwnerPortal, CancellationToken.None)).Should().BeFalse();
     }
 

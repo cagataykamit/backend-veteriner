@@ -16,8 +16,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.OwnerPortal;
 
 /// <summary>
-/// TIER-001 (docs/PLAN_FEATURES_API_CONTRACT.md): paket portalı ve çok kliniği gerçekten zorlar. Paket düşünce mevcut bağ ve
-/// fazla klinik kalır, yalnız yenisi eklenemez (çalışma varsayımı, kullanıcı onayı bekliyor). Denemede şube sınırlanmaz (K7).
+/// TIER-001 (docs/PLAN_FEATURES_API_CONTRACT.md): paket portalı ve çok kliniği gerçekten zorlar. Portalsız pakette mevcut bağda okuma
+/// kapanır, sahip hakları açık kalır; veri silinmez (ADR-035 2026-11-08). Deneme seçilen pakete göre davranır, çok klinik dahil.
 /// </summary>
 public sealed partial class OwnerPortalIntegrationTests
 {
@@ -175,12 +175,49 @@ public sealed partial class OwnerPortalIntegrationTests
         (await CreateClinicAsync(staff, $"Şube-{Guid.NewGuid():N}"[..12])).StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
-    [Fact]
-    public async Task Trial_Should_Not_Limit_Clinic_Count_On_Basic()
+    /// <summary>ADR-035 2026-11-08: deneme seçilen pakete göre davranır, çok klinik dahil.</summary>
+    [Theory]
+    [InlineData(SubscriptionPlanCode.Basic)]
+    [InlineData(SubscriptionPlanCode.Pro)]
+    public async Task Trial_Without_MultiClinic_Should_Reject_Second_Clinic(SubscriptionPlanCode plan)
     {
-        var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Basic, trialing: true);
+        var staff = await SeedPlanTenantAsync(plan, trialing: true);
+
+        await ShouldBeNotInPlanAsync(await CreateClinicAsync(staff, $"Şube-{Guid.NewGuid():N}"[..12]), "Premium");
+
+        var state = await (await SendAsync(HttpMethod.Get, $"/api/v1/tenants/{staff.TenantId}/access-state", staff.Token))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        state.GetProperty("planFeatures").EnumerateArray().Single(f => f.GetProperty("feature").GetString() == "MultiClinic")
+            .GetProperty("isEnabled").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Premium_Trial_Should_Allow_Second_Clinic()
+    {
+        var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Premium, trialing: true);
 
         (await CreateClinicAsync(staff, $"Şube-{Guid.NewGuid():N}"[..12])).StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    /// <summary>Kararın öncesinden denemede iki aktif kliniği olan kiracı: klinikler kalır, yenisi açılamaz.</summary>
+    [Fact]
+    public async Task Existing_Trial_With_Two_Clinics_Should_Keep_Them_And_Block_New_Ones()
+    {
+        var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Basic, trialing: true);
+        Guid secondClinicId;
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var second = new Clinic(staff.TenantId, "Eski Şube", "Bursa");
+            db.Clinics.Add(second);
+            await db.SaveChangesAsync();
+            secondClinicId = second.Id;
+        }
+
+        var detail = await SendAsync(HttpMethod.Get, $"/api/v1/clinics/{secondClinicId}", staff.Token);
+        detail.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await detail.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("isActive").GetBoolean().Should().BeTrue();
+        await ShouldBeNotInPlanAsync(await CreateClinicAsync(staff, $"Üçüncü-{Guid.NewGuid():N}"[..12]), "Premium");
     }
 
     [Fact]

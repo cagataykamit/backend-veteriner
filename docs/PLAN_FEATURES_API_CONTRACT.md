@@ -18,7 +18,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `TIER-001`, A
 |---|---|
 | Tablonun yeri | Yalnız `SubscriptionPlanCatalog` (`PlanEntry.Features`). Yeni üst paket işi `PlanFeature` ile bu tabloya eklenir. |
 | Kiracı için karar | Yalnız `TenantPlanFeatureEvaluator`. Abonelik kaydı olmayan kiracı kilitli sayılır. |
-| Deneme | Seçilen pakete göre davranır (`OwnerPortal` Basic denemede kilitli); denemede paket ücretsiz değişir. **Tek istisna `MultiClinic`:** denemede şube sayısı sınırlanmaz (K7). |
+| Deneme | Seçilen pakete göre davranır, `MultiClinic` dahil (2026-11-08 kullanıcı kararı; K7 istisnası kalktı): Temel ve Profesyonel denemede ikinci aktif klinik açılamaz, Kurumsal denemede açılır. Denemede paket ücretsiz değişir; değişim sığma kuralına bağlıdır (§4). |
 | Abonelik durumu | Paket kuralı durumdan bağımsızdır; salt okunur kiracıda yazma kapısı (`Subscriptions.TenantReadOnly`) ayrıca çalışır. |
 | Kilitlenmeyenler | Yasal kayıt defterleri, KVKK araçları (veri talebi gelen kutusu dahil), klinik web sitesi (ADR-045 K13), kliniğe özel kimliksiz online randevu bağlantısı (ADR-042). Bu tablonun dışındadır. |
 | Site metni | `pricing-plan.utils.ts` `PRICING_FEATURE_ROWS` pazarlama metnidir; tablo değişirse elle eşitlenir. |
@@ -60,7 +60,7 @@ Kayıt (`owner-signup`) ilk kliniği her pakette oluşturur. Pasif klinik sayıl
   ] }
 ```
 
-`isEnabled` §2 ile aynı kuraldır (denemede `MultiClinic` açık). Pasif kiracıda `planCode: null`, `planFeatures: []`.
+`isEnabled` §2 ile aynı kuraldır (deneme dahil yalnız paket belirler). Pasif kiracıda `planCode: null`, `planFeatures: []`.
 
 ## 4) Paket değişimi — seçenek A (kullanıcı kararı, ADR-035 2026-11-08)
 
@@ -101,10 +101,10 @@ Hata gövdesi (standart `ProblemDetails`, alanlar üst düzeyde):
 **Kapanan risk:** üst paket alıp şube açarak ya da portal daveti göndererek düşmek artık mümkün değil.
 ## 5) Testler
 
-- Application: `TenantPlanFeatureEvaluatorTests` (paket tablosu, gereken paket, kayıtsız kiracı, ilk ve ikinci klinik, deneme), `CreateClinicCommandHandlerTests`, `ClinicSettingsHandlersTests`, `CreateClientPortalInviteCommandHandlerTests`.
-- Entegrasyon: `OwnerPortalPlanFeatureIntegrationTests` (Temel red, deneme dahil; Profesyonel davet ve kabul; düşürmede mevcut bağ, bekleyen davet ve fazla klinik; Kurumsal ve denemede ikinci klinik; `access-state`).
+- Application: `TenantPlanFeatureEvaluatorTests` (paket tablosu, gereken paket, kayıtsız kiracı, ilk ve ikinci klinik, deneme, sığma kuralı ve bekleyen davet), `StartSubscriptionCheckoutCommandHandlerTests` (denemede değişimde ve yenilemede sığma), `CreateClinicCommandHandlerTests`, `ClinicSettingsHandlersTests`, `CreateClientPortalInviteCommandHandlerTests`.
+- Entegrasyon: `OwnerPortalPlanFeatureIntegrationTests` (Temel red, deneme dahil; Profesyonel davet ve kabul; portalsız pakette okuma kapalı, veri talebi, tercihler ve hesap silme açık, yükseltince geri gelir; bekleyen davet ve fazla klinik; Temel ve Profesyonel denemede ikinci klinik reddi, Kurumsal denemede kabul; denemede eski iki klinik kalır; `access-state`), `TenantInviteUserLimitIntegrationTests` (sığmayan düşürmede 409 ve sayılar, bekleyen davet ve fazla klinik, sığan düşürmede kabul, dönem sonu ret ve uygulama, özetteki `rejectedPlanChange`).
 
 ## 6) Bilinen sınırlar
 
 - Klinik sayısı kontrolü kullanıcı sınırıyla aynı şekilde kilitsizdir; aynı anda iki istek ikinci kliniği açabilir.
-- `TRIAL_LIMITS_API_CONTRACT.md` K7 metnindeki "`Basic` = 1" kullanıcı sınırı eskidir (katalog 3); bu işte değiştirilmedi.
+- Sığma kontrolü de kilitsizdir: düşürme planlanırken ve uygulanırken eşzamanlı klinik açma ya da davet sınırı aşabilir; dönem sonu yeniden kontrolü planlanmış düşürmeyi bu yüzden korur.

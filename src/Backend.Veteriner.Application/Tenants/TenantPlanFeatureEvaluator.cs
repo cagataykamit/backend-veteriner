@@ -9,7 +9,8 @@ namespace Backend.Veteriner.Application.Tenants;
 
 /// <summary>
 /// Kiracının paketi özelliği içeriyor mu (TIER-001): tablo <see cref="SubscriptionPlanCatalog"/>, karar burada. Deneme seçilen pakete
-/// göre davranır; tek istisna çok kliniktir (TRIAL_LIMITS K7: denemede şube sayısı sınırlanmaz). Salt okunur durum ayrı kapıdır
+/// göre davranır, çok klinik dahil (ADR-035 2026-11-08, TRIAL_LIMITS K7). Paket değişiminde sığma kuralı da buradadır
+/// (<see cref="GetPlanFitAsync"/>). Salt okunur durum ayrı kapıdır
 /// (<see cref="TenantSubscriptionEffectiveWriteEvaluator"/>). Abonelik kaydı olmayan kiracı kilitli sayılır.
 /// Kapsamlı (scoped) servistir; abonelik istek başına kiracı başına bir kez okunur.
 /// </summary>
@@ -43,10 +44,9 @@ public sealed class TenantPlanFeatureEvaluator
     public static int? MaxActiveClinics(SubscriptionPlanCode plan)
         => SubscriptionPlanCatalog.Allows(plan, PlanFeature.MultiClinic) ? null : 1;
 
-    /// <summary>Abonelik için özellik açık mı; <c>access-state</c> da aynı kuraldan okur.</summary>
+    /// <summary>Abonelik için özellik açık mı; <c>access-state</c> da aynı kuraldan okur. Deneme dahil yalnız paket belirler.</summary>
     public static bool IsEnabled(TenantSubscription subscription, PlanFeature feature)
-        => (feature == PlanFeature.MultiClinic && subscription.Status == TenantSubscriptionStatus.Trialing)
-           || SubscriptionPlanCatalog.Allows(subscription.PlanCode, feature);
+        => SubscriptionPlanCatalog.Allows(subscription.PlanCode, feature);
 
     public async Task<bool> IsAllowedAsync(Guid tenantId, PlanFeature feature, CancellationToken ct)
         => await GetSubscriptionAsync(tenantId, ct) is { } subscription && IsEnabled(subscription, feature);
