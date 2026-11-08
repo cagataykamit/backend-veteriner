@@ -50,6 +50,10 @@ Kiracı **istekte taşınmaz**; yeni access token, sunucudaki refresh kaydındak
 
 Access token içinde `tenant_id` claim’i, login/refresh sırasında çözümlenen kiracı için üretilir.
 
+**Ömür:** access token 30 dakika (`Jwt:ExpMinutes`, SEC-002), refresh token 7 gün (`Jwt:RefreshExpDays`). `expiresAt` yanıtta döner.
+
+**Erişim değişince eski token 401 (SEC-002):** kullanıcının rolü (kiracı ekranından ya da yönetim API'sinden), rolünün izin listesi, izin tanımı, kiracı üyeliği ya da klinik ataması değişince sunucu o kullanıcı için bir izin değişim damgası yazar. Damgadan önce üretilmiş access token her uçta `401` alır (`WWW-Authenticate: Bearer error="invalid_token"`). İstemci mevcut akışla bir kez `POST .../auth/refresh` yapar ve isteği yeni token'la tekrarlar; yeni token güncel izinleri taşır. Üyelikten çıkarılan kullanıcının yenilemesi `Auth.TenantNotMember` ile reddedilir. Platform yöneticisi rolü de aynı kurala tabidir. Ayrıntı ve tek süreç varsayımı: `SECURITY_CONFIGURATION.md` "İzin değişim damgası".
+
 ## Tenant-scoped API’ler
 
 Kiracı bağlamı **`ITenantContext`** üzerinden yalnız JWT `tenant_id`'den gelir. Sorgu `tenantId` kiracı belirlemez: JWT'dekinden farklıysa 403, JWT'de kiracı yoksa yok sayılır (2026-10-28 güvenlik düzeltmesi); create/list/get için gövde `tenantId` beklenmez (ilgili komutlar buna göre güncellenmiştir).
