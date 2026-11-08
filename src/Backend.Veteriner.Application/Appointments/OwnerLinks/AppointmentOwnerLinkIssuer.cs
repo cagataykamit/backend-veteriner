@@ -57,7 +57,28 @@ public sealed class AppointmentOwnerLinkIssuer
             tenantId, clinicId, appointmentId, _hash.ComputeSha256(rawToken), appointmentStartUtc, utcNow, AppointmentOwnerLinkPurpose.Calendar);
         return new IssuedAppointmentCalendarLink(link, AppointmentOwnerLinkUrls.CalendarFile(_app, rawToken));
     }
+
+    /// <summary>
+    /// Bekleme listesi teklifinin kabul bağlantısı (TIER-018): aynı token deseni ve tablo, amaç
+    /// <see cref="AppointmentOwnerLinkPurpose.WaitlistOffer"/>. Sayfayı açmak hiçbir şeyi değiştirmez; kabul ve ret POST'tur.
+    /// </summary>
+    public IssuedWaitlistOfferLink IssueWaitlistOffer(
+        Guid tenantId,
+        Guid clinicId,
+        Guid sourceAppointmentId,
+        Guid offerId,
+        DateTime offerExpiresAtUtc,
+        DateTime utcNow)
+    {
+        var rawToken = _secrets.CreateToken();
+        var link = AppointmentOwnerLink.CreateForWaitlistOffer(
+            tenantId, clinicId, sourceAppointmentId, offerId, _hash.ComputeSha256(rawToken), offerExpiresAtUtc, utcNow);
+        return new IssuedWaitlistOfferLink(link, AppointmentOwnerLinkUrls.WaitlistOfferPage(_portal, _app, rawToken));
+    }
 }
+
+/// <summary>Yeni teklif bağlantısı (izlenmez; çağıran e-postayla aynı kayıtta ekler) ve portal sayfası adresi.</summary>
+public sealed record IssuedWaitlistOfferLink(AppointmentOwnerLink Link, string PageUrl);
 
 /// <summary>Yeni takvim bağlantısı (izlenmez; çağıran e-postayla aynı kayıtta ekler) ve .ics adresi.</summary>
 public sealed record IssuedAppointmentCalendarLink(AppointmentOwnerLink Link, string IcsUrl);
@@ -78,6 +99,12 @@ public static class AppointmentOwnerLinkUrls
     public static string Page(OwnerPortalOptions portal, AppOptions app, string rawToken, AppointmentOwnerLinkAction action)
         => $"{OwnerPortalEmails.PortalRoot(portal, app)}/{PagePath}?token={Uri.EscapeDataString(rawToken)}"
            + $"&islem={(action == AppointmentOwnerLinkAction.Cancel ? CancelActionValue : ConfirmActionValue)}";
+
+    /// <summary>Bekleme listesi teklifi (TIER-018): <c>{PortalBaseUrl}/bekleme-teklifi?token=…</c>.</summary>
+    public const string WaitlistOfferPagePath = "bekleme-teklifi";
+
+    public static string WaitlistOfferPage(OwnerPortalOptions portal, AppOptions app, string rawToken)
+        => $"{OwnerPortalEmails.PortalRoot(portal, app)}/{WaitlistOfferPagePath}?token={Uri.EscapeDataString(rawToken)}";
 
     /// <summary><c>{App:BaseUrl}/api/portal/v1/appointment-link/calendar.ics?token=…</c>; GET yalnız dosya döner.</summary>
     public static string CalendarFile(AppOptions app, string rawToken)

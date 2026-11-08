@@ -37,6 +37,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Application/ExternalApi/ExternalApiAccess.cs"] = "Dış API anahtarı ön ekle aranır; ön ek tüm kiracılarda benzersiz",
         ["Backend.Veteriner.Application/Clinics/OnlineBooking/OnlineBookingClinicResolver.cs"] = "Online randevu bağlantısı kodla aranır; kod tüm kiracılarda benzersiz",
         ["Backend.Veteriner.Application/Appointments/OwnerLinks/AppointmentOwnerLinkResolver.cs"] = "Hatırlatma onayla/iptal bağlantısı token ile aranır",
+        ["Backend.Veteriner.Application/Waitlist/WaitlistOfferLinkFeatures.cs"] = "Bekleme listesi teklif bağlantısı token ile aranır",
         ["Backend.Veteriner.Application/OwnerPortal/MarketingOptOut/MarketingOptOutLinkResolver.cs"] = "Ticari ileti ret bağlantısı token ile aranır",
         ["Backend.Veteriner.Application/ClinicSites/ClinicSiteAddressBook.cs"] = "Site adresi tüm kiracılarda benzersiz; adres kiracılar arası aranır",
         ["Backend.Veteriner.Application/VetFinder/Public/VetFinderDirectory.cs"] = "Veteriner bul: listelenmeyi açmış klinikler tüm kiracılardan okunur",
@@ -47,6 +48,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Api/Controllers/CustomDevelopmentRequestsAdminController.cs"] = "Özel geliştirme talepleri (platform yöneticisi)",
         ["Backend.Veteriner.Infrastructure/Tenants/TrialActivationMetricsReader.cs"] = "Deneme metrikleri (platform yöneticisi)",
         // Arka plan ve bakım
+        ["Backend.Veteriner.Application/Waitlist/WaitlistOfferProcessor.cs"] = "Bekleme listesi işleyicisi: sıradaki kaydı ya da açık teklifi olan kiracıları tarar",
         ["Backend.Veteriner.Infrastructure/Imports/ImportValidationProcessor.cs"] = "Kuyruk taraması",
         ["Backend.Veteriner.Infrastructure/Imports/ImportCommitProcessor.cs"] = "Kuyruk taraması",
         ["Backend.Veteriner.Infrastructure/Imports/ImportRollbackProcessor.cs"] = "Kuyruk taraması",
