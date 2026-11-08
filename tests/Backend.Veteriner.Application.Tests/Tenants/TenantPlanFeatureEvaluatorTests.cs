@@ -47,6 +47,9 @@ public sealed class TenantPlanFeatureEvaluatorTests
     [InlineData(SubscriptionPlanCode.Basic, PlanFeature.Waitlist, false)]
     [InlineData(SubscriptionPlanCode.Pro, PlanFeature.Waitlist, true)]
     [InlineData(SubscriptionPlanCode.Premium, PlanFeature.Waitlist, true)]
+    [InlineData(SubscriptionPlanCode.Basic, PlanFeature.FreeMigrationSupport, false)]
+    [InlineData(SubscriptionPlanCode.Pro, PlanFeature.FreeMigrationSupport, false)]
+    [InlineData(SubscriptionPlanCode.Premium, PlanFeature.FreeMigrationSupport, true)]
     public void Catalog_Should_Match_Adr035_Table(SubscriptionPlanCode plan, PlanFeature feature, bool expected)
         => SubscriptionPlanCatalog.Allows(plan, feature).Should().Be(expected);
 
@@ -59,6 +62,7 @@ public sealed class TenantPlanFeatureEvaluatorTests
     [InlineData(PlanFeature.ExternalApi, SubscriptionPlanCode.Premium)]
     [InlineData(PlanFeature.CustomDevelopment, SubscriptionPlanCode.Premium)]
     [InlineData(PlanFeature.Waitlist, SubscriptionPlanCode.Pro)]
+    [InlineData(PlanFeature.FreeMigrationSupport, SubscriptionPlanCode.Premium)]
     public void MinimumPlanFor_Should_Return_Smallest_Plan(PlanFeature feature, SubscriptionPlanCode expected)
         => SubscriptionPlanCatalog.MinimumPlanFor(feature).Should().Be(expected);
 

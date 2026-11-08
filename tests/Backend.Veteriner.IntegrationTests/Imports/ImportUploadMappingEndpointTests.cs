@@ -674,6 +674,92 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         columns.Should().OnlyContain(c => c.GetProperty("confidence").GetString() == "Exact");
     }
 
+    // ---------------------------------------------------------------- Kaynak program profili (TIER-021)
+
+    [Fact]
+    public async Task Source_Profile_Should_Drive_Suggestions_And_Be_Stored_On_Batch()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var bytes = Workbook(
+            ("Musteriler", [["ADI", "Protokol No", "Gsm"], ["Ayşe Yılmaz", "P-1", "05321234567"]]),
+            ("Hastalar", [["Sahip", "Gsm", "Hasta", "Tür", "Hasta Irkı"], ["Ayşe Yılmaz", "05321234567", "Pamuk", "Kedi", "Tekir"]]));
+
+        var response = await PostAsync(
+            client, Guid.NewGuid(), null, null, [("sourceProfile", "EVet")], ("file", "evet.xlsx", bytes, XlsxType));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("sourceProfile").GetString().Should().Be("EVet");
+        var tables = json.GetProperty("tables").EnumerateArray().ToList();
+        var customers = tables[0].GetProperty("columns").EnumerateArray().ToList();
+        customers.Select(c => c.GetProperty("suggested").GetString()).Should().Equal("AdSoyad", "MusteriNo", "Telefon");
+        customers.Select(c => c.GetProperty("confidence").GetString()).Should().Equal("Profile", "Profile", "Profile");
+        tables[1].GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("suggested").GetString())
+            .Should().Equal("SahipAdSoyad", "SahipTelefon", "HayvanAdi", "Tur", "Irk");
+
+        var id = json.GetProperty("id").GetGuid();
+        var detail = await (await client.GetAsync($"/api/v1/imports/batches/{id}")).Content.ReadFromJsonAsync<JsonElement>();
+        detail.GetProperty("sourceProfile").GetString().Should().Be("EVet");
+        detail.GetProperty("tables")[0].GetProperty("columns")[0].GetProperty("confidence").GetString().Should().Be("Profile");
+
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).SourceProfile.Should().Be(ImportSourceProfile.EVet);
+    }
+
+    [Fact]
+    public async Task Without_Source_Profile_Same_File_Should_Use_General_Synonyms_Only()
+    {
+        var ctx = await SeedAsync();
+        var bytes = Workbook(("Musteriler", [["ADI", "Gsm"], [$"Ayşe {Guid.NewGuid():N}", "05321234567"]]));
+
+        var response = await PostAsync(ClientFor(ctx.Token), Guid.NewGuid(), null, null, ("file", "genel.xlsx", bytes, XlsxType));
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("sourceProfile").GetString().Should().Be("Generic");
+        json.GetProperty("tables")[0].GetProperty("columns").EnumerateArray()
+            .Select(c => (c.GetProperty("suggested").GetString(), c.GetProperty("confidence").GetString()))
+            .Should().Equal((null, "None"), ("Telefon", "Alias"));
+    }
+
+    [Fact]
+    public async Task Invalid_Source_Profile_Or_Changed_Profile_On_Replay_Should_Be_Rejected()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var bytes = Workbook(("Musteriler", [["AdSoyad"], [$"Ayşe {Guid.NewGuid():N}"]]));
+
+        var invalid = await PostAsync(client, Guid.NewGuid(), null, null, [("sourceProfile", "Vetinity")], ("file", "x.xlsx", bytes, XlsxType));
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var requestId = Guid.NewGuid();
+        (await PostAsync(client, requestId, null, null, [("sourceProfile", "Kolayvet")], ("file", "x.xlsx", bytes, XlsxType)))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+        (await PostAsync(client, requestId, null, null, [("sourceProfile", "Kolayvet")], ("file", "x.xlsx", bytes, XlsxType)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        var changed = await PostAsync(client, requestId, null, null, [("sourceProfile", "EVet")], ("file", "x.xlsx", bytes, XlsxType));
+        changed.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(changed)).Should().Be("Imports.RequestIdConflict");
+    }
+
+    [Fact]
+    public async Task Source_Profiles_Endpoint_Should_List_Unverified_Profiles_And_Require_Permission()
+    {
+        var ctx = await SeedAsync();
+
+        var response = await ClientFor(ctx.Token).GetAsync("/api/v1/imports/source-profiles");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var profiles = (await response.Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray().ToList();
+        profiles.Select(p => p.GetProperty("code").GetString()).Should().Equal("Generic", "Kolayvet", "EVet");
+        profiles.Should().OnlyContain(p => !p.GetProperty("verified").GetBoolean());
+        profiles[2].GetProperty("mappings").EnumerateArray().Should().OnlyContain(m => !m.GetProperty("verified").GetBoolean());
+
+        (await ClientFor(await TokenAsync(ctx, new[] { "Clients.Read" })).GetAsync("/api/v1/imports/source-profiles"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     // ---------------------------------------------------------------- Yardımcılar
 
     private static byte[] Workbook(params (string Sheet, object?[][] Rows)[] sheets)
