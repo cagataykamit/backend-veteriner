@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,7 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 
         b.Property(x => x.Currency).IsRequired().HasMaxLength(3);
         b.Property(x => x.Method).IsRequired();
+        b.Property(x => x.CashRegisterId);
         b.Property(x => x.PaidAtUtc).IsRequired();
         b.Property(x => x.Notes).HasMaxLength(4000);
 
@@ -57,6 +59,7 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.HasIndex(x => new { x.TenantId, x.PetId });
         b.HasIndex(x => new { x.TenantId, x.PaidAtUtc });
         b.HasIndex(x => new { x.TenantId, x.Method });
+        b.HasOne<CashRegister>().WithMany().HasForeignKey(x => x.CashRegisterId).OnDelete(DeleteBehavior.Restrict);
 
         // Bugün/randevu ödeme eşleştirmesi (randevu ve muayene kimlikleriyle), kiracı + iptal durumu üzerinden kapsayıcı
         // (PERFORMANCE_FINDINGS §5 #4).

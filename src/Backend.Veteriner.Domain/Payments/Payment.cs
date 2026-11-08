@@ -29,6 +29,12 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
     public string Currency { get; private set; } = default!;
 
     public PaymentMethod Method { get; private set; }
+
+    /// <summary>
+    /// Nakdin girdiği kasa (TIER-008); yalnız nakitte dolu olabilir. Nakitte boşsa (eski kayıt, örnek veri) kliniğin Ana kasasıdır.
+    /// </summary>
+    public Guid? CashRegisterId { get; private set; }
+
     public DateTime PaidAtUtc { get; private set; }
     public string? Notes { get; private set; }
 
@@ -158,6 +164,10 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
                 "Ücrete tahsis edilmiş ödemenin tutarı, müşterisi, kliniği veya para birimi değiştirilemez.");
         }
 
+        // Kasa yalnız nakitte ve kendi kliniğinde anlamlıdır; yöntem ya da klinik değişince bağ kalkar, nakit Ana kasaya düşer.
+        if (method != PaymentMethod.Cash || clinicId != ClinicId)
+            CashRegisterId = null;
+
         ClinicId = clinicId;
         ClientId = clientId;
         PetId = petId;
@@ -169,6 +179,16 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
         PaidAtUtc = NormalizeUtc(paidAtUtc);
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         MutationSequence++;
+        return Result.Success();
+    }
+
+    /// <summary>Yeni nakit tahsilatın kasası; kart ve havale kasaya bağlanmaz (banka hesapları bu dilimde yok).</summary>
+    public Result AssignCashRegister(Guid? cashRegisterId)
+    {
+        if (cashRegisterId is not null && Method != PaymentMethod.Cash)
+            return Result.Failure("Payments.Validation", "Kasa yalnız nakit ödemede seçilir.");
+
+        CashRegisterId = cashRegisterId;
         return Result.Success();
     }
 

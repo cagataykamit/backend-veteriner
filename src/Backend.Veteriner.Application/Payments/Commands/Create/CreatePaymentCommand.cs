@@ -12,7 +12,8 @@ namespace Backend.Veteriner.Application.Payments.Commands.Create;
 /// Zorunlu: <see cref="ClinicId"/>, <see cref="ClientId"/>, <see cref="Amount"/>, <see cref="Currency"/>, <see cref="Method"/>, <see cref="PaidAtUtc"/>,
 /// <see cref="RequestId"/> (çift istek koruması) ve <see cref="Allocations"/>; tahsis toplamı + <see cref="CreditAmount"/> = <see cref="Amount"/>.
 /// <see cref="CreditAmount"/> > 0 ise fazlası (ya da tahsissiz tamamı, avans) müşteri kredisine yazılır (FIN-005).
-/// Opsiyonel: <see cref="PetId"/>, <see cref="AppointmentId"/>, <see cref="ExaminationId"/>, <see cref="Notes"/>.
+/// Opsiyonel: <see cref="PetId"/>, <see cref="AppointmentId"/>, <see cref="ExaminationId"/>, <see cref="Notes"/>, <see cref="CashRegisterId"/>
+/// (yalnız nakitte; verilmezse kliniğin Ana kasası, TIER-008).
 /// Ödeme, tahsisler ve sayaçlar tek veritabanı işleminde yazılır; hata durumunda hiçbiri kalmaz.
 /// </summary>
 public sealed record CreatePaymentCommand(
@@ -28,7 +29,8 @@ public sealed record CreatePaymentCommand(
     string? Notes,
     Guid RequestId = default,
     IReadOnlyList<PaymentAllocationLineDto>? Allocations = null,
-    decimal CreditAmount = 0m)
+    decimal CreditAmount = 0m,
+    Guid? CashRegisterId = null)
     : IRequest<Result<PaymentCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest, IActivationSignalRequest
 {
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.PaymentCreated;

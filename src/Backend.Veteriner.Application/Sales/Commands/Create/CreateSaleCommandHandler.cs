@@ -205,7 +205,8 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
                     payment.PaidAtUtc ?? nowUtc,
                     payment.Notes,
                     RequestId: sale.Id,
-                    Allocations: [new PaymentAllocationLineDto(chargeId, amount)]),
+                    Allocations: [new PaymentAllocationLineDto(chargeId, amount)],
+                    CashRegisterId: payment.CashRegisterId),
                 ct);
             if (!paid.IsSuccess)
                 return Result<SaleCreateResultDto>.Failure(paid.Error);

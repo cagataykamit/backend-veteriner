@@ -3,6 +3,8 @@ using Backend.Veteriner.Application.Users.Common;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.CareInstructions;
+using Backend.Veteriner.Domain.CashCounts;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clients;
@@ -93,6 +95,7 @@ public static class DataExportTables
     private const string VisitRef = "Bağlı geliş (gelisler.csv Id).";
     private const string ProductRef = "Ürün (urunler.csv Id).";
     private const string Currency = "Para birimi (ISO 4217, ör. TRY).";
+    private const string RegisterRef = "Nakdin kasası (kasalar.csv Id); nakitte boşsa kliniğin Ana kasası.";
 
     public sealed record StaffRow(Guid Id, string? DisplayName, string Email, DateTime JoinedAtUtc);
 
@@ -469,6 +472,7 @@ public static class DataExportTables
                 DataExportColumn<Payment>.Number("Tutar", "Tutar.", x => x.Amount),
                 DataExportColumn<Payment>.Text("ParaBirimi", Currency, x => x.Currency),
                 DataExportColumn<Payment>.Code("Yontem", "Ödeme yöntemi.", x => x.Method),
+                DataExportColumn<Payment>.Id("KasaId", RegisterRef, x => x.CashRegisterId),
                 DataExportColumn<Payment>.Instant("Odeme", "Ödeme zamanı.", x => x.PaidAtUtc),
                 DataExportColumn<Payment>.Number("UcreteDagitilan", "Ücretlere dağıtılan tutar.", x => x.AllocatedAmount),
                 DataExportColumn<Payment>.Number("KredideKalan", "Müşteri kredisine aktarılan tutar.", x => x.CreditedAmount),
@@ -504,6 +508,7 @@ public static class DataExportTables
                 DataExportColumn<ClientCredit>.Instant("Iade", "Müşteriye iade zamanı.", x => x.RefundedAtUtc),
                 DataExportColumn<ClientCredit>.Number("IadeTutari", "İade edilen tutar.", x => x.RefundedAmount),
                 DataExportColumn<ClientCredit>.Code("IadeYontemi", "İade yöntemi.", x => x.RefundMethod),
+                DataExportColumn<ClientCredit>.Id("IadeKasaId", RegisterRef, x => x.RefundCashRegisterId),
                 DataExportColumn<ClientCredit>.Text("IadeNedeni", "İade gerekçesi.", x => x.RefundReason),
                 DataExportColumn<ClientCredit>.Id("IadeEdenId", UserRef, x => x.RefundedByUserId),
                 DataExportColumn<ClientCredit>.Instant("Iptal", "İptal zamanı.", x => x.VoidedAtUtc),
@@ -520,6 +525,66 @@ public static class DataExportTables
                 DataExportColumn<ClientCreditApplication>.Instant("Olusturma", "Kayıt zamanı.", x => x.CreatedAtUtc),
                 DataExportColumn<ClientCreditApplication>.Instant("GeriAlma", "Geri alınma zamanı.", x => x.ReversedAtUtc),
                 DataExportColumn<ClientCreditApplication>.Text("GeriAlmaNedeni", "Geri alma gerekçesi.", x => x.ReverseReason),
+            ]),
+
+        new DataExportTable<CashRegister>("kasalar.csv", "Kasalar",
+            (db, t) => db.CashRegisters.Where(x => x.TenantId == t),
+            [
+                DataExportColumn<CashRegister>.Id("Id", "Kasa kimliği.", x => x.Id),
+                DataExportColumn<CashRegister>.Id("KlinikId", ClinicRef, x => x.ClinicId),
+                DataExportColumn<CashRegister>.Text("Kod", "Klinikte benzersiz kasa kodu.", x => x.Code),
+                DataExportColumn<CashRegister>.Text("Ad", "Kasa adı.", x => x.Name),
+                DataExportColumn<CashRegister>.Boolean("AnaKasa", "Kliniğin Ana kasası mı.", x => x.IsMain),
+                DataExportColumn<CashRegister>.Boolean("Etkin", "Etkin mi.", x => x.IsActive),
+                DataExportColumn<CashRegister>.Instant("Olusturma", "Kayıt zamanı.", x => x.CreatedAtUtc),
+            ]),
+
+        new DataExportTable<CashMovementCategory>("kasa_hareket_turleri.csv", "Kasa giriş/çıkışının gelir/gider türleri",
+            (db, t) => db.CashMovementCategories.Where(x => x.TenantId == t),
+            [
+                DataExportColumn<CashMovementCategory>.Id("Id", "Tür kimliği.", x => x.Id),
+                DataExportColumn<CashMovementCategory>.Text("Ad", "Tür adı.", x => x.Name),
+                DataExportColumn<CashMovementCategory>.Boolean("Etkin", "Etkin mi.", x => x.IsActive),
+            ]),
+
+        new DataExportTable<CashMovement>("kasa_hareketleri.csv", "Kasa giriş/çıkışları ve kasalar arası aktarımlar",
+            (db, t) => db.CashMovements.Where(x => x.TenantId == t),
+            [
+                DataExportColumn<CashMovement>.Id("Id", "Hareket kimliği.", x => x.Id),
+                DataExportColumn<CashMovement>.Id("KlinikId", ClinicRef, x => x.ClinicId),
+                DataExportColumn<CashMovement>.Id("KasaId", "Kasa (kasalar.csv Id).", x => x.CashRegisterId),
+                DataExportColumn<CashMovement>.Code("Tur", "Hareket türü.", x => x.Kind),
+                DataExportColumn<CashMovement>.Date("Tarih", "Hareketin günü.", x => x.BusinessDate),
+                DataExportColumn<CashMovement>.Number("Tutar", "Tutar (yönü türe göre).", x => x.Amount),
+                DataExportColumn<CashMovement>.Text("ParaBirimi", Currency, x => x.Currency),
+                DataExportColumn<CashMovement>.Id("HareketTuruId", "Gelir/gider türü (kasa_hareket_turleri.csv Id).", x => x.CategoryId),
+                DataExportColumn<CashMovement>.Text("Aciklama", "Açıklama.", x => x.Description),
+                DataExportColumn<CashMovement>.Id("AktarimId", "Aktarımın iki bacağını bağlar.", x => x.TransferId),
+                DataExportColumn<CashMovement>.Id("KarsiKasaId", "Aktarımda karşı kasa (kasalar.csv Id).", x => x.CounterpartCashRegisterId),
+                DataExportColumn<CashMovement>.Id("KaydedenId", UserRef, x => x.CreatedByUserId),
+                DataExportColumn<CashMovement>.Instant("Olusturma", "Kayıt zamanı.", x => x.CreatedAtUtc),
+                DataExportColumn<CashMovement>.Instant("Iptal", "İptal zamanı.", x => x.VoidedAtUtc),
+                DataExportColumn<CashMovement>.Text("IptalNedeni", "İptal gerekçesi.", x => x.VoidReason),
+            ]),
+
+        new DataExportTable<CashCount>("kasa_sayimlari.csv", "Günlük kasa sayımları",
+            (db, t) => db.CashCounts.Where(x => x.TenantId == t),
+            [
+                DataExportColumn<CashCount>.Id("Id", "Sayım kimliği.", x => x.Id),
+                DataExportColumn<CashCount>.Id("KlinikId", ClinicRef, x => x.ClinicId),
+                DataExportColumn<CashCount>.Id("KasaId", "Kasa (kasalar.csv Id).", x => x.CashRegisterId),
+                DataExportColumn<CashCount>.Date("Tarih", "Sayılan gün.", x => x.BusinessDate),
+                DataExportColumn<CashCount>.Number("Acilis", "Açılış nakdi.", x => x.OpeningAmount),
+                DataExportColumn<CashCount>.Number("Beklenen", "Kayıt anında kasanın gün neti.", x => x.ExpectedCashAmount),
+                DataExportColumn<CashCount>.Number("Sayilan", "Sayılan nakit.", x => x.CountedAmount),
+                DataExportColumn<CashCount>.Number("Fark", "Sayılan − (açılış + beklenen).", x => x.DifferenceAmount),
+                DataExportColumn<CashCount>.Text("Not", "Açıklama.", x => x.Note),
+                DataExportColumn<CashCount>.Text("ParaBirimi", Currency, x => x.Currency),
+                DataExportColumn<CashCount>.Id("DuzelttigiSayimId", "Yerine geçtiği sayım (kasa_sayimlari.csv Id).", x => x.CorrectsCashCountId),
+                DataExportColumn<CashCount>.Id("KaydedenId", UserRef, x => x.CreatedByUserId),
+                DataExportColumn<CashCount>.Instant("Olusturma", "Kayıt zamanı.", x => x.CreatedAtUtc),
+                DataExportColumn<CashCount>.Instant("Iptal", "İptal zamanı.", x => x.VoidedAtUtc),
+                DataExportColumn<CashCount>.Text("IptalNedeni", "İptal gerekçesi.", x => x.VoidReason),
             ]),
 
         new DataExportTable<Product>("urunler.csv", "Ürünler ve hizmet kalemleri",

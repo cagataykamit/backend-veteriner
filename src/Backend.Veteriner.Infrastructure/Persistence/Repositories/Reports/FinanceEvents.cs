@@ -31,6 +31,9 @@ internal sealed class FinanceEvent
     /// <summary>Ödeme kollarında tahsilatı alan (ilk tahsisi yapan; tahsissiz avansta krediyi oluşturan, FIN-005); eski ödemede null.</summary>
     public Guid? CollectedByUserId { get; init; }
 
+    /// <summary>Ödeme ve kredi iadesi kollarında nakdin kasası (TIER-008); nakitte boşsa Ana kasa.</summary>
+    public Guid? CashRegisterId { get; init; }
+
     public DateTime? PaidAtUtc { get; init; }
     public string? Reason { get; init; }
 
@@ -74,6 +77,8 @@ internal static class FinanceEvents
             events = events.Where(e => e.Method == method);
         if (f.PerformedByUserId is { } userId)
             events = events.Where(e => e.PerformedByUserId == userId);
+        if (f.CashRegister is { } register)
+            events = InCashRegister(events, register);
 
         return events;
     }
@@ -102,6 +107,19 @@ internal static class FinanceEvents
         }
 
         return null;
+    }
+
+    /// <summary>Kasa süzgecinin tek yeri: yalnız nakit; kasası boş nakit Ana kasanındır (<see cref="CashRegisterScope"/>).</summary>
+    private static IQueryable<FinanceEvent> InCashRegister(IQueryable<FinanceEvent> events, CashRegisterScope register)
+    {
+        var cash = PaymentMethod.Cash;
+        events = events.Where(e => e.Method == cash);
+        if (register.CashRegisterId is not { } registerId)
+            return events.Where(e => e.CashRegisterId == null);
+
+        return register.IncludesUnassigned
+            ? events.Where(e => e.CashRegisterId == registerId || e.CashRegisterId == null)
+            : events.Where(e => e.CashRegisterId == registerId);
     }
 
     private static IQueryable<T> InScope<T>(IQueryable<T> q, FinanceEventFilter f) where T : class
@@ -146,6 +164,7 @@ internal static class FinanceEvents
                 IsVoided = c.VoidedAtUtc != null,
                 PerformedByUserId = c.CreatedByUserId,
                 CollectedByUserId = null,
+                CashRegisterId = null,
                 PaidAtUtc = null,
                 Reason = null,
                 Payload = null,
@@ -173,6 +192,7 @@ internal static class FinanceEvents
                 IsVoided = true,
                 PerformedByUserId = c.VoidedByUserId,
                 CollectedByUserId = null,
+                CashRegisterId = null,
                 PaidAtUtc = null,
                 Reason = c.VoidReason,
                 Payload = null,
@@ -202,6 +222,7 @@ internal static class FinanceEvents
                 IsVoided = c.VoidedAtUtc != null,
                 PerformedByUserId = a.ActorUserId,
                 CollectedByUserId = null,
+                CashRegisterId = null,
                 PaidAtUtc = null,
                 Reason = null,
                 Payload = a.RequestPayload,
@@ -232,6 +253,7 @@ internal static class FinanceEvents
                 IsVoided = x.Payment.VoidedAtUtc != null,
                 PerformedByUserId = x.Collector,
                 CollectedByUserId = x.Collector,
+                CashRegisterId = x.Payment.CashRegisterId,
                 PaidAtUtc = x.Payment.PaidAtUtc,
                 Reason = null,
                 Payload = null,
@@ -262,6 +284,7 @@ internal static class FinanceEvents
                 IsVoided = true,
                 PerformedByUserId = x.Payment.VoidedByUserId,
                 CollectedByUserId = x.Collector,
+                CashRegisterId = x.Payment.CashRegisterId,
                 PaidAtUtc = x.Payment.PaidAtUtc,
                 Reason = x.Payment.VoidReason,
                 Payload = null,
@@ -290,6 +313,7 @@ internal static class FinanceEvents
                 IsVoided = false,
                 PerformedByUserId = c.RefundedByUserId,
                 CollectedByUserId = null,
+                CashRegisterId = c.RefundCashRegisterId,
                 PaidAtUtc = null,
                 Reason = c.RefundReason,
                 Payload = null,
@@ -321,6 +345,7 @@ internal static class FinanceEvents
                 IsVoided = p.VoidedAtUtc != null,
                 PerformedByUserId = a.ActorUserId,
                 CollectedByUserId = null,
+                CashRegisterId = p.CashRegisterId,
                 PaidAtUtc = p.PaidAtUtc,
                 Reason = null,
                 Payload = a.RequestPayload,

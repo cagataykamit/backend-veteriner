@@ -107,7 +107,7 @@ public sealed class ClientCreditsController : ControllerBase
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
-        var result = await _mediator.Send(new RefundClientCreditCommand(clientId, creditId, body.Reason, body.Method), ct);
+        var result = await _mediator.Send(new RefundClientCreditCommand(clientId, creditId, body.Reason, body.Method, body.CashRegisterId), ct);
         return result.ToActionResult(this);
     }
 }
@@ -118,4 +118,5 @@ public sealed record ClientCreditReasonBody(string? Reason);
 
 public sealed record RefundClientCreditBody(
     string? Reason,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] PaymentMethod Method);
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] PaymentMethod Method,
+    Guid? CashRegisterId = null);

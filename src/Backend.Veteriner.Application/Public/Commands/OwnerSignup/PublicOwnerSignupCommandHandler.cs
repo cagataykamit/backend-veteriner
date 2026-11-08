@@ -10,6 +10,7 @@ using Backend.Veteriner.Application.Tenants.ExampleClinic;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.SalesPartners;
@@ -45,6 +46,8 @@ public sealed class PublicOwnerSignupCommandHandler
     private readonly IExampleClinicLoader _exampleClinic;
     private readonly ILogger<PublicOwnerSignupCommandHandler> _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly IRepository<CashRegister> _cashRegistersWrite;
+    private readonly IRepository<CashMovementCategory> _cashCategoriesWrite;
 
     public PublicOwnerSignupCommandHandler(
         IReadRepository<User> usersRead,
@@ -65,6 +68,8 @@ public sealed class PublicOwnerSignupCommandHandler
         IUnitOfWork uow,
         IExampleClinicLoader exampleClinic,
         TimeProvider timeProvider,
+        IRepository<CashRegister> cashRegistersWrite,
+        IRepository<CashMovementCategory> cashCategoriesWrite,
         ILogger<PublicOwnerSignupCommandHandler>? logger = null)
     {
         _usersRead = usersRead;
@@ -86,6 +91,8 @@ public sealed class PublicOwnerSignupCommandHandler
         _exampleClinic = exampleClinic;
         _logger = logger ?? NullLogger<PublicOwnerSignupCommandHandler>.Instance;
         _timeProvider = timeProvider;
+        _cashRegistersWrite = cashRegistersWrite;
+        _cashCategoriesWrite = cashCategoriesWrite;
     }
 
     public async ValueTask<Result<PublicOwnerSignupResultDto>> Handle(PublicOwnerSignupCommand request, CancellationToken ct)
@@ -187,6 +194,9 @@ public sealed class PublicOwnerSignupCommandHandler
         await _clinicsWrite.AddAsync(clinic, ct);
         await _userTenantsWrite.AddAsync(new UserTenant(user.Id, tenant.Id, utcNow), ct);
         await _userClinicsWrite.AddAsync(new UserClinic(user.Id, clinic.Id, utcNow), ct);
+        // Kasa (TIER-008): Ana kasa ve varsayılan gelir/gider türleri kiracıyla birlikte yazılır.
+        await _cashRegistersWrite.AddAsync(CashRegister.CreateMain(tenant.Id, clinic.Id, utcNow), ct);
+        await _cashCategoriesWrite.AddRangeAsync(CashMovementCategory.CreateDefaults(tenant.Id, utcNow), ct);
         await _userOperationClaims.AddAsync(new UserOperationClaim(user.Id, adminClaim.Id), ct);
         await _legalAcceptancesWrite.AddRangeAsync(
             LegalDocumentCatalog.CreateAcceptances(user.Id, tenant.Id, requiredLegalDocuments, utcNow), ct);

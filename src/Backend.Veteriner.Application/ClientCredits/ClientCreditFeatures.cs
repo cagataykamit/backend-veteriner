@@ -1,10 +1,13 @@
 using System.Text.Json.Serialization;
+using Backend.Veteriner.Application.CashRegisters;
 using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Finance;
 using Backend.Veteriner.Application.Payments.Access;
+using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clients;
@@ -74,8 +77,9 @@ public sealed record ReverseClientCreditApplicationCommand(Guid ClientId, Guid A
     public string? AuditTarget => $"ApplicationId={ApplicationId}";
 }
 
-/// <summary>Kalan kredinin tamamını iade eder (FIN-005 K6); <c>Payments.Correct</c>.</summary>
-public sealed record RefundClientCreditCommand(Guid ClientId, Guid CreditId, string? Reason, PaymentMethod Method)
+/// <summary>Kalan kredinin tamamını iade eder (FIN-005 K6); <c>Payments.Correct</c>. Nakit iadede kasa seçilebilir (TIER-008): verilmezse
+/// Ana kasa; kart ve havalede kasa yok.</summary>
+public sealed record RefundClientCreditCommand(Guid ClientId, Guid CreditId, string? Reason, PaymentMethod Method, Guid? CashRegisterId = null)
     : IRequest<Result<ClientCreditDto>>, IAuditableRequest
 {
     public string AuditAction => "ClientCredit.Refund";
@@ -337,6 +341,8 @@ public sealed class RefundClientCreditCommandHandler : IRequestHandler<RefundCli
     private readonly IReadRepository<ClientCreditApplication> _applications;
     private readonly IReadRepository<Charge> _charges;
     private readonly TimeProvider _timeProvider;
+    private readonly IReadRepository<CashRegister> _cashRegisters;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public RefundClientCreditCommandHandler(
         ITenantContext tenantContext,
@@ -347,7 +353,9 @@ public sealed class RefundClientCreditCommandHandler : IRequestHandler<RefundCli
         IRepository<ClientCredit> credits,
         IReadRepository<ClientCreditApplication> applications,
         IReadRepository<Charge> charges,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IReadRepository<CashRegister> cashRegisters,
+        TenantPlanFeatureEvaluator planFeatures)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -358,6 +366,8 @@ public sealed class RefundClientCreditCommandHandler : IRequestHandler<RefundCli
         _applications = applications;
         _charges = charges;
         _timeProvider = timeProvider;
+        _cashRegisters = cashRegisters;
+        _planFeatures = planFeatures;
     }
 
     public async ValueTask<Result<ClientCreditDto>> Handle(RefundClientCreditCommand request, CancellationToken ct)
@@ -375,7 +385,21 @@ public sealed class RefundClientCreditCommandHandler : IRequestHandler<RefundCli
         if (!access.IsSuccess)
             return Result<ClientCreditDto>.Failure(access.Error);
 
-        var refunded = credit.Refund(userId, request.Reason, request.Method, _timeProvider.GetUtcNow().UtcDateTime);
+        Guid? cashRegisterId = null;
+        if (request.Method == PaymentMethod.Cash)
+        {
+            var register = await CashRegisterRules.ResolveForCashAsync(
+                _cashRegisters, _planFeatures, tenantId, credit.ClinicId, request.CashRegisterId, ct);
+            if (!register.IsSuccess)
+                return Result<ClientCreditDto>.Failure(register.Error);
+            cashRegisterId = register.Value;
+        }
+        else
+        {
+            cashRegisterId = request.CashRegisterId;
+        }
+
+        var refunded = credit.Refund(userId, request.Reason, request.Method, _timeProvider.GetUtcNow().UtcDateTime, cashRegisterId);
         if (!refunded.IsSuccess)
             return Result<ClientCreditDto>.Failure(refunded.Error);
 

@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -16,19 +17,25 @@ public sealed class CreateClinicCommandHandler : IRequestHandler<CreateClinicCom
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IRepository<Clinic> _clinicsWrite;
     private readonly TenantPlanFeatureEvaluator _planFeatures;
+    private readonly IRepository<CashRegister> _cashRegisters;
+    private readonly TimeProvider _timeProvider;
 
     public CreateClinicCommandHandler(
         ITenantContext tenantContext,
         IReadRepository<Tenant> tenants,
         IReadRepository<Clinic> clinicsRead,
         IRepository<Clinic> clinicsWrite,
-        TenantPlanFeatureEvaluator planFeatures)
+        TenantPlanFeatureEvaluator planFeatures,
+        IRepository<CashRegister> cashRegisters,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
         _clinicsRead = clinicsRead;
         _clinicsWrite = clinicsWrite;
         _planFeatures = planFeatures;
+        _cashRegisters = cashRegisters;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<Guid>> Handle(CreateClinicCommand request, CancellationToken ct)
@@ -71,6 +78,9 @@ public sealed class CreateClinicCommandHandler : IRequestHandler<CreateClinicCom
             request.Description,
             request.District);
         await _clinicsWrite.AddAsync(clinic, ct);
+
+        // Her klinikte silinemeyen Ana kasa (TIER-008); klinikle aynı SaveChanges.
+        await _cashRegisters.AddAsync(CashRegister.CreateMain(tenantId, clinic.Id, _timeProvider.GetUtcNow().UtcDateTime), ct);
         await _clinicsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(clinic.Id);
     }

@@ -228,6 +228,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Kasa (TIER-008): pasif kasaya yeni hareket girilmez; Ana kasa pasife alınamaz. Tanımın durumu ile çakışma.
+        if (normalized is "cashregisters.inactive" or "cashregisters.mainregisterlocked")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Tüm veri dışa aktarma (DATA_EXPORT_API_CONTRACT.md §5): açık iş var, talep sınırı dolu ya da paket hazır değil;
         // süresi dolan paket 410.
         if (normalized is "dataexports.anotherjobrunning" or "dataexports.limitreached" or "dataexports.notready")

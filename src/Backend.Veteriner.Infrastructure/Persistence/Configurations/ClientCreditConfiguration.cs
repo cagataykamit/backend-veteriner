@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clients;
@@ -37,12 +38,14 @@ public sealed class ClientCreditConfiguration : IEntityTypeConfiguration<ClientC
         b.Property(x => x.RefundedByUserId);
         b.Property(x => x.RefundedAmount).HasPrecision(18, 2);
         b.Property(x => x.RefundMethod);
+        b.Property(x => x.RefundCashRegisterId);
         b.Property(x => x.RefundReason).HasMaxLength(CorrectionReason.MaxLength);
         b.Property(x => x.VoidedAtUtc);
         b.Property(x => x.MutationSequence).IsRequired().HasDefaultValue(0L).IsConcurrencyToken();
 
         b.HasOne<Payment>().WithMany().HasForeignKey(x => x.SourcePaymentId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<CashRegister>().WithMany().HasForeignKey(x => x.RefundCashRegisterId).OnDelete(DeleteBehavior.Restrict);
 
         b.HasIndex(x => new { x.TenantId, x.ClientId, x.ClinicId });
 

@@ -174,6 +174,20 @@ public static class PermissionCatalog
         public const string Correct = "CashCounts.Correct";
     }
 
+    /// <summary>Kasa tanımları ve gelir/gider türleri (TIER-008): okuma; tanım ve hareket iptali yönetici düzeyinde.</summary>
+    public static class CashRegisters
+    {
+        public const string Read = "CashRegisters.Read";
+        public const string Manage = "CashRegisters.Manage";
+    }
+
+    /// <summary>Kasa giriş/çıkışı ve kasalar arası aktarım (TIER-008): kayıt ve gerekçeli iptal ayrı.</summary>
+    public static class CashMovements
+    {
+        public const string Create = "CashMovements.Create";
+        public const string Void = "CashMovements.Void";
+    }
+
     public static class Administrations
     {
         public const string Read = "Administrations.Read";
@@ -416,6 +430,11 @@ public static class PermissionCatalog
         new(CashCounts.Read, "Günlük kasa sayımını ve geçmiş sayımları görüntüleme yetkisi", "CashCounts"),
         new(CashCounts.Create, "Günlük kasa sayımını kaydetme yetkisi", "CashCounts"),
         new(CashCounts.Correct, "Kasa sayımını gerekçeyle düzeltme/iptal yetkisi", "CashCounts"),
+
+        new(CashRegisters.Read, "Kasaları, gelir/gider türlerini, kasa hareketlerini ve kasa raporunu görüntüleme yetkisi", "CashRegisters"),
+        new(CashRegisters.Manage, "Kasa ve gelir/gider türü tanımlama, düzenleme ve pasife alma yetkisi", "CashRegisters"),
+        new(CashMovements.Create, "Kasa giriş/çıkışı ve kasalar arası aktarım kaydetme yetkisi", "CashMovements"),
+        new(CashMovements.Void, "Kasa hareketini ve aktarımı gerekçeyle iptal etme yetkisi", "CashMovements"),
 
         new(Administrations.Read, "Uygulama kayıtlarını listeleme ve görüntüleme yetkisi", "Administrations"),
         new(Administrations.Create, "Hastaya uygulanan ürünü kaydetme yetkisi (stok düşer)", "Administrations"),

@@ -22,7 +22,7 @@ public static class SubscriptionPlanCatalog
             new HashSet<PlanFeature>
             {
                 PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests, PlanFeature.AutomatedReminders, PlanFeature.AdvancedReports,
-                PlanFeature.VaccinationWizard, PlanFeature.MobileBarcode, PlanFeature.Waitlist,
+                PlanFeature.VaccinationWizard, PlanFeature.MobileBarcode, PlanFeature.Waitlist, PlanFeature.CashManagement,
             }),
         new(SubscriptionPlanCode.Premium, "Premium", "Kurumsal özellikler.", 15,
             new HashSet<PlanFeature>

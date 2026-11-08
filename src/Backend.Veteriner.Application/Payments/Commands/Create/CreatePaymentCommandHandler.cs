@@ -1,4 +1,7 @@
 ﻿using Backend.Veteriner.Application.Appointments.Specs;
+using Backend.Veteriner.Application.CashRegisters;
+using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -45,6 +48,8 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
     private readonly TimeProvider _timeProvider;
     private readonly IPaymentIntegrationEventOutbox _eventOutbox;
     private readonly IRepository<ClientCredit> _creditsWrite;
+    private readonly IReadRepository<CashRegister> _cashRegisters;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public CreatePaymentCommandHandler(
         ITenantContext tenantContext,
@@ -63,9 +68,13 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         IRepository<PaymentAllocation> allocationsWrite,
         TimeProvider timeProvider,
         IPaymentIntegrationEventOutbox eventOutbox,
-        IRepository<ClientCredit> creditsWrite)
+        IRepository<ClientCredit> creditsWrite,
+        IReadRepository<CashRegister> cashRegisters,
+        TenantPlanFeatureEvaluator planFeatures)
     {
         _creditsWrite = creditsWrite;
+        _cashRegisters = cashRegisters;
+        _planFeatures = planFeatures;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clientContext = clientContext;
@@ -247,6 +256,21 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         if (_clientContext.UserId is not { } userId)
             return Fail("Auth.UserContextMissing", "Kullanıcı bağlamı bulunamadı.");
 
+        // Nakit kasaya girer (TIER-008): seçilmezse Ana kasa; kart ve havale kasaya bağlanmaz.
+        Guid? cashRegisterId = null;
+        if (request.Method == PaymentMethod.Cash)
+        {
+            var register = await CashRegisterRules.ResolveForCashAsync(
+                _cashRegisters, _planFeatures, tenantId, effectiveClinicId, request.CashRegisterId, ct);
+            if (!register.IsSuccess)
+                return Result<PaymentCreateResultDto>.Failure(register.Error);
+            cashRegisterId = register.Value;
+        }
+        else if (request.CashRegisterId is not null)
+        {
+            return Fail("Payments.Validation", "Kasa yalnız nakit ödemede seçilir.");
+        }
+
         // İzlenen ücretler: tahsis sayacı concurrency token ile güncellenir (iki kullanıcı çakışması 409).
         var chargeIds = allocationLines.Select(l => l.ChargeId).Distinct().ToArray();
         var charges = chargeIds.Length == 0
@@ -280,6 +304,7 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
             request.Notes,
             request.RequestId,
             fingerprint);
+        payment.AssignCashRegister(cashRegisterId);
 
         // 1) Önce yalnızca ödeme yazılır: RequestId benzersiz indeksi çift isteği burada eler ve ücretlere dokunulmamış olur.
         try

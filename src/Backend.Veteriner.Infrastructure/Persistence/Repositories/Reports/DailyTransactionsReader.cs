@@ -88,7 +88,20 @@ public sealed class DailyTransactionsReader : IDailyTransactionsReader, ICashEve
             e.PerformedByUserId,
             names.User(e.PerformedByUserId),
             e.Reason,
-            e.Kind == DailyTransactionKind.CreditRefund)).ToList();
+            e.Kind == DailyTransactionKind.CreditRefund,
+            e.CashRegisterId)).ToList();
+    }
+
+    public async Task<CashEventTotals> SumAsync(FinanceEventFilter filter, CancellationToken ct = default)
+    {
+        var groups = await FinanceEvents.Query(_db, filter, CashKinds)
+            .GroupBy(e => e.Kind)
+            .Select(g => new { Kind = g.Key, Sum = g.Sum(e => e.Amount) ?? 0m })
+            .ToListAsync(ct);
+
+        decimal Amount(DailyTransactionKind k) => groups.Where(g => g.Kind == k).Sum(g => g.Sum);
+        return new CashEventTotals(
+            Amount(DailyTransactionKind.Payment), Amount(DailyTransactionKind.PaymentVoid), Amount(DailyTransactionKind.CreditRefund));
     }
 
     private static DailyTransactionTotalsDto BuildTotals(IEnumerable<(DailyTransactionKind Kind, bool IsDirectSale, int Count, decimal Sum)> groups)
